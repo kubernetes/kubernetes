@@ -18,6 +18,7 @@ package internalclientset
 
 import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned"
 	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned"
 	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
@@ -50,6 +51,11 @@ func FromUnversionedClient(c *unversioned.Client) *internalclientset.Clientset {
 		clientset.AutoscalingClient = unversionedautoscaling.New(c.AutoscalingClient.RESTClient)
 	} else {
 		clientset.AutoscalingClient = unversionedautoscaling.New(nil)
+	}
+	if c != nil && c.AuthenticationClient != nil {
+		clientset.AuthenticationClient = unversionedauthentication.New(c.AuthenticationClient.RESTClient)
+	} else {
+		clientset.AuthenticationClient = unversionedauthentication.New(nil)
 	}
 	if c != nil && c.DiscoveryClient != nil {
 		clientset.DiscoveryClient = discovery.NewDiscoveryClient(c.DiscoveryClient.RESTClient)

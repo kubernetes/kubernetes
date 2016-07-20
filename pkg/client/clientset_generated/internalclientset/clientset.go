@@ -18,6 +18,7 @@ package internalclientset
 
 import (
 	"github.com/golang/glog"
+	unversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned"
 	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned"
 	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
@@ -32,6 +33,7 @@ type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Core() unversionedcore.CoreInterface
 	Extensions() unversionedextensions.ExtensionsInterface
+	Authentication() unversionedauthentication.AuthenticationInterface
 	Autoscaling() unversionedautoscaling.AutoscalingInterface
 	Batch() unversionedbatch.BatchInterface
 	Rbac() unversionedrbac.RbacInterface
@@ -43,6 +45,7 @@ type Clientset struct {
 	*discovery.DiscoveryClient
 	*unversionedcore.CoreClient
 	*unversionedextensions.ExtensionsClient
+	*unversionedauthentication.AuthenticationClient
 	*unversionedautoscaling.AutoscalingClient
 	*unversionedbatch.BatchClient
 	*unversionedrbac.RbacClient
@@ -62,6 +65,14 @@ func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
 		return nil
 	}
 	return c.ExtensionsClient
+}
+
+// Authentication retrieves the AuthenticationClient
+func (c *Clientset) Authentication() unversionedauthentication.AuthenticationInterface {
+	if c == nil {
+		return nil
+	}
+	return c.AuthenticationClient
 }
 
 // Autoscaling retrieves the AutoscalingClient
@@ -109,6 +120,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	clientset.AuthenticationClient, err = unversionedauthentication.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 	clientset.AutoscalingClient, err = unversionedautoscaling.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
@@ -136,6 +151,7 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = unversionedcore.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = unversionedextensions.NewForConfigOrDie(c)
+	clientset.AuthenticationClient = unversionedauthentication.NewForConfigOrDie(c)
 	clientset.AutoscalingClient = unversionedautoscaling.NewForConfigOrDie(c)
 	clientset.BatchClient = unversionedbatch.NewForConfigOrDie(c)
 	clientset.RbacClient = unversionedrbac.NewForConfigOrDie(c)
@@ -149,6 +165,7 @@ func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = unversionedcore.New(c)
 	clientset.ExtensionsClient = unversionedextensions.New(c)
+	clientset.AuthenticationClient = unversionedauthentication.New(c)
 	clientset.AutoscalingClient = unversionedautoscaling.New(c)
 	clientset.BatchClient = unversionedbatch.New(c)
 	clientset.RbacClient = unversionedrbac.New(c)

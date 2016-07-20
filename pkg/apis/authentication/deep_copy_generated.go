@@ -28,43 +28,47 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		DeepCopy_authenticationk8sio_TokenReview,
-		DeepCopy_authenticationk8sio_TokenReviewSpec,
-		DeepCopy_authenticationk8sio_TokenReviewStatus,
-		DeepCopy_authenticationk8sio_UserInfo,
+		DeepCopy_authentication_TokenReview,
+		DeepCopy_authentication_TokenReviewSpec,
+		DeepCopy_authentication_TokenReviewStatus,
+		DeepCopy_authentication_UserInfo,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
 	}
 }
 
-func DeepCopy_authenticationk8sio_TokenReview(in TokenReview, out *TokenReview, c *conversion.Cloner) error {
+func DeepCopy_authentication_TokenReview(in TokenReview, out *TokenReview, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_authenticationk8sio_TokenReviewSpec(in.Spec, &out.Spec, c); err != nil {
+	if err := api.DeepCopy_api_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
-	if err := DeepCopy_authenticationk8sio_TokenReviewStatus(in.Status, &out.Status, c); err != nil {
+	if err := DeepCopy_authentication_TokenReviewSpec(in.Spec, &out.Spec, c); err != nil {
+		return err
+	}
+	if err := DeepCopy_authentication_TokenReviewStatus(in.Status, &out.Status, c); err != nil {
 		return err
 	}
 	return nil
 }
 
-func DeepCopy_authenticationk8sio_TokenReviewSpec(in TokenReviewSpec, out *TokenReviewSpec, c *conversion.Cloner) error {
+func DeepCopy_authentication_TokenReviewSpec(in TokenReviewSpec, out *TokenReviewSpec, c *conversion.Cloner) error {
 	out.Token = in.Token
 	return nil
 }
 
-func DeepCopy_authenticationk8sio_TokenReviewStatus(in TokenReviewStatus, out *TokenReviewStatus, c *conversion.Cloner) error {
+func DeepCopy_authentication_TokenReviewStatus(in TokenReviewStatus, out *TokenReviewStatus, c *conversion.Cloner) error {
 	out.Authenticated = in.Authenticated
-	if err := DeepCopy_authenticationk8sio_UserInfo(in.User, &out.User, c); err != nil {
+	if err := DeepCopy_authentication_UserInfo(in.User, &out.User, c); err != nil {
 		return err
 	}
+	out.Error = in.Error
 	return nil
 }
 
-func DeepCopy_authenticationk8sio_UserInfo(in UserInfo, out *UserInfo, c *conversion.Cloner) error {
+func DeepCopy_authentication_UserInfo(in UserInfo, out *UserInfo, c *conversion.Cloner) error {
 	out.Username = in.Username
 	out.UID = in.UID
 	if in.Groups != nil {
@@ -76,12 +80,12 @@ func DeepCopy_authenticationk8sio_UserInfo(in UserInfo, out *UserInfo, c *conver
 	}
 	if in.Extra != nil {
 		in, out := in.Extra, &out.Extra
-		*out = make(map[string][]string)
+		*out = make(map[string]ExtraValue)
 		for key, val := range in {
 			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
 			} else {
-				(*out)[key] = newVal.([]string)
+				(*out)[key] = newVal.(ExtraValue)
 			}
 		}
 	} else {

@@ -23,6 +23,7 @@ package v1beta1
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -40,6 +41,9 @@ func init() {
 
 func DeepCopy_v1beta1_TokenReview(in TokenReview, out *TokenReview, c *conversion.Cloner) error {
 	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	if err := v1.DeepCopy_v1_ObjectMeta(in.ObjectMeta, &out.ObjectMeta, c); err != nil {
 		return err
 	}
 	if err := DeepCopy_v1beta1_TokenReviewSpec(in.Spec, &out.Spec, c); err != nil {
@@ -61,6 +65,7 @@ func DeepCopy_v1beta1_TokenReviewStatus(in TokenReviewStatus, out *TokenReviewSt
 	if err := DeepCopy_v1beta1_UserInfo(in.User, &out.User, c); err != nil {
 		return err
 	}
+	out.Error = in.Error
 	return nil
 }
 
@@ -76,12 +81,12 @@ func DeepCopy_v1beta1_UserInfo(in UserInfo, out *UserInfo, c *conversion.Cloner)
 	}
 	if in.Extra != nil {
 		in, out := in.Extra, &out.Extra
-		*out = make(map[string][]string)
+		*out = make(map[string]ExtraValue)
 		for key, val := range in {
 			if newVal, err := c.DeepCopy(val); err != nil {
 				return err
 			} else {
-				(*out)[key] = newVal.([]string)
+				(*out)[key] = newVal.(ExtraValue)
 			}
 		}
 	} else {
