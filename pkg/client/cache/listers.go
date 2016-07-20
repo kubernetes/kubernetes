@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -669,4 +670,26 @@ func (s *StoreToPetSetLister) GetPodPetSets(pod *api.Pod) (psList []apps.PetSet,
 		err = fmt.Errorf("could not find PetSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// StoreToCertificateRequestLister gives a store List and Exists methods. The store must contain only CertificateRequests.
+type StoreToCertificateRequestLister struct {
+	Store
+}
+
+// Exists checks if the given csr exists in the store.
+func (s *StoreToCertificateRequestLister) Exists(csr *certificates.CertificateSigningRequest) (bool, error) {
+	_, exists, err := s.Store.Get(csr)
+	if err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StoreToCertificateRequestLister lists all csrs in the store.
+func (s *StoreToCertificateRequestLister) List() (csrs certificates.CertificateSigningRequestList, err error) {
+	for _, c := range s.Store.List() {
+		csrs.Items = append(csrs.Items, *(c.(*certificates.CertificateSigningRequest)))
+	}
+	return csrs, nil
 }

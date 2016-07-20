@@ -224,6 +224,71 @@
 			"Rev": "ee4a0888a9abe7eefe5a0992ca4cb06864839873"
 		},
 		{
+			"ImportPath": "github.com/cloudflare/cfssl/auth",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/certdb",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/config",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/crypto/pkcs7",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/csr",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/errors",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/helpers",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/helpers/derhelpers",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/info",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/log",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/ocsp/config",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/signer",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/cloudflare/cfssl/signer/local",
+			"Comment": "1.2.0",
+			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
 			"ImportPath": "github.com/codegangsta/negroni",
 			"Comment": "v0.1.0-62-g8d75e11",
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
@@ -1126,6 +1191,26 @@
 			"Rev": "51574ec04ff12ca5a50f0935625ec02437191a06"
 		},
 		{
+			"ImportPath": "github.com/google/certificate-transparency/go",
+			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+		},
+		{
+			"ImportPath": "github.com/google/certificate-transparency/go/asn1",
+			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+		},
+		{
+			"ImportPath": "github.com/google/certificate-transparency/go/client",
+			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+		},
+		{
+			"ImportPath": "github.com/google/certificate-transparency/go/x509",
+			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+		},
+		{
+			"ImportPath": "github.com/google/certificate-transparency/go/x509/pkix",
+			"Rev": "af98904302724c29aa6659ca372d41c9687de2b7"
+		},
+		{
 			"ImportPath": "github.com/google/gofuzz",
 			"Rev": "bbcb9da2d746f8bdbd6a936686a0a6067ada0ec5"
 		},
@@ -1329,6 +1414,10 @@
 		{
 			"ImportPath": "github.com/mitchellh/mapstructure",
 			"Rev": "740c764bc6149d3f1806231418adb9f52c11bcbf"
+		},
+		{
+			"ImportPath": "github.com/mreiferson/go-httpclient",
+			"Rev": "31f0106b4474f14bc441575c19d3a5fa21aa1f6c"
 		},
 		{
 			"ImportPath": "github.com/mvdan/xurls",
@@ -1971,15 +2060,27 @@
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/bcrypt",
-			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/blowfish",
-			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/curve25519",
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/pkcs12",
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/pkcs12/internal/rc2",
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
 		},
 		{
 			"ImportPath": "golang.org/x/crypto/ssh",
-			"Rev": "c84e1f8e3a7e322d497cd16c0e8a13c7e127baf3"
+			"Rev": "1f22c0103821b9390939b6776727195525381532"
 		},
 		{
 			"ImportPath": "golang.org/x/exp/inotify",
