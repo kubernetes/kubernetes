@@ -103,15 +103,6 @@ func TmpfsRoot(l *LinuxFactory) error {
 	return nil
 }
 
-// CriuPath returns an option func to configure a LinuxFactory with the
-// provided criupath
-func CriuPath(criupath string) func(*LinuxFactory) error {
-	return func(l *LinuxFactory) error {
-		l.CriuPath = criupath
-		return nil
-	}
-}
-
 // New returns a linux based container factory based in the root directory and
 // configures the factory with the provided option funcs.
 func New(root string, options ...func(*LinuxFactory) error) (Factory, error) {

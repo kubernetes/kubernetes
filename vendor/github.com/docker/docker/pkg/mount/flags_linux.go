@@ -23,7 +23,7 @@ const (
 	SYNCHRONOUS = syscall.MS_SYNCHRONOUS
 
 	// DIRSYNC will force all directory updates within the file system to be done
-	// synchronously. This affects the following system calls: create, link,
+	// synchronously. This affects the following system calls: creat, link,
 	// unlink, symlink, mkdir, rmdir, mknod and rename.
 	DIRSYNC = syscall.MS_DIRSYNC
 

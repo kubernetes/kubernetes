@@ -8,10 +8,7 @@ import (
 const (
 	getTermios = syscall.TIOCGETA
 	setTermios = syscall.TIOCSETA
-)
 
-// Termios magic numbers, passthrough to the ones defined in syscall.
-const (
 	IGNBRK = syscall.IGNBRK
 	PARMRK = syscall.PARMRK
 	INLCR  = syscall.INLCR
@@ -32,7 +29,6 @@ const (
 	IEXTEN = syscall.IEXTEN
 )
 
-// Termios is the Unix API for terminal I/O.
 type Termios struct {
 	Iflag  uint32
 	Oflag  uint32
