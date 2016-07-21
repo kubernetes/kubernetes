@@ -1350,6 +1350,9 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
+	if pod.Status.PodIP == "" {
+		pod.Status.PodIP = podIP
+	}
 	var err error
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
@@ -1522,6 +1525,8 @@ func (kl *Kubelet) makeEnvironmentVariables(pod *api.Pod, container *api.Contain
 						return result, err
 					}
 				}
+
+				format.ExpandConfigMap(configMap, pod)
 				runtimeVal, ok = configMap.Data[key]
 				if !ok {
 					return result, fmt.Errorf("Couldn't find key %v in ConfigMap %v/%v", key, pod.Namespace, name)

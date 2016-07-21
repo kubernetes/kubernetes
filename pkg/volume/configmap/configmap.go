@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	ioutil "k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -155,6 +156,14 @@ func (b *configMapVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		glog.Errorf("Couldn't get configMap %v/%v: %v", b.pod.Namespace, b.source.Name, err)
 		return err
 	}
+
+	//reload the pod
+	pod, err := kubeClient.Core().Pods(b.pod.Namespace).Get(b.pod.Name)
+	if err != nil {
+		glog.Errorf("Couldn't get pod%v/%v: %v", b.pod.Namespace, b.pod.Name, err)
+		return err
+	}
+	format.ExpandConfigMap(configMap, pod)
 
 	totalBytes := totalBytes(configMap)
 	glog.V(3).Infof("Received configMap %v/%v containing (%v) pieces of data, %v total bytes",
