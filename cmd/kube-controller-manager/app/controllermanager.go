@@ -249,11 +249,15 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	nodeController.Run(s.NodeSyncPeriod.Duration)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	serviceController := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
-	if err := serviceController.Run(s.ServiceSyncPeriod.Duration, s.NodeSyncPeriod.Duration); err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
+	if cloud != nil {
+		serviceController := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
+		if err := serviceController.Run(s.ServiceSyncPeriod.Duration, s.NodeSyncPeriod.Duration); err != nil {
+			glog.Fatalf("Failed to start service controller: %v", err)
+		}
+		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+	} else {
+		glog.Warning("no cloud provider provided, services of type LoadBalancer will fail.")
 	}
-	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
 		if cloud == nil {
@@ -408,7 +412,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	volumeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	attachDetachController, attachDetachControllerErr :=
+	attachDetachController, err :=
 		attachdetach.NewAttachDetachController(
 			clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "attachdetach-controller")),
 			podInformer,
@@ -417,12 +421,11 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			pvInformer,
 			cloud,
 			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
-	if attachDetachControllerErr != nil {
-		glog.Fatalf("Failed to start attach/detach controller: %v", attachDetachControllerErr)
-	} else {
-		go attachDetachController.Run(wait.NeverStop)
-		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+	if err != nil {
+		glog.Fatalf("Failed to start attach/detach controller: %v", err)
 	}
+	go attachDetachController.Run(wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	groupVersion = "certificates/v1alpha1"
 	resources, found = resourceMap[groupVersion]
@@ -439,10 +442,9 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 				s.ClusterSigningKeyFile,
 			)
 			if err != nil {
-				glog.Errorf("Failed to start certificate controller: %v", err)
-			} else {
-				go certController.Run(1, wait.NeverStop)
+				glog.Fatalf("Failed to start certificate controller: %v", err)
 			}
+			go certController.Run(1, wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	}
@@ -464,7 +466,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	if len(s.ServiceAccountKeyFile) > 0 {
 		privateKey, err := serviceaccount.ReadPrivateKey(s.ServiceAccountKeyFile)
 		if err != nil {
-			glog.Errorf("Error reading key for service account token controller: %v", err)
+			glog.Fatalf("Error reading key for service account token controller: %v", err)
 		} else {
 			go serviceaccountcontroller.NewTokensController(
 				clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "tokens-controller")),
@@ -492,12 +494,12 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		clientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc)
 		garbageCollector, err := garbagecollector.NewGarbageCollector(clientPool, groupVersionResources)
 		if err != nil {
-			glog.Errorf("Failed to start the generic garbage collector")
-		} else {
-			// TODO: make this a flag of kube-controller-manager
-			workers := int(s.ConcurrentGCSyncs)
-			go garbageCollector.Run(workers, wait.NeverStop)
+			glog.Fatalf("Failed to start the generic garbage collector")
 		}
+		// TODO: make this a flag of kube-controller-manager
+		workers := int(s.ConcurrentGCSyncs)
+		go garbageCollector.Run(workers, wait.NeverStop)
+
 	}
 
 	// run the shared informers
