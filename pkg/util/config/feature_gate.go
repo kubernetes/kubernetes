@@ -36,7 +36,8 @@ const (
 	// allAlpha is a global toggle for alpha features. Per feature key
 	// values override the default set by allAlpha.
 	// e.g. allAlpha=false,newFeature=true will result in newFeature=true
-	allAlpha = "allAlpha"
+	allAlpha             = "allAlpha"
+	dynamicKubeletConfig = "dynamicKubeletConfig"
 )
 
 var (
@@ -45,7 +46,8 @@ var (
 
 	// Default values for recorded features.
 	knownFeatures = map[string]featureInfo{
-		allAlpha: {false, alpha},
+		allAlpha:             {false, alpha},
+		dynamicKubeletConfig: {false, alpha},
 	}
 
 	alpha = prerelease("ALPHA")
@@ -68,6 +70,7 @@ type FeatureGate interface {
 	// alpha: v1.4
 	AllAlpha() bool
 	// TODO: Define accessors for each non-API alpha feature.
+	DynamicKubeletConfig() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -121,6 +124,11 @@ func (f *featureGate) Type() string {
 // AllAlpha returns value for allAlpha.
 func (f *featureGate) AllAlpha() bool {
 	return f.lookup(allAlpha)
+}
+
+// DynamicKubeletConfig returns value for dynamicKubeletConfig
+func (f *featureGate) DynamicKubeletConfig() bool {
+	return f.lookup(dynamicKubeletConfig)
 }
 
 func (f *featureGate) lookup(key string) bool {
