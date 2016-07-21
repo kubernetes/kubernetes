@@ -387,16 +387,23 @@ func toContainerStats2(s *cgroups.Stats, ret *info.ContainerStats) {
 		ret.Memory.ContainerData.Pgmajfault = v
 		ret.Memory.HierarchicalData.Pgmajfault = v
 	}
-
-	workingSet := ret.Memory.Usage
-	if v, ok := s.MemoryStats.Stats["total_inactive_file"]; ok {
+	if v, ok := s.MemoryStats.Stats["total_inactive_anon"]; ok {
+		workingSet := ret.Memory.Usage
 		if workingSet < v {
 			workingSet = 0
 		} else {
 			workingSet -= v
 		}
+
+		if v, ok := s.MemoryStats.Stats["total_inactive_file"]; ok {
+			if workingSet < v {
+				workingSet = 0
+			} else {
+				workingSet -= v
+			}
+		}
+		ret.Memory.WorkingSet = workingSet
 	}
-	ret.Memory.WorkingSet = workingSet
 }
 
 func toContainerStats3(libcontainerStats *libcontainer.Stats, ret *info.ContainerStats) {

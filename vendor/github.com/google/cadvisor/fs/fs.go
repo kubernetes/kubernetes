@@ -99,13 +99,36 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	// Avoid devicemapper container mounts - these are tracked by the ThinPoolWatcher
-	excluded := []string{fmt.Sprintf("%s/devicemapper/mnt", context.Docker.Root)}
 	fsInfo := &RealFsInfo{
-		partitions: processMounts(mounts, excluded),
+		partitions: make(map[string]partition, 0),
 		labels:     make(map[string]string, 0),
 		dmsetup:    devicemapper.NewDmsetupClient(),
+	}
+
+	supportedFsType := map[string]bool{
+		// all ext systems are checked through prefix.
+		"btrfs": true,
+		"xfs":   true,
+		"zfs":   true,
+	}
+	for _, mount := range mounts {
+		var Fstype string
+		if !strings.HasPrefix(mount.Fstype, "ext") && !supportedFsType[mount.Fstype] {
+			continue
+		}
+		// Avoid bind mounts.
+		if _, ok := fsInfo.partitions[mount.Source]; ok {
+			continue
+		}
+		if mount.Fstype == "zfs" {
+			Fstype = mount.Fstype
+		}
+		fsInfo.partitions[mount.Source] = partition{
+			fsType:     Fstype,
+			mountpoint: mount.Mountpoint,
+			major:      uint(mount.Major),
+			minor:      uint(mount.Minor),
+		}
 	}
 
 	fsInfo.addRktImagesLabel(context, mounts)
@@ -116,47 +139,6 @@ func NewFsInfo(context Context) (FsInfo, error) {
 	glog.Infof("Filesystem partitions: %+v", fsInfo.partitions)
 	fsInfo.addSystemRootLabel(mounts)
 	return fsInfo, nil
-}
-
-func processMounts(mounts []*mount.Info, excludedMountpointPrefixes []string) map[string]partition {
-	partitions := make(map[string]partition, 0)
-
-	supportedFsType := map[string]bool{
-		// all ext systems are checked through prefix.
-		"btrfs": true,
-		"xfs":   true,
-		"zfs":   true,
-	}
-
-	for _, mount := range mounts {
-		if !strings.HasPrefix(mount.Fstype, "ext") && !supportedFsType[mount.Fstype] {
-			continue
-		}
-		// Avoid bind mounts.
-		if _, ok := partitions[mount.Source]; ok {
-			continue
-		}
-
-		hasPrefix := false
-		for _, prefix := range excludedMountpointPrefixes {
-			if strings.HasPrefix(mount.Mountpoint, prefix) {
-				hasPrefix = true
-				break
-			}
-		}
-		if hasPrefix {
-			continue
-		}
-
-		partitions[mount.Source] = partition{
-			fsType:     mount.Fstype,
-			mountpoint: mount.Mountpoint,
-			major:      uint(mount.Major),
-			minor:      uint(mount.Minor),
-		}
-	}
-
-	return partitions
 }
 
 // getDockerDeviceMapperInfo returns information about the devicemapper device and "partition" if

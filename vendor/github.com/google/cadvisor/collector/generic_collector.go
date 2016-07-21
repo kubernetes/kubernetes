@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/info/v1"
 )
 
@@ -52,14 +51,12 @@ type collectorInfo struct {
 }
 
 //Returns a new collector using the information extracted from the configfile
-func NewCollector(collectorName string, configFile []byte, metricCountLimit int, containerHandler container.ContainerHandler) (*GenericCollector, error) {
+func NewCollector(collectorName string, configFile []byte, metricCountLimit int) (*GenericCollector, error) {
 	var configInJSON Config
 	err := json.Unmarshal(configFile, &configInJSON)
 	if err != nil {
 		return nil, err
 	}
-
-	configInJSON.Endpoint.configure(containerHandler)
 
 	//TODO : Add checks for validity of config file (eg : Accurate JSON fields)
 
@@ -133,7 +130,7 @@ func (collector *GenericCollector) Collect(metrics map[string][]v1.MetricVal) (t
 	currentTime := time.Now()
 	nextCollectionTime := currentTime.Add(time.Duration(collector.info.minPollingFrequency))
 
-	uri := collector.configFile.Endpoint.URL
+	uri := collector.configFile.Endpoint
 	response, err := http.Get(uri)
 	if err != nil {
 		return nextCollectionTime, nil, err

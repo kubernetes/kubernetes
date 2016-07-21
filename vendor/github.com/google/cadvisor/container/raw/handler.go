@@ -256,11 +256,6 @@ func (self *rawContainerHandler) GetContainerLabels() map[string]string {
 	return map[string]string{}
 }
 
-func (self *rawContainerHandler) GetContainerIPAddress() string {
-	// the IP address for the raw container corresponds to the system ip address.
-	return "127.0.0.1"
-}
-
 func (self *rawContainerHandler) ListContainers(listType container.ListType) ([]info.ContainerReference, error) {
 	return common.ListContainers(self.name, self.cgroupPaths, listType)
 }
