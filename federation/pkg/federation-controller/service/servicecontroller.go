@@ -26,13 +26,13 @@ import (
 	"github.com/golang/glog"
 	v1beta1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federationcache "k8s.io/kubernetes/federation/client/cache"
-	federation_release_1_3 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	release_1_3 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -99,7 +99,7 @@ type serviceCache struct {
 
 type ServiceController struct {
 	dns              dnsprovider.Interface
-	federationClient federation_release_1_3.Interface
+	federationClient federation_release_1_4.Interface
 	federationName   string
 	zoneName         string
 	// each federation should be configured with a single zone (e.g. "mycompany.com")
@@ -124,7 +124,7 @@ type ServiceController struct {
 // New returns a new service controller to keep DNS provider service resources
 // (like Kubernetes Services and DNS server records for service discovery) in sync with the registry.
 
-func New(federationClient federation_release_1_3.Interface, dns dnsprovider.Interface, federationName, zoneName string) *ServiceController {
+func New(federationClient federation_release_1_4.Interface, dns dnsprovider.Interface, federationName, zoneName string) *ServiceController {
 	broadcaster := record.NewBroadcaster()
 	// federationClient event is not supported yet
 	// broadcaster.StartRecordingToSink(&unversioned_core.EventSinkImpl{Interface: kubeClient.Core().Events("")})
@@ -305,7 +305,7 @@ func wantsDNSRecords(service *v1.Service) bool {
 // processServiceForCluster creates or updates service to all registered running clusters,
 // update DNS records and update the service info with DNS entries to federation apiserver.
 // the function returns any error caught
-func (s *ServiceController) processServiceForCluster(cachedService *cachedService, clusterName string, service *v1.Service, client *release_1_3.Clientset) error {
+func (s *ServiceController) processServiceForCluster(cachedService *cachedService, clusterName string, service *v1.Service, client *release_1_4.Clientset) error {
 	glog.V(4).Infof("Process service %s/%s for cluster %s", service.Namespace, service.Name, clusterName)
 	// Create or Update k8s Service
 	err := s.ensureClusterService(cachedService, clusterName, service, client)
@@ -365,7 +365,7 @@ func (s *ServiceController) deleteFederationService(cachedService *cachedService
 	return nil, !retryable
 }
 
-func (s *ServiceController) deleteClusterService(clusterName string, cachedService *cachedService, clientset *release_1_3.Clientset) error {
+func (s *ServiceController) deleteClusterService(clusterName string, cachedService *cachedService, clientset *release_1_4.Clientset) error {
 	service := cachedService.lastState
 	glog.V(4).Infof("Deleting service %s/%s from cluster %s", service.Namespace, service.Name, clusterName)
 	var err error
@@ -382,7 +382,7 @@ func (s *ServiceController) deleteClusterService(clusterName string, cachedServi
 	return err
 }
 
-func (s *ServiceController) ensureClusterService(cachedService *cachedService, clusterName string, service *v1.Service, client *release_1_3.Clientset) error {
+func (s *ServiceController) ensureClusterService(cachedService *cachedService, clusterName string, service *v1.Service, client *release_1_4.Clientset) error {
 	var err error
 	var needUpdate bool
 	for i := 0; i < clientRetryCount; i++ {

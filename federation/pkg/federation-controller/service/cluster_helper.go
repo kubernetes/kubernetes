@@ -23,7 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	cache "k8s.io/kubernetes/pkg/client/cache"
-	release_1_3 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
@@ -37,7 +37,7 @@ import (
 )
 
 type clusterCache struct {
-	clientset *release_1_3.Clientset
+	clientset *release_1_4.Clientset
 	cluster   *v1beta1.Cluster
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
@@ -196,10 +196,10 @@ func (cc *clusterClientCache) addToClientMap(obj interface{}) {
 	}
 }
 
-func newClusterClientset(c *v1beta1.Cluster) (*release_1_3.Clientset, error) {
+func newClusterClientset(c *v1beta1.Cluster) (*release_1_4.Clientset, error) {
 	clusterConfig, err := util.BuildClusterConfig(c)
 	if clusterConfig != nil {
-		clientset := release_1_3.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))
+		clientset := release_1_4.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, UserAgentName))
 		return clientset, nil
 	}
 	return nil, err
