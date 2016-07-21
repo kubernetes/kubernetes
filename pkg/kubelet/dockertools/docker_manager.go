@@ -861,7 +861,7 @@ func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, er
 // Removes the specified image.
 func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
 	// TODO(harryz) currently Runtime interface does not provide other remove options.
-	_, err := dm.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{})
+	_, err := dm.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
 	return err
 }
 
