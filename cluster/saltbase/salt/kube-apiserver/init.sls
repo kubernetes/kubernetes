@@ -19,6 +19,7 @@
 /srv/kubernetes/abac-authz-policy.jsonl:
   file.managed:
     - source: salt://kube-apiserver/abac-authz-policy.jsonl
+    - template: jinja
     - user: root
     - group: root
     - mode: 600
