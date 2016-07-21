@@ -448,6 +448,24 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 					}
 				}
 			}
+			for j := range pod.Spec.InitContainers {
+				container := &pod.Spec.InitContainers[j]
+				for k, v := range limit.Min {
+					if err := minConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
+					}
+				}
+				for k, v := range limit.Max {
+					if err := maxConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
+					}
+				}
+				for k, v := range limit.MaxLimitRequestRatio {
+					if err := limitRequestRatioConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
+					}
+				}
+			}
 		}
 
 		// enforce pod limits on init containers
