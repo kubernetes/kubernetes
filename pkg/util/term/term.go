@@ -52,11 +52,6 @@ type TTY struct {
 	sizeQueue *sizeQueue
 }
 
-// fd returns a file descriptor for a given object.
-type fd interface {
-	Fd() uintptr
-}
-
 // IsTerminalIn returns true if t.In is a terminal. Does not check /dev/tty
 // even if TryDev is set.
 func (t TTY) IsTerminalIn() bool {
@@ -71,8 +66,8 @@ func (t TTY) IsTerminalOut() bool {
 
 // IsTerminal returns whether the passed object is a terminal or not
 func IsTerminal(i interface{}) bool {
-	file, ok := i.(fd)
-	return ok && term.IsTerminal(file.Fd())
+	_, terminal := term.GetFdInfo(i)
+	return terminal
 }
 
 // Safe invokes the provided function and will attempt to ensure that when the
@@ -82,22 +77,16 @@ func IsTerminal(i interface{}) bool {
 // If the input file descriptor is not a TTY and TryDev is true, the /dev/tty file
 // will be opened (if available).
 func (t TTY) Safe(fn SafeFunc) error {
-	in := t.In
+	inFd, isTerminal := term.GetFdInfo(t.In)
 
-	var hasFd bool
-	var inFd uintptr
-	if desc, ok := in.(fd); ok && in != nil {
-		inFd = desc.Fd()
-		hasFd = true
-	}
-	if t.TryDev && (!hasFd || !term.IsTerminal(inFd)) {
+	if !isTerminal && t.TryDev {
 		if f, err := os.Open("/dev/tty"); err == nil {
 			defer f.Close()
 			inFd = f.Fd()
-			hasFd = true
+			isTerminal = term.IsTerminal(inFd)
 		}
 	}
-	if !hasFd || !term.IsTerminal(inFd) {
+	if !isTerminal {
 		return fn()
 	}
 
