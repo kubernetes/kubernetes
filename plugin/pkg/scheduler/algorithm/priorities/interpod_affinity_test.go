@@ -504,7 +504,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			hardPodAffinityWeight: api.DefaultHardPodAffinitySymmetricWeight,
 			failureDomains:        priorityutil.Topologies{DefaultKeys: strings.Split(api.DefaultFailureDomains, ",")},
 		}
-		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(test.nodes))
+		list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -592,7 +592,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 			podLister:             algorithm.FakePodLister(test.pods),
 			hardPodAffinityWeight: test.hardPodAffinityWeight,
 		}
-		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(test.nodes))
+		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -677,7 +677,7 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 			hardPodAffinityWeight: api.DefaultHardPodAffinitySymmetricWeight,
 			failureDomains:        test.failureDomains,
 		}
-		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, algorithm.FakeNodeLister(test.nodes))
+		list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

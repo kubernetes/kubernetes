@@ -61,12 +61,7 @@ func NewSelectorSpreadPriority(podLister algorithm.PodLister, serviceLister algo
 // i.e. it pushes the scheduler towards a node where there's the smallest number of
 // pods which match the same service selectors or RC selectors as the pod being scheduled.
 // Where zone information is included on the nodes, it favors nodes in zones with fewer existing matching pods.
-func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
-	}
-
+func (s *SelectorSpread) CalculateSpreadPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	selectors := make([]labels.Selector, 0, 3)
 	if services, err := s.serviceLister.GetPodServices(pod); err == nil {
 		for _, service := range services {
@@ -193,13 +188,8 @@ func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister
 // CalculateAntiAffinityPriority spreads pods by minimizing the number of pods belonging to the same service
 // on machines with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	var nsServicePods []*api.Pod
-	nodes, err := nodeLister.List()
-	if err != nil {
-		return nil, err
-	}
-
 	if services, err := s.serviceLister.GetPodServices(pod); err == nil {
 		// just use the first service and get the other pods within the service
 		// TODO: a separate predicate can be created that tries to handle all services for the pod
