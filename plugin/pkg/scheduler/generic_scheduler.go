@@ -152,7 +152,7 @@ func findNodesThatFit(
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
 		filtered = make([]*api.Node, len(nodes))
-		meta := predicates.PredicateMetadata(pod)
+		meta := predicates.PredicateMetadata(pod, nodeNameToInfo)
 		errs := []error{}
 
 		var predicateResultLock sync.Mutex
