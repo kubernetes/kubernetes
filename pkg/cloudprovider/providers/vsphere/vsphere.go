@@ -311,7 +311,7 @@ func (i *Instances) List(filter string) ([]string, error) {
 		return nil, err
 	}
 
-	glog.V(3).Infof("Found %s instances matching %s: %s",
+	glog.V(3).Infof("Found %d instances matching %s: %s",
 		len(vmList), filter, vmList)
 
 	return vmList, nil
