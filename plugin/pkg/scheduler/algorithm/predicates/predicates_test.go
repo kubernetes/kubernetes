@@ -142,8 +142,8 @@ func TestPodFitsResources(t *testing.T) {
 			fits: false,
 			test: "too many resources fails",
 			reasons: []algorithm.PredicateFailureReason{
-				newInsufficientResourceError(cpuResourceName, 1, 10, 10),
-				newInsufficientResourceError(memoryResourceName, 1, 20, 20),
+				NewInsufficientResourceError(api.ResourceCPU, 1, 10, 10),
+				NewInsufficientResourceError(api.ResourceMemory, 1, 20, 20),
 			},
 		},
 		{
@@ -152,7 +152,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 8, Memory: 19})),
 			fits:    false,
 			test:    "too many resources fails due to init container cpu",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(cpuResourceName, 3, 8, 10)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceCPU, 3, 8, 10)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 3, Memory: 1}, schedulercache.Resource{MilliCPU: 2, Memory: 1}),
@@ -160,7 +160,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 8, Memory: 19})),
 			fits:    false,
 			test:    "too many resources fails due to highest init container cpu",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(cpuResourceName, 3, 8, 10)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceCPU, 3, 8, 10)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 3}),
@@ -168,7 +168,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			fits:    false,
 			test:    "too many resources fails due to init container memory",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(memoryResourceName, 3, 19, 20)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceMemory, 3, 19, 20)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 3}, schedulercache.Resource{MilliCPU: 1, Memory: 2}),
@@ -176,7 +176,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 19})),
 			fits:    false,
 			test:    "too many resources fails due to highest init container memory",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(memoryResourceName, 3, 19, 20)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceMemory, 3, 19, 20)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}), schedulercache.Resource{MilliCPU: 1, Memory: 1}),
@@ -208,7 +208,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 9, Memory: 5})),
 			fits:    false,
 			test:    "one resource memory fits",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(cpuResourceName, 2, 9, 10)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceCPU, 2, 9, 10)},
 		},
 		{
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 2}),
@@ -216,7 +216,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			fits:    false,
 			test:    "one resource cpu fits",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(memoryResourceName, 2, 19, 20)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceMemory, 2, 19, 20)},
 		},
 		{
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}),
@@ -241,9 +241,6 @@ func TestPodFitsResources(t *testing.T) {
 		test.nodeInfo.SetNode(&node)
 
 		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if !reflect.DeepEqual(err, test.wErr) {
-			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
-		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -268,7 +265,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 10, Memory: 20})),
 			fits:    false,
 			test:    "even without specified resources predicate fails when there's no space for additional pod",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(podCountResourceName, 1, 1, 1)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourcePods, 1, 1, 1)},
 		},
 		{
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 1, Memory: 1}),
@@ -276,7 +273,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 5})),
 			fits:    false,
 			test:    "even if both resources fit predicate fails when there's no space for additional pod",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(podCountResourceName, 1, 1, 1)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourcePods, 1, 1, 1)},
 		},
 		{
 			pod: newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}),
@@ -284,7 +281,7 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			fits:    false,
 			test:    "even for equal edge case predicate fails when there's no space for additional pod",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(podCountResourceName, 1, 1, 1)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourcePods, 1, 1, 1)},
 		},
 		{
 			pod: newResourceInitPod(newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 1}), schedulercache.Resource{MilliCPU: 5, Memory: 1}),
@@ -292,17 +289,14 @@ func TestPodFitsResources(t *testing.T) {
 				newResourcePod(schedulercache.Resource{MilliCPU: 5, Memory: 19})),
 			fits:    false,
 			test:    "even for equal edge case predicate fails when there's no space for additional pod due to init container",
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(podCountResourceName, 1, 1, 1)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourcePods, 1, 1, 1)},
 		},
 	}
 	for _, test := range notEnoughPodsTests {
 		node := api.Node{Status: api.NodeStatus{Capacity: api.ResourceList{}, Allocatable: makeAllocatableResources(10, 20, 0, 1)}}
 		test.nodeInfo.SetNode(&node)
 
-		fits, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if !reflect.DeepEqual(err, test.wErr) {
-			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
-		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
+		fits, reasons, err := PodFitsResources(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -361,13 +355,7 @@ func TestPodFitsHost(t *testing.T) {
 	for _, test := range tests {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
-		result, err := PodFitsHost(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if !reflect.DeepEqual(err, ErrPodNotMatchHostName) && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-
-		//
-		fits, reasons, err := PodFitsHost(test.pod, PredicateMetadata(test.pod), nodeInfo)
+		fits, reasons, err := PodFitsHost(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -440,10 +428,7 @@ func TestPodFitsHostPorts(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		fits, err := PodFitsHostPorts(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if !reflect.DeepEqual(err, ErrPodNotFitsHostPorts) && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		fits, reasons, err := PodFitsHostPorts(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
+		fits, reasons, err := PodFitsHostPorts(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -528,10 +513,7 @@ func TestDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
+		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -583,14 +565,11 @@ func TestAWSDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
+		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
-		if ok == false && !reflect.DeepEqual(reasons, []algorithm.PredicateFailureReason{ErrDiskConflict}) {
+		if !ok && !reflect.DeepEqual(reasons, []algorithm.PredicateFailureReason{ErrDiskConflict}) {
 			t.Errorf("%s: unexpected failure reasons: %v", test.test, reasons)
 		}
 		if test.isOk && !ok {
@@ -644,10 +623,7 @@ func TestRBDDiskConflicts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ok, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if !reflect.DeepEqual(err, ErrDiskConflict) && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
+		ok, reasons, err := NoDiskConflict(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -1126,10 +1102,7 @@ func TestPodFitsSelector(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&node)
 
-		fits, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		fits, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)
+		fits, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -1194,10 +1167,7 @@ func TestNodeLabelPresence(t *testing.T) {
 		nodeInfo.SetNode(&node)
 
 		labelChecker := NodeLabelChecker{test.labels, test.presence}
-		fits, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if !reflect.DeepEqual(err, ErrNodeLabelPresenceViolated) && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod), nodeInfo)
+		fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -1342,10 +1312,7 @@ func TestServiceAffinity(t *testing.T) {
 		serviceAffinity := ServiceAffinity{algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels}
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(test.node)
-		fits, err := serviceAffinity.CheckServiceAffinity(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if !reflect.DeepEqual(err, ErrServiceAffinityViolated) && err != nil {
-			t.Errorf("unexpected error: %v", err)
-		fits, reasons, err := serviceAffinity.CheckServiceAffinity(test.pod, PredicateMetadata(test.pod), nodeInfo)
+		fits, reasons, err := serviceAffinity.CheckServiceAffinity(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -1626,10 +1593,7 @@ func TestEBSVolumeCountConflicts(t *testing.T) {
 
 	for _, test := range tests {
 		pred := NewMaxPDVolumeCountPredicate(filter, test.maxVols, pvInfo, pvcInfo)
-		fits, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
-		if err != nil && !reflect.DeepEqual(err, ErrMaxVolumeCountExceeded) {
-			t.Errorf("unexpected error: %v", err)
-		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod), schedulercache.NewNodeInfo(test.existingPods...))
+		fits, reasons, err := pred(test.newPod, PredicateMetadata(test.newPod, nil), schedulercache.NewNodeInfo(test.existingPods...))
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -1770,8 +1734,8 @@ func TestRunGeneralPredicates(t *testing.T) {
 			fits: false,
 			wErr: nil,
 			reasons: []algorithm.PredicateFailureReason{
-				newInsufficientResourceError(cpuResourceName, 8, 5, 10),
-				newInsufficientResourceError(memoryResourceName, 10, 19, 20),
+				NewInsufficientResourceError(api.ResourceCPU, 8, 5, 10),
+				NewInsufficientResourceError(api.ResourceMemory, 10, 19, 20),
 			},
 			test: "not enough cpu and memory resource",
 		},
@@ -1792,7 +1756,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 			node:    &api.Node{Status: api.NodeStatus{Capacity: makeResources(10, 20, 1, 32).Capacity, Allocatable: makeAllocatableResources(10, 20, 1, 32)}},
 			fits:    false,
 			wErr:    nil,
-			reasons: []algorithm.PredicateFailureReason{newInsufficientResourceError(nvidiaGpuResourceName, 1, 1, 1)},
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(api.ResourceNvidiaGPU, 1, 1, 1)},
 			test:    "not enough GPU resource",
 		},
 		{
@@ -1836,10 +1800,7 @@ func TestRunGeneralPredicates(t *testing.T) {
 	}
 	for _, test := range resourceTests {
 		test.nodeInfo.SetNode(test.node)
-		fits, err := GeneralPredicates(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		if !reflect.DeepEqual(err, test.wErr) {
-			t.Errorf("%s: unexpected error: %v, want: %v", test.test, err, test.wErr)
-		fits, reasons, err := GeneralPredicates(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
+		fits, reasons, err := GeneralPredicates(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.test, err)
 		}
@@ -2391,9 +2352,7 @@ func TestInterPodAffinity(t *testing.T) {
 		nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 		nodeInfo.SetNode(test.node)
 		nodeInfoMap := map[string]*schedulercache.NodeInfo{test.node.Name: nodeInfo}
-		fits, err := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
-		if !reflect.DeepEqual(err, ErrPodAffinityNotMatch) && err != nil {
-		fits, reasons, err := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)
+		fits, reasons, err := fit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 		if err != nil {
 			t.Errorf("%s: unexpected error %v", test.test, err)
 		}
@@ -2563,9 +2522,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			nodeInfo := schedulercache.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(&node)
 			nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-			fits, err := testFit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
-			if !reflect.DeepEqual(err, ErrPodAffinityNotMatch) && err != nil {
-			fits, reasons, err := testFit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)
+			fits, reasons, err := testFit.InterPodAffinityMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 			if err != nil {
 				t.Errorf("%s: unexpected error %v", test.test, err)
 			}
@@ -2580,10 +2537,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)
 				nodeInfoMap := map[string]*schedulercache.NodeInfo{node.Name: nodeInfo}
-				fits2, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
-				if !reflect.DeepEqual(err, ErrNodeSelectorNotMatch) && err != nil {
-					t.Errorf("unexpected error: %v", err)
-				fits2, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)
+				fits2, reasons, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 				if err != nil {
 					t.Errorf("%s: unexpected error: %v", test.test, err)
 				}
@@ -2872,9 +2826,7 @@ func TestPodToleratesTaints(t *testing.T) {
 	for _, test := range podTolerateTaintsTests {
 		nodeInfo := schedulercache.NewNodeInfo()
 		nodeInfo.SetNode(&test.node)
-		fits, err := PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
-		if fits == false && !reflect.DeepEqual(err, ErrTaintsTolerationsNotMatch) {
-		fits, reasons, err := PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod), nodeInfo)
+		fits, reasons, err := PodToleratesNodeTaints(test.pod, PredicateMetadata(test.pod, nil), nodeInfo)
 		if err != nil {
 			t.Errorf("%s, unexpected error: %v", test.test, err)
 		}
@@ -2983,8 +2935,7 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fits, err := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
-		fits, reasons, err := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod), test.nodeInfo)
+		fits, reasons, err := CheckNodeMemoryPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if fits != test.fits {
 			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
 		}
@@ -3055,13 +3006,15 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fits, err := CheckNodeDiskPressurePredicate(test.pod, nil, test.nodeInfo)
+		fits, reasons, err := CheckNodeDiskPressurePredicate(test.pod, PredicateMetadata(test.pod, nil), test.nodeInfo)
 		if fits != test.fits {
 			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
 		}
-
-		if err != nil && err != ErrNodeUnderDiskPressure {
+		if err != nil {
 			t.Errorf("%s: unexpected error: %v", test.name, err)
+		}
+		if !fits && !reflect.DeepEqual(reasons, []algorithm.PredicateFailureReason{ErrNodeUnderDiskPressure}) {
+			t.Errorf("%s: unexpected failure reasons: %v", test.name, reasons)
 		}
 	}
 }

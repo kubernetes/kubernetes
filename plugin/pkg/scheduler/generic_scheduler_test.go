@@ -38,23 +38,23 @@ func falsePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.Nod
 }
 
 func truePredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
-	return true, []algorithm.PredicateFailureReason{}, nil
+	return true, nil, nil
 }
 
 func matchesPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return false, []algorithm.PredicateFailureReason{}, fmt.Errorf("node not found")
+		return false, nil, fmt.Errorf("node not found")
 	}
 	if pod.Name == node.Name {
-		return true, []algorithm.PredicateFailureReason{}, nil
+		return true, nil, nil
 	}
 	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
 func hasNoPodsPredicate(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	if len(nodeInfo.Pods()) == 0 {
-		return true, []algorithm.PredicateFailureReason{}, nil
+		return true, nil, nil
 	}
 	return false, []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
@@ -193,8 +193,8 @@ func TestGenericScheduler(t *testing.T) {
 			wErr: &FitError{
 				Pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
 				FailedPredicates: FailedPredicateMap{
-					"machine1": algorithmpredicates.ErrFakePredicate.PredicateName,
-					"machine2": algorithmpredicates.ErrFakePredicate.PredicateName,
+					"machine1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"machine2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				}},
 		},
 		{
@@ -251,9 +251,9 @@ func TestGenericScheduler(t *testing.T) {
 			wErr: &FitError{
 				Pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
 				FailedPredicates: FailedPredicateMap{
-					"3": algorithmpredicates.ErrFakePredicate.PredicateName,
-					"2": algorithmpredicates.ErrFakePredicate.PredicateName,
-					"1": algorithmpredicates.ErrFakePredicate.PredicateName,
+					"3": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				},
 			},
 		},
@@ -282,8 +282,8 @@ func TestGenericScheduler(t *testing.T) {
 			wErr: &FitError{
 				Pod: &api.Pod{ObjectMeta: api.ObjectMeta{Name: "2"}},
 				FailedPredicates: FailedPredicateMap{
-					"1": algorithmpredicates.ErrFakePredicate.PredicateName,
-					"2": algorithmpredicates.ErrFakePredicate.PredicateName,
+					"1": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
+					"2": []algorithm.PredicateFailureReason{algorithmpredicates.ErrFakePredicate},
 				},
 			},
 		},
@@ -351,7 +351,7 @@ func TestFindFitSomeError(t *testing.T) {
 	}
 
 	_, predicateMap, err := findNodesThatFit(pod, nodeNameToInfo, makeNodeList(nodes), predicates, nil)
-	if err != nil && !reflect.DeepEqual(err, algorithmpredicates.ErrFakePredicate) {
+	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 

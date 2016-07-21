@@ -16,13 +16,9 @@ limitations under the License.
 
 package predicates
 
-import "fmt"
-
-const (
-	podCountResourceName  string = "PodCount"
-	cpuResourceName       string = "CPU"
-	memoryResourceName    string = "Memory"
-	nvidiaGpuResourceName string = "NvidiaGpu"
+import (
+	"fmt"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 var (
@@ -49,13 +45,13 @@ var (
 // hit and caused the unfitting failure.
 type InsufficientResourceError struct {
 	// resourceName is the name of the resource that is insufficient
-	ResourceName string
+	ResourceName api.ResourceName
 	requested    int64
 	used         int64
 	capacity     int64
 }
 
-func newInsufficientResourceError(resourceName string, requested, used, capacity int64) *InsufficientResourceError {
+func NewInsufficientResourceError(resourceName api.ResourceName, requested, used, capacity int64) *InsufficientResourceError {
 	return &InsufficientResourceError{
 		ResourceName: resourceName,
 		requested:    requested,
