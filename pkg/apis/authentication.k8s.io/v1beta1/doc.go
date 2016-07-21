@@ -14,22 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+// +k8s:deepcopy-gen=package,register
+// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/authentication.k8s.io
 
-import (
-	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
-)
-
-type TokenReviewExpansion interface {
-	Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error)
-}
-
-func (c *tokenReviews) Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
-	result = &authenticationapi.TokenReview{}
-	err = c.client.Post().
-		Resource("tokenreviews").
-		Body(tokenReview).
-		Do().
-		Into(result)
-	return
-}
+package v1beta1 // import "k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1"
