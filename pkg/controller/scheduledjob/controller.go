@@ -118,7 +118,6 @@ func (jm *ScheduledJobController) SyncAll() {
 
 // SyncOne reconciles a ScheduledJob with a list of any Jobs that it created.
 // All known jobs created by "sj" should be included in "js".
-// Returns a new ScheduledJobStatus if an update to status is required, else nil.
 // The current time is passed in to facilitate testing.
 // It has no receiver, to facilitate testing.
 func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, recorder record.EventRecorder) {
@@ -199,7 +198,6 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		return
 	}
 	if sj.Spec.ConcurrencyPolicy == batch.ReplaceConcurrent {
-		glog.Errorf("Not starting job for %s because of prior execution still running and concurrency policy is Replace and delete is not supported yet", nameForLog)
 		for _, j := range sj.Status.Active {
 			glog.V(4).Infof("Deleting job %s of %s s that was still running at next scheduled start time", j.Name, nameForLog)
 			if err := jc.DeleteJob(j.Namespace, j.Name); err != nil {
