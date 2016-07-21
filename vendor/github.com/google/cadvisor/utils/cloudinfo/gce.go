@@ -15,27 +15,15 @@
 package cloudinfo
 
 import (
-	"io/ioutil"
 	"strings"
 
 	info "github.com/google/cadvisor/info/v1"
 
-	"github.com/golang/glog"
 	"google.golang.org/cloud/compute/metadata"
 )
 
-const (
-	gceProductName = "/sys/class/dmi/id/product_name"
-	google         = "Google"
-)
-
 func onGCE() bool {
-	data, err := ioutil.ReadFile(gceProductName)
-	if err != nil {
-		glog.V(2).Infof("Error while reading product_name: %v", err)
-		return false
-	}
-	return strings.Contains(string(data), google)
+	return metadata.OnGCE()
 }
 
 func getGceInstanceType() info.InstanceType {

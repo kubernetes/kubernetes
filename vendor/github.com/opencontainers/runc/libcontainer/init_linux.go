@@ -52,7 +52,6 @@ type initConfig struct {
 	AppArmorProfile  string           `json:"apparmor_profile"`
 	NoNewPrivileges  bool             `json:"no_new_privileges"`
 	User             string           `json:"user"`
-	AdditionalGroups []string         `json:"additional_groups"`
 	Config           *configs.Config  `json:"config"`
 	Console          string           `json:"console"`
 	Networks         []*network       `json:"network"`
@@ -214,8 +213,8 @@ func setupUser(config *initConfig) error {
 	}
 
 	var addGroups []int
-	if len(config.AdditionalGroups) > 0 {
-		addGroups, err = user.GetAdditionalGroupsPath(config.AdditionalGroups, groupPath)
+	if len(config.Config.AdditionalGroups) > 0 {
+		addGroups, err = user.GetAdditionalGroupsPath(config.Config.AdditionalGroups, groupPath)
 		if err != nil {
 			return err
 		}

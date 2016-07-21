@@ -69,10 +69,10 @@ type Resources struct {
 	CpuPeriod int64 `json:"cpu_period"`
 
 	// How many time CPU will use in realtime scheduling (in usecs).
-	CpuRtRuntime int64 `json:"cpu_rt_quota"`
+	CpuRtRuntime int64 `json:"cpu_quota"`
 
 	// CPU period to be used for realtime scheduling (in usecs).
-	CpuRtPeriod int64 `json:"cpu_rt_period"`
+	CpuRtPeriod int64 `json:"cpu_period"`
 
 	// CPU to use
 	CpusetCpus string `json:"cpuset_cpus"`
@@ -120,5 +120,5 @@ type Resources struct {
 	NetPrioIfpriomap []*IfPrioMap `json:"net_prio_ifpriomap"`
 
 	// Set class identifier for container's network packets
-	NetClsClassid uint32 `json:"net_cls_classid"`
+	NetClsClassid string `json:"net_cls_classid"`
 }
