@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -2807,6 +2808,141 @@ func WaitForAllNodesSchedulable(c *client.Client) error {
 		}
 		return true, nil
 	})
+}
+
+func AddOrUpdateLabelOnNode(c *client.Client, nodeName string, labelKey string, labelValue string) {
+	patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, labelKey, labelValue)
+	err := c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
+	ExpectNoError(err)
+}
+
+func ExpectNodeHasLabel(c *client.Client, nodeName string, labelKey string, labelValue string) {
+	By("verifying the node has the label " + labelKey + " " + labelValue)
+	node, err := c.Nodes().Get(nodeName)
+	ExpectNoError(err)
+	Expect(node.Labels[labelKey]).To(Equal(labelValue))
+}
+
+// RemoveLabelOffNode is for cleaning up labels temporarily added to node,
+// won't fail if target label doesn't exist or has been removed.
+func RemoveLabelOffNode(c *client.Client, nodeName string, labelKey string) {
+	By("removing the label " + labelKey + " off the node " + nodeName)
+	node, err := c.Nodes().Get(nodeName)
+	ExpectNoError(err)
+	if node.Labels == nil || len(node.Labels[labelKey]) == 0 {
+		return
+	}
+	delete(node.Labels, labelKey)
+	nodeUpdated, err := c.Nodes().Update(node)
+	ExpectNoError(err)
+
+	By("verifying the node doesn't have the label " + labelKey)
+	if nodeUpdated.Labels != nil && len(nodeUpdated.Labels[labelKey]) != 0 {
+		Failf("Failed removing label " + labelKey + " of the node " + nodeName)
+	}
+}
+
+func AddOrUpdateTaintOnNode(c *client.Client, nodeName string, taint api.Taint) {
+	node, err := c.Nodes().Get(nodeName)
+	ExpectNoError(err)
+
+	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	ExpectNoError(err)
+
+	var newTaints []api.Taint
+	updated := false
+	for _, existingTaint := range nodeTaints {
+		if existingTaint.Key == taint.Key {
+			newTaints = append(newTaints, taint)
+			updated = true
+			continue
+		}
+
+		newTaints = append(newTaints, existingTaint)
+	}
+
+	if !updated {
+		newTaints = append(newTaints, taint)
+	}
+
+	taintsData, err := json.Marshal(newTaints)
+	ExpectNoError(err)
+	node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
+	_, err = c.Nodes().Update(node)
+	ExpectNoError(err)
+}
+
+func taintExists(taints []api.Taint, taintKey string) bool {
+	for _, taint := range taints {
+		if taint.Key == taintKey {
+			return true
+		}
+	}
+	return false
+}
+
+func ExpectNodeHasTaint(c *client.Client, nodeName string, taintKey string) {
+	By("verifying the node has the taint " + taintKey)
+	node, err := c.Nodes().Get(nodeName)
+	ExpectNoError(err)
+
+	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	ExpectNoError(err)
+
+	if len(nodeTaints) == 0 || !taintExists(nodeTaints, taintKey) {
+		Failf("Failed to find taint %s on node %s", taintKey, nodeName)
+	}
+}
+
+func deleteTaintByKey(taints []api.Taint, taintKey string) ([]api.Taint, error) {
+	newTaints := []api.Taint{}
+	found := false
+	for _, taint := range taints {
+		if taint.Key == taintKey {
+			found = true
+			continue
+		}
+		newTaints = append(newTaints, taint)
+	}
+
+	if !found {
+		return nil, fmt.Errorf("taint key=\"%s\" not found.", taintKey)
+	}
+	return newTaints, nil
+}
+
+// RemoveTaintOffNode is for cleaning up taints temporarily added to node,
+// won't fail if target taint doesn't exist or has been removed.
+func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
+	By("removing the taint " + taintKey + " off the node " + nodeName)
+	node, err := c.Nodes().Get(nodeName)
+	ExpectNoError(err)
+
+	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+	ExpectNoError(err)
+	if len(nodeTaints) == 0 {
+		return
+	}
+
+	if !taintExists(nodeTaints, taintKey) {
+		return
+	}
+
+	newTaints, err := deleteTaintByKey(nodeTaints, taintKey)
+	ExpectNoError(err)
+
+	taintsData, err := json.Marshal(newTaints)
+	ExpectNoError(err)
+	node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
+	nodeUpdated, err := c.Nodes().Update(node)
+	ExpectNoError(err)
+
+	By("verifying the node doesn't have the taint " + taintKey)
+	taintsGot, err := api.GetTaintsFromNodeAnnotations(nodeUpdated.Annotations)
+	ExpectNoError(err)
+	if taintExists(taintsGot, taintKey) {
+		Failf("Failed removing taint " + taintKey + " of the node " + nodeName)
+	}
 }
 
 func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
