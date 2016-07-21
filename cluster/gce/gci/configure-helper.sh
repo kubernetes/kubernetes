@@ -637,7 +637,12 @@ function start-kube-apiserver {
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-  cp "${src_dir}/abac-authz-policy.jsonl" /etc/srv/kubernetes/
+
+  local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
+  remove-salt-config-comments "${abac_policy_json}"
+  sed -i -e "s@{{kube_user}}@${KUBE_USER}@g" "${abac_policy_json}"
+  cp "${abac_policy_json}" /etc/srv/kubernetes/
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.
