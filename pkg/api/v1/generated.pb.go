@@ -2180,6 +2180,14 @@ func (m *DownwardAPIVolumeFile) MarshalTo(data []byte) (int, error) {
 		}
 		i += n28
 	}
+	data[i] = 0x22
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.ConfigMapRef)))
+	i += copy(data[i:], m.ConfigMapRef)
+	data[i] = 0x2a
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Template)))
+	i += copy(data[i:], m.Template)
 	return i, nil
 }
 
@@ -8347,6 +8355,10 @@ func (m *DownwardAPIVolumeFile) Size() (n int) {
 		l = m.ResourceFieldRef.Size()
 		n += 1 + l + sovGenerated(uint64(l))
 	}
+	l = len(m.ConfigMapRef)
+	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.Template)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -10817,6 +10829,8 @@ func (this *DownwardAPIVolumeFile) String() string {
 		`Path:` + fmt.Sprintf("%v", this.Path) + `,`,
 		`FieldRef:` + strings.Replace(fmt.Sprintf("%v", this.FieldRef), "ObjectFieldSelector", "ObjectFieldSelector", 1) + `,`,
 		`ResourceFieldRef:` + strings.Replace(fmt.Sprintf("%v", this.ResourceFieldRef), "ResourceFieldSelector", "ResourceFieldSelector", 1) + `,`,
+		`ConfigMapRef:` + fmt.Sprintf("%v", this.ConfigMapRef) + `,`,
+		`Template:` + fmt.Sprintf("%v", this.Template) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -16693,6 +16707,64 @@ func (m *DownwardAPIVolumeFile) Unmarshal(data []byte) error {
 			if err := m.ResourceFieldRef.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
 			}
+			iNdEx = postIndex
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ConfigMapRef", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.ConfigMapRef = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 5:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Template", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Template = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex

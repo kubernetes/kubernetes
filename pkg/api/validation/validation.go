@@ -744,21 +744,29 @@ var validDownwardAPIFieldPathExpressions = sets.NewString(
 	"metadata.annotations")
 
 func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSource, fldPath *field.Path) field.ErrorList {
+	var refCount int
 	allErrs := field.ErrorList{}
 	for _, file := range downwardAPIVolume.Items {
 		if len(file.Path) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 		}
 		allErrs = append(allErrs, validateLocalNonReservedPath(file.Path, fldPath.Child("path"))...)
+		refCount = 0
 		if file.FieldRef != nil {
 			allErrs = append(allErrs, validateObjectFieldSelector(file.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
-			if file.ResourceFieldRef != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
-			}
-		} else if file.ResourceFieldRef != nil {
+			refCount += 1
+		}
+		if file.ResourceFieldRef != nil {
 			allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, fldPath.Child("resourceFieldRef"), true)...)
-		} else {
-			allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
+			refCount += 1
+		}
+		if file.ConfigMapRef != "" {
+			refCount += 1
+		}
+		if refCount == 0 {
+			allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef, resourceFieldRef or configMapRef is required"))
+		} else if refCount > 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath, "resource", "only one of fieldRef, resourceFieldRef or configMapRef can be specified"))
 		}
 	}
 	return allErrs

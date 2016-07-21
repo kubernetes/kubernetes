@@ -719,6 +719,8 @@ type DownwardAPIVolumeFile struct {
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty"`
+	ConfigMapRef     string                 `json:"configMapRef,omitempty"`
+	Template         string                 `json:"template,omitempty"`
 }
 
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
