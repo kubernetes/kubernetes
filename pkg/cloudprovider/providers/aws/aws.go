@@ -219,13 +219,11 @@ type VolumeOptions struct {
 // TODO: Allow other clouds to implement this
 type Volumes interface {
 	// Attach the disk to the specified instance
-	// instanceName can be empty to mean "the instance on which we are running"
 	// Returns the device (e.g. /dev/xvdf) where we attached the volume
-	AttachDisk(diskName string, instanceName string, readOnly bool) (string, error)
+	AttachDisk(diskName string, readOnly bool) (string, error)
 	// Detach the disk from the specified instance
-	// instanceName can be empty to mean "the instance on which we are running"
 	// Returns the device where the volume was attached
-	DetachDisk(diskName string, instanceName string) (string, error)
+	DetachDisk(diskName string) (string, error)
 
 	// Create a volume with the specified options
 	CreateDisk(volumeOptions *VolumeOptions) (volumeName string, err error)
@@ -242,7 +240,7 @@ type Volumes interface {
 	GetDiskPath(volumeName string) (string, error)
 
 	// Check if the volume is already attached to the instance
-	DiskIsAttached(diskName, instanceID string) (bool, error)
+	DiskIsAttached(diskName string) (bool, error)
 }
 
 // InstanceGroups is an interface for managing cloud-managed instance groups / autoscaling instance groups
@@ -1329,30 +1327,20 @@ func (c *Cloud) buildSelfAWSInstance() (*awsInstance, error) {
 }
 
 // Gets the awsInstance with node-name nodeName, or the 'self' instance if nodeName == ""
-func (c *Cloud) getAwsInstance(nodeName string) (*awsInstance, error) {
+func (c *Cloud) getAwsInstance() (*awsInstance, error) {
 	var awsInstance *awsInstance
-	if nodeName == "" {
-		awsInstance = c.selfAWSInstance
-	} else {
-		instance, err := c.getInstanceByNodeName(nodeName)
-		if err != nil {
-			return nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
-		}
-
-		awsInstance = newAWSInstance(c.ec2, instance)
-	}
-
+	awsInstance = c.selfAWSInstance
 	return awsInstance, nil
 }
 
 // AttachDisk implements Volumes.AttachDisk
-func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) (string, error) {
+func (c *Cloud) AttachDisk(diskName string, readOnly bool) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, err := c.getAwsInstance(instanceName)
+	awsInstance, err := c.getAwsInstance()
 	if err != nil {
 		return "", err
 	}
@@ -1411,13 +1399,13 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 }
 
 // DetachDisk implements Volumes.DetachDisk
-func (c *Cloud) DetachDisk(diskName string, instanceName string) (string, error) {
+func (c *Cloud) DetachDisk(diskName string) (string, error) {
 	disk, err := newAWSDisk(c, diskName)
 	if err != nil {
 		return "", err
 	}
 
-	awsInstance, err := c.getAwsInstance(instanceName)
+	awsInstance, err := c.getAwsInstance()
 	if err != nil {
 		return "", err
 	}
@@ -1559,8 +1547,8 @@ func (c *Cloud) GetDiskPath(volumeName string) (string, error) {
 }
 
 // DiskIsAttached implements Volumes.DiskIsAttached
-func (c *Cloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
-	awsInstance, err := c.getAwsInstance(instanceID)
+func (c *Cloud) DiskIsAttached(diskName string) (bool, error) {
+	awsInstance, err := c.getAwsInstance()
 	if err != nil {
 		return false, err
 	}
