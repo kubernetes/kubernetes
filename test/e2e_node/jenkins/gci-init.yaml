@@ -2,7 +2,7 @@
 
 runcmd:
   - mount /tmp /tmp -o remount,exec,suid
-  - ETCD_VERSION=v2.2.5
+  - ETCD_VERSION=v3.0.3
   - curl -L https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
   - tar xzvf /tmp/etcd.tar.gz -C /tmp
   - cp /tmp/etcd-${ETCD_VERSION}-linux-amd64/etcd* /tmp/
