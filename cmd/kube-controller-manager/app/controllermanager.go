@@ -265,10 +265,8 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			routeController.Run(s.NodeSyncPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
-	} else if s.ConfigureCloudRoutes && !s.AllocateNodeCIDRs {
-		glog.Warningf("allocate-node-cidrs set to %v, will not configure cloud provider routes.", s.AllocateNodeCIDRs)
-	} else if s.AllocateNodeCIDRs && !s.ConfigureCloudRoutes {
-		glog.Infof("configure-cloud-routes is set to %v, will not configure cloud provider routes.", s.ConfigureCloudRoutes)
+	} else {
+		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.AllocateNodeCIDRs, s.ConfigureCloudRoutes)
 	}
 
 	resourceQuotaControllerClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "resourcequota-controller"))
@@ -419,10 +417,9 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
 	if attachDetachControllerErr != nil {
 		glog.Fatalf("Failed to start attach/detach controller: %v", attachDetachControllerErr)
-	} else {
-		go attachDetachController.Run(wait.NeverStop)
-		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 	}
+	go attachDetachController.Run(wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	groupVersion = "certificates/v1alpha1"
 	resources, found = resourceMap[groupVersion]
