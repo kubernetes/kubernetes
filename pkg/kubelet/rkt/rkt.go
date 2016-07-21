@@ -1522,9 +1522,10 @@ func (r *Runtime) convertRktPod(rktpod *rktapi.Pod) (*kubecontainer.Pod, error) 
 			ID:   buildContainerID(&containerID{rktpod.Id, app.Name}),
 			Name: app.Name,
 			// By default, the version returned by rkt API service will be "latest" if not specified.
-			Image: fmt.Sprintf("%s:%s", app.Image.Name, app.Image.Version),
-			Hash:  containerHash,
-			State: appStateToContainerState(app.State),
+			Image:   fmt.Sprintf("%s:%s", app.Image.Name, app.Image.Version),
+			ImageID: app.Image.Id,
+			Hash:    containerHash,
+			State:   appStateToContainerState(app.State),
 		})
 	}
 
