@@ -4,9 +4,9 @@ package keyctl
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 	"syscall"
+	"strings"
+	"strconv"
 	"unsafe"
 )
 
@@ -17,7 +17,7 @@ const KEYCTL_DESCRIBE = 6
 type KeySerial uint32
 
 func JoinSessionKeyring(name string) (KeySerial, error) {
-	var _name *byte
+	var _name *byte = nil
 	var err error
 
 	if len(name) > 0 {
@@ -34,7 +34,7 @@ func JoinSessionKeyring(name string) (KeySerial, error) {
 	return KeySerial(sessKeyId), nil
 }
 
-// ModKeyringPerm modifies permissions on a keyring by reading the current permissions,
+// modify permissions on a keyring by reading the current permissions,
 // anding the bits with the given mask (clearing permissions) and setting
 // additional permission bits
 func ModKeyringPerm(ringId KeySerial, mask, setbits uint32) error {
@@ -64,3 +64,4 @@ func ModKeyringPerm(ringId KeySerial, mask, setbits uint32) error {
 
 	return nil
 }
+
