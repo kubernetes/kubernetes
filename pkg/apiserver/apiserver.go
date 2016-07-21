@@ -166,7 +166,6 @@ func (g *APIGroupVersion) newInstaller() *APIInstaller {
 // TODO: document all handlers
 // InstallVersionHandler registers the APIServer's `/version` handler
 func InstallVersionHandler(mux Mux, container *restful.Container) {
-
 	// Set up a service to return the git code version.
 	versionWS := new(restful.WebService)
 	versionWS.Path("/version")
