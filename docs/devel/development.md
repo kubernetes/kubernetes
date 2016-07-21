@@ -75,8 +75,14 @@ binaries):
         make
 ```
 
-You may pass build options and packages to the script as necessary. To build
-binaries for all platforms:
+You may pass build options and packages to the script as necessary. For example,
+to build with optimizations disabled for enabling use of source debug tools:
+
+```sh
+        make GOGCFLAGS="-N -l"
+```
+
+To build binaries for all platforms:
 
 ```sh
         make cross
