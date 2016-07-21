@@ -153,6 +153,6 @@ Instructive & educational resources for the Kubernetes community. By the communi
 
 * **Community Documentation**
 
-Here you can learn more about the current happening's in the [kubernetes community](https://github.com/kubernetes/community).
+Here you can learn more about the current happenings in the [kubernetes community](https://github.com/kubernetes/community).
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/README.md?pixel)]()
