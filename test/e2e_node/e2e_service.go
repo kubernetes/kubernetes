@@ -361,7 +361,10 @@ func (k *killCmd) Kill() error {
 	const timeout = 10 * time.Second
 	for _, signal := range []string{"-TERM", "-KILL"} {
 		glog.V(2).Infof("Killing process %d (%s) with %s", pid, name, signal)
-		_, err := exec.Command("sudo", "kill", signal, strconv.Itoa(pid)).Output()
+		cmd := exec.Command("sudo", "kill", signal, strconv.Itoa(pid))
+		// Run the 'kill' command in a separate process group so sudo doesn't ignore it
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		_, err := cmd.Output()
 		if err != nil {
 			glog.Errorf("Error signaling process %d (%s) with %s: %v", pid, name, signal, err)
 			continue
