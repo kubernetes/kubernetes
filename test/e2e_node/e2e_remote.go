@@ -213,14 +213,11 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 
 	glog.Infof("Copying test artifacts from %s", host)
 	scpErr := getTestArtifacts(host, tmp)
-	exitOk := true
 	if scpErr != nil {
-		// Only exit non-0 if the scp failed
-		exitOk = false
-		aggErrs = append(aggErrs, err)
+		aggErrs = append(aggErrs, scpErr)
 	}
 
-	return output, exitOk, utilerrors.NewAggregate(aggErrs)
+	return output, len(aggErrs) == 0, utilerrors.NewAggregate(aggErrs)
 }
 
 func getTestArtifacts(host, testDir string) error {

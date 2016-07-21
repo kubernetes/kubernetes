@@ -195,12 +195,17 @@ function e2e_test() {
         echo "Publish version to ci/latest-green.txt: $(cat version)"
         gsutil cp ./version "gs://${KUBE_GCS_DEV_RELEASE_BUCKET}/ci/latest-green.txt"
     fi
+    return ${exitcode}
 }
 
 echo "--------------------------------------------------------------------------------"
 echo "Test Environment:"
 printenv | sort
 echo "--------------------------------------------------------------------------------"
+
+# Set this var instead of exiting-- we must do the cluster teardown step. We'll
+# return this at the very end.
+EXIT_CODE=0
 
 # We get the Kubernetes tarballs unless we are going to use old ones
 if [[ "${JENKINS_USE_EXISTING_BINARIES:-}" =~ ^[yY]$ ]]; then
@@ -332,7 +337,7 @@ if [[ -n "${JENKINS_PUBLISHED_SKEW_VERSION:-}" ]]; then
     if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
         # Add a report prefix for the e2e tests so that the tests don't get overwritten when we run
         # the rest of the e2es.
-        E2E_REPORT_PREFIX='upgrade' e2e_test "${GINKGO_UPGRADE_TEST_ARGS:-}"
+        E2E_REPORT_PREFIX='upgrade' e2e_test "${GINKGO_UPGRADE_TEST_ARGS:-}" || EXIT_CODE=1
     fi
     if [[ "${JENKINS_USE_SKEW_TESTS:-}" != "true" ]]; then
         # Back out into the old tests now that we've downloaded & maybe upgraded.
@@ -347,7 +352,7 @@ if [[ -n "${JENKINS_PUBLISHED_SKEW_VERSION:-}" ]]; then
 fi
 
 if [[ "${E2E_TEST,,}" == "true" ]]; then
-    e2e_test "${GINKGO_TEST_ARGS:-}"
+    e2e_test "${GINKGO_TEST_ARGS:-}" || EXIT_CODE=1
 fi
 
 ### Start Kubemark ###
@@ -365,6 +370,8 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   # junit.xml results for test failures and not process the exit code.  This is needed by jenkins to more gracefully
   # handle blocking the merge queue as a result of test failure flakes.  Infrastructure failures should continue to
   # exit non-0.
+  # TODO: The above comment is no longer accurate. Need to fix this before
+  # turning xunit off for the postsubmit tests. See: #28200
   ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS:-starting\s30\spods}" "${KUBEMARK_TEST_ARGS:-}" || dump_cluster_logs
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${NUM_NODES_BKP}
@@ -397,6 +404,8 @@ if [[ "${E2E_UP:-}" == "${E2E_DOWN:-}" && -f "${gcp_resources_before}" && -f "${
   if [[ -n $(echo "${difference}" | tail -n +3 | grep -E "^\+") ]] && [[ "${FAIL_ON_GCP_RESOURCE_LEAK:-}" == "true" ]]; then
     echo "${difference}"
     echo "!!! FAIL: Google Cloud Platform resources leaked while running tests!"
-    exit 1
+    EXIT_CODE=1
   fi
 fi
+
+exit ${EXIT_CODE}
