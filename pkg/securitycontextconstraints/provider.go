@@ -278,6 +278,12 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 			idxPath := containersPath.Index(idx)
 			allErrs = append(allErrs, s.hasHostPort(&c, idxPath)...)
 		}
+
+		containersPath = fldPath.Child("initContainers")
+		for idx, c := range pod.Spec.InitContainers {
+			idxPath := containersPath.Index(idx)
+			allErrs = append(allErrs, s.hasHostPort(&c, idxPath)...)
+		}
 	}
 
 	if !s.scc.AllowHostPID && pod.Spec.SecurityContext.HostPID {

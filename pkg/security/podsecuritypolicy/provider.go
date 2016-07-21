@@ -250,6 +250,12 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 		allErrs = append(allErrs, s.hasInvalidHostPort(&c, idxPath)...)
 	}
 
+	containersPath = fldPath.Child("initContainers")
+	for idx, c := range pod.Spec.InitContainers {
+		idxPath := containersPath.Index(idx)
+		allErrs = append(allErrs, s.hasInvalidHostPort(&c, idxPath)...)
+	}
+
 	if !s.psp.Spec.HostPID && pod.Spec.SecurityContext.HostPID {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostPID"), pod.Spec.SecurityContext.HostPID, "Host PID is not allowed to be used"))
 	}
