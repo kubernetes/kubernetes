@@ -234,6 +234,7 @@ func TestHammerController(t *testing.T) {
 
 	// Run the controller and run it until we close stop.
 	stop := make(chan struct{})
+	defer close(stop)
 	go controller.Run(stop)
 
 	// Let's wait for the controller to do its initial sync
@@ -392,6 +393,7 @@ func TestUpdate(t *testing.T) {
 	// Once Run() is called, calls to testDoneWG.Done() might start, so
 	// all testDoneWG.Add() calls must happen before this point
 	stop := make(chan struct{})
+	defer close(stop)
 	go controller.Run(stop)
 	<-watchCh
 
