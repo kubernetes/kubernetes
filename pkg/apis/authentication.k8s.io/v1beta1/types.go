@@ -17,66 +17,47 @@ limitations under the License.
 package v1beta1
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 )
-
-// +genclient=true
-// +nonNamespaced=true
-// +noMethods=true
 
 // TokenReview attempts to authenticate a token to a known user.
 // Note: TokenReview requests may be cached by the webhook token authenticator
 // plugin in the kube-apiserver.
 type TokenReview struct {
 	unversioned.TypeMeta `json:",inline"`
-	v1.ObjectMeta        `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Spec holds information about the request being evaluated
-	Spec TokenReviewSpec `json:"spec" protobuf:"bytes,2,opt,name=spec"`
+	Spec TokenReviewSpec `json:"spec"`
 
 	// Status is filled in by the server and indicates whether the request can be authenticated.
-	Status TokenReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
+	Status TokenReviewStatus `json:"status,omitempty"`
 }
 
 // TokenReviewSpec is a description of the token authentication request.
 type TokenReviewSpec struct {
 	// Token is the opaque bearer token.
-	Token string `json:"token,omitempty" protobuf:"bytes,1,opt,name=token"`
+	Token string `json:"token,omitempty"`
 }
 
 // TokenReviewStatus is the result of the token authentication request.
 type TokenReviewStatus struct {
 	// Authenticated indicates that the token was associated with a known user.
-	Authenticated bool `json:"authenticated,omitempty" protobuf:"varint,1,opt,name=authenticated"`
+	Authenticated bool `json:"authenticated,omitempty"`
 	// User is the UserInfo associated with the provided token.
-	User UserInfo `json:"user,omitempty" protobuf:"bytes,2,opt,name=user"`
-	// Error indicates that the token couldn't be checked
-	Error string `json:"error,omitempty" protobuf:"bytes,3,opt,name=error"`
+	User UserInfo `json:"user,omitempty"`
 }
 
 // UserInfo holds the information about the user needed to implement the
 // user.Info interface.
 type UserInfo struct {
 	// The name that uniquely identifies this user among all active users.
-	Username string `json:"username,omitempty" protobuf:"bytes,1,opt,name=username"`
+	Username string `json:"username,omitempty"`
 	// A unique value that identifies this user across time. If this user is
 	// deleted and another user by the same name is added, they will have
 	// different UIDs.
-	UID string `json:"uid,omitempty" protobuf:"bytes,2,opt,name=uid"`
+	UID string `json:"uid,omitempty"`
 	// The names of groups this user is a part of.
-	Groups []string `json:"groups,omitempty" protobuf:"bytes,3,rep,name=groups"`
+	Groups []string `json:"groups,omitempty"`
 	// Any additional information provided by the authenticator.
-	Extra map[string]ExtraValue `json:"extra,omitempty" protobuf:"bytes,4,rep,name=extra"`
-}
-
-// ExtraValue masks the value so protobuf can generate
-// +protobuf.nullable=true
-// +protobuf.options.(gogoproto.goproto_stringer)=false
-type ExtraValue []string
-
-func (t ExtraValue) String() string {
-	return fmt.Sprintf("%v", []string(t))
+	Extra map[string][]string `json:"extra,omitempty"`
 }

@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -353,8 +352,6 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			switch gvk.Group {
 			case api.GroupName:
 				return c.RESTClient, nil
-			case authentication.GroupName:
-				return c.AuthenticationClient.RESTClient, nil
 			case autoscaling.GroupName:
 				return c.AutoscalingClient.RESTClient, nil
 			case batch.GroupName:
