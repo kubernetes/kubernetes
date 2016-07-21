@@ -17,20 +17,12 @@ limitations under the License.
 package authentication
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
-
-// +genclient=true
-// +nonNamespaced=true
-// +noMethods=true
 
 // TokenReview attempts to authenticate a token to a known user.
 type TokenReview struct {
 	unversioned.TypeMeta
-	// ObjectMeta fulfills the meta.ObjectMetaAccessor interface so that the stock
-	// REST handler paths work
-	api.ObjectMeta
 
 	// Spec holds information about the request being evaluated
 	Spec TokenReviewSpec
@@ -46,14 +38,11 @@ type TokenReviewSpec struct {
 }
 
 // TokenReviewStatus is the result of the token authentication request.
-// This type mirrors the authentication.Token interface
 type TokenReviewStatus struct {
 	// Authenticated indicates that the token was associated with a known user.
 	Authenticated bool
 	// User is the UserInfo associated with the provided token.
 	User UserInfo
-	// Error indicates that the token couldn't be checked
-	Error string
 }
 
 // UserInfo holds the information about the user needed to implement the
@@ -68,8 +57,5 @@ type UserInfo struct {
 	// The names of groups this user is a part of.
 	Groups []string
 	// Any additional information provided by the authenticator.
-	Extra map[string]ExtraValue
+	Extra map[string][]string
 }
-
-// ExtraValue masks the value so protobuf can generate
-type ExtraValue []string

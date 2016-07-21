@@ -62,14 +62,6 @@
     "description": "get information of a group"
    },
    {
-    "path": "/apis/authentication.k8s.io/v1beta1",
-    "description": "API at /apis/authentication.k8s.io/v1beta1"
-   },
-   {
-    "path": "/apis/authentication.k8s.io",
-    "description": "get information of a group"
-   },
-   {
     "path": "/apis/certificates/v1alpha1",
     "description": "API at /apis/certificates/v1alpha1"
    },

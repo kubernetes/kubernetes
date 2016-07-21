@@ -30,7 +30,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
+	"k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
 )
@@ -353,21 +353,10 @@ func TestWebhookTokenAuthenticator(t *testing.T) {
 
 type authenticationUserInfo v1beta1.UserInfo
 
-func (a *authenticationUserInfo) GetName() string     { return a.Username }
-func (a *authenticationUserInfo) GetUID() string      { return a.UID }
-func (a *authenticationUserInfo) GetGroups() []string { return a.Groups }
-
-func (a *authenticationUserInfo) GetExtra() map[string][]string {
-	if a.Extra == nil {
-		return nil
-	}
-	ret := map[string][]string{}
-	for k, v := range a.Extra {
-		ret[k] = []string(v)
-	}
-
-	return ret
-}
+func (a *authenticationUserInfo) GetName() string               { return a.Username }
+func (a *authenticationUserInfo) GetUID() string                { return a.UID }
+func (a *authenticationUserInfo) GetGroups() []string           { return a.Groups }
+func (a *authenticationUserInfo) GetExtra() map[string][]string { return a.Extra }
 
 // Ensure v1beta1.UserInfo contains the fields necessary to implement the
 // user.Info interface.

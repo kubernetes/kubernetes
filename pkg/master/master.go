@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
-	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -104,7 +103,6 @@ import (
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
-	"k8s.io/kubernetes/pkg/registry/tokenreview"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
@@ -377,26 +375,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			GroupMeta: *appsGroupMeta,
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1alpha1": appsResources,
-			},
-			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
-			Scheme:                 api.Scheme,
-			ParameterCodec:         api.ParameterCodec,
-			NegotiatedSerializer:   api.Codecs,
-		}
-		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
-	}
-
-	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(authenticationv1beta1.SchemeGroupVersion) {
-		resources := m.getAuthenticationResources(c)
-		groupMeta := registered.GroupOrDie(authenticationv1beta1.GroupName)
-
-		// Hard code preferred group version to authentication.k8s.io/v1beta1
-		groupMeta.GroupVersion = authenticationv1beta1.SchemeGroupVersion
-
-		apiGroupInfo := genericapiserver.APIGroupInfo{
-			GroupMeta: *groupMeta,
-			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-				authenticationv1beta1.SchemeGroupVersion.Version: resources,
 			},
 			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
 			Scheme:                 api.Scheme,
@@ -984,19 +962,6 @@ func (m *Master) getAppsResources(c *Config) map[string]rest.Storage {
 	return storage
 }
 
-// getAuthenticationResources returns the resources for authentication api
-func (m *Master) getAuthenticationResources(c *Config) map[string]rest.Storage {
-	// TODO update when we support more than one version of this group
-	version := authenticationv1beta1.SchemeGroupVersion
-
-	storage := map[string]rest.Storage{}
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("tokenreviews")) {
-		tokenReviewStorage := tokenreview.NewREST(c.Authenticator)
-		storage["tokenreviews"] = tokenReviewStorage
-	}
-	return storage
-}
-
 func (m *Master) getRBACResources(c *Config) map[string]rest.Storage {
 	version := rbacapi.SchemeGroupVersion
 
@@ -1086,17 +1051,7 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(
-		apiv1.SchemeGroupVersion,
-		appsapi.SchemeGroupVersion,
-		authenticationv1beta1.SchemeGroupVersion,
-		autoscalingapiv1.SchemeGroupVersion,
-		batchapiv1.SchemeGroupVersion,
-		certificatesapiv1alpha1.SchemeGroupVersion,
-		extensionsapiv1beta1.SchemeGroupVersion,
-		policyapiv1alpha1.SchemeGroupVersion,
-		rbacapi.SchemeGroupVersion,
-	)
+	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, policyapiv1alpha1.SchemeGroupVersion, rbacapi.SchemeGroupVersion, certificatesapiv1alpha1.SchemeGroupVersion)
 
 	// all extensions resources except these are disabled by default
 	ret.EnableResources(
