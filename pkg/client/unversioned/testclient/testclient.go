@@ -309,6 +309,10 @@ func (c *Fake) Rbac() client.RbacInterface {
 	return &FakeRbac{Fake: c}
 }
 
+func (c *Fake) Authentication() client.AuthenticationInterface {
+	return &FakeAuthentication{Fake: c}
+}
+
 // SwaggerSchema returns an empty swagger.ApiDeclaration for testing
 func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
 	action := ActionImpl{}
@@ -334,6 +338,18 @@ type FakeAutoscaling struct {
 
 func (c *FakeAutoscaling) HorizontalPodAutoscalers(namespace string) client.HorizontalPodAutoscalerInterface {
 	return &FakeHorizontalPodAutoscalers{Fake: c, Namespace: namespace}
+}
+
+func NewSimpleFakeAuthentication(objects ...runtime.Object) *FakeAuthentication {
+	return &FakeAuthentication{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeAuthentication struct {
+	*Fake
+}
+
+func (c *FakeAuthentication) TokenReviews() client.TokenReviewInterface {
+	return &FakeTokenReviews{Fake: c}
 }
 
 // NewSimpleFakeBatch returns a client that will respond with the provided objects
