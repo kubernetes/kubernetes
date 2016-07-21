@@ -3,8 +3,6 @@
 package fs
 
 import (
-	"strconv"
-
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
@@ -25,8 +23,8 @@ func (s *NetClsGroup) Apply(d *cgroupData) error {
 }
 
 func (s *NetClsGroup) Set(path string, cgroup *configs.Cgroup) error {
-	if cgroup.Resources.NetClsClassid != 0 {
-		if err := writeFile(path, "net_cls.classid", strconv.FormatUint(uint64(cgroup.Resources.NetClsClassid), 10)); err != nil {
+	if cgroup.Resources.NetClsClassid != "" {
+		if err := writeFile(path, "net_cls.classid", cgroup.Resources.NetClsClassid); err != nil {
 			return err
 		}
 	}

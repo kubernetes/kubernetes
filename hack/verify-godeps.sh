@@ -95,8 +95,6 @@ git init > /dev/null 2>&1
 
 # Recreate the Godeps using the nice clean set we just downloaded
 hack/godep-save.sh
-# Run it again to make godep include recursive dependencies.
-hack/godep-save.sh
 
 # Test for diffs
 if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-matching-line='^\s*\"GodepVersion\":' --ignore-matching-lines='^\s*\"Comment\":' ${KUBE_ROOT}/Godeps/Godeps.json ${_kubetmp}/Godeps/Godeps.json)"; then

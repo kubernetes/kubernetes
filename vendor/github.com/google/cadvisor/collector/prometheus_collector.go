@@ -24,7 +24,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/info/v1"
 )
 
@@ -47,14 +46,12 @@ type PrometheusCollector struct {
 }
 
 //Returns a new collector using the information extracted from the configfile
-func NewPrometheusCollector(collectorName string, configFile []byte, metricCountLimit int, containerHandler container.ContainerHandler) (*PrometheusCollector, error) {
+func NewPrometheusCollector(collectorName string, configFile []byte, metricCountLimit int) (*PrometheusCollector, error) {
 	var configInJSON Prometheus
 	err := json.Unmarshal(configFile, &configInJSON)
 	if err != nil {
 		return nil, err
 	}
-
-	configInJSON.Endpoint.configure(containerHandler)
 
 	minPollingFrequency := configInJSON.PollingFrequency
 
@@ -111,7 +108,7 @@ func getMetricData(line string) string {
 
 func (collector *PrometheusCollector) GetSpec() []v1.MetricSpec {
 	specs := []v1.MetricSpec{}
-	response, err := http.Get(collector.configFile.Endpoint.URL)
+	response, err := http.Get(collector.configFile.Endpoint)
 	if err != nil {
 		return specs
 	}
@@ -156,7 +153,7 @@ func (collector *PrometheusCollector) Collect(metrics map[string][]v1.MetricVal)
 	currentTime := time.Now()
 	nextCollectionTime := currentTime.Add(time.Duration(collector.pollingFrequency))
 
-	uri := collector.configFile.Endpoint.URL
+	uri := collector.configFile.Endpoint
 	response, err := http.Get(uri)
 	if err != nil {
 		return nextCollectionTime, nil, err
