@@ -2305,3 +2305,35 @@ func TestSyncPodGetsPodIPFromNetworkPlugin(t *testing.T) {
 		"create", "start", "inspect_container",
 	})
 }
+
+// only test conditions "if inspect == nil || inspect.Config == nil || inspect.Config.Labels == nil" now
+func TestContainerAndPodFromLabels(t *testing.T) {
+	tests := []struct {
+		inspect       *dockertypes.ContainerJSON
+		expectedError error
+	}{
+		{
+			inspect:       nil,
+			expectedError: errNoPodOnContainer,
+		},
+		{
+			inspect:       &dockertypes.ContainerJSON{},
+			expectedError: errNoPodOnContainer,
+		},
+		{
+			inspect: &dockertypes.ContainerJSON{
+				Config: &dockercontainer.Config{
+					Hostname: "foo",
+				},
+			},
+			expectedError: errNoPodOnContainer,
+		},
+	}
+
+	for k, v := range tests {
+		pod, container, err := containerAndPodFromLabels(v.inspect)
+		if pod != nil || container != nil || err != v.expectedError {
+			t.Errorf("case[%q]: expected: nil, nil, %v, got: %v, %v, %v", k, v.expectedError, pod, container, err)
+		}
+	}
+}
