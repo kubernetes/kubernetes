@@ -131,7 +131,6 @@ func addGrouplessTypes() {
 	api.Scheme.AddKnownTypes(grouplessGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &ListOptions{},
 		&api.DeleteOptions{}, &apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
-	api.Scheme.AddKnownTypes(grouplessGroupVersion, &api.Pod{})
 	api.Scheme.AddKnownTypes(grouplessInternalGroupVersion,
 		&apiservertesting.Simple{}, &apiservertesting.SimpleList{}, &api.ListOptions{},
 		&apiservertesting.SimpleGetOptions{}, &apiservertesting.SimpleRoot{})
