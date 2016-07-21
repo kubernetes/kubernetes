@@ -33,7 +33,7 @@ import (
 
 var (
 	test                   = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
-	inputVersions          = flag.StringSlice("input", []string{"api/", "extensions/", "autoscaling/", "authentication/", "batch/", "rbac/", "certificates/"}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\". Default to \"api/,extensions/,autoscaling/,batch/,rbac/\"")
+	inputVersions          = flag.StringSlice("input", []string{"api/", "extensions/", "autoscaling/", "batch/", "rbac/", "certificates/"}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\". Default to \"api/,extensions/,autoscaling/,batch/,rbac/\"")
 	includedTypesOverrides = flag.StringSlice("included-types-overrides", []string{}, "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient=true in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient=true will be used for other group versions.")
 	basePath               = flag.String("input-base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group. Default to \"k8s.io/kubernetes/pkg/apis\"")
 	clientsetName          = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")

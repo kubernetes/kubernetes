@@ -17,7 +17,6 @@ limitations under the License.
 package authentication
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -44,10 +43,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 
 func addKnownTypes(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&api.ListOptions{},
-		&api.DeleteOptions{},
-		&api.ExportOptions{},
-
 		&TokenReview{},
 	)
 }
+
+func (obj *TokenReview) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
