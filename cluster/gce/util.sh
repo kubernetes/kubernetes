@@ -612,7 +612,7 @@ function kube-up() {
     create-nodes
   elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
     create-loadbalancer
-    # TODO: Add logic for copying an existing master.
+    replicate-master
   else
     check-existing
     create-network
@@ -738,6 +738,46 @@ function create-master() {
   get-master-root-disk-size
 
   create-master-instance "${MASTER_RESERVED_IP}" &
+}
+
+function replicate-master() {
+  set-replica-name
+
+  local existing_master=$(gcloud compute instances list \
+    --project "${PROJECT}" \
+    --regexp "$(get-replica-name-regexp)" \
+    --format "value(name,zone)" | head -n1)
+  local existing_master_name=$(echo "${existing_master}" | cut -f1)
+  local existing_master_zone=$(echo "${existing_master}" | cut -f2)
+
+  echo "Replicating existing master ${existing_master_zone}/${existing_master_name} as ${ZONE}/${REPLICA_NAME}"
+
+  # Before we do anything else, we should configure etcd to expect more replicas.
+  gcloud compute ssh ${existing_master_name} \
+    --project "${PROJECT}" \
+    --zone "${existing_master_zone}" \
+    --command \
+      "curl localhost:4001/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"http://${REPLICA_NAME}:2380\"]}'; \
+       curl localhost:4002/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"http://${REPLICA_NAME}:2381\"]}'" 2>/dev/null
+
+  # We have to make sure the disk is created before creating the master VM, so
+  # run this in the foreground.
+  gcloud compute disks create "${MASTER_NAME}-pd" \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --type "${MASTER_DISK_TYPE}" \
+    --size "${MASTER_DISK_SIZE}"
+
+  # Sets MASTER_ROOT_DISK_SIZE that is used by create-master-instance
+  get-master-root-disk-size
+
+  replicate-master-instance "${existing_master_zone}" "${existing_master_name}"
+
+  # Add new replica to the load balancer.
+  gcloud compute target-pools add-instances ${MASTER_NAME} \
+    --project "${PROJECT}" \
+    --zone ${ZONE} \
+    --instances ${REPLICA_NAME}
 }
 
 # Detaches old and ataches new external IP to a VM.
@@ -1077,14 +1117,29 @@ function kube-down() {
     fi
   done
 
+  local -r REPLICA_NAME=$(get-replica-name)
+
   # First delete the master (if it exists).
-  if gcloud compute instances describe "${MASTER_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+  if gcloud compute instances describe "${REPLICA_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
+    # If there is a load balancer in front of apiservers we need to first update its configuration.
+    if gcloud compute target-pools describe "${MASTER_NAME}" --region "${REGION}" --project "${PROJECT}" &>/dev/null; then
+      local MASTER_IP=$(gcloud compute instances describe \
+        --project "${PROJECT}" \
+        --zone "${ZONE}" \
+        "${REPLICA_NAME}" \
+        --format="value(networkInterfaces[0].accessConfigs[0].natIP)")
+      gcloud compute target-pools remove-instances "${MASTER_NAME}" \
+        --project "${PROJECT}" \
+        --zone "${ZONE}" \
+        --instances "${REPLICA_NAME}"
+    fi
+    # Now we can safely delete the VM.
     gcloud compute instances delete \
       --project "${PROJECT}" \
       --quiet \
       --delete-disks all \
       --zone "${ZONE}" \
-      "${MASTER_NAME}"
+      "${REPLICA_NAME}"
   fi
 
   # Delete the master pd (possibly leaked by kube-up if master create failed).
@@ -1110,7 +1165,7 @@ function kube-down() {
   # Check if this are any remaining master replicas.
   local REMAINING_MASTER_COUNT=$(gcloud compute instances list \
     --project "${PROJECT}" \
-    --regexp "${MASTER_NAME}(-...)?" \
+    --regexp "$(get-replica-name-regexp)" \
     --format "value(zone)" | wc -l)
 
   # In the replicated scenario, if there's only a single master left, we should also delete load balancer in front of it.
@@ -1212,6 +1267,52 @@ function kube-down() {
     clear-kubeconfig
   fi
   set -e
+}
+
+# Prints name of one of the master replicas in the current zone. It will be either
+# just MASTER_NAME or MASTER_NAME with a suffix for a replica (see get-replica-name-regexp).
+#
+# Assumed vars:
+#   PROJECT
+#   ZONE
+#   MASTER_NAME
+#
+# NOTE: Must be in sync with get-replica-name-regexp and set-replica-name.
+function get-replica-name() {
+  echo $(gcloud compute instances list \
+    --project "${PROJECT}" \
+    --zone "${ZONE}" \
+    --regexp "$(get-replica-name-regexp)" \
+    --format "value(name)" | head -n1)
+}
+
+# Prints regexp for full master machine name. In a cluster with replicated master,
+# VM names may either be MASTER_NAME or MASTER_NAME with a suffix for a replica.
+function get-replica-name-regexp() {
+  echo "${MASTER_NAME}(-...)?"
+}
+
+# Sets REPLICA_NAME to a unique name for a master replica that will match
+# expected regexp (see get-replica-name-regexp).
+#
+# Assumed vars:
+#   PROJECT
+#   ZONE
+#   MASTER_NAME
+#
+# Sets:
+#   REPLICA_NAME
+function set-replica-name() {
+  local instances=$(gcloud compute instances list \
+    --project "${PROJECT}" \
+    --regexp "$(get-replica-name-regexp)" \
+    --format "value(name)")
+
+  suffix=""
+  while echo ${instances} | grep "${suffix}" &>/dev/null; do
+    suffix="$(date | md5sum | head -c3)"
+  done
+  REPLICA_NAME="${MASTER_NAME}-${suffix}"
 }
 
 # Gets the instance template for given NODE_INSTANCE_PREFIX. It echos the template name so that the function
