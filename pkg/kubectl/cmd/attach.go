@@ -32,7 +32,6 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	remotecommandserver "k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -51,9 +50,11 @@ var (
 
 func NewCmdAttach(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &AttachOptions{
-		In:  cmdIn,
-		Out: cmdOut,
-		Err: cmdErr,
+		StreamOptions: StreamOptions{
+			In:  cmdIn,
+			Out: cmdOut,
+			Err: cmdErr,
+		},
 
 		Attach: &DefaultRemoteAttach{},
 	}
@@ -100,19 +101,9 @@ func (*DefaultRemoteAttach) Attach(method string, url *url.URL, config *restclie
 
 // AttachOptions declare the arguments accepted by the Exec command
 type AttachOptions struct {
-	Namespace     string
-	PodName       string
-	ContainerName string
-	Stdin         bool
-	TTY           bool
-	CommandName   string
+	StreamOptions
 
-	// InterruptParent, if set, is used to handle interrupts while attached
-	InterruptParent *interrupt.Handler
-
-	In  io.Reader
-	Out io.Writer
-	Err io.Writer
+	CommandName string
 
 	Pod *api.Pod
 
@@ -188,38 +179,30 @@ func (p *AttachOptions) Run() error {
 	}
 	pod := p.Pod
 
-	// ensure we can recover the terminal while attached
-	t := term.TTY{
-		Parent: p.InterruptParent,
-		Out:    p.Out,
-	}
-
 	// check for TTY
-	tty := p.TTY
 	containerToAttach, err := p.containerToAttachTo(pod)
 	if err != nil {
 		return fmt.Errorf("cannot attach to the container: %v", err)
 	}
-	if tty && !containerToAttach.TTY {
-		tty = false
-		fmt.Fprintf(p.Err, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
-	}
-	if p.Stdin {
-		t.In = p.In
-		if tty && !t.IsTerminalIn() {
-			tty = false
-			fmt.Fprintln(p.Err, "Unable to use a TTY - input is not a terminal or the right kind of file")
+	if p.TTY && !containerToAttach.TTY {
+		p.TTY = false
+		if p.Err != nil {
+			fmt.Fprintf(p.Err, "Unable to use a TTY - container %s did not allocate one\n", containerToAttach.Name)
 		}
-	} else {
-		p.In = nil
+	} else if !p.TTY && containerToAttach.TTY {
+		// the container was launched with a TTY, so we have to force a TTY here, otherwise you'll get
+		// an error "Unrecognized input header"
+		p.TTY = true
 	}
-	t.Raw = tty
+
+	// ensure we can recover the terminal while attached
+	t := p.setupTTY()
 
 	// save p.Err so we can print the command prompt message below
 	stderr := p.Err
 
 	var sizeQueue term.TerminalSizeQueue
-	if tty {
+	if t.Raw {
 		if size := t.GetSize(); size != nil {
 			// fake resizing +1 and then back to normal so that attach-detach-reattach will result in the
 			// screen being redrawn
@@ -252,17 +235,17 @@ func (p *AttachOptions) Run() error {
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
 			Stderr:    p.Err != nil,
-			TTY:       tty,
+			TTY:       t.Raw,
 		}, api.ParameterCodec)
 
-		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, tty, sizeQueue)
+		return p.Attach.Attach("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {
 		return err
 	}
 
-	if p.Stdin && tty && pod.Spec.RestartPolicy == api.RestartPolicyAlways {
+	if p.Stdin && t.Raw && pod.Spec.RestartPolicy == api.RestartPolicyAlways {
 		fmt.Fprintf(p.Out, "Session ended, resume using '%s %s -c %s -i -t' command when the pod is running\n", p.CommandName, pod.Name, containerToAttach.Name)
 	}
 	return nil
