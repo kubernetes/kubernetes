@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/authentication"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -66,6 +67,15 @@ func New(c *restclient.Config) (*Client, error) {
 	if registered.IsRegistered(autoscaling.GroupName) {
 		autoscalingConfig := *c
 		autoscalingClient, err = NewAutoscaling(&autoscalingConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var authenticationClient *AuthenticationClient
+	if registered.IsRegistered(authentication.GroupName) {
+		authenticationConfig := *c
+		authenticationClient, err = NewAuthentication(&authenticationConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +133,18 @@ func New(c *restclient.Config) (*Client, error) {
 		}
 	}
 
-	return &Client{RESTClient: client, AutoscalingClient: autoscalingClient, BatchClient: batchClient, CertificatesClient: certsClient, ExtensionsClient: extensionsClient, DiscoveryClient: discoveryClient, AppsClient: appsClient, PolicyClient: policyClient, RbacClient: rbacClient}, nil
+	return &Client{
+		RESTClient:           client,
+		AppsClient:           appsClient,
+		AuthenticationClient: authenticationClient,
+		AutoscalingClient:    autoscalingClient,
+		BatchClient:          batchClient,
+		CertificatesClient:   certsClient,
+		DiscoveryClient:      discoveryClient,
+		ExtensionsClient:     extensionsClient,
+		PolicyClient:         policyClient,
+		RbacClient:           rbacClient,
+	}, nil
 }
 
 // MatchesServerVersion queries the server to compares the build version
