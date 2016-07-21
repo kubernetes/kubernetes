@@ -3,7 +3,7 @@
 package configs
 
 var (
-	// DefaultSimpleDevices are devices that are to be both allowed and created.
+	// These are devices that are to be both allowed and created.
 	DefaultSimpleDevices = []*Device{
 		// /dev/null and zero
 		{

@@ -355,6 +355,9 @@ func (c *Client) dial(laddr string, lport int, raddr string, rport int) (Channel
 		lport: uint32(lport),
 	}
 	ch, in, err := c.OpenChannel("direct-tcpip", Marshal(&msg))
+	if err != nil {
+		return nil, err
+	}
 	go DiscardRequests(in)
 	return ch, err
 }

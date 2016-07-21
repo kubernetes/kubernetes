@@ -27,8 +27,7 @@ type Int32msg struct {
 	Value uint32
 }
 
-// Serialize serializes the message.
-// Int32msg has the following representation
+// int32msg has the following representation
 // | nlattr len | nlattr type |
 // | uint32 value             |
 func (msg *Int32msg) Serialize() []byte {
@@ -44,7 +43,7 @@ func (msg *Int32msg) Len() int {
 	return syscall_NLA_HDRLEN + 4
 }
 
-// Bytemsg has the following representation
+// bytemsg has the following representation
 // | nlattr len | nlattr type |
 // | value              | pad |
 type Bytemsg struct {

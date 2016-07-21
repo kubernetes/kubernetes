@@ -100,12 +100,17 @@ func Setctty() error {
 	return nil
 }
 
-// RunningInUserNS detects whether we are currently running in a user namespace.
-// Copied from github.com/lxc/lxd/shared/util.go
+/*
+ * Detect whether we are currently running in a user namespace.
+ * Copied from github.com/lxc/lxd/shared/util.go
+ */
 func RunningInUserNS() bool {
 	file, err := os.Open("/proc/self/uid_map")
 	if err != nil {
-		// This kernel-provided file only exists if user namespaces are supported
+		/*
+		 * This kernel-provided file only exists if user namespaces are
+		 * supported
+		 */
 		return false
 	}
 	defer file.Close()

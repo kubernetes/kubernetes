@@ -1,4 +1,4 @@
-// Package libcontainer provides a native Go implementation for creating containers
+// Libcontainer provides a native Go implementation for creating containers
 // with namespaces, cgroups, capabilities, and filesystem access controls.
 // It allows you to manage the lifecycle of the container performing additional operations
 // after the container is created.
@@ -11,20 +11,24 @@ import (
 	"github.com/opencontainers/runc/libcontainer/configs"
 )
 
-// Status is the status of a container.
+// The status of a container.
 type Status int
 
 const (
-	// Created is the status that denotes the container exists but has not been run yet.
+	// The container exists but has not been run yet
 	Created Status = iota
-	// Running is the status that denotes the container exists and is running.
+
+	// The container exists and is running.
 	Running
-	// Pausing is the status that denotes the container exists, it is in the process of being paused.
+
+	// The container exists, it is in the process of being paused.
 	Pausing
-	// Paused is the status that denotes the container exists, but all its processes are paused.
+
+	// The container exists, but all its processes are paused.
 	Paused
-	// Stopped is the status that denotes the container does not have a created or running process.
-	Stopped
+
+	// The container does not exist.
+	Destroyed
 )
 
 func (s Status) String() string {
@@ -37,8 +41,8 @@ func (s Status) String() string {
 		return "pausing"
 	case Paused:
 		return "paused"
-	case Stopped:
-		return "stopped"
+	case Destroyed:
+		return "destroyed"
 	default:
 		return "unknown"
 	}
@@ -63,7 +67,7 @@ type BaseState struct {
 	Config configs.Config `json:"config"`
 }
 
-// BaseContainer is a libcontainer container object.
+// A libcontainer container object.
 //
 // Each container is thread-safe within the same process. Since a container can
 // be destroyed by a separate process, any function may return that the container
@@ -76,13 +80,13 @@ type BaseContainer interface {
 	//
 	// errors:
 	// ContainerDestroyed - Container no longer exists,
-	// SystemError - System error.
+	// Systemerror - System error.
 	Status() (Status, error)
 
 	// State returns the current container's state information.
 	//
 	// errors:
-	// SystemError - System error.
+	// Systemerror - System error.
 	State() (*State, error)
 
 	// Returns the current config of the container.
@@ -92,7 +96,7 @@ type BaseContainer interface {
 	//
 	// errors:
 	// ContainerDestroyed - Container no longer exists,
-	// SystemError - System error.
+	// Systemerror - System error.
 	//
 	// Some of the returned PIDs may no longer refer to processes in the Container, unless
 	// the Container state is PAUSED in which case every PID in the slice is valid.
@@ -102,7 +106,7 @@ type BaseContainer interface {
 	//
 	// errors:
 	// ContainerDestroyed - Container no longer exists,
-	// SystemError - System error.
+	// Systemerror - System error.
 	Stats() (*Stats, error)
 
 	// Set resources of container as configured
@@ -110,7 +114,7 @@ type BaseContainer interface {
 	// We can use this to change resources when containers are running.
 	//
 	// errors:
-	// SystemError - System error.
+	// Systemerror - System error.
 	Set(config configs.Config) error
 
 	// Start a process inside the container. Returns error if process fails to
@@ -120,19 +124,8 @@ type BaseContainer interface {
 	// ContainerDestroyed - Container no longer exists,
 	// ConfigInvalid - config is invalid,
 	// ContainerPaused - Container is paused,
-	// SystemError - System error.
+	// Systemerror - System error.
 	Start(process *Process) (err error)
-
-	// Run immediatly starts the process inside the conatiner.  Returns error if process
-	// fails to start.  It does not block waiting for the exec fifo  after start returns but
-	// opens the fifo after start returns.
-	//
-	// errors:
-	// ContainerDestroyed - Container no longer exists,
-	// ConfigInvalid - config is invalid,
-	// ContainerPaused - Container is paused,
-	// SystemError - System error.
-	Run(process *Process) (err error)
 
 	// Destroys the container after killing all running processes.
 	//
@@ -140,18 +133,12 @@ type BaseContainer interface {
 	// No error is returned if the container is already destroyed.
 	//
 	// errors:
-	// SystemError - System error.
+	// Systemerror - System error.
 	Destroy() error
 
 	// Signal sends the provided signal code to the container's initial process.
 	//
 	// errors:
-	// SystemError - System error.
+	// Systemerror - System error.
 	Signal(s os.Signal) error
-
-	// Exec signals the container to exec the users process at the end of the init.
-	//
-	// errors:
-	// SystemError - System error.
-	Exec() error
 }
