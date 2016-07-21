@@ -23,12 +23,11 @@ import (
 )
 
 const (
-	stateFilename    = "state.json"
-	execFifoFilename = "exec.fifo"
+	stateFilename = "state.json"
 )
 
 var (
-	idRegex  = regexp.MustCompile(`^[\w+-\.]+$`)
+	idRegex  = regexp.MustCompile(`^[\w-\.]+$`)
 	maxIdLen = 1024
 )
 
@@ -159,34 +158,13 @@ func (l *LinuxFactory) Create(id string, config *configs.Config) (Container, err
 	if err := l.Validator.Validate(config); err != nil {
 		return nil, newGenericError(err, ConfigInvalid)
 	}
-	uid, err := config.HostUID()
-	if err != nil {
-		return nil, newGenericError(err, SystemError)
-	}
-	gid, err := config.HostGID()
-	if err != nil {
-		return nil, newGenericError(err, SystemError)
-	}
 	containerRoot := filepath.Join(l.Root, id)
 	if _, err := os.Stat(containerRoot); err == nil {
 		return nil, newGenericError(fmt.Errorf("container with id exists: %v", id), IdInUse)
 	} else if !os.IsNotExist(err) {
 		return nil, newGenericError(err, SystemError)
 	}
-	if err := os.MkdirAll(containerRoot, 0711); err != nil {
-		return nil, newGenericError(err, SystemError)
-	}
-	if err := os.Chown(containerRoot, uid, gid); err != nil {
-		return nil, newGenericError(err, SystemError)
-	}
-	fifoName := filepath.Join(containerRoot, execFifoFilename)
-	oldMask := syscall.Umask(0000)
-	if err := syscall.Mkfifo(fifoName, 0622); err != nil {
-		syscall.Umask(oldMask)
-		return nil, newGenericError(err, SystemError)
-	}
-	syscall.Umask(oldMask)
-	if err := os.Chown(fifoName, uid, gid); err != nil {
+	if err := os.MkdirAll(containerRoot, 0700); err != nil {
 		return nil, newGenericError(err, SystemError)
 	}
 	c := &linuxContainer{
@@ -217,18 +195,17 @@ func (l *LinuxFactory) Load(id string) (Container, error) {
 		fds:              state.ExternalDescriptors,
 	}
 	c := &linuxContainer{
-		initProcess:          r,
-		initProcessStartTime: state.InitProcessStartTime,
-		id:                   id,
-		config:               &state.Config,
-		initPath:             l.InitPath,
-		initArgs:             l.InitArgs,
-		criuPath:             l.CriuPath,
-		cgroupManager:        l.NewCgroupsManager(state.Config.Cgroups, state.CgroupPaths),
-		root:                 containerRoot,
-		created:              state.Created,
+		initProcess:   r,
+		id:            id,
+		config:        &state.Config,
+		initPath:      l.InitPath,
+		initArgs:      l.InitArgs,
+		criuPath:      l.CriuPath,
+		cgroupManager: l.NewCgroupsManager(state.Config.Cgroups, state.CgroupPaths),
+		root:          containerRoot,
+		created:       state.Created,
 	}
-	c.state = &loadedState{c: c}
+	c.state = &createdState{c: c, s: Created}
 	if err := c.refreshState(); err != nil {
 		return nil, err
 	}
@@ -242,18 +219,10 @@ func (l *LinuxFactory) Type() string {
 // StartInitialization loads a container by opening the pipe fd from the parent to read the configuration and state
 // This is a low level implementation detail of the reexec and should not be consumed externally
 func (l *LinuxFactory) StartInitialization() (err error) {
-	var pipefd, rootfd int
-	for k, v := range map[string]*int{
-		"_LIBCONTAINER_INITPIPE": &pipefd,
-		"_LIBCONTAINER_STATEDIR": &rootfd,
-	} {
-		s := os.Getenv(k)
-
-		i, err := strconv.Atoi(s)
-		if err != nil {
-			return fmt.Errorf("unable to convert %s=%s to int", k, s)
-		}
-		*v = i
+	fdStr := os.Getenv("_LIBCONTAINER_INITPIPE")
+	pipefd, err := strconv.Atoi(fdStr)
+	if err != nil {
+		return fmt.Errorf("error converting env var _LIBCONTAINER_INITPIPE(%q) to an int: %s", fdStr, err)
 	}
 	var (
 		pipe = os.NewFile(uintptr(pipefd), "pipe")
@@ -262,7 +231,6 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 	// clear the current process's environment to clean any libcontainer
 	// specific env vars.
 	os.Clearenv()
-
 	var i initer
 	defer func() {
 		// We have an error during the initialization of the container's init,
@@ -271,22 +239,24 @@ func (l *LinuxFactory) StartInitialization() (err error) {
 		// this defer function will never be called.
 		if _, ok := i.(*linuxStandardInit); ok {
 			//  Synchronisation only necessary for standard init.
-			if werr := utils.WriteJSON(pipe, syncT{procError}); werr != nil {
+			if err := utils.WriteJSON(pipe, syncT{procError}); err != nil {
 				panic(err)
 			}
 		}
-		if werr := utils.WriteJSON(pipe, newSystemError(err)); werr != nil {
+		if err := utils.WriteJSON(pipe, newSystemError(err)); err != nil {
 			panic(err)
 		}
 		// ensure that this pipe is always closed
 		pipe.Close()
 	}()
+
 	defer func() {
 		if e := recover(); e != nil {
 			err = fmt.Errorf("panic from initialization: %v, %v", e, string(debug.Stack()))
 		}
 	}()
-	i, err = newContainerInit(it, pipe, rootfd)
+
+	i, err = newContainerInit(it, pipe)
 	if err != nil {
 		return err
 	}

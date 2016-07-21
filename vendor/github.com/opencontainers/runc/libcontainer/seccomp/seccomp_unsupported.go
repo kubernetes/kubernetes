@@ -10,7 +10,7 @@ import (
 
 var ErrSeccompNotEnabled = errors.New("seccomp: config provided but seccomp not supported")
 
-// InitSeccomp does nothing because seccomp is not supported.
+// Seccomp not supported, do nothing
 func InitSeccomp(config *configs.Seccomp) error {
 	if config != nil {
 		return ErrSeccompNotEnabled

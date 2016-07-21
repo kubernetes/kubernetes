@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"syscall"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -78,7 +77,7 @@ type stoppedState struct {
 }
 
 func (b *stoppedState) status() Status {
-	return Stopped
+	return Destroyed
 }
 
 func (b *stoppedState) transition(s containerState) error {
@@ -111,11 +110,11 @@ func (r *runningState) status() Status {
 func (r *runningState) transition(s containerState) error {
 	switch s.(type) {
 	case *stoppedState:
-		t, err := r.c.runType()
+		running, err := r.c.isRunning()
 		if err != nil {
 			return err
 		}
-		if t == Running {
+		if running {
 			return newGenericError(fmt.Errorf("container still running"), ContainerNotStopped)
 		}
 		r.c.state = s
@@ -130,38 +129,14 @@ func (r *runningState) transition(s containerState) error {
 }
 
 func (r *runningState) destroy() error {
-	t, err := r.c.runType()
+	running, err := r.c.isRunning()
 	if err != nil {
 		return err
 	}
-	if t == Running {
+	if running {
 		return newGenericError(fmt.Errorf("container is not destroyed"), ContainerNotStopped)
 	}
 	return destroy(r.c)
-}
-
-type createdState struct {
-	c *linuxContainer
-}
-
-func (i *createdState) status() Status {
-	return Created
-}
-
-func (i *createdState) transition(s containerState) error {
-	switch s.(type) {
-	case *runningState, *pausedState, *stoppedState:
-		i.c.state = s
-		return nil
-	case *createdState:
-		return nil
-	}
-	return newStateTransitionError(i, s)
-}
-
-func (i *createdState) destroy() error {
-	i.c.initProcess.signal(syscall.SIGKILL)
-	return destroy(i.c)
 }
 
 // pausedState represents a container that is currently pause.  It cannot be destroyed in a
@@ -186,11 +161,11 @@ func (p *pausedState) transition(s containerState) error {
 }
 
 func (p *pausedState) destroy() error {
-	t, err := p.c.runType()
+	isRunning, err := p.c.isRunning()
 	if err != nil {
 		return err
 	}
-	if t != Running && t != Created {
+	if !isRunning {
 		if err := p.c.cgroupManager.Freeze(configs.Thawed); err != nil {
 			return err
 		}
@@ -200,7 +175,7 @@ func (p *pausedState) destroy() error {
 }
 
 // restoredState is the same as the running state but also has accociated checkpoint
-// information that maybe need destroyed when the container is stopped and destroy is called.
+// information that maybe need destroyed when the container is stopped and destory is called.
 type restoredState struct {
 	imageDir string
 	c        *linuxContainer
@@ -229,23 +204,23 @@ func (r *restoredState) destroy() error {
 	return destroy(r.c)
 }
 
-// loadedState is used whenever a container is restored, loaded, or setting additional
+// createdState is used whenever a container is restored, loaded, or setting additional
 // processes inside and it should not be destroyed when it is exiting.
-type loadedState struct {
+type createdState struct {
 	c *linuxContainer
 	s Status
 }
 
-func (n *loadedState) status() Status {
+func (n *createdState) status() Status {
 	return n.s
 }
 
-func (n *loadedState) transition(s containerState) error {
+func (n *createdState) transition(s containerState) error {
 	n.c.state = s
 	return nil
 }
 
-func (n *loadedState) destroy() error {
+func (n *createdState) destroy() error {
 	if err := n.c.refreshState(); err != nil {
 		return err
 	}

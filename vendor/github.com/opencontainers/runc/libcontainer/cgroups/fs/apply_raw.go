@@ -142,9 +142,7 @@ func (m *Manager) Apply(pid int) (err error) {
 		// created then join consists of writing the process pids to cgroup.procs
 		p, err := d.path(sys.Name())
 		if err != nil {
-			// The non-presence of the devices subsystem is
-			// considered fatal for security reasons.
-			if cgroups.IsNotFound(err) && sys.Name() != "devices" {
+			if cgroups.IsNotFound(err) {
 				continue
 			}
 			return err
@@ -351,7 +349,7 @@ func writeFile(dir, file, data string) error {
 	// Normally dir should not be empty, one case is that cgroup subsystem
 	// is not mounted, we will get empty dir, and we want it fail here.
 	if dir == "" {
-		return fmt.Errorf("no such directory for %s", file)
+		return fmt.Errorf("no such directory for %s.", file)
 	}
 	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700); err != nil {
 		return fmt.Errorf("failed to write %v to %v: %v", data, file, err)
