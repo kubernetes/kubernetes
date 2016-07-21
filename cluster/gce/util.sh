@@ -98,17 +98,17 @@ KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
 # How long (in seconds) to wait for cluster initialization.
 KUBE_CLUSTER_INITIALIZATION_TIMEOUT=${KUBE_CLUSTER_INITIALIZATION_TIMEOUT:-300}
 
-function join_csv {
+function join_csv() {
   local IFS=','; echo "$*";
 }
 
 # This function returns the first string before the comma
-function split_csv {
+function split_csv() {
   echo "$*" | cut -d',' -f1
 }
 
 # Verify prereqs
-function verify-prereqs {
+function verify-prereqs() {
   local cmd
   for cmd in gcloud gsutil; do
     if ! which "${cmd}" >/dev/null; then
@@ -149,7 +149,7 @@ function verify-prereqs {
 #
 # Vars set:
 #   KUBE_TEMP
-function ensure-temp-dir {
+function ensure-temp-dir() {
   if [[ -z ${KUBE_TEMP-} ]]; then
     KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
     trap 'rm -rf "${KUBE_TEMP}"' EXIT
@@ -162,7 +162,7 @@ function ensure-temp-dir {
 # Vars set:
 #   PROJECT
 #   PROJECT_REPORTED
-function detect-project () {
+function detect-project() {
   if [[ -z "${PROJECT-}" ]]; then
     PROJECT=$(gcloud config list project --format 'value(core.project)')
   fi
@@ -328,7 +328,7 @@ function upload-server-tars() {
 # Vars set:
 #   NODE_NAMES
 #   INSTANCE_GROUPS
-function detect-node-names {
+function detect-node-names() {
   detect-project
   INSTANCE_GROUPS=()
   INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
@@ -354,7 +354,7 @@ function detect-node-names {
 # Vars set:
 #   NODE_NAMES
 #   KUBE_NODE_IP_ADDRESSES (array)
-function detect-nodes () {
+function detect-nodes() {
   detect-project
   detect-node-names
   KUBE_NODE_IP_ADDRESSES=()
@@ -383,7 +383,7 @@ function detect-nodes () {
 # Vars set:
 #   KUBE_MASTER
 #   KUBE_MASTER_IP
-function detect-master () {
+function detect-master() {
   detect-project
   KUBE_MASTER=${MASTER_NAME}
   if [[ -z "${KUBE_MASTER_IP-}" ]]; then
@@ -413,7 +413,7 @@ function get-master-env() {
 # Robustly try to create a static ip.
 # $1: The name of the ip to create
 # $2: The name of the region to create the ip in.
-function create-static-ip {
+function create-static-ip() {
   detect-project
   local attempt=0
   local REGION="$2"
@@ -446,7 +446,7 @@ function create-static-ip {
 # $1: The name of firewall rule.
 # $2: IP ranges.
 # $3: Target tags for this firewall rule.
-function create-firewall-rule {
+function create-firewall-rule() {
   detect-project
   local attempt=0
   while true; do
@@ -470,7 +470,7 @@ function create-firewall-rule {
 }
 
 # $1: version (required)
-function get-template-name-from-version {
+function get-template-name-from-version() {
   # trim template name to pass gce name validation
   echo "${NODE_INSTANCE_PREFIX}-template-${1}" | cut -c 1-63 | sed 's/[\.\+]/-/g;s/-*$//g'
 }
@@ -479,7 +479,7 @@ function get-template-name-from-version {
 # $1: The name of the instance template.
 # $2: The scopes flag.
 # $3 and others: Metadata entries (must all be from a file).
-function create-node-template {
+function create-node-template() {
   detect-project
   local template_name="$1"
 
@@ -536,7 +536,7 @@ function create-node-template {
 # Robustly try to add metadata on an instance.
 # $1: The name of the instance.
 # $2...$n: The metadata key=value pairs to add.
-function add-instance-metadata {
+function add-instance-metadata() {
   local -r instance=$1
   shift 1
   local -r kvs=( "$@" )
@@ -563,7 +563,7 @@ function add-instance-metadata {
 # Robustly try to add metadata on an instance, from a file.
 # $1: The name of the instance.
 # $2...$n: The metadata key=file pairs to add.
-function add-instance-metadata-from-file {
+function add-instance-metadata-from-file() {
   local -r instance=$1
   shift 1
   local -r kvs=( "$@" )
@@ -593,7 +593,7 @@ function add-instance-metadata-from-file {
 # Assumed vars
 #   KUBE_ROOT
 #   <Various vars set in config file>
-function kube-up {
+function kube-up() {
   ensure-temp-dir
   detect-project
 
@@ -1039,7 +1039,7 @@ function check-cluster() {
 # This function tears down cluster resources 10 at a time to avoid issuing too many
 # API calls and exceeding API quota. It is important to bring down the instances before bringing
 # down the firewall rules and routes.
-function kube-down {
+function kube-down() {
   local -r batch=200
 
   detect-project
@@ -1220,7 +1220,7 @@ function kube-down {
 #   NODE_INSTANCE_PREFIX
 #
 # $1: project
-function get-template {
+function get-template() {
   gcloud compute instance-templates list -r "${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?" \
     --project="${1}" --format='value(name)'
 }
@@ -1234,7 +1234,7 @@ function get-template {
 #   REGION
 # Vars set:
 #   KUBE_RESOURCE_FOUND
-function check-resources {
+function check-resources() {
   detect-project
   detect-node-names
 
@@ -1385,7 +1385,7 @@ function prepare-push() {
 }
 
 # Push binaries to kubernetes master
-function push-master {
+function push-master() {
   echo "Updating master metadata ..."
   write-master-env
   prepare-startup-script
@@ -1408,7 +1408,7 @@ function push-node() {
 }
 
 # Push binaries to kubernetes cluster
-function kube-push {
+function kube-push() {
   # Disable this until it's fixed.
   # See https://github.com/kubernetes/kubernetes/issues/17397
   echo "./cluster/kube-push.sh is currently not supported in GCE."
@@ -1451,7 +1451,7 @@ function kube-push {
 #
 # Assumed Vars:
 #   KUBE_ROOT
-function test-build-release {
+function test-build-release() {
   # Make a release
   "${KUBE_ROOT}/build/release.sh"
 }
@@ -1461,7 +1461,7 @@ function test-build-release {
 #
 # Assumed vars:
 #   Variables from config.sh
-function test-setup {
+function test-setup() {
   # Detect the project into $PROJECT if it isn't set
   detect-project
 
@@ -1516,7 +1516,7 @@ function test-setup {
 
 # Execute after running tests to perform any required clean-up. This is called
 # from hack/e2e.go
-function test-teardown {
+function test-teardown() {
   detect-project
   echo "Shutting down test cluster in background."
   gcloud compute firewall-rules delete  \
@@ -1541,7 +1541,7 @@ function test-teardown {
 }
 
 # SSH to a node by name ($1) and run a command ($2).
-function ssh-to-node {
+function ssh-to-node() {
   local node="$1"
   local cmd="$2"
   # Loop until we can successfully ssh into the box
