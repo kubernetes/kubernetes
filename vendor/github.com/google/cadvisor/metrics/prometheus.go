@@ -493,6 +493,7 @@ func (c *PrometheusCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches the stats from all containers and delivers them as
 // Prometheus metrics. It implements prometheus.PrometheusCollector.
 func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
+	c.errors.Set(0)
 	c.collectMachineInfo(ch)
 	c.collectVersionInfo(ch)
 	c.collectContainersInfo(ch)
@@ -502,7 +503,7 @@ func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
 func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric) {
 	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
-		c.errors.Set(1)
+		c.errors.Inc()
 		glog.Warningf("Couldn't get containers: %s", err)
 		return
 	}
@@ -573,7 +574,7 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 func (c *PrometheusCollector) collectVersionInfo(ch chan<- prometheus.Metric) {
 	versionInfo, err := c.infoProvider.GetVersionInfo()
 	if err != nil {
-		c.errors.Set(1)
+		c.errors.Inc()
 		glog.Warningf("Couldn't get version info: %s", err)
 		return
 	}
@@ -583,7 +584,7 @@ func (c *PrometheusCollector) collectVersionInfo(ch chan<- prometheus.Metric) {
 func (c *PrometheusCollector) collectMachineInfo(ch chan<- prometheus.Metric) {
 	machineInfo, err := c.infoProvider.GetMachineInfo()
 	if err != nil {
-		c.errors.Set(1)
+		c.errors.Inc()
 		glog.Warningf("Couldn't get machine info: %s", err)
 		return
 	}
