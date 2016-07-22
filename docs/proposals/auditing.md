@@ -137,6 +137,12 @@ $ kube-apiserver --audit-output file:path=/var/log/apiserver-audit.log,rotate=1d
   --audit-policy user=EndUser,kind=ReplicationController:output=diff,exclude=status
 ```
 
+## Sensible (not necessarily sequential) Milestones of Implementation
+
+1. add `audit.Event` and `audit.OutputBackend` and implement https://github.com/kubernetes/kubernetes/pull/27087/'s basic auth using them
+2. add deep inspection on the storage level to the old and the new object
+3. add output level policy support (versus static policy in the initial implementation)
+
 ## Examples
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
