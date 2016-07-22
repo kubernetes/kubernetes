@@ -23,26 +23,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-// FilterPodsByNameSpaces filters the pods based the given list of namespaces,
-// empty set of namespaces means all namespaces.
-func FilterPodsByNameSpaces(names sets.String, pods []*api.Pod) []*api.Pod {
-	if len(pods) == 0 || len(names) == 0 {
-		return pods
-	}
-	result := []*api.Pod{}
-	for _, pod := range pods {
-		if names.Has(pod.Namespace) {
-			result = append(result, pod)
-		}
-	}
-	return result
-}
-
 // GetNamespacesFromPodAffinityTerm returns a set of names
 // according to the namespaces indicated in podAffinityTerm.
-// if the NameSpaces is nil considers the given pod's namespace
-// if the Namespaces is empty list then considers all the namespaces
-func GetNamespacesFromPodAffinityTerm(pod *api.Pod, podAffinityTerm api.PodAffinityTerm) sets.String {
+// 1. If the namespaces is nil considers the given pod's namespace
+// 2. If the namespaces is empty list then considers all the namespaces
+func getNamespacesFromPodAffinityTerm(pod *api.Pod, podAffinityTerm api.PodAffinityTerm) sets.String {
 	names := sets.String{}
 	if podAffinityTerm.Namespaces == nil {
 		names.Insert(pod.Namespace)
@@ -50,6 +35,21 @@ func GetNamespacesFromPodAffinityTerm(pod *api.Pod, podAffinityTerm api.PodAffin
 		names.Insert(podAffinityTerm.Namespaces...)
 	}
 	return names
+}
+
+// PodMatchesTermsNamespaceAndSelector returns true if the given <pod>
+// matches the namespace and selector defined by <affinityPod>`s <term>.
+func PodMatchesTermsNamespaceAndSelector(pod *api.Pod, affinityPod *api.Pod, term *api.PodAffinityTerm) (bool, error) {
+	namespaces := getNamespacesFromPodAffinityTerm(affinityPod, *term)
+	if len(namespaces) != 0 && !namespaces.Has(pod.Namespace) {
+		return false, nil
+	}
+
+	selector, err := unversioned.LabelSelectorAsSelector(term.LabelSelector)
+	if err != nil || !selector.Matches(labels.Set(pod.Labels)) {
+		return false, err
+	}
+	return true, nil
 }
 
 // nodesHaveSameTopologyKeyInternal checks if nodeA and nodeB have same label value with given topologyKey as label key.
@@ -75,21 +75,4 @@ func (tps *Topologies) NodesHaveSameTopologyKey(nodeA, nodeB *api.Node, topology
 	} else {
 		return nodesHaveSameTopologyKeyInternal(nodeA, nodeB, topologyKey)
 	}
-}
-
-// CheckIfPodMatchPodAffinityTerm checks if podB's affinity request is compatible with podA
-// TODO: Get rid this method. We should avoid computing Namespaces and selectors multiple times
-// and check them on higher levels and then use NodesHaveSameTopologyKey method.
-func (tps *Topologies) CheckIfPodMatchPodAffinityTerm(podA *api.Pod, nodeA, nodeB *api.Node, podB *api.Pod, podBAffinityTerm api.PodAffinityTerm) (bool, error) {
-	names := GetNamespacesFromPodAffinityTerm(podB, podBAffinityTerm)
-	if len(names) != 0 && !names.Has(podA.Namespace) {
-		return false, nil
-	}
-
-	labelSelector, err := unversioned.LabelSelectorAsSelector(podBAffinityTerm.LabelSelector)
-	if err != nil || !labelSelector.Matches(labels.Set(podA.Labels)) {
-		return false, err
-	}
-
-	return tps.NodesHaveSameTopologyKey(nodeA, nodeB, podBAffinityTerm.TopologyKey), nil
 }
