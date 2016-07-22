@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
@@ -41,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
@@ -56,6 +58,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -243,7 +246,13 @@ func Run(s *options.APIServer) error {
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
 	}
-	admissionController := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile)
+	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
+	pluginInitializer := admission.NewPluginInitializer(sharedInformers)
+
+	admissionController, err := admission.NewFromPlugins(client, admissionControlPluginNames, s.AdmissionControlConfigFile, pluginInitializer)
+	if err != nil {
+		glog.Fatalf("Failed to initialize plugins: %v", err)
+	}
 
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
@@ -278,6 +287,7 @@ func Run(s *options.APIServer) error {
 		return err
 	}
 
+	sharedInformers.Start(wait.NeverStop)
 	m.Run(s.ServerRunOptions)
 	return nil
 }
