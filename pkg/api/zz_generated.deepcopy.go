@@ -2917,6 +2917,7 @@ func DeepCopy_api_ReplicationControllerStatus(in interface{}, out interface{}, c
 		out := out.(*ReplicationControllerStatus)
 		out.Replicas = in.Replicas
 		out.FullyLabeledReplicas = in.FullyLabeledReplicas
+		out.AvailableReplicas = in.AvailableReplicas
 		out.ObservedGeneration = in.ObservedGeneration
 		return nil
 	}

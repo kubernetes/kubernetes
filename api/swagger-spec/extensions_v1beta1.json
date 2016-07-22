@@ -10212,6 +10212,11 @@
       "format": "int32",
       "description": "The number of pods that have labels matching the labels of the pod template of the replicaset."
      },
+     "availableReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of available replicas for this replica set."
+     },
      "observedGeneration": {
       "type": "integer",
       "format": "int64",

@@ -6309,6 +6309,9 @@ func (m *ReplicationControllerStatus) MarshalTo(data []byte) (int, error) {
 	data[i] = 0x18
 	i++
 	i = encodeVarintGenerated(data, i, uint64(m.ObservedGeneration))
+	data[i] = 0x20
+	i++
+	i = encodeVarintGenerated(data, i, uint64(m.AvailableReplicas))
 	return i, nil
 }
 
@@ -9754,6 +9757,7 @@ func (m *ReplicationControllerStatus) Size() (n int) {
 	n += 1 + sovGenerated(uint64(m.Replicas))
 	n += 1 + sovGenerated(uint64(m.FullyLabeledReplicas))
 	n += 1 + sovGenerated(uint64(m.ObservedGeneration))
+	n += 1 + sovGenerated(uint64(m.AvailableReplicas))
 	return n
 }
 
@@ -11973,6 +11977,7 @@ func (this *ReplicationControllerStatus) String() string {
 		`Replicas:` + fmt.Sprintf("%v", this.Replicas) + `,`,
 		`FullyLabeledReplicas:` + fmt.Sprintf("%v", this.FullyLabeledReplicas) + `,`,
 		`ObservedGeneration:` + fmt.Sprintf("%v", this.ObservedGeneration) + `,`,
+		`AvailableReplicas:` + fmt.Sprintf("%v", this.AvailableReplicas) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -32087,6 +32092,25 @@ func (m *ReplicationControllerStatus) Unmarshal(data []byte) error {
 				b := data[iNdEx]
 				iNdEx++
 				m.ObservedGeneration |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+		case 4:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field AvailableReplicas", wireType)
+			}
+			m.AvailableReplicas = 0
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				m.AvailableReplicas |= (int32(b) & 0x7F) << shift
 				if b < 0x80 {
 					break
 				}

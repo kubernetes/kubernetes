@@ -679,15 +679,19 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	// a superset of the selector of the replication controller, so the possible
 	// matching pods must be part of the filteredPods.
 	fullyLabeledReplicasCount := 0
+	availableReplicasCount := 0
 	templateLabel := labels.Set(rc.Spec.Template.Labels).AsSelector()
 	for _, pod := range filteredPods {
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++
 		}
+		if api.IsPodReady(pod) {
+			availableReplicasCount++
+		}
 	}
 
 	// Always updates status as pods come up or die.
-	if err := updateReplicaCount(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, len(filteredPods), fullyLabeledReplicasCount); err != nil {
+	if err := updateReplicaCount(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, len(filteredPods), fullyLabeledReplicasCount, availableReplicasCount); err != nil {
 		// Multiple things could lead to this update failing. Requeuing the controller ensures
 		// we retry with some fairness.
 		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rc.Namespace, rc.Name, err)

@@ -97,13 +97,17 @@ func newReplicationController(replicas int) *api.ReplicationController {
 
 // create a pod with the given phase for the given rc (same selectors and namespace).
 func newPod(name string, rc *api.ReplicationController, status api.PodPhase) *api.Pod {
+	var conditions []api.PodCondition
+	if status == api.PodRunning {
+		conditions = append(conditions, api.PodCondition{Type: api.PodReady, Status: api.ConditionTrue})
+	}
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Labels:    rc.Spec.Selector,
 			Namespace: rc.Namespace,
 		},
-		Status: api.PodStatus{Phase: status},
+		Status: api.PodStatus{Phase: status, Conditions: conditions},
 	}
 }
 
@@ -242,7 +246,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	activePods := 5
 	rc := newReplicationController(activePods)
 	manager.rcStore.Indexer.Add(rc)
-	rc.Status = api.ReplicationControllerStatus{Replicas: int32(activePods)}
+	rc.Status = api.ReplicationControllerStatus{Replicas: int32(activePods), AvailableReplicas: int32(activePods)}
 	newPodList(manager.podStore.Indexer, activePods, api.PodRunning, rc, "pod")
 
 	fakePodControl := controller.FakePodControl{}
@@ -283,7 +287,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
 	rc := newReplicationController(5)
 	manager.rcStore.Indexer.Add(rc)
-	rc.Status = api.ReplicationControllerStatus{Replicas: 2, FullyLabeledReplicas: 6, ObservedGeneration: 0}
+	rc.Status = api.ReplicationControllerStatus{Replicas: 2, FullyLabeledReplicas: 6, AvailableReplicas: 2, ObservedGeneration: 0}
 	rc.Generation = 1
 	newPodList(manager.podStore.Indexer, 2, api.PodRunning, rc, "pod")
 	rcCopy := *rc
@@ -304,7 +308,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	// 2. Status.FullyLabeledReplicas should equal to the number of pods that
 	// has the extra labels, i.e., 2.
 	// 3. Every update to the status should include the Generation of the spec.
-	rc.Status = api.ReplicationControllerStatus{Replicas: 4, ObservedGeneration: 1}
+	rc.Status = api.ReplicationControllerStatus{Replicas: 4, AvailableReplicas: 4, ObservedGeneration: 1}
 
 	decRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
 	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name)+"/status", "PUT", &decRc)
@@ -331,11 +335,13 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 
 	// Creates a replica and sets expectations
 	controllerSpec.Status.Replicas = 1
+	controllerSpec.Status.AvailableReplicas = 1
 	manager.syncReplicationController(getKey(controllerSpec, t))
 	validateSyncReplication(t, &fakePodControl, 1, 0, 0)
 
 	// Expectations prevents replicas but not an update on status
 	controllerSpec.Status.Replicas = 0
+	controllerSpec.Status.AvailableReplicas = 0
 	fakePodControl.Clear()
 	manager.syncReplicationController(getKey(controllerSpec, t))
 	validateSyncReplication(t, &fakePodControl, 0, 0, 0)
@@ -350,6 +356,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	// fakePodControl error will prevent this, leaving expectations at 0, 0.
 	manager.expectations.CreationObserved(rcKey)
 	controllerSpec.Status.Replicas = 1
+	controllerSpec.Status.AvailableReplicas = 1
 	fakePodControl.Clear()
 	fakePodControl.Err = fmt.Errorf("Fake Error")
 
@@ -635,7 +642,7 @@ func TestControllerUpdateStatusWithFailure(t *testing.T) {
 	})
 	fakeRCClient := c.Core().ReplicationControllers("default")
 	numReplicas := 10
-	updateReplicaCount(fakeRCClient, *rc, numReplicas, 0)
+	updateReplicaCount(fakeRCClient, *rc, numReplicas, 0, 0)
 	updates, gets := 0, 0
 	for _, a := range c.Actions() {
 		if a.GetResource().Resource != "replicationcontrollers" {
@@ -1317,4 +1324,43 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 		t.Fatal(err)
 	}
 	validateSyncReplication(t, fakePodControl, 0, 0, 0)
+}
+
+func TestAvailableReplicas(t *testing.T) {
+	// This is a happy server just to record the PUT request we expect for status.Replicas
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   200,
+		ResponseBody: "{}",
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	defer testServer.Close()
+
+	c := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	manager := NewReplicationManagerFromClient(c, controller.NoResyncPeriodFunc, BurstReplicas, 0)
+	manager.podStoreSynced = alwaysReady
+
+	// Status.Replica should update to match number of pods in system, 1 new pod should be created.
+	rc := newReplicationController(2)
+	rc.Status = api.ReplicationControllerStatus{Replicas: 2, AvailableReplicas: 0, ObservedGeneration: 1}
+	rc.Generation = 1
+	manager.rcStore.Indexer.Add(rc)
+
+	newPodList(manager.podStore.Indexer, 2, api.PodPending, rc, "pod")
+	newPodList(manager.podStore.Indexer, 2, api.PodRunning, rc, "pod")
+
+	// This response body is just so we don't err out decoding the http response
+	response := runtime.EncodeOrDie(testapi.Default.Codec(), &api.ReplicationController{})
+	fakeHandler.ResponseBody = response
+
+	fakePodControl := controller.FakePodControl{}
+	manager.podControl = &fakePodControl
+
+	manager.syncReplicationController(getKey(rc, t))
+
+	// AvailableReplicas should go from 0 to 2.
+	rc.Status = api.ReplicationControllerStatus{Replicas: 2, AvailableReplicas: 2, ObservedGeneration: 1}
+
+	decRc := runtime.EncodeOrDie(testapi.Default.Codec(), rc)
+	fakeHandler.ValidateRequest(t, testapi.Default.ResourcePath(replicationControllerResourceName(), rc.Namespace, rc.Name)+"/status", "PUT", &decRc)
+	validateSyncReplication(t, &fakePodControl, 0, 0, 0)
 }

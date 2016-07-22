@@ -864,6 +864,7 @@ func DeepCopy_extensions_ReplicaSetStatus(in interface{}, out interface{}, c *co
 		out := out.(*ReplicaSetStatus)
 		out.Replicas = in.Replicas
 		out.FullyLabeledReplicas = in.FullyLabeledReplicas
+		out.AvailableReplicas = in.AvailableReplicas
 		out.ObservedGeneration = in.ObservedGeneration
 		return nil
 	}
