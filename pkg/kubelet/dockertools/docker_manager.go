@@ -859,7 +859,16 @@ func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, er
 
 // Removes the specified image.
 func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
-	// TODO(harryz) currently Runtime interface does not provide other remove options.
+	// If the image has multiple tags, we need to remove all the tags
+	if inspectImage, err := dm.client.InspectImage(image.Image); err == nil && len(inspectImage.RepoTags) > 1 {
+		for _, tag := range inspectImage.RepoTags {
+			if _, err := dm.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
 	_, err := dm.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
 	return err
 }
