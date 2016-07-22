@@ -162,6 +162,11 @@ function install_google_cloud_sdk_tarball() {
 function dump_cluster_logs_and_exit() {
     local -r exit_status=$?
     dump_cluster_logs
+    if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
+      # If we tried to bring the Kubemark cluster up, make a courtesy
+      # attempt to bring it down so we're not leaving resources around.
+      ./test/kubemark/stop-kubemark.sh || true
+    fi
     if [[ "${E2E_DOWN,,}" == "true" ]]; then
       # If we tried to bring the cluster up, make a courtesy attempt
       # to bring the cluster down so we're not leaving resources
@@ -412,7 +417,6 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${KUBEMARK_NUM_NODES:-$NUM_NODES}
   MASTER_SIZE=${KUBEMARK_MASTER_SIZE:-$MASTER_SIZE}
-  # If start-kubemark fails, we trigger empty set of tests that would trigger storing logs from the base cluster.
   ./test/kubemark/start-kubemark.sh || dump_cluster_logs_and_exit
   # Similarly, if tests fail, we trigger empty set of tests that would trigger storing logs from the base cluster.
   # We intentionally overwrite the exit-code from `run-e2e-tests.sh` because we want jenkins to look at the
@@ -421,7 +425,7 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   # exit non-0.
   # TODO: The above comment is no longer accurate. Need to fix this before
   # turning xunit off for the postsubmit tests. See: #28200
-  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS:-starting\s30\spods}" "${KUBEMARK_TEST_ARGS:-}" || dump_cluster_logs
+  ./test/kubemark/run-e2e-tests.sh --ginkgo.focus="${KUBEMARK_TESTS:-starting\s30\spods}" "${KUBEMARK_TEST_ARGS:-}" || dump_cluster_logs_and_exit
   ./test/kubemark/stop-kubemark.sh
   NUM_NODES=${NUM_NODES_BKP}
   MASTER_SIZE=${MASTER_SIZE_BKP}
