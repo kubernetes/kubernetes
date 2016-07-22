@@ -21,15 +21,15 @@ EVENT_STORE_URL="http://${EVENT_STORE_IP}:4002"
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 	sudo docker run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd \
 		--listen-peer-urls http://127.0.0.1:2381 \
-		--addr=127.0.0.1:4002 \
-		--bind-addr=0.0.0.0:4002 \
+		--advertise-client-urls=http://127.0.0.1:4002 \
+		--listen-client-urls=http://0.0.0.0:4002 \
 		--data-dir=/var/etcd/data
 fi
 
 sudo docker run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd \
 	--listen-peer-urls http://127.0.0.1:2380 \
-	--addr=127.0.0.1:4001 \
-	--bind-addr=0.0.0.0:4001 \
+	--advertise-client-urls=http://127.0.0.1:4001 \
+	--listen-client-urls=http://0.0.0.0:4001 \
 	--data-dir=/var/etcd/data
 
 # Increase the allowed number of open file descriptors
