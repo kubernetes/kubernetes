@@ -16,7 +16,11 @@ limitations under the License.
 
 package dnsprovider
 
-import "k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+import (
+	"reflect"
+
+	"k8s.io/kubernetes/federation/pkg/dnsprovider/rrstype"
+)
 
 // Interface is an abstract, pluggable interface for DNS providers.
 type Interface interface {
@@ -65,4 +69,20 @@ type ResourceRecordSet interface {
 	Ttl() int64
 	// Type returns the type of the record set (A, CNAME, SRV, etc)
 	Type() rrstype.RrsType
+}
+
+/* ResourceRecordSetsEquivalent compares two ResourceRecordSets for semantic equivalence.
+   Go's equality operator doesn't work the way we want it to in this case,
+   hence the need for this function.
+   More specifically (from the Go spec):
+   "Two struct values are equal if their corresponding non-blank fields are equal."
+   In our case, there may be some private internal member variables that may not be not equal,
+   but we want the two structs to be considered equivalent anyway, if the fields exposed
+   via their interfaces are equal.
+*/
+func ResourceRecordSetsEquivalent(r1, r2 ResourceRecordSet) bool {
+	if r1.Name() == r2.Name() && reflect.DeepEqual(r1.Rrdatas(), r2.Rrdatas()) && r1.Ttl() == r2.Ttl() && r1.Type() == r2.Type() {
+		return true
+	}
+	return false
 }
