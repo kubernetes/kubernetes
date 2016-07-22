@@ -54,6 +54,8 @@ type managerImpl struct {
 	summaryProvider stats.SummaryProvider
 	// records when a threshold was first observed
 	thresholdsFirstObservedAt thresholdsObservedAt
+	// resourceToRankFunc maps a resource to ranking function for that resource.
+	resourceToRankFunc map[api.ResourceName]rankFunc
 }
 
 // ensure it implements the required interface
@@ -87,12 +89,17 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if len(m.nodeConditions) == 0 {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
-	notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
-	if notBestEffort {
-		return lifecycle.PodAdmitResult{Admit: true}
+
+	// the node has memory pressure, admit if not best-effort
+	if hasNodeCondition(m.nodeConditions, api.NodeMemoryPressure) {
+		notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
+		if notBestEffort {
+			return lifecycle.PodAdmitResult{Admit: true}
+		}
 	}
+
+	// reject pods when under memory pressure (if pod is best effort), or if under disk pressure.
 	glog.Warningf("Failed to admit pod %v - %s", format.Pod(attrs.Pod), "node has conditions: %v", m.nodeConditions)
-	// we reject all best effort pods until we are stable.
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  reason,
@@ -102,6 +109,14 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 
 // Start starts the control loop to observe and response to low compute resources.
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, monitoringInterval time.Duration) error {
+	// build the ranking functions now that we can know if the imagefs is dedicated or not.
+	hasDedicatedImageFs, err := diskInfoProvider.HasDedicatedImageFs()
+	if err != nil {
+		return err
+	}
+	m.resourceToRankFunc = buildResourceToRankFunc(hasDedicatedImageFs)
+
+	// start the eviction manager monitoring
 	go wait.Until(func() { m.synchronize(podFunc) }, monitoringInterval, wait.NeverStop)
 	return nil
 }
@@ -111,6 +126,13 @@ func (m *managerImpl) IsUnderMemoryPressure() bool {
 	m.RLock()
 	defer m.RUnlock()
 	return hasNodeCondition(m.nodeConditions, api.NodeMemoryPressure)
+}
+
+// IsUnderDiskPressure returns true if the node is under disk pressure.
+func (m *managerImpl) IsUnderDiskPressure() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return hasNodeCondition(m.nodeConditions, api.NodeDiskPressure)
 }
 
 // synchronize is the main control loop that enforces eviction thresholds.
@@ -175,7 +197,7 @@ func (m *managerImpl) synchronize(podFunc ActivePodsFunc) {
 	m.recorder.Eventf(m.nodeRef, api.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
 
 	// rank the pods for eviction
-	rank, ok := resourceToRankFunc[resourceToReclaim]
+	rank, ok := m.resourceToRankFunc[resourceToReclaim]
 	if !ok {
 		glog.Errorf("eviction manager: no ranking function for resource %s", resourceToReclaim)
 		return

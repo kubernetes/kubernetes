@@ -134,6 +134,14 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 					LastTransitionTime: unversioned.Time{},
 				},
 				{
+					Type:               api.NodeDiskPressure,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasNoDiskPressure",
+					Message:            fmt.Sprintf("kubelet has no disk pressure"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
 					Type:               api.NodeReady,
 					Status:             api.ConditionTrue,
 					Reason:             "KubeletReady",
@@ -317,6 +325,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 					},
 					{
+						Type:               api.NodeDiskPressure,
+						Status:             api.ConditionFalse,
+						Reason:             "KubeletHasSufficientDisk",
+						Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
+						LastHeartbeatTime:  unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+					},
+					{
 						Type:               api.NodeReady,
 						Status:             api.ConditionTrue,
 						Reason:             "KubeletReady",
@@ -377,6 +393,14 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletHasSufficientMemory",
 					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeDiskPressure,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasSufficientDisk",
+					Message:            fmt.Sprintf("kubelet has sufficient disk space available"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},
@@ -489,7 +513,6 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 						LastTransitionTime: unversioned.NewTime(clock.Now()),
 					},
 					{
-
 						Type:               api.NodeOutOfDisk,
 						Status:             api.ConditionTrue,
 						Reason:             "KubeletOutOfDisk",
@@ -509,8 +532,13 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 		NumCores:       2,
 		MemoryCapacity: 1024,
 	}
+	fsInfo := cadvisorapiv2.FsInfo{
+		Device: "123",
+	}
 	mockCadvisor.On("Start").Return(nil)
 	mockCadvisor.On("MachineInfo").Return(machineInfo, nil)
+	mockCadvisor.On("ImagesFsInfo").Return(fsInfo, nil)
+	mockCadvisor.On("RootFsInfo").Return(fsInfo, nil)
 	versionInfo := &cadvisorapi.VersionInfo{
 		KernelVersion:      "3.16.0-0.bpo.4-amd64",
 		ContainerOsVersion: "Debian GNU/Linux 7 (wheezy)",
@@ -668,6 +696,14 @@ func TestUpdateNodeStatusWithRuntimeStateError(t *testing.T) {
 					Status:             api.ConditionFalse,
 					Reason:             "KubeletHasSufficientMemory",
 					Message:            fmt.Sprintf("kubelet has sufficient memory available"),
+					LastHeartbeatTime:  unversioned.Time{},
+					LastTransitionTime: unversioned.Time{},
+				},
+				{
+					Type:               api.NodeDiskPressure,
+					Status:             api.ConditionFalse,
+					Reason:             "KubeletHasNoDiskPressure",
+					Message:            fmt.Sprintf("kubelet has no disk pressure"),
 					LastHeartbeatTime:  unversioned.Time{},
 					LastTransitionTime: unversioned.Time{},
 				},

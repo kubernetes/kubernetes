@@ -30,6 +30,22 @@ type Signal string
 const (
 	// SignalMemoryAvailable is memory available (i.e. capacity - workingSet), in bytes.
 	SignalMemoryAvailable Signal = "memory.available"
+	// SignalNodeFsAvailable is amount of storage available on filesystem that kubelet uses for volumes, daemon logs, etc.
+	SignalNodeFsAvailable Signal = "nodefs.available"
+	// SignalImageFsAvailable is amount of storage available on filesystem that container runtime uses for for storing images and container writable layers.
+	SignalImageFsAvailable Signal = "imagefs.available"
+)
+
+// fsStats defines the types of filesystem stats to collect.
+type fsStats string
+
+const (
+	// fsStatsLocalVolumeSource identifies stats for pod local volume sources.
+	fsStatsLocalVolumeSource fsStats = "localVolumeSource"
+	// fsStatsLogs identifies stats for pod logs.
+	fsStatsLogs fsStats = "logs"
+	// fsStatsRoot identifies stats for pod container writable layers.
+	fsStatsRoot fsStats = "root"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.
@@ -71,6 +87,9 @@ type Manager interface {
 
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
+
+	// IsUnderDiskPressure returns true if the node is under disk pressure.
+	IsUnderDiskPressure() bool
 }
 
 // DiskInfoProvider is responsible for informing the manager how disk is configured.
