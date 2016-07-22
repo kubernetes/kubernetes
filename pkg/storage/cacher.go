@@ -136,7 +136,7 @@ type Cacher struct {
 	ready *ready
 
 	// Underlying storage.Interface.
-	Interface
+	storage Interface
 
 	// "sliding window" of recent changes of objects and the current state.
 	watchCache *watchCache
@@ -180,7 +180,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 
 	cacher := &Cacher{
 		ready:       newReady(),
-		Interface:   config.Storage,
+		storage:     config.Storage,
 		watchCache:  watchCache,
 		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
 		versioner:   config.Versioner,
@@ -244,6 +244,26 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 }
 
 // Implements storage.Interface.
+func (c *Cacher) Backends(ctx context.Context) []string {
+	return c.storage.Backends(ctx)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Versioner() Versioner {
+	return c.storage.Versioner()
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
+	return c.storage.Create(ctx, key, obj, out, ttl)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error {
+	return c.storage.Delete(ctx, key, out, preconditions)
+}
+
+// Implements storage.Interface.
 func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error) {
 	watchRV, err := ParseWatchResourceVersion(resourceVersion)
 	if err != nil {
@@ -286,11 +306,26 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 }
 
 // Implements storage.Interface.
+func (c *Cacher) WatchList(ctx context.Context, key string, resourceVersion string, filter Filter) (watch.Interface, error) {
+	return c.Watch(ctx, key, resourceVersion, filter)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Get(ctx context.Context, key string, objPtr runtime.Object, ignoreNotFound bool) error {
+	return c.storage.Get(ctx, key, objPtr, ignoreNotFound)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) GetToList(ctx context.Context, key string, filter Filter, listObj runtime.Object) error {
+	return c.storage.GetToList(ctx, key, filter, listObj)
+}
+
+// Implements storage.Interface.
 func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, filter Filter, listObj runtime.Object) error {
 	if resourceVersion == "" {
 		// If resourceVersion is not specified, serve it from underlying
 		// storage (for backward compatibility).
-		return c.Interface.List(ctx, key, resourceVersion, filter, listObj)
+		return c.storage.List(ctx, key, resourceVersion, filter, listObj)
 	}
 
 	// If resourceVersion is specified, serve it from cache.
@@ -334,6 +369,16 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, f
 		}
 	}
 	return nil
+}
+
+// Implements storage.Interface.
+func (c *Cacher) GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, preconditions *Preconditions, tryUpdate UpdateFunc) error {
+	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
+}
+
+// Implements storage.Interface.
+func (c *Cacher) Codec() runtime.Codec {
+	return c.storage.Codec()
 }
 
 func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
