@@ -194,7 +194,7 @@ If you do not specify `.spec.parallelism`, then it defaults to `.spec.completion
 A Container in a Pod may fail for a number of reasons, such as because the process in it exited with
 a non-zero exit code, or the Container was killed for exceeding a memory limit, etc.  If this
 happens, and the `.spec.template.containers[].restartPolicy = "OnFailure"`, then the Pod stays
-on the node, but the Container is re-run.  Therefore, your program needs to handle the the case when it is
+on the node, but the Container is re-run.  Therefore, your program needs to handle the case when it is
 restarted locally, or else specify `.spec.template.containers[].restartPolicy = "Never"`.
 See [pods-states](pod-states.html) for more information on `restartPolicy`.
 
