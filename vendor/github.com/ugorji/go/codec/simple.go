@@ -512,7 +512,6 @@ func (e *simpleEncDriver) reset() {
 
 func (d *simpleDecDriver) reset() {
 	d.r = d.d.r
-	d.bd, d.bdRead = 0, false
 }
 
 var _ decDriver = (*simpleDecDriver)(nil)

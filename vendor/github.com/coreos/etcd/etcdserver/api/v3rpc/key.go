@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -125,38 +125,38 @@ func (s *kvServer) Compact(ctx context.Context, r *pb.CompactionRequest) (*pb.Co
 
 func checkRangeRequest(r *pb.RangeRequest) error {
 	if len(r.Key) == 0 {
-		return rpctypes.ErrEmptyKey
+		return rpctypes.ErrGRPCEmptyKey
 	}
 	return nil
 }
 
 func checkPutRequest(r *pb.PutRequest) error {
 	if len(r.Key) == 0 {
-		return rpctypes.ErrEmptyKey
+		return rpctypes.ErrGRPCEmptyKey
 	}
 	return nil
 }
 
 func checkDeleteRequest(r *pb.DeleteRangeRequest) error {
 	if len(r.Key) == 0 {
-		return rpctypes.ErrEmptyKey
+		return rpctypes.ErrGRPCEmptyKey
 	}
 	return nil
 }
 
 func checkTxnRequest(r *pb.TxnRequest) error {
 	if len(r.Compare) > MaxOpsPerTxn || len(r.Success) > MaxOpsPerTxn || len(r.Failure) > MaxOpsPerTxn {
-		return rpctypes.ErrTooManyOps
+		return rpctypes.ErrGRPCTooManyOps
 	}
 
 	for _, c := range r.Compare {
 		if len(c.Key) == 0 {
-			return rpctypes.ErrEmptyKey
+			return rpctypes.ErrGRPCEmptyKey
 		}
 	}
 
 	for _, u := range r.Success {
-		if err := checkRequestUnion(u); err != nil {
+		if err := checkRequestOp(u); err != nil {
 			return err
 		}
 	}
@@ -165,23 +165,19 @@ func checkTxnRequest(r *pb.TxnRequest) error {
 	}
 
 	for _, u := range r.Failure {
-		if err := checkRequestUnion(u); err != nil {
+		if err := checkRequestOp(u); err != nil {
 			return err
 		}
 	}
-	if err := checkRequestDupKeys(r.Failure); err != nil {
-		return err
-	}
-
-	return nil
+	return checkRequestDupKeys(r.Failure)
 }
 
-// checkRequestDupKeys gives rpctypes.ErrDuplicateKey if the same key is modified twice
-func checkRequestDupKeys(reqs []*pb.RequestUnion) error {
+// checkRequestDupKeys gives rpctypes.ErrGRPCDuplicateKey if the same key is modified twice
+func checkRequestDupKeys(reqs []*pb.RequestOp) error {
 	// check put overlap
 	keys := make(map[string]struct{})
 	for _, requ := range reqs {
-		tv, ok := requ.Request.(*pb.RequestUnion_RequestPut)
+		tv, ok := requ.Request.(*pb.RequestOp_RequestPut)
 		if !ok {
 			continue
 		}
@@ -189,11 +185,10 @@ func checkRequestDupKeys(reqs []*pb.RequestUnion) error {
 		if preq == nil {
 			continue
 		}
-		key := string(preq.Key)
-		if _, ok := keys[key]; ok {
-			return rpctypes.ErrDuplicateKey
+		if _, ok := keys[string(preq.Key)]; ok {
+			return rpctypes.ErrGRPCDuplicateKey
 		}
-		keys[key] = struct{}{}
+		keys[string(preq.Key)] = struct{}{}
 	}
 
 	// no need to check deletes if no puts; delete overlaps are permitted
@@ -210,7 +205,7 @@ func checkRequestDupKeys(reqs []*pb.RequestUnion) error {
 
 	// check put overlap with deletes
 	for _, requ := range reqs {
-		tv, ok := requ.Request.(*pb.RequestUnion_RequestDeleteRange)
+		tv, ok := requ.Request.(*pb.RequestOp_RequestDeleteRange)
 		if !ok {
 			continue
 		}
@@ -218,17 +213,16 @@ func checkRequestDupKeys(reqs []*pb.RequestUnion) error {
 		if dreq == nil {
 			continue
 		}
-		key := string(dreq.Key)
 		if dreq.RangeEnd == nil {
-			if _, found := keys[key]; found {
-				return rpctypes.ErrDuplicateKey
+			if _, found := keys[string(dreq.Key)]; found {
+				return rpctypes.ErrGRPCDuplicateKey
 			}
 		} else {
-			lo := sort.SearchStrings(sortedKeys, key)
+			lo := sort.SearchStrings(sortedKeys, string(dreq.Key))
 			hi := sort.SearchStrings(sortedKeys, string(dreq.RangeEnd))
 			if lo != hi {
 				// element between lo and hi => overlap
-				return rpctypes.ErrDuplicateKey
+				return rpctypes.ErrGRPCDuplicateKey
 			}
 		}
 	}
@@ -236,23 +230,23 @@ func checkRequestDupKeys(reqs []*pb.RequestUnion) error {
 	return nil
 }
 
-func checkRequestUnion(u *pb.RequestUnion) error {
+func checkRequestOp(u *pb.RequestOp) error {
 	// TODO: ensure only one of the field is set.
 	switch uv := u.Request.(type) {
-	case *pb.RequestUnion_RequestRange:
+	case *pb.RequestOp_RequestRange:
 		if uv.RequestRange != nil {
 			return checkRangeRequest(uv.RequestRange)
 		}
-	case *pb.RequestUnion_RequestPut:
+	case *pb.RequestOp_RequestPut:
 		if uv.RequestPut != nil {
 			return checkPutRequest(uv.RequestPut)
 		}
-	case *pb.RequestUnion_RequestDeleteRange:
+	case *pb.RequestOp_RequestDeleteRange:
 		if uv.RequestDeleteRange != nil {
 			return checkDeleteRequest(uv.RequestDeleteRange)
 		}
 	default:
-		// empty union
+		// empty op
 		return nil
 	}
 	return nil

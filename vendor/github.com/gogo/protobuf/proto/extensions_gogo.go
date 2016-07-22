@@ -56,6 +56,10 @@ func (this *Extension) Equal(that *Extension) bool {
 	return bytes.Equal(this.enc, that.enc)
 }
 
+func (this *Extension) Compare(that *Extension) int {
+	return bytes.Compare(this.enc, that.enc)
+}
+
 func SizeOfExtensionMap(m map[int32]Extension) (n int) {
 	return sizeExtensionMap(m)
 }
@@ -183,6 +187,17 @@ func NewExtension(e []byte) Extension {
 	ee := Extension{enc: make([]byte, len(e))}
 	copy(ee.enc, e)
 	return ee
+}
+
+func AppendExtension(e extendableProto, tag int32, buf []byte) {
+	if ee, eok := e.(extensionsMap); eok {
+		ext := ee.ExtensionMap()[int32(tag)] // may be missing
+		ext.enc = append(ext.enc, buf...)
+		ee.ExtensionMap()[int32(tag)] = ext
+	} else if ee, eok := e.(extensionsBytes); eok {
+		ext := ee.GetExtensions()
+		*ext = append(*ext, buf...)
+	}
 }
 
 func (this Extension) GoString() string {

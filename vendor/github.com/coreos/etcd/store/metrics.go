@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ import (
 var (
 	readCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "etcd",
+			Namespace: "etcd_debugging",
 			Subsystem: "store",
 			Name:      "reads_total",
 			Help:      "Total number of reads action by (get/getRecursive), local to this member.",
@@ -34,7 +34,7 @@ var (
 
 	writeCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "etcd",
+			Namespace: "etcd_debugging",
 			Subsystem: "store",
 			Name:      "writes_total",
 			Help:      "Total number of writes (e.g. set/compareAndDelete) seen by this member.",
@@ -42,7 +42,7 @@ var (
 
 	readFailedCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "etcd",
+			Namespace: "etcd_debugging",
 			Subsystem: "store",
 			Name:      "reads_failed_total",
 			Help:      "Failed read actions by (get/getRecursive), local to this member.",
@@ -50,7 +50,7 @@ var (
 
 	writeFailedCounter = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Namespace: "etcd",
+			Namespace: "etcd_debugging",
 			Subsystem: "store",
 			Name:      "writes_failed_total",
 			Help:      "Failed write actions (e.g. set/compareAndDelete), seen by this member.",
@@ -58,7 +58,7 @@ var (
 
 	expireCounter = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: "etcd",
+			Namespace: "etcd_debugging",
 			Subsystem: "store",
 			Name:      "expires_total",
 			Help:      "Total number of expired keys.",
@@ -66,7 +66,7 @@ var (
 
 	watchRequests = prometheus.NewCounter(
 		prometheus.CounterOpts{
-			Namespace: "etcd",
+			Namespace: "etcd_debugging",
 			Subsystem: "store",
 			Name:      "watch_requests_total",
 			Help:      "Total number of incoming watch requests (new or reestablished).",
@@ -74,7 +74,7 @@ var (
 
 	watcherCount = prometheus.NewGauge(
 		prometheus.GaugeOpts{
-			Namespace: "etcd",
+			Namespace: "etcd_debugging",
 			Subsystem: "store",
 			Name:      "watchers",
 			Help:      "Count of currently active watchers.",
