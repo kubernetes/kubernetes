@@ -215,9 +215,26 @@ func TestJSONPrinter(t *testing.T) {
 	testPrinter(t, &JSONPrinter{}, json.Unmarshal)
 }
 
+func TestFormatResourceName(t *testing.T) {
+	tests := []struct {
+		kind, name string
+		want       string
+	}{
+		{"", "", ""},
+		{"", "name", "name"},
+		{"kind", "", "kind/"}, // should not happen in practice
+		{"kind", "name", "kind/name"},
+	}
+	for _, tt := range tests {
+		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
+			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
+		}
+	}
+}
+
 func PrintCustomType(obj *TestPrintType, w io.Writer, options PrintOptions) error {
 	data := obj.Data
-	kind := options.KindName
+	kind := options.Kind
 	if options.WithKind {
 		data = kind + "/" + data
 	}
@@ -254,8 +271,7 @@ func TestCustomTypePrintingWithKind(t *testing.T) {
 		ColumnLabels: []string{},
 	})
 	printer.Handler(columns, PrintCustomType)
-	printer.Options.WithKind = true
-	printer.Options.KindName = "test"
+	printer.EnsurePrintWithKind("test")
 
 	obj := TestPrintType{"test object"}
 	buffer := &bytes.Buffer{}
