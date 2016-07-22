@@ -106,6 +106,8 @@ set +e
 
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
+API_HOST_IP=${API_HOST_IP:-${API_HOST}}
+API_BIND_ADDR=${API_HOST_IP:-"0.0.0.0"}
 KUBELET_HOST=${KUBELET_HOST:-"127.0.0.1"}
 # By default only allow CORS for requests on localhost
 API_CORS_ALLOWED_ORIGINS=${API_CORS_ALLOWED_ORIGINS:-"/127.0.0.1(:[0-9]+)?$,/localhost(:[0-9]+)?$"}
@@ -122,7 +124,7 @@ CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s defaul
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
-    curl $API_HOST:$API_PORT
+    curl -g $API_HOST:$API_PORT
     if [ ! $? -eq 0 ]; then
         echo "API SERVER port is free, proceeding..."
     else
@@ -276,9 +278,10 @@ function start_apiserver {
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
       --service-account-lookup="${SERVICE_ACCOUNT_LOOKUP}" \
       --admission-control="${ADMISSION_CONTROL}" \
-      --insecure-bind-address="${API_HOST}" \
+      --bind-address="${API_BIND_ADDR}" \
+      --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
-      --advertise-address="${API_HOST}" \
+      --advertise-address="${API_HOST_IP}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="10.0.0.0/24" \
       --cloud-provider="${CLOUD_PROVIDER}" \
