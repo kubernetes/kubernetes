@@ -81,5 +81,5 @@ type CertificateSigningRequestList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	Items []CertificateSigningRequest `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+	Items []CertificateSigningRequest `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
