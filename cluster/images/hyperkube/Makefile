@@ -91,11 +91,22 @@ ifeq ($(ARCH),amd64)
 	# Download CNI
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni
 else
+	cd ${TEMP_DIR} && ${SED_CMD} "s/CROSS_BUILD_//g" Dockerfile
+
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	curl -sSL --retry 5 https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-${QEMUARCH}-static.tar.xz | tar -xJ -C ${TEMP_DIR}
-	cd ${TEMP_DIR} && ${SED_CMD} "s/CROSS_BUILD_//g" Dockerfile
+
+	# This cross-compiles cni for the other architectures, until CNI releases binaries for all arches: https://github.com/containernetworking/cni/pull/241
+	docker run -it -v ${TEMP_DIR}/cni:/cnibin golang:1.6 /bin/bash -c "\
+		git clone https://github.com/containernetworking/cni \
+		&& cd cni \
+		&& git checkout $(CNI_RELEASE) \
+		&& curl -sSL https://patch-diff.githubusercontent.com/raw/containernetworking/cni/pull/241.patch > multiarch.patch \
+		&& git apply --exclude=.travis.yml --exclude=scripts/release-with-rkt.sh < multiarch.patch \
+		&& GOARCH=$(ARCH) ./build \
+		&& cp bin/* /cnibin"
 endif
 
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
