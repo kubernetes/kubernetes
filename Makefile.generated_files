@@ -12,8 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Constants used throughout.
-GENERATED_FILE_PREFIX := zz_generated.
+# Don't allow an implicit 'all' rule.  This is not a user-facing file.
+ifeq ($(MAKECMDGOALS),)
+    $(error This Makefile requires an explicit rule to be specified)
+endif
+
+ifeq ($(DBG_MAKEFILE),1)
+    $(warning ***** starting Makefile.generated_files for goal(s) "$(MAKECMDGOALS)")
+    $(warning ***** $(shell date))
+endif
+
+
+# It's necessary to set this because some environments don't link sh -> bash.
+SHELL := /bin/bash
+
+# This rule collects all the generated file sets into a single rule.  Other
+# rules should depend on this to ensure generated files are rebuilt.
+.PHONY: generated_files
+generated_files: gen_deepcopy gen_conversion
 
 # Code-generation logic.
 #
@@ -92,24 +108,11 @@ GENERATED_FILE_PREFIX := zz_generated.
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all *.go dirs)
 endif
-ALL_GO_DIRS := $(shell             \
-    find .                         \
-        -not \(                    \
-            \(                     \
-                -path ./vendor -o  \
-                -path ./_\* -o     \
-                -path ./.\* -o     \
-                -path ./docs -o    \
-                -path ./examples   \
-            \) -prune              \
-        \)                         \
-        -type f -name \*.go        \
-        | sed 's|^./||'            \
-        | xargs -n1 dirname        \
-        | sort -u                  \
+ALL_GO_DIRS := $(shell                                                   \
+    hack/make-rules/helpers/cache_go_dirs.sh $(META_DIR)/all_go_dirs.mk  \
 )
 
-# The name of the make metadata file listing Go files.
+# The name of the metadata file which lists *.go files in each pkg.
 GOFILES_META := gofiles.mk
 
 # Establish a dependency between the deps file and the dir.  Whenever a dir
@@ -139,12 +142,18 @@ $(foreach dir, $(ALL_GO_DIRS), $(eval           \
 # We regenerate the output file in order to satisfy make's "newer than" rules,
 # but we only need to rebuild targets if the contents actually changed.  That
 # is what the .stamp file represents.
-$(foreach dir, $(ALL_GO_DIRS), $(META_DIR)/$(dir)/$(GOFILES_META)):
+$(foreach dir, $(ALL_GO_DIRS),  \
+    $(META_DIR)/$(dir)/$(GOFILES_META)):
 	FILES=$$(ls $</*.go | grep --color=never -v $(GENERATED_FILE_PREFIX));  \
 	mkdir -p $(@D);                                           \
 	echo "gofiles__$< := $$(echo $${FILES})" >$@.tmp;         \
 	cmp -s $@.tmp $@ || touch $@.stamp;                       \
 	mv $@.tmp $@
+# This is required to fill in the DAG, since some cases (e.g. 'make clean all')
+# will reference the .stamp file when it doesn't exist.  We don't need to
+# rebuild it in that case, just keep make happy.
+$(foreach dir, $(ALL_GO_DIRS),  \
+    $(META_DIR)/$(dir)/$(GOFILES_META).stamp):
 
 # Include any deps files as additional Makefile rules.  This triggers make to
 # consider the deps files for rebuild, which makes the whole
@@ -219,7 +228,7 @@ gen_deepcopy: $(DEEPCOPY_FILES)
 # has changed.  This allows us to detect deleted input files.
 $(foreach dir, $(DEEPCOPY_DIRS), $(eval                                    \
     $(dir)/$(DEEPCOPY_FILENAME): $(META_DIR)/$(dir)/$(GOFILES_META).stamp  \
-                                   $(gofiles__$(dir))                      \
+                                 $(gofiles__$(dir))                        \
 ))
 
 # Unilaterally remove any leftovers from previous runs.
@@ -228,6 +237,7 @@ $(shell rm -f $(META_DIR)/$(DEEPCOPY_GEN)*.todo)
 # How to regenerate deep-copy code.  This is a little slow to run, so we batch
 # it up and trigger the batch from the 'generated_files' target.
 $(DEEPCOPY_FILES): $(DEEPCOPY_GEN)
+	mkdir -p $$(dirname $(META_DIR)/$(DEEPCOPY_GEN))
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(DEEPCOPY_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
@@ -291,7 +301,7 @@ CONVERSION_FILENAME := $(CONVERSION_BASENAME).go
 # The tool used to generate conversions.
 CONVERSION_GEN := $(BIN_DIR)/conversion-gen
 
-# The name of the make metadata file controlling conversions.
+# The name of the metadata file listing conversion peers for each pkg.
 CONVERSIONS_META := conversions.mk
 
 # All directories that request any form of conversion generation.
@@ -341,8 +351,9 @@ $(foreach dir, $(CONVERSION_DIRS), $(eval           \
 # We regenerate the output file in order to satisfy make's "newer than" rules,
 # but we only need to rebuild targets if the contents actually changed.  That
 # is what the .stamp file represents.
-$(foreach dir, $(CONVERSION_DIRS), $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
-	TAGS=$$(grep --color=never -h '^// *+k8s:conversion-gen=' $</*.go  \
+$(foreach dir, $(CONVERSION_DIRS),  \
+    $(META_DIR)/$(dir)/$(CONVERSIONS_META)):
+	TAGS=$$(grep --color=never -h '^// *+k8s:conversion-gen=' $</*.go   \
 	    | cut -f2- -d=                                    \
 	    | sed 's|$(PRJ_SRC_PATH)/||');                    \
 	mkdir -p $(@D);                                       \
@@ -407,6 +418,7 @@ $(shell rm -f $(META_DIR)/$(CONVERSION_GEN)*.todo)
 # How to regenerate conversion code.  This is a little slow to run, so we batch
 # it up and trigger the batch from the 'generated_files' target.
 $(CONVERSION_FILES): $(CONVERSION_GEN)
+	mkdir -p $$(dirname $(META_DIR)/$(CONVERSION_GEN))
 	echo $(PRJ_SRC_PATH)/$(@D) >> $(META_DIR)/$(CONVERSION_GEN).todo
 
 # This calculates the dependencies for the generator tool, so we only rebuild
@@ -446,17 +458,3 @@ sinclude $(META_DIR)/$(CONVERSION_GEN).mk
 $(CONVERSION_GEN):
 	hack/make-rules/build.sh cmd/libs/go2idl/conversion-gen
 	touch $@
-
-# This rule collects all the generated file sets into a single dep, which is
-# defined BELOW the *_FILES variables and leaves higher-level rules clean.
-# Top-level rules should depend on this to ensure generated files are rebuilt.
-.PHONY: generated_files
-generated_files: gen_deepcopy gen_conversion
-
-# Remove all auto-generated artifacts.
-#
-# Example:
-#   make clean_generated
-.PHONY: clean_generated
-clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f

@@ -14,7 +14,7 @@
 
 DBG_MAKEFILE ?=
 ifeq ($(DBG_MAKEFILE),1)
-    $(warning ***** starting makefile for goal(s) "$(MAKECMDGOALS)")
+    $(warning ***** starting Makefile for goal(s) "$(MAKECMDGOALS)")
     $(warning ***** $(shell date))
 else
     # If we're not debugging the Makefile, don't echo recipes.
@@ -29,38 +29,25 @@ endif
 #   test: Run tests.
 #   clean: Clean up.
 
-# It's necessary to set this because some docker images don't make sh -> bash.
+# It's necessary to set this because some environments don't link sh -> bash.
 SHELL := /bin/bash
 
 # We don't need make's built-in rules.
 MAKEFLAGS += --no-builtin-rules
 .SUFFIXES:
 
-# We want make to yell at us if we use undefined variables.
-MAKEFLAGS += --warn-undefined-variables
-
 # Constants used throughout.
+.EXPORT_ALL_VARIABLES:
 OUT_DIR ?= _output
 BIN_DIR := $(OUT_DIR)/bin
 PRJ_SRC_PATH := k8s.io/kubernetes
+GENERATED_FILE_PREFIX := zz_generated.
 
 # Metadata for driving the build lives here.
 META_DIR := .make
 
-#
-# Define variables that we use as inputs so we can warn about undefined variables.
-#
-
-WHAT ?=
-TESTS ?=
-
-GOFLAGS ?=
-KUBE_GOFLAGS = $(GOFLAGS)
-export KUBE_GOFLAGS GOFLAGS
-
-GOLDFLAGS ?=
-KUBE_GOLDFLAGS = $(GOLDFLAGS)
-export KUBE_GOLDFLAGS GOLDFLAGS
+KUBE_GOFLAGS := $(GOFLAGS)
+KUBE_GOLDFLAGS := $(GOLDFLAGS)
 
 GOGCFLAGS ?=
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
@@ -99,7 +86,7 @@ ginkgo:
 # Runs all the presubmission verifications.
 #
 # Args:
-#   BRANCH: Branch to be passed to hack/verify-godeps.sh script.
+#   BRANCH: Branch to be passed to verify-godeps.sh script.
 #
 # Example:
 #   make verify
@@ -184,7 +171,7 @@ test-e2e-node: ginkgo generated_files
 #
 # Example:
 #   make test-cmd
-test-cmd:
+test-cmd: generated_files
 	@hack/make-rules/test-cmd.sh
 .PHONY: test-cmd
 
@@ -208,6 +195,14 @@ clean: clean_meta
 clean_meta:
 	rm -rf $(META_DIR)
 
+# Remove all auto-generated artifacts.
+#
+# Example:
+#   make clean_generated
+.PHONY: clean_generated
+clean_generated:
+	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
+
 # Run 'go vet'.
 #
 # Args:
@@ -227,7 +222,7 @@ vet:
 # Example:
 #   make release
 .PHONY: release
-release: generated_files
+release:
 	build/release.sh
 
 # Build a release, but skip tests
@@ -235,7 +230,7 @@ release: generated_files
 # Example:
 #   make release-skip-tests
 .PHONY: release-skip-tests quick-release
-release-skip-tests quick-release: generated_files
+release-skip-tests quick-release:
 	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
 
 # Cross-compile for all platforms
@@ -254,5 +249,10 @@ cross:
 $(notdir $(abspath $(wildcard cmd/*/))): generated_files
 	hack/make-rules/build.sh cmd/$@
 
-# Include logic for generated files.
-include Makefile.generated_files
+# Produce auto-generated files needed for the build.
+#
+# Example:
+#   make generated_files
+.PHONY: generated_files
+generated_files:
+	$(MAKE) -f Makefile.$@ $@
