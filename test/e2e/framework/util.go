@@ -4209,6 +4209,7 @@ func ScaleRCByLabels(client *client.Client, ns string, l map[string]string, repl
 	return nil
 }
 
+// TODO(random-liu): Change this to be a member function of the framework.
 func GetPodLogs(c *client.Client, namespace, podName, containerName string) (string, error) {
 	return getPodLogsInternal(c, namespace, podName, containerName, false)
 }

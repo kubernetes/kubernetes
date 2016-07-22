@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
 	"fmt"
@@ -127,13 +127,10 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 		defer func() {
 			By("Deleting the pod")
-			f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+			f.PodClient().Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
 		By("Creating the pod")
-		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
+		f.PodClient().CreateSync(pod)
 
 		pollLogs := func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, containerName)
@@ -272,9 +269,9 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 			},
 		}
 
-		framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
+		f.TestContainerOutput("consume configMaps", pod, 0, []string{
 			"content of file \"/etc/configmap-volume/data-1\": value-1",
-		}, f.Namespace.Name)
+		})
 
 	})
 })
