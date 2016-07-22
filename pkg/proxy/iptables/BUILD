@@ -19,6 +19,7 @@ go_library(
         "//pkg/api/service:go_default_library",
         "//pkg/proxy:go_default_library",
         "//pkg/proxy/healthcheck:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/config:go_default_library",
         "//pkg/util/exec:go_default_library",
@@ -41,6 +42,7 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/util:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/exec:go_default_library",
         "//pkg/util/iptables:go_default_library",

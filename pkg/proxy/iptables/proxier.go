@@ -39,6 +39,7 @@ import (
 	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/types"
 	featuregate "k8s.io/kubernetes/pkg/util/config"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
@@ -514,8 +515,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 		}
 	}
 	proxier.syncProxyRules()
-	proxier.deleteServiceConnections(staleUDPServices.List())
-
+	utilproxy.DeleteServiceConnections(proxier.exec, staleUDPServices.List())
 }
 
 // Generate a list of ip strings from the list of endpoint infos
@@ -741,7 +741,7 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 		if svcInfo, ok := proxier.serviceMap[epSvcPair.servicePortName]; ok && svcInfo.protocol == api.ProtocolUDP {
 			endpointIP := strings.Split(epSvcPair.endpoint, ":")[0]
 			glog.V(2).Infof("Deleting connection tracking state for service IP %s, endpoint IP %s", svcInfo.clusterIP.String(), endpointIP)
-			err := proxier.execConntrackTool("-D", "--orig-dst", svcInfo.clusterIP.String(), "--dst-nat", endpointIP, "-p", "udp")
+			err := utilproxy.ExecConntrackTool(proxier.exec, "-D", "--orig-dst", svcInfo.clusterIP.String(), "--dst-nat", endpointIP, "-p", "udp")
 			if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
 				// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
 				// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
@@ -750,33 +750,6 @@ func (proxier *Proxier) deleteEndpointConnections(connectionMap map[endpointServ
 			}
 		}
 	}
-}
-
-// deleteServiceConnection use conntrack-tool to delete UDP connection specified by service ip
-func (proxier *Proxier) deleteServiceConnections(svcIPs []string) {
-	for _, ip := range svcIPs {
-		glog.V(2).Infof("Deleting connection tracking state for service IP %s", ip)
-		err := proxier.execConntrackTool("-D", "--orig-dst", ip, "-p", "udp")
-		if err != nil && !strings.Contains(err.Error(), noConnectionToDelete) {
-			// TODO: Better handling for deletion failure. When failure occur, stale udp connection may not get flushed.
-			// These stale udp connection will keep black hole traffic. Making this a best effort operation for now, since it
-			// is expensive to baby sit all udp connections to kubernetes services.
-			glog.Errorf("conntrack return with error: %v", err)
-		}
-	}
-}
-
-//execConntrackTool executes conntrack tool using given parameters
-func (proxier *Proxier) execConntrackTool(parameters ...string) error {
-	conntrackPath, err := proxier.exec.LookPath("conntrack")
-	if err != nil {
-		return fmt.Errorf("Error looking for path of conntrack: %v", err)
-	}
-	output, err := proxier.exec.Command(conntrackPath, parameters...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Conntrack command returned: %q, error message: %s", string(output), err)
-	}
-	return nil
 }
 
 // This is where all of the iptables-save/restore calls happen.

@@ -31,9 +31,12 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type portal struct {
@@ -106,6 +109,7 @@ type Proxier struct {
 	hostIP          net.IP
 	proxyPorts      PortAllocator
 	makeProxySocket ProxySocketFunc
+	exec            utilexec.Interface
 }
 
 // assert Proxier is a ProxyProvider
@@ -150,15 +154,15 @@ func IsProxyLocked(err error) bool {
 // if iptables fails to update or acquire the initial lock. Once a proxier is
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
-func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
-	return NewCustomProxier(loadBalancer, listenIP, iptables, pr, syncPeriod, minSyncPeriod, udpIdleTimeout, newProxySocket)
+func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
+	return NewCustomProxier(loadBalancer, listenIP, iptables, exec, pr, syncPeriod, minSyncPeriod, udpIdleTimeout, newProxySocket)
 }
 
 // NewCustomProxier functions similarly to NewProxier, returing a new Proxier
 // for the given LoadBalancer and address.  The new proxier is constructed using
 // the ProxySocket constructor provided, however, instead of constructing the
 // default ProxySockets.
-func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
+func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, pr utilnet.PortRange, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
@@ -176,10 +180,10 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 	proxyPorts := newPortAllocator(pr)
 
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
-	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod, minSyncPeriod, udpIdleTimeout, makeProxySocket)
+	return createProxier(loadBalancer, listenIP, iptables, exec, hostIP, proxyPorts, syncPeriod, minSyncPeriod, udpIdleTimeout, makeProxySocket)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
 	// convenient to pass nil for tests..
 	if proxyPorts == nil {
 		proxyPorts = newPortAllocator(utilnet.PortRange{})
@@ -206,6 +210,7 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		hostIP:          hostIP,
 		proxyPorts:      proxyPorts,
 		makeProxySocket: makeProxySocket,
+		exec:            exec,
 	}, nil
 }
 
@@ -469,11 +474,18 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			proxier.loadBalancer.NewService(serviceName, info.sessionAffinityType, info.stickyMaxAgeMinutes)
 		}
 	}
+
+	staleUDPServices := sets.NewString()
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	for name, info := range proxier.serviceMap {
 		if !activeServices[name] {
 			glog.V(1).Infof("Stopping service %q", name)
+
+			if proxier.serviceMap[name].protocol == api.ProtocolUDP {
+				staleUDPServices.Insert(proxier.serviceMap[name].portal.ip.String())
+			}
+
 			err := proxier.closePortal(name, info)
 			if err != nil {
 				glog.Errorf("Failed to close portal for %q: %v", name, err)
@@ -485,6 +497,8 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			proxier.loadBalancer.DeleteService(name)
 		}
 	}
+
+	utilproxy.DeleteServiceConnections(proxier.exec, staleUDPServices.List())
 }
 
 func sameConfig(info *ServiceInfo, service *api.Service, port *api.ServicePort) bool {
