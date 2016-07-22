@@ -27,6 +27,8 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
+**WORK-IN-PROCESS -- UNFINISHED -- WORK-IN-PROGRESS**
+
 ## Abstract
 
 This proposal aims at extending the auditing log capabilities of the apiserver.
