@@ -41,7 +41,7 @@ func CalculateNodeAffinityPriority(pod *api.Pod, nodeNameToInfo map[string]*sche
 	// A nil element of PreferredDuringSchedulingIgnoredDuringExecution matches no objects.
 	// An element of PreferredDuringSchedulingIgnoredDuringExecution that refers to an
 	// empty PreferredSchedulingTerm matches all objects.
-	if affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
+	if affinity != nil && affinity.NodeAffinity != nil && affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution != nil {
 		// Match PreferredDuringSchedulingIgnoredDuringExecution term by term.
 		for _, preferredSchedulingTerm := range affinity.NodeAffinity.PreferredDuringSchedulingIgnoredDuringExecution {
 			if preferredSchedulingTerm.Weight == 0 {

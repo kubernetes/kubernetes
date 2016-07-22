@@ -1863,6 +1863,9 @@ func ValidateAffinityInPodAnnotations(annotations map[string]string, fldPath *fi
 		allErrs = append(allErrs, field.Invalid(fldPath, api.AffinityAnnotationKey, err.Error()))
 		return allErrs
 	}
+	if affinity == nil {
+		return allErrs
+	}
 
 	affinityFldPath := fldPath.Child(api.AffinityAnnotationKey)
 	if affinity.NodeAffinity != nil {

@@ -127,14 +127,14 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 			return nil, err
 		}
 
-		if affinity.PodAffinity != nil {
+		if affinity != nil && affinity.PodAffinity != nil {
 			// For every soft pod affinity term of <pod>, if <existingPod> matches the term,
 			// increment <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPods>`s node by the term`s weight.
 			terms := affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
 			pm.processTerms(terms, pod, existingPod, existingPodNode, 1)
 		}
-		if affinity.PodAntiAffinity != nil {
+		if affinity != nil && affinity.PodAntiAffinity != nil {
 			// For every soft pod anti-affinity term of <pod>, if <existingPod> matches the term,
 			// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>`s node by the term`s weight.
@@ -142,7 +142,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 			pm.processTerms(terms, pod, existingPod, existingPodNode, -1)
 		}
 
-		if existingPodAffinity.PodAffinity != nil {
+		if existingPodAffinity != nil && existingPodAffinity.PodAffinity != nil {
 			// For every hard pod affinity term of <existingPod>, if <pod> matches the term,
 			// increment <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>'s node by the constant <ipa.hardPodAffinityWeight>
@@ -162,7 +162,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *api.Pod, nod
 			terms := existingPodAffinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution
 			pm.processTerms(terms, existingPod, pod, existingPodNode, 1)
 		}
-		if existingPodAffinity.PodAntiAffinity != nil {
+		if existingPodAffinity != nil && existingPodAffinity.PodAntiAffinity != nil {
 			// For every soft pod anti-affinity term of <existingPod>, if <pod> matches the term,
 			// decrement <pm.counts> for every node in the cluster with the same <term.TopologyKey>
 			// value as that of <existingPod>'s node by the term's weight.

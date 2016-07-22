@@ -512,7 +512,7 @@ func podMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
 	// 5. zero-length non-nil []NodeSelectorRequirement matches no nodes also, just for simplicity
 	// 6. non-nil empty NodeSelectorRequirement is not allowed
 	nodeAffinityMatches := true
-	if affinity.NodeAffinity != nil {
+	if affinity != nil && affinity.NodeAffinity != nil {
 		nodeAffinity := affinity.NodeAffinity
 		// if no required NodeAffinity requirements, will do no-op, means select all nodes.
 		// TODO: Replace next line with subsequent commented-out line when implement RequiredDuringSchedulingRequiredDuringExecution.
@@ -809,14 +809,19 @@ func (checker *PodAffinityChecker) InterPodAffinityMatches(pod *api.Pod, meta in
 
 	// Check if the current node match the inter-pod affinity scheduling constraints.
 	// Hard inter-pod affinity is not symmetric, check only when affinity.PodAffinity exists.
-	if affinity.PodAffinity != nil {
+	if affinity != nil && affinity.PodAffinity != nil {
 		if !checker.NodeMatchesHardPodAffinity(pod, allPods, node, affinity.PodAffinity) {
 			return false, ErrPodAffinityNotMatch
 		}
 	}
 
-	// Hard inter-pod anti-affinity is symmetric, we should always check it.
-	if !checker.NodeMatchesHardPodAntiAffinity(pod, allPods, node, affinity.PodAntiAffinity) {
+	// Hard inter-pod anti-affinity is symmetric, we should always check it
+	// (also when affinity or affinity.PodAntiAffinity is nil).
+	var antiAffinity *api.PodAntiAffinity
+	if affinity != nil {
+		antiAffinity = affinity.PodAntiAffinity
+	}
+	if !checker.NodeMatchesHardPodAntiAffinity(pod, allPods, node, antiAffinity) {
 		return false, ErrPodAffinityNotMatch
 	}
 
@@ -932,6 +937,9 @@ func (checker *PodAffinityChecker) NodeMatchesHardPodAntiAffinity(pod *api.Pod, 
 		if err != nil {
 			glog.V(10).Infof("Failed to get Affinity from Pod %+v, err: %+v", podName(pod), err)
 			return false
+		}
+		if epAffinity == nil {
+			continue
 		}
 		epNode, err := checker.info.GetNodeInfo(ep.Spec.NodeName)
 		if err != nil {
