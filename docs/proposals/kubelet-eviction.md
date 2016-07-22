@@ -359,20 +359,20 @@ If `nodefs` is triggering evictions, `kubelet` will sort pods based on the usage
 
 If `imagefs` is triggering evictions, `kubelet` will sort pods based on the writable layer usage of all its containers.
 
-## Minimum eviction thresholds
+## Minimum eviction reclaim
 
 In certain scenarios, eviction of pods could result in reclamation of small amount of resources. This can result in
 `kubelet` hitting eviction thresholds in repeated successions. In addition to that, eviction of resources like `disk`,
  is time consuming.
 
-To mitigate these issues, `kubelet` will have a per-resource `minimum-threshold`. Whenever `kubelet` observes
-resource pressure, `kubelet` will attempt to reclaim at least `minimum-threshold` amount of resource.
+To mitigate these issues, `kubelet` will have a per-resource `minimum-reclaim`. Whenever `kubelet` observes
+resource pressure, `kubelet` will attempt to reclaim at least `minimum-reclaim` amount of resource.
 
-Following are the flags through which `minimum-thresholds` can be configured for each evictable resource:
+Following are the flags through which `minimum-reclaim` can be configured for each evictable resource:
 
-`--minimum-eviction-thresholds="memory.available=0Mi,nodefs.available=500Mi,imagefs.available=2Gi"`
+`--eviction-minimum-reclaim="memory.available=0Mi,nodefs.available=500Mi,imagefs.available=2Gi"`
 
-The default `minimum-eviction-threshold` is `0` for all resources.
+The default `eviction-minimum-reclaim` is `0` for all resources.
 
 ## Deprecation of existing features
 
@@ -382,7 +382,7 @@ some of the existing features/flags around disk space retrieval will be deprecat
 | Existing Flag | New Flag | Rationale |
 | ------------- | -------- | --------- |
 | `--image-gc-high-threshold` | `--eviction-hard` or `eviction-soft` | existing eviction signals can capture image garbage collection |
-| `--image-gc-low-threshold` | `--minimum-eviction-thresholds` | eviction thresholds achieve the same behavior |
+| `--image-gc-low-threshold` | `--eviction-minimum-reclaim` | eviction reclaims achieve the same behavior |
 | `--maximum-dead-containers` | | deprecated once old logs are stored outside of container's context |
 | `--maximum-dead-containers-per-container` | | deprecated once old logs are stored outside of container's context |
 | `--minimum-container-ttl-duration` | | deprecated once old logs are stored outside of container's context |
@@ -422,8 +422,8 @@ The `kubelet` will reject all pods if any of the disk eviction thresholds have b
 Let's assume the operator started the `kubelet` with the following:
 
 ```
---eviction-soft="disk.available<1500Mi"
---eviction-soft-grace-period="disk.available=30s"
+--eviction-soft="nodefs.available<1500Mi"
+--eviction-soft-grace-period="nodefs.available=30s"
 ```
 
 If the `kubelet` sees that it has less than `1500Mi` of disk available
