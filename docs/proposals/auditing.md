@@ -98,6 +98,8 @@ An audit event holds all the data necessary for an *output backend* to produce a
 
 The audit event struct is passed through the apiserver layers as an `*audit.Event` pointer inside the http context. It might be `nil` in case auditing is completely disabled.
 
+If auditing is enabled and the policy has an audit policy action (see below), the http handler will attach an `audit.Event` to the context:
+
 ```go
 package api
 
@@ -108,6 +110,8 @@ func AuditEventFrom(ctx Context) *audit.Event
 Depending on the audit policy, different layers of the apiserver (e.g. http handler, storage) will fill the `audit.Event` struct. Certain fields might stay empty or `nil` if the policy does not require that field. E.g. in the case only http headers are supposed to be audit logged, no `OldObject` or `NewObject` is to be retrieved on the storage layer.
 
 The audit policy is a partial mapping from kind, namespace, method, user to a policy action. An policy action defines the level of audit logging to be performed. The audit level can be `HttpHeaders`, `RequestObject`, `StorageObject`. In addition the policy action can contain a number of output backend dependent key/values e.g. to define JSON object paths which should be logged or excluded from logging. For portable policy actions, a number of key/values are standardised and ought to be supported by output backends.
+
+When the http request is processes, the request handler will close the audit event by filling in the http response. Then it will pass the event to the configured policy backend.
 
 ### Events
 
@@ -140,6 +144,8 @@ type Event struct {
 }
 ```
 
+### Concurrency/Transaction Model for Events
+
 ### Policy
 
 ```go
@@ -166,6 +172,8 @@ type Policy interface {
   func Action(kind, namespace, method, user string) Action
 }
 ```
+
+TODO: how do the storage layer and the http handlers get access to the policy?
 
 ### Output Backend Interface
 
