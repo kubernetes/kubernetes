@@ -2906,3 +2906,72 @@ func TestPodSchedulesOnNodeWithMemoryPressureCondition(t *testing.T) {
 		}
 	}
 }
+
+func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
+	pod := &api.Pod{
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:            "container",
+					Image:           "image",
+					ImagePullPolicy: "Always",
+				},
+			},
+		},
+	}
+
+	// specify a node with no disk pressure condition on
+	noPressureNode := &api.Node{
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{
+					Type:   "Ready",
+					Status: "True",
+				},
+			},
+		},
+	}
+
+	// specify a node with pressure condition on
+	pressureNode := &api.Node{
+		Status: api.NodeStatus{
+			Conditions: []api.NodeCondition{
+				{
+					Type:   "DiskPressure",
+					Status: "True",
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		pod      *api.Pod
+		nodeInfo *schedulercache.NodeInfo
+		fits     bool
+		name     string
+	}{
+		{
+			pod:      pod,
+			nodeInfo: makeEmptyNodeInfo(noPressureNode),
+			fits:     true,
+			name:     "pod schedulable on node without pressure condition on",
+		},
+		{
+			pod:      pod,
+			nodeInfo: makeEmptyNodeInfo(pressureNode),
+			fits:     false,
+			name:     "pod not schedulable on node with pressure condition on",
+		},
+	}
+
+	for _, test := range tests {
+		fits, err := CheckNodeDiskPressurePredicate(test.pod, test.nodeInfo)
+		if fits != test.fits {
+			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
+		}
+
+		if err != nil && err != ErrNodeUnderDiskPressure {
+			t.Errorf("%s: unexpected error: %v", test.name, err)
+		}
+	}
+}
