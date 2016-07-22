@@ -292,7 +292,10 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	}
 	newService := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test"},
-		Spec:       api.ServiceSpec{Type: api.ServiceTypeNodePort},
+		Spec: api.ServiceSpec{
+			Type:  api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{Port: 1234}},
+		},
 	}
 	err := handler.Admit(admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, nil))
 	if err != nil {
