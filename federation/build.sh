@@ -38,6 +38,7 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 CUR_ROOT=$(dirname "${BASH_SOURCE}")
 
+source "${KUBE_ROOT}/cluster/lib/logging.sh"
 source "${KUBE_ROOT}/build/util.sh"
 source "${KUBE_ROOT}/build/common.sh"
 
@@ -101,15 +102,18 @@ function build() {
 }
 
 function push() {
+	kube::log::status "Pushing hyperkube image to the registry"
 	gcloud docker push "${KUBE_REGISTRY}/hyperkube-amd64:${KUBE_VERSION}"
 }
 
 function pull_installer() {
+	kube::log::status "Pulling installer images"
 	gcloud docker pull "${KUBE_ANYWHERE_FEDERATION_IMAGE}:${KUBE_ANYWHERE_FEDERATION_VERSION}"
 	gcloud docker pull "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}"
 }
 
 function kube_action() {
+	kube::log::status "${ACTION} clusters"
 	docker run \
 		--user="$(id -u):$(id -g)" \
 		-m 12G \
@@ -121,6 +125,7 @@ function kube_action() {
 }
 
 function federation_action() {
+	kube::log::status "${ACTION} federation components"
 	docker run \
 		-m 12G \
 		-v "${HOME}/.kube/config:/root/.kube/config:ro" \
@@ -168,3 +173,5 @@ else
 	federation_action
 	kube_action
 fi
+
+kube::log::status "Successfully completed!"
