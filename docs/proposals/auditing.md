@@ -146,6 +146,8 @@ type Event struct {
 
 ### Concurrency/Transaction Model for Events
 
+TODO: define (and maybe adapt interface) how synchronization of the writable audit event of a context takes place.
+
 ### Policy
 
 ```go
@@ -174,6 +176,10 @@ type Policy interface {
 ```
 
 TODO: how do the storage layer and the http handlers get access to the policy?
+
+### Policy Actions
+
+TODO: define what we need next to the audit level
 
 ### Output Backend Interface
 
