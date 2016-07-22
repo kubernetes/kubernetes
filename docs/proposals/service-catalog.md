@@ -413,6 +413,67 @@ Additional fulfillment types are possible as long as there is a controller that 
 - What does it mean to "unlink"?
 - What happens if you delete a claim - does it cascade?
 
+# Prototype
+
+We have implemented a prototype to demonstrate a possible workflow for Catalogs in a Kubernetes
+cluster.  The implementation is [here](https://github.com/sjenning/kubernetes/tree/catalog-apiserver).
+
+This prototype allows for the following type of workflow:
+
+1. A user (the “provider” or “publisher”) creates one or more resources that he/she wants to share
+   with others. For this example, let’s imagine that I want to share a secret I created with other
+   users.
+1. The publisher creates a catalog posting that references the secret.
+1. Another user (the “consumer”) searches for and locates the entry in the catalog for the secret.
+1. The consumer instantiates the catalog entry (we’re currently calling this a claim, but the name
+   is open for discussion)
+1. The end result is a new secret in the consumer’s namespace.
+1. If the publisher changes the contents of the secret, all consumers’ secrets are automatically
+   updated with the latest data.
+
+
+We added a new executable that runs an apiserver and controllers related to catalogs. This process
+handles requests to a new API group, servicecatalog/v1alpha1. It also starts the controllers that
+monitor the resources in the new API group and performs actions such as catalog entry generation,
+catalog entry claim binding, and synchronization of resources created by catalog entry claims.
+
+The types in the new API group are:
+
+- CatalogPosting
+  - Namespace-scoped references to a collection of resources to be made available for claiming
+- CatalogEntry
+    - Cluster-scoped reference to a CatalogPosting with information relevant to consumers; displays
+      sufficient level of details to consumers without exposing sensitive information
+- CatalogClaim
+  - A resource that expresses intent to consume (i.e. import into a destination namespace) the
+    resources offered by a CatalogPosting via a CatalogEntry
+
+Here is a more detailed description of the workflow above:
+
+1. The publisher creates one or more resources in his/her namespace that are to be shared with
+   others
+1. The publisher creates a CatalogPosting that references the resources from step 1
+1. A controller creates a CatalogEntry that corresponds to the new CatalogPosting that contains
+   information about the shared resources relevant to consumers
+1. The consumer lists the available entries in the catalog
+1. The consumer creates a CatalogClaim for a specific CatalogEntry expressing intent to consume that
+   entry
+1. A controller processes the CatalogClaim and provisions the appropriate resources in the
+   consumer’s namespace
+1. A controller monitors resources associated with CatalogPostings for change and keeps all
+   resources provisioned from CatalogClaims in sync
+
+The controller to sync all possible resources types that a catalog posting could reference would be
+a large task. For demonstration purposes, the claim sync controller in this prototype only syncs
+secrets, since those are a resource a publisher could likely change and would need to sync down to
+the claimed secrets in order for pods to continue functioning.
+
+For example, if a publisher shares a secret and a consumer claims it, when the publisher changes the
+secret, the copy in the consumer’s namespace is updated. The consumer may need to restart/redeploy
+any pods referencing that secret, if the secret’s contents are referenced as environment variables,
+or if the application isn’t able to react to changes to secrets mounted as files.
+
+A video demo of the prototype is [here](https://www.youtube.com/watch?v=Jbi19qk79bo).
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/service-catalog.md?pixel)]()
