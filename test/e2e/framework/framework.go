@@ -32,7 +32,6 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -137,21 +136,10 @@ func (f *Framework) BeforeEach() {
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.Client == nil {
 		By("Creating a kubernetes client")
-		var config *restclient.Config
-		if TestContext.NodeName != "" {
-			// This is a node e2e test, apply the node e2e configuration
-			config = &restclient.Config{
-				Host:  TestContext.Host,
-				QPS:   100,
-				Burst: 100,
-			}
-		} else {
-			var err error
-			config, err = LoadConfig()
-			Expect(err).NotTo(HaveOccurred())
-			config.QPS = f.options.ClientQPS
-			config.Burst = f.options.ClientBurst
-		}
+		config, err := LoadConfig()
+		Expect(err).NotTo(HaveOccurred())
+		config.QPS = f.options.ClientQPS
+		config.Burst = f.options.ClientBurst
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
