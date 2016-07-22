@@ -1090,6 +1090,17 @@ func (r Result) Into(obj runtime.Object) error {
 	return runtime.DecodeInto(r.decoder, r.body, obj)
 }
 
+// Decode decodes the result.
+func (r Result) Decode() (obj runtime.Object, gvk *unversioned.GroupVersionKind, err error) {
+	if r.err != nil {
+		return nil, nil, r.err
+	}
+	if r.decoder == nil {
+		return nil, nil, fmt.Errorf("serializer for %s doesn't exist", r.contentType)
+	}
+	return r.decoder.Decode(r.body, nil, nil)
+}
+
 // WasCreated updates the provided bool pointer to whether the server returned
 // 201 created or a different response.
 func (r Result) WasCreated(wasCreated *bool) Result {

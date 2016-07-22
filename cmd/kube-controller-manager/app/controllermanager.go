@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/controller/job"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
@@ -487,7 +488,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		if err != nil {
 			glog.Fatalf("Failed to get supported resources from server: %v", err)
 		}
-		compressingClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc, garbagecollector.NewCompressingCodec())
+		compressingClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc, metaonly.MetaOnlyJSONScheme)
 		clientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc, nil)
 		garbageCollector, err := garbagecollector.NewGarbageCollector(compressingClientPool, clientPool, groupVersionResources)
 		if err != nil {

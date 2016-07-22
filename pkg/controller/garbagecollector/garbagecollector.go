@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -154,6 +155,7 @@ func (p *Propagator) addDependentToOwners(n *node, owners []metatypes.OwnerRefer
 				dependentsLock: &sync.RWMutex{},
 				dependents:     make(map[*node]struct{}),
 			}
+			glog.V(6).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			p.uidToNode.Write(ownerNode)
 			p.gc.dirtyQueue.Add(ownerNode)
 		}
@@ -439,8 +441,6 @@ type GarbageCollector struct {
 	propagator  *Propagator
 }
 
-// TODO: make special List and Watch function that removes fields other than
-// ObjectMeta.
 func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -470,7 +470,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
 	var monitor monitor
-	client, err := clientPool.ClientForGroupVersion(resource.GroupVersion())
+	client, err := p.gc.compressingClientPool.ClientForGroupVersion(resource.GroupVersion())
 	if err != nil {
 		return monitor, err
 	}
@@ -553,7 +553,7 @@ func (gc *GarbageCollector) worker() {
 	defer gc.dirtyQueue.Done(key)
 	err := gc.processItem(key.(*node))
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error syncing item %v: %v", key, err))
+		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", key, err))
 	}
 }
 
@@ -627,6 +627,20 @@ func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
 	return ret
 }
 
+func objectReferenceToMetaOnly(ref objectReference) *metaonly.MetaOnly {
+	return &metaonly.MetaOnly{
+		TypeMeta: unversioned.TypeMeta{
+			APIVersion: ref.APIVersion,
+			Kind:       ref.Kind,
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: ref.Namespace,
+			UID:       ref.UID,
+			Name:      ref.Name,
+		},
+	}
+}
+
 func (gc *GarbageCollector) processItem(item *node) error {
 	// Get the latest item from the API server
 	latest, err := gc.getObject(item.identity)
@@ -638,15 +652,22 @@ func (gc *GarbageCollector) processItem(item *node) error {
 			glog.V(6).Infof("item %v not found, generating a virtual delete event", item.identity)
 			event := event{
 				eventType: deleteEvent,
-				obj:       objectReferenceToUnstructured(item.identity),
+				obj:       objectReferenceToMetaOnly(item.identity),
 			}
+			glog.V(6).Infof("generating virtual delete event for %s\n\n", metaonly.PrintAsMetaOnly(event.obj))
 			gc.propagator.eventQueue.Add(event)
 			return nil
 		}
 		return err
 	}
 	if latest.GetUID() != item.identity.UID {
-		glog.V(6).Infof("UID doesn't match, item %v not found, ignore it", item.identity)
+		glog.V(6).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
+		event := event{
+			eventType: deleteEvent,
+			obj:       objectReferenceToMetaOnly(item.identity),
+		}
+		glog.V(6).Infof("generating virtual delete event for %s\n\n", metaonly.PrintAsMetaOnly(event.obj))
+		gc.propagator.eventQueue.Add(event)
 		return nil
 	}
 	ownerReferences := latest.GetOwnerReferences()

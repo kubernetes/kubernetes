@@ -14,16 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package garbagecollector
+package metaonly
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 func getPod() *v1.Pod {
@@ -74,64 +74,56 @@ func getPodListJson(t *testing.T) []byte {
 	return data
 }
 
-func verifyMetadataKeys(t *testing.T, in map[string]interface{}) {
-	if _, ok := in["apiVersion"]; !ok {
-		t.Errorf("mising apiVersion")
+func verfiyMetadata(t *testing.T, in *MetaOnly) {
+	pod := getPod()
+	if e, a := pod.ObjectMeta, in.ObjectMeta; !reflect.DeepEqual(e, a) {
+		t.Errorf("expect %#v, got %#v", e, a)
 	}
-	if _, ok := in["kind"]; !ok {
-		t.Errorf("mising kind")
-	}
-	if _, ok := in["metadata"]; !ok {
-		t.Errorf("mising metadata")
-	}
-	if len(in) != 3 {
-		t.Errorf("got unexpected keys: %#v", in)
+	if e, a := (unversioned.TypeMeta{APIVersion: "v1", Kind: "Pod"}), in.TypeMeta; e != a {
+		t.Errorf("expect %#v, got %#v", e, a)
 	}
 }
 
-func TestDecodeToUnstructured(t *testing.T) {
+func TestDecodeToMetaOnly(t *testing.T) {
 	data := getPodJson(t)
-	codec := NewCompressingCodec()
-	into := &runtime.Unstructured{}
-	ret, _, err := codec.Decode(data, nil, into)
+	into := &MetaOnly{}
+	ret, _, err := MetaOnlyJSONScheme.Decode(data, nil, into)
 	if err != nil {
 		t.Fatal(err)
 	}
-	unstructured, ok := ret.(*runtime.Unstructured)
+	metaOnly, ok := ret.(*MetaOnly)
 	if !ok {
-		t.Fatalf("expect ret to be *runtime.Unstructured")
+		t.Fatalf("expect ret to be *runtime.MetaOnly")
 	}
-	verifyMetadataKeys(t, unstructured.Object)
-	verifyMetadataKeys(t, into.Object)
+	verfiyMetadata(t, metaOnly)
+	verfiyMetadata(t, into)
 }
 
-func verifyUnstructureListMetadataKeys(t *testing.T, unstructuredList *runtime.UnstructuredList) {
-	// this is how reflector handles the unstructuredList
-	items, err := meta.ExtractList(unstructuredList)
+func verifyListMetadata(t *testing.T, metaOnlyList *MetaOnlyList) {
+	items, err := meta.ExtractList(metaOnlyList)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, item := range items {
-		unstructured, ok := item.(*runtime.Unstructured)
+		metaOnly, ok := item.(*MetaOnly)
 		if !ok {
-			t.Fatalf("expect item to be *runtime.Unstructured")
+			t.Fatalf("expect item to be *MetaOnly")
 		}
-		verifyMetadataKeys(t, unstructured.Object)
+		verfiyMetadata(t, metaOnly)
 	}
 }
 
-func TestDecodeToUnstructuredList(t *testing.T) {
+func TestDecodeToMetaOnlyList(t *testing.T) {
 	data := getPodListJson(t)
-	into := &runtime.UnstructuredList{}
-	codec := NewCompressingCodec()
-	ret, _, err := codec.Decode(data, nil, into)
+	into := &MetaOnlyList{}
+	ret, _, err := MetaOnlyJSONScheme.Decode(data, nil, into)
 	if err != nil {
 		t.Fatal(err)
 	}
-	unstructuredList, ok := ret.(*runtime.UnstructuredList)
+	metaOnlyList, ok := ret.(*MetaOnlyList)
 	if !ok {
 		t.Fatalf("expect ret to be *runtime.UnstructuredList")
 	}
-	verifyUnstructureListMetadataKeys(t, unstructuredList)
-	verifyUnstructureListMetadataKeys(t, into)
+	verifyListMetadata(t, metaOnlyList)
+	verifyListMetadata(t, into)
 }

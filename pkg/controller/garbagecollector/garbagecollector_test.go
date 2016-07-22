@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
@@ -39,7 +40,7 @@ import (
 )
 
 func TestNewGarbageCollector(t *testing.T) {
-	compressingClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, NewCompressingCodec())
+	compressingClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, metaonly.MetaOnlyJSONScheme)
 	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, nil)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)
@@ -142,7 +143,7 @@ func TestProcessItem(t *testing.T) {
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
-	compressingClientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, NewCompressingCodec())
+	compressingClientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, metaonly.MetaOnlyJSONScheme)
 	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, nil)
 	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)
 	if err != nil {
@@ -295,7 +296,7 @@ func TestProcessEvent(t *testing.T) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
-	compressingClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, NewCompressingCodec())
+	compressingClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, metaonly.MetaOnlyJSONScheme)
 	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, nil)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)

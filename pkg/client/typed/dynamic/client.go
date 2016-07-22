@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -62,6 +63,10 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	if len(conf.UserAgent) == 0 {
 		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
+	}
+	if conf.NegotiatedSerializer == nil {
+		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: Codec{}}, streamingInfo)
 	}
 
 	cl, err := restclient.RESTClientFor(conf)
@@ -113,19 +118,18 @@ type ResourceClient struct {
 }
 
 // List returns a list of objects for this resource.
-func (rc *ResourceClient) List(opts runtime.Object) (*runtime.UnstructuredList, error) {
-	result := new(runtime.UnstructuredList)
+func (rc *ResourceClient) List(opts runtime.Object) (runtime.Object, error) {
 	parameterEncoder := rc.parameterCodec
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
 	}
-	err := rc.cl.Get().
+	ret, _, err := rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		VersionedParams(opts, parameterEncoder).
 		Do().
-		Into(result)
-	return result, err
+		Decode()
+	return ret, err
 }
 
 // Get gets the resource with the specified name.
