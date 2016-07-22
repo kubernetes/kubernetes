@@ -269,8 +269,16 @@ function start_apiserver {
       runtime_config="--runtime-config=${RUNTIME_CONFIG}"
     fi
 
+    # Let the API server pick a default address when API_HOST
+    # is set to 127.0.0.1
+    advertise_address=""
+    if [[ "${API_HOST}" != "127.0.0.1" ]]; then
+        advertise_address="--advertise_address=${API_HOST}"
+    fi
+
     APISERVER_LOG=/tmp/kube-apiserver.log
     sudo -E "${GO_OUT}/hyperkube" apiserver ${priv_arg} ${runtime_config}\
+      ${advertise_address} \
       --v=${LOG_LEVEL} \
       --cert-dir="${CERT_DIR}" \
       --service-account-key-file="${SERVICE_ACCOUNT_KEY}" \
@@ -279,7 +287,6 @@ function start_apiserver {
       --bind-address="${API_BIND_ADDR}" \
       --insecure-bind-address="${API_HOST_IP}" \
       --insecure-port="${API_PORT}" \
-      --advertise-address="${API_HOST_IP}" \
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="10.0.0.0/24" \
       --cloud-provider="${CLOUD_PROVIDER}" \
