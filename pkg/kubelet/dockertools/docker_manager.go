@@ -2032,6 +2032,9 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		}
 	}
 
+	//update podIP with determined IP
+	pod.Status.PodIP = podIP
+
 	next, status, done := findActiveInitContainer(pod, podStatus)
 	if status != nil {
 		if status.ExitCode != 0 {
