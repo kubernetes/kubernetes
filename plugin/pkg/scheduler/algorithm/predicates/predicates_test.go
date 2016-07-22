@@ -2500,7 +2500,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			if affinity.NodeAffinity != nil {
+			if affinity != nil && affinity.NodeAffinity != nil {
 				nodeInfo := schedulercache.NewNodeInfo()
 				nodeInfo.SetNode(&node)
 				fits2, err := PodSelectorMatches(test.pod, PredicateMetadata(test.pod), nodeInfo)

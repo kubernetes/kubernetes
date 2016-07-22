@@ -153,6 +153,14 @@ func (n *NodeInfo) String() string {
 	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v}", podKeys, n.requestedResource, n.nonzeroRequest)
 }
 
+func hasPodAffinityConstraints(pod *api.Pod) bool {
+	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
+	if err != nil || affinity == nil {
+		return false
+	}
+	return affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil
+}
+
 // addPod adds pod information to this NodeInfo.
 func (n *NodeInfo) addPod(pod *api.Pod) {
 	cpu, mem, nvidia_gpu, non0_cpu, non0_mem := calculateResource(pod)
@@ -162,8 +170,7 @@ func (n *NodeInfo) addPod(pod *api.Pod) {
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
 	n.pods = append(n.pods, pod)
-	// TODO: This should return pointer to avoid allocations.
-	if affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations); err == nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil) {
+	if hasPodAffinityConstraints(pod) {
 		n.podsWithAffinity = append(n.podsWithAffinity, pod)
 	}
 	n.generation++
