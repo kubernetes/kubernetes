@@ -94,7 +94,8 @@ TODO
 
 ```go
 package audit
-type Event interface {
+
+type Event struct {
   // opening
   ID string
   Timestamp time.Timestamp
