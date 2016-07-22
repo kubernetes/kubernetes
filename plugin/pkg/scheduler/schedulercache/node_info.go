@@ -33,11 +33,13 @@ type NodeInfo struct {
 	// Overall node information.
 	node *api.Node
 
+	pods             []*api.Pod
+	podsWithAffinity []*api.Pod
+
 	// Total requested resource of all pods on this node.
 	// It includes assumed pods which scheduler sends binding to apiserver but
 	// didn't get it as scheduled yet.
 	requestedResource *Resource
-	pods              []*api.Pod
 	nonzeroRequest    *Resource
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
@@ -126,12 +128,18 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	pods := append([]*api.Pod(nil), n.pods...)
 	clone := &NodeInfo{
 		node:                n.node,
+		pods:                pods,
 		requestedResource:   &(*n.requestedResource),
 		nonzeroRequest:      &(*n.nonzeroRequest),
 		allocatableResource: &(*n.allocatableResource),
 		allowedPodNumber:    n.allowedPodNumber,
-		pods:                pods,
 		generation:          n.generation,
+	}
+	if len(n.pods) > 0 {
+		clone.pods = append([]*api.Pod(nil), n.pods...)
+	}
+	if len(n.podsWithAffinity) > 0 {
+		clone.podsWithAffinity = append([]*api.Pod(nil), n.podsWithAffinity...)
 	}
 	return clone
 }
@@ -154,6 +162,10 @@ func (n *NodeInfo) addPod(pod *api.Pod) {
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
 	n.pods = append(n.pods, pod)
+	// TODO: This should return pointer to avoid allocations.
+	if affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations); err == nil && (affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil) {
+		n.podsWithAffinity = append(n.podsWithAffinity, pod)
+	}
 	n.generation++
 }
 
@@ -164,6 +176,19 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 		return err
 	}
 
+	for i := range n.podsWithAffinity {
+		k2, err := getPodKey(n.podsWithAffinity[i])
+		if err != nil {
+			glog.Errorf("Cannot get pod key, err: %v", err)
+			continue
+		}
+		if k1 == k2 {
+			// delete the element
+			n.podsWithAffinity[i] = n.podsWithAffinity[len(n.podsWithAffinity)-1]
+			n.podsWithAffinity = n.podsWithAffinity[:len(n.podsWithAffinity)-1]
+			break
+		}
+	}
 	for i := range n.pods {
 		k2, err := getPodKey(n.pods[i])
 		if err != nil {
