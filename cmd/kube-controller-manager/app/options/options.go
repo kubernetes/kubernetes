@@ -97,6 +97,7 @@ func NewCMServer() *CMServer {
 			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
 		},
 	}
+	s.LeaderElection.LeaderElect = true
 	return &s
 }
 
