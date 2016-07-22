@@ -226,6 +226,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			loadBalancer,
 			net.ParseIP(config.BindAddress),
 			iptInterface,
+			execer,
 			*utilnet.ParsePortRangeOrDie(config.PortRange),
 			config.IPTablesSyncPeriod.Duration,
 			config.UDPIdleTimeout.Duration,

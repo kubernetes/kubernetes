@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
+	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -236,7 +237,7 @@ func TestExecConntrackTool(t *testing.T) {
 	expectErr := []bool{false, false, true}
 
 	for i := range testCases {
-		err := fakeProxier.execConntrackTool(testCases[i]...)
+		err := utilproxy.ExecConntrackTool(fakeProxier.exec, testCases[i]...)
 
 		if expectErr[i] {
 			if err == nil {
@@ -325,54 +326,6 @@ func TestDeleteEndpointConnections(t *testing.T) {
 
 		if expectCommandExecCount != fexec.CommandCalls {
 			t.Errorf("Exepect comand executed %d times, but got %d", expectCommandExecCount, fexec.CommandCalls)
-		}
-	}
-}
-
-func TestDeleteServiceConnections(t *testing.T) {
-	fcmd := exec.FakeCmd{
-		CombinedOutputScript: []exec.FakeCombinedOutputAction{
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) { return []byte("1 flow entries have been deleted"), nil },
-			func() ([]byte, error) {
-				return []byte(""), fmt.Errorf("conntrack v1.4.2 (conntrack-tools): 0 flow entries have been deleted.")
-			},
-		},
-	}
-	fexec := exec.FakeExec{
-		CommandScript: []exec.FakeCommandAction{
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-			func(cmd string, args ...string) exec.Cmd { return exec.InitFakeCmd(&fcmd, cmd, args...) },
-		},
-		LookPathFunc: func(cmd string) (string, error) { return cmd, nil },
-	}
-
-	fakeProxier := Proxier{exec: &fexec}
-
-	testCases := [][]string{
-		{
-			"10.240.0.3",
-			"10.240.0.5",
-		},
-		{
-			"10.240.0.4",
-		},
-	}
-
-	svcCount := 0
-	for i := range testCases {
-		fakeProxier.deleteServiceConnections(testCases[i])
-		for _, ip := range testCases[i] {
-			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s -p udp", ip)
-			execCommand := strings.Join(fcmd.CombinedOutputLog[svcCount], " ")
-			if expectCommand != execCommand {
-				t.Errorf("Exepect comand: %s, but executed %s", expectCommand, execCommand)
-			}
-			svcCount += 1
-		}
-		if svcCount != fexec.CommandCalls {
-			t.Errorf("Exepect comand executed %d times, but got %d", svcCount, fexec.CommandCalls)
 		}
 	}
 }
