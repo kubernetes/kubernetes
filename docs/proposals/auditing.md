@@ -77,7 +77,11 @@ while
 
 1. As a cluster operator I want to **integrate with external systems**, which will have different requirements for the log format, network protocols and communication modes (e.g. pull vs. push).
 
-1. As a cluster operator I must be able to provide a **complete trace of changes** to API objects.
+1. As a cluster operator I must be able to provide a **complete trace of changes to an object** to API objects.
+
+1. As a cluster operator I must be able to create a trace for **all accesses to a secret**.
+
+1. As a cluster operator I want to **define log-rotation** of a file-based output backend.
 
 ## Community Work
 
@@ -104,7 +108,7 @@ If auditing is enabled and the policy has an audit policy action (see below), th
 package api
 
 func WithAuditEvent(parent Context, e *audit.Event) Context
-func AuditEventFrom(ctx Context) *audit.Event
+func AuditEventFrom(ctx Context) (*audit.Event, bool)
 ```
 
 Depending on the audit policy, different layers of the apiserver (e.g. http handler, storage) will fill the `audit.Event` struct. Certain fields might stay empty or `nil` if the policy does not require that field. E.g. in the case only http headers are supposed to be audit logged, no `OldObject` or `NewObject` is to be retrieved on the storage layer.
