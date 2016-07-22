@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -48,7 +48,8 @@ func newFilePipeline(dir string, fileSize int64) *filePipeline {
 	return fp
 }
 
-// Open returns a fresh file for writing
+// Open returns a fresh file for writing. Rename the file before calling
+// Open again or there will be file collisions.
 func (fp *filePipeline) Open() (f *fileutil.LockedFile, err error) {
 	select {
 	case f = <-fp.filec:
@@ -63,8 +64,9 @@ func (fp *filePipeline) Close() error {
 }
 
 func (fp *filePipeline) alloc() (f *fileutil.LockedFile, err error) {
-	fpath := path.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count))
-	if f, err = fileutil.LockFile(fpath, os.O_CREATE|os.O_WRONLY, 0600); err != nil {
+	// count % 2 so this file isn't the same as the one last published
+	fpath := path.Join(fp.dir, fmt.Sprintf("%d.tmp", fp.count%2))
+	if f, err = fileutil.LockFile(fpath, os.O_CREATE|os.O_WRONLY, fileutil.PrivateFileMode); err != nil {
 		return nil, err
 	}
 	if err = fileutil.Preallocate(f.File, fp.size, true); err != nil {

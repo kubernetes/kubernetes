@@ -92,6 +92,12 @@ func (p *PackageLogger) Fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
+func (p *PackageLogger) Fatalln(args ...interface{}) {
+	s := fmt.Sprintln(args...)
+	p.internalLog(calldepth, CRITICAL, s)
+	os.Exit(1)
+}
+
 // Error Functions
 
 func (p *PackageLogger) Errorf(format string, args ...interface{}) {

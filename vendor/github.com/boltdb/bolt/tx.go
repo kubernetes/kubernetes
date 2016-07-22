@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strings"
 	"time"
 	"unsafe"
 )
@@ -202,8 +203,17 @@ func (tx *Tx) Commit() error {
 	// If strict mode is enabled then perform a consistency check.
 	// Only the first consistency error is reported in the panic.
 	if tx.db.StrictMode {
-		if err, ok := <-tx.Check(); ok {
-			panic("check fail: " + err.Error())
+		ch := tx.Check()
+		var errs []string
+		for {
+			err, ok := <-ch
+			if !ok {
+				break
+			}
+			errs = append(errs, err.Error())
+		}
+		if len(errs) > 0 {
+			panic("check fail: " + strings.Join(errs, "\n"))
 		}
 	}
 
@@ -297,12 +307,34 @@ func (tx *Tx) WriteTo(w io.Writer) (n int64, err error) {
 	}
 	defer func() { _ = f.Close() }()
 
-	// Copy the meta pages.
-	tx.db.metalock.Lock()
-	n, err = io.CopyN(w, f, int64(tx.db.pageSize*2))
-	tx.db.metalock.Unlock()
+	// Generate a meta page. We use the same page data for both meta pages.
+	buf := make([]byte, tx.db.pageSize)
+	page := (*page)(unsafe.Pointer(&buf[0]))
+	page.flags = metaPageFlag
+	*page.meta() = *tx.meta
+
+	// Write meta 0.
+	page.id = 0
+	page.meta().checksum = page.meta().sum64()
+	nn, err := w.Write(buf)
+	n += int64(nn)
 	if err != nil {
-		return n, fmt.Errorf("meta copy: %s", err)
+		return n, fmt.Errorf("meta 0 copy: %s", err)
+	}
+
+	// Write meta 1 with a lower transaction id.
+	page.id = 1
+	page.meta().txid -= 1
+	page.meta().checksum = page.meta().sum64()
+	nn, err = w.Write(buf)
+	n += int64(nn)
+	if err != nil {
+		return n, fmt.Errorf("meta 1 copy: %s", err)
+	}
+
+	// Move past the meta pages in the file.
+	if _, err := f.Seek(int64(tx.db.pageSize*2), os.SEEK_SET); err != nil {
+		return n, fmt.Errorf("seek: %s", err)
 	}
 
 	// Copy data pages.
@@ -441,6 +473,8 @@ func (tx *Tx) write() error {
 	for _, p := range tx.pages {
 		pages = append(pages, p)
 	}
+	// Clear out page cache early.
+	tx.pages = make(map[pgid]*page)
 	sort.Sort(pages)
 
 	// Write pages to disk in order.
@@ -485,8 +519,22 @@ func (tx *Tx) write() error {
 		}
 	}
 
-	// Clear out page cache.
-	tx.pages = make(map[pgid]*page)
+	// Put small pages back to page pool.
+	for _, p := range pages {
+		// Ignore page sizes over 1 page.
+		// These are allocated using make() instead of the page pool.
+		if int(p.overflow) != 0 {
+			continue
+		}
+
+		buf := (*[maxAllocSize]byte)(unsafe.Pointer(p))[:tx.db.pageSize]
+
+		// See https://go.googlesource.com/go/+/f03c9202c43e0abb130669852082117ca50aa9b1
+		for i := range buf {
+			buf[i] = 0
+		}
+		tx.db.pagePool.Put(buf)
+	}
 
 	return nil
 }

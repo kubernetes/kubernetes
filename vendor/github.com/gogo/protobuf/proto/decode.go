@@ -773,10 +773,11 @@ func (o *Buffer) dec_new_map(p *Properties, base structPointer) error {
 		}
 	}
 	keyelem, valelem := keyptr.Elem(), valptr.Elem()
-	if !keyelem.IsValid() || !valelem.IsValid() {
-		// We did not decode the key or the value in the map entry.
-		// Either way, it's an invalid map entry.
-		return fmt.Errorf("proto: bad map data: missing key/val")
+	if !keyelem.IsValid() {
+		keyelem = reflect.Zero(p.mtype.Key())
+	}
+	if !valelem.IsValid() {
+		valelem = reflect.Zero(p.mtype.Elem())
 	}
 
 	v.SetMapIndex(keyelem, valelem)

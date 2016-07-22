@@ -31,6 +31,7 @@ const (
 	HTML_SKIP_LINKS                            // skip all links
 	HTML_SAFELINK                              // only link to trusted protocols
 	HTML_NOFOLLOW_LINKS                        // only link with rel="nofollow"
+	HTML_NOREFERRER_LINKS                      // only link with rel="noreferrer"
 	HTML_HREF_TARGET_BLANK                     // add a blank target
 	HTML_TOC                                   // generate a table of contents
 	HTML_OMIT_CONTENTS                         // skip the main contents (for a standalone table of contents)
@@ -38,7 +39,8 @@ const (
 	HTML_USE_XHTML                             // generate XHTML output instead of HTML
 	HTML_USE_SMARTYPANTS                       // enable smart punctuation substitutions
 	HTML_SMARTYPANTS_FRACTIONS                 // enable smart fractions (with HTML_USE_SMARTYPANTS)
-	HTML_SMARTYPANTS_LATEX_DASHES              // enable LaTeX-style dashes (with HTML_USE_SMARTYPANTS)
+	HTML_SMARTYPANTS_DASHES                    // enable smart dashes (with HTML_USE_SMARTYPANTS)
+	HTML_SMARTYPANTS_LATEX_DASHES              // enable LaTeX-style dashes (with HTML_USE_SMARTYPANTS and HTML_SMARTYPANTS_DASHES)
 	HTML_SMARTYPANTS_ANGLED_QUOTES             // enable angled double quotes (with HTML_USE_SMARTYPANTS) for double quotes rendering
 	HTML_FOOTNOTE_RETURN_LINKS                 // generate a link at the end of a footnote to return to the source
 )
@@ -75,7 +77,7 @@ type HtmlRendererParameters struct {
 // Do not create this directly, instead use the HtmlRenderer function.
 type Html struct {
 	flags    int    // HTML_* options
-	closeTag string // how to end singleton tags: either " />\n" or ">\n"
+	closeTag string // how to end singleton tags: either " />" or ">"
 	title    string // document title
 	css      string // optional css file url (used with HTML_COMPLETE_PAGE)
 
@@ -94,8 +96,8 @@ type Html struct {
 }
 
 const (
-	xhtmlClose = " />\n"
-	htmlClose  = ">\n"
+	xhtmlClose = " />"
+	htmlClose  = ">"
 )
 
 // HtmlRenderer creates and configures an Html object, which
@@ -249,6 +251,7 @@ func (options *Html) HRule(out *bytes.Buffer) {
 	doubleSpace(out)
 	out.WriteString("<hr")
 	out.WriteString(options.closeTag)
+	out.WriteByte('\n')
 }
 
 func (options *Html) BlockCode(out *bytes.Buffer, text []byte, lang string) {
@@ -373,7 +376,9 @@ func (options *Html) List(out *bytes.Buffer, text func() bool, flags int) {
 	marker := out.Len()
 	doubleSpace(out)
 
-	if flags&LIST_TYPE_ORDERED != 0 {
+	if flags&LIST_TYPE_DEFINITION != 0 {
+		out.WriteString("<dl>")
+	} else if flags&LIST_TYPE_ORDERED != 0 {
 		out.WriteString("<ol>")
 	} else {
 		out.WriteString("<ul>")
@@ -382,7 +387,9 @@ func (options *Html) List(out *bytes.Buffer, text func() bool, flags int) {
 		out.Truncate(marker)
 		return
 	}
-	if flags&LIST_TYPE_ORDERED != 0 {
+	if flags&LIST_TYPE_DEFINITION != 0 {
+		out.WriteString("</dl>\n")
+	} else if flags&LIST_TYPE_ORDERED != 0 {
 		out.WriteString("</ol>\n")
 	} else {
 		out.WriteString("</ul>\n")
@@ -390,12 +397,25 @@ func (options *Html) List(out *bytes.Buffer, text func() bool, flags int) {
 }
 
 func (options *Html) ListItem(out *bytes.Buffer, text []byte, flags int) {
-	if flags&LIST_ITEM_CONTAINS_BLOCK != 0 || flags&LIST_ITEM_BEGINNING_OF_LIST != 0 {
+	if (flags&LIST_ITEM_CONTAINS_BLOCK != 0 && flags&LIST_TYPE_DEFINITION == 0) ||
+		flags&LIST_ITEM_BEGINNING_OF_LIST != 0 {
 		doubleSpace(out)
 	}
-	out.WriteString("<li>")
+	if flags&LIST_TYPE_TERM != 0 {
+		out.WriteString("<dt>")
+	} else if flags&LIST_TYPE_DEFINITION != 0 {
+		out.WriteString("<dd>")
+	} else {
+		out.WriteString("<li>")
+	}
 	out.Write(text)
-	out.WriteString("</li>\n")
+	if flags&LIST_TYPE_TERM != 0 {
+		out.WriteString("</dt>\n")
+	} else if flags&LIST_TYPE_DEFINITION != 0 {
+		out.WriteString("</dd>\n")
+	} else {
+		out.WriteString("</li>\n")
+	}
 }
 
 func (options *Html) Paragraph(out *bytes.Buffer, text func() bool) {
@@ -429,9 +449,17 @@ func (options *Html) AutoLink(out *bytes.Buffer, link []byte, kind int) {
 
 	entityEscapeWithSkip(out, link, skipRanges)
 
+	var relAttrs []string
 	if options.flags&HTML_NOFOLLOW_LINKS != 0 && !isRelativeLink(link) {
-		out.WriteString("\" rel=\"nofollow")
+		relAttrs = append(relAttrs, "nofollow")
 	}
+	if options.flags&HTML_NOREFERRER_LINKS != 0 && !isRelativeLink(link) {
+		relAttrs = append(relAttrs, "noreferrer")
+	}
+	if len(relAttrs) > 0 {
+		out.WriteString(fmt.Sprintf("\" rel=\"%s", strings.Join(relAttrs, " ")))
+	}
+
 	// blank target only add to external link
 	if options.flags&HTML_HREF_TARGET_BLANK != 0 && !isRelativeLink(link) {
 		out.WriteString("\" target=\"_blank")
@@ -476,7 +504,7 @@ func (options *Html) Emphasis(out *bytes.Buffer, text []byte) {
 }
 
 func (options *Html) maybeWriteAbsolutePrefix(out *bytes.Buffer, link []byte) {
-	if options.parameters.AbsolutePrefix != "" && isRelativeLink(link) {
+	if options.parameters.AbsolutePrefix != "" && isRelativeLink(link) && link[0] != '.' {
 		out.WriteString(options.parameters.AbsolutePrefix)
 		if link[0] != '/' {
 			out.WriteByte('/')
@@ -503,12 +531,12 @@ func (options *Html) Image(out *bytes.Buffer, link []byte, title []byte, alt []b
 
 	out.WriteByte('"')
 	out.WriteString(options.closeTag)
-	return
 }
 
 func (options *Html) LineBreak(out *bytes.Buffer) {
 	out.WriteString("<br")
 	out.WriteString(options.closeTag)
+	out.WriteByte('\n')
 }
 
 func (options *Html) Link(out *bytes.Buffer, link []byte, title []byte, content []byte) {
@@ -535,9 +563,17 @@ func (options *Html) Link(out *bytes.Buffer, link []byte, title []byte, content 
 		out.WriteString("\" title=\"")
 		attrEscape(out, title)
 	}
+	var relAttrs []string
 	if options.flags&HTML_NOFOLLOW_LINKS != 0 && !isRelativeLink(link) {
-		out.WriteString("\" rel=\"nofollow")
+		relAttrs = append(relAttrs, "nofollow")
 	}
+	if options.flags&HTML_NOREFERRER_LINKS != 0 && !isRelativeLink(link) {
+		relAttrs = append(relAttrs, "noreferrer")
+	}
+	if len(relAttrs) > 0 {
+		out.WriteString(fmt.Sprintf("\" rel=\"%s", strings.Join(relAttrs, " ")))
+	}
+
 	// blank target only add to external link
 	if options.flags&HTML_HREF_TARGET_BLANK != 0 && !isRelativeLink(link) {
 		out.WriteString("\" target=\"_blank")
@@ -850,6 +886,14 @@ func skipSpace(tag []byte, i int) int {
 	return i
 }
 
+func skipChar(data []byte, start int, char byte) int {
+	i := start
+	for i < len(data) && data[i] == char {
+		i++
+	}
+	return i
+}
+
 func doubleSpace(out *bytes.Buffer) {
 	if out.Len() > 0 {
 		out.WriteByte('\n')
@@ -857,23 +901,32 @@ func doubleSpace(out *bytes.Buffer) {
 }
 
 func isRelativeLink(link []byte) (yes bool) {
-	yes = false
-
 	// a tag begin with '#'
 	if link[0] == '#' {
-		yes = true
+		return true
 	}
 
 	// link begin with '/' but not '//', the second maybe a protocol relative link
 	if len(link) >= 2 && link[0] == '/' && link[1] != '/' {
-		yes = true
+		return true
 	}
 
 	// only the root '/'
 	if len(link) == 1 && link[0] == '/' {
-		yes = true
+		return true
 	}
-	return
+
+	// current directory : begin with "./"
+	if bytes.HasPrefix(link, []byte("./")) {
+		return true
+	}
+
+	// parent directory : begin with "../"
+	if bytes.HasPrefix(link, []byte("../")) {
+		return true
+	}
+
+	return false
 }
 
 func (options *Html) ensureUniqueHeaderID(id string) string {
