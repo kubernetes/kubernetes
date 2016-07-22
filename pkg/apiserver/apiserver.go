@@ -134,21 +134,28 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 // this method will return an error.
 func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 	installer := g.newInstaller()
-	var ws *restful.WebService = nil
-
-	for i, s := range container.RegisteredWebServices() {
-		if s.RootPath() == installer.prefix {
-			ws = container.RegisteredWebServices()[i]
-			break
-		}
-	}
-
+	ws := g.GetREST(container)
 	if ws == nil {
 		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
 	}
 	apiResources, registrationErrors := installer.Install(ws)
+	ws.RemoveRoute(ws.RootPath()+"/", "GET")
 	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, apiResources)
 	return utilerrors.NewAggregate(registrationErrors)
+}
+
+// GetREST returns the REST handlers for this APIGroupVersion from an existing web service
+// in the restful Container.  It will use the prefix (root/version) to find the existing
+// web service.  If a web service does not exist within the container to support the prefix
+// this method will return nil.
+func (g *APIGroupVersion) GetREST(container *restful.Container) *restful.WebService {
+	installer := g.newInstaller()
+	for i, s := range container.RegisteredWebServices() {
+		if s.RootPath() == installer.prefix {
+			return container.RegisteredWebServices()[i]
+		}
+	}
+	return nil
 }
 
 // newInstaller is a helper to create the installer.  Used by InstallREST and UpdateREST.
@@ -345,6 +352,9 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 		ss = StripVersionNegotiatedSerializer{s}
 	}
 	resourceHandler := SupportedResourcesHandler(ss, groupVersion, apiResources)
+	// Setting Dynamic Routes to true so that we can add, modify and delete new resources to the same webservice
+	// For example, a webservice with group example.com can be modified to add foos and bars and also delete foosdummy.
+	ws.SetDynamicRoutes(true)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
 		Operation("getAPIResources").

@@ -37,8 +37,18 @@ func makeThirdPartyPath(group string) string {
 	return thirdpartyprefix + "/" + group
 }
 
-func getThirdPartyGroupName(path string) string {
-	return strings.TrimPrefix(strings.TrimPrefix(path, thirdpartyprefix), "/")
+func getThirdPartyGroupResourceName(path string) (string, string) {
+	parts := strings.Split(path, "/")
+	if len(parts) == 4 {
+		return parts[2], parts[3]
+	} else if len(parts) == 5 {
+		return parts[2], parts[4]
+	}
+	return "", ""
+}
+
+func getResourceNameFromKind(kind string) string {
+	return strings.ToLower(kind) + "s"
 }
 
 // resourceInterface is the interface for the parts of the master that know how to add/remove
@@ -86,19 +96,21 @@ func (t *ThirdPartyController) SyncResources() error {
 }
 
 func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
-	existing := sets.String{}
+	existingResources := sets.String{}
+	existingGroups := sets.String{}
 	switch list := list.(type) {
 	case *expapi.ThirdPartyResourceList:
 		// Loop across all schema objects for third party resources
 		for ix := range list.Items {
 			item := &list.Items[ix]
 			// extract the api group and resource kind from the schema
-			_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
+			kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(item)
 			if err != nil {
 				return err
 			}
 			// place it in the set of resources that we expect, so that we don't delete it in the delete pass
-			existing.Insert(makeThirdPartyPath(group))
+			existingResources.Insert(makeThirdPartyPath(group) + "/" + strings.ToLower(kind) + "s")
+			existingGroups.Insert(makeThirdPartyPath(group))
 			// ensure a RESTful resource for this schema exists on the master
 			if err := t.SyncOneResource(item); err != nil {
 				return err
@@ -111,9 +123,10 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 	installed := t.master.ListThirdPartyResources()
 	for _, installedAPI := range installed {
 		found := false
+		group, resourceName := getThirdPartyGroupResourceName(installedAPI)
 		// search across the expected restful resources to see if this resource belongs to one of the expected ones
-		for _, apiPath := range existing.List() {
-			if installedAPI == apiPath || strings.HasPrefix(installedAPI, apiPath+"/") {
+		for _, apiPath := range existingResources.List() {
+			if apiPath == installedAPI || apiPath == makeThirdPartyPath(group)+"/"+resourceName {
 				found = true
 				break
 			}
@@ -125,6 +138,5 @@ func (t *ThirdPartyController) syncResourceList(list runtime.Object) error {
 			}
 		}
 	}
-
 	return nil
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package master
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -26,32 +27,60 @@ import (
 )
 
 type FakeAPIInterface struct {
-	removed   []string
-	installed []*expapi.ThirdPartyResource
-	apis      []string
-	t         *testing.T
+	removed              []string
+	installed            []*expapi.ThirdPartyResource
+	services             []string
+	removedWebservices   []string
+	installedWebservices []string
+	apis                 []string
+	t                    *testing.T
 }
 
 func (f *FakeAPIInterface) RemoveThirdPartyResource(path string) error {
 	f.removed = append(f.removed, path)
+	group, resourceName := getThirdPartyGroupResourceName(path)
+	for _, webservice := range f.installedWebservices {
+		found := false
+		for _, installedResourcePath := range f.apis {
+			installedGroup, installedKind := getThirdPartyGroupResourceName(installedResourcePath)
+			if resourceName != installedKind && group != installedGroup && strings.HasPrefix(webservice, makeThirdPartyPath(installedGroup)) {
+				found = true
+			}
+		}
+		if !found {
+			f.removedWebservices = append(f.removedWebservices, webservice)
+		}
+	}
 	return nil
 }
 
 func (f *FakeAPIInterface) InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) error {
 	f.installed = append(f.installed, rsrc)
-	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
-	f.apis = append(f.apis, makeThirdPartyPath(group))
+	kind, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	f.apis = append(f.apis, makeThirdPartyPath(group)+"/"+getResourceNameFromKind(kind))
 	return nil
+}
+
+func (f *FakeAPIInterface) HasWebservice(group string) (bool, error) {
+	for _, webservice := range f.installedWebservices {
+		if strings.HasPrefix(webservice, makeThirdPartyPath(group)) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (f *FakeAPIInterface) HasThirdPartyResource(rsrc *expapi.ThirdPartyResource) (bool, error) {
 	if f.apis == nil {
 		return false, nil
 	}
-	_, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	kind, group, _ := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	path := makeThirdPartyPath(group)
 	for _, api := range f.apis {
-		if api == path {
+		if strings.HasPrefix(api, makeThirdPartyPath(group)) && strings.HasSuffix(api, getResourceNameFromKind(kind)) {
+			return true, nil
+		}
+		if api == path+"/"+getResourceNameFromKind(kind) {
 			return true, nil
 		}
 	}
@@ -90,8 +119,7 @@ func TestSyncAPIs(t *testing.T) {
 				Items: resourcesNamed("foo.example.com"),
 			},
 			apis: []string{
-				"/apis/example.com",
-				"/apis/example.com/v1",
+				"/apis/example.com/v1/foos",
 			},
 			name: "does nothing",
 		},
@@ -100,15 +128,16 @@ func TestSyncAPIs(t *testing.T) {
 				Items: resourcesNamed("foo.example.com"),
 			},
 			apis: []string{
-				"/apis/example.com",
-				"/apis/example.com/v1",
+				"/apis/example.com/v1/foos",
 				"/apis/example.co",
 				"/apis/example.co/v1",
+				"/apis/example.co/v1/foo",
 			},
 			name: "deletes substring API",
 			expectedRemoved: []string{
 				"/apis/example.co",
 				"/apis/example.co/v1",
+				"/apis/example.co/v1/foo",
 			},
 		},
 		{
@@ -116,8 +145,7 @@ func TestSyncAPIs(t *testing.T) {
 				Items: resourcesNamed("foo.example.com", "foo.company.com"),
 			},
 			apis: []string{
-				"/apis/company.com",
-				"/apis/company.com/v1",
+				"/apis/company.com/v1/foos",
 			},
 			expectedInstalled: []string{"foo.example.com"},
 			name:              "adds with existing",
@@ -127,11 +155,10 @@ func TestSyncAPIs(t *testing.T) {
 				Items: resourcesNamed("foo.example.com"),
 			},
 			apis: []string{
-				"/apis/company.com",
-				"/apis/company.com/v1",
+				"/apis/company.com/v1/foos",
 			},
 			expectedInstalled: []string{"foo.example.com"},
-			expectedRemoved:   []string{"/apis/company.com", "/apis/company.com/v1"},
+			expectedRemoved:   []string{"/apis/company.com/v1/foos"},
 			name:              "removes with existing",
 		},
 	}
@@ -162,7 +189,7 @@ func TestSyncAPIs(t *testing.T) {
 			}
 		}
 		if len(test.expectedRemoved) != len(fake.removed) {
-			t.Errorf("[%s] unexpected installed APIs: %d, expected %d", test.name, len(fake.removed), len(test.expectedRemoved))
+			t.Errorf("[%s] unexpected uninstalled APIs: %d, expected %d", test.name, len(fake.removed), len(test.expectedRemoved))
 			continue
 		} else {
 			names := sets.String{}
