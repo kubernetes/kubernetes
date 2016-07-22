@@ -90,7 +90,7 @@ MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
 
 run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
   ${GCLOUD_COMMON_ARGS} \
-  --address "${MASTER_IP}"
+  --address "${MASTER_IP}" \
   --machine-type "${MASTER_SIZE}" \
   --image-project="${MASTER_IMAGE_PROJECT}" \
   --image "${MASTER_IMAGE}" \
