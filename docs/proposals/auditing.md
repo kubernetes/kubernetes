@@ -59,7 +59,7 @@ while
 ## Constraints and Assumptions
 
 * it is not the goal to implement all output formats one can imagine. The  main goal is to be extensible with a clear golang interface. Implementations of e.g. CADF must be possible, but won't be discussed there.
-* dynamic loading of plugins for new output formats are out of scope.
+* dynamic loading of backends for new output formats are out of scope.
 
 ## Use Cases
 
@@ -88,7 +88,26 @@ while
 
 ## Proposed Design
 
-TODO
+The main concepts are those of
+- an audit *event*,
+- an audit *policy*,
+- an audit *policy action*
+- an audit *output backend*.
+
+An audit event holds all the data necessary for an *output backend* to produce a audit log entry. The *event* is independent of the *output backend*.
+
+The audit event struct is passed through the apiserver layers as an `*audit.Event` pointer inside the http context. It might be `nil` in case auditing is completely disabled.
+
+```go
+package api
+
+func WithAuditEvent(parent Context, e *audit.Event) Context
+func AuditEventFrom(ctx Context) *audit.Event
+```
+
+Depending on the audit policy, different layers of the apiserver (e.g. http handler, storage) will fill the `audit.Event` struct. Certain fields might stay empty or `nil` if the policy does not require that field. E.g. in the case only http headers are supposed to be audit logged, no `OldObject` or `NewObject` is to be retrieved on the storage layer.
+
+The audit policy is a partial mapping from kind, namespace, method, user to a policy action. An policy action defines the level of audit logging to be performed. The audit level can be `HttpHeaders`, `RequestObject`, `StorageObject`. In addition the policy action can contain a number of output backend dependent key/values e.g. to define JSON object paths which should be logged or excluded from logging. For portable policy actions, a number of key/values are standardised and ought to be supported by output backends.
 
 ### Events
 
@@ -96,6 +115,8 @@ TODO
 package audit
 
 type Event struct {
+  Level Level
+
   // opening
   ID string
   Timestamp time.Timestamp
@@ -119,14 +140,40 @@ type Event struct {
 }
 ```
 
-### Output Plugin Interface
+### Policy
+
+```go
+package audit
+
+type Level string
+
+const (
+  // only logs http request level information without payload inspection
+  HttpHeadersLevel = "HttpHeaders"
+  // in addition to `HttpHeaders` the request payload is logged (if the output backend decides so)
+  RequestObjectLevel = "RequestObject"
+  // in addition to `RequestObject` the old and new object are intercepted on
+  // the storage layer and passed to the output backend. The output backend can // decide whether full objects are logged or a differential output is produced.
+  StorageObjectLevel = "StorageObject"
+)
+
+type Action interface {
+  Level() Level
+  Value(key string) string
+}
+
+type Policy interface {
+  func Action(kind, namespace, method, user string) Action
+}
+```
+
+### Output Backend Interface
 
 ```go
 package audit
 
 type OutputBackend interface {
-  Log(e *Event) error
-  ...
+  Log(e *Event, a Action) error
 }
 ```
 
