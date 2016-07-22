@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/golang/glog"
@@ -689,6 +690,26 @@ func validateNFSVolumeSource(nfs *api.NFSVolumeSource, fldPath *field.Path) fiel
 	}
 	if !path.IsAbs(nfs.Path) {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("path"), nfs.Path, "must be an absolute path"))
+	}
+	if len(nfs.Options) > 0 {
+		valid_opts := []string{"[r|w]size=[0-9]+$", "vers=[3|4]", "proto=tcp|udp"}
+		opts := strings.Split(nfs.Options, ",")
+		if len(opts) < 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("option"), nfs.Options, "invalid options"))
+		}
+		for _, o := range opts {
+			valid := false
+			for _, vo := range valid_opts {
+				r := regexp.MustCompile(vo)
+				if r.MatchString(o) {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("option"), nfs.Options, "invalid option: "+o))
+			}
+		}
 	}
 	return allErrs
 }

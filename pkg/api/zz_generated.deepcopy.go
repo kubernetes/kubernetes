@@ -1479,6 +1479,7 @@ func DeepCopy_api_NFSVolumeSource(in interface{}, out interface{}, c *conversion
 		out.Server = in.Server
 		out.Path = in.Path
 		out.ReadOnly = in.ReadOnly
+		out.Options = in.Options
 		return nil
 	}
 }

@@ -3455,6 +3455,10 @@ func (m *NFSVolumeSource) MarshalTo(data []byte) (int, error) {
 		data[i] = 0
 	}
 	i++
+	data[i] = 0x22
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.Options)))
+	i += copy(data[i:], m.Options)
 	return i, nil
 }
 
@@ -8701,6 +8705,8 @@ func (m *NFSVolumeSource) Size() (n int) {
 	l = len(m.Path)
 	n += 1 + l + sovGenerated(uint64(l))
 	n += 2
+	l = len(m.Options)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -11128,6 +11134,7 @@ func (this *NFSVolumeSource) String() string {
 		`Server:` + fmt.Sprintf("%v", this.Server) + `,`,
 		`Path:` + fmt.Sprintf("%v", this.Path) + `,`,
 		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
+		`Options:` + fmt.Sprintf("%v", this.Options) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -21837,6 +21844,35 @@ func (m *NFSVolumeSource) Unmarshal(data []byte) error {
 				}
 			}
 			m.ReadOnly = bool(v != 0)
+		case 4:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field Options", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.Options = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])

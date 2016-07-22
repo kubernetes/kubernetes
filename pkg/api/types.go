@@ -621,6 +621,10 @@ type NFSVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the NFS export to be mounted with read-only permissions
 	ReadOnly bool `json:"readOnly,omitempty"`
+
+	// Optional: comma delimited NFS mount options.
+	// Examples are: rsize=32768,vers=3,proto=tcp
+	Options string `json:"options,omitempty"`
 }
 
 // Represents a Glusterfs mount that lasts the lifetime of a pod.

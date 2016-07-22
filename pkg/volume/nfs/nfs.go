@@ -116,6 +116,7 @@ func (plugin *nfsPlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, mou
 		server:     source.Server,
 		exportPath: source.Path,
 		readOnly:   readOnly,
+		options:    source.Options,
 	}, nil
 }
 
@@ -157,6 +158,7 @@ type nfsMounter struct {
 	server     string
 	exportPath string
 	readOnly   bool
+	options    string
 }
 
 var _ volume.Mounter = &nfsMounter{}
@@ -188,6 +190,12 @@ func (b *nfsMounter) SetUpAt(dir string, fsGroup *int64) error {
 	options := []string{}
 	if b.readOnly {
 		options = append(options, "ro")
+	}
+	if len(b.options) > 0 {
+		if len(options) > 0 {
+			options = append(options, ",")
+		}
+		options = append(options, b.options)
 	}
 	err = b.mounter.Mount(source, dir, "nfs", options)
 	if err != nil {
