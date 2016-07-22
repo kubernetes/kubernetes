@@ -39,6 +39,7 @@ var (
 	ErrServiceAffinityViolated   = newPredicateFailureError("CheckServiceAffinity")
 	ErrMaxVolumeCountExceeded    = newPredicateFailureError("MaxVolumeCount")
 	ErrNodeUnderMemoryPressure   = newPredicateFailureError("NodeUnderMemoryPressure")
+	ErrNodeUnderDiskPressure     = newPredicateFailureError("NodeUnderDiskPressure")
 	// ErrFakePredicate is used for test only. The fake predicates returning false also returns error
 	// as ErrFakePredicate.
 	ErrFakePredicate = newPredicateFailureError("FakePredicateError")
