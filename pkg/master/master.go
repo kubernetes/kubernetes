@@ -707,6 +707,13 @@ func (m *Master) ListThirdPartyResources() []string {
 	return result
 }
 
+func (m *Master) hasThirdPartyResourceStorage(path string) bool {
+	m.thirdPartyResourcesLock.Lock()
+	defer m.thirdPartyResourcesLock.Unlock()
+	_, found := m.thirdPartyResources[path]
+	return found
+}
+
 func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyresourcedataetcd.REST, apiGroup unversioned.APIGroup) {
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
@@ -731,12 +738,19 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
 	})
+	path := makeThirdPartyPath(group)
 
 	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name, plural.Resource)
-	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
-		glog.Fatalf("Unable to setup thirdparty api: %v", err)
+
+	// If storage exists, this group has already been added, just update
+	// the group with the new API
+	if m.hasThirdPartyResourceStorage(path) {
+		return thirdparty.UpdateREST(m.HandlerContainer)
 	}
-	path := makeThirdPartyPath(group)
+
+	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
+		glog.Errorf("Unable to setup thirdparty api: %v", err)
+	}
 	groupVersion := unversioned.GroupVersionForDiscovery{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
