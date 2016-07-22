@@ -146,7 +146,7 @@ version (all required to issue a future event update).
 generated event (meaning none of the above fields match between the new event
 and any previously generated events), then the event is considered to be
 new/unique and a new event entry is created in etcd:
-     * The usual POST/create event API is called to create a new event entry in
+     * The usual POST/CREATE event API is called to create a new event entry in
 etcd.
      * An entry for the event is also added to the previously generated events
 cache.
