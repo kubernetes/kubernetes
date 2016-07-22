@@ -105,10 +105,11 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 		glog.V(4).Infof("Cached endpoint was found for %s/%s, cluster %s, removing", cachedService.lastState.Namespace, cachedService.lastState.Name, clusterName)
 		delete(cachedService.endpointMap, clusterName)
 		for i := 0; i < clientRetryCount; i++ {
-			if err := serviceController.ensureDnsRecords(clusterName, cachedService); err == nil {
+			err := serviceController.ensureDnsRecords(clusterName, cachedService)
+			if err == nil {
 				return nil
 			}
-			glog.V(4).Infof("Error ensuring DNS Records: %v", err)
+			glog.Infof("Error ensuring DNS Records: %v", err)
 			time.Sleep(cachedService.nextDNSUpdateDelay())
 		}
 	}
