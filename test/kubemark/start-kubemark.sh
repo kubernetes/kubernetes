@@ -80,7 +80,6 @@ run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
   --type "${MASTER_DISK_TYPE}" \
   --size "${MASTER_DISK_SIZE}"
 
-REGION=${ZONE%-*}
 run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
   --project "${PROJECT}" \
   --region "${REGION}" -q

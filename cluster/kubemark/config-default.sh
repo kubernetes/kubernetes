@@ -23,6 +23,7 @@ source "${KUBE_ROOT}/cluster/gce/config-common.sh"
 
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
+REGION=${ZONE%-*}
 NUM_NODES=${NUM_NODES:-100}
 MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_DISK_TYPE=pd-ssd
