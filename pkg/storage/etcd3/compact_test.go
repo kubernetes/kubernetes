@@ -36,14 +36,19 @@ func TestCompact(t *testing.T) {
 		t.Fatalf("Put failed: %v", err)
 	}
 
-	_, _, err = compact(ctx, client, 0, putResp.Header.Revision)
+	putResp1, err := client.Put(ctx, "/somekey", "data2")
+	if err != nil {
+		t.Fatalf("Put failed: %v", err)
+	}
+
+	_, _, err = compact(ctx, client, 0, putResp1.Header.Revision)
 	if err != nil {
 		t.Fatalf("compact failed: %v", err)
 	}
 
-	_, err = client.Get(ctx, "/somekey", clientv3.WithRev(putResp.Header.Revision))
+	obj, err := client.Get(ctx, "/somekey", clientv3.WithRev(putResp.Header.Revision))
 	if err != etcdrpc.ErrCompacted {
-		t.Errorf("Expecting ErrCompacted, but get=%v", err)
+		t.Errorf("Expecting ErrCompacted, but get=%v err=%v", obj, err)
 	}
 }
 
