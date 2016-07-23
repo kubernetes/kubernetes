@@ -108,8 +108,8 @@ function push() {
 
 function pull_installer() {
 	kube::log::status "Pulling installer images"
-	gcloud docker pull "${KUBE_ANYWHERE_FEDERATION_IMAGE}:${KUBE_ANYWHERE_FEDERATION_VERSION}"
-	gcloud docker pull "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}"
+	docker pull "${KUBE_ANYWHERE_FEDERATION_IMAGE}:${KUBE_ANYWHERE_FEDERATION_VERSION}"
+	docker pull "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}"
 }
 
 function kube_action() {
