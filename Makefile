@@ -157,6 +157,7 @@ test-e2e: ginkgo generated_files
 #  IMAGES.  Defaults to "kubernetes-node-e2e-images".
 #  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
 #    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
+#  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container

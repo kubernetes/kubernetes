@@ -57,6 +57,8 @@ type logFileData struct {
 const (
 	// This is consistent with the level used in a cluster e2e test.
 	LOG_VERBOSITY_LEVEL = "4"
+	// Etcd binary is expected to either be available via PATH, or at this location.
+	defaultEtcdPath = "/tmp/etcd"
 )
 
 func newE2eService(nodeName string, cgroupsPerQOS bool) *e2eService {
@@ -179,7 +181,16 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 		return nil, err
 	}
 	es.etcdDataDir = dataDir
-	cmd := exec.Command("etcd")
+	etcdPath, err := exec.LookPath("etcd")
+	if err != nil {
+		glog.Infof("etcd not found in PATH. Defaulting to %s...", defaultEtcdPath)
+		_, err = os.Stat(defaultEtcdPath)
+		if err != nil {
+			return nil, fmt.Errorf("etcd binary not found")
+		}
+		etcdPath = defaultEtcdPath
+	}
+	cmd := exec.Command(etcdPath)
 	// Execute etcd in the data directory instead of using --data-dir because the flag sometimes requires additional
 	// configuration (e.g. --name in version 0.4.9)
 	cmd.Dir = es.etcdDataDir

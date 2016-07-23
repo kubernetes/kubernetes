@@ -51,6 +51,7 @@ Why run tests *Locally*?  Much faster than running tests Remotely.
 Prerequisites:
 - [Install etcd](https://github.com/coreos/etcd/releases) on your PATH
   - Verify etcd is installed correctly by running `which etcd`
+  - Or make etcd binary available and executable at `/tmp/etcd`
 - [Install ginkgo](https://github.com/onsi/ginkgo) on your PATH
   - Verify ginkgo is installed correctly by running `which ginkgo`
 
