@@ -2367,6 +2367,15 @@ func (gce *GCECloud) AttachDisk(diskName, instanceID string, readOnly bool) erro
 func (gce *GCECloud) DetachDisk(devicePath, instanceID string) error {
 	inst, err := gce.getInstanceByName(instanceID)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// If instance no longer exists, safe to assume volume is not attached.
+			glog.Warningf(
+				"Instance %q does not exist. DetachDisk will assume PD %q is not attached to it.",
+				instanceID,
+				devicePath)
+			return nil
+		}
+
 		return fmt.Errorf("error getting instance %q", instanceID)
 	}
 
@@ -2381,6 +2390,15 @@ func (gce *GCECloud) DetachDisk(devicePath, instanceID string) error {
 func (gce *GCECloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
 	instance, err := gce.getInstanceByName(instanceID)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// If instance no longer exists, safe to assume volume is not attached.
+			glog.Warningf(
+				"Instance %q does not exist. DiskIsAttached will assume PD %q is not attached to it.",
+				instanceID,
+				diskName)
+			return false, nil
+		}
+
 		return false, err
 	}
 

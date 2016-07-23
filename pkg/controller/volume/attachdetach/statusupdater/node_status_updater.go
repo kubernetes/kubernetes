@@ -62,10 +62,12 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 	for nodeName, attachedVolumes := range nodesToUpdate {
 		nodeObj, exists, err := nsu.nodeInformer.GetStore().GetByKey(nodeName)
 		if nodeObj == nil || !exists || err != nil {
-			return fmt.Errorf(
-				"failed to find node %q in NodeInformer cache. %v",
+			// If node does not exist, its status cannot be updated, log error and move on.
+			glog.Warningf(
+				"Could not update node status. Failed to find node %q in NodeInformer cache. %v",
 				nodeName,
 				err)
+			return nil
 		}
 
 		node, ok := nodeObj.(*api.Node)
