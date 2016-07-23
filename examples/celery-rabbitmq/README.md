@@ -272,6 +272,13 @@ spec:
         resources:
           limits:
             cpu: 100m
+        livenessProbe:
+          httpGet:
+            # Path to probe; should be cheap, but representative of typical behavior
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
 ```
 
 [Download example](flower-controller.yaml?raw=true)
