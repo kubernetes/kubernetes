@@ -613,6 +613,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	for _, c := range fakeDocker.RunningContainerList {
 		if c.Image == "pod_infra_image" && strings.HasPrefix(c.Names[0], "/k8s_POD") {
 			found = true
+			break
 		}
 	}
 	if !found {
