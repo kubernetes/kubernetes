@@ -48,14 +48,16 @@ source "${KUBE_ROOT}/build/common.sh"
 readonly ACTION="${1:-gen}"
 
 readonly TMP_DIR="$(mktemp -d)"
-
 readonly FEDERATION_OUTPUT_ROOT="${LOCAL_OUTPUT_ROOT}/federation"
 
 readonly KUBE_ANYWHERE_FEDERATION_IMAGE="gcr.io/madhusudancs-containers/kubernetes-anywhere-federation"
 readonly KUBE_ANYWHERE_FEDERATION_VERSION="v0.9.0"
-
 readonly KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE="gcr.io/madhusudancs-containers/federation-charts"
 readonly KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION="v0.9.0"
+
+readonly GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-${HOME}/.config/gcloud/application_default_credentials.json}"
+readonly KUBE_CONFIG_DIR="${KUBE_CONFIG_DIR:-${HOME}/.kube}"
+readonly KUBE_CONFIG="${KUBE_CONFIG:-${HOME}/.kube/config}"
 
 KUBE_PROJECT="madhusudancs-k8s"
 KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
@@ -127,13 +129,26 @@ function pull_installer() {
 	docker pull "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}"
 }
 
+function ensure_files() {
+	kube::log::status "Ensure credential files exist..."
+	if [[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
+		echo "Please ensure Google credentials file \""${GOOGLE_APPLICATION_CREDENTIALS}"\" exists."
+		exit 1
+	fi
+
+	if [[ ! -f "${KUBE_CONFIG}" ]]; then
+		echo "Please ensure kubeconfig file \""${KUBE_CONFIG}"\" exists."
+		exit 1
+	fi
+}
+
 function kube_action() {
 	kube::log::status "${ACTION} clusters"
 	docker run \
 		--user="$(id -u):$(id -g)" \
 		-m 12G \
-		-v "${HOME}/.config/gcloud/application_default_credentials.json:/.config/gcloud/application_default_credentials.json:ro" \
-		-v "${HOME}/.kube:/.kube" \
+		-v "${GOOGLE_APPLICATION_CREDENTIALS}:/.config/gcloud/application_default_credentials.json:ro" \
+		-v "${KUBE_CONFIG_DIR}:/.kube" \
 		-v "${FEDERATION_OUTPUT_ROOT}:/_output" \
 		"${KUBE_ANYWHERE_FEDERATION_IMAGE}:${KUBE_ANYWHERE_FEDERATION_VERSION}" \
 		"${ACTION}"
@@ -143,7 +158,7 @@ function federation_action() {
 	kube::log::status "${ACTION} federation components"
 	docker run \
 		-m 12G \
-		-v "${HOME}/.kube/config:/root/.kube/config:ro" \
+		-v "${KUBE_CONFIG}:/root/.kube/config:ro" \
 		-v "${FEDERATION_OUTPUT_ROOT}:/_output" \
 		"${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}" \
 		"${ACTION}"
@@ -171,6 +186,8 @@ EOF
 }
 
 if [[ "${ACTION}" == "gen" || "${ACTION}" == "deploy" ]]; then
+	ensure_files
+
 	cd "${KUBE_ROOT}"
 	build
 	push
