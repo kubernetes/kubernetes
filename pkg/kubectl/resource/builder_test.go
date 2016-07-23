@@ -445,6 +445,7 @@ func TestDirectoryBuilder(t *testing.T) {
 	for _, info := range test.Infos {
 		if info.Name == "redis-master" && info.Namespace == "test" && info.Object != nil {
 			found = true
+			break
 		}
 	}
 	if !found {
