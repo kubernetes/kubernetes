@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -33,7 +32,6 @@ var (
 		&FreezerGroup{},
 		&NameGroup{GroupName: "name=systemd", Join: true},
 	}
-	CgroupProcesses  = "cgroup.procs"
 	HugePageSizes, _ = cgroups.GetHugePageSize()
 )
 
@@ -341,7 +339,7 @@ func (raw *cgroupData) join(subsystem string) (string, error) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", err
 	}
-	if err := writeFile(path, CgroupProcesses, strconv.Itoa(raw.pid)); err != nil {
+	if err := cgroups.WriteCgroupProc(path, raw.pid); err != nil {
 		return "", err
 	}
 	return path, nil
