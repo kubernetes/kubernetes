@@ -1,4 +1,4 @@
-[Sysdig Cloud](http://www.sysdig.com/) is the first and only monitoring, alerting, and troubleshooting solution designed from the ground up to provide unprecedented visibility into containerized infrastructures.
+[Sysdig Cloud](http://www.sysdig.com/) is a monitoring, alerting, and troubleshooting platform designed to natively support containerized and service-oriented applications.
 
 Sysdig Cloud comes with built-in, first class support for Kubernetes. In order to instrument your Kubernetes environment with Sysdig Cloud, you simply need to install the Sysdig Cloud agent container on each underlying host in your Kubernetes cluster. Sysdig Cloud will automatically begin monitoring all of your hosts, apps, pods, and services, and will also automatically connect to the Kubernetes API to pull relevant metadata about your environment.
 
