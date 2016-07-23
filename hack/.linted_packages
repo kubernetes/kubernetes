@@ -170,6 +170,7 @@ pkg/util/json
 pkg/util/limitwriter
 pkg/util/logs
 pkg/util/maps
+pkg/util/replicaset
 pkg/util/validation/field
 pkg/util/workqueue
 pkg/version/prometheus
