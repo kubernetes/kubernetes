@@ -144,6 +144,7 @@ func Run(s *options.CMServer) error {
 			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		}
+		configz.InstallHandler(mux)
 		mux.Handle("/metrics", prometheus.Handler())
 
 		server := &http.Server{
