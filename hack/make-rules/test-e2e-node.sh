@@ -133,9 +133,8 @@ else
   fi
   # Test using the host the script was run on
   # Provided for backwards compatibility
-  set -x
   "${ginkgo}" --focus=$focus --skip=$skip "${KUBE_ROOT}/test/e2e_node/" --report-dir=${report} \
-    -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=false \
+    -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true \
     --start-services=true --stop-services=true $test_args
   exit $?
 fi
