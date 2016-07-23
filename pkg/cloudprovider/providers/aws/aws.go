@@ -812,7 +812,7 @@ func (c *Cloud) NodeAddresses(name string) ([]api.NodeAddress, error) {
 	}
 	instance, err := c.getInstanceByNodeName(name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("getInstanceByNodeName failed for %q with %v", name, err)
 	}
 
 	addresses := []api.NodeAddress{}
@@ -869,7 +869,7 @@ func (c *Cloud) InstanceID(name string) (string, error) {
 	}
 	inst, err := c.getInstanceByNodeName(name)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", name, err)
 	}
 	return "/" + orEmpty(inst.Placement.AvailabilityZone) + "/" + orEmpty(inst.InstanceId), nil
 }
@@ -881,7 +881,7 @@ func (c *Cloud) InstanceType(name string) (string, error) {
 	}
 	inst, err := c.getInstanceByNodeName(name)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getInstanceByNodeName failed for %q with %v", name, err)
 	}
 	return orEmpty(inst.InstanceType), nil
 }
@@ -1336,7 +1336,7 @@ func (c *Cloud) getAwsInstance(nodeName string) (*awsInstance, error) {
 	} else {
 		instance, err := c.getInstanceByNodeName(nodeName)
 		if err != nil {
-			return nil, fmt.Errorf("error finding instance %s: %v", nodeName, err)
+			return nil, err
 		}
 
 		awsInstance = newAWSInstance(c.ec2, instance)
@@ -1354,7 +1354,7 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 
 	awsInstance, err := c.getAwsInstance(instanceName)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error finding instance %s: %v", instanceName, err)
 	}
 
 	if readOnly {
@@ -1419,6 +1419,15 @@ func (c *Cloud) DetachDisk(diskName string, instanceName string) (string, error)
 
 	awsInstance, err := c.getAwsInstance(instanceName)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// If instance no longer exists, safe to assume volume is not attached.
+			glog.Warningf(
+				"Instance %q does not exist. DetachDisk will assume disk %q is not attached to it.",
+				instanceName,
+				diskName)
+			return "", nil
+		}
+
 		return "", err
 	}
 
@@ -1562,6 +1571,15 @@ func (c *Cloud) GetDiskPath(volumeName string) (string, error) {
 func (c *Cloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
 	awsInstance, err := c.getAwsInstance(instanceID)
 	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// If instance no longer exists, safe to assume volume is not attached.
+			glog.Warningf(
+				"Instance %q does not exist. DiskIsAttached will assume disk %q is not attached to it.",
+				instanceID,
+				diskName)
+			return false, nil
+		}
+
 		return false, err
 	}
 
@@ -2918,7 +2936,7 @@ func (c *Cloud) findInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
 func (c *Cloud) getInstanceByNodeName(nodeName string) (*ec2.Instance, error) {
 	instance, err := c.findInstanceByNodeName(nodeName)
 	if err == nil && instance == nil {
-		return nil, fmt.Errorf("no instances found for name: %s", nodeName)
+		return nil, cloudprovider.InstanceNotFound
 	}
 	return instance, err
 }
