@@ -25,6 +25,9 @@
 # will deploy the components using
 # localhost:5000/anushku/hyperkube-amd64:1.3.0-dev image.
 
+# Everything in this script is expected to be executed from the $KUBE_ROOT
+# directory.
+
 # TODO(madhusudancs): Separate the dev functions from the deployment
 # functions. A lot of code here is to make this work in dev environments.
 # The script that we ship to the users as part of a release should be
@@ -56,7 +59,10 @@ readonly KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION="v0.9.0"
 
 KUBE_PROJECT="madhusudancs-k8s"
 KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
-KUBE_VERSION="${KUBE_VERSION:-$(kube::release::semantic_image_tag_version)}"
+
+# In dev environments this value must be recomputed after build. See
+# the build() function.
+KUBE_VERSION="${KUBE_VERSION:-}"
 
 
 function cleanup {
@@ -94,6 +100,15 @@ function build() {
 	kube::build::verify_prereqs
 	kube::build::build_image
 	kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube"
+
+	# Recompute KUBE_VERSION because it might have changed after rebuild.
+	KUBE_VERSION="${KUBE_VERSION:-$(kube::release::semantic_image_tag_version)}"
+
+	# Also append the dirty tree SHA to keep the versions unique across
+	# builds.
+	if [[ "${KUBE_VERSION}" == *-dirty ]]; then
+		KUBE_VERSION+=".$(dirty_sha)"
+	fi
 
 	BASEIMAGE="ubuntu:16.04" \
 		REGISTRY="${KUBE_REGISTRY}" \
@@ -135,12 +150,8 @@ function federation_action() {
 }
 
 function gen_or_update_config() {
-	if [[ "${KUBE_VERSION}" == *-dirty ]]; then
-		KUBE_VERSION+=".$(dirty_sha)"
-	fi
-
 	mkdir -p "${FEDERATION_OUTPUT_ROOT}"
-	cp "config.default.json" "${FEDERATION_OUTPUT_ROOT}/config.json"
+	cp "federation/config.default.json" "${FEDERATION_OUTPUT_ROOT}/config.json"
 
 	update_config \
 		'[.[] | .phase1.gce.project |= "'"${KUBE_PROJECT}"'"]' \
@@ -160,12 +171,15 @@ EOF
 }
 
 if [[ "${ACTION}" == "gen" || "${ACTION}" == "deploy" ]]; then
-	gen_or_update_config
-
 	cd "${KUBE_ROOT}"
 	build
 	push
+
 	pull_installer
+
+	# Update config after build and push, but before turning up the clusters
+	# to ensure the config has the right image version tags.
+	gen_or_update_config
 
 	kube_action
 	federation_action
