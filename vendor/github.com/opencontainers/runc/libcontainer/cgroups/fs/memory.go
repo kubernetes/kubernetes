@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
@@ -27,75 +26,38 @@ func (s *MemoryGroup) Apply(d *cgroupData) (err error) {
 	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
-	// reset error.
-	err = nil
-	if path == "" {
-		// Invalid input.
-		return fmt.Errorf("invalid path for memory cgroups: %+v", d)
+	if memoryAssigned(d.config) {
+		if path != "" {
+			if err := os.MkdirAll(path, 0755); err != nil {
+				return err
+			}
+		}
+		// We have to set kernel memory here, as we can't change it once
+		// processes have been attached.
+		if err := s.SetKernelMemory(path, d.config); err != nil {
+			return err
+		}
 	}
+
 	defer func() {
 		if err != nil {
 			os.RemoveAll(path)
 		}
 	}()
-	if !cgroups.PathExists(path) {
-		if err = os.MkdirAll(path, 0755); err != nil {
-			return err
-		}
-	}
-	if memoryAssigned(d.config) {
-		// We have to set kernel memory here, as we can't change it once
-		// processes have been attached to the cgroup.
-		if err = s.SetKernelMemory(path, d.config); err != nil {
-			return err
-		}
-	}
+
 	// We need to join memory cgroup after set memory limits, because
 	// kmem.limit_in_bytes can only be set when the cgroup is empty.
-	if _, jerr := d.join("memory"); jerr != nil && !cgroups.IsNotFound(jerr) {
-		err = jerr
+	_, err = d.join("memory")
+	if err != nil && !cgroups.IsNotFound(err) {
 		return err
 	}
 	return nil
 }
 
-func getModifyTime(path string) (time.Time, error) {
-	stat, err := os.Stat(path)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to get memory cgroups creation time: %v", err)
-	}
-	return stat.ModTime(), nil
-}
-
 func (s *MemoryGroup) SetKernelMemory(path string, cgroup *configs.Cgroup) error {
-	// This has to be done separately because it has special
-	// constraints (it can only be initialized before setting up a
-	// hierarchy or adding a task to the cgroups. However, if
-	// sucessfully initialized, it can be updated anytime afterwards)
-	if cgroup.Resources.KernelMemory != 0 {
-		// Is kmem.limit_in_bytes already set?
-		// memory.kmem.max_usage_in_bytes is a read-only file. Use it to get cgroups creation time.
-		kmemCreationTime, err := getModifyTime(filepath.Join(path, "memory.kmem.max_usage_in_bytes"))
-		if err != nil {
-			return err
-		}
-		kmemLimitsUpdateTime, err := getModifyTime(filepath.Join(path, "memory.kmem.limit_in_bytes"))
-		if err != nil {
-			return err
-		}
-		// kmem.limit_in_bytes has already been set if its update time is after that of creation time.
-		// We use `!=` op instead of `>` because updates are losing precision compared to creation.
-		kmemInitialized := !kmemLimitsUpdateTime.Equal(kmemCreationTime)
-		if !kmemInitialized {
-			// If there's already tasks in the cgroup, we can't change the limit either
-			tasks, err := getCgroupParamString(path, "tasks")
-			if err != nil {
-				return err
-			}
-			if tasks != "" {
-				return fmt.Errorf("cannot set kmem.limit_in_bytes after task have joined this cgroup")
-			}
-		}
+	// This has to be done separately because it has special constraints (it
+	// can't be done after there are processes attached to the cgroup).
+	if cgroup.Resources.KernelMemory > 0 {
 		if err := writeFile(path, "memory.kmem.limit_in_bytes", strconv.FormatInt(cgroup.Resources.KernelMemory, 10)); err != nil {
 			return err
 		}
@@ -148,10 +110,6 @@ func setMemoryAndSwap(path string, cgroup *configs.Cgroup) error {
 
 func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
 	if err := setMemoryAndSwap(path, cgroup); err != nil {
-		return err
-	}
-
-	if err := s.SetKernelMemory(path, cgroup); err != nil {
 		return err
 	}
 

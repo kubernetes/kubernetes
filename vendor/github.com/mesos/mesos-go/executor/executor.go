@@ -292,7 +292,7 @@ func (driver *MesosExecutorDriver) recoveryTimedOut(connection string) {
 	}
 	// ensure that connection ID's match otherwise we've been re-registered
 	if connection == driver.connection.String() {
-		log.Infof("recovery timeout of %v exceeded; shutting down", driver.recoveryTimeout)
+		log.Info("recovery timeout of %v exceeded; shutting down", driver.recoveryTimeout)
 		driver.shutdown(driver.context(), nil, nil)
 	}
 }
