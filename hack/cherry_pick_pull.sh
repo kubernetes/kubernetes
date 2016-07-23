@@ -37,6 +37,8 @@ if [[ -z ${GITHUB_USER:-} ]]; then
   exit 1
 fi
 
+USER_REMOTE=${USER_REMOTE:-origin}
+
 if ! which hub > /dev/null; then
   echo "Can't find 'hub' tool in PATH, please install from https://github.com/github/hub"
   exit 1
@@ -49,6 +51,9 @@ if [[ "$#" -lt 2 ]]; then
   echo "  Examples:"
   echo "    $0 upstream/release-3.14 12345        # Cherry-picks PR 12345 onto upstream/release-3.14 and proposes that as a PR."
   echo "    $0 upstream/release-3.14 12345 56789  # Cherry-picks PR 12345, then 56789 and proposes the combination as a single PR."
+  echo ""
+  echo "  Assumes that origin is the name of the remote for your personal fork.  If this is not the case:"
+  echo "    export USER_REMOTE=<your-remote>"
   echo
   echo "  Set the DRY_RUN environment var to skip git push and creating PR."
   echo "  This is useful for creating patches to a release branch without making a PR."
@@ -191,8 +196,8 @@ if [[ -n "${DRY_RUN}" ]]; then
   exit 0
 fi
 
-if git remote -v | grep ^${FORK_REMOTE} | grep kubernetes/kubernetes.git; then
-  echo "!!! You have ${FORK_REMOTE} configured as your kubernetes/kubernetes.git"
+if git remote -v | grep ^${USER_REMOTE} | grep kubernetes/kubernetes.git; then
+  echo "!!! You have ${USER_REMOTE} configured as your kubernetes/kubernetes.git"
   echo "This isn't normal. Leaving you with push instructions:"
   echo
   echo "+++ First manually push the branch this script created:"
@@ -200,7 +205,7 @@ if git remote -v | grep ^${FORK_REMOTE} | grep kubernetes/kubernetes.git; then
   echo "  git push REMOTE ${NEWBRANCHUNIQ}:${NEWBRANCH}"
   echo
   echo "where REMOTE is your personal fork (maybe ${UPSTREAM_REMOTE}? Consider swapping those.)."
-  echo "OR consider setting UPSTREAM_REMOTE and FORK_REMOTE to different values."
+  echo "OR consider setting UPSTREAM_REMOTE and USER_REMOTE to different values."
   echo
   make-a-pr
   cleanbranch=""
@@ -208,9 +213,9 @@ if git remote -v | grep ^${FORK_REMOTE} | grep kubernetes/kubernetes.git; then
 fi
 
 echo
-echo "+++ I'm about to do the following to push to GitHub (and I'm assuming ${FORK_REMOTE} is your personal fork):"
+echo "+++ I'm about to do the following to push to GitHub (and I'm assuming ${USER_REMOTE} is your personal fork):"
 echo
-echo "  git push ${FORK_REMOTE} ${NEWBRANCHUNIQ}:${NEWBRANCH}"
+echo "  git push ${USER_REMOTE} ${NEWBRANCHUNIQ}:${NEWBRANCH}"
 echo
 read -p "+++ Proceed (anything but 'y' aborts the cherry-pick)? [y/n] " -r
 if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
@@ -218,5 +223,5 @@ if ! [[ "${REPLY}" =~ ^[yY]$ ]]; then
   exit 1
 fi
 
-git push "${FORK_REMOTE}" -f "${NEWBRANCHUNIQ}:${NEWBRANCH}"
+git push "${USER_REMOTE}" -f "${NEWBRANCHUNIQ}:${NEWBRANCH}"
 make-a-pr

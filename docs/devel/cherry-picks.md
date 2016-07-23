@@ -34,6 +34,8 @@ label and lose the `cherrypick-candidate` label.
   * Run the cherry pick script. This example applies a master branch PR #98765
 to the remote branch `upstream/release-3.14`:
 `hack/cherry_pick_pull.sh upstream/release-3.14 98765`
+  * The cherry_pick_pull.sh script assumes that your personal fork is named
+    origin.  You can `export USER_REMOTE=username` if this is not the case.
   * Your cherrypick PR (targeted to the branch) will immediately get the
 `do-not-merge` label. The branch owner will triage PRs targeted to
 the branch and label the ones to be merged by applying the `lgtm`
