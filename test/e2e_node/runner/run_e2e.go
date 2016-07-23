@@ -310,7 +310,9 @@ func createInstance(image, imageProject string) (string, error) {
 		},
 	}
 	if *instanceMetadata != "" {
+		glog.V(2).Infof("parsing instance metadata: %q", *instanceMetadata)
 		raw := parseInstanceMetadata(*instanceMetadata)
+		glog.V(3).Infof("parsed instance metadata: %v", raw)
 		i.Metadata = &compute.Metadata{}
 		metadata := []*compute.MetadataItems{}
 		for k, v := range raw {
@@ -422,12 +424,12 @@ func parseInstanceMetadata(str string) map[string]string {
 		}
 		kp := strings.Split(s, "<")
 		if len(kp) != 2 {
-			glog.Errorf("Invalid instance metadata: %q", s)
+			glog.Fatalf("Invalid instance metadata: %q", s)
 			continue
 		}
 		v, err := ioutil.ReadFile(kp[1])
 		if err != nil {
-			glog.Errorf("Failed to read metadata file %q: %v", kp[1], err)
+			glog.Fatalf("Failed to read metadata file %q: %v", kp[1], err)
 			continue
 		}
 		metadata[kp[0]] = string(v)
