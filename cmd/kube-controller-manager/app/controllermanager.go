@@ -391,7 +391,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 	provisioner, err := NewVolumeProvisioner(cloud, s.VolumeConfiguration)
 	if err != nil {
-		glog.Fatal("A Provisioner could not be created, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.")
+		glog.Fatalf("A Provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
 
 	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
@@ -490,9 +490,8 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		clientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc)
 		garbageCollector, err := garbagecollector.NewGarbageCollector(clientPool, groupVersionResources)
 		if err != nil {
-			glog.Errorf("Failed to start the generic garbage collector")
+			glog.Errorf("Failed to start the generic garbage collector: %v", err)
 		} else {
-			// TODO: make this a flag of kube-controller-manager
 			workers := int(s.ConcurrentGCSyncs)
 			go garbageCollector.Run(workers, wait.NeverStop)
 		}
