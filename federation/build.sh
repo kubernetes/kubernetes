@@ -93,7 +93,7 @@ function update_config() {
 function build() {
 	kube::build::verify_prereqs
 	kube::build::build_image
-	kube::build::run_build_command make WHAT=cmd/hyperkube
+	kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube"
 
 	BASEIMAGE="ubuntu:16.04" \
 		REGISTRY="${KUBE_REGISTRY}" \
