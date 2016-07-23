@@ -122,7 +122,7 @@ CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s defaul
 function test_apiserver_off {
     # For the common local scenario, fail fast if server is already running.
     # this can happen if you run local-up-cluster.sh twice and kill etcd in between.
-    curl -g $API_HOST:$API_PORT
+    curl --silent -g $API_HOST:$API_PORT
     if [ ! $? -eq 0 ]; then
         echo "API SERVER port is free, proceeding..."
     else
