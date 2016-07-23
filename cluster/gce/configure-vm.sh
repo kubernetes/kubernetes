@@ -166,7 +166,7 @@ download-or-bust() {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 80 --retry 6 --retry-delay 10 "${url}"; then
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
