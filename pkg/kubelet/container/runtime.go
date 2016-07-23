@@ -381,6 +381,15 @@ type PortMapping struct {
 	HostIP string
 }
 
+type DeviceInfo struct {
+	// Path on host for mapping
+	PathOnHost string
+	// Path in Container to map
+	PathInContainer string
+	// Cgroup permissions
+	Permissions string
+}
+
 // RunContainerOptions specify the options which are necessary for running containers
 type RunContainerOptions struct {
 	// The environment variables list.
@@ -388,7 +397,7 @@ type RunContainerOptions struct {
 	// The mounts for the containers.
 	Mounts []Mount
 	// The host devices mapped into the containers.
-	Devices []string
+	Devices []DeviceInfo
 	// The port mappings for the containers.
 	PortMappings []PortMapping
 	// If the container has specified the TerminationMessagePath, then
