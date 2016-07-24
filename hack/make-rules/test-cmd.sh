@@ -605,7 +605,7 @@ runTests() {
   kubectl label pods valid-pod record-change=true --record=true "${kube_flags[@]}"
   # Post-condition: valid-pod has record annotation
   kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*--record=true.*"
-  
+
   ### Do not record label change
   # Command
   kubectl label pods valid-pod no-record-change=true --record=false "${kube_flags[@]}"
@@ -618,7 +618,7 @@ runTests() {
   # Post-condition: valid-pod's record annotation contains new change
   kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*new-record-change=true.*"
 
-    
+
   ### Delete POD by label
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
@@ -1765,15 +1765,15 @@ __EOF__
 
   ### Try to generate a service with invalid name (exceeding maximum valid size)
   # Pre-condition: use --name flag
-  output_message=$(! kubectl expose -f hack/testdata/pod-with-large-name.yaml --name=invalid-large-service-name --port=8081 2>&1 "${kube_flags[@]}")
+  output_message=$(! kubectl expose -f hack/testdata/pod-with-large-name.yaml --name=invalid-large-service-name-that-has-more-than-sixty-three-characters --port=8081 2>&1 "${kube_flags[@]}")
   # Post-condition: should fail due to invalid name
   kube::test::if_has_string "${output_message}" 'metadata.name: Invalid value'
   # Pre-condition: default run without --name flag; should succeed by truncating the inherited name
   output_message=$(kubectl expose -f hack/testdata/pod-with-large-name.yaml --port=8081 2>&1 "${kube_flags[@]}")
   # Post-condition: inherited name from pod has been truncated
-  kube::test::if_has_string "${output_message}" '\"kubernetes-serve-hostnam\" exposed'
+  kube::test::if_has_string "${output_message}" '\"kubernetes-serve-hostname-testing-sixty-three-characters-in-len\" exposed'
   # Clean-up
-  kubectl delete svc kubernetes-serve-hostnam "${kube_flags[@]}"
+  kubectl delete svc kubernetes-serve-hostname-testing-sixty-three-characters-in-len "${kube_flags[@]}"
 
   ### Expose multiport object as a new service
   # Pre-condition: don't use --port flag
@@ -1893,7 +1893,7 @@ __EOF__
   # Clean up
   kubectl delete deployment nginx "${kube_flags[@]}"
 
-  ### Set image of a deployment 
+  ### Set image of a deployment
   # Pre-condition: no deployment exists
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Create a deployment
@@ -1901,13 +1901,13 @@ __EOF__
   kube::test::get_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" 'nginx-deployment:'
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
-  # Set the deployment's image 
+  # Set the deployment's image
   kubectl set image deployment nginx-deployment nginx="${IMAGE_DEPLOYMENT_R2}" "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
-  # Set non-existing container should fail 
+  # Set non-existing container should fail
   ! kubectl set image deployment nginx-deployment redis=redis "${kube_flags[@]}"
-  # Set image of deployments without specifying name 
+  # Set image of deployments without specifying name
   kubectl set image deployments --all nginx="${IMAGE_DEPLOYMENT_R1}" "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
@@ -1915,11 +1915,11 @@ __EOF__
   kubectl set image -f hack/testdata/deployment-multicontainer.yaml nginx="${IMAGE_DEPLOYMENT_R2}" "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
-  # Set image of a local file without talking to the server 
+  # Set image of a local file without talking to the server
   kubectl set image -f hack/testdata/deployment-multicontainer.yaml nginx="${IMAGE_DEPLOYMENT_R1}" "${kube_flags[@]}" --local -o yaml
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R2}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_PERL}:"
-  # Set image of all containers of the deployment 
+  # Set image of all containers of the deployment
   kubectl set image deployment nginx-deployment "*"="${IMAGE_DEPLOYMENT_R1}" "${kube_flags[@]}"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"
   kube::test::get_object_assert deployment "{{range.items}}{{$deployment_second_image_field}}:{{end}}" "${IMAGE_DEPLOYMENT_R1}:"

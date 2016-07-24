@@ -665,7 +665,7 @@ func getSkyMsg(ip string, port int) (*skymsg.Service, string) {
 // The conjunction of the following conditions forms the test for the federated service query
 // pattern:
 //   1. `path` has exactly 4+len(domainPath) segments: mysvc.myns.myfederation.svc.domain.path.
-//   2. Service name component must be a valid RFC 952 name.
+//   2. Service name component must be a valid RFC 1035 name.
 //   3. Namespace component must be a valid RFC 1123 name.
 //   4. Federation component must also be a valid RFC 1123 name.
 //   5. Fourth segment is exactly "svc"
@@ -679,8 +679,8 @@ func (kd *KubeDNS) isFederationQuery(path []string) bool {
 		glog.V(2).Infof("not a federation query: len(%q) != 4+len(%q)", path, kd.domainPath)
 		return false
 	}
-	if errs := validation.IsDNS952Label(path[0]); len(errs) != 0 {
-		glog.V(2).Infof("not a federation query: %q is not an RFC 952 label: %q", path[0], errs)
+	if errs := validation.IsDNS1035Label(path[0]); len(errs) != 0 {
+		glog.V(2).Infof("not a federation query: %q is not an RFC 1035 label: %q", path[0], errs)
 		return false
 	}
 	if errs := validation.IsDNS1123Label(path[1]); len(errs) != 0 {
