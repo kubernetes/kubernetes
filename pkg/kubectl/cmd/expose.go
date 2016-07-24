@@ -52,7 +52,7 @@ var (
 		for that resource as the selector for a new service on the specified port. A deployment or replica set
 		will be exposed as a service only if its selector is convertible to a selector that service supports,
 		i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
-		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no 
+		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no
 		labels are specified, the new service will re-use the labels from the resource it exposes.
 
 		Possible resources include (case insensitive): `) + expose_resources
@@ -170,8 +170,8 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 		params := kubectl.MakeParams(cmd, names)
 		name := info.Name
-		if len(name) > validation.DNS952LabelMaxLength {
-			name = name[:validation.DNS952LabelMaxLength]
+		if len(name) > validation.DNS1035LabelMaxLength {
+			name = name[:validation.DNS1035LabelMaxLength]
 		}
 		params["default-name"] = name
 
