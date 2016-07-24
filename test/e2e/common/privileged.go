@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
 	"encoding/json"
@@ -24,9 +24,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -54,7 +51,8 @@ var _ = framework.KubeDescribe("PrivilegedPod", func() {
 		f: f,
 	}
 	It("should test privileged pod", func() {
-		config.hostExecPod = framework.LaunchHostExecPod(config.f.Client, config.f.Namespace.Name, "hostexec")
+		By("Creating a hostexec pod")
+		config.createHostExecPod()
 
 		By("Creating a privileged pod")
 		config.createPrivilegedPod()
@@ -90,7 +88,7 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 		v.Encode())
 
 	By(fmt.Sprintf("Exec-ing into container over http. Running command:%s", cmd))
-	stdout := framework.RunHostCmdOrDie(config.hostExecPod.Namespace, config.hostExecPod.Name, cmd)
+	stdout := config.f.ExecShellInPod(config.hostExecPod.Name, cmd)
 	var output map[string]string
 	err := json.Unmarshal([]byte(stdout), &output)
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Could not unmarshal curl response: %s", stdout))
@@ -102,10 +100,6 @@ func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
 	isPrivileged := true
 	notPrivileged := false
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      privilegedPodName,
 			Namespace: config.f.Namespace.Name,
@@ -140,28 +134,12 @@ func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
 	return pod
 }
 
+func (config *PrivilegedPodTestConfig) createHostExecPod() {
+	podSpec := framework.NewHostExecPodSpec(config.f.Namespace.Name, "hostexec")
+	config.hostExecPod = config.f.PodClient().CreateSync(podSpec)
+}
+
 func (config *PrivilegedPodTestConfig) createPrivilegedPod() {
 	podSpec := config.createPrivilegedPodSpec()
-	config.privilegedPod = config.createPod(podSpec)
-}
-
-func (config *PrivilegedPodTestConfig) createPod(pod *api.Pod) *api.Pod {
-	createdPod, err := config.getPodClient().Create(pod)
-	if err != nil {
-		framework.Failf("Failed to create %q pod: %v", pod.Name, err)
-	}
-	framework.ExpectNoError(config.f.WaitForPodRunning(pod.Name))
-	createdPod, err = config.getPodClient().Get(pod.Name)
-	if err != nil {
-		framework.Failf("Failed to retrieve %q pod: %v", pod.Name, err)
-	}
-	return createdPod
-}
-
-func (config *PrivilegedPodTestConfig) getPodClient() client.PodInterface {
-	return config.f.Client.Pods(config.f.Namespace.Name)
-}
-
-func (config *PrivilegedPodTestConfig) getNamespaceClient() client.NamespaceInterface {
-	return config.f.Client.Namespaces()
+	config.privilegedPod = config.f.PodClient().CreateSync(podSpec)
 }
