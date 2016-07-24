@@ -44,6 +44,7 @@ const (
 	PodInfraContainerName = leaky.PodInfraContainerName
 	DockerPrefix          = "docker://"
 	LogSuffix             = "log"
+	ext4MaxFileNameLen    = 255
 )
 
 const (
@@ -299,7 +300,13 @@ func ParseDockerName(name string) (dockerName *KubeletContainerName, hash uint64
 }
 
 func LogSymlink(containerLogsDir, podFullName, containerName, dockerId string) string {
-	return path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s.%s", podFullName, containerName, dockerId, LogSuffix))
+	suffix := fmt.Sprintf(".%s", LogSuffix)
+	logPath := fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerId)
+	// Length of a filename cannot exceed 255 characters in ext4 on Linux.
+	if len(logPath) > ext4MaxFileNameLen-len(suffix) {
+		logPath = logPath[:ext4MaxFileNameLen-len(suffix)]
+	}
+	return path.Join(containerLogsDir, logPath+suffix)
 }
 
 // Get a *dockerapi.Client, either using the endpoint passed in, or using

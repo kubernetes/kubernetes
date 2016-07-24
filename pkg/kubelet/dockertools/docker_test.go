@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/adler32"
+	"math/rand"
+	"path"
 	"reflect"
 	"sort"
 	"strconv"
@@ -799,4 +801,25 @@ func TestMilliCPUToQuota(t *testing.T) {
 			t.Errorf("Input %v, expected quota %v period %v, but got quota %v period %v", testCase.input, testCase.quota, testCase.period, quota, period)
 		}
 	}
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func TestLogSymLink(t *testing.T) {
+	as := assert.New(t)
+	containerLogsDir := "/foo/bar"
+	podFullName := randStringBytes(128)
+	containerName := randStringBytes(70)
+	dockerId := randStringBytes(80)
+	// The file name cannot exceed 255 characters. Since .log suffix is required, the prefix cannot exceed 251 characters.
+	expectedPath := path.Join(containerLogsDir, fmt.Sprintf("%s_%s-%s", podFullName, containerName, dockerId)[:251]+".log")
+	as.Equal(expectedPath, LogSymlink(containerLogsDir, podFullName, containerName, dockerId))
 }
