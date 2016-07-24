@@ -84,7 +84,7 @@ func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func AutoscalerToSelectableFields(limitRange *autoscaling.HorizontalPodAutoscaler) fields.Set {
+func AutoscalerToSelectableFields(hpa *autoscaling.HorizontalPodAutoscaler) fields.Set {
 	return fields.Set{}
 }
 
