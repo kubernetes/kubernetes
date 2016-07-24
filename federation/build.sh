@@ -41,9 +41,11 @@ set -o pipefail
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 CUR_ROOT=$(dirname "${BASH_SOURCE}")
 
-source "${KUBE_ROOT}/cluster/lib/logging.sh"
-source "${KUBE_ROOT}/build/util.sh"
 source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/util.sh"
+# Provides the $KUBERNETES_PROVIDER variable and detect-project function
+source "${KUBE_ROOT}/cluster/kube-util.sh"
+source "${KUBE_ROOT}/cluster/lib/logging.sh"
 
 readonly ACTION="${1:-gen}"
 
@@ -59,11 +61,12 @@ readonly GOOGLE_APPLICATION_CREDENTIALS="${GOOGLE_APPLICATION_CREDENTIALS:-${HOM
 readonly KUBE_CONFIG_DIR="${KUBE_CONFIG_DIR:-${HOME}/.kube}"
 readonly KUBE_CONFIG="${KUBE_CONFIG:-${HOME}/.kube/config}"
 
-KUBE_PROJECT="madhusudancs-k8s"
-KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
+detect-project
+readonly KUBE_PROJECT="${KUBE_PROJECT:-${PROJECT:-}}"
 
+readonly KUBE_REGISTRY="${KUBE_REGISTRY:-gcr.io/${KUBE_PROJECT}}"
 # In dev environments this value must be recomputed after build. See
-# the build() function.
+# the build() function. Not making it readonly
 KUBE_VERSION="${KUBE_VERSION:-}"
 
 
