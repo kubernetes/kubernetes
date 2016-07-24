@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -219,7 +220,6 @@ func TestStoreListResourceVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	versioner := etcdstorage.APIObjectVersioner{}
 	rev, err := versioner.ObjectResourceVersion(obj)
 	if err != nil {
 		t.Fatal(err)
@@ -1020,7 +1020,6 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (*etcdtesti
 		config := storage.CacherConfig{
 			CacheCapacity:  10,
 			Storage:        s,
-			Versioner:      etcdstorage.APIObjectVersioner{},
 			Type:           &api.Pod{},
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
