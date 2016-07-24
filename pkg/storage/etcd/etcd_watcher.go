@@ -111,7 +111,6 @@ type etcdWatcher struct {
 const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.
-// The versioner must be able to handle the objects that transform creates.
 func newEtcdWatcher(
 	list bool, quorum bool, include includeFunc, filter storage.Filter,
 	encoding runtime.Codec, transform TransformFunc,
