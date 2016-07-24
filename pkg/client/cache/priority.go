@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/util/sets"
     "k8s.io/kubernetes/pkg/api/meta"
+    "k8s.io/kubernetes/pkg/api"
     "fmt"
     "strconv"
     "container/heap"
@@ -44,9 +45,11 @@ type Priority struct {
 	cond sync.Cond
 	// We depend on the property that items in the set are in the queue and vice versa.
     //items stores the actual objects in the queue
-	items map[string]interface{}
+	//items map[string]interface{}
     //queue keeps track of the order of the items
-	queue []PriorityObject
+	//queue []PriorityObject
+    // This is the underlying queue object without syncronization features
+    queue PriorityQueue
 
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update was called first.
@@ -56,6 +59,7 @@ type Priority struct {
 
 	// keyFunc is used to make the key used for queued item insertion and retrieval, and
 	// should be deterministic.
+    // TODO: is this needed at the top level object?
 	keyFunc KeyFunc
 }
 
@@ -67,117 +71,104 @@ type PriorityKey struct {
 
 type PriorityQueue struct {
     //this is the underlying priority queue object
-    //TODO: refactor everything to use this!!!
+    queue []PriorityKey
+    items map[string]interface{}
+
+	// keyFunc is used to make the key used for queued item insertion and retrieval, and
+	// should be deterministic.
+	keyFunc KeyFunc
 }
 
-//Helper functions
+// Init functions
+
+// New PriorityQueue returns a struct that can be used to store items
+// to be retrieved in priority order
+func NewPriorityQueue(keyFunc KeyFunc) PriorityQueue {
+	pq := PriorityQueue{
+		items:   map[string]interface{}{},
+		queue:   []PriorityKey{},
+        keyFunc: keyFunc,
+	}
+    heap.Init(&pq)
+	return pq
+}
 
 // NewPriority returns a Store which can be used to queue up items to
 // process.
 func NewPriority(keyFunc KeyFunc) *Priority {
-	pq := &Priority{
-		items:   map[string]interface{}{},
-		queue:   []PriorityKey,
-		keyFunc: keyFunc,
-	}
-    heap.Init(&pq.queue)
-	pq.cond.L = &f.lock
-	return pq
+    p := &Priority{
+        queue:   NewPriorityQueue(keyFunc),
+		keyFunc: keyFunc, //TODO: is this needed here?
+    }
+        
+	p.cond.L = &p.lock
+	return p
 }
 
-func (pq Priority) GetPlaceInQueue(key string) (int, error) {
-    for i, pk := range *pq.queue {
-        if pk.key = key {
+// Helper Methods
+func (pq PriorityQueue) GetPlaceInQueue(key string) (int, error) {
+    for i, pk := range pq.queue {
+        if pk.key == key {
             return i, nil
         }
     }
     return -1, errors.New("key not found in queue")
 }
 
-//implement these func for heap:
-//Len
-func (pq Priority) Len() int {
+// Methods for the heap interface:
+
+// Len
+// returns the length of the queue
+func (pq PriorityQueue) Len() int {
     return len(pq.queue)
 }
-//Less
-func (pq Priority) Less(i, j int) bool {
+
+// Less
+// compares the relative priority of two items in the queue and
+func (pq PriorityQueue) Less(i, j int) bool {
     //Pop should give us the highest priority item
     return pq.queue[i].priority > pq.queue[j].priority
 }
-//Swap
-func (pq Priority) Swap(i, j int) {
+
+// Swap
+// switches the position of two items in the queue
+func (pq PriorityQueue) Swap(i, j int) {
     pq.queue[i], pq.queue[j] = pq.queue[j], pq.queue[i]
     pq.queue[i].index = i
     pq.queue[j].index = j
 }
-//Push
-//adds an item to the end of the queue
-func (pq *Priority) Push(obj interface{}) {
-	key, err := pq.keyFunc(obj)
-    priority, err := MetaPriorityFunc(obj)
-    n := *pq.Len()
+
+// Push
+// adds an item to the queue. Used by the heap function. Do not use this
+// outside heap.Push!
+func (pq PriorityQueue) Push(obj interface{}) {
+	key, _ := pq.keyFunc(obj)
+    priority, _ := MetaPriorityFunc(obj)
+    n := pq.Len()
     pk := PriorityKey{
         key:        key,
         priority:   priority,
-        index:      n
+        index:      n,
     }
 
-    *pq.items[key] = obj
-    *pq.queue = append(*pq.queue, pk)
-    //heap.Fix(*pq.queue, pk.index) //this function is called by heap, so don't do this?
+    pq.items[key] = obj
+    pq.queue = append(pq.queue, pk)
 }
-//Pop
-//grabs the last item in the queue
-func (pq *Priority) Pop() interface{} {
-    //grab the queue
-    old := *pq.queue
-    n := len(old)
-    item := old(n-1)
-    item.index = -1 //for safety
-    *pw.queue = old[0:n-1]
 
-    //delete from items
-    delete(*pq.items, item.key)
+// Pop
+// grabs the highest priority item from the queue, returns and deletes it
+func (pq PriorityQueue) Pop() interface{} {
+    //grab the queue
+    old := pq.queue
+    n := len(old)
+    item := old[n-1]
+    item.index = -1 //for safety
+    pq.queue = old[0:n-1]
+
+    //delete from items map
+    delete(pq.items, item.key)
 
     return item
-}
-// Pop for queue...
-// Pop waits until an item is ready and processes it. If multiple items are
-// ready, they are returned in the priority order.
-// The item is removed from the queue (and the store) before it is processed,
-// so if you don't successfully process it, it should be added back with
-// AddIfNotPresent(). process function is called under lock, so it is safe
-// update data structures in it that need to be in sync with the queue.
-// TODO: check this forever loop to make sure it does the priority queue...
-//!!! omg how do I fix two conflicting interfaces?
-//... I could rewrite a bunch of stuff so that the Priority merely has a pq inside it...
-// this could have naming implications...
-//maybe if I make this a private struct?
-func (f *Priority) Pop(process PopProcessFunc) (interface{}, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	for {
-		for len(f.queue) == 0 {
-			f.cond.Wait()
-		}
-		id := f.queue[0]
-		f.queue = f.queue[1:]
-		if f.initialPopulationCount > 0 {
-			f.initialPopulationCount--
-		}
-		item, ok := f.items[id]
-		if !ok {
-			// Item may have been deleted subsequently.
-			continue
-		}
-		delete(f.items, id)
-		err := process(item)
-		if e, ok := err.(ErrRequeue); ok {
-			f.addIfNotPresent(id, item)
-			err = e.Err
-		}
-		return item, err
-	}
 }
 
 ////update
@@ -186,31 +177,36 @@ func (f *Priority) Pop(process PopProcessFunc) (interface{}, error) {
 //    item.priority = priority
 //    heap.Fix(pq.queue, item.index)
 //}
-//implement these for Store
-//Add
-// Add inserts an item, and puts it in the queue. The item is only enqueued
+
+
+// Methods for the Store interface:
+
+// Add
+// inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
-func (pq *Priority) Add(obj interface{}) error {
-    return pq.AddIfNotPresent(obj)
+func (p *Priority) Add(obj interface{}) error {
+    return p.AddIfNotPresent(obj)
 }
-//Update
-//Update can modify any part of the object, especially it's priority
-//However, if the keyfunc is not identical to the original object, then
-//this acts like Add. The controller currently creates the key based on
-//GetNamespace() and GetLabels(), so it should be safe to update anything
-//else.
-func (pq *Priority) Update(obj interface{}) error {
-	key, err := pq.keyFunc(obj)
+
+// Update
+// can modify any part of the object, especially it's priority
+// However, if the keyfunc result is not identical to the original object, then
+// this acts like Add. The controller currently creates the key based on
+// GetNamespace() and GetLabels(), so it should be safe to update anything
+// else.
+func (p *Priority) Update(obj interface{}) error {
+	key, err := p.keyFunc(obj)
+    pq := p.queue
 
     //if it already exists, then update the object and don't add a new key
 	if _, exists := pq.items[key]; exists {
-        *pq.items[key] = obj
+        pq.items[key] = obj
         //the item is already indexed, but might need a new priority
-        index, err :=  pq.GetPlaceInQueue(key)
-        priority, err := MetaPriorityFunc(obj)
+        index, _ :=  pq.GetPlaceInQueue(key)
+        priority, _ := MetaPriorityFunc(obj)
 
-        *pq.queue[index].priority = priority
-        heap.Fix(pq, pk.index)
+        pq.queue[index].priority = priority
+        heap.Fix(pq, index)
     } else {
         //if it doesn't already exist (or it has a new key), then add it
         heap.Push(&pq, obj) //I hope this actually works...
@@ -218,198 +214,229 @@ func (pq *Priority) Update(obj interface{}) error {
     //TODO: fix error handling
     return err
 }
-//Delete
-// Delete removes an item from the queue
-func (pq *Priority) Delete(obj interface{}) error {
-	id, err := pq.keyFunc(obj)
+
+// Delete
+// Delete removes an item from anywhere in the queue
+// TODO: move the bulk of this to the PriorityQueue object
+func (p *Priority) Delete(obj interface{}) error {
+	key, err := p.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
-	pq.lock.Lock()
-	defer pq.lock.Unlock()
-	pq.populated = true
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.populated = true
 
-	delete(pq.items, id)
+    pq := p.queue
+	delete(pq.items, key)
     i, err :=  pq.GetPlaceInQueue(key)
     pq.queue = append(pq.queue[:i], pq.queue[i+1:]...)
 
 	return err
 }
 
-//List
-// List returns a list of all the items in key order.
-// This is NOT sorted by priority. //TODO: Should it be?
-func (pq *Priority) List() []interface{} {
-	pq.lock.RLock()
-	defer pq.lock.RUnlock()
+// List
+// List returns an array of all the items in priority order
+func (p *Priority) List() []interface{} {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+    pq := p.queue
 	list := make([]interface{}, 0, len(pq.items))
-	for _, item := range pq.items {
+
+    for i := len(pq.items)-1; i >=0; i-- {
+        list = append(list, pq.items[pq.queue[i].key])
+    }
+	return list
+}
+
+// ListKeys
+// ListKeys returns a list of all the keys of the objects currently
+// in the Priority. This is NOT sorted by priority. //TODO: Should it be?
+func (p *Priority) ListKeys() []string {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+    pq := p.queue
+	list := make([]string, 0, len(pq.items))
+	for item := range pq.items {
 		list = append(list, item)
 	}
 	return list
 }
 
-//ListKeys
-// ListKeys returns a list of all the keys of the objects currently
-// in the Priority. This is NOT sorted py priority. //TODO: Should it be?
-func (pq *Priority) ListKeys() []string {
-	pq.lock.RLock()
-	defer pq.lock.RUnlock()
-	list := make([]string, 0, len(pq.items))
-	for item := range pq.items {
-		list = append(list, item.key)
-	}
-	return list
-}
-
-//Get
+// Get
 // Get returns the requested item, or sets exists=false.
-func (pq *Priority) Get(obj interface{}) (item interface{}, exists bool, err error) {
-	key, err := pq.keyFunc(obj)
+func (p *Priority) Get(obj interface{}) (item interface{}, exists bool, err error) {
+	key, err := p.keyFunc(obj)
 	if err != nil {
 		return nil, false, KeyError{obj, err}
 	}
-	return pq.GetByKey(key)
+	return p.GetByKey(key)
 }
 
-//GetByKey
+// GetByKey
 // GetByKey returns the requested item, or sets exists=false.
-func (pq *Priority) GetByKey(key string) (item interface{}, exists bool, err error) {
-	pq.lock.RLock()
-	defer pq.lock.RUnlock()
+func (p *Priority) GetByKey(key string) (item interface{}, exists bool, err error) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+    pq := p.queue
 	item, exists = pq.items[key]
 	return item, exists, nil
 }
 
-//Replace
-// Replace will delete the contents of 'pq', using instead the given map.
-// 'pq' takes ownership of the map, you should not reference the map again
-// after calling this function. pq's queue is reset, too; upon return, it
+// Replace
+// Replace will delete the contents of 'p', using instead the given map.
+// 'p' takes ownership of the map, you should not reference the map again
+// after calling this function. p's queue is reset, too; upon return, it
 // will contain the items in the map, in priority order.
-func (pq *Priority) Replace(list []interface{}, resourceVersion string) error {
+func (p *Priority) Replace(list []interface{}, resourceVersion string) error {
 
-    holder := NewPriority(pq.keyFunc)
-	for _, item := range list {
-       holder.Add(item)
-    } 
+    //holder := NewPriority(p.keyFunc)
+	//for _, item := range list {
+    //   holder.Add(item)
+    //} 
+    pq := NewPriorityQueue(p.keyFunc)
+    for _, item := range list {
+        heap.Push(pq, item)
+    }
 
-	pq.lock.Lock()
-	defer pq.lock.Unlock()
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
-	if !pq.populated {
-		pq.populated = true
-		pq.initialPopulationCount = len(items)
+	if !p.populated {
+		p.populated = true
+		p.initialPopulationCount = pq.Len()
 	}
 
-	pq.items = *holder.items
-	pq.queue = *holder.queue
+    p.queue = pq
 
-	if len(pq.queue) > 0 {
-		pq.cond.Broadcast()
+	if p.queue.Len() > 0 {
+		p.cond.Broadcast()
 	}
 	return nil
 }
 
-//Resync
+// Resync
 // Resync will make sure all the items in the object map are in the queue
 // it currently doesn't check if all items in the queue are in the map, so
 // there could be dangling items in the queue... //TODO
-func (pq *Priority) Resync() error {
-    err := nil
-	pq.lock.Lock()
-	defer pq.lock.Unlock()
+func (p *Priority) Resync() error {
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
+    pq := p.queue
 	inQueue := sets.NewString()
 	for _, pk := range pq.queue {
 		inQueue.Insert(pk.key)
 	}
 	for key, item := range pq.items {
 		if !inQueue.Has(key) {
-            priority, err := MetaPriorityFunc(item)
-            n := len(*pq.queue)
-            pk := PriorityKey{
-                key:        key,
-                priority:   priority,
-                index:      n
-            }
+            //priority, _ := MetaPriorityFunc(item)
+            //n := len(pq.queue)
+            //pk := PriorityKey{
+            //    key:        key,
+            //    priority:   priority,
+            //    index:      n,
+            //}
 
-            heap.Push(*pq.queue, pk)
+            heap.Push(pq, item)
 		}
 	}
-	if len(f.queue) > 0 {
-		f.cond.Broadcast()
+    if len(pq.queue) != len(pq.items) {
+        return errors.New("PriorityQueue failed to sync")
+    }
+
+	if p.queue.Len() > 0 {
+		p.cond.Broadcast()
 	}
-	return err
+	return nil
 }
 
-//implement these for Queue
-//Pop (duplicate)
-//AddIfNotPresent
-// AddIfNotPresent inserts an item, and puts it in the queue. If the item is already
+// Methods for the Queue interface:
+
+// Pop 
+// Pop waits until an item is ready and processes it. If multiple items are
+// ready, the highest priority one is returned.
+// The item is removed from the queue (and the store) before it is processed,
+// so if you don't successfully process it, it should be added back with
+// AddIfNotPresent(). process function is called under lock, so it is safe
+// update data structures in it that need to be in sync with the queue.
+func (p *Priority) Pop(process PopProcessFunc) (interface{}, error) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	for {
+        for p.queue.Len() == 0 {
+            p.cond.Wait()
+		}
+
+        pq := p.queue
+
+        item := heap.Pop(&pq)
+		if p.initialPopulationCount > 0 {
+			p.initialPopulationCount--
+		}
+
+        err := process(item)
+		if e, ok := err.(ErrRequeue); ok {
+			p.AddIfNotPresent(item)
+			err = e.Err
+		}
+        return item, err
+	}
+}
+
+// AddIfNotPresent
+// inserts an item, and puts it in the queue. If the item is already
 // present in the set, it is neither enqueued nor added to the set.
 //
 // This is useful in a single producer/consumer scenario so that the consumer can
 // safely retry items without contending with the producer and potentially enqueueing
 // stale items.
-func (pq *Priority) AddIfNotPresent(obj interface{}) error {
-	id, err := pq.keyFunc(obj)
+func (p *Priority) AddIfNotPresent(obj interface{}) error {
+	id, err := p.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
-	pq.lock.Lock()
-	defer pq.lock.Unlock()
-	pq.populated = true
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.populated = true
+
+    pq := p.queue
     //here's where the map + array are important...
 	if _, exists := pq.items[id]; !exists {
-        heap.Push(&pq, obj) //I hope this actually works...
+        heap.Push(&pq, obj)
 	}
-	pq.cond.Broadcast()
+	p.cond.Broadcast()
 
 	return nil
 }
 
-//HasSynced
-// Return true if an Add/Update/Delete/AddIfNotPresent are called first,
+// HasSynced
+// returns true if an Add/Update/Delete/AddIfNotPresent are called first,
 // or an Update called first but the first batch of items inserted by Replace() has been popped
-func (pq *Priority) HasSynced() bool {
-	pq.lock.Lock()
-	defer pq.lock.Unlock()
-	return pq.populated && f.initialPopulationCount == 0
+func (p *Priority) HasSynced() bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	return p.populated && p.initialPopulationCount == 0
 }
 
 var (
 	_ = Queue(&Priority{}) // Priority is a Queue
 )
 
-// Queue is exactly like a Store, but has a Pop() method too.
-//type Queue interface {
-//	Store
-//
-//	// Pop blocks until it has something to process.
-//	// It returns the object that was process and the result of processing.
-//	// The PopProcessFunc may return an ErrRequeue{...} to indicate the item
-//	// should be requeued before releasing the lock on the queue.
-//	Pop(PopProcessFunc) (interface{}, error)
-//
-//	// AddIfNotPresent adds a value previously
-//	// returned by Pop back into the queue as long
-//	// as nothing else (presumably more recent)
-//	// has since been added.
-//	AddIfNotPresent(interface{}) error
-//
-//	// Return true if the first batch of items has been popped
-//	HasSynced() bool
-//}
-
-
-
-
+// Helpter Functions
 const annotationKey = "k8s_priority"
 
+// MetaPriorityFunc
 // extracts the priority annotation of an object
 // if the priority is not set, then set priority to -1
+// The object must be a pointer of a valid API type
+// TODO: make this allow non-pod objects
 func MetaPriorityFunc(obj interface{}) (int, error) {
-    meta, err := meta.Accessor(obj)
+    pod, _ := obj.(api.Pod)
+    //if err != nil {
+    //    return -1, fmt.Errorf("object is not a pod: %v", err)
+    //}
+    meta, err := meta.Accessor(&pod)
     if err != nil {
         return -1, fmt.Errorf("object has no meta: %v", err)
     }
@@ -428,23 +455,6 @@ func MetaPriorityFunc(obj interface{}) (int, error) {
     return -1, nil
 }
 
-//inherited from FIFO
-// PopProcessFunc is passed to Pop() method of Queue interface.
-// It is supposed to process the element popped from the queue.
-// pulled in from FIFO
-//type PopProcessFunc func(interface{}) error
-
-// ErrRequeue may be returned by a PopProcessFunc to safely requeue
-// the current item. The value of Err will be returned from Pop.
-//type ErrRequeue struct {
-//	// Err is returned by the Pop function
-//	Err error
-//}
-
-//func (e ErrRequeue) Error() string {
-//	if e.Err == nil {
-//		return "the popped item should be requeued without returning an error"
-//	}
-//	return e.Err.Error()
-//}
-
+// There are a number of objects pulled from other files in the package. Here
+// are a few important ones:
+// PopProcessFunc, ErrRequeue
