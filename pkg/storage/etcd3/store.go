@@ -29,7 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	"k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/coreos/etcd/clientv3"
@@ -40,7 +40,6 @@ import (
 type store struct {
 	client     *clientv3.Client
 	codec      runtime.Codec
-	versioner  storage.Versioner
 	pathPrefix string
 	watcher    *watcher
 }
@@ -63,13 +62,11 @@ func New(c *clientv3.Client, codec runtime.Codec, prefix string) storage.Interfa
 }
 
 func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
-	versioner := etcd.APIObjectVersioner{}
 	return &store{
 		client:     c,
-		versioner:  versioner,
 		codec:      codec,
 		pathPrefix: prefix,
-		watcher:    newWatcher(c, codec, versioner),
+		watcher:    newWatcher(c, codec),
 	}
 }
 
@@ -92,11 +89,6 @@ func (s *store) Codec() runtime.Codec {
 	return s.codec
 }
 
-// Versioner implements storage.Interface.Versioner.
-func (s *store) Versioner() storage.Versioner {
-	return s.versioner
-}
-
 // Get implements storage.Interface.Get.
 func (s *store) Get(ctx context.Context, key string, out runtime.Object, ignoreNotFound bool) error {
 	key = keyWithPrefix(s.pathPrefix, key)
@@ -112,12 +104,12 @@ func (s *store) Get(ctx context.Context, key string, out runtime.Object, ignoreN
 		return storage.NewKeyNotFoundError(key, 0)
 	}
 	kv := getResp.Kvs[0]
-	return decode(s.codec, s.versioner, kv.Value, out, kv.ModRevision)
+	return decode(s.codec, kv.Value, out, kv.ModRevision)
 }
 
 // Create implements storage.Interface.Create.
 func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
-	if version, err := s.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
+	if version, err := versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion should not be set on objects to be created")
 	}
 	data, err := runtime.Encode(s.codec, obj)
@@ -145,7 +137,7 @@ func (s *store) Create(ctx context.Context, key string, obj, out runtime.Object,
 
 	if out != nil {
 		putResp := txnResp.Responses[0].GetResponsePut()
-		return decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
+		return decode(s.codec, data, out, putResp.Header.Revision)
 	}
 	return nil
 }
@@ -179,7 +171,7 @@ func (s *store) unconditionalDelete(ctx context.Context, key string, out runtime
 	}
 
 	kv := getResp.Kvs[0]
-	return decode(s.codec, s.versioner, kv.Value, out, kv.ModRevision)
+	return decode(s.codec, kv.Value, out, kv.ModRevision)
 }
 
 func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.Object, v reflect.Value, precondtions *storage.Preconditions) error {
@@ -210,7 +202,7 @@ func (s *store) conditionalDelete(ctx context.Context, key string, out runtime.O
 			glog.V(4).Infof("deletion of %s failed because of a conflict, going to retry", key)
 			continue
 		}
-		return decode(s.codec, s.versioner, origState.data, out, origState.rev)
+		return decode(s.codec, origState.data, out, origState.rev)
 	}
 }
 
@@ -245,7 +237,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 			return err
 		}
 		if bytes.Equal(data, origState.data) {
-			return decode(s.codec, s.versioner, origState.data, out, origState.rev)
+			return decode(s.codec, origState.data, out, origState.rev)
 		}
 
 		opts, err := s.ttlOpts(ctx, int64(ttl))
@@ -269,7 +261,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 			continue
 		}
 		putResp := txnResp.Responses[0].GetResponsePut()
-		return decode(s.codec, s.versioner, data, out, putResp.Header.Revision)
+		return decode(s.codec, data, out, putResp.Header.Revision)
 	}
 }
 
@@ -292,11 +284,11 @@ func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter
 		data: getResp.Kvs[0].Value,
 		rev:  uint64(getResp.Kvs[0].ModRevision),
 	}}
-	if err := decodeList(elems, filter, listPtr, s.codec, s.versioner); err != nil {
+	if err := decodeList(elems, filter, listPtr, s.codec); err != nil {
 		return err
 	}
 	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision))
+	return versioner.UpdateList(listObj, uint64(getResp.Header.Revision))
 }
 
 // List implements storage.Interface.List.
@@ -324,11 +316,11 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 			rev:  uint64(kv.ModRevision),
 		}
 	}
-	if err := decodeList(elems, filter, listPtr, s.codec, s.versioner); err != nil {
+	if err := decodeList(elems, filter, listPtr, s.codec); err != nil {
 		return err
 	}
 	// update version with cluster level revision
-	return s.versioner.UpdateList(listObj, uint64(getResp.Header.Revision))
+	return versioner.UpdateList(listObj, uint64(getResp.Header.Revision))
 }
 
 // Watch implements storage.Interface.Watch.
@@ -366,7 +358,7 @@ func (s *store) getState(getResp *clientv3.GetResponse, key string, v reflect.Va
 		state.rev = getResp.Kvs[0].ModRevision
 		state.meta.ResourceVersion = uint64(state.rev)
 		state.data = getResp.Kvs[0].Value
-		if err := decode(s.codec, s.versioner, state.data, state.obj, state.rev); err != nil {
+		if err := decode(s.codec, state.data, state.obj, state.rev); err != nil {
 			return nil, err
 		}
 	}
@@ -379,13 +371,13 @@ func (s *store) updateState(st *objState, userUpdate storage.UpdateFunc) (runtim
 		return nil, 0, err
 	}
 
-	version, err := s.versioner.ObjectResourceVersion(ret)
+	version, err := versioner.ObjectResourceVersion(ret)
 	if err != nil {
 		return nil, 0, err
 	}
 	if version != 0 {
 		// We cannot store object with resourceVersion in etcd. We need to reset it.
-		if err := s.versioner.UpdateObject(ret, 0); err != nil {
+		if err := versioner.UpdateObject(ret, 0); err != nil {
 			return nil, 0, fmt.Errorf("UpdateObject failed: %v", err)
 		}
 	}
@@ -420,7 +412,7 @@ func keyWithPrefix(prefix, key string) string {
 
 // decode decodes value of bytes into object. It will also set the object resource version to rev.
 // On success, objPtr would be set to the object.
-func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objPtr runtime.Object, rev int64) error {
+func decode(codec runtime.Codec, value []byte, objPtr runtime.Object, rev int64) error {
 	if _, err := conversion.EnforcePtr(objPtr); err != nil {
 		panic("unable to convert output object to pointer")
 	}
@@ -435,7 +427,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 
 // decodeList decodes a list of values into a list of objects, with resource version set to corresponding rev.
 // On success, ListPtr would be set to the list of objects.
-func decodeList(elems []*elemForDecode, filter storage.Filter, ListPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
+func decodeList(elems []*elemForDecode, filter storage.Filter, ListPtr interface{}, codec runtime.Codec) error {
 	v, err := conversion.EnforcePtr(ListPtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		panic("need ptr to slice")

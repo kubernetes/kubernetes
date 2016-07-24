@@ -101,9 +101,6 @@ type Interface interface {
 	// of this method from the interface.
 	Backends(ctx context.Context) []string
 
-	// Returns Versioner associated with this interface.
-	Versioner() Versioner
-
 	// Create adds a new object at a key unless it already exists. 'ttl' is time-to-live
 	// in seconds (0 means forever). If no error is returned and out is not nil, out will be
 	// set to the read value from database.

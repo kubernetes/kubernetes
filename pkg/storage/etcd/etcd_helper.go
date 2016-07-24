@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 	"k8s.io/kubernetes/pkg/util"
 	utilcache "k8s.io/kubernetes/pkg/util/cache"
 	"k8s.io/kubernetes/pkg/watch"
@@ -47,7 +48,6 @@ func NewEtcdStorage(client etcd.Client, codec runtime.Codec, prefix string, quor
 		etcdMembersAPI: etcd.NewMembersAPI(client),
 		etcdKeysAPI:    etcd.NewKeysAPI(client),
 		codec:          codec,
-		versioner:      APIObjectVersioner{},
 		copier:         api.Scheme,
 		pathPrefix:     path.Join("/", prefix),
 		quorum:         quorum,
@@ -61,11 +61,6 @@ type etcdHelper struct {
 	etcdKeysAPI    etcd.KeysAPI
 	codec          runtime.Codec
 	copier         runtime.ObjectCopier
-	// Note that versioner is required for etcdHelper to work correctly.
-	// The public constructors (NewStorage & NewEtcdStorage) are setting it
-	// correctly, so be careful when manipulating with it manually.
-	// optional, has to be set to perform any atomic operations
-	versioner storage.Versioner
 	// prefix for all etcd keys
 	pathPrefix string
 	// if true,  perform quorum read
@@ -108,11 +103,6 @@ func (h *etcdHelper) Backends(ctx context.Context) []string {
 }
 
 // Implements storage.Interface.
-func (h *etcdHelper) Versioner() storage.Versioner {
-	return h.versioner
-}
-
-// Implements storage.Interface.
 func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Object, ttl uint64) error {
 	trace := util.NewTrace("etcdHelper::Create " + getTypeName(obj))
 	defer trace.LogIfLong(250 * time.Millisecond)
@@ -125,7 +115,7 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 	if err != nil {
 		return err
 	}
-	if version, err := h.versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
+	if version, err := versioner.ObjectResourceVersion(obj); err == nil && version != 0 {
 		return errors.New("resourceVersion may not be set on objects to be created")
 	}
 	trace.Step("Version checked")
@@ -232,7 +222,7 @@ func (h *etcdHelper) Watch(ctx context.Context, key string, resourceVersion stri
 		return nil, err
 	}
 	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(false, h.quorum, nil, filter, h.codec, h.versioner, nil, h)
+	w := newEtcdWatcher(false, h.quorum, nil, filter, h.codec, nil, h)
 	go w.etcdWatch(ctx, h.etcdKeysAPI, key, watchRV)
 	return w, nil
 }
@@ -247,7 +237,7 @@ func (h *etcdHelper) WatchList(ctx context.Context, key string, resourceVersion 
 		return nil, err
 	}
 	key = h.prefixEtcdKey(key)
-	w := newEtcdWatcher(true, h.quorum, exceptKey(key), filter, h.codec, h.versioner, nil, h)
+	w := newEtcdWatcher(true, h.quorum, exceptKey(key), filter, h.codec, nil, h)
 	go w.etcdWatch(ctx, h.etcdKeysAPI, key, watchRV)
 	return w, nil
 }
@@ -313,7 +303,7 @@ func (h *etcdHelper) extractObj(response *etcd.Response, inErr error, objPtr run
 		return body, nil, fmt.Errorf("unable to decode object %s into %v", gvk.String(), reflect.TypeOf(objPtr))
 	}
 	// being unable to set the version does not prevent the object from being extracted
-	_ = h.versioner.UpdateObject(objPtr, node.ModifiedIndex)
+	_ = versioner.UpdateObject(objPtr, node.ModifiedIndex)
 	return body, node, err
 }
 
@@ -351,7 +341,7 @@ func (h *etcdHelper) GetToList(ctx context.Context, key string, filter storage.F
 		return err
 	}
 	trace.Step("Object decoded")
-	if err := h.versioner.UpdateList(listObj, response.Index); err != nil {
+	if err := versioner.UpdateList(listObj, response.Index); err != nil {
 		return err
 	}
 	return nil
@@ -386,7 +376,7 @@ func (h *etcdHelper) decodeNodeList(nodes []*etcd.Node, filter storage.Filter, s
 				return err
 			}
 			// being unable to set the version does not prevent the object from being extracted
-			_ = h.versioner.UpdateObject(obj, node.ModifiedIndex)
+			_ = versioner.UpdateObject(obj, node.ModifiedIndex)
 			if filter.Filter(obj) {
 				v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 			}
@@ -423,7 +413,7 @@ func (h *etcdHelper) List(ctx context.Context, key string, resourceVersion strin
 		return err
 	}
 	trace.Step("Node list decoded")
-	if err := h.versioner.UpdateList(listObj, index); err != nil {
+	if err := versioner.UpdateList(listObj, index); err != nil {
 		return err
 	}
 	return nil
@@ -508,7 +498,7 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 		}
 
 		// Since update object may have a resourceVersion set, we need to clear it here.
-		if err := h.versioner.UpdateObject(ret, 0); err != nil {
+		if err := versioner.UpdateObject(ret, 0); err != nil {
 			return errors.New("resourceVersion cannot be set on objects store in etcd")
 		}
 

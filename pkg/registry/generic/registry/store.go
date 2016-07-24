@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
@@ -317,13 +318,13 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 		// If AllowUnconditionalUpdate() is true and the object specified by the user does not have a resource version,
 		// then we populate it with the latest version.
 		// Else, we check that the version specified by the user matches the version of latest storage object.
-		resourceVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+		resourceVersion, err := versioner.ObjectResourceVersion(obj)
 		if err != nil {
 			return nil, nil, err
 		}
 		doUnconditionalUpdate := resourceVersion == 0 && e.UpdateStrategy.AllowUnconditionalUpdate()
 
-		version, err := e.Storage.Versioner().ObjectResourceVersion(existing)
+		version, err := versioner.ObjectResourceVersion(existing)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -347,13 +348,13 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 		creatingObj = nil
 		if doUnconditionalUpdate {
 			// Update the object's resource version to match the latest storage object's resource version.
-			err = e.Storage.Versioner().UpdateObject(obj, res.ResourceVersion)
+			err = versioner.UpdateObject(obj, res.ResourceVersion)
 			if err != nil {
 				return nil, nil, err
 			}
 		} else {
 			// Check if the object's resource version matches the latest resource version.
-			newVersion, err := e.Storage.Versioner().ObjectResourceVersion(obj)
+			newVersion, err := versioner.ObjectResourceVersion(obj)
 			if err != nil {
 				return nil, nil, err
 			}

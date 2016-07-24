@@ -73,12 +73,12 @@ func ObjectResourceVersion(obj runtime.Object) (uint64, error) {
 // CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,
 // but etcd resource versions are special, they're actually ints, so we can easily compare them.
 func CompareResourceVersion(lhs, rhs runtime.Object) int {
-	lhsVersion, err := Versioner.ObjectResourceVersion(lhs)
+	lhsVersion, err := ObjectResourceVersion(lhs)
 	if err != nil {
 		// coder error
 		panic(err)
 	}
-	rhsVersion, err := Versioner.ObjectResourceVersion(rhs)
+	rhsVersion, err := ObjectResourceVersion(rhs)
 	if err != nil {
 		// coder error
 		panic(err)

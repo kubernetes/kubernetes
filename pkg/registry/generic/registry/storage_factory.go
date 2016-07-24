@@ -20,7 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 )
 
 // Creates a cacher on top of the given 'storageInterface'.
@@ -36,7 +35,6 @@ func StorageWithCacher(
 	config := storage.CacherConfig{
 		CacheCapacity:        capacity,
 		Storage:              storageInterface,
-		Versioner:            etcdstorage.APIObjectVersioner{},
 		Type:                 objectType,
 		ResourcePrefix:       resourcePrefix,
 		NewListFunc:          newListFunc,
