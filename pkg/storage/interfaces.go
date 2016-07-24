@@ -23,22 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// Versioner abstracts setting and retrieving metadata fields from database response
-// onto the object ot list.
-type Versioner interface {
-	// UpdateObject sets storage metadata into an API object. Returns an error if the object
-	// cannot be updated correctly. May return nil if the requested object does not need metadata
-	// from database.
-	UpdateObject(obj runtime.Object, resourceVersion uint64) error
-	// UpdateList sets the resource version into an API list object. Returns an error if the object
-	// cannot be updated correctly. May return nil if the requested object does not need metadata
-	// from database.
-	UpdateList(obj runtime.Object, resourceVersion uint64) error
-	// ObjectResourceVersion returns the resource version (for persistence) of the specified object.
-	// Should return an error if the specified object does not have a persistable version.
-	ObjectResourceVersion(obj runtime.Object) (uint64, error)
-}
-
 // ResponseMeta contains information about the database metadata that is associated with
 // an object. It abstracts the actual underlying objects to prevent coupling with concrete
 // database and to improve testability.

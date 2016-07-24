@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package versioner
 
 import (
 	"strconv"
@@ -22,15 +22,12 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 )
 
-// APIObjectVersioner implements versioning and extracting etcd node information
-// for objects that have an embedded ObjectMeta or ListMeta field.
-type APIObjectVersioner struct{}
-
-// UpdateObject implements Versioner
-func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uint64) error {
+// UpdateObject sets storage metadata into an API object. Returns an error if the object
+// cannot be updated correctly. May return nil if the requested object does not need metadata
+// from database.
+func UpdateObject(obj runtime.Object, resourceVersion uint64) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
@@ -43,8 +40,10 @@ func (a APIObjectVersioner) UpdateObject(obj runtime.Object, resourceVersion uin
 	return nil
 }
 
-// UpdateList implements Versioner
-func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint64) error {
+// UpdateList sets the resource version into an API list object. Returns an error if the object
+// cannot be updated correctly. May return nil if the requested object does not need metadata
+// from database.
+func UpdateList(obj runtime.Object, resourceVersion uint64) error {
 	listMeta, err := api.ListMetaFor(obj)
 	if err != nil || listMeta == nil {
 		return err
@@ -57,8 +56,9 @@ func (a APIObjectVersioner) UpdateList(obj runtime.Object, resourceVersion uint6
 	return nil
 }
 
-// ObjectResourceVersion implements Versioner
-func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, error) {
+// ObjectResourceVersion returns the resource version (for persistence) of the specified object.
+// Should return an error if the specified object does not have a persistable version.
+func ObjectResourceVersion(obj runtime.Object) (uint64, error) {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return 0, err
@@ -70,12 +70,9 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 	return strconv.ParseUint(version, 10, 64)
 }
 
-// APIObjectVersioner implements Versioner
-var Versioner storage.Versioner = APIObjectVersioner{}
-
 // CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,
 // but etcd resource versions are special, they're actually ints, so we can easily compare them.
-func (a APIObjectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int {
+func CompareResourceVersion(lhs, rhs runtime.Object) int {
 	lhsVersion, err := Versioner.ObjectResourceVersion(lhs)
 	if err != nil {
 		// coder error
