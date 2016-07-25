@@ -206,7 +206,7 @@ Before committing any changes, please link/copy the pre-commit hook into your
 code. This hook will also do a build and test whether documentation generation
 scripts need to be executed.
 
-The hook requires both Godep and etcd on your `PATH`.
+The hook requires both govendor and etcd on your `PATH`.
 
 ```sh
 cd kubernetes/.git/hooks/
@@ -240,6 +240,79 @@ reviews much easier.
 
 See [Faster Reviews](faster_reviews.md) for more details.
 
+## Dependency Management
+
+Kubernetes uses [govendor](https://github.com/kardianos/govendor) to manage dependencies.
+It is not strictly required for building Kubernetes but it is required when
+managing dependencies under the vendor/ tree, and is required by a number of the
+build and test scripts. Please make sure that `govendor` is installed and in your
+`$PATH`.
+
+### Installing govendor
+
+There are many ways to build and host Go binaries. Here is an easy way to get
+utilities like `govendor` installed:
+
+1) Create a new GOPATH for your tools and install govendor:
+
+```sh
+export GOPATH=$HOME/go-tools
+mkdir -p $GOPATH
+go get -u github.com/kardianos/govendor
+```
+
+2) Add this $GOPATH/bin to your path. Typically you'd add this to your ~/.profile:
+
+```sh
+export GOPATH=$HOME/go-tools
+export PATH=$PATH:$GOPATH/bin
+```
+
+### Using govendor
+
+Here's a quick walkthrough of one way to use `govendor` to add or update a
+Kubernetes dependency into `vendor/`. For more details, please see the
+instructions in [`govendor`'s documentation](https://github.com/kardianos/govendor).
+
+1) Devote a directory to this endeavor:
+
+_Devoting a separate directory is not strictly required, but it is helpful to
+separate dependency updates from other changes._
+
+```sh
+export KPATH=$HOME/code/kubernetes
+mkdir -p $KPATH/src/k8s.io
+cd $KPATH/src/k8s.io
+git clone https://github.com/$YOUR_GITHUB_USERNAME/kubernetes.git # assumes your fork is 'kubernetes'
+# Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
+```
+
+2) Set up your GOPATH.
+
+```sh
+# This will *not* let your local builds see packages that exist elsewhere on your system.
+export GOPATH=$KPATH
+```
+
+3) Update a dependency to a new git sha
+
+```sh
+cd $KPATH/src/k8s.io/kubernetes
+govendor fetch golang.org/x/net/context@a4bbce9fcae005b22ae5443f6af064d80a6f5a55
+```
+
+After all of this is done, `git status` should show you what files have been
+modified and added/removed.  Make sure to `git add` and `git rm` them.  It is
+commonly advised to make one `git commit` which includes just the dependency
+update and vendored deps files, and another `git commit` that includes changes to
+Kubernetes code to use the new/updated dependency.  These commits can go into a
+single pull request.
+
+4) Before sending your PR, it's a good idea to sanity check that your
+vendor.json file and the contents of `vendor/ `are ok by running `hack/verify-vendored-deps.sh`
+
+5) If you updated the vendored deps, please also update `vendor/LICENSES` by running
+`hack/update-vendored-deps-licenses.sh`.
 
 ## Testing
 

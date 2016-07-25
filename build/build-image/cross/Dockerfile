@@ -68,7 +68,7 @@ RUN mkdir $TMPDIR \
   && chmod o+t $TMPDIR \
   && go get golang.org/x/tools/cmd/cover \
             golang.org/x/tools/cmd/goimports \
-            github.com/tools/godep \
+            github.com/kardianos/govendor \
             github.com/jteeuwen/go-bindata/go-bindata
 
 # Download and symlink etcd. We need this for our integration tests.

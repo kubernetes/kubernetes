@@ -23,16 +23,15 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 readonly branch=${1:-${KUBE_VERIFY_GIT_BRANCH:-master}}
 if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
-  ! kube::util::has_changes_against_upstream_branch "${branch}" 'Godeps/' && \
   ! kube::util::has_changes_against_upstream_branch "${branch}" 'vendor/'; then
   exit 0
 fi
 
-# create a nice clean place to put our new godeps
+# create a nice clean place to put our new vendored deps
 # must be in the user dir (e.g. KUBE_ROOT) in order for the docker volume mount
 # to work with docker-machine on macs
 mkdir -p "${KUBE_ROOT}/_tmp"
-_tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-godep-licenses.XXXXXX")"
+_tmpdir="$(mktemp -d "${KUBE_ROOT}/_tmp/kube-vendored-deps-licenses.XXXXXX")"
 #echo "Created workspace: ${_tmpdir}"
 function cleanup {
   #echo "Removing workspace: ${_tmpdir}"
@@ -40,16 +39,15 @@ function cleanup {
 }
 trap cleanup EXIT
 
-cp -r "${KUBE_ROOT}/Godeps" "${_tmpdir}/Godeps"
+cp -r "${KUBE_ROOT}/vendor" "${_tmpdir}/vendor"
 ln -s "${KUBE_ROOT}/LICENSE" "${_tmpdir}"
-ln -s "${KUBE_ROOT}/vendor" "${_tmpdir}"
 
-# Update Godep Licenses
-LICENSE_ROOT="${_tmpdir}" "${KUBE_ROOT}/hack/update-godep-licenses.sh"
+# Update vendored deps Licenses
+LICENSE_ROOT="${_tmpdir}" "${KUBE_ROOT}/hack/update-vendored-deps-licenses.sh"
 
-# Compare Godep Licenses
-if ! _out="$(diff -Naupr ${KUBE_ROOT}/Godeps/LICENSES ${_tmpdir}/Godeps/LICENSES)"; then
-  echo "Your godep licenses file is out of date. Run hack/update-godep-licenses.sh and commit the results."
+# Compare vendored deps Licenses
+if ! _out="$(diff -Naupr ${KUBE_ROOT}/vendor/LICENSES ${_tmpdir}/vendor/LICENSES)"; then
+  echo "Your vendored deps licenses file is out of date. Run hack/update-vendored-deps-licenses.sh and commit the results."
   echo "${_out}"
   exit 1
 fi

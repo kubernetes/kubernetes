@@ -13,18 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Update the Godeps/LICENSES document.
-# Generates a table of Godep dependencies and their license.
+# Update the vendor/LICENSES document.
+# Generates a table of vendored dependencies and their license.
 #
 # Usage:
 #    $0 [--create-missing] [/path/to/licenses]
 #
 #    --create-missing will write the files that only exist upstream, locally.
 #    This option is mostly used for testing as we cannot check-in any of the
-#    additionally created files into the godep auto-generated tree.
+#    additionally created files into the vendored deps auto-generated tree.
 #
-#    Run every time a license file is added/modified within /Godeps to
-#    update /Godeps/LICENSES
+#    Run every time a license file is added/modified within /vendor to
+#    update /vendor/LICENSES
 
 set -o errexit
 set -o nounset
@@ -116,8 +116,8 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 LICENSE_ROOT="${LICENSE_ROOT:-${KUBE_ROOT}}"
 cd "${LICENSE_ROOT}"
 
-GODEPS_LICENSE_FILE="Godeps/LICENSES"
-TMP_LICENSE_FILE="/tmp/Godeps.LICENSES.$$"
+DEPS_LICENSE_FILE="vendor/LICENSES"
+TMP_LICENSE_FILE="/tmp/vendor.LICENSES.$$"
 DEPS_DIR="vendor"
 declare -Ag CONTENT
 
@@ -132,9 +132,9 @@ echo "= LICENSE $(cat ${LICENSE_ROOT}/LICENSE | md5sum)"
 echo "================================================================================"
 ) > ${TMP_LICENSE_FILE}
 
-# Loop through every package in Godeps.json
-for PACKAGE in $(cat Godeps/Godeps.json | \
-                 jq -r ".Deps[].ImportPath" | \
+# Loop through every package in vendor.json
+for PACKAGE in $(cat vendor/vendor.json | \
+                 jq -r ".package[].path" | \
                  sort -f); do
   process_content ${PACKAGE} LICENSE
   process_content ${PACKAGE} COPYRIGHT
@@ -172,4 +172,4 @@ __EOF__
   echo
 done >> ${TMP_LICENSE_FILE}
 
-cat ${TMP_LICENSE_FILE} > ${GODEPS_LICENSE_FILE}
+cat ${TMP_LICENSE_FILE} > ${DEPS_LICENSE_FILE}

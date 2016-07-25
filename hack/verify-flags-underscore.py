@@ -79,7 +79,7 @@ def get_all_files(rootdir):
 
 def normalize_files(rootdir, files):
     newfiles = []
-    a = ['Godeps', '_gopath', 'third_party', '.git', 'exceptions.txt', 'known-flags.txt']
+    a = ['_gopath', 'third_party', '.git', 'exceptions.txt', 'known-flags.txt']
     for f in files:
         if any(x in f for x in a):
             continue

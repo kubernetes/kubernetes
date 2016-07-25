@@ -89,7 +89,7 @@ ginkgo:
 # Runs all the presubmission verifications.
 #
 # Args:
-#   BRANCH: Branch to be passed to verify-godeps.sh script.
+#   BRANCH: Branch to be passed to verify-vendored-deps.sh script.
 #
 # Example:
 #   make verify
@@ -190,7 +190,6 @@ test-cmd: generated_files
 clean: clean_meta
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
-	rm -rf Godeps/_workspace # Just until we are sure it is gone
 
 # Remove make-related metadata files.
 #
