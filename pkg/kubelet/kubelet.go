@@ -177,6 +177,7 @@ type Option func(*Kubelet)
 // bootstrapping interface for kubelet, targets the initialization protocol
 type KubeletBootstrap interface {
 	GetConfig() *KubeletConfig
+	GetConfiguration() *componentconfig.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
 	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool)
@@ -640,6 +641,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
 	klet.kubeletConfig = kc_old
+	klet.kubeletConfiguration = kc_new
 	return klet, nil
 }
 
@@ -653,7 +655,8 @@ type nodeLister interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	kubeletConfig *KubeletConfig
+	kubeletConfig        *KubeletConfig
+	kubeletConfiguration *componentconfig.KubeletConfiguration
 
 	hostname      string
 	nodeName      string
@@ -3006,9 +3009,14 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 	return kl.runner.PortForward(&pod, port, stream)
 }
 
-// GetConfig returns the KubeletConfig used to configure for the kubelet.
+// GetConfig returns the KubeletConfig used to configure the kubelet.
 func (kl *Kubelet) GetConfig() *KubeletConfig {
 	return kl.kubeletConfig
+}
+
+// GetConfig returns the KubeletConfiguration used to configure the kubelet.
+func (kl *Kubelet) GetConfiguration() *componentconfig.KubeletConfiguration {
+	return kl.kubeletConfiguration
 }
 
 // BirthCry sends an event that the kubelet has started up.
