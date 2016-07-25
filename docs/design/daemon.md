@@ -195,15 +195,15 @@ some discussion of this topic).
 #### Client
 
 - Add support for DaemonSet commands to kubectl and the client. Client code was
-added to client/unversioned. The main files in Kubectl that were modified are
-kubectl/describe.go and kubectl/stop.go, since for other calls like Get, Create,
+added to pkg/client/unversioned. The main files in Kubectl that were modified are
+pkg/kubectl/describe.go and pkg/kubectl/stop.go, since for other calls like Get, Create,
 and Update, the client simply forwards the request to the backend via the REST
 API.
 
 #### Apiserver
 
 - Accept, parse, validate client commands
-- REST API calls are handled in registry/daemon
+- REST API calls are handled in pkg/registry/daemonset
   - In particular, the api server will add the object to etcd
   - DaemonManager listens for updates to etcd (using Framework.informer)
 - API objects for DaemonSet were created in expapi/v1/types.go and
