@@ -1,0 +1,21 @@
+#!/bin/bash -e
+
+ORG_PATH="github.com/coreos"
+REPO_PATH="${ORG_PATH}/go-iptables"
+
+if [ ! -h gopath/src/${REPO_PATH} ]; then
+	mkdir -p gopath/src/${ORG_PATH}
+	ln -s ../../../.. gopath/src/${REPO_PATH} || exit 255
+fi
+
+export GOBIN=${PWD}/bin
+export GOPATH=${PWD}/gopath
+
+eval $(go env)
+
+if [ ${GOOS} = "linux" ]; then
+	echo "Building go-iptables..."
+	go build ${REPO_PATH}/iptables
+else
+	echo "Not on Linux"
+fi

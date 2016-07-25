@@ -1,0 +1,102 @@
+hash: 17c68b031c830c07db965733785b9c1575b542503c07ad742a00972e59310ffc
+updated: 2016-07-12T01:03:53.553504535-04:00
+imports:
+- name: github.com/aws/aws-sdk-go
+  version: 5c0313fff8cd85670ae4fc996254dd7d66cb4cf7
+  subpackages:
+  - aws
+  - internal/endpoints
+  - internal/protocol/ec2query
+  - internal/protocol/query/queryutil
+  - internal/protocol/rest
+  - internal/protocol/xml/xmlutil
+  - internal/signer/v4
+  - service/ec2
+  - aws/awserr
+  - aws/ec2metadata
+  - aws/credentials
+  - aws/request
+  - aws/service
+  - aws/service/serviceinfo
+  - aws/awsutil
+  - aws/defaults
+  - aws/corehandlers
+  - aws/credentials/ec2rolecreds
+- name: github.com/coreos/etcd
+  version: a1ef699aebbe7ebb4da2f90a42e0f612eec08384
+  subpackages:
+  - client
+  - pkg/pathutil
+  - pkg/transport
+  - pkg/types
+  - pkg/runtime
+- name: github.com/coreos/go-iptables
+  version: 74b0926558061d3a23824e9c18c9cf9c1b9c11f4
+  subpackages:
+  - iptables
+- name: github.com/coreos/go-systemd
+  version: a606a1e936df81b70d85448221c7b1c6d8a74ef1
+  subpackages:
+  - activation
+  - daemon
+- name: github.com/coreos/pkg
+  version: 7f080b6c11ac2d2347c3cd7521e810207ea1a041
+  subpackages:
+  - flagutil
+- name: github.com/golang/glog
+  version: d1c4472bf2efd3826f2b5bdcc02d8416798d678c
+- name: github.com/golang/protobuf
+  version: 127091107ff5f822298f1faa7487ffcf578adcf6
+  subpackages:
+  - proto
+- name: github.com/gorilla/context
+  version: 50c25fb3b2b3b3cc724e9b6ac75fb44b3bccd0da
+- name: github.com/gorilla/mux
+  version: e444e69cbd2e2e3e0749a2f3c717cec491552bbf
+- name: github.com/jonboulle/clockwork
+  version: fad208dd89dbc316a149043e332a192477f0e2a2
+- name: github.com/vaughan0/go-ini
+  version: a98ad7ee00ec53921f08832bc06ecf7fd600e6a1
+- name: github.com/vishvananda/netlink
+  version: e73bad418fd727ed3a02830b1af1ad0283a1de6c
+  subpackages:
+  - nl
+- name: github.com/vishvananda/netns
+  version: 8ba1072b58e0c2a240eb5f6120165c7776c3e7b8
+- name: golang.org/x/net
+  version: b6d7b1396ec874c3b00f6c84cd4301a17c56c8ed
+  subpackages:
+  - context
+  - context/ctxhttp
+- name: golang.org/x/oauth2
+  version: 188fb45fbef6ffd967b3a8abcfe176fd473361df
+  subpackages:
+  - google
+  - internal
+  - jws
+  - jwt
+- name: google.golang.org/api
+  version: e6294e63a06b2be522ff3d328d8cacded0b1bd31
+  subpackages:
+  - compute/v1
+  - gensupport
+  - googleapi
+  - googleapi/internal/uritemplates
+- name: google.golang.org/appengine
+  version: 6a436539be38c296a8075a871cc536686b458371
+  subpackages:
+  - urlfetch
+  - internal
+  - internal/urlfetch
+  - internal/app_identity
+  - internal/modules
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/remote_api
+- name: google.golang.org/cloud
+  version: 872c736f496c2ba12786bedbb8325576bbdb33cf
+  subpackages:
+  - compute/metadata
+  - internal
+devImports: []

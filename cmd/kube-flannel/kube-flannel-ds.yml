@@ -1,0 +1,43 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-flannel-ds
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: flannel
+    spec:
+      hostNetwork: true
+      containers:
+      - name: kube-flannel
+        image: gcr.io/mikedanese-k8s/kube-flannel:dev5
+        securityContext:
+          privileged: true
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: flannel-cfg
+          configMap:
+            name: kube-flannel-cfg
