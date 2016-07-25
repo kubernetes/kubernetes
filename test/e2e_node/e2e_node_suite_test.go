@@ -135,7 +135,9 @@ var _ = AfterSuite(func() {
 func maskLocksmithdOnCoreos() {
 	data, err := ioutil.ReadFile("/etc/os-release")
 	if err != nil {
-		glog.Fatalf("Could not read /etc/os-release: %v", err)
+		// Not all distros contain this file.
+		glog.Infof("Could not read /etc/os-release: %v", err)
+		return
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
 		if output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput(); err != nil {
