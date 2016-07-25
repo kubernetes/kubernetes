@@ -374,13 +374,13 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		glog.Errorf("Failed to parse %q timestamp %q for container %q of pod %q", label, s, id, kubecontainer.BuildPodFullName(podName, podNamespace))
 	}
 	var createdAt, startedAt, finishedAt time.Time
-	if createdAt, err = parseDockerTimestamp(iResult.Created); err != nil {
+	if createdAt, err = ParseDockerTimestamp(iResult.Created); err != nil {
 		parseTimestampError("Created", iResult.Created)
 	}
-	if startedAt, err = parseDockerTimestamp(iResult.State.StartedAt); err != nil {
+	if startedAt, err = ParseDockerTimestamp(iResult.State.StartedAt); err != nil {
 		parseTimestampError("StartedAt", iResult.State.StartedAt)
 	}
-	if finishedAt, err = parseDockerTimestamp(iResult.State.FinishedAt); err != nil {
+	if finishedAt, err = ParseDockerTimestamp(iResult.State.FinishedAt); err != nil {
 		parseTimestampError("FinishedAt", iResult.State.FinishedAt)
 	}
 

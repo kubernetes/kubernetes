@@ -531,8 +531,8 @@ func (d *kubeDockerClient) getTimeoutContext() (context.Context, context.CancelF
 	return context.WithTimeout(context.Background(), d.timeout)
 }
 
-// parseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
-func parseDockerTimestamp(s string) (time.Time, error) {
+// ParseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
+func ParseDockerTimestamp(s string) (time.Time, error) {
 	// Timestamp returned by Docker is in time.RFC3339Nano format.
 	return time.Parse(time.RFC3339Nano, s)
 }
