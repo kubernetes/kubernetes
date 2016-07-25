@@ -443,8 +443,6 @@ func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
 	return nil, false, nil
 }
 
-// ListKeys implements the interface required by DeltaFIFO to list the keys we
-// already know about.
 func (s *serviceCache) allServices() []*cachedService {
 	s.mu.Lock()
 	defer s.mu.Unlock()
