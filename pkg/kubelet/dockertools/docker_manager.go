@@ -285,7 +285,13 @@ func NewDockerManager(
 // stream the log. Set 'follow' to false and specify the number of lines (e.g.
 // "100" or "all") to tail the log.
 // TODO: Make 'RawTerminal' option  flagable.
-func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
+func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
+	return GetContainerLogs(dm.client, pod, containerID, logOptions, stdout, stderr)
+}
+
+// Temporarily export this function to share with dockershim.
+// TODO: clean this up.
+func GetContainerLogs(client DockerInterface, pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) error {
 	var since int64
 	if logOptions.SinceSeconds != nil {
 		t := unversioned.Now().Add(-time.Duration(*logOptions.SinceSeconds) * time.Second)
@@ -309,8 +315,7 @@ func (dm *DockerManager) GetContainerLogs(pod *api.Pod, containerID kubecontaine
 		ErrorStream:  stderr,
 		RawTerminal:  false,
 	}
-	err = dm.client.Logs(containerID.ID, opts, sopts)
-	return
+	return client.Logs(containerID.ID, opts, sopts)
 }
 
 var (
@@ -1123,10 +1128,16 @@ func (dm *DockerManager) ExecInContainer(containerID kubecontainer.ContainerID, 
 }
 
 func (dm *DockerManager) AttachContainer(containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+	return AttachContainer(dm.client, containerID, stdin, stdout, stderr, tty, resize)
+}
+
+// Temporarily export this function to share with dockershim.
+// TODO: clean this up.
+func AttachContainer(client DockerInterface, containerID kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	// Have to start this before the call to client.AttachToContainer because client.AttachToContainer is a blocking
 	// call :-( Otherwise, resize events don't get processed and the terminal never resizes.
 	kubecontainer.HandleResizing(resize, func(size term.Size) {
-		dm.client.ResizeContainerTTY(containerID.ID, int(size.Height), int(size.Width))
+		client.ResizeContainerTTY(containerID.ID, int(size.Height), int(size.Width))
 	})
 
 	// TODO(random-liu): Do we really use the *Logs* field here?
@@ -1142,7 +1153,7 @@ func (dm *DockerManager) AttachContainer(containerID kubecontainer.ContainerID, 
 		ErrorStream:  stderr,
 		RawTerminal:  tty,
 	}
-	return dm.client.AttachToContainer(containerID.ID, opts, sopts)
+	return client.AttachToContainer(containerID.ID, opts, sopts)
 }
 
 func noPodInfraContainerError(podName, podNamespace string) error {

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -31,11 +32,11 @@ import (
 
 // TODO: implement the methods in this file.
 func (ds *dockerService) AttachContainer(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
-	return fmt.Errorf("not implemented")
+	return dockertools.AttachContainer(ds.client, id, stdin, stdout, stderr, tty, resize)
 }
 
 func (ds *dockerService) GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error) {
-	return fmt.Errorf("not implemented")
+	return dockertools.GetContainerLogs(ds.client, pod, containerID, logOptions, stdout, stderr)
 }
 
 func (ds *dockerService) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
