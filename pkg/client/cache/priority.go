@@ -125,8 +125,14 @@ func (pq PriorityQueue) Len() int {
 
 // Less
 // compares the relative priority of two items in the queue and
+// for a priority queue, less is more
 func (pq PriorityQueue) Less(i, j int) bool {
     //Pop should give us the highest priority item
+    return pq.more(i, j)
+}
+
+// more
+func (pq PriorityQueue) more(i, j int) bool {
     return pq.queue[i].priority > pq.queue[j].priority
 }
 
@@ -141,7 +147,7 @@ func (pq PriorityQueue) Swap(i, j int) {
 // Push
 // adds an item to the queue. Used by the heap function. Do not use this
 // outside heap.Push!
-func (pq PriorityQueue) Push(obj interface{}) {
+func (pq *PriorityQueue) Push(obj interface{}) {
 	key, _ := pq.keyFunc(obj)
     priority, _ := MetaPriorityFunc(obj)
     n := pq.Len()
@@ -157,16 +163,17 @@ func (pq PriorityQueue) Push(obj interface{}) {
 
 // Pop
 // grabs the highest priority item from the queue, returns and deletes it
-func (pq PriorityQueue) Pop() interface{} {
+// Do not use outside of heap.Pop!
+func (pq *PriorityQueue) Pop() interface{} {
     //grab the queue
     old := pq.queue
     n := len(old)
-    item := old[n-1]
-    item.index = -1 //for safety
-    pq.queue = old[0:n-1]
+    pk := old[n-1]
+    item := pq.items[pk.key]
 
-    //delete from items map
-    delete(pq.items, item.key)
+    //delete from map and array
+    delete(pq.items, pk.key)
+    pq.queue = old[0:n-1]
 
     return item
 }
@@ -206,7 +213,7 @@ func (p *Priority) Update(obj interface{}) error {
         priority, _ := MetaPriorityFunc(obj)
 
         pq.queue[index].priority = priority
-        heap.Fix(pq, index)
+        heap.Fix(&pq, index)
     } else {
         //if it doesn't already exist (or it has a new key), then add it
         heap.Push(&pq, obj) //I hope this actually works...
@@ -296,7 +303,7 @@ func (p *Priority) Replace(list []interface{}, resourceVersion string) error {
     //} 
     pq := NewPriorityQueue(p.keyFunc)
     for _, item := range list {
-        heap.Push(pq, item)
+        heap.Push(&pq, item)
     }
 
 	p.lock.Lock()
@@ -338,7 +345,7 @@ func (p *Priority) Resync() error {
             //    index:      n,
             //}
 
-            heap.Push(pq, item)
+            heap.Push(&pq, item)
 		}
 	}
     if len(pq.queue) != len(pq.items) {
@@ -392,7 +399,7 @@ func (p *Priority) Pop(process PopProcessFunc) (interface{}, error) {
 // safely retry items without contending with the producer and potentially enqueueing
 // stale items.
 func (p *Priority) AddIfNotPresent(obj interface{}) error {
-	id, err := p.keyFunc(obj)
+	key, err := p.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
@@ -402,7 +409,7 @@ func (p *Priority) AddIfNotPresent(obj interface{}) error {
 
     pq := p.queue
     //here's where the map + array are important...
-	if _, exists := pq.items[id]; !exists {
+	if _, exists := pq.items[key]; !exists {
         heap.Push(&pq, obj)
 	}
 	p.cond.Broadcast()

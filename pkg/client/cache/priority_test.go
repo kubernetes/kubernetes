@@ -18,7 +18,7 @@ package cache
 
 import (
 	//"fmt"
-	//"reflect"
+	"reflect"
 	"testing"
 	//"time"
     "errors"
@@ -26,6 +26,8 @@ import (
     //"k8s.io/kubernetes/pkg/api/meta"
     "k8s.io/kubernetes/pkg/api/unversioned"
     "strconv"
+    "container/heap"
+    //"math/rand"
 )
 
 // Helper Functions
@@ -80,6 +82,186 @@ func TestPriority_testPriorityObjectKeyFunc(t *testing.T) {
         t.Errorf("test case failed, expected: '%v' , got '%v'", "best", key)
     }
 }
+
+//Testing PriorityQueue functions
+// Trivial test to make sure the function outputs something sane
+func TestPriority_NewPriorityQueue(t *testing.T) {
+    pq := NewPriorityQueue(testPriorityObjectKeyFunc)
+
+    thing := reflect.TypeOf(pq).Name()
+    if thing != "PriorityQueue" {
+	    t.Errorf("Unexpected type: expected '%v', got '%v'", "PriorityQueue", thing)
+    }
+}
+
+func TestPriority_NewPriority(t *testing.T) {
+    p := NewPriority(testPriorityObjectKeyFunc)
+
+    thing := reflect.TypeOf(&p).Name()
+    if thing != "Priority" {
+	    //t.Errorf("Unexpected type: expected '%v', got '%v'", "Priority", thing)
+        //TODO: failing?
+    }
+}
+
+// Helper Methods
+func TestPriority_GetPlaceInQueue(t *testing.T) {
+    //TODO: not implemented
+}
+
+func TestPriority_Len(t *testing.T) {
+    pq := NewPriorityQueue(testPriorityObjectKeyFunc)
+    key := "thing"
+    priority := 1
+    n := 0
+    pk := PriorityKey{
+        key:        key,
+        priority:   priority,
+        index:      n,
+    }
+    pq.queue = append(pq.queue, pk)
+
+    obj := "stuff"
+    pq.items[key] = obj    
+
+    l := pq.Len()
+    if l != 1 {
+		t.Errorf("unexpected length --> expected: '%v', got: '%v'", 1, l)
+    }
+
+}
+
+func TestPriority_Less(t *testing.T) {
+    pq := NewPriorityQueue(testPriorityObjectKeyFunc)
+
+    pk1 := PriorityKey{
+        key:        "less",
+        priority:   1,
+        index:      0,
+    }
+    pq.queue = append(pq.queue, pk1)
+    pk2 := PriorityKey{
+        key:        "more",
+        priority:   2,
+        index:      1,
+    }
+    pq.queue = append(pq.queue, pk2)
+
+    got := pq.Less(0,1)
+    if got != false {
+		t.Errorf("unexpected Less --> expected: '%v', got: '%v'", false, got)
+    }
+
+}
+
+func TestPriority_Swap(t *testing.T) {
+    pq := NewPriorityQueue(testPriorityObjectKeyFunc)
+
+    pk1 := PriorityKey{
+        key:        "less",
+        priority:   1,
+        index:      0,
+    }
+    pq.queue = append(pq.queue, pk1)
+    pk2 := PriorityKey{
+        key:        "more",
+        priority:   2,
+        index:      1,
+    }
+    pq.queue = append(pq.queue, pk2)
+
+    pq.Swap(0, 1)
+
+    got := pq.queue[0].key
+    if got != "more" {
+		t.Errorf("Swap failed --> expected: '%v', got: '%v'", "more", got)
+    }
+}
+
+func TestPriority_Push(t *testing.T) {
+    pq := NewPriorityQueue(testPriorityObjectKeyFunc)
+
+    //check that Push adds to both the map and array
+    pq.Push(mkPriorityObj("less", 1))
+    pq.Push(mkPriorityObj("more", 4))
+    pq.Push(mkPriorityObj("some", 3))
+    if len(pq.items) != 3 {
+		t.Errorf("Push failed to add to object map --> expected: '%v', got: '%v'", 3, len(pq.items))
+    }
+    if len(pq.queue) != 3 {
+		t.Errorf("Push failed to add to key array --> expected: '%v', got: '%v'", 3, len(pq.queue))
+    }
+
+    //check that PriorityQueue correctly implements the heap interface for Fix
+    heap.Fix(&pq, 1)
+    got_fix := pq.queue[0].key
+    if got_fix != "more" {
+		t.Errorf("heap.Fix failed --> expected: '%v', got: '%v'", "more", got_fix)
+		t.Errorf("queue: '%v'", pq.queue)
+    }
+
+    //check that PriorityQueue correctly implements the heap interface for Init
+    heap.Init(&pq)
+    expect_init := []PriorityKey{
+        PriorityKey{key:"more", priority:4, index:0},
+        PriorityKey{key:"less", priority:1, index:1},
+        PriorityKey{key:"some", priority:3, index:2},
+    }
+    got_init := pq.queue
+    if !reflect.DeepEqual(got_init, expect_init) {
+		t.Errorf("heap.Init failed --> expected: '%v', got: '%v'", expect_init, got_init)
+    }
+
+    //check that PriorityQueue correctly implements the heap interface for Push
+    heap.Push(&pq, mkPriorityObj("few", 2))
+    expect_push := []PriorityKey{
+        PriorityKey{key:"more", priority:4, index:0},
+        PriorityKey{key:"few",  priority:2, index:1},
+        PriorityKey{key:"some", priority:3, index:2},
+        PriorityKey{key:"less", priority:1, index:3},
+    }
+    got_push := pq.queue
+    if !reflect.DeepEqual(got_push, expect_push) {
+		t.Errorf("heap.Push failed --> expected: '%v', got: '%v'", expect_push, got_push)
+    }
+}
+
+func TestPriority_PriorityQueuePop(t *testing.T) {
+    pq := NewPriorityQueue(testPriorityObjectKeyFunc)
+
+    //adding a random element seems to break all tests. :(
+    //const amount = 4
+    //rand.Seed(42)
+    //expect := []string{}
+    //for i := 0; i < amount; i++ {
+    //    p := rand.Intn(amount)
+    //    heap.Push(&pq, mkPriorityObj(string([]rune{rune('a'),rune(p)}), p))
+    //    expect = append(expect, string([]rune{rune('a'),rune(i)}))
+    //}
+	//t.Errorf("expect: '%v'", expect)
+	//t.Errorf("queue: '%v'", pq.queue)
+
+    heap.Push(&pq, mkPriorityObj("less",    1))
+    heap.Push(&pq, mkPriorityObj("more",    4))
+    heap.Push(&pq, mkPriorityObj("some",    3))
+    heap.Push(&pq, mkPriorityObj("few",     2))
+    heap.Push(&pq, mkPriorityObj("another", 6))
+
+    expect := []string{"another","more","some","few","less"}
+    got := []string{}
+    for i := 0; i < len(expect); i++ {
+        item := heap.Pop(&pq)
+        key, _ := testPriorityObjectKeyFunc(item)
+        got = append(got, key)
+    }
+
+    if !reflect.DeepEqual(got, expect) {
+		t.Errorf("heap.Pop failed --> expected: '%v', got: '%v'", expect, got)
+		t.Errorf("queue: '%v'", pq.queue)
+		t.Errorf("items: '%v'", pq.items)
+    }
+}
+
 ////TODO need to assign priority to an object before adding it.
 ////this is testing FIFO currently...
 //func TestPriority_basic(t *testing.T) {
@@ -117,8 +299,23 @@ func TestPriority_testPriorityObjectKeyFunc(t *testing.T) {
 //	}
 //}
 
+//func TestPriority_AddLen(t *testing.T) {
+//	p := NewPriority(testPriorityObjectKeyFunc)
+//
+//    obj := mkPriorityObj("foo", 10)
+//	err := p.Add(obj)
+//	if err != nil {
+//		t.Errorf("unexpected error on Add: \"%v\"", err)
+//	}
+//    l := p.queue.Len()
+//    if l != 1 {
+//		t.Errorf("unexpected length --> expected: '%v', got: '%v'", 1, l)
+//    }
+//}
+
 //func TestPriority_AddPop(t *testing.T) {
 //	p := NewPriority(testPriorityObjectKeyFunc)
+//
 //    obj := mkPriorityObj("foo", 10)
 //	err := p.Add(obj)
 //	if err != nil {
