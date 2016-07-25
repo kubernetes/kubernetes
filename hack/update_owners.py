@@ -61,7 +61,9 @@ def write_owners(fname, owners):
     with open(fname, 'w') as f:
         out = csv.writer(f, lineterminator='\n')
         out.writerow(['name', 'owner', 'auto-assigned'])
-        for name, (owner, random_assignment) in sorted(owners.items()):
+        sort_key = lambda (k, v): (k != 'DEFAULT', k)  # put 'DEFAULT' first.
+        items = sorted(owners.items(), key=sort_key)
+        for name, (owner, random_assignment) in items:
             out.writerow([name, owner, int(random_assignment)])
 
 
@@ -73,28 +75,30 @@ def get_maintainers():
     # [].slice.call(document.querySelectorAll('.team-member-username a')).map(
     #     e => e.textContent.trim())
     ret = {"a-robinson", "alex-mohr", "amygdala", "andyzheng0831", "apelisse",
-        "aronchick", "ArtfulCoder", "bgrant0607", "bgrant0607-nocc",
-        "bprashanth", "brendandburns", "caesarxuchao", "childsb", "cjcullen",
-        "david-mcmahon", "davidopp", "dchen1107", "deads2k", "derekwaynecarr",
-        "dubstack", "eparis", "erictune", "fabioy", "fejta", "fgrzadkowski",
-        "freehan", "ghodss", "girishkalele", "gmarek", "goltermann",
-        "grodrigues3", "hurf", "ingvagabund", "ixdy",
-        "jackgr", "janetkuo", "jbeda", "jdef", "jingxu97", "jlowdermilk",
-        "jsafrane", "jszczepkowski", "justinsb", "kargakis", "karlkfi",
-        "kelseyhightower", "kevin-wangzefeng", "krousey", "lavalamp",
-        "liggitt", "luxas", "madhusudancs", "maisem", "mansoorj", "matchstick",
-        "mikedanese", "mml", "mtaufen", "mwielgus", "ncdc", "nikhiljindal",
-        "piosz", "pmorie", "pwittrock", "Q-Lee", "quinton-hoole", "Random-Liu",
-        "rmmh", "roberthbailey", "ronnielai", "saad-ali", "sarahnovotny",
-        "smarterclayton", "soltysh", "spxtr", "sttts", "swagiaal", "thockin",
-        "timothysc", "timstclair", "tmrts", "vishh", "vulpecula", "wojtek-t",
-        "xiang90", "yifan-gu", "yujuhong", "zmerlynn"}
+           "aronchick", "bgrant0607", "bgrant0607-nocc", "bprashanth",
+           "brendandburns", "caesarxuchao", "childsb", "cjcullen",
+           "david-mcmahon", "davidopp", "dchen1107", "deads2k",
+           "derekwaynecarr", "dubstack", "eparis", "erictune", "fabioy",
+           "fejta", "fgrzadkowski", "freehan", "ghodss", "girishkalele",
+           "gmarek", "goltermann", "grodrigues3", "hurf", "ingvagabund", "ixdy",
+           "jackgr", "janetkuo", "jbeda", "jdef", "jfrazelle", "jingxu97",
+           "jlowdermilk", "jsafrane", "jszczepkowski", "justinsb", "kargakis",
+           "karlkfi", "kelseyhightower", "kevin-wangzefeng", "krousey",
+           "lavalamp", "liggitt", "luxas", "madhusudancs", "maisem", "mansoorj",
+           "matchstick", "mbohlool", "mikedanese", "mml", "mtaufen", "mwielgus",
+           "ncdc", "nikhiljindal", "piosz", "pmorie", "pwittrock", "Q-Lee",
+           "quinton-hoole", "Random-Liu", "rmmh", "roberthbailey", "ronnielai",
+           "saad-ali", "sarahnovotny", "smarterclayton", "soltysh", "spxtr",
+           "sttts", "swagiaal", "thockin", "timothysc", "timstclair", "tmrts",
+           "vishh", "vulpecula", "wojtek-t", "xiang90", "yifan-gu", "yujuhong",
+           "zmerlynn"}
     return sorted(ret - SKIP_MAINTAINERS)
 
 
 def main():
     test_history = get_test_history()
     test_names = sorted(set(map(normalize, test_history['test_names'])))
+    test_names.append('DEFAULT')
     owners = load_owners(OWNERS_PATH)
 
     outdated_tests = sorted(set(owners) - set(test_names))
@@ -129,7 +133,7 @@ def main():
     for owner, count in owner_counts.most_common():
         print '%-20s %3d' % (owner, count)
 
-    write_owners(OWNERS_PATH + '.new', owners)
+    write_owners(OWNERS_PATH, owners)
 
 
 if __name__ == '__main__':
