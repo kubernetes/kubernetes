@@ -185,8 +185,7 @@ func (dc *DisruptionController) finders() []podControllerFinder {
 	return []podControllerFinder{dc.getPodReplicationControllers, dc.getPodDeployments, dc.getPodReplicaSets}
 }
 
-/* getPodReplicaSets finds replicasets which have no matching deployments.
- */
+// getPodReplicaSets finds replicasets which have no matching deployments.
 func (dc *DisruptionController) getPodReplicaSets(pod *api.Pod) ([]controllerAndScale, error) {
 	cas := []controllerAndScale{}
 	rss, err := dc.rsLister.GetPodReplicaSets(pod)
@@ -213,8 +212,7 @@ func (dc *DisruptionController) getPodReplicaSets(pod *api.Pod) ([]controllerAnd
 	return cas, nil
 }
 
-/* getPodDeployments finds deployments for any replicasets which are being managed by deployments.
- */
+// getPodDeployments finds deployments for any replicasets which are being managed by deployments.
 func (dc *DisruptionController) getPodDeployments(pod *api.Pod) ([]controllerAndScale, error) {
 	cas := []controllerAndScale{}
 	rss, err := dc.rsLister.GetPodReplicaSets(pod)
@@ -558,10 +556,9 @@ func (dc *DisruptionController) updatePdbSpec(pdb *policy.PodDisruptionBudget, c
 	return dc.getUpdater()(&newPdb)
 }
 
-/* refresh tries to re-GET the given PDB.  If there are any errors, it just
- * returns the old PDB.  Intended to be used in a retry loop where it runs a
- * bounded number of times.
- */
+// refresh tries to re-GET the given PDB.  If there are any errors, it just
+// returns the old PDB.  Intended to be used in a retry loop where it runs a
+// bounded number of times.
 func refresh(pdbClient client.PodDisruptionBudgetInterface, pdb *policy.PodDisruptionBudget) *policy.PodDisruptionBudget {
 	newPdb, err := pdbClient.Get(pdb.Name)
 	if err == nil {
