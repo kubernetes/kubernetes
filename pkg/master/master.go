@@ -94,6 +94,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
 	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rolebinding/policybased"
+	scheduledjobetcd "k8s.io/kubernetes/pkg/registry/scheduledjob/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
@@ -939,11 +940,21 @@ func (m *Master) getCertificateResources(c *Config) map[string]rest.Storage {
 
 // getBatchResources returns the resources for batch api
 func (m *Master) getBatchResources(c *Config, version unversioned.GroupVersion) map[string]rest.Storage {
+	restOptions := func(resource string) generic.RESTOptions {
+		return m.GetRESTOptionsOrDie(c, batch.Resource(resource))
+	}
+
 	storage := map[string]rest.Storage{}
 	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(m.GetRESTOptionsOrDie(c, batch.Resource("jobs")))
+		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptions("jobs"))
 		storage["jobs"] = jobsStorage
 		storage["jobs/status"] = jobsStatusStorage
+	}
+	if version == batchapiv2alpha1.SchemeGroupVersion &&
+		c.APIResourceConfigSource.ResourceEnabled(version.WithResource("scheduledjobs")) {
+		scheduledJobsStorage, scheduledJobsStatusStorage := scheduledjobetcd.NewREST(restOptions("scheduledjobs"))
+		storage["scheduledjobs"] = scheduledJobsStorage
+		storage["scheduledjobs/status"] = scheduledJobsStatusStorage
 	}
 	return storage
 }
@@ -1065,7 +1076,15 @@ func (m *Master) IsTunnelSyncHealthy(req *http.Request) error {
 
 func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion, batchapiv1.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion, appsapi.SchemeGroupVersion, policyapiv1alpha1.SchemeGroupVersion, rbacapi.SchemeGroupVersion, certificatesapiv1alpha1.SchemeGroupVersion)
+	ret.EnableVersions(
+		apiv1.SchemeGroupVersion,
+		extensionsapiv1beta1.SchemeGroupVersion,
+		batchapiv1.SchemeGroupVersion, batchapiv2alpha1.SchemeGroupVersion,
+		autoscalingapiv1.SchemeGroupVersion,
+		appsapi.SchemeGroupVersion,
+		policyapiv1alpha1.SchemeGroupVersion,
+		rbacapi.SchemeGroupVersion,
+		certificatesapiv1alpha1.SchemeGroupVersion)
 
 	// all extensions resources except these are disabled by default
 	ret.EnableResources(
