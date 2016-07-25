@@ -150,7 +150,7 @@ func (h *etcdHelper) Create(ctx context.Context, key string, obj, out runtime.Ob
 	return err
 }
 
-func checkPreconditions(preconditions *storage.Preconditions, out runtime.Object) error {
+func checkPreconditions(key string, preconditions *storage.Preconditions, out runtime.Object) error {
 	if preconditions == nil {
 		return nil
 	}
@@ -159,7 +159,8 @@ func checkPreconditions(preconditions *storage.Preconditions, out runtime.Object
 		return storage.NewInternalErrorf("can't enforce preconditions %v on un-introspectable object %v, got error: %v", *preconditions, out, err)
 	}
 	if preconditions.UID != nil && *preconditions.UID != objMeta.UID {
-		return etcd.Error{Code: etcd.ErrorCodeTestFailed, Message: fmt.Sprintf("the UID in the precondition (%s) does not match the UID in record (%s). The object might have been deleted and then recreated", *preconditions.UID, objMeta.UID)}
+		errMsg := fmt.Sprintf("Precondition failed: UID in precondition: %v, UID in object meta: %v", preconditions.UID, objMeta.UID)
+		return storage.NewInvalidObjError(key, errMsg)
 	}
 	return nil
 }
@@ -195,7 +196,7 @@ func (h *etcdHelper) Delete(ctx context.Context, key string, out runtime.Object,
 		if err != nil {
 			return toStorageErr(err, key, 0)
 		}
-		if err := checkPreconditions(preconditions, obj); err != nil {
+		if err := checkPreconditions(key, preconditions, obj); err != nil {
 			return toStorageErr(err, key, 0)
 		}
 		index := uint64(0)
@@ -471,7 +472,7 @@ func (h *etcdHelper) GuaranteedUpdate(ctx context.Context, key string, ptrToType
 		if err != nil {
 			return toStorageErr(err, key, 0)
 		}
-		if err := checkPreconditions(preconditions, obj); err != nil {
+		if err := checkPreconditions(key, preconditions, obj); err != nil {
 			return toStorageErr(err, key, 0)
 		}
 		meta := storage.ResponseMeta{}
