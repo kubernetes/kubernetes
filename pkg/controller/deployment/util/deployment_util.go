@@ -605,6 +605,7 @@ func countAvailablePods(pods []api.Pod, minReadySeconds int32) int32 {
 	availablePodCount := int32(0)
 	for _, pod := range pods {
 		// TODO: Make the time.Now() as argument to allow unit test this.
+		// FIXME: avoid using time.Now
 		if IsPodAvailable(&pod, minReadySeconds, time.Now()) {
 			glog.V(4).Infof("Pod %s/%s is available.", pod.Namespace, pod.Name)
 			availablePodCount++

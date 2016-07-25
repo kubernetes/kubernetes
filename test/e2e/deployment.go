@@ -86,6 +86,7 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("scaled rollout should not block on annotation check", func() {
 		testScaledRolloutDeployment(f)
 	})
+	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
 })
 
 func newRS(rsName string, replicas int32, rsPodLabels map[string]string, imageName string, image string) *extensions.ReplicaSet {
@@ -514,19 +515,15 @@ func testRolloverDeployment(f *framework.Framework) {
 		framework.Logf("error in waiting for pods to come up: %s", err)
 		Expect(err).NotTo(HaveOccurred())
 	}
-	// Wait for the required pods to be ready for at least minReadySeconds (be available)
-	deploymentMinReadySeconds := int32(5)
-	err = framework.WaitForPodsReady(c, ns, podName, int(deploymentMinReadySeconds))
-	Expect(err).NotTo(HaveOccurred())
 
 	// Create a deployment to delete nginx pods and instead bring up redis-slave pods.
+	// We use a nonexistent image here, so that we make sure it won't finish
 	deploymentName, deploymentImageName := "test-rollover-deployment", "redis-slave"
 	deploymentReplicas := int32(4)
-	deploymentImage := "gcr.io/google_samples/gb-redisslave:v1"
+	deploymentImage := "gcr.io/google_samples/gb-redisslave:nonexistent"
 	deploymentStrategyType := extensions.RollingUpdateDeploymentStrategyType
 	framework.Logf("Creating deployment %s", deploymentName)
 	newDeployment := newDeployment(deploymentName, deploymentReplicas, deploymentPodLabels, deploymentImageName, deploymentImage, deploymentStrategyType, nil)
-	newDeployment.Spec.MinReadySeconds = deploymentMinReadySeconds
 	newDeployment.Spec.Strategy.RollingUpdate = &extensions.RollingUpdateDeployment{
 		MaxUnavailable: intstr.FromInt(1),
 		MaxSurge:       intstr.FromInt(1),
@@ -544,7 +541,6 @@ func testRolloverDeployment(f *framework.Framework) {
 	_, newRS := checkDeploymentRevision(c, ns, deploymentName, "1", deploymentImageName, deploymentImage)
 
 	// Before the deployment finishes, update the deployment to rollover the above 2 ReplicaSets and bring up redis pods.
-	// If the deployment already finished here, the test would fail. When this happens, increase its minReadySeconds or replicas to prevent it.
 	Expect(newRS.Spec.Replicas).Should(BeNumerically("<", deploymentReplicas))
 	updatedDeploymentImageName, updatedDeploymentImage := redisImageName, redisImage
 	deployment, err = framework.UpdateDeploymentWithRetries(c, ns, newDeployment.Name, func(update *extensions.Deployment) {
