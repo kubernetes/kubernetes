@@ -29,7 +29,7 @@ ENV WORKSPACE=/workspace \
 # bc is needed by shell2junit
 # dnsutils is needed by federation cluster scripts.
 # file is used when uploading test artifacts to GCS.
-# jq is used by hack/verify-godep-licenses.sh
+# jq is used by hack/verify-vendored-deps-licenses.sh
 # python-pip is needed to install the AWS cli.
 # netcat is used by integration test scripts.
 RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y \

@@ -45,9 +45,8 @@ and tips that our developers have found useful.
 
 ## Recommended Tools
 
-- [godep](https://github.com/tools/godep) - Used for Kubernetes dependency management. See also [Kubernetes godep and dependency management](development.md#godep-and-dependency-management)
+- [govendor](https://github.com/kardianos/govendor) - Used for Kubernetes dependency management. See also [Kubernetes dependency management](development.md#dependency-management)
 - [Go Version Manager](https://github.com/moovweb/gvm) - A handy tool for managing Go versions.
-- [godepq](https://github.com/google/godepq) - A tool for analyzing go import trees.
 
 ## Go Tips
 

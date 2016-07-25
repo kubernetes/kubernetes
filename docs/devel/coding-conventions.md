@@ -159,7 +159,7 @@ using the system](../user-guide/config-best-practices.md)
   - Third-party code
 
     - Go code for normal third-party dependencies is managed using
-[Godeps](https://github.com/tools/godep)
+[govendor](https://github.com/kardianos/govendor)
 
     - Other third-party code belongs in `/third_party`
       - forked third party Go code goes in `/third_party/forked`
