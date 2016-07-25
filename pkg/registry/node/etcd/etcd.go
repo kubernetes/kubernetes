@@ -64,7 +64,7 @@ func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedOb
 	return r.store.Update(ctx, name, objInfo)
 }
 
-// NewREST returns a RESTStorage object that will work against nodes.
+// NewStorage returns a NodeStorage object that will work against nodes.
 func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter, proxyTransport http.RoundTripper) NodeStorage {
 	prefix := "/minions"
 
