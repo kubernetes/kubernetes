@@ -296,7 +296,7 @@ Next, specify the docker repository where your ci images will be pushed.
 	* `${FEDERATION_PUSH_REPO_BASE}/federation-controller-manager`
 
 	These repositories must allow public read access, as the e2e node docker daemons will not have any credentials. If you're using
-	gce/gke as your provider, the repositories will have read-access by default.
+	GCE/GKE as your provider, the repositories will have read-access by default.
 
 #### Build
 
