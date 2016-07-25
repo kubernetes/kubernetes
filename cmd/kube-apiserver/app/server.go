@@ -132,7 +132,7 @@ func Run(s *options.APIServer) error {
 
 	kubeletClient, err := kubeletclient.NewStaticKubeletClient(&s.KubeletConfig)
 	if err != nil {
-		glog.Fatalf("Failure to start kubelet client: %v", err)
+		glog.Fatalf("Failed to start kubelet client: %v", err)
 	}
 
 	storageGroupsToEncodingVersion, err := s.StorageGroupsToEncodingVersion()
