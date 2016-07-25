@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -272,8 +272,8 @@ while true; do sleep 1; done
 						}
 						if testCase.waiting && status.State.Waiting != nil {
 							reason := status.State.Waiting.Reason
-							return reason == kubecontainer.ErrImagePull.Error() ||
-								reason == kubecontainer.ErrImagePullBackOff.Error(), nil
+							return reason == images.ErrImagePull.Error() ||
+								reason == images.ErrImagePullBackOff.Error(), nil
 
 						}
 						return false, nil
