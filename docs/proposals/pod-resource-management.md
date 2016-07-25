@@ -59,6 +59,7 @@ This document proposes a design for introducing pod level resource accounting to
       - [Rkt runtime](#rkt-runtime)
       - [Add Pod level metrics to Kubelet's metrics provider](#add-pod-level-metrics-to-kubelets-metrics-provider)
   - [Rollout Plan](#rollout-plan)
+  - [Implementation Status](#implementation-status)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -400,6 +401,40 @@ Update Kubelet’s metrics provider to include Pod level metrics. Use cAdvisor's
 ## Rollout Plan
 
 This feature will be opt-in in v1.4 and an opt-out in v1.5. We recommend users to drain their nodes and opt-in, before switching to v1.5, which will result in a no-op when v1.5 kubelet is rolled out.
+
+## Implementation Status
+
+The implementation goals of the first milestone are outlined below.
+- [x] Finalize and submit Pod Resource Management proposal for the project #26751
+- [x] Refactor qos package to be used globally throughout the codebase #27749 #28093
+- [x] Add interfaces for CgroupManager and CgroupManagerImpl which implements the CgroupManager interface and creates, destroys/updates cgroups using the libcontainer cgroupfs driver. #27755 #28566
+- [x] Inject top level QoS Cgroup creation in the Kubelet and add e2e tests to test that behaviour. #27853
+- [x] Add PodContainerManagerImpl Create and Destroy methods which implements the respective PodContainerManager methods using a cgroupfs driver. #28017
+- [x] Have docker manager create container cgroups under pod level cgroups. Inject creation and deletion of pod cgroups into the pod workers. Add e2e tests to test this behaviour. #29049
+- [x] Add support for updating policy for the pod cgroups. Add e2e tests to test this behaviour. #29087
+- [ ] Enabling 'cgroup-per-qos' flag in Kubelet: The user is expected to drain the node and restart it before eenabling this feature, but as a fallback we also want to allow the user to just restart the kubelet with the cgroup-per-qos flag enabled to use this feature. As a part of this we need to figure out a policy for pods having Restart Policy: Never. More details in this [issue](https://github.com/kubernetes/kubernetes/issues/29946).
+- [ ] Removing terminated pod's Cgroup : We need to cleanup the pod's cgroup once the pod is terminated. More details in this [issue](https://github.com/kubernetes/kubernetes/issues/29927).
+- [ ] Kubelet needs to ensure that the cgroup settings are what the kubelet expects them to be. If security is not of concern, one can assume that once kubelet applies cgroups setting successfully, the values will never change unless kubelet changes it. If security is of concern, then kubelet will have to ensure that the cgroup values meet its requirements and then continue to watch for updates to cgroups via inotify and re-apply cgroup values if necessary.
+Updating QoS limits needs to happen before pod cgroups values are updated. When pod cgroups are being deleted, QoS limits have to be updated after pod cgroup values have been updated for deletion or pod cgroups have been removed. Given that kubelet doesn't have any checkpoints and updates to QoS and pod cgroups are not atomic, kubelet needs to reconcile cgroups status whenever it restarts to ensure that the cgroups values match kubelet's expectation.
+- [ ] [TEST] Opting in for this feature and rollbacks should be accompanied by detailed error message when killing pod intermittently.
+- [ ] Add a systemd implementation for Cgroup Manager interface
+
+
+Other smaller work items that we would be good to have before the release of this feature.
+- [ ] Add Pod UID to the downward api which will help simplify the e2e testing logic.
+- [ ] Check if parent cgroup exist and error out if they don’t.
+- [ ] Set top level cgroup limit to resource allocatable until we support QoS level cgroup updates. If cgroup root is not `/` then set node resource allocatable as the cgroup resource limits on cgroup root.
+- [ ] Add a NodeResourceAllocatableProvider which returns the amount of allocatable resources on the nodes. This interface would be used both by the Kubelet and ContainerManager.
+- [ ] Add top level feasibility check to ensure that pod can be admitted on the node by estimating left over resources on the node.
+- [ ] Log basic cgroup management ie. creation/deletion metrics
+
+
+To better support our requirements we needed to make some changes/add features to Libcontainer as well
+
+- [x] Allowing or denying all devices by writing 'a' to devices.allow or devices.deny is
+not possible once the device cgroups has children. Libcontainer doesn’t have the option of skipping updates on parent devices cgroup. opencontainers/runc/pull/958
+- [x] To use libcontainer for creating and managing cgroups in the Kubelet, I would like to just create a cgroup with no pid attached and if need be apply a pid to the cgroup later on. But libcontainer did not support cgroup creation without attaching a pid. opencontainers/runc/pull/956
+
 
 
 
