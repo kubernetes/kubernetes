@@ -481,7 +481,7 @@ func TestWatchControllers(t *testing.T) {
 	select {
 	case <-received:
 	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("Expected 1 call but got 0")
+		t.Errorf("unexpected timeout from result channel")
 	}
 }
 
@@ -528,7 +528,7 @@ func TestWatchPods(t *testing.T) {
 	select {
 	case <-received:
 	case <-time.After(wait.ForeverTestTimeout):
-		t.Errorf("Expected 1 call but got 0")
+		t.Errorf("unexpected timeout from result channel")
 	}
 }
 
