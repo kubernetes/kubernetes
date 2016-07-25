@@ -43,13 +43,8 @@ import (
 type Priority struct {
 	lock sync.RWMutex
 	cond sync.Cond
-	// We depend on the property that items in the set are in the queue and vice versa.
-    //items stores the actual objects in the queue
-	//items map[string]interface{}
-    //queue keeps track of the order of the items
-	//queue []PriorityObject
     // This is the underlying queue object without syncronization features
-    queue PriorityQueue
+    queue *PriorityQueue
 
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update was called first.
@@ -83,13 +78,13 @@ type PriorityQueue struct {
 
 // New PriorityQueue returns a struct that can be used to store items
 // to be retrieved in priority order
-func NewPriorityQueue(keyFunc KeyFunc) PriorityQueue {
-	pq := PriorityQueue{
+func NewPriorityQueue(keyFunc KeyFunc) *PriorityQueue {
+	pq := &PriorityQueue{
 		items:   map[string]interface{}{},
 		queue:   []PriorityKey{},
         keyFunc: keyFunc,
 	}
-    heap.Init(&pq)
+    heap.Init(pq)
 	return pq
 }
 
@@ -213,10 +208,10 @@ func (p *Priority) Update(obj interface{}) error {
         priority, _ := MetaPriorityFunc(obj)
 
         pq.queue[index].priority = priority
-        heap.Fix(&pq, index)
+        heap.Fix(pq, index)
     } else {
         //if it doesn't already exist (or it has a new key), then add it
-        heap.Push(&pq, obj) //I hope this actually works...
+        heap.Push(pq, obj) //I hope this actually works...
 	}
     //TODO: fix error handling
     return err
@@ -303,7 +298,7 @@ func (p *Priority) Replace(list []interface{}, resourceVersion string) error {
     //} 
     pq := NewPriorityQueue(p.keyFunc)
     for _, item := range list {
-        heap.Push(&pq, item)
+        heap.Push(pq, item)
     }
 
 	p.lock.Lock()
@@ -345,7 +340,7 @@ func (p *Priority) Resync() error {
             //    index:      n,
             //}
 
-            heap.Push(&pq, item)
+            heap.Push(pq, item)
 		}
 	}
     if len(pq.queue) != len(pq.items) {
@@ -370,23 +365,25 @@ func (p *Priority) Resync() error {
 func (p *Priority) Pop(process PopProcessFunc) (interface{}, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	for {
+	for { //what is this forever loop for? To cycle through items until one is ready?
         for p.queue.Len() == 0 {
             p.cond.Wait()
 		}
 
-        pq := p.queue
-
-        item := heap.Pop(&pq)
+        fmt.Println("popping")
+        item := heap.Pop(p.queue)
 		if p.initialPopulationCount > 0 {
 			p.initialPopulationCount--
 		}
 
         err := process(item)
 		if e, ok := err.(ErrRequeue); ok {
-			p.AddIfNotPresent(item)
+            fmt.Println("requeue")
+            key, _ := p.keyFunc(item) //TODO: add error handling
+			p.addIfNotPresent(key, item)
 			err = e.Err
 		}
+        fmt.Println("returning from Pop")
         return item, err
 	}
 }
@@ -398,23 +395,33 @@ func (p *Priority) Pop(process PopProcessFunc) (interface{}, error) {
 // This is useful in a single producer/consumer scenario so that the consumer can
 // safely retry items without contending with the producer and potentially enqueueing
 // stale items.
+// syncronized wrapper for addIfNotPresent. It also derives the key
+// in order to avoid unneccessary locks
 func (p *Priority) AddIfNotPresent(obj interface{}) error {
 	key, err := p.keyFunc(obj)
 	if err != nil {
 		return KeyError{obj, err}
 	}
+
 	p.lock.Lock()
 	defer p.lock.Unlock()
-	p.populated = true
 
-    pq := p.queue
-    //here's where the map + array are important...
-	if _, exists := pq.items[key]; !exists {
-        heap.Push(&pq, obj)
-	}
-	p.cond.Broadcast()
+    p.addIfNotPresent(key, obj)
 
 	return nil
+}
+
+// addIfNotPresent
+// this is the non syncronized form. It should always be called under lock
+func (p *Priority) addIfNotPresent(key string, obj interface{}) {
+
+	p.populated = true
+    pq := p.queue
+    //here's where the map is important...
+	if _, exists := pq.items[key]; !exists {
+        heap.Push(pq, obj)
+	}
+	p.cond.Broadcast()
 }
 
 // HasSynced
