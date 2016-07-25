@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
+	kubeExternal "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -193,7 +194,6 @@ type KubeletBuilder func(kc_old *KubeletConfig, kc_new *componentconfig.KubeletC
 // TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
 type KubeletConfig struct {
 	Auth                    server.AuthInterface
-	AutoDetectCloudProvider bool
 	Builder                 KubeletBuilder
 	CAdvisorInterface       cadvisor.Interface
 	Cloud                   cloudprovider.Interface
@@ -415,7 +415,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		cadvisor:                       kc_old.CAdvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
 		cloud:                          kc_old.Cloud,
-		autoDetectCloudProvider:   kc_old.AutoDetectCloudProvider,
+		autoDetectCloudProvider:   (kubeExternal.AutoDetectCloudProvider == kc_new.CloudProvider),
 		nodeRef:                   nodeRef,
 		nodeLabels:                kc_new.NodeLabels,
 		nodeStatusUpdateFrequency: kc_new.NodeStatusUpdateFrequency.Duration,

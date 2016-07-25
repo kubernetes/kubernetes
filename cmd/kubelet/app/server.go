@@ -199,9 +199,7 @@ func run(s *options.KubeletServer, kcfg *kubelet.KubeletConfig) (err error) {
 			glog.Warningf("No API client: %v", err)
 		}
 
-		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
-			kcfg.AutoDetectCloudProvider = true
-		} else {
+		if s.CloudProvider != kubeExternal.AutoDetectCloudProvider {
 			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
 			if err != nil {
 				return err
