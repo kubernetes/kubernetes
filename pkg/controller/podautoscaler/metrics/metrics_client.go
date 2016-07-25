@@ -119,6 +119,11 @@ func (h *HeapsterMetricsClient) GetCpuConsumptionAndRequestInMillis(namespace st
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("failed to get pod list: %v", err)
 	}
+
+	if len(podList.Items) == 0 {
+		return 0, 0, time.Time{}, fmt.Errorf("empty pod list for selector: %v", selector)
+	}
+
 	podNames := map[string]struct{}{}
 	requestSum := int64(0)
 	missing := false
