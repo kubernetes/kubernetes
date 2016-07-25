@@ -331,10 +331,10 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		requiredResources := quota.Intersection(hardResources, evaluatorResources)
 		err := evaluator.Constraints(requiredResources, inputObject)
 		if err != nil {
-			return nil, admission.NewForbidden(a, fmt.Errorf("Failed quota: %s: %v", resourceQuota.Name, err))
+			return nil, admission.NewForbidden(a, fmt.Errorf("failed quota: %s: %v", resourceQuota.Name, err))
 		}
 		if !hasUsageStats(&resourceQuota) {
-			return nil, admission.NewForbidden(a, fmt.Errorf("Status unknown for quota: %s", resourceQuota.Name))
+			return nil, admission.NewForbidden(a, fmt.Errorf("status unknown for quota: %s", resourceQuota.Name))
 		}
 
 		interestingQuotaIndexes = append(interestingQuotaIndexes, i)
@@ -361,7 +361,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	if admission.Update == op {
 		prevItem := a.GetOldObject()
 		if prevItem == nil {
-			return nil, admission.NewForbidden(a, fmt.Errorf("Unable to get previous usage since prior version of object was not found"))
+			return nil, admission.NewForbidden(a, fmt.Errorf("unable to get previous usage since prior version of object was not found"))
 		}
 		prevUsage := evaluator.Usage(prevItem)
 		deltaUsage = quota.Subtract(deltaUsage, prevUsage)
@@ -381,7 +381,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 			failedUsed := quota.Mask(resourceQuota.Status.Used, exceeded)
 			failedHard := quota.Mask(resourceQuota.Status.Hard, exceeded)
 			return nil, admission.NewForbidden(a,
-				fmt.Errorf("Exceeded quota: %s, requested: %s, used: %s, limited: %s",
+				fmt.Errorf("exceeded quota: %s, requested: %s, used: %s, limited: %s",
 					resourceQuota.Name,
 					prettyPrint(failedRequestedUsage),
 					prettyPrint(failedUsed),

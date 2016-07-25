@@ -53,5 +53,5 @@ func newDataSource(kind string) (dataSource, error) {
 	if kind == "hawkular" {
 		return newHawkularSource(*hawkularConfig)
 	}
-	return nil, fmt.Errorf("Unknown data source %v", kind)
+	return nil, fmt.Errorf("unknown data source %v", kind)
 }
