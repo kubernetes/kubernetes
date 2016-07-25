@@ -96,11 +96,7 @@ func (gcc *PodGCController) gc() {
 	terminatedPodCount := len(terminatedPods)
 	sort.Sort(byCreationTimestamp(terminatedPods))
 
-	deleteCount := terminatedPodCount - gcc.threshold
-
-	if deleteCount > terminatedPodCount {
-		deleteCount = terminatedPodCount
-	}
+	deleteCount := terminatedPodCount
 	if deleteCount > 0 {
 		glog.Infof("garbage collecting %v pods", deleteCount)
 	}
