@@ -233,7 +233,7 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 		return obj.(*api.Pod).Name != "bar"
 	}
 	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
-	w := newEtcdWatcher(false, false, nil, filter, codec, versioner, nil, &fakeEtcdCache{})
+	w := newEtcdWatcher(false, false, nil, filter, codec, nil, &fakeEtcdCache{})
 
 	eventChan := make(chan watch.Event, 1)
 	w.emit = func(e watch.Event) {
