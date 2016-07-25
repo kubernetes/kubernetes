@@ -25,4 +25,6 @@ type RESTOptions struct {
 	Storage                 pkgstorage.Interface
 	Decorator               StorageDecorator
 	DeleteCollectionWorkers int
+
+	ResourcePrefix string
 }

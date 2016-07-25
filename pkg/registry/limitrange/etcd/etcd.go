@@ -32,7 +32,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against horizontal pod autoscalers.
 func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/limitranges"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.LimitRangeList{} }
 	storageInterface := opts.Decorator(

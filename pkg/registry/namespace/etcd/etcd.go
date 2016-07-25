@@ -50,7 +50,7 @@ type FinalizeREST struct {
 
 // NewREST returns a RESTStorage object that will work against namespaces.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *FinalizeREST) {
-	prefix := "/namespaces"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.NamespaceList{} }
 	storageInterface := opts.Decorator(

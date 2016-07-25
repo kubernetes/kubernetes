@@ -32,7 +32,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against pod templates.
 func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/podtemplates"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.PodTemplateList{} }
 	storageInterface := opts.Decorator(
