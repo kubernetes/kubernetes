@@ -56,6 +56,27 @@ func Test_NewGoRoutineMap_Positive_SingleOp(t *testing.T) {
 	}
 }
 
+func Test_NewGoRoutineMap_Positive_TwoOps(t *testing.T) {
+	// Arrange
+	grm := NewGoRoutineMap(false /* exponentialBackOffOnError */)
+	operation1Name := "operation1-name"
+	operation2Name := "operation2-name"
+	operation := func() error { return nil }
+
+	// Act
+	err1 := grm.Run(operation1Name, operation)
+	err2 := grm.Run(operation2Name, operation)
+
+	// Assert
+	if err1 != nil {
+		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", operation1Name, err1)
+	}
+
+	if err2 != nil {
+		t.Fatalf("NewGoRoutine %q failed. Expected: <no error> Actual: <%v>", operation2Name, err2)
+	}
+}
+
 func Test_NewGoRoutineMap_Positive_SingleOpWithExpBackoff(t *testing.T) {
 	// Arrange
 	grm := NewGoRoutineMap(true /* exponentialBackOffOnError */)

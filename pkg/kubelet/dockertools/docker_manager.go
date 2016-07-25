@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -128,7 +129,7 @@ type DockerManager struct {
 	dockerPuller DockerPuller
 
 	// wrapped image puller.
-	imagePuller kubecontainer.ImagePuller
+	imagePuller images.ImageManager
 
 	// Root of the Docker runtime.
 	dockerRoot string
@@ -261,11 +262,7 @@ func NewDockerManager(
 		seccompProfileRoot:     seccompProfileRoot,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	if serializeImagePulls {
-		dm.imagePuller = kubecontainer.NewSerializedImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
-	} else {
-		dm.imagePuller = kubecontainer.NewImagePuller(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff)
-	}
+	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls)
 	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
 
 	dm.versionCache = cache.NewObjectCache(
@@ -691,9 +688,10 @@ func (dm *DockerManager) runContainer(
 
 	glog.V(3).Infof("Container %v/%v/%v: setting entrypoint \"%v\" and command \"%v\"", pod.Namespace, pod.Name, container.Name, dockerOpts.Config.Entrypoint, dockerOpts.Config.Cmd)
 
+	supplementalGids := dm.runtimeHelper.GetExtraSupplementalGroupsForPod(pod)
 	securityContextProvider := securitycontext.NewSimpleSecurityContextProvider()
 	securityContextProvider.ModifyContainerConfig(pod, container, dockerOpts.Config)
-	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig)
+	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids)
 	createResp, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
 		dm.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
@@ -862,8 +860,17 @@ func (dm *DockerManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, er
 
 // Removes the specified image.
 func (dm *DockerManager) RemoveImage(image kubecontainer.ImageSpec) error {
-	// TODO(harryz) currently Runtime interface does not provide other remove options.
-	_, err := dm.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{})
+	// If the image has multiple tags, we need to remove all the tags
+	if inspectImage, err := dm.client.InspectImage(image.Image); err == nil && len(inspectImage.RepoTags) > 1 {
+		for _, tag := range inspectImage.RepoTags {
+			if _, err := dm.client.RemoveImage(tag, dockertypes.ImageRemoveOptions{PruneChildren: true}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	_, err := dm.client.RemoveImage(image.Image, dockertypes.ImageRemoveOptions{PruneChildren: true})
 	return err
 }
 
@@ -1332,7 +1339,7 @@ func (dm *DockerManager) KillContainerInPod(containerID kubecontainer.ContainerI
 		}
 		storedPod, storedContainer, cerr := containerAndPodFromLabels(inspect)
 		if cerr != nil {
-			glog.Errorf("unable to access pod data from container: %v", err)
+			glog.Errorf("unable to access pod data from container: %v", cerr)
 		}
 		if container == nil {
 			container = storedContainer
@@ -1437,7 +1444,7 @@ var errNoPodOnContainer = fmt.Errorf("no pod information labels on Docker contai
 
 // containerAndPodFromLabels tries to load the appropriate container info off of a Docker container's labels
 func containerAndPodFromLabels(inspect *dockertypes.ContainerJSON) (pod *api.Pod, container *api.Container, err error) {
-	if inspect == nil && inspect.Config == nil && inspect.Config.Labels == nil {
+	if inspect == nil || inspect.Config == nil || inspect.Config.Labels == nil {
 		return nil, nil, errNoPodOnContainer
 	}
 	labels := inspect.Config.Labels
@@ -1718,7 +1725,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 
 	// No pod secrets for the infra container.
 	// The message isn't needed for the Infra container
-	if err, msg := dm.imagePuller.PullImage(pod, container, nil); err != nil {
+	if err, msg := dm.imagePuller.EnsureImageExists(pod, container, nil); err != nil {
 		return "", err, msg
 	}
 
@@ -2031,7 +2038,8 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			}
 
 			// Overwrite the podIP passed in the pod status, since we just started the infra container.
-			podIP = dm.determineContainerIP(pod.Name, pod.Namespace, podInfraContainer)
+			podIP = dm.determineContainerIP(pod.Namespace, pod.Name, podInfraContainer)
+			glog.V(4).Infof("Determined pod ip after infra change: %q: %q", format.Pod(pod), podIP)
 		}
 	}
 
@@ -2129,7 +2137,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 // tryContainerStart attempts to pull and start the container, returning an error and a reason string if the start
 // was not successful.
 func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, namespaceMode, pidMode, podIP string) (err error, reason string) {
-	err, msg := dm.imagePuller.PullImage(pod, container, pullSecrets)
+	err, msg := dm.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
 		return err, msg
 	}

@@ -74,21 +74,21 @@ func TestPodAndContainerAttach(t *testing.T) {
 			name:        "no container, no flags",
 		},
 		{
-			p:                 &AttachOptions{ContainerName: "bar"},
+			p:                 &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
 			args:              []string{"foo"},
 			expectedPod:       "foo",
 			expectedContainer: "bar",
 			name:              "container in flag",
 		},
 		{
-			p:                 &AttachOptions{ContainerName: "initfoo"},
+			p:                 &AttachOptions{StreamOptions: StreamOptions{ContainerName: "initfoo"}},
 			args:              []string{"foo"},
 			expectedPod:       "foo",
 			expectedContainer: "initfoo",
 			name:              "init container in flag",
 		},
 		{
-			p:           &AttachOptions{ContainerName: "bar"},
+			p:           &AttachOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
 			args:        []string{"foo", "-c", "wrong"},
 			expectError: true,
 			name:        "non-existing container in flag",
@@ -187,11 +187,13 @@ func TestAttach(t *testing.T) {
 			remoteAttach.err = fmt.Errorf("attach error")
 		}
 		params := &AttachOptions{
-			ContainerName: test.container,
-			In:            bufIn,
-			Out:           bufOut,
-			Err:           bufErr,
-			Attach:        remoteAttach,
+			StreamOptions: StreamOptions{
+				ContainerName: test.container,
+				In:            bufIn,
+				Out:           bufOut,
+				Err:           bufErr,
+			},
+			Attach: remoteAttach,
 		}
 		cmd := &cobra.Command{}
 		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {
@@ -261,13 +263,15 @@ func TestAttachWarnings(t *testing.T) {
 		bufIn := bytes.NewBuffer([]byte{})
 		ex := &fakeRemoteAttach{}
 		params := &AttachOptions{
-			ContainerName: test.container,
-			In:            bufIn,
-			Out:           bufOut,
-			Err:           bufErr,
-			Stdin:         test.stdin,
-			TTY:           test.tty,
-			Attach:        ex,
+			StreamOptions: StreamOptions{
+				ContainerName: test.container,
+				In:            bufIn,
+				Out:           bufOut,
+				Err:           bufErr,
+				Stdin:         test.stdin,
+				TTY:           test.tty,
+			},
+			Attach: ex,
 		}
 		cmd := &cobra.Command{}
 		if err := params.Complete(f, cmd, []string{"foo"}); err != nil {

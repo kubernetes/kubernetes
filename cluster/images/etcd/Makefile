@@ -17,10 +17,10 @@
 # Usage:
 # 	[TAG=2.2.1] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
-TAG?=2.2.5
+TAG?=3.0.3
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
-GOLANG_VERSION?=1.6.0
+GOLANG_VERSION?=1.6.3
 GOARM=6
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -49,10 +49,17 @@ else
 	
 	# Download etcd in a golang container and cross-compile it statically
 	docker run -it -v $(TEMP_DIR):/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
-		"git clone https://github.com/coreos/etcd \
-		&& cd etcd && git checkout v$(TAG) \
+		"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
+		&& cd /go/src/github.com/coreos/etcd \
+		&& git checkout v$(TAG) \
 		&& GOARM=$(GOARM) GOARCH=$(ARCH) ./build \
-		&& cp bin/* /etcdbin"
+		&& cp bin/$(ARCH)/* /etcdbin"
+
+	# Add this ENV variable in order to workaround an unsupported arch blocker
+	# The multiarch feature is in an limited and experimental state right now, and etcd should work fine on arm64
+	# On arm (which is 32-bit), it can't handle >1GB data in-memory, but it is very unlikely someone tinkering with their limited arm devices would reach such a high usage
+	# ppc64le is still quite untested, but compiles and is probably in the process of being validated by IBM.
+	cd $(TEMP_DIR) && echo "ENV ETCD_UNSUPPORTED_ARCH=$(ARCH)" >> Dockerfile
 endif
 
 	# Replace BASEIMAGE with the real base image

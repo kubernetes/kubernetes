@@ -25,8 +25,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -114,9 +115,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						glog.Infof("Started DetachVolume for volume %q from node %q", attachedVolume.VolumeName, attachedVolume.NodeName)
 					}
 					if err != nil &&
-						!goroutinemap.IsAlreadyExists(err) &&
-						!goroutinemap.IsExponentialBackoff(err) {
-						// Ignore goroutinemap.IsAlreadyExists && goroutinemap.IsExponentialBackoff errors, they are expected.
+						!nestedpendingoperations.IsAlreadyExists(err) &&
+						!exponentialbackoff.IsExponentialBackoff(err) {
+						// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 						// Log all other errors.
 						glog.Errorf(
 							"operationExecutor.DetachVolume failed to start for volume %q (spec.Name: %q) from node %q with err: %v",
@@ -134,9 +135,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 							glog.Infof("Started DetachVolume for volume %q from node %q due to maxWaitForUnmountDuration expiry.", attachedVolume.VolumeName, attachedVolume.NodeName)
 						}
 						if err != nil &&
-							!goroutinemap.IsAlreadyExists(err) &&
-							!goroutinemap.IsExponentialBackoff(err) {
-							// Ignore goroutinemap.IsAlreadyExists && goroutinemap.IsExponentialBackoff errors, they are expected.
+							!nestedpendingoperations.IsAlreadyExists(err) &&
+							!exponentialbackoff.IsExponentialBackoff(err) {
+							// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 							// Log all other errors.
 							glog.Errorf(
 								"operationExecutor.DetachVolume failed to start (maxWaitForUnmountDuration expiry) for volume %q (spec.Name: %q) from node %q with err: %v",
@@ -169,9 +170,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 					glog.Infof("Started AttachVolume for volume %q to node %q", volumeToAttach.VolumeName, volumeToAttach.NodeName)
 				}
 				if err != nil &&
-					!goroutinemap.IsAlreadyExists(err) &&
-					!goroutinemap.IsExponentialBackoff(err) {
-					// Ignore goroutinemap.IsAlreadyExists && goroutinemap.IsExponentialBackoff errors, they are expected.
+					!nestedpendingoperations.IsAlreadyExists(err) &&
+					!exponentialbackoff.IsExponentialBackoff(err) {
+					// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
 					glog.Errorf(
 						"operationExecutor.AttachVolume failed to start for volume %q (spec.Name: %q) to node %q with err: %v",

@@ -219,7 +219,7 @@ func Test_Master(t *testing.T) {
 	expectedMaster := unpackIPv4(TEST_MASTER_IP)
 
 	if master != expectedMaster {
-		t.Fatalf("Master returns the expected value: (expected: %#v, actual: %#v", expectedMaster, master)
+		t.Fatalf("Master returns the unexpected value: (expected: %#v, actual: %#v", expectedMaster, master)
 	}
 }
 

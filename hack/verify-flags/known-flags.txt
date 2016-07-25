@@ -61,6 +61,8 @@ cluster-domain
 cluster-name
 cluster-tag
 cluster-monitor-period
+cluster-signing-cert-file
+cluster-signing-key-file
 concurrent-deployment-syncs
 concurrent-endpoint-syncs
 concurrent-namespace-syncs
@@ -148,6 +150,7 @@ eviction-soft
 eviction-soft-grace-period
 eviction-pressure-transition-period
 eviction-max-pod-grace-period
+eviction-minimum-reclaim
 executor-bindall
 executor-logv
 executor-path

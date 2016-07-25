@@ -13,17 +13,16 @@ cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
 cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
-cluster/gce/coreos/node-helper.sh:# cloud_config yaml file should be passed
 cluster/gce/gci/configure-helper.sh:      reconcile_cidr="false"
 cluster/gce/gci/configure-helper.sh:  local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
 cluster/gce/gci/configure-helper.sh:  local reconcile_cidr="true"
 cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
 cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, cluster_name, server, ca)))
 cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, context, cluster_name, user)))
 cluster/juju/layers/kubernetes/reactive/k8s.py:    client_key = '/srv/kubernetes/client.key'
+cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
 cluster/juju/layers/kubernetes/reactive/k8s.py:    tlslib.client_key(None, client_key, user='ubuntu', group='ubuntu')
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
@@ -73,7 +72,9 @@ examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethos
 examples/storage/cassandra/image/run.sh:	cluster_name \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
 hack/jenkins/e2e-runner.sh:    local -r image_project="$1"
+hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
+hack/local-up-cluster.sh:    advertise_address=""
 hack/local-up-cluster.sh:    runtime_config=""
 hack/test-update-storage-objects.sh:  local storage_media_type=${2:-""}
 hack/test-update-storage-objects.sh:  local storage_versions=${1:-""}
@@ -100,7 +101,7 @@ test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
 test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
 test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
-test/e2e_node/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
+test/e2e_node/configmap_test.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")
 test/images/mount-tester/mt.go:	flag.StringVar(&readFileContentInLoopPath, "file_content_in_loop", "", "Path to read the file content in loop from")

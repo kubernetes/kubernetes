@@ -203,7 +203,7 @@ func (c *Fake) InvokesProxy(action Action) restclient.ResponseWrapper {
 // ClearActions clears the history of actions called on the fake client
 func (c *Fake) ClearActions() {
 	c.Lock()
-	c.Unlock()
+	defer c.Unlock()
 
 	c.actions = make([]Action, 0)
 }

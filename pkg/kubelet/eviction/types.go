@@ -60,15 +60,23 @@ type Threshold struct {
 	Value *resource.Quantity
 	// GracePeriod represents the amount of time that a threshold must be met before eviction is triggered.
 	GracePeriod time.Duration
+	// MinReclaim represents the minimum amount of resource to reclaim if the threshold is met.
+	MinReclaim *resource.Quantity
 }
 
 // Manager evaluates when an eviction threshold for node stability has been met on the node.
 type Manager interface {
 	// Start starts the control loop to monitor eviction thresholds at specified interval.
-	Start(podFunc ActivePodsFunc, monitoringInterval time.Duration)
+	Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, monitoringInterval time.Duration) error
 
 	// IsUnderMemoryPressure returns true if the node is under memory pressure.
 	IsUnderMemoryPressure() bool
+}
+
+// DiskInfoProvider is responsible for informing the manager how disk is configured.
+type DiskInfoProvider interface {
+	// HasDedicatedImageFs returns true if the imagefs is on a separate device from the rootfs.
+	HasDedicatedImageFs() (bool, error)
 }
 
 // KillPodFunc kills a pod.

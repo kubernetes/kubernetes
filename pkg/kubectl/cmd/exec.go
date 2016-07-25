@@ -21,6 +21,7 @@ import (
 	"io"
 	"net/url"
 
+	dockerterm "github.com/docker/docker/pkg/term"
 	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
@@ -49,9 +50,11 @@ var (
 
 func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &ExecOptions{
-		In:  cmdIn,
-		Out: cmdOut,
-		Err: cmdErr,
+		StreamOptions: StreamOptions{
+			In:  cmdIn,
+			Out: cmdOut,
+			Err: cmdErr,
+		},
 
 		Executor: &DefaultRemoteExecutor{},
 	}
@@ -98,21 +101,28 @@ func (*DefaultRemoteExecutor) Execute(method string, url *url.URL, config *restc
 	})
 }
 
-// ExecOptions declare the arguments accepted by the Exec command
-type ExecOptions struct {
+type StreamOptions struct {
 	Namespace     string
 	PodName       string
 	ContainerName string
 	Stdin         bool
 	TTY           bool
-	Command       []string
-
 	// InterruptParent, if set, is used to handle interrupts while attached
 	InterruptParent *interrupt.Handler
+	In              io.Reader
+	Out             io.Writer
+	Err             io.Writer
 
-	In  io.Reader
-	Out io.Writer
-	Err io.Writer
+	// for testing
+	overrideStreams func() (io.ReadCloser, io.Writer, io.Writer)
+	isTerminalIn    func(t term.TTY) bool
+}
+
+// ExecOptions declare the arguments accepted by the Exec command
+type ExecOptions struct {
+	StreamOptions
+
+	Command []string
 
 	Executor RemoteExecutor
 	Client   *client.Client
@@ -177,6 +187,58 @@ func (p *ExecOptions) Validate() error {
 	return nil
 }
 
+func (o *StreamOptions) setupTTY() term.TTY {
+	t := term.TTY{
+		Parent: o.InterruptParent,
+		Out:    o.Out,
+	}
+
+	if !o.Stdin {
+		// need to nil out o.In to make sure we don't create a stream for stdin
+		o.In = nil
+		o.TTY = false
+		return t
+	}
+
+	t.In = o.In
+	if !o.TTY {
+		return t
+	}
+
+	if o.isTerminalIn == nil {
+		o.isTerminalIn = func(tty term.TTY) bool {
+			return tty.IsTerminalIn()
+		}
+	}
+	if !o.isTerminalIn(t) {
+		o.TTY = false
+
+		if o.Err != nil {
+			fmt.Fprintln(o.Err, "Unable to use a TTY - input is not a terminal or the right kind of file")
+		}
+
+		return t
+	}
+
+	// if we get to here, the user wants to attach stdin, wants a TTY, and o.In is a terminal, so we
+	// can safely set t.Raw to true
+	t.Raw = true
+
+	if o.overrideStreams == nil {
+		// use dockerterm.StdStreams() to get the right I/O handles on Windows
+		o.overrideStreams = dockerterm.StdStreams
+	}
+	stdin, stdout, _ := o.overrideStreams()
+	o.In = stdin
+	t.In = stdin
+	if o.Out != nil {
+		o.Out = stdout
+		t.Out = stdout
+	}
+
+	return t
+}
+
 // Run executes a validated remote execution against a pod.
 func (p *ExecOptions) Run() error {
 	pod, err := p.Client.Pods(p.Namespace).Get(p.PodName)
@@ -195,26 +257,10 @@ func (p *ExecOptions) Run() error {
 	}
 
 	// ensure we can recover the terminal while attached
-	t := term.TTY{
-		Parent: p.InterruptParent,
-		Out:    p.Out,
-	}
-
-	// check for TTY
-	tty := p.TTY
-	if p.Stdin {
-		t.In = p.In
-		if tty && !t.IsTerminalIn() {
-			tty = false
-			fmt.Fprintln(p.Err, "Unable to use a TTY - input is not a terminal or the right kind of file")
-		}
-	} else {
-		p.In = nil
-	}
-	t.Raw = tty
+	t := p.setupTTY()
 
 	var sizeQueue term.TerminalSizeQueue
-	if tty {
+	if t.Raw {
 		// this call spawns a goroutine to monitor/update the terminal size
 		sizeQueue = t.MonitorSize(t.GetSize())
 
@@ -237,10 +283,10 @@ func (p *ExecOptions) Run() error {
 			Stdin:     p.Stdin,
 			Stdout:    p.Out != nil,
 			Stderr:    p.Err != nil,
-			TTY:       tty,
+			TTY:       t.Raw,
 		}, api.ParameterCodec)
 
-		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.Err, tty, sizeQueue)
+		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.Err, t.Raw, sizeQueue)
 	}
 
 	if err := t.Safe(fn); err != nil {

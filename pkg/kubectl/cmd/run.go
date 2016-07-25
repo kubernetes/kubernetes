@@ -226,11 +226,13 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 
 	if attach {
 		opts := &AttachOptions{
-			In:    cmdIn,
-			Out:   cmdOut,
-			Err:   cmdErr,
-			Stdin: interactive,
-			TTY:   tty,
+			StreamOptions: StreamOptions{
+				In:    cmdIn,
+				Out:   cmdOut,
+				Err:   cmdErr,
+				Stdin: interactive,
+				TTY:   tty,
+			},
 
 			CommandName: cmd.Parent().CommandPath() + " attach",
 

@@ -406,21 +406,6 @@ func NewMainKubelet(
 	klet.podCache = kubecontainer.NewCache()
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
-	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, volumePlugins)
-	if err != nil {
-		return nil, err
-	}
-
-	klet.volumeManager, err = volumemanager.NewVolumeManager(
-		enableControllerAttachDetach,
-		hostname,
-		klet.podManager,
-		klet.kubeClient,
-		klet.volumePluginMgr,
-		klet.containerRuntime,
-		mounter)
-
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -522,7 +507,7 @@ func NewMainKubelet(
 
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
 		enableControllerAttachDetach,
-		hostname,
+		nodeName,
 		klet.podManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,
@@ -941,7 +926,11 @@ func (kl *Kubelet) initializeModules() error {
 // initializeRuntimeDependentModules will initialize internal modules that require the container runtime to be up.
 func (kl *Kubelet) initializeRuntimeDependentModules() {
 	if err := kl.cadvisor.Start(); err != nil {
-		kl.runtimeState.setInternalError(fmt.Errorf("Failed to start cAdvisor %v", err))
+		kl.runtimeState.setInternalError(fmt.Errorf("failed to start cAdvisor %v", err))
+	}
+	// eviction manager must start after cadvisor because it needs to know if the container runtime has a dedicated imagefs
+	if err := kl.evictionManager.Start(kl, kl.getActivePods, evictionMonitoringPeriod); err != nil {
+		kl.runtimeState.setInternalError(fmt.Errorf("failed to start eviction manager %v", err))
 	}
 }
 
@@ -976,7 +965,6 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// Start component sync loops.
 	kl.statusManager.Start()
 	kl.probeManager.Start()
-	kl.evictionManager.Start(kl.getActivePods, evictionMonitoringPeriod)
 
 	// Start the pod lifecycle event generator.
 	kl.pleg.Start()
