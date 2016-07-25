@@ -86,7 +86,7 @@ func fakeFilepathGlob(devicePath string) (globs []string, err error) {
 	return []string{devicePath}, nil
 }
 
-func TestextractTransportname(t *testing.T) {
+func TestExtractTransportname(t *testing.T) {
 	fakeIscsiadmOutput := []string{
 		"# BEGIN RECORD 2.0-873\n" +
 			"iface.iscsi_ifacename = default\n" +
