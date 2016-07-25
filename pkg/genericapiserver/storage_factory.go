@@ -19,6 +19,7 @@ package genericapiserver
 import (
 	"fmt"
 	"mime"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -37,6 +38,12 @@ type StorageFactory interface {
 	// New finds the storage destination for the given group and resource. It will
 	// return an error if the group has no storage destination configured.
 	New(groupResource unversioned.GroupResource) (storage.Interface, error)
+
+	// ResourcePrefix returns the overridden resource prefix for the GroupResource
+	// This allows for cohabitation of resources with different native types and provides
+	// centralized control over the shape of etcd directories
+	ResourcePrefix(groupResource unversioned.GroupResource) string
+
 	// Backends gets all backends for all registered storage destinations.
 	// Used for getting all instances for health validations.
 	Backends() []string
@@ -78,8 +85,12 @@ type groupResourceOverrides struct {
 	// etcdLocation contains the list of "special" locations that are used for particular GroupResources
 	// These are merged on top of the StorageConfig when requesting the storage.Interface for a given GroupResource
 	etcdLocation []string
-	// etcdPrefix contains the list of "special" prefixes for a GroupResource.  Resource=* means for the entire group
+	// etcdPrefix is the base location for a GroupResource.
 	etcdPrefix string
+	// etcdResourcePrefix is the location to use to store a particular type under the `etcdPrefix` location
+	// If empty, the default mapping is used.  If the default mapping doesn't contain an entry, it will use
+	// the ToLowered name of the resource, not including the group.
+	etcdResourcePrefix string
 	// mediaType is the desired serializer to choose. If empty, the default is chosen.
 	mediaType string
 	// serializer contains the list of "special" serializers for a GroupResource.  Resource=* means for the entire group
@@ -120,6 +131,13 @@ func (s *DefaultStorageFactory) SetEtcdLocation(groupResource unversioned.GroupR
 func (s *DefaultStorageFactory) SetEtcdPrefix(groupResource unversioned.GroupResource, prefix string) {
 	overrides := s.Overrides[groupResource]
 	overrides.etcdPrefix = prefix
+	s.Overrides[groupResource] = overrides
+}
+
+// SetResourceEtcdPrefix sets the prefix for a resource, but not the base-dir.  You'll end up in `etcdPrefix/resourceEtcdPrefix`.
+func (s *DefaultStorageFactory) SetResourceEtcdPrefix(groupResource unversioned.GroupResource, prefix string) {
+	overrides := s.Overrides[groupResource]
+	overrides.etcdResourcePrefix = prefix
 	s.Overrides[groupResource] = overrides
 }
 
@@ -267,4 +285,31 @@ func NewStorageCodec(storageMediaType string, ns runtime.StorageSerializer, stor
 		}
 	}
 	return runtime.NewCodec(encoder, decoder), nil
+}
+
+var specialDefaultResourcePrefixes = map[unversioned.GroupResource]string{
+	unversioned.GroupResource{Group: "", Resource: "replicationControllers"}: "controllers",
+	unversioned.GroupResource{Group: "", Resource: "replicationcontrollers"}: "controllers",
+	unversioned.GroupResource{Group: "", Resource: "endpoints"}:              "services/endpoints",
+	unversioned.GroupResource{Group: "", Resource: "nodes"}:                  "minions",
+	unversioned.GroupResource{Group: "", Resource: "services"}:               "services/specs",
+}
+
+func (s *DefaultStorageFactory) ResourcePrefix(groupResource unversioned.GroupResource) string {
+	chosenStorageResource := s.getStorageGroupResource(groupResource)
+	groupOverride := s.Overrides[getAllResourcesAlias(chosenStorageResource)]
+	exactResourceOverride := s.Overrides[chosenStorageResource]
+
+	etcdResourcePrefix := specialDefaultResourcePrefixes[chosenStorageResource]
+	if len(groupOverride.etcdResourcePrefix) > 0 {
+		etcdResourcePrefix = groupOverride.etcdResourcePrefix
+	}
+	if len(exactResourceOverride.etcdResourcePrefix) > 0 {
+		etcdResourcePrefix = exactResourceOverride.etcdResourcePrefix
+	}
+	if len(etcdResourcePrefix) == 0 {
+		etcdResourcePrefix = strings.ToLower(chosenStorageResource.Resource)
+	}
+
+	return etcdResourcePrefix
 }

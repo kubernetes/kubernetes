@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -185,7 +186,7 @@ func Run(s *options.APIServer) error {
 		if err != nil {
 			glog.Fatalf("Unable to get serviceaccounts storage: %v", err)
 		}
-		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storage)
+		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storage, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
 	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
@@ -222,11 +223,11 @@ func Run(s *options.APIServer) error {
 
 	if modeEnabled(apiserver.ModeRBAC) {
 		mustGetRESTOptions := func(resource string) generic.RESTOptions {
-			s, err := storageFactory.New(api.Resource(resource))
+			s, err := storageFactory.New(rbac.Resource(resource))
 			if err != nil {
 				glog.Fatalf("Unable to get %s storage: %v", resource, err)
 			}
-			return generic.RESTOptions{Storage: s, Decorator: generic.UndecoratedStorage}
+			return generic.RESTOptions{Storage: s, Decorator: generic.UndecoratedStorage, ResourcePrefix: storageFactory.ResourcePrefix(rbac.Resource(resource))}
 		}
 
 		// For initial bootstrapping go directly to etcd to avoid privillege escalation check.

@@ -58,7 +58,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against ReplicaSet.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/replicasets"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &extensions.ReplicaSetList{} }
 	storageInterface := opts.Decorator(
