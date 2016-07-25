@@ -86,7 +86,7 @@ func (puller *parallelImagePuller) pullImage(pod *api.Pod, container *api.Contai
 	if err != nil {
 		msg := fmt.Sprintf("Failed to inspect image %q: %v", container.Image, err)
 		puller.logIt(ref, api.EventTypeWarning, events.FailedToInspectImage, logPrefix, msg, glog.Warning)
-		return kubecontainer.ErrImageInspect, msg
+		return ErrImageInspect, msg
 	}
 
 	if !shouldPullImage(container, present) {
@@ -97,7 +97,7 @@ func (puller *parallelImagePuller) pullImage(pod *api.Pod, container *api.Contai
 		} else {
 			msg := fmt.Sprintf("Container image %q is not present with pull policy of Never", container.Image)
 			puller.logIt(ref, api.EventTypeWarning, events.ErrImageNeverPullPolicy, logPrefix, msg, glog.Warning)
-			return kubecontainer.ErrImageNeverPull, msg
+			return ErrImageNeverPull, msg
 		}
 	}
 
@@ -105,21 +105,20 @@ func (puller *parallelImagePuller) pullImage(pod *api.Pod, container *api.Contai
 	if puller.backOff.IsInBackOffSinceUpdate(backOffKey, puller.backOff.Clock.Now()) {
 		msg := fmt.Sprintf("Back-off pulling image %q", container.Image)
 		puller.logIt(ref, api.EventTypeNormal, events.BackOffPullImage, logPrefix, msg, glog.Info)
-		return kubecontainer.ErrImagePullBackOff, msg
+		return ErrImagePullBackOff, msg
 	}
 	puller.logIt(ref, api.EventTypeNormal, events.PullingImage, logPrefix, fmt.Sprintf("pulling image %q", container.Image), glog.Info)
 	if err := puller.runtime.PullImage(spec, pullSecrets); err != nil {
 		puller.logIt(ref, api.EventTypeWarning, events.FailedToPullImage, logPrefix, fmt.Sprintf("Failed to pull image %q: %v", container.Image, err), glog.Warning)
 		puller.backOff.Next(backOffKey, puller.backOff.Clock.Now())
-		if err == kubecontainer.RegistryUnavailable {
+		if err == RegistryUnavailable {
 			msg := fmt.Sprintf("image pull failed for %s because the registry is unavailable.", container.Image)
 			return err, msg
 		} else {
-			return kubecontainer.ErrImagePull, err.Error()
+			return ErrImagePull, err.Error()
 		}
 	}
 	puller.logIt(ref, api.EventTypeNormal, events.PulledImage, logPrefix, fmt.Sprintf("Successfully pulled image %q", container.Image), glog.Info)
-	puller.backOff.DeleteEntry(backOffKey)
 	puller.backOff.GC()
 	return nil, ""
 }
