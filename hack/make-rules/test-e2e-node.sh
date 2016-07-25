@@ -34,6 +34,7 @@ delete_instances=${DELETE_INSTANCES:-"false"}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 list_images=${LIST_IMAGES:-"false"}
 test_args=${TEST_ARGS:-""}
+metadata=${INSTANCE_METADATA:-""}
 
 if  [[ $list_images == "true" ]]; then
   gcloud compute images list --project="${image_project}" | grep "e2e-node"
@@ -111,14 +112,14 @@ if [ $remote = true ] ; then
   echo "Images: $images"
   echo "Hosts: $hosts"
   echo "Ginkgo Flags: $ginkgoflags"
-
+  echo "Instance Metadata: $metadata"
   # Invoke the runner
   go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
     --zone="$zone" --project="$project"  \
     --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
     --image-project="$image_project" --instance-name-prefix="$instance_prefix" --setup-node="true" \
-    --delete-instances="$delete_instances" --test_args="$test_args"
+    --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata"
   exit $?
 
 else
