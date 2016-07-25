@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	dockertypes "github.com/docker/engine-api/types"
+
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
@@ -87,5 +88,27 @@ func toRuntimeAPIContainerState(state string) runtimeApi.ContainerState {
 		return runtimeApi.ContainerState_CREATED
 	default:
 		return runtimeApi.ContainerState_UNKNOWN
+	}
+}
+
+func toRuntimeAPISandboxState(state string) runtimeApi.PodSandBoxState {
+	// Parse the state string in dockertypes.Container. This could break when
+	// we upgrade docker.
+	switch {
+	case strings.HasPrefix(state, statusRunningPrefix):
+		return runtimeApi.PodSandBoxState_READY
+	default:
+		return runtimeApi.PodSandBoxState_NOTREADY
+	}
+}
+
+func toRuntimeAPISandbox(c *dockertypes.Container) *runtimeApi.PodSandbox {
+	state := toRuntimeAPISandboxState(c.Status)
+	return &runtimeApi.PodSandbox{
+		Id:        &c.ID,
+		Name:      &c.Names[0],
+		State:     &state,
+		CreatedAt: &c.Created, // TODO: Why do we need CreateAt timestamp for sandboxes?
+		Labels:    c.Labels,   // TODO: Need to disthinguish annotaions and labels.
 	}
 }
