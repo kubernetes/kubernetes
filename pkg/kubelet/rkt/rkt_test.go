@@ -860,7 +860,7 @@ func baseApp(t *testing.T) *appctypes.App {
 		SupplementaryGIDs: []int{4, 5, 6},
 		WorkingDirectory:  "/foo",
 		Environment: []appctypes.EnvironmentVariable{
-			{"env-foo", "bar"},
+			{Name: "env-foo", Value: "bar"},
 		},
 		MountPoints: []appctypes.MountPoint{
 			{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: false},
@@ -997,7 +997,7 @@ func TestSetApp(t *testing.T) {
 				SupplementaryGIDs: []int{4, 5, 6},
 				WorkingDirectory:  "/foo",
 				Environment: []appctypes.EnvironmentVariable{
-					{"env-foo", "bar"},
+					{Name: "env-foo", Value: "bar"},
 				},
 				MountPoints: []appctypes.MountPoint{
 					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: false},
@@ -1056,8 +1056,8 @@ func TestSetApp(t *testing.T) {
 				SupplementaryGIDs: []int{1, 2, 3, 4},
 				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
-					{"env-foo", "bar"},
-					{"env-bar", "foo"},
+					{Name: "env-foo", Value: "bar"},
+					{Name: "env-bar", Value: "foo"},
 				},
 				MountPoints: []appctypes.MountPoint{
 					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: false},
@@ -1120,8 +1120,8 @@ func TestSetApp(t *testing.T) {
 				SupplementaryGIDs: []int{1, 2, 3, 4},
 				WorkingDirectory:  tmpDir,
 				Environment: []appctypes.EnvironmentVariable{
-					{"env-foo", "foo"},
-					{"env-bar", "bar"},
+					{Name: "env-foo", Value: "foo"},
+					{Name: "env-bar", Value: "bar"},
 				},
 				MountPoints: []appctypes.MountPoint{
 					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-bar", ReadOnly: true},
