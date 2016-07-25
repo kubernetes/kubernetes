@@ -136,9 +136,14 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 // limitedAPIResourceConfigSource only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion,
-		batchapiv1.SchemeGroupVersion, batchapiv2alpha1.SchemeGroupVersion,
-		appsapi.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
+	ret.EnableVersions(
+		apiv1.SchemeGroupVersion,
+		extensionsapiv1beta1.SchemeGroupVersion,
+		batchapiv1.SchemeGroupVersion,
+		batchapiv2alpha1.SchemeGroupVersion,
+		appsapi.SchemeGroupVersion,
+		autoscalingapiv1.SchemeGroupVersion,
+	)
 	return ret
 }
 
@@ -493,7 +498,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		},
 	}
 
-	assert.Equal(3, len(groupList.Groups))
+	assert.Equal(4, len(groupList.Groups))
 	for _, group := range groupList.Groups {
 		if !expectGroupNames.Has(group.Name) {
 			t.Errorf("got unexpected group %s", group.Name)
@@ -520,7 +525,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assert.Equal(4, len(groupList.Groups))
+	assert.Equal(5, len(groupList.Groups))
 
 	expectGroupNames.Insert("company.com")
 	expectVersions["company.com"] = []unversioned.GroupVersionForDiscovery{thirdPartyGV}
