@@ -57,7 +57,7 @@ func (w *SpecWatcher) runnersForSuites(suites []testsuite.TestSuite, additionalA
 	runners := []*testrunner.TestRunner{}
 
 	for _, suite := range suites {
-		runners = append(runners, testrunner.New(suite, w.commandFlags.NumCPU, w.commandFlags.ParallelStream, w.commandFlags.Race, w.commandFlags.Cover, w.commandFlags.CoverPkg, w.commandFlags.Tags, additionalArgs))
+		runners = append(runners, testrunner.New(suite, w.commandFlags.NumCPU, w.commandFlags.ParallelStream, w.commandFlags.Race, w.commandFlags.Cover, w.commandFlags.CoverPkg, w.commandFlags.Tags, w.commandFlags.GCFlags, additionalArgs))
 	}
 
 	return runners
