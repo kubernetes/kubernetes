@@ -117,11 +117,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		writer = &kubeio.NsenterWriter{}
 	}
 
-	tlsOptions, err := InitializeTLS(s)
-	if err != nil {
-		return nil, err
-	}
-
 	return &kubelet.KubeletConfig{
 		Auth:              nil, // default does not enforce auth[nz]
 		CAdvisorInterface: nil, // launches background processes, not set here
@@ -133,7 +128,6 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*kubelet.KubeletConfig, e
 		NetworkPlugins:    ProbeNetworkPlugins(s.NetworkPluginDir),
 		OOMAdjuster:       oom.NewOOMAdjuster(),
 		OSInterface:       kubecontainer.RealOS{},
-		TLSOptions:        tlsOptions,
 		Writer:            writer,
 		VolumePlugins:     ProbeVolumePlugins(s.VolumePluginDir),
 	}, nil
@@ -278,15 +272,15 @@ func run(s *options.KubeletServer, kcfg *kubelet.KubeletConfig) (err error) {
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
-func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
-	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
-		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
-		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if crypto.ShouldGenSelfSignedCerts(s.TLSCertFile, s.TLSPrivateKeyFile) {
-			if err := crypto.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err != nil {
+func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions, error) {
+	if kc.TLSCertFile == "" && kc.TLSPrivateKeyFile == "" {
+		kc.TLSCertFile = path.Join(kc.CertDirectory, "kubelet.crt")
+		kc.TLSPrivateKeyFile = path.Join(kc.CertDirectory, "kubelet.key")
+		if crypto.ShouldGenSelfSignedCerts(kc.TLSCertFile, kc.TLSPrivateKeyFile) {
+			if err := crypto.GenerateSelfSignedCert(nodeutil.GetHostname(kc.HostnameOverride), kc.TLSCertFile, kc.TLSPrivateKeyFile, nil, nil); err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
-			glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
+			glog.V(4).Infof("Using self-signed cert (%s, %s)", kc.TLSCertFile, kc.TLSPrivateKeyFile)
 		}
 	}
 	tlsOptions := &server.TLSOptions{
@@ -298,8 +292,8 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 			// Populate PeerCertificates in requests, but don't yet reject connections without certificates.
 			ClientAuth: tls.RequestClientCert,
 		},
-		CertFile: s.TLSCertFile,
-		KeyFile:  s.TLSPrivateKeyFile,
+		CertFile: kc.TLSCertFile,
+		KeyFile:  kc.TLSPrivateKeyFile,
 	}
 	return tlsOptions, nil
 }
@@ -485,7 +479,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		// SerializeImagePulls: true,
 		// SyncFrequency:       syncFrequency,
 		// SystemCgroups:       "",
-		TLSOptions:    tlsOptions,
+		// TLSOptions:    tlsOptions,
 		VolumePlugins: volumePlugins,
 		Writer:        &kubeio.StdWriter{},
 		// OutOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
@@ -622,20 +616,30 @@ func RunKubelet(kcfg *kubelet.KubeletConfig, kcfg_new *componentconfig.KubeletCo
 		}
 		glog.Infof("Started kubelet %s as runonce", version.Get().String())
 	} else {
-		startKubelet(k, podCfg, kcfg, kcfg_new)
+		err := startKubelet(k, podCfg, kcfg, kcfg_new)
+		if err != nil {
+			return err
+		}
 		glog.Infof("Started kubelet %s", version.Get().String())
 	}
 	return nil
 }
 
-func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kc_old *kubelet.KubeletConfig, kc_new *componentconfig.KubeletConfiguration) {
+func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kc_old *kubelet.KubeletConfig, kc_new *componentconfig.KubeletConfiguration) error {
+
+	// Initialize the TLS Options
+	tlsOptions, err := InitializeTLS(kc_new)
+	if err != nil {
+		return err
+	}
+
 	// start the kubelet
 	go wait.Until(func() { k.Run(podCfg.Updates()) }, 0, wait.NeverStop)
 
 	// start the kubelet server
 	if kc_new.EnableServer {
 		go wait.Until(func() {
-			k.ListenAndServe(net.ParseIP(kc_new.Address), uint(kc_new.Port), kc_old.TLSOptions, kc_old.Auth, kc_new.EnableDebuggingHandlers)
+			k.ListenAndServe(net.ParseIP(kc_new.Address), uint(kc_new.Port), tlsOptions, kc_old.Auth, kc_new.EnableDebuggingHandlers)
 		}, 0, wait.NeverStop)
 	}
 	if kc_new.ReadOnlyPort > 0 {
@@ -643,6 +647,8 @@ func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kc_old *
 			k.ListenAndServeReadOnly(net.ParseIP(kc_new.Address), uint(kc_new.ReadOnlyPort))
 		}, 0, wait.NeverStop)
 	}
+
+	return nil
 }
 
 func CreateAndInitKubelet(kc_old *kubelet.KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (k kubelet.KubeletBootstrap, err error) {

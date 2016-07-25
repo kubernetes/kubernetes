@@ -209,7 +209,6 @@ type KubeletConfig struct {
 	OSInterface             kubecontainer.OSInterface
 	PodConfig               *config.PodConfig
 	Recorder                record.EventRecorder
-	TLSOptions              *server.TLSOptions
 	Writer                  kubeio.Writer
 	VolumePlugins           []volume.VolumePlugin
 	ContainerRuntimeOptions []kubecontainer.Option
