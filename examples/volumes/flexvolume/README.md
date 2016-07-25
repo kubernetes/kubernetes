@@ -77,7 +77,7 @@ Unmount:
 <driver executable> unmount <mount dir>
 ```
 
-See lvm[lvm] for a quick example on how to write a simple flexvolume driver.
+See [lvm](lvm) for a quick example on how to write a simple flexvolume driver.
 
 ### Driver output:
 
