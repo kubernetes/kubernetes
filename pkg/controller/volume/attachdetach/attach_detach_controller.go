@@ -582,3 +582,7 @@ func (adc *attachDetachController) GetHostIP() (net.IP, error) {
 func (adc *attachDetachController) GetRootContext() string {
 	return ""
 }
+
+func (adc *attachDetachController) GetNodeAllocatable() (api.ResourceList, error) {
+	return api.ResourceList{}, nil
+}
