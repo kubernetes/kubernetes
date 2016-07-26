@@ -503,7 +503,7 @@ func NewMainKubelet(
 
 	klet.volumeManager, err = kubeletvolume.NewVolumeManager(
 		enableControllerAttachDetach,
-		hostname,
+		nodeName,
 		klet.podManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,
