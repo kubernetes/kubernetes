@@ -621,14 +621,16 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		zones := getZones(item.fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+				uid, _ := value.UID.(string)
+				remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
 				if remaining {
-					nodeController.zoneTerminationEvictor[zone].Add(value.Value)
+					nodeController.zoneTerminationEvictor[zone].Add(value.Value, value.UID)
 				}
 				return true, 0
 			})
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, value.AddedAt, nodeController.maximumGracePeriod)
+				uid, _ := value.UID.(string)
+				terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, uid, value.AddedAt, nodeController.maximumGracePeriod)
 				return true, 0
 			})
 		}
@@ -1151,7 +1153,8 @@ func TestNodeDeletion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	nodeController.zonePodEvictor[""].Try(func(value TimedValue) (bool, time.Duration) {
-		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+		uid, _ := value.UID.(string)
+		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
 		return true, 0
 	})
 	podEvicted := false

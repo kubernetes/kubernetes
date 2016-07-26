@@ -28,7 +28,9 @@ import (
 
 // TimedValue is a value that should be processed at a designated time.
 type TimedValue struct {
-	Value     string
+	Value string
+	// UID could be anything that helps identify the value
+	UID       interface{}
 	AddedAt   time.Time
 	ProcessAt time.Time
 }
@@ -199,12 +201,13 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	}
 }
 
-// Adds value to the queue to be processed. Won't add the same value a second time if it was already
-// added and not removed.
-func (q *RateLimitedTimedQueue) Add(value string) bool {
+// Adds value to the queue to be processed. Won't add the same value(comparsion by value) a second time
+// if it was already added and not removed.
+func (q *RateLimitedTimedQueue) Add(value string, uid interface{}) bool {
 	now := now()
 	return q.queue.Add(TimedValue{
 		Value:     value,
+		UID:       uid,
 		AddedAt:   now,
 		ProcessAt: now,
 	})
