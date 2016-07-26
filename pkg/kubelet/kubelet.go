@@ -1637,11 +1637,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Wait for volumes to attach/mount
-	defaultedPod, _, err := kl.defaultPodLimitsForDownwardApi(pod, nil)
-	if err != nil {
-		return err
-	}
-	if err := kl.volumeManager.WaitForAttachAndMount(defaultedPod); err != nil {
+	if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
 		kl.recorder.Eventf(pod, api.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
 		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
 		return err
