@@ -442,7 +442,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod without a label to get a node which can launch it.")
 		podName := "without-label"
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -459,8 +459,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -476,7 +476,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
-		_, err = c.Pods(ns).Create(&api.Pod{
+		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -504,7 +504,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName, pod.ResourceVersion))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -575,7 +575,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod without a label to get a node which can launch it.")
 		podName := "without-label"
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -592,8 +592,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -609,7 +609,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
-		_, err = c.Pods(ns).Create(&api.Pod{
+		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -651,7 +651,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName, pod.ResourceVersion))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -666,7 +666,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod without a label to get a node which can launch it.")
 		podName := "without-label"
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -683,8 +683,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -710,7 +710,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName, ""))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -826,7 +826,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		podName := "with-label-" + string(util.NewUUID())
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -844,8 +844,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -860,7 +860,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch the pod, now with podAffinity.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
-		_, err = c.Pods(ns).Create(&api.Pod{
+		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -900,7 +900,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName, pod.ResourceVersion))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -914,7 +914,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		podName := "with-label-" + string(util.NewUUID())
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -932,8 +932,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -998,7 +998,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		podName := "with-label-" + string(util.NewUUID())
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1016,8 +1016,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -1032,7 +1032,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
-		_, err = c.Pods(ns).Create(&api.Pod{
+		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1080,7 +1080,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName, pod.ResourceVersion))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -1094,7 +1094,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
 		podName := "with-label-" + string(util.NewUUID())
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1112,8 +1112,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -1128,7 +1128,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
 		labelPodName := "with-podantiaffinity-" + string(util.NewUUID())
-		_, err = c.Pods(ns).Create(&api.Pod{
+		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1179,7 +1179,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName, pod.ResourceVersion))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -1193,7 +1193,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod with label to get a node which can launch it.")
 		podName := "with-label-" + string(util.NewUUID())
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1211,8 +1211,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -1237,7 +1237,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new label yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, labelPodName, pod.ResourceVersion))
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
@@ -1254,7 +1254,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod without a toleration to get a node which can launch it.")
 		podName := "without-toleration"
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1271,8 +1271,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -1296,7 +1296,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
-		_, err = c.Pods(ns).Create(&api.Pod{
+		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1331,7 +1331,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
 		// already when the kubelet does not know about its new taint yet. The
 		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, tolerationPodName))
+		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, tolerationPodName, pod.ResourceVersion))
 		deployedPod, err := c.Pods(ns).Get(tolerationPodName)
 		framework.ExpectNoError(err)
 		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
@@ -1348,7 +1348,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// scheduled onto it.
 		By("Trying to launch a pod without a toleration to get a node which can launch it.")
 		podName := "without-toleration"
-		_, err := c.Pods(ns).Create(&api.Pod{
+		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1365,8 +1365,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, podName, ns))
-		pod, err := c.Pods(ns).Get(podName)
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(c, pod))
+		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
@@ -1390,7 +1390,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to relaunch the pod, still no tolerations.")
 		podNameNoTolerations := "still-no-tolerations"
-		podNoTolerations := api.Pod{
+		podNoTolerations := &api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
 			},
@@ -1407,7 +1407,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 				},
 			},
 		}
-		_, err = c.Pods(ns).Create(&podNoTolerations)
+		_, err = c.Pods(ns).Create(podNoTolerations)
 		framework.ExpectNoError(err)
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
@@ -1419,7 +1419,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		// TODO(@kevin-wangzefeng) Figure out how to do it correctly
 		// By("Trying to relaunch the same.")
-		// _, err = c.Pods(ns).Create(&podNoTolerations)
+		// podNoTolerations, err = c.Pods(ns).Create(&podNoTolerations)
 		// framework.ExpectNoError(err)
 		// defer c.Pods(ns).Delete(podNameNoTolerations, api.NewDeleteOptions(0))
 
@@ -1428,7 +1428,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// // kubelet and the scheduler: the scheduler might have scheduled a pod
 		// // already when the kubelet does not know about its new taint yet. The
 		// // kubelet will then refuse to launch the pod.
-		// framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podNameNoTolerations))
+		// framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podNameNoTolerations, podNoTolerations.ResourceVersion))
 		// deployedPod, err := c.Pods(ns).Get(podNameNoTolerations)
 		// framework.ExpectNoError(err)
 		// Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
