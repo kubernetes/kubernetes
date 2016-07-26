@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -45,7 +45,7 @@ func (limitrangeStrategy) NamespaceScoped() bool {
 func (limitrangeStrategy) PrepareForCreate(obj runtime.Object) {
 	limitRange := obj.(*api.LimitRange)
 	if len(limitRange.Name) == 0 {
-		limitRange.Name = string(util.NewUUID())
+		limitRange.Name = string(uuid.NewUUID())
 	}
 }
 

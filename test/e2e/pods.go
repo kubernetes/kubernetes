@@ -31,8 +31,8 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -210,7 +210,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	f := framework.NewDefaultFramework("pods")
 
 	It("should get a host IP [Conformance]", func() {
-		name := "pod-hostip-" + string(util.NewUUID())
+		name := "pod-hostip-" + string(uuid.NewUUID())
 		testHostIP(f.Client, f.Namespace.Name, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,
@@ -230,7 +230,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-update-" + string(util.NewUUID())
+		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -267,7 +267,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-update-" + string(util.NewUUID())
+		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -414,7 +414,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-update-" + string(util.NewUUID())
+		name := "pod-update-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -482,7 +482,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-update-activedeadlineseconds-" + string(util.NewUUID())
+		name := "pod-update-activedeadlineseconds-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -542,7 +542,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 	It("should contain environment variables for services [Conformance]", func() {
 		// Make a pod that will be a service.
 		// This pod serves its hostname via HTTP.
-		serverName := "server-envvars-" + string(util.NewUUID())
+		serverName := "server-envvars-" + string(uuid.NewUUID())
 		serverPod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   serverName,
@@ -597,7 +597,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		}
 
 		// Make a client pod that verifies that it has the service environment variables.
-		podName := "client-envvars-" + string(util.NewUUID())
+		podName := "client-envvars-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   podName,
@@ -631,7 +631,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-init-" + string(util.NewUUID())
+		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -697,7 +697,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-init-" + string(util.NewUUID())
+		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -767,7 +767,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-init-" + string(util.NewUUID())
+		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -883,7 +883,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-init-" + string(util.NewUUID())
+		name := "pod-init-" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
@@ -1142,7 +1142,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-exec-websocket-" + string(util.NewUUID())
+		name := "pod-exec-websocket-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,
@@ -1221,7 +1221,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		podClient := f.Client.Pods(f.Namespace.Name)
 
 		By("creating the pod")
-		name := "pod-logs-websocket-" + string(util.NewUUID())
+		name := "pod-logs-websocket-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name: name,

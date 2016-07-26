@@ -25,8 +25,8 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/system"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -47,7 +47,7 @@ var _ = framework.KubeDescribe("NodeProblemDetector", func() {
 	BeforeEach(func() {
 		c = f.Client
 		ns = f.Namespace.Name
-		uid = string(util.NewUUID())
+		uid = string(uuid.NewUUID())
 		name = "node-problem-detector-" + uid
 		configName = "node-problem-detector-config-" + uid
 		// There is no namespace for Node, event recorder will set default namespace for node events.

@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
@@ -91,7 +92,7 @@ func TestRecycler(t *testing.T) {
 
 func TestDeleter(t *testing.T) {
 	// Deleter has a hard-coded regex for "/tmp".
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 	if err != nil {
@@ -148,7 +149,7 @@ func TestDeleterTempDir(t *testing.T) {
 }
 
 func TestProvisioner(t *testing.T) {
-	tempPath := fmt.Sprintf("/tmp/hostpath/%s", util.NewUUID())
+	tempPath := fmt.Sprintf("/tmp/hostpath/%s", uuid.NewUUID())
 	defer os.RemoveAll(tempPath)
 	err := os.MkdirAll(tempPath, 0750)
 

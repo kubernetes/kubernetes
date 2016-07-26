@@ -32,9 +32,9 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -457,7 +457,7 @@ func (config *KubeProxyTestConfig) createService(serviceSpec *api.Service) *api.
 
 func (config *KubeProxyTestConfig) setup() {
 	By("creating a selector")
-	selectorName := "selector-" + string(util.NewUUID())
+	selectorName := "selector-" + string(uuid.NewUUID())
 	serviceSelector := map[string]string{
 		selectorName: "true",
 	}
