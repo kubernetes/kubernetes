@@ -46,6 +46,8 @@ const (
 	defaultLongRunningRequestRE = "(/|^)((watch|proxy)(/|$)|(logs?|portforward|exec|attach)/?$)"
 )
 
+var DefaultServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
+
 // ServerRunOptions contains the options while running a generic api server.
 type ServerRunOptions struct {
 	APIGroupPrefix             string
@@ -133,7 +135,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MinRequestTimeout:       1800,
 		RuntimeConfig:           make(config.ConfigurationMap),
 		SecurePort:              6443,
-		ServiceNodePortRange:    utilnet.PortRange{Base: 30000, Size: 2768},
+		ServiceNodePortRange:    DefaultServiceNodePortRange,
 		StorageVersions:         registered.AllPreferredGroupVersions(),
 	}
 }
