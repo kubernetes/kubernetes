@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"os"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/capabilities"
@@ -117,4 +118,13 @@ func allowHostIPC(pod *api.Pod) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// dirExists returns true if the path exists and represents a directory.
+func dirExists(path string) bool {
+	s, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return s.IsDir()
 }

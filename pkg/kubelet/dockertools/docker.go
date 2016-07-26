@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -142,7 +143,7 @@ func filterHTTPError(err error, image string) error {
 		jerr.Code == http.StatusServiceUnavailable ||
 		jerr.Code == http.StatusGatewayTimeout) {
 		glog.V(2).Infof("Pulling image %q failed: %v", image, err)
-		return kubecontainer.RegistryUnavailable
+		return images.RegistryUnavailable
 	} else {
 		return err
 	}

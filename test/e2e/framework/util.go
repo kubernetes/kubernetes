@@ -3155,14 +3155,17 @@ func waitForReplicaSetPodsGone(c *client.Client, rs *extensions.ReplicaSet) erro
 
 // Waits for the deployment to reach desired state.
 // Returns an error if minAvailable or maxCreated is broken at any times.
-func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, desiredUpdatedReplicas, minAvailable, maxCreated, minReadySeconds int32) error {
-	var oldRSs, allOldRSs, allRSs []*extensions.ReplicaSet
-	var newRS *extensions.ReplicaSet
-	var deployment *extensions.Deployment
-	err := wait.Poll(Poll, 5*time.Minute, func() (bool, error) {
+func WaitForDeploymentStatus(c clientset.Interface, d *extensions.Deployment, expectComplete bool) error {
+	var (
+		oldRSs, allOldRSs, allRSs []*extensions.ReplicaSet
+		newRS                     *extensions.ReplicaSet
+		deployment                *extensions.Deployment
+		reason                    string
+	)
 
+	err := wait.Poll(Poll, 2*time.Minute, func() (bool, error) {
 		var err error
-		deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
+		deployment, err = c.Extensions().Deployments(d.Namespace).Get(d.Name)
 		if err != nil {
 			return false, err
 		}
@@ -3172,47 +3175,57 @@ func WaitForDeploymentStatus(c clientset.Interface, ns, deploymentName string, d
 		}
 		if newRS == nil {
 			// New RC hasn't been created yet.
+			reason = "new replica set hasn't been created yet"
 			return false, nil
 		}
 		allRSs = append(oldRSs, newRS)
 		// The old/new ReplicaSets need to contain the pod-template-hash label
 		for i := range allRSs {
 			if !labelsutil.SelectorHasLabel(allRSs[i].Spec.Selector, extensions.DefaultDeploymentUniqueLabelKey) {
+				reason = "all replica sets need to contain the pod-template-hash label"
 				return false, nil
 			}
 		}
 		totalCreated := deploymentutil.GetReplicaCountForReplicaSets(allRSs)
-		totalAvailable, err := deploymentutil.GetAvailablePodsForDeployment(c, deployment, minReadySeconds)
+		totalAvailable, err := deploymentutil.GetAvailablePodsForDeployment(c, deployment, deployment.Spec.MinReadySeconds)
 		if err != nil {
 			return false, err
 		}
+		maxCreated := deployment.Spec.Replicas + deploymentutil.MaxSurge(*deployment)
 		if totalCreated > maxCreated {
-			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfDeployment(c, deployment, minReadySeconds)
-			return false, fmt.Errorf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
+			reason = fmt.Sprintf("total pods created: %d, more than the max allowed: %d", totalCreated, maxCreated)
+			Logf(reason)
+			return false, nil
 		}
+		minAvailable := deployment.Spec.Replicas - deploymentutil.MaxUnavailable(*deployment)
 		if totalAvailable < minAvailable {
-			logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-			logPodsOfDeployment(c, deployment, minReadySeconds)
-			return false, fmt.Errorf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
+			reason = fmt.Sprintf("total pods available: %d, less than the min required: %d", totalAvailable, minAvailable)
+			Logf(reason)
+			return false, nil
+		}
+
+		if !expectComplete {
+			return true, nil
 		}
 
 		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deployment.Status.Replicas == desiredUpdatedReplicas &&
-			deployment.Status.UpdatedReplicas == desiredUpdatedReplicas &&
+		if deployment.Status.Replicas == deployment.Spec.Replicas &&
+			deployment.Status.UpdatedReplicas == deployment.Spec.Replicas &&
 			deploymentutil.GetReplicaCountForReplicaSets(oldRSs) == 0 &&
-			deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) == desiredUpdatedReplicas {
+			deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) == deployment.Spec.Replicas {
 			return true, nil
 		}
+		reason = fmt.Sprintf("deployment %q is yet to complete: %#v", deployment.Name, deployment.Status)
 		return false, nil
 	})
 
 	if err == wait.ErrWaitTimeout {
 		logReplicaSetsOfDeployment(deployment, allOldRSs, newRS)
-		logPodsOfDeployment(c, deployment, minReadySeconds)
+		logPodsOfDeployment(c, deployment, deployment.Spec.MinReadySeconds)
+		err = fmt.Errorf("%s", reason)
 	}
 	if err != nil {
-		return fmt.Errorf("error waiting for deployment %s status to match expectation: %v", deploymentName, err)
+		return fmt.Errorf("error waiting for deployment %q status to match expectation: %v", d.Name, err)
 	}
 	return nil
 }

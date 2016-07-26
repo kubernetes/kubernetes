@@ -204,7 +204,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	cfg.LoadBalancer.LBVersion = "v2"
+	cfg.LoadBalancer.LBVersion = "v1"
 
 	os, err := newOpenStack(cfg)
 	if err != nil {

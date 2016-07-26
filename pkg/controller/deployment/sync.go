@@ -510,15 +510,26 @@ func (dc *DeploymentController) updateDeploymentStatus(allRSs []*extensions.Repl
 
 // isScalingEvent checks whether the provided deployment has been updated with a scaling event
 // by looking at the desired-replicas annotation in the active replica sets of the deployment.
-func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment) bool {
+func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment) (bool, error) {
 	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(d, false)
 	if err != nil {
-		return false
+		return false, err
 	}
 	// If there is no new replica set matching this deployment and the deployment isn't paused
 	// then there is a new rollout that waits to happen
 	if newRS == nil && !d.Spec.Paused {
-		return false
+		// Update all active replicas sets to the new deployment size. SetReplicasAnnotations makes
+		// sure that we will update only replica sets that don't have the current size of the deployment.
+		maxSurge := deploymentutil.MaxSurge(*d)
+		for _, rs := range controller.FilterActiveReplicaSets(oldRSs) {
+			if updated := deploymentutil.SetReplicasAnnotations(rs, d.Spec.Replicas, d.Spec.Replicas+maxSurge); updated {
+				if _, err := dc.client.Extensions().ReplicaSets(rs.Namespace).Update(rs); err != nil {
+					glog.Infof("Cannot update annotations for replica set %q: %v", rs.Name, err)
+					return false, err
+				}
+			}
+		}
+		return false, nil
 	}
 	allRSs := append(oldRSs, newRS)
 	for _, rs := range controller.FilterActiveReplicaSets(allRSs) {
@@ -527,8 +538,8 @@ func (dc *DeploymentController) isScalingEvent(d *extensions.Deployment) bool {
 			continue
 		}
 		if desired != d.Spec.Replicas {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
