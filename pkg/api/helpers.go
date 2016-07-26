@@ -432,6 +432,14 @@ const (
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
+
+	// AppArmorPodAnnotationKey represents the key of an AppArmor profile applied to all containers of a
+	// pod.
+	AppArmorPodAnnotationKey string = "apparmor.security.alpha.kubernetes.io/pod"
+
+	// AppArmorContainerAnnotationKeyPrefix represents the key of an AppArmor profile applied to one
+	// container of a pod.
+	AppArmorContainerAnnotationKeyPrefix string = "apparmor.security.alpha.kubernetes.io/container/"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
