@@ -157,6 +157,10 @@ func parseThresholdStatement(statement string) (Threshold, error) {
 	if err != nil {
 		return Threshold{}, err
 	}
+	if quantity.Sign() < 0 {
+		return Threshold{}, fmt.Errorf("eviction threshold %v cannot be negative: %s", signal, &quantity)
+	}
+
 	return Threshold{
 		Signal:   signal,
 		Operator: operator,
