@@ -173,7 +173,7 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 				glog.V(4).Infof("Creating CNAME to %q for %q", uplevelCname, dnsName)
 				newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
 				glog.V(4).Infof("Adding recordset %v", newRrset)
-				rrset, err = rrsets.Add(newRrset)
+				err = rrsets.StartChangeset().Add(newRrset).Apply()
 				if err != nil {
 					return err
 				}
@@ -192,7 +192,7 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			}
 			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
 			glog.V(4).Infof("Adding recordset %v", newRrset)
-			rrset, err = rrsets.Add(newRrset)
+			err = rrsets.StartChangeset().Add(newRrset).Apply()
 			if err != nil {
 				return err
 			}
@@ -205,24 +205,26 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			// Need an appropriate CNAME record.  Check that we have it.
 			newRrset := rrsets.New(dnsName, []string{uplevelCname}, minDnsTtl, rrstype.CNAME)
 			glog.V(4).Infof("No healthy endpoints for %s.  Have recordset %v. Need recordset %v", dnsName, rrset, newRrset)
-			if rrset == newRrset {
-				// The existing rrset is equal to the required one - our work is done here
-				glog.V(4).Infof("Existing recordset %v is equal to needed recordset %v, our work is done here.", rrset, newRrset)
+			if dnsprovider.ResourceRecordSetsEquivalent(rrset, newRrset) {
+				// The existing rrset is equivalent to the required one - our work is done here
+				glog.V(4).Infof("Existing recordset %v is equivalent to needed recordset %v, our work is done here.", rrset, newRrset)
 				return nil
 			} else {
 				// Need to replace the existing one with a better one (or just remove it if we have no healthy endpoints).
-				// TODO: Ideally do these inside a transaction, or do an atomic update, but dnsprovider interface doesn't support that yet.
-				glog.V(4).Infof("Existing recordset %v not equal to needed recordset %v removing existing and adding needed.", rrset, newRrset)
-				if err = rrsets.Remove(rrset); err != nil {
-					return err
-				}
-				glog.V(4).Infof("Successfully removed existing recordset %v", rrset)
+				glog.V(4).Infof("Existing recordset %v not equivalent to needed recordset %v removing existing and adding needed.", rrset, newRrset)
+				changeSet := rrsets.StartChangeset()
+				changeSet.Remove(rrset)
 				if uplevelCname != "" {
-					if _, err = rrsets.Add(newRrset); err != nil {
+					changeSet.Add(newRrset)
+					if err := changeSet.Apply(); err != nil {
 						return err
 					}
-					glog.V(4).Infof("Successfully added needed recordset %v", newRrset)
+					glog.V(4).Infof("Successfully replaced needed recordset %v -> %v", rrset, newRrset)
 				} else {
+					if err := changeSet.Apply(); err != nil {
+						return err
+					}
+					glog.V(4).Infof("Successfully removed existing recordset %v", rrset)
 					glog.V(4).Infof("Uplevel CNAME is empty string. Not adding recordset %v", newRrset)
 				}
 			}
@@ -236,22 +238,18 @@ func (s *ServiceController) ensureDnsRrsets(dnsZoneName, dnsName string, endpoin
 			}
 			newRrset := rrsets.New(dnsName, resolvedEndpoints, minDnsTtl, rrstype.A)
 			glog.V(4).Infof("Have recordset %v. Need recordset %v", rrset, newRrset)
-			if rrset == newRrset {
-				glog.V(4).Infof("Existing recordset %v is equal to needed recordset %v, our work is done here.", rrset, newRrset)
+			if dnsprovider.ResourceRecordSetsEquivalent(rrset, newRrset) {
+				glog.V(4).Infof("Existing recordset %v is equivalent to needed recordset %v, our work is done here.", rrset, newRrset)
 				// TODO: We could be more thorough about checking for equivalence to avoid unnecessary updates, but in the
 				//       worst case we'll just replace what's there with an equivalent, if not exactly identical record set.
 				return nil
 			} else {
 				// Need to replace the existing one with a better one
-				// TODO: Ideally do these inside a transaction, or do an atomic update, but dnsprovider interface doesn't support that yet.
-				glog.V(4).Infof("Existing recordset %v is not equal to needed recordset %v, removing existing and adding needed.", rrset, newRrset)
-				if err = rrsets.Remove(rrset); err != nil {
+				glog.V(4).Infof("Existing recordset %v is not equivalent to needed recordset %v, removing existing and adding needed.", rrset, newRrset)
+				if err = rrsets.StartChangeset().Remove(rrset).Add(newRrset).Apply(); err != nil {
 					return err
 				}
-				glog.V(4).Infof("Successfully removed existing recordset %v", rrset)
-				if _, err = rrsets.Add(newRrset); err != nil {
-					return err
-				}
+				glog.V(4).Infof("Successfully replaced recordset %v -> %v", rrset, newRrset)
 			}
 		}
 	}

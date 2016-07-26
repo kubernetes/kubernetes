@@ -23,7 +23,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app"
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
@@ -40,7 +39,6 @@ func init() {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := options.NewCMServer()
 	s.AddFlags(pflag.CommandLine)
 

@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package limitwriter provides a writer that only allows a certain number of bytes to be
 // written.
-package limitwriter
+package limitwriter // import "k8s.io/kubernetes/pkg/util/limitwriter"

@@ -54,4 +54,4 @@ The RESTClient type implements the Kubernetes API conventions (see `docs/devel/a
 for a given API path and is intended for use by consumers implementing their own Kubernetes
 compatible APIs.
 */
-package unversioned
+package unversioned // import "k8s.io/kubernetes/pkg/client/unversioned"

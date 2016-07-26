@@ -606,7 +606,7 @@ func TestList(t *testing.T) {
 	for _, item := range table {
 		result, err := aws.List(item.input)
 		if err != nil {
-			t.Errorf("Expected call with %v to succeed, failed with %s", item.input, err)
+			t.Errorf("Expected call with %v to succeed, failed with %v", item.input, err)
 		}
 		if e, a := item.expect, result; !reflect.DeepEqual(e, a) {
 			t.Errorf("Expected %v, got %v", e, a)

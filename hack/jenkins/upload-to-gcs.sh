@@ -46,13 +46,19 @@ fi
 
 if [[ ${JOB_NAME} =~ -pull- ]]; then
   : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/pr-logs/pull/${ghprbPullId:-unknown}"}
+  : ${JENKINS_GCS_LATEST_PATH:="gs://kubernetes-jenkins/pr-logs/directory"}
+  : ${JENKINS_GCS_LOGS_INDIRECT:="gs://kubernetes-jenkins/pr-logs/directory/${JOB_NAME}"}
 else
   : ${JENKINS_GCS_LOGS_PATH:="gs://kubernetes-jenkins/logs"}
+  : ${JENKINS_GCS_LATEST_PATH:="gs://kubernetes-jenkins/logs"}
+  : ${JENKINS_GCS_LOGS_INDIRECT:=""}
 fi
 
 readonly artifacts_path="${WORKSPACE}/_artifacts"
 readonly gcs_job_path="${JENKINS_GCS_LOGS_PATH}/${JOB_NAME}"
 readonly gcs_build_path="${gcs_job_path}/${BUILD_NUMBER}"
+readonly gcs_latest_path="${JENKINS_GCS_LATEST_PATH}/${JOB_NAME}"
+readonly gcs_indirect_path="${JENKINS_GCS_LOGS_INDIRECT}"
 readonly gcs_acl="public-read"
 readonly results_url=${gcs_build_path//"gs:/"/"https://console.cloud.google.com/storage/browser"}
 readonly timestamp=$(date +%s)
@@ -115,11 +121,25 @@ function upload_artifacts_and_build_result() {
       echo "Uploading build log"
       gsutil -q cp -Z -a "${gcs_acl}" "${WORKSPACE}/build-log.txt" "${gcs_build_path}"
     fi
+
+    # For pull jobs, keep a canonical ordering for tools that want to examine
+    # the output.
+    if [[ "${gcs_indirect_path}" != "" ]]; then
+      echo "Writing ${gcs_build_path} to ${gcs_indirect_path}/${BUILD_NUMBER}.txt"
+      echo "${gcs_build_path}" | \
+        gsutil -q -h "Content-Type:text/plain" \
+          cp -a "${gcs_acl}" - "${gcs_indirect_path}/${BUILD_NUMBER}.txt" || continue
+      echo "Marking build ${BUILD_NUMBER} as the latest completed build for this PR"
+      echo "${BUILD_NUMBER}" | \
+        gsutil -q -h "Content-Type:text/plain" -h "Cache-Control:private, max-age=0, no-transform" \
+          cp -a "${gcs_acl}" - "${gcs_job_path}/latest-build.txt" || continue
+    fi
+
     # Mark this build as the latest completed.
     echo "Marking build ${BUILD_NUMBER} as the latest completed build"
     echo "${BUILD_NUMBER}" | \
       gsutil -q -h "Content-Type:text/plain" -h "Cache-Control:private, max-age=0, no-transform" \
-        cp -a "${gcs_acl}" - "${gcs_job_path}/latest-build.txt" || continue
+        cp -a "${gcs_acl}" - "${gcs_latest_path}/latest-build.txt" || continue
     break  # all uploads succeeded if we hit this point
   done
 

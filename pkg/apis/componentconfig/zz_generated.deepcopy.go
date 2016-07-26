@@ -97,6 +97,8 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.NodeStartupGracePeriod = in.NodeStartupGracePeriod
 		out.NodeMonitorPeriod = in.NodeMonitorPeriod
 		out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
+		out.ClusterSigningCertFile = in.ClusterSigningCertFile
+		out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
 		out.EnableProfiling = in.EnableProfiling
 		out.ClusterName = in.ClusterName
 		out.ClusterCIDR = in.ClusterCIDR
@@ -298,6 +300,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
 		out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 		out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
+		out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
 		out.PodsPerCore = in.PodsPerCore
 		out.EnableControllerAttachDetach = in.EnableControllerAttachDetach
 		if in.SystemReserved != nil {

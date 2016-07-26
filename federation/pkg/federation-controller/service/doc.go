@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package service contains code for syncing Kubernetes services,
 // and cloud DNS servers with the federated service registry.
-package service
+package service // import "k8s.io/kubernetes/federation/pkg/federation-controller/service"

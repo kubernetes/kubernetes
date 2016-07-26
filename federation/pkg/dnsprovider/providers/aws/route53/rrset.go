@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 )
 
-// Compile time check for interface adeherence
+// Compile time check for interface adherence
 var _ dnsprovider.ResourceRecordSet = ResourceRecordSet{}
 
 type ResourceRecordSet struct {

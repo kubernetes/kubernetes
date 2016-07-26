@@ -17,15 +17,14 @@ limitations under the License.
 package main
 
 import (
-	"github.com/docker/docker/pkg/term"
+	"os"
+
 	"k8s.io/kubernetes/pkg/kubectl/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
 func NewKubectlServer() *Server {
-	// need to use term.StdStreams to get the right IO refs on Windows
-	stdin, stdout, stderr := term.StdStreams()
-	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), stdin, stdout, stderr)
+	cmd := cmd.NewKubectlCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr)
 	localFlags := cmd.LocalFlags()
 	localFlags.SetInterspersed(false)
 

@@ -22,10 +22,11 @@ import (
 	"os"
 
 	"fmt"
-	"github.com/spf13/pflag"
-	"k8s.io/kubernetes/pkg/util/validation"
 	_ "net/http/pprof"
 	"strings"
+
+	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 type KubeDNSConfig struct {

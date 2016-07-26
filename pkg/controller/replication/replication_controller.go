@@ -615,12 +615,6 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	trace.Step("ReplicationController restored")
 	rcNeedsSync := rm.expectations.SatisfiedExpectations(rcKey)
 	trace.Step("Expectations restored")
-	if err != nil {
-		glog.Errorf("Error getting pods for rc %q: %v", key, err)
-		rm.queue.Add(key)
-		return err
-	}
-	trace.Step("Pods listed")
 
 	// TODO: Do the List and Filter in a single pass, or use an index.
 	var filteredPods []*api.Pod
@@ -653,7 +647,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		for _, pod := range controlledDoesNotMatch {
 			err := cm.ReleasePod(pod)
 			if err != nil {
-				errlist = append(errlist, cm.ReleasePod(pod))
+				errlist = append(errlist, err)
 			}
 		}
 		if len(errlist) != 0 {

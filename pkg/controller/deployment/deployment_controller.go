@@ -499,7 +499,11 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		}
 	}
 
-	if dc.isScalingEvent(d) {
+	scalingEvent, err := dc.isScalingEvent(d)
+	if err != nil {
+		return err
+	}
+	if scalingEvent {
 		return dc.sync(d)
 	}
 

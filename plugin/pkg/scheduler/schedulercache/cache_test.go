@@ -457,6 +457,36 @@ func TestRemovePod(t *testing.T) {
 	}
 }
 
+func TestForgetPod(t *testing.T) {
+	nodeName := "node"
+	basePod := makeBasePod(nodeName, "test", "100m", "500", []api.ContainerPort{{HostPort: 80}})
+	tests := []struct {
+		pods []*api.Pod
+	}{{
+		pods: []*api.Pod{basePod},
+	}}
+	now := time.Now()
+	ttl := 10 * time.Second
+
+	for i, tt := range tests {
+		cache := newSchedulerCache(ttl, time.Second, nil)
+		for _, pod := range tt.pods {
+			if err := cache.assumePod(pod, now); err != nil {
+				t.Fatalf("assumePod failed: %v", err)
+			}
+		}
+		for _, pod := range tt.pods {
+			if err := cache.ForgetPod(pod); err != nil {
+				t.Fatalf("ForgetPod failed: %v", err)
+			}
+		}
+		cache.cleanupAssumedPods(now.Add(2 * ttl))
+		if n := cache.nodes[nodeName]; n != nil {
+			t.Errorf("#%d: expecting pod deleted and nil node info, get=%s", i, n)
+		}
+	}
+}
+
 func BenchmarkList1kNodes30kPods(b *testing.B) {
 	cache := setupCacheOf1kNodes30kPods(b)
 	b.ResetTimer()

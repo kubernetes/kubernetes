@@ -54,10 +54,8 @@ func (m *cgroupManagerImpl) Exists(name string) bool {
 	}
 
 	// If even one cgroup doesn't exist we go on to create it
-	// @TODO(dubstack) We skip check for systemd until we update
-	// libcontainer in vendor
-	for key, path := range cgroupPaths {
-		if key != "systemd" && !libcontainercgroups.PathExists(path) {
+	for _, path := range cgroupPaths {
+		if !libcontainercgroups.PathExists(path) {
 			return false
 		}
 	}

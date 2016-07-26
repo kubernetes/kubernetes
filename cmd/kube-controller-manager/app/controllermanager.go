@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
+	certcontroller "k8s.io/kubernetes/pkg/controller/certificates"
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	"k8s.io/kubernetes/pkg/controller/deployment"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -143,6 +144,7 @@ func Run(s *options.CMServer) error {
 			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 		}
+		configz.InstallHandler(mux)
 		mux.Handle("/metrics", prometheus.Handler())
 
 		server := &http.Server{
@@ -264,10 +266,8 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			routeController.Run(s.NodeSyncPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
-	} else if s.ConfigureCloudRoutes && !s.AllocateNodeCIDRs {
-		glog.Warningf("allocate-node-cidrs set to %v, will not configure cloud provider routes.", s.AllocateNodeCIDRs)
-	} else if s.AllocateNodeCIDRs && !s.ConfigureCloudRoutes {
-		glog.Infof("configure-cloud-routes is set to %v, will not configure cloud provider routes.", s.ConfigureCloudRoutes)
+	} else {
+		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.AllocateNodeCIDRs, s.ConfigureCloudRoutes)
 	}
 
 	resourceQuotaControllerClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "resourcequota-controller"))
@@ -365,7 +365,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 		if containsResource(resources, "replicasets") {
 			glog.Infof("Starting ReplicaSet controller")
-			go replicaset.NewReplicaSetController(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replicaset-controller")), ResyncPeriod(s), replicaset.BurstReplicas, int(s.LookupCacheSizeForRS)).
+			go replicaset.NewReplicaSetController(podInformer, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "replicaset-controller")), ResyncPeriod(s), replicaset.BurstReplicas, int(s.LookupCacheSizeForRS), s.EnableGarbageCollector).
 				Run(int(s.ConcurrentRSSyncs), wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
@@ -391,7 +391,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 	provisioner, err := NewVolumeProvisioner(cloud, s.VolumeConfiguration)
 	if err != nil {
-		glog.Fatal("A Provisioner could not be created, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.")
+		glog.Fatalf("A Provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
 
 	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
@@ -418,9 +418,31 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
 	if attachDetachControllerErr != nil {
 		glog.Fatalf("Failed to start attach/detach controller: %v", attachDetachControllerErr)
-	} else {
-		go attachDetachController.Run(wait.NeverStop)
-		time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+	}
+	go attachDetachController.Run(wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	groupVersion = "certificates/v1alpha1"
+	resources, found = resourceMap[groupVersion]
+	glog.Infof("Attempting to start certificates, full resource map %+v", resourceMap)
+	if containsVersion(versions, groupVersion) && found {
+		glog.Infof("Starting %s apis", groupVersion)
+		if containsResource(resources, "certificatesigningrequests") {
+			glog.Infof("Starting certificate request controller")
+			resyncPeriod := ResyncPeriod(s)()
+			certController, err := certcontroller.NewCertificateController(
+				clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "certificate-controller")),
+				resyncPeriod,
+				s.ClusterSigningCertFile,
+				s.ClusterSigningKeyFile,
+			)
+			if err != nil {
+				glog.Errorf("Failed to start certificate controller: %v", err)
+			} else {
+				go certController.Run(1, wait.NeverStop)
+			}
+			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+		}
 	}
 
 	var rootCA []byte
@@ -468,9 +490,8 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		clientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc)
 		garbageCollector, err := garbagecollector.NewGarbageCollector(clientPool, groupVersionResources)
 		if err != nil {
-			glog.Errorf("Failed to start the generic garbage collector")
+			glog.Errorf("Failed to start the generic garbage collector: %v", err)
 		} else {
-			// TODO: make this a flag of kube-controller-manager
 			workers := int(s.ConcurrentGCSyncs)
 			go garbageCollector.Run(workers, wait.NeverStop)
 		}

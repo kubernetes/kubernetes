@@ -277,7 +277,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	// TODO: handle failed mounts here.
 	notmnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.V(4).Infof("IsLikelyNotMountPoint failed: %v", err)
+		glog.Errorf("Cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notmnt {
@@ -299,6 +299,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	// Perform a bind mount to the full path to allow duplicate mounts of the same PD.
+	glog.V(4).Infof("Attempting to mount cinder volume %s to %s with options %v", b.pdName, dir, options)
 	err = b.mounter.Mount(globalPDPath, dir, "", options)
 	if err != nil {
 		glog.V(4).Infof("Mount failed: %v", err)
@@ -326,6 +327,7 @@ func (b *cinderVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		os.Remove(dir)
 		// TODO: we should really eject the attach/detach out into its own control loop.
 		detachDiskLogError(b.cinderVolume)
+		glog.Errorf("Failed to mount %s: %v", dir, err)
 		return err
 	}
 

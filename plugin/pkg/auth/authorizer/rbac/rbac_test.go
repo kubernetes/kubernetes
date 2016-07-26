@@ -192,13 +192,13 @@ func TestAuthorizer(t *testing.T) {
 		ruleResolver := validation.NewTestRuleResolver(tt.roles, tt.roleBindings, tt.clusterRoles, tt.clusterRoleBindings)
 		a := RBACAuthorizer{tt.superUser, ruleResolver}
 		for _, attr := range tt.shouldPass {
-			if err := a.Authorize(attr); err != nil {
-				t.Errorf("case %d: incorrectly restricted %s: %T %v", i, attr, err, err)
+			if authorized, _, _ := a.Authorize(attr); !authorized {
+				t.Errorf("case %d: incorrectly restricted %s", i, attr)
 			}
 		}
 
 		for _, attr := range tt.shouldFail {
-			if err := a.Authorize(attr); err == nil {
+			if authorized, _, _ := a.Authorize(attr); authorized {
 				t.Errorf("case %d: incorrectly passed %s", i, attr)
 			}
 		}

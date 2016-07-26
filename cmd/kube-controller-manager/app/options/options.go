@@ -93,8 +93,11 @@ func NewCMServer() *CMServer {
 			ControllerStartInterval: unversioned.Duration{Duration: 0 * time.Second},
 			EnableGarbageCollector:  false,
 			ConcurrentGCSyncs:       5,
+			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
+			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
 		},
 	}
+	s.LeaderElection.LeaderElect = true
 	return &s
 }
 
@@ -150,6 +153,8 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&s.NodeMonitorPeriod.Duration, "node-monitor-period", s.NodeMonitorPeriod.Duration,
 		"The period for syncing NodeStatus in NodeController.")
 	fs.StringVar(&s.ServiceAccountKeyFile, "service-account-private-key-file", s.ServiceAccountKeyFile, "Filename containing a PEM-encoded private RSA key used to sign service account tokens.")
+	fs.StringVar(&s.ClusterSigningCertFile, "cluster-signing-cert-file", s.ClusterSigningCertFile, "Filename containing a PEM-encoded X509 CA certificate used to issue cluster-scoped certificates")
+	fs.StringVar(&s.ClusterSigningKeyFile, "cluster-signing-key-file", s.ClusterSigningKeyFile, "Filename containing a PEM-encoded RSA or ECDSA private key used to sign cluster-scoped certificates")
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.ClusterName, "cluster-name", s.ClusterName, "The instance prefix for the cluster")
 	fs.StringVar(&s.ClusterCIDR, "cluster-cidr", s.ClusterCIDR, "CIDR Range for Pods in cluster.")

@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // +groupName=testgroup.k8s.io
-package testgroup
+package testgroup // import "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io"

@@ -246,7 +246,7 @@ func TestPersistentVolumeBindRace(t *testing.T) {
 		newPvc.ObjectMeta = api.ObjectMeta{Name: fmt.Sprintf("fake-pvc-race-%d", counter)}
 		claim, err := testClient.PersistentVolumeClaims(ns.Name).Create(newPvc)
 		if err != nil {
-			t.Fatal("Error creating newPvc: %v", err)
+			t.Fatalf("Error creating newPvc: %v", err)
 		}
 		claims = append(claims, claim)
 	}

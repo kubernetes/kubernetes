@@ -71,12 +71,17 @@ func (pr *PortRange) Set(value string) error {
 		high, err = strconv.Atoi(value[hyphenIndex+1:])
 	}
 	if err != nil {
-		return fmt.Errorf("unable to parse port range: %s", value)
+		return fmt.Errorf("unable to parse port range: %s: %v", value, err)
+	}
+
+	if low > 65535 || high > 65535 {
+		return fmt.Errorf("the port range cannot be greater than 65535: %s", value)
 	}
 
 	if high < low {
 		return fmt.Errorf("end port cannot be less than start port: %s", value)
 	}
+
 	pr.Base = low
 	pr.Size = 1 + high - low
 	return nil

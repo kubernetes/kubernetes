@@ -279,6 +279,7 @@ func (gc *GarbageCollector) removeOrphanFinalizer(owner *node) error {
 		for _, f := range finalizers {
 			if f == api.FinalizerOrphan {
 				found = true
+				break
 			} else {
 				newFinalizers = append(newFinalizers, f)
 			}

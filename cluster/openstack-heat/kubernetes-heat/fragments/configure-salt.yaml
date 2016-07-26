@@ -24,6 +24,7 @@ write_files:
         docker_opts: ""
         master_extra_sans: "DNS:kubernetes,DNS:kubernetes.default,DNS:kubernetes.default.svc,DNS:kubernetes.default.svc.cluster.local,DNS:kubernetes-master"
         keep_host_etcd: true
+        kube_user: $KUBE_USER
   - path: /srv/kubernetes/openstack.conf
     content: |
       [Global]

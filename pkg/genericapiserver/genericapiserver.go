@@ -864,30 +864,30 @@ func (s *GenericAPIServer) getAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	for k, v := range apiGroupInfo.VersionedResourcesStorageMap[groupVersion.Version] {
 		storage[strings.ToLower(k)] = v
 	}
-	version, err := s.newAPIGroupVersion(apiGroupInfo.GroupMeta, groupVersion)
+	version, err := s.newAPIGroupVersion(apiGroupInfo, groupVersion)
 	version.Root = apiPrefix
 	version.Storage = storage
-	version.ParameterCodec = apiGroupInfo.ParameterCodec
-	version.Serializer = apiGroupInfo.NegotiatedSerializer
-	version.Creater = apiGroupInfo.Scheme
-	version.Convertor = apiGroupInfo.Scheme
-	version.Copier = apiGroupInfo.Scheme
-	version.Typer = apiGroupInfo.Scheme
-	version.SubresourceGroupVersionKind = apiGroupInfo.SubresourceGroupVersionKind
 	return version, err
 }
 
-func (s *GenericAPIServer) newAPIGroupVersion(groupMeta apimachinery.GroupMeta, groupVersion unversioned.GroupVersion) (*apiserver.APIGroupVersion, error) {
+func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupVersion unversioned.GroupVersion) (*apiserver.APIGroupVersion, error) {
 	return &apiserver.APIGroupVersion{
 		RequestInfoResolver: s.NewRequestInfoResolver(),
 
 		GroupVersion: groupVersion,
-		Linker:       groupMeta.SelfLinker,
-		Mapper:       groupMeta.RESTMapper,
 
-		Admit:   s.AdmissionControl,
-		Context: s.RequestContextMapper,
+		ParameterCodec: apiGroupInfo.ParameterCodec,
+		Serializer:     apiGroupInfo.NegotiatedSerializer,
+		Creater:        apiGroupInfo.Scheme,
+		Convertor:      apiGroupInfo.Scheme,
+		Copier:         apiGroupInfo.Scheme,
+		Typer:          apiGroupInfo.Scheme,
+		SubresourceGroupVersionKind: apiGroupInfo.SubresourceGroupVersionKind,
+		Linker: apiGroupInfo.GroupMeta.SelfLinker,
+		Mapper: apiGroupInfo.GroupMeta.RESTMapper,
 
+		Admit:             s.AdmissionControl,
+		Context:           s.RequestContextMapper,
 		MinRequestTimeout: s.MinRequestTimeout,
 	}, nil
 }

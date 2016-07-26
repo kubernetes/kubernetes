@@ -35,7 +35,7 @@ import (
 )
 
 var _ = framework.KubeDescribe("MirrorPod", func() {
-	f := NewDefaultFramework("mirror-pod")
+	f := framework.NewDefaultFramework("mirror-pod")
 	Context("when create a mirror pod ", func() {
 		var staticPodName, mirrorPodName string
 		BeforeEach(func() {

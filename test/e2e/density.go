@@ -151,6 +151,7 @@ func logPodStartupStatus(c *client.Client, expectedPods int, ns string, observed
 	podStore := framework.NewPodStore(c, ns, label, fields.Everything())
 	defer podStore.Stop()
 	ticker := time.NewTicker(period)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:

@@ -265,7 +265,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	notmnt, err := f.blockDeviceMounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("Cannot validate mountpoint: %s", dir)
+		glog.Errorf("Cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notmnt {
@@ -290,18 +290,20 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		f.options[optionKeySecret+"/"+name] = secret
 	}
 
+	glog.V(4).Infof("attempting to attach volume: %s with options %v", f.volName, f.options)
 	device, err := f.manager.attach(f)
 	if err != nil {
 		if !isCmdNotSupportedErr(err) {
-			glog.Errorf("Failed to attach volume: %s", f.volName)
+			glog.Errorf("failed to attach volume: %s", f.volName)
 			return err
 		}
 		// Attach not supported or required. Continue to mount.
 	}
 
+	glog.V(4).Infof("attempting to mount volume: %s", f.volName)
 	if err := f.manager.mount(f, device, dir); err != nil {
 		if !isCmdNotSupportedErr(err) {
-			glog.Errorf("Failed to mount volume: %s", f.volName)
+			glog.Errorf("failed to mount volume: %s", f.volName)
 			return err
 		}
 		options := make([]string, 0)
@@ -318,13 +320,15 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 		os.MkdirAll(dir, 0750)
 		// Mount not supported by driver. Use core mounting logic.
+		glog.V(4).Infof("attempting to mount the volume: %s to device: %s", f.volName, device)
 		err = f.blockDeviceMounter.Mount(string(device), dir, f.fsType, options)
 		if err != nil {
-			glog.Errorf("Failed to mount the volume: %s, device: %s, error: %s", f.volName, device, err.Error())
+			glog.Errorf("failed to mount the volume: %s to device: %s, error: %v", f.volName, device, err)
 			return err
 		}
 	}
 
+	glog.V(4).Infof("Successfully mounted volume: %s on device: %s", f.volName, device)
 	return nil
 }
 
@@ -370,7 +374,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 		}
 		// Unmount not supported by the driver. Use core unmount logic.
 		if err := f.mounter.Unmount(dir); err != nil {
-			glog.Errorf("Failed to unmount volume: %s, error: %s", dir, err.Error())
+			glog.Errorf("Failed to unmount volume: %s, error: %v", dir, err)
 			return err
 		}
 	}
@@ -378,7 +382,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	if refCount == 1 {
 		if err := f.manager.detach(f, device); err != nil {
 			if !isCmdNotSupportedErr(err) {
-				glog.Errorf("Failed to teardown volume: %s, error: %s", dir, err.Error())
+				glog.Errorf("Failed to teardown volume: %s, error: %v", dir, err)
 				return err
 			}
 			// Teardown not supported by driver. Unmount is good enough.

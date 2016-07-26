@@ -184,10 +184,12 @@ func buildPod(namespace, podName string, podLabels map[string]string, phase api.
 }
 
 func (tc *testCase) verifyResults(t *testing.T, val *float64, timestamp time.Time, err error) {
-	assert.Equal(t, tc.desiredError, err)
 	if tc.desiredError != nil {
+		assert.Error(t, err)
+		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError))
 		return
 	}
+	assert.NoError(t, err)
 	assert.NotNil(t, val)
 	assert.True(t, tc.desiredValue-0.001 < *val)
 	assert.True(t, tc.desiredValue+0.001 > *val)
@@ -426,7 +428,7 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc := testCase{
 		replicas:           3,
 		targetResource:     "cpu-usage",
-		desiredError:       fmt.Errorf("metrics obtained for 2/3 of pods"),
+		desiredError:       fmt.Errorf("metrics obtained for 2/3 of pods (sample missing pod: test-namespace/test-pod-2)"),
 		reportedPodMetrics: [][]int64{{100}, {300, 400}},
 		useMetricsApi:      true,
 	}

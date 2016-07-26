@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -37,7 +37,7 @@ const (
 )
 
 var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
-	f := NewDefaultFramework("runtime-conformance")
+	f := framework.NewDefaultFramework("runtime-conformance")
 
 	Describe("container runtime conformance blackbox test", func() {
 		Context("when starting a container that exits", func() {
@@ -91,7 +91,7 @@ while true; do sleep 1; done
 					testContainer.Name = testCase.Name
 					testContainer.Command = []string{"sh", "-c", tmpCmd}
 					terminateContainer := ConformanceContainer{
-						Framework:     f,
+						PodClient:     f.PodClient(),
 						Container:     testContainer,
 						RestartPolicy: testCase.RestartPolicy,
 						Volumes:       testVolumes,
@@ -134,7 +134,7 @@ while true; do sleep 1; done
 				terminationMessagePath := "/dev/termination-log"
 				priv := true
 				c := ConformanceContainer{
-					Framework: f,
+					PodClient: f.PodClient(),
 					Container: api.Container{
 						Image:   ImageRegistry[busyBoxImage],
 						Name:    name,
@@ -235,7 +235,7 @@ while true; do sleep 1; done
 					name := "image-pull-test"
 					command := []string{"/bin/sh", "-c", "while true; do sleep 1; done"}
 					container := ConformanceContainer{
-						Framework: f,
+						PodClient: f.PodClient(),
 						Container: api.Container{
 							Name:    name,
 							Image:   testCase.image,
@@ -272,8 +272,8 @@ while true; do sleep 1; done
 						}
 						if testCase.waiting && status.State.Waiting != nil {
 							reason := status.State.Waiting.Reason
-							return reason == kubecontainer.ErrImagePull.Error() ||
-								reason == kubecontainer.ErrImagePullBackOff.Error(), nil
+							return reason == images.ErrImagePull.Error() ||
+								reason == images.ErrImagePullBackOff.Error(), nil
 
 						}
 						return false, nil

@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -229,7 +229,7 @@ other providers you’ll need to delete all this stuff by yourself.
 Kubemark master uses exactly the same binaries as ordinary Kubernetes does. This
 means that it will never be out of date. On the other hand HollowNodes use
 existing fake for Kubelet (called SimpleKubelet), which mocks its runtime
-manager with `pkg/kubelet/fake-docker-manager.go`, where most logic sits.
+manager with `pkg/kubelet/dockertools/fake_manager.go`, where most logic sits.
 Because there’s no easy way of mocking other managers (e.g. VolumeManager), they
 are not supported in Kubemark (e.g. we can’t schedule Pods with volumes in them
 yet).

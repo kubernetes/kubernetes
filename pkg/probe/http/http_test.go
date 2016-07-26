@@ -32,15 +32,6 @@ import (
 
 const FailureCode int = -1
 
-func containsAny(s string, substrs []string) bool {
-	for _, substr := range substrs {
-		if strings.Contains(s, substr) {
-			return true
-		}
-	}
-	return false
-}
-
 func TestHTTPProbeChecker(t *testing.T) {
 	handleReq := func(s int, body string) func(w http.ResponseWriter, r *http.Request) {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -54,20 +45,17 @@ func TestHTTPProbeChecker(t *testing.T) {
 		handler    func(w http.ResponseWriter, r *http.Request)
 		reqHeaders http.Header
 		health     probe.Result
-		// go1.5: error message changed for timeout, need to support
-		// both old and new
-		accBodies []string
+		accBody    string
 	}{
 		// The probe will be filled in below.  This is primarily testing that an HTTP GET happens.
 		{
-			handleReq(http.StatusOK, "ok body"),
-			nil,
-			probe.Success,
-			[]string{"ok body"},
+			handler: handleReq(http.StatusOK, "ok body"),
+			health:  probe.Success,
+			accBody: "ok body",
 		},
 		{
 			// Echo handler that returns the contents of request headers in the body
-			func(w http.ResponseWriter, r *http.Request) {
+			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(200)
 				output := ""
 				for k, arr := range r.Header {
@@ -77,50 +65,40 @@ func TestHTTPProbeChecker(t *testing.T) {
 				}
 				w.Write([]byte(output))
 			},
-			http.Header{
+			reqHeaders: http.Header{
 				"X-Muffins-Or-Cupcakes": {"muffins"},
 			},
-			probe.Success,
-			[]string{
-				"X-Muffins-Or-Cupcakes: muffins",
-			},
+			health:  probe.Success,
+			accBody: "X-Muffins-Or-Cupcakes: muffins",
 		},
 		{
 			// Echo handler that returns the contents of Host in the body
-			func(w http.ResponseWriter, r *http.Request) {
+			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(200)
 				w.Write([]byte(r.Host))
 			},
-			http.Header{
+			reqHeaders: http.Header{
 				"Host": {"muffins.cupcakes.org"},
 			},
-			probe.Success,
-			[]string{
-				"muffins.cupcakes.org",
-			},
+			health:  probe.Success,
+			accBody: "muffins.cupcakes.org",
 		},
 		{
-			handleReq(FailureCode, "fail body"),
-			nil,
-			probe.Failure,
-			[]string{
-				fmt.Sprintf("HTTP probe failed with statuscode: %d", FailureCode),
-				fmt.Sprintf("malformed HTTP status code \"%d\"", FailureCode),
-			},
+			handler: handleReq(FailureCode, "fail body"),
+			health:  probe.Failure,
 		},
 		{
-			func(w http.ResponseWriter, r *http.Request) {
+			handler: handleReq(http.StatusInternalServerError, "fail body"),
+			health:  probe.Failure,
+		},
+		{
+			handler: func(w http.ResponseWriter, r *http.Request) {
 				time.Sleep(3 * time.Second)
 			},
-			nil,
-			probe.Failure,
-			[]string{
-				"use of closed network connection",
-				"request canceled (Client.Timeout exceeded while awaiting headers)",
-			},
+			health: probe.Failure,
 		},
 	}
-	for _, test := range testCases {
+	for i, test := range testCases {
 		func() {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				test.handler(w, r)
@@ -128,28 +106,30 @@ func TestHTTPProbeChecker(t *testing.T) {
 			defer server.Close()
 			u, err := url.Parse(server.URL)
 			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				t.Errorf("case %d: unexpected error: %v", i, err)
 			}
 			_, port, err := net.SplitHostPort(u.Host)
 			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				t.Errorf("case %d: unexpected error: %v", i, err)
 			}
 			_, err = strconv.Atoi(port)
 			if err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				t.Errorf("case %d: unexpected error: %v", i, err)
 			}
 			health, output, err := prober.Probe(u, test.reqHeaders, 1*time.Second)
 			if test.health == probe.Unknown && err == nil {
-				t.Errorf("Expected error")
+				t.Errorf("case %d: expected error", i)
 			}
 			if test.health != probe.Unknown && err != nil {
-				t.Errorf("Unexpected error: %v", err)
+				t.Errorf("case %d: unexpected error: %v", i, err)
 			}
 			if health != test.health {
-				t.Errorf("Expected %v, got %v", test.health, health)
+				t.Errorf("case %d: expected %v, got %v", i, test.health, health)
 			}
-			if !containsAny(output, test.accBodies) {
-				t.Errorf("Expected one of %#v, got %v", test.accBodies, output)
+			if health != probe.Failure && test.health != probe.Failure {
+				if !strings.Contains(output, test.accBody) {
+					t.Errorf("Expected response body to contain %v, got %v", test.accBody, output)
+				}
 			}
 		}()
 	}

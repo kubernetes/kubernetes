@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -142,7 +143,7 @@ func filterHTTPError(err error, image string) error {
 		jerr.Code == http.StatusServiceUnavailable ||
 		jerr.Code == http.StatusGatewayTimeout) {
 		glog.V(2).Infof("Pulling image %q failed: %v", image, err)
-		return kubecontainer.RegistryUnavailable
+		return images.RegistryUnavailable
 	} else {
 		return err
 	}
@@ -374,7 +375,6 @@ func milliCPUToShares(milliCPU int64) int64 {
 
 // GetKubeletDockerContainers lists all container or just the running ones.
 // Returns a list of docker containers that we manage
-// TODO: Move this function with dockerCache to DockerManager.
 func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*dockertypes.Container, error) {
 	result := []*dockertypes.Container{}
 	containers, err := client.ListContainers(dockertypes.ContainerListOptions{All: allContainers})
@@ -388,9 +388,7 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*
 		}
 		// Skip containers that we didn't create to allow users to manually
 		// spin up their own containers if they want.
-		// TODO(dchen1107): Remove the old separator "--" by end of Oct
-		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"_") &&
-			!strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"--") {
+		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"_") {
 			glog.V(3).Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
 			continue
 		}

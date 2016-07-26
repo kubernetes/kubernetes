@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package dbus provides an injectable interface and implementations for D-Bus communication
-package dbus
+package dbus // import "k8s.io/kubernetes/pkg/util/dbus"

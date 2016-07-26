@@ -127,10 +127,14 @@ else
     sudo -v || exit 1
   fi
 
+  # If the flag --disable-kubenet is not set, set true by default.
+  if ! [[ $test_args =~ "--disable-kubenet" ]]; then
+    test_args="$test_args --disable-kubenet=true"
+  fi
   # Test using the host the script was run on
   # Provided for backwards compatibility
   "${ginkgo}" --focus=$focus --skip=$skip "${KUBE_ROOT}/test/e2e_node/" --report-dir=${report} \
-    -- --alsologtostderr --v 2 --node-name $(hostname) --disable-kubenet=true --build-services=true \
-    --start-services=true --stop-services=true "$test_args"
+    -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true \
+    --start-services=true --stop-services=true $test_args
   exit $?
 fi

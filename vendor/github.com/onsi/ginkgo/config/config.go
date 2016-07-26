@@ -31,6 +31,7 @@ type GinkgoConfigType struct {
 	SkipMeasurements   bool
 	FailOnPending      bool
 	FailFast           bool
+	FlakeAttempts      int
 	EmitSpecProgress   bool
 	DryRun             bool
 
@@ -74,6 +75,8 @@ func Flags(flagSet *flag.FlagSet, prefix string, includeParallelFlags bool) {
 	flagSet.StringVar(&(GinkgoConfig.SkipString), prefix+"skip", "", "If set, ginkgo will only run specs that do not match this regular expression.")
 
 	flagSet.BoolVar(&(GinkgoConfig.RegexScansFilePath), prefix+"regexScansFilePath", false, "If set, ginkgo regex matching also will look at the file path (code location).")
+
+	flagSet.IntVar(&(GinkgoConfig.FlakeAttempts), prefix+"flakeAttempts", 1, "Make up to this many attempts to run each spec. Please note that if any of the attempts succeed, the suite will not be failed. But any failures will still be recorded.")
 
 	flagSet.BoolVar(&(GinkgoConfig.EmitSpecProgress), prefix+"progress", false, "If set, ginkgo will emit progress information as each spec runs to the GinkgoWriter.")
 
@@ -126,6 +129,10 @@ func BuildFlagArgs(prefix string, ginkgo GinkgoConfigType, reporter DefaultRepor
 
 	if ginkgo.SkipString != "" {
 		result = append(result, fmt.Sprintf("--%sskip=%s", prefix, ginkgo.SkipString))
+	}
+
+	if ginkgo.FlakeAttempts > 1 {
+		result = append(result, fmt.Sprintf("--%sflakeAttempts=%d", prefix, ginkgo.FlakeAttempts))
 	}
 
 	if ginkgo.EmitSpecProgress {

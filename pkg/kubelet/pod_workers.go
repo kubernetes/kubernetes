@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
@@ -181,7 +182,7 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 		}
 		if err != nil {
 			glog.Errorf("Error syncing pod %s, skipping: %v", update.Pod.UID, err)
-			p.recorder.Eventf(update.Pod, api.EventTypeWarning, kubecontainer.FailedSync, "Error syncing pod, skipping: %v", err)
+			p.recorder.Eventf(update.Pod, api.EventTypeWarning, events.FailedSync, "Error syncing pod, skipping: %v", err)
 		}
 		p.wrapUp(update.Pod.UID, err)
 	}

@@ -166,7 +166,7 @@ download-or-bust() {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 80 --retry 6 --retry-delay 10 "${url}"; then
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -422,6 +422,7 @@ function create-salt-pillar() {
   mkdir -p /srv/salt-overlay/pillar
   cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
 instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
+node_tags: '$(echo "$NODE_TAGS" | sed -e "s/'/''/g")'
 node_instance_prefix: '$(echo "$NODE_INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
@@ -814,8 +815,13 @@ EOF
   fi
 
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
+    if [[ -n "${NODE_TAGS:-}" ]]; then
+      local -r node_tags="${NODE_TAGS}"
+    else
+      local -r node_tags="${NODE_INSTANCE_PREFIX}"
+    fi
     cat <<EOF >>/etc/gce.conf
-node-tags = ${NODE_INSTANCE_PREFIX}
+node-tags = ${NODE_TAGS}
 node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
     CLOUD_CONFIG=/etc/gce.conf
@@ -898,6 +904,7 @@ EOF
   fi
 
   env-to-grains "runtime_config"
+  env-to-grains "kube_user"
 }
 
 function salt-node-role() {

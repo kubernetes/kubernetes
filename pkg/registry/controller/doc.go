@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package controller provides Registry interface and it's RESTStorage
 // implementation for storing ReplicationController api objects.
-package controller
+package controller // import "k8s.io/kubernetes/pkg/registry/controller"

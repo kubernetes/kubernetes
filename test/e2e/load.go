@@ -142,6 +142,16 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 				framework.Logf("Skipping service creation")
 			}
 
+			// We assume a default throughput of 10 pods/second throughput.
+			// We may want to revisit it in the future.
+			// However, this can be overriden by LOAD_TEST_THROUGHPUT env var.
+			throughput := 10
+			if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
+				if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {
+					throughput = newThroughput
+				}
+			}
+
 			// Simulate lifetime of RC:
 			//  * create with initial size
 			//  * scale RC to a random size and list all pods
@@ -155,17 +165,17 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 
 			// We would like to spread creating replication controllers over time
 			// to make it possible to create/schedule them in the meantime.
-			// Currently we assume 10 pods/second average throughput.
+			// Currently we assume <throughput> pods/second average throughput.
 			// We may want to revisit it in the future.
-			creatingTime := time.Duration(totalPods/10) * time.Second
+			creatingTime := time.Duration(totalPods/throughput) * time.Second
 			createAllRC(configs, creatingTime)
 			By("============================================================================")
 
 			// We would like to spread scaling replication controllers over time
 			// to make it possible to create/schedule & delete them in the meantime.
-			// Currently we assume that 10 pods/second average throughput.
+			// Currently we assume that <throughput> pods/second average throughput.
 			// The expected number of created/deleted pods is less than totalPods/3.
-			scalingTime := time.Duration(totalPods/30) * time.Second
+			scalingTime := time.Duration(totalPods/(3*throughput)) * time.Second
 			scaleAllRC(configs, scalingTime)
 			By("============================================================================")
 
@@ -173,9 +183,9 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 			By("============================================================================")
 
 			// Cleanup all created replication controllers.
-			// Currently we assume 10 pods/second average deletion throughput.
+			// Currently we assume <throughput> pods/second average deletion throughput.
 			// We may want to revisit it in the future.
-			deletingTime := time.Duration(totalPods/10) * time.Second
+			deletingTime := time.Duration(totalPods/throughput) * time.Second
 			deleteAllRC(configs, deletingTime)
 			if createServices == "true" {
 				for _, service := range services {

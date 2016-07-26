@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Kubelet interactions with cAdvisor.
-package cadvisor
+package cadvisor // import "k8s.io/kubernetes/pkg/kubelet/cadvisor"

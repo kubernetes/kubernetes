@@ -76,7 +76,7 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 		} else {
 			//TODO(jdef) other errors should probably trigger a retry (w/ backoff).
 			//For now, drop the pod on the floor
-			log.Warning("aborting reconciliation for pod %v: %v", t.Pod.Name, err)
+			log.Warningf("aborting reconciliation for pod %v: %v", t.Pod.Name, err)
 		}
 		return
 	}
