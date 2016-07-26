@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fieldpath"
 )
 
 // defaultPodLimitsForDownwardApi copies the input pod, and optional container,
@@ -49,7 +50,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *api.Pod, container *api.C
 		return nil, nil, fmt.Errorf("unexpected type returned from deep copy of pod object")
 	}
 	for idx := range outputPod.Spec.Containers {
-		mergeContainerResourceLimitsWithCapacity(&outputPod.Spec.Containers[idx], capacity)
+		fieldpath.MergeContainerResourceLimitsWithCapacity(&outputPod.Spec.Containers[idx], capacity)
 	}
 
 	var outputContainer *api.Container
@@ -62,23 +63,7 @@ func (kl *Kubelet) defaultPodLimitsForDownwardApi(pod *api.Pod, container *api.C
 		if !ok {
 			return nil, nil, fmt.Errorf("unexpected type returned from deep copy of container object")
 		}
-		mergeContainerResourceLimitsWithCapacity(outputContainer, capacity)
+		fieldpath.MergeContainerResourceLimitsWithCapacity(outputContainer, capacity)
 	}
 	return outputPod, outputContainer, nil
-}
-
-// mergeContainerResourceLimitsWithCapacity checks if a limit is applied for
-// the container, and if not, it sets the limit based on the capacity.
-func mergeContainerResourceLimitsWithCapacity(container *api.Container,
-	capacity api.ResourceList) {
-	if container.Resources.Limits == nil {
-		container.Resources.Limits = make(api.ResourceList)
-	}
-	for _, resource := range []api.ResourceName{api.ResourceCPU, api.ResourceMemory} {
-		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
-			if cap, exists := capacity[resource]; exists {
-				container.Resources.Limits[resource] = *cap.Copy()
-			}
-		}
-	}
 }

@@ -75,6 +75,29 @@ func ExtractResourceValueByContainerName(fs *api.ResourceFieldSelector, pod *api
 	return ExtractContainerResourceValue(fs, container)
 }
 
+// ExtractResourceValueByContainerNameAndNodeCapacity extracts the value of a resource
+// by providing container name and node capacity
+func ExtractResourceValueByContainerNameAndNodeCapacity(fs *api.ResourceFieldSelector, pod *api.Pod, containerName string, nodeCapacity api.ResourceList) (string, error) {
+	realContainer, err := findContainerInPod(pod, containerName)
+	if err != nil {
+		return "", err
+	}
+
+	containerCopy, err := api.Scheme.DeepCopy(realContainer)
+	if err != nil {
+		return "", fmt.Errorf("failed to perform a deep copy of container object: %v", err)
+	}
+
+	container, ok := containerCopy.(*api.Container)
+	if !ok {
+		return "", fmt.Errorf("unexpected type returned from deep copy of container object")
+	}
+
+	MergeContainerResourceLimitsWithCapacity(container, nodeCapacity)
+
+	return ExtractContainerResourceValue(fs, container)
+}
+
 // ExtractContainerResourceValue extracts the value of a resource
 // in an already known container
 func ExtractContainerResourceValue(fs *api.ResourceFieldSelector, container *api.Container) (string, error) {
@@ -121,4 +144,20 @@ func convertResourceCPUToString(cpu *resource.Quantity, divisor resource.Quantit
 func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Quantity) (string, error) {
 	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
 	return strconv.FormatInt(m, 10), nil
+}
+
+// MergeContainerResourceLimitsWithCapacity checks if a limit is applied for
+// the container, and if not, it sets the limit based on the capacity.
+func MergeContainerResourceLimitsWithCapacity(container *api.Container,
+	capacity api.ResourceList) {
+	if container.Resources.Limits == nil {
+		container.Resources.Limits = make(api.ResourceList)
+	}
+	for _, resource := range []api.ResourceName{api.ResourceCPU, api.ResourceMemory} {
+		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
+			if cap, exists := capacity[resource]; exists {
+				container.Resources.Limits[resource] = *cap.Copy()
+			}
+		}
+	}
 }
