@@ -167,6 +167,13 @@ def launch_dns():
         check_call(split('kubectl create namespace kube-system'))
     # Check for the kubedns replication controller.
     return_code = call(split('kubectl get -f files/manifests/kubedns-rc.yaml'))
+    # Check for the skydns configmap
+    return_code = call(split('kubectl get -f files/manifests/kubedns-configmap.yml'))
+    if return_code != 0:
+        # Create the skydns configmap from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-configmap.yml'))
+    # Check for the skydns replication controller.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-rc.yml'))
     if return_code != 0:
         # Create the kubedns replication controller from the rendered file.
         check_call(split('kubectl create -f files/manifests/kubedns-rc.yaml'))

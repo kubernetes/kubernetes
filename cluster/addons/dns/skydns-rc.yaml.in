@@ -18,8 +18,8 @@
 
 # Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
 
-apiVersion: v1
 kind: ReplicationController
+apiVersion: v1
 metadata:
   name: kube-dns-v19
   namespace: kube-system
