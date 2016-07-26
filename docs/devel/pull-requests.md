@@ -71,7 +71,7 @@ The following will save time for both you and your reviewer:
 * Enable [pre-commit hooks](development.md#committing-changes-to-your-fork) and verify they pass.
 * Verify `make verify` passes.
 * Verify `make test` passes.
-* Verify `make test-integration.sh` passes.
+* Verify `make test-integration` passes.
 
 ## Release Notes
 
