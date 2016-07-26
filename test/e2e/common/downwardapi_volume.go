@@ -163,6 +163,24 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		})
 	})
 
+	It("should provide node capacity (cpu) as default cpu limit if the limit is not set", func() {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/cpu_limit")
+
+		f.TestContainerOutputRegexp("downward API volume plugin", pod, 0, []string{
+			fmt.Sprintf("[1-9]"),
+		})
+	})
+
+	It("should provide node capacity (memory) as default memory limit if the limit is not set", func() {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		pod := downwardAPIVolumeForDefaultContainerResources(podName, "/etc/memory_limit")
+
+		f.TestContainerOutputRegexp("downward API volume plugin", pod, 0, []string{
+			fmt.Sprintf("[1-9]"),
+		})
+	})
+
 })
 
 func downwardAPIVolumePodForSimpleTest(name string, filePath string) *api.Pod {
@@ -192,6 +210,12 @@ func downwardAPIVolumeForContainerResources(name string, filePath string) *api.P
 	return pod
 }
 
+func downwardAPIVolumeForDefaultContainerResources(name string, filePath string) *api.Pod {
+	pod := downwardAPIVolumeBasePod(name, nil, nil)
+	pod.Spec.Containers = downwardAPIVolumeDefaultBaseContainer("client-container", filePath)
+	return pod
+}
+
 func downwardAPIVolumeBaseContainers(name, filePath string) []api.Container {
 	return []api.Container{
 		{
@@ -208,6 +232,24 @@ func downwardAPIVolumeBaseContainers(name, filePath string) []api.Container {
 					api.ResourceMemory: resource.MustParse("64Mi"),
 				},
 			},
+			VolumeMounts: []api.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+					ReadOnly:  false,
+				},
+			},
+		},
+	}
+
+}
+
+func downwardAPIVolumeDefaultBaseContainer(name, filePath string) []api.Container {
+	return []api.Container{
+		{
+			Name:    name,
+			Image:   "gcr.io/google_containers/mounttest:0.6",
+			Command: []string{"/mt", "--file_content=" + filePath},
 			VolumeMounts: []api.VolumeMount{
 				{
 					Name:      "podinfo",
