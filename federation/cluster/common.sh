@@ -52,6 +52,7 @@ KUBE_PLATFORM=${KUBE_PLATFORM:-linux}
 KUBE_ARCH=${KUBE_ARCH:-amd64}
 KUBE_BUILD_STAGE=${KUBE_BUILD_STAGE:-release-stage}
 
+source "${KUBE_ROOT}/build/common.sh"
 source "${KUBE_ROOT}/cluster/common.sh"
 source "${KUBE_ROOT}/hack/lib/util.sh"
 
@@ -66,11 +67,11 @@ function create-federation-api-objects {
 (
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
     export FEDERATION_APISERVER_DEPLOYMENT_NAME="federation-apiserver"
-    export FEDERATION_APISERVER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/federation-apiserver"
+    export FEDERATION_APISERVER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/hyperkube"
     export FEDERATION_APISERVER_IMAGE_TAG="${FEDERATION_IMAGE_TAG:-$(cat ${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin/federation-apiserver.docker_tag)}"
 
     export FEDERATION_CONTROLLER_MANAGER_DEPLOYMENT_NAME="federation-controller-manager"
-    export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/federation-controller-manager"
+    export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/hyperkube"
     export FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG="${FEDERATION_IMAGE_TAG:-$(cat ${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin/federation-controller-manager.docker_tag)}"
 
     if [[ -z "${FEDERATION_DNS_PROVIDER:-}" ]]; then
@@ -229,7 +230,7 @@ function create-federation-api-objects {
 # FEDERATION_IMAGE_TAG: push all federated images with this tag. Used for ci testing
 function push-federation-images {
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
-    local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"federation-apiserver federation-controller-manager"}
+    local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"hyperkube"}
 
     local imageFolder="${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin"
 
