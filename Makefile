@@ -250,6 +250,14 @@ cross:
 $(notdir $(abspath $(wildcard cmd/*/))): generated_files
 	hack/make-rules/build.sh cmd/$@
 
+# Add rules for all directories in federation/cmd/
+#
+# Example:
+#   make federation-apiserver federation-controller-manager
+.PHONY: $(notdir $(abspath $(wildcard federation/cmd/*/)))
+$(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
+	hack/make-rules/build.sh federation/cmd/$@
+
 # Produce auto-generated files needed for the build.
 #
 # Example:
