@@ -65,9 +65,8 @@ func NewNestedPendingOperations(exponentialBackOffOnError bool) NestedPendingOpe
 	g := &nestedPendingOperations{
 		operations:                []operation{},
 		exponentialBackOffOnError: exponentialBackOffOnError,
-		lock: &sync.Mutex{},
 	}
-	g.cond = sync.NewCond(g.lock)
+	g.cond = sync.NewCond(&g.lock)
 	return g
 }
 
@@ -75,7 +74,7 @@ type nestedPendingOperations struct {
 	operations                []operation
 	exponentialBackOffOnError bool
 	cond                      *sync.Cond
-	lock                      *sync.Mutex
+	lock                      sync.Mutex
 }
 
 type operation struct {
