@@ -199,7 +199,6 @@ func createManager(containerName string) *fs.Manager {
 	}
 }
 
-// TODO: plumb this up as a flag to Kubelet in a future PR
 type KernelTunableBehavior string
 
 const (
@@ -288,8 +287,7 @@ func (cm *containerManagerImpl) setupNode() error {
 	if !f.cpuHardcapping {
 		cm.status.SoftRequirements = fmt.Errorf("CPU hardcapping unsupported")
 	}
-	// TODO: plumb kernel tunable options into container manager, right now, we modify by default
-	if err := setupKernelTunables(KernelTunableModify); err != nil {
+	if err := setupKernelTunables(cm.GetNodeConfig().KernelTunableBehavior); err != nil {
 		return err
 	}
 

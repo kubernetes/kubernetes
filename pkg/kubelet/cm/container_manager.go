@@ -45,6 +45,7 @@ type NodeConfig struct {
 	ContainerRuntime   string
 	CgroupsPerQOS      bool
 	CgroupRoot         string
+	KernelTunableBehavior
 }
 
 type Status struct {

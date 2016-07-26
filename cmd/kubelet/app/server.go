@@ -197,6 +197,8 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Thresholds:               thresholds,
 	}
 
+	kernelTunableBehaviour := parseKernelTunableBehaviour(s.ProtectKernelDefaults)
+
 	return &KubeletConfig{
 		Address:                      net.ParseIP(s.Address),
 		AllowPrivileged:              s.AllowPrivileged,
@@ -279,9 +281,10 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		HairpinMode:                    s.HairpinMode,
 		BabysitDaemons:                 s.BabysitDaemons,
 		ExperimentalFlannelOverlay:     s.ExperimentalFlannelOverlay,
-		NodeIP:         net.ParseIP(s.NodeIP),
-		EvictionConfig: evictionConfig,
-		PodsPerCore:    int(s.PodsPerCore),
+		NodeIP:                net.ParseIP(s.NodeIP),
+		EvictionConfig:        evictionConfig,
+		PodsPerCore:           int(s.PodsPerCore),
+		KernelTunableBehavior: kernelTunableBehaviour,
 	}, nil
 }
 
@@ -369,12 +372,13 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
 		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface, cm.NodeConfig{
-			RuntimeCgroupsName: kcfg.RuntimeCgroups,
-			SystemCgroupsName:  kcfg.SystemCgroups,
-			KubeletCgroupsName: kcfg.KubeletCgroups,
-			ContainerRuntime:   kcfg.ContainerRuntime,
-			CgroupsPerQOS:      kcfg.CgroupsPerQOS,
-			CgroupRoot:         kcfg.CgroupRoot,
+			RuntimeCgroupsName:    kcfg.RuntimeCgroups,
+			SystemCgroupsName:     kcfg.SystemCgroups,
+			KubeletCgroupsName:    kcfg.KubeletCgroups,
+			ContainerRuntime:      kcfg.ContainerRuntime,
+			CgroupsPerQOS:         kcfg.CgroupsPerQOS,
+			CgroupRoot:            kcfg.CgroupRoot,
+			KernelTunableBehavior: kcfg.KernelTunableBehavior,
 		})
 		if err != nil {
 			return err
@@ -623,6 +627,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		OutOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		EvictionConfig:               evictionConfig,
 		PodsPerCore:                  podsPerCore,
+		KernelTunableBehavior:        cm.KernelTunableModify,
 	}
 	return &kcfg
 }
@@ -875,6 +880,8 @@ type KubeletConfig struct {
 	HairpinMode                string
 	BabysitDaemons             bool
 	Options                    []kubelet.Option
+
+	KernelTunableBehavior cm.KernelTunableBehavior
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -1019,4 +1026,12 @@ func parseResourceList(m utilconfig.ConfigurationMap) (api.ResourceList, error) 
 		}
 	}
 	return rl, nil
+}
+
+func parseKernelTunableBehaviour(protect bool) cm.KernelTunableBehavior {
+	if protect {
+		return cm.KernelTunableError
+	} else {
+		return cm.KernelTunableModify
+	}
 }
