@@ -184,6 +184,7 @@ func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *opt
 	}
 
 	expired := time.NewTimer(streamCreationTimeout)
+	defer expired.Stop()
 
 	ctx, err := handler.waitForStreams(streamCh, opts.expectedStreams, expired.C)
 	if err != nil {

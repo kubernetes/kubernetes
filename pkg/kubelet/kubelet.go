@@ -2072,7 +2072,9 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	// that need to be sync'd. A one-second period is sufficient because the
 	// sync interval is defaulted to 10s.
 	syncTicker := time.NewTicker(time.Second)
+	defer syncTicker.Stop()
 	housekeepingTicker := time.NewTicker(housekeepingPeriod)
+	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	for {
 		if rs := kl.runtimeState.errors(); len(rs) != 0 {

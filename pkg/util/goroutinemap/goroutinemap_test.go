@@ -484,6 +484,7 @@ func retryWithExponentialBackOff(initialDuration time.Duration, fn wait.Conditio
 
 func waitChannelWithTimeout(ch <-chan interface{}, timeout time.Duration) error {
 	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
 	select {
 	case <-ch:
