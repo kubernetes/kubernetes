@@ -1179,18 +1179,31 @@ func CheckInvariants(events []watch.Event, fns ...InvariantFunc) error {
 
 // Waits default amount of time (PodStartTimeout) for the specified pod to become running.
 // Returns an error if timeout occurs first, or pod goes in to failed state.
-func WaitForPodRunningInNamespace(c *client.Client, podName string, namespace string) error {
-	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, PodStartTimeout)
+func WaitForPodRunningInNamespace(c *client.Client, pod *api.Pod) error {
+	// this short-cicuit is needed for cases when we pass a list of pods instead
+	// of newly created pod (eg. VerifyPods) which means we are getting already
+	// running pod for which waiting does not make sense and will always fail
+	if pod.Status.Phase == api.PodRunning {
+		return nil
+	}
+	return waitTimeoutForPodRunningInNamespace(c, pod.Name, pod.Namespace, pod.ResourceVersion, PodStartTimeout)
+}
+
+// Waits default amount of time (PodStartTimeout) for the specified pod to become running.
+// Returns an error if timeout occurs first, or pod goes in to failed state.
+func WaitForPodNameRunningInNamespace(c *client.Client, podName, namespace string) error {
+	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, "", PodStartTimeout)
 }
 
 // Waits an extended amount of time (slowPodStartTimeout) for the specified pod to become running.
-// Returns an error if timeout occurs first, or pod goes in to failed state.
-func waitForPodRunningInNamespaceSlow(c *client.Client, podName string, namespace string) error {
-	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, slowPodStartTimeout)
+// The resourceVersion is used when Watching object changes, it tells since when we care
+// about changes to the pod. Returns an error if timeout occurs first, or pod goes in to failed state.
+func waitForPodRunningInNamespaceSlow(c *client.Client, podName, namespace, resourceVersion string) error {
+	return waitTimeoutForPodRunningInNamespace(c, podName, namespace, resourceVersion, slowPodStartTimeout)
 }
 
-func waitTimeoutForPodRunningInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+func waitTimeoutForPodRunningInNamespace(c *client.Client, podName, namespace, resourceVersion string, timeout time.Duration) error {
+	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1200,12 +1213,12 @@ func waitTimeoutForPodRunningInNamespace(c *client.Client, podName string, names
 
 // Waits default amount of time (podNoLongerRunningTimeout) for the specified pod to stop running.
 // Returns an error if timeout occurs first.
-func WaitForPodNoLongerRunningInNamespace(c *client.Client, podName string, namespace string) error {
-	return waitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, podNoLongerRunningTimeout)
+func WaitForPodNoLongerRunningInNamespace(c *client.Client, podName, namespace, resourceVersion string) error {
+	return waitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, resourceVersion, podNoLongerRunningTimeout)
 }
 
-func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName, namespace, resourceVersion string, timeout time.Duration) error {
+	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1213,8 +1226,8 @@ func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName strin
 	return err
 }
 
-func waitTimeoutForPodReadyInNamespace(c *client.Client, podName string, namespace string, timeout time.Duration) error {
-	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+func waitTimeoutForPodReadyInNamespace(c *client.Client, podName, namespace, resourceVersion string, timeout time.Duration) error {
+	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1223,8 +1236,10 @@ func waitTimeoutForPodReadyInNamespace(c *client.Client, podName string, namespa
 }
 
 // WaitForPodNotPending returns an error if it took too long for the pod to go out of pending state.
-func WaitForPodNotPending(c *client.Client, ns, podName string) error {
-	w, err := c.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: podName}))
+// The resourceVersion is used when Watching object changes, it tells since when we care
+// about changes to the pod.
+func WaitForPodNotPending(c *client.Client, ns, podName, resourceVersion string) error {
+	w, err := c.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
 	}
@@ -1619,7 +1634,7 @@ func podsRunning(c *client.Client, pods *api.PodList) []error {
 
 	for _, pod := range pods.Items {
 		go func(p api.Pod) {
-			error_chan <- WaitForPodRunningInNamespace(c, p.Name, p.Namespace)
+			error_chan <- WaitForPodRunningInNamespace(c, &p)
 		}(pod)
 	}
 
@@ -3656,7 +3671,7 @@ func LaunchHostExecPod(client *client.Client, ns, name string) *api.Pod {
 	hostExecPod := NewHostExecPodSpec(ns, name)
 	pod, err := client.Pods(ns).Create(hostExecPod)
 	ExpectNoError(err)
-	err = WaitForPodRunningInNamespace(client, pod.Name, pod.Namespace)
+	err = WaitForPodRunningInNamespace(client, pod)
 	ExpectNoError(err)
 	return pod
 }
