@@ -83,6 +83,22 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectErr:               true,
 			expectThresholds:        []Threshold{},
 		},
+		"hard-signal-negative": {
+			evictionHard:            "memory.available<-150Mi",
+			evictionSoft:            "",
+			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "",
+			expectErr:               true,
+			expectThresholds:        []Threshold{},
+		},
+		"soft-signal-negative": {
+			evictionHard:            "",
+			evictionSoft:            "memory.available<-150Mi",
+			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "",
+			expectErr:               true,
+			expectThresholds:        []Threshold{},
+		},
 		"duplicate-signal": {
 			evictionHard:            "memory.available<150Mi,memory.available<100Mi",
 			evictionSoft:            "",
