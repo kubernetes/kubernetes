@@ -25,8 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -101,7 +101,7 @@ var _ = framework.KubeDescribe("Generated release_1_2 clientset", func() {
 	It("should create pods, delete pods, watch pods", func() {
 		podClient := f.Clientset_1_2.Core().Pods(f.Namespace.Name)
 		By("constructing the pod")
-		name := "pod" + string(util.NewUUID())
+		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		podCopy := testingPod(name, value)
 		pod := &podCopy
@@ -175,7 +175,7 @@ var _ = framework.KubeDescribe("Generated release_1_3 clientset", func() {
 	It("should create pods, delete pods, watch pods", func() {
 		podClient := f.Clientset_1_3.Core().Pods(f.Namespace.Name)
 		By("constructing the pod")
-		name := "pod" + string(util.NewUUID())
+		name := "pod" + string(uuid.NewUUID())
 		value := strconv.Itoa(time.Now().Nanosecond())
 		podCopy := testingPod(name, value)
 		pod := &podCopy

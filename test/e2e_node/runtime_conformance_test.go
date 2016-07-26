@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -246,7 +246,7 @@ while true; do sleep 1; done
 						RestartPolicy: api.RestartPolicyNever,
 					}
 					if testCase.secret {
-						secret.Name = "image-pull-secret-" + string(util.NewUUID())
+						secret.Name = "image-pull-secret-" + string(uuid.NewUUID())
 						By("create image pull secret")
 						_, err := f.Client.Secrets(f.Namespace.Name).Create(secret)
 						Expect(err).NotTo(HaveOccurred())

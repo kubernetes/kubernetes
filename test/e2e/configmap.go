@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -63,7 +63,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		// minute) plus additional time for fudge factor.
 		const podLogTimeout = 300 * time.Second
 
-		name := "configmap-test-upd-" + string(util.NewUUID())
+		name := "configmap-test-upd-" + string(uuid.NewUUID())
 		volumeName := "configmap-volume"
 		volumeMountPath := "/etc/configmap-volume"
 		containerName := "configmap-volume-test"
@@ -92,7 +92,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-configmaps-" + string(util.NewUUID()),
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 	})
 
 	It("should be consumable via environment variable [Conformance]", func() {
-		name := "configmap-test-" + string(util.NewUUID())
+		name := "configmap-test-" + string(uuid.NewUUID())
 		configMap := newConfigMap(f, name)
 		By(fmt.Sprintf("Creating configMap %v/%v", f.Namespace.Name, configMap.Name))
 		defer func() {
@@ -168,7 +168,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-configmaps-" + string(util.NewUUID()),
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -202,7 +202,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 	It("should be consumable in multiple volumes in the same pod", func() {
 		var (
-			name             = "configmap-test-volume-" + string(util.NewUUID())
+			name             = "configmap-test-volume-" + string(uuid.NewUUID())
 			volumeName       = "configmap-volume"
 			volumeMountPath  = "/etc/configmap-volume"
 			volumeName2      = "configmap-volume-2"
@@ -224,7 +224,7 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-configmaps-" + string(util.NewUUID()),
+				Name: "pod-configmaps-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
@@ -295,7 +295,7 @@ func newConfigMap(f *framework.Framework, name string) *api.ConfigMap {
 
 func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 	var (
-		name            = "configmap-test-volume-" + string(util.NewUUID())
+		name            = "configmap-test-volume-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
 		volumeMountPath = "/etc/configmap-volume"
 		configMap       = newConfigMap(f, name)
@@ -315,7 +315,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "pod-configmaps-" + string(util.NewUUID()),
+			Name: "pod-configmaps-" + string(uuid.NewUUID()),
 		},
 		Spec: api.PodSpec{
 			SecurityContext: &api.PodSecurityContext{},
@@ -365,7 +365,7 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 
 func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
 	var (
-		name            = "configmap-test-volume-map-" + string(util.NewUUID())
+		name            = "configmap-test-volume-map-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
 		volumeMountPath = "/etc/configmap-volume"
 		configMap       = newConfigMap(f, name)
@@ -385,7 +385,7 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name: "pod-configmaps-" + string(util.NewUUID()),
+			Name: "pod-configmaps-" + string(uuid.NewUUID()),
 		},
 		Spec: api.PodSpec{
 			SecurityContext: &api.PodSecurityContext{},

@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -65,7 +65,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	numNodes := nodeNames.Len()
 	totalPods := podsPerNode * numNodes
 	By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
-	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(util.NewUUID()))
+	rcName := fmt.Sprintf("resource%d-%s", totalPods, string(uuid.NewUUID()))
 
 	// TODO: Use a more realistic workload
 	Expect(framework.RunRC(framework.RCConfig{

@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("Garbage collector [Feature:GarbageCollector] [Sl
 })
 
 func createTerminatingPod(f *framework.Framework) (*api.Pod, error) {
-	uuid := util.NewUUID()
+	uuid := uuid.NewUUID()
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: string(uuid),

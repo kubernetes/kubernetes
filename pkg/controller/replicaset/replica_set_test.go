@@ -38,9 +38,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -60,7 +60,7 @@ func newReplicaSet(replicas int, selectorMap map[string]string) *extensions.Repl
 	rs := &extensions.ReplicaSet{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
-			UID:             util.NewUUID(),
+			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "18",
@@ -958,7 +958,7 @@ func TestOverlappingRSs(t *testing.T) {
 		for j := 1; j < 10; j++ {
 			rsSpec := newReplicaSet(1, labelMap)
 			rsSpec.CreationTimestamp = unversioned.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
-			rsSpec.Name = string(util.NewUUID())
+			rsSpec.Name = string(uuid.NewUUID())
 			controllers = append(controllers, rsSpec)
 		}
 		shuffledControllers := shuffle(controllers)
@@ -1083,7 +1083,7 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 	rs := newReplicaSet(2, labelMap)
 	manager.rsStore.Store.Add(rs)
 	var trueVar = true
-	otherControllerReference := api.OwnerReference{UID: util.NewUUID(), APIVersion: "v1beta1", Kind: "ReplicaSet", Name: "AnotherRS", Controller: &trueVar}
+	otherControllerReference := api.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1beta1", Kind: "ReplicaSet", Name: "AnotherRS", Controller: &trueVar}
 	// add to podStore a matching Pod controlled by another controller. Expect no patch.
 	pod := newPod("pod", rs, api.PodRunning)
 	pod.OwnerReferences = []api.OwnerReference{otherControllerReference}
@@ -1104,7 +1104,7 @@ func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 	// add to podStore one more matching pod that doesn't have a controller
 	// ref, but has an owner ref pointing to other object. Expect a patch to
 	// take control of it.
-	unrelatedOwnerReference := api.OwnerReference{UID: util.NewUUID(), APIVersion: "batch/v1", Kind: "Job", Name: "Job"}
+	unrelatedOwnerReference := api.OwnerReference{UID: uuid.NewUUID(), APIVersion: "batch/v1", Kind: "Job", Name: "Job"}
 	pod := newPod("pod", rs, api.PodRunning)
 	pod.OwnerReferences = []api.OwnerReference{unrelatedOwnerReference}
 	manager.podStore.Indexer.Add(pod)

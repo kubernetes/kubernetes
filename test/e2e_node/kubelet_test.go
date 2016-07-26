@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apiUnversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/davecgh/go-spew/spew"
@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 		podClient = f.PodClient()
 	})
 	Context("when scheduling a busybox command in a pod", func() {
-		podName := "busybox-scheduling-" + string(util.NewUUID())
+		podName := "busybox-scheduling-" + string(uuid.NewUUID())
 		It("it should print the output to logs", func() {
 			podClient.CreateSync(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	})
 
 	Context("when scheduling a read only busybox container", func() {
-		podName := "busybox-readonly-fs" + string(util.NewUUID())
+		podName := "busybox-readonly-fs" + string(uuid.NewUUID())
 		It("it should not write to root filesystem", func() {
 			isReadOnly := true
 			podClient.CreateSync(&api.Pod{
@@ -114,7 +114,7 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 	Describe("metrics api", func() {
 		Context("when querying /stats/summary", func() {
 			It("it should report resource usage through the stats api", func() {
-				podNamePrefix := "stats-busybox-" + string(util.NewUUID())
+				podNamePrefix := "stats-busybox-" + string(uuid.NewUUID())
 				volumeNamePrefix := "test-empty-dir"
 				podNames, volumes := createSummaryTestPods(f.PodClient(), podNamePrefix, 2, volumeNamePrefix)
 				By("Returning stats summary")
