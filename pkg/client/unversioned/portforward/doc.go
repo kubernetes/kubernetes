@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package portforward adds support for SSH-like port forwarding from the client's
 // local host to remote containers.
-package portforward
+package portforward // import "k8s.io/kubernetes/pkg/client/unversioned/portforward"

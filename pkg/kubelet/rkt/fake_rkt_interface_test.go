@@ -175,6 +175,10 @@ func (f *fakeRuntimeHelper) GetPodDir(podUID types.UID) string {
 	return "/poddir/" + string(podUID)
 }
 
+func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+	return nil
+}
+
 type fakeRktCli struct {
 	sync.Mutex
 	cmds   []string

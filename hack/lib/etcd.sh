@@ -46,8 +46,8 @@ kube::etcd::start() {
   else
     ETCD_LOGFILE=/dev/null
   fi
-  kube::log::info "etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
-  etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
+  kube::log::info "etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug > \"${ETCD_LOGFILE}\" 2>/dev/null"
+  etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
   echo "Waiting for etcd to come up."

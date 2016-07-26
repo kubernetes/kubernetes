@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package chown provides utilities to chown a path
-package chown
+package chown // import "k8s.io/kubernetes/pkg/util/chown"

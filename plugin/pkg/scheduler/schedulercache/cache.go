@@ -149,6 +149,7 @@ func (cache *schedulerCache) ForgetPod(pod *api.Pod) error {
 		if err != nil {
 			return err
 		}
+		delete(cache.assumedPods, key)
 		delete(cache.podStates, key)
 	default:
 		return fmt.Errorf("pod state wasn't assumed but get forgotten. Pod key: %v", key)

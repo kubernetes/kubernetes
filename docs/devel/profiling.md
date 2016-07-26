@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -52,7 +52,7 @@ m.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 
 to the init(c *Config) method in 'pkg/master/master.go' and import 'net/http/pprof' package.
 
-In most use cases to use profiler service it's enough to do 'import _ net/http/pprof', which automatically registers a handler in the default http.Server. Slight inconvenience is that APIserver uses default server for intra-cluster communication, so plugging profiler to it is not really useful. In 'pkg/master/server/server.go' more servers are created and started as separate goroutines. The one that is usually serving external traffic is secureServer. The handler for this traffic is defined in 'pkg/master/master.go' and stored in Handler variable. It is created from HTTP multiplexer, so the only thing that needs to be done is adding profiler handler functions to this multiplexer. This is exactly what lines after TL;DR do.
+In most use cases to use profiler service it's enough to do 'import _ net/http/pprof', which automatically registers a handler in the default http.Server. Slight inconvenience is that APIserver uses default server for intra-cluster communication, so plugging profiler to it is not really useful. In 'pkg/kubelet/server/server.go' more servers are created and started as separate goroutines. The one that is usually serving external traffic is secureServer. The handler for this traffic is defined in 'pkg/master/master.go' and stored in Handler variable. It is created from HTTP multiplexer, so the only thing that needs to be done is adding profiler handler functions to this multiplexer. This is exactly what lines after TL;DR do.
 
 ## Connecting to the profiler
 

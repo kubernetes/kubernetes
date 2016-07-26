@@ -20,11 +20,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -54,25 +51,20 @@ type PrivilegedPodTestConfig struct {
 	privilegedPod *api.Pod
 }
 
+// TODO(random-liu): Change the test to use framework and framework pod client.
 var _ = Describe("PrivilegedPod", func() {
-	var c *client.Client
-	restClientConfig := &restclient.Config{Host: *apiServerAddress}
-	BeforeEach(func() {
-		// Setup the apiserver client
-		c = client.NewOrDie(restClientConfig)
-	})
+	f := framework.NewDefaultFramework("privileged-pod")
 	It("should test privileged pod", func() {
-		namespace := "privileged-pods"
 		config := &PrivilegedPodTestConfig{
-			client:    c,
-			config:    restClientConfig,
-			namespace: namespace,
+			client:    f.Client,
+			config:    &restclient.Config{Host: framework.TestContext.Host},
+			namespace: f.Namespace.Name,
 		}
 		By("Creating a host exec pod")
-		config.hostExecPod = createPodAndWaitUntilRunning(c, newHostExecPodSpec(config.namespace, "hostexec"))
+		config.hostExecPod = f.PodClient().CreateSync(newHostExecPodSpec("hostexec"))
 
 		By("Creating a privileged pod")
-		config.privilegedPod = createPodAndWaitUntilRunning(c, config.createPrivilegedPodSpec())
+		config.privilegedPod = f.PodClient().CreateSync(config.createPrivilegedPodSpec())
 
 		By("Executing privileged command on privileged container")
 		config.runPrivilegedCommandOnPrivilegedContainer()
@@ -86,13 +78,8 @@ func (config *PrivilegedPodTestConfig) createPrivilegedPodSpec() *api.Pod {
 	isPrivileged := true
 	notPrivileged := false
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-		},
 		ObjectMeta: api.ObjectMeta{
-			Name:      privilegedPodName,
-			Namespace: config.namespace,
+			Name: privilegedPodName,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -143,7 +130,7 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 		v.Encode())
 	By(fmt.Sprintf("Exec-ing into container over http. Running command: %s", cmd))
 
-	stdout, err := execCommandInContainer(config.config, config.client, config.hostExecPod.Namespace, config.hostExecPod.Name, config.hostExecPod.Spec.Containers[0].Name,
+	stdout, err := execCommandInContainer(config.config, config.client, config.namespace, config.hostExecPod.Name, config.hostExecPod.Spec.Containers[0].Name,
 		[]string{"/bin/sh", "-c", cmd})
 	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Error running command %q: %v", cmd, err))
 
@@ -154,15 +141,10 @@ func (config *PrivilegedPodTestConfig) dialFromContainer(containerIP string, con
 }
 
 // newHostExecPodSpec returns the pod spec of hostexec pod
-func newHostExecPodSpec(ns, name string) *api.Pod {
+func newHostExecPodSpec(name string) *api.Pod {
 	return &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-		},
 		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+			Name: name,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -177,42 +159,4 @@ func newHostExecPodSpec(ns, name string) *api.Pod {
 			},
 		},
 	}
-}
-
-// TODO: This is a very basic helper function. Remove this once a common
-// utility function has been ported from the the e2e package.
-func waitForPodRunning(c *client.Client, ns string, name string) error {
-	var pod *api.Pod
-	var err error
-	for t := time.Now(); time.Since(t) < time.Minute*2; time.Sleep(time.Second * 5) {
-		pod, err = c.Pods(ns).Get(name)
-		Expect(err).NotTo(HaveOccurred())
-		if pod == nil {
-			continue
-		}
-		if pod.Status.Phase != api.PodRunning {
-			continue
-		}
-		return nil
-	}
-	return fmt.Errorf("Time out while waiting for pod %s/%s to become running; current status: %+v", ns, name, pod.Status)
-}
-
-func createPodAndWaitUntilRunning(c *client.Client, pod *api.Pod) *api.Pod {
-	ref := fmt.Sprintf("%v/%v", pod.Namespace, pod.Name)
-	_, err := createPodWithSpec(c, pod)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to create pod %q: %v", ref, err))
-	err = waitForPodRunning(c, pod.Namespace, pod.Name)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed waiting for pod %q to become running: %v", ref, err))
-	runningPod, err := c.Pods(pod.Namespace).Get(pod.Name)
-	Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("Failed to retrieve pod %q: %v", ref, err))
-	return runningPod
-}
-
-func createPodWithSpec(c *client.Client, pod *api.Pod) (*api.Pod, error) {
-	// Manually assign pod to node because we don't run the scheduler in node
-	// e2e tests.
-	pod.Spec.NodeName = framework.TestContext.NodeName
-	createdPod, err := c.Pods(pod.Namespace).Create(pod)
-	return createdPod, err
 }

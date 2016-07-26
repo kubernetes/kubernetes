@@ -19,9 +19,10 @@ limitations under the License.
 package mount
 
 import (
+	"path/filepath"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"path/filepath"
 )
 
 type Interface interface {
@@ -37,6 +38,11 @@ type Interface interface {
 	// IsLikelyNotMountPoint determines if a directory is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	IsLikelyNotMountPoint(file string) (bool, error)
+	// DeviceOpened determines if the device is in use elsewhere
+	// on the system, i.e. still mounted.
+	DeviceOpened(pathname string) (bool, error)
+	// PathIsDevice determines if a path is a device.
+	PathIsDevice(pathname string) (bool, error)
 }
 
 // This represents a single line in /proc/mounts or /etc/fstab.

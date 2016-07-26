@@ -472,13 +472,6 @@ func (t *thirdPartyResourceDataDecoder) populateListResource(objIn *extensions.T
 	return nil
 }
 
-const template = `{
-  "kind": "%s",
-  "apiVersion": "%s",
-  "metadata": {},
-  "items": [ %s ]
-}`
-
 type thirdPartyResourceDataEncoder struct {
 	delegate runtime.Encoder
 	gvk      unversioned.GroupVersionKind
@@ -509,19 +502,37 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 	case *extensions.ThirdPartyResourceData:
 		return encodeToJSON(obj, stream)
 	case *extensions.ThirdPartyResourceDataList:
-		// TODO: There must be a better way to do this...
-		dataStrings := make([]string, len(obj.Items))
+		// TODO: There are likely still better ways to do this...
+		listItems := make([]json.RawMessage, len(obj.Items))
+
 		for ix := range obj.Items {
 			buff := &bytes.Buffer{}
 			err := encodeToJSON(&obj.Items[ix], buff)
 			if err != nil {
 				return err
 			}
-			dataStrings[ix] = buff.String()
+			listItems[ix] = json.RawMessage(buff.Bytes())
 		}
-		gv := t.gvk.GroupVersion()
-		fmt.Fprintf(stream, template, t.gvk.Kind+"List", gv.String(), strings.Join(dataStrings, ","))
-		return nil
+
+		encMap := struct {
+			Kind       string               `json:"kind,omitempty"`
+			Items      []json.RawMessage    `json:"items"`
+			Metadata   unversioned.ListMeta `json:"metadata,omitempty"`
+			APIVersion string               `json:"apiVersion,omitempty"`
+		}{
+			Kind:       t.gvk.Kind + "List",
+			Items:      listItems,
+			Metadata:   obj.ListMeta,
+			APIVersion: t.gvk.GroupVersion().String(),
+		}
+
+		encBytes, err := json.Marshal(encMap)
+		if err != nil {
+			return err
+		}
+
+		_, err = stream.Write(encBytes)
+		return err
 	case *versioned.InternalEvent:
 		event := &versioned.Event{}
 		err := versioned.Convert_versioned_InternalEvent_to_versioned_Event(obj, event, nil)

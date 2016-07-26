@@ -598,6 +598,27 @@ runTests() {
   # Post-condition: valid-pod is labelled
   kube::test::get_object_assert 'pod valid-pod' "{{range$labels_field}}{{.}}:{{end}}" 'valid-pod:new-valid-pod:'
 
+  ### Record label change
+  # Pre-condition: valid-pod does not have record annotation
+  kube::test::get_object_assert 'pod valid-pod' "{{range.items}}{{$annotations_field}}:{{end}}" ''
+  # Command
+  kubectl label pods valid-pod record-change=true --record=true "${kube_flags[@]}"
+  # Post-condition: valid-pod has record annotation
+  kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*--record=true.*"
+  
+  ### Do not record label change
+  # Command
+  kubectl label pods valid-pod no-record-change=true --record=false "${kube_flags[@]}"
+  # Post-condition: valid-pod's record annotation still contains command with --record=true
+  kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*--record=true.*"
+
+  ### Record label change with unspecified flag and previous change already recorded
+  # Command
+  kubectl label pods valid-pod new-record-change=true "${kube_flags[@]}"
+  # Post-condition: valid-pod's record annotation contains new change
+  kube::test::get_object_assert 'pod valid-pod' "{{range$annotations_field}}{{.}}:{{end}}" ".*new-record-change=true.*"
+
+    
   ### Delete POD by label
   # Pre-condition: valid-pod POD exists
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'

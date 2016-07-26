@@ -16,7 +16,10 @@ import (
 	"github.com/docker/go-units"
 )
 
-const cgroupNamePrefix = "name="
+const (
+	cgroupNamePrefix = "name="
+	CgroupProcesses  = "cgroup.procs"
+)
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt
 func FindCgroupMountpoint(subsystem string) (string, error) {
@@ -239,7 +242,7 @@ func GetInitCgroupDir(subsystem string) (string, error) {
 }
 
 func readProcsFile(dir string) ([]int, error) {
-	f, err := os.Open(filepath.Join(dir, "cgroup.procs"))
+	f, err := os.Open(filepath.Join(dir, CgroupProcesses))
 	if err != nil {
 		return nil, err
 	}
@@ -326,8 +329,7 @@ func PathExists(path string) bool {
 func EnterPid(cgroupPaths map[string]string, pid int) error {
 	for _, path := range cgroupPaths {
 		if PathExists(path) {
-			if err := ioutil.WriteFile(filepath.Join(path, "cgroup.procs"),
-				[]byte(strconv.Itoa(pid)), 0700); err != nil {
+			if err := WriteCgroupProc(path, pid); err != nil {
 				return err
 			}
 		}
@@ -396,7 +398,7 @@ func GetAllPids(path string) ([]int, error) {
 	// collect pids from all sub-cgroups
 	err := filepath.Walk(path, func(p string, info os.FileInfo, iErr error) error {
 		dir, file := filepath.Split(p)
-		if file != "cgroup.procs" {
+		if file != CgroupProcesses {
 			return nil
 		}
 		if iErr != nil {
@@ -410,4 +412,21 @@ func GetAllPids(path string) ([]int, error) {
 		return nil
 	})
 	return pids, err
+}
+
+// WriteCgroupProc writes the specified pid into the cgroup's cgroup.procs file
+func WriteCgroupProc(dir string, pid int) error {
+	// Normally dir should not be empty, one case is that cgroup subsystem
+	// is not mounted, we will get empty dir, and we want it fail here.
+	if dir == "" {
+		return fmt.Errorf("no such directory for %s", CgroupProcesses)
+	}
+
+	// Dont attach any pid to the cgroup if -1 is specified as a pid
+	if pid != -1 {
+		if err := ioutil.WriteFile(filepath.Join(dir, CgroupProcesses), []byte(strconv.Itoa(pid)), 0700); err != nil {
+			return fmt.Errorf("failed to write %v to %v: %v", pid, CgroupProcesses, err)
+		}
+	}
+	return nil
 }

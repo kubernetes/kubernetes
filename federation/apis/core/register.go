@@ -59,6 +59,8 @@ func AddToScheme(scheme *runtime.Scheme) {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&api.ServiceList{},
 		&api.Service{},
+		&api.Namespace{},
+		&api.NamespaceList{},
 		&api.ListOptions{},
 		&api.DeleteOptions{},
 	)
@@ -72,4 +74,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&unversioned.APIGroup{},
 		&unversioned.APIResourceList{},
 	)
+
+	addDefaultingFuncs(scheme)
+	addConversionFuncs(scheme)
 }

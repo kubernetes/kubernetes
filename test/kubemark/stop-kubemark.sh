@@ -32,6 +32,11 @@ gcloud compute instances delete "${MASTER_NAME}" \
 gcloud compute disks delete "${MASTER_NAME}-pd" \
     ${GCLOUD_COMMON_ARGS} || true
 
+gcloud compute addresses delete "${MASTER_NAME}-ip" \
+    --project "${PROJECT}" \
+    --region "${REGION}" \
+    --quiet || true
+
 gcloud compute firewall-rules delete "${INSTANCE_PREFIX}-kubemark-master-https" \
 	--project "${PROJECT}" \
 	--quiet || true

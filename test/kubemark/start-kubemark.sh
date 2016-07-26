@@ -80,8 +80,16 @@ run-gcloud-compute-with-retries disks create "${MASTER_NAME}-pd" \
   --type "${MASTER_DISK_TYPE}" \
   --size "${MASTER_DISK_SIZE}"
 
+run-gcloud-compute-with-retries addresses create "${MASTER_NAME}-ip" \
+  --project "${PROJECT}" \
+  --region "${REGION}" -q
+
+MASTER_IP=$(gcloud compute addresses describe "${MASTER_NAME}-ip" \
+  --project "${PROJECT}" --region "${REGION}" -q --format='value(address)')
+
 run-gcloud-compute-with-retries instances create "${MASTER_NAME}" \
   ${GCLOUD_COMMON_ARGS} \
+  --address "${MASTER_IP}" \
   --machine-type "${MASTER_SIZE}" \
   --image-project="${MASTER_IMAGE_PROJECT}" \
   --image "${MASTER_IMAGE}" \
@@ -96,9 +104,6 @@ run-gcloud-compute-with-retries firewall-rules create "${INSTANCE_PREFIX}-kubema
   --source-ranges "0.0.0.0/0" \
   --target-tags "${MASTER_TAG}" \
   --allow "tcp:443"
-
-MASTER_IP=$(gcloud compute instances describe ${MASTER_NAME} \
-  --zone="${ZONE}" --project="${PROJECT}" | grep natIP: | cut -f2 -d":" | sed "s/ //g")
 
 if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
   EVENT_STORE_NAME="${INSTANCE_PREFIX}-event-store"
@@ -127,8 +132,8 @@ if [ "${SEPARATE_EVENT_MACHINE:-false}" == "true" ]; then
   gcloud compute ssh "${EVENT_STORE_NAME}" --zone="${ZONE}" --project="${PROJECT}" \
     --command="sudo docker run --net=host -d gcr.io/google_containers/etcd:2.0.12 /usr/local/bin/etcd \
       --listen-peer-urls http://127.0.0.1:2380 \
-      --addr=127.0.0.1:4002 \
-      --bind-addr=0.0.0.0:4002 \
+      --advertise-client-urls=http://127.0.0.1:4002 \
+      --listen-client-urls=http://0.0.0.0:4002 \
       --data-dir=/var/etcd/data"
 fi
 

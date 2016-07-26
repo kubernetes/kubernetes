@@ -246,3 +246,41 @@ func TestEncodeToStreamForInternalEvent(t *testing.T) {
 		t.Errorf("unexpected error encoding: %v", err)
 	}
 }
+
+func TestThirdPartyResourceDataListEncoding(t *testing.T) {
+	gv := unversioned.GroupVersion{Group: "stable.foo.faz", Version: "v1"}
+	gvk := gv.WithKind("Bar")
+	e := &thirdPartyResourceDataEncoder{delegate: testapi.Extensions.Codec(), gvk: gvk}
+	subject := &extensions.ThirdPartyResourceDataList{}
+
+	buf := bytes.NewBuffer([]byte{})
+	err := e.Encode(subject, buf)
+	if err != nil {
+		t.Errorf("encoding unexpected error: %v", err)
+	}
+
+	targetOutput := struct {
+		Kind       string               `json:"kind,omitempty"`
+		Items      []json.RawMessage    `json:"items"`
+		Metadata   unversioned.ListMeta `json:"metadata,omitempty"`
+		APIVersion string               `json:"apiVersion,omitempty"`
+	}{}
+	err = json.Unmarshal(buf.Bytes(), &targetOutput)
+
+	if err != nil {
+		t.Errorf("unmarshal unexpected error: %v", err)
+	}
+
+	if expectedKind := gvk.Kind + "List"; expectedKind != targetOutput.Kind {
+		t.Errorf("unexpected kind on list got %s expected %s", targetOutput.Kind, expectedKind)
+	}
+
+	if targetOutput.Metadata != subject.ListMeta {
+		t.Errorf("metadata mismatch %v != %v", targetOutput.Metadata, subject.ListMeta)
+	}
+
+	if targetOutput.APIVersion != gv.String() {
+		t.Errorf("apiversion mismatch %v != %v", targetOutput.APIVersion, gv.String())
+	}
+
+}

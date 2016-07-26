@@ -65,7 +65,7 @@ func validSignal(signal Signal) bool {
 }
 
 // ParseThresholdConfig parses the flags for thresholds.
-func ParseThresholdConfig(evictionHard, evictionSoft, evictionSoftGracePeriod string) ([]Threshold, error) {
+func ParseThresholdConfig(evictionHard, evictionSoft, evictionSoftGracePeriod, evictionMinimumReclaim string) ([]Threshold, error) {
 	results := []Threshold{}
 
 	hardThresholds, err := parseThresholdStatements(evictionHard)
@@ -82,6 +82,10 @@ func ParseThresholdConfig(evictionHard, evictionSoft, evictionSoftGracePeriod st
 	if err != nil {
 		return nil, err
 	}
+	minReclaims, err := parseMinimumReclaims(evictionMinimumReclaim)
+	if err != nil {
+		return nil, err
+	}
 	for i := range softThresholds {
 		signal := softThresholds[i].Signal
 		period, found := gracePeriods[signal]
@@ -91,6 +95,14 @@ func ParseThresholdConfig(evictionHard, evictionSoft, evictionSoftGracePeriod st
 		softThresholds[i].GracePeriod = period
 	}
 	results = append(results, softThresholds...)
+	for i := range results {
+		for signal, minReclaim := range minReclaims {
+			if results[i].Signal == signal {
+				results[i].MinReclaim = &minReclaim
+				break
+			}
+		}
+	}
 	return results, nil
 }
 
@@ -182,6 +194,38 @@ func parseGracePeriods(expr string) (map[Signal]time.Duration, error) {
 			return nil, fmt.Errorf("duplicate eviction grace period specified for %v", signal)
 		}
 		results[signal] = gracePeriod
+	}
+	return results, nil
+}
+
+// parseMinimumReclaims parses the minimum reclaim statements
+func parseMinimumReclaims(expr string) (map[Signal]resource.Quantity, error) {
+	if len(expr) == 0 {
+		return nil, nil
+	}
+	results := map[Signal]resource.Quantity{}
+	statements := strings.Split(expr, ",")
+	for _, statement := range statements {
+		parts := strings.Split(statement, "=")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid eviction minimum reclaim syntax: %v, expected <signal>=<quantity>", statement)
+		}
+		signal := Signal(parts[0])
+		if !validSignal(signal) {
+			return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
+		}
+		// check against duplicate statements
+		if _, found := results[signal]; found {
+			return nil, fmt.Errorf("duplicate eviction minimum reclaim specified for %v", signal)
+		}
+		quantity, err := resource.ParseQuantity(parts[1])
+		if quantity.Sign() < 0 {
+			return nil, fmt.Errorf("negative eviction minimum reclaim specified for %v", signal)
+		}
+		if err != nil {
+			return nil, err
+		}
+		results[signal] = quantity
 	}
 	return results, nil
 }

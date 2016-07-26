@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package meta provides functions for retrieving API metadata from objects
 // belonging to the Kubernetes API
-package meta
+package meta // import "k8s.io/kubernetes/pkg/api/meta"

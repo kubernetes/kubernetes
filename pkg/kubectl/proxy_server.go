@@ -35,7 +35,7 @@ import (
 const (
 	DefaultHostAcceptRE   = "^localhost$,^127\\.0\\.0\\.1$,^\\[::1\\]$"
 	DefaultPathAcceptRE   = "^/.*"
-	DefaultPathRejectRE   = "^/api/.*/exec,^/api/.*/run,^/api/.*/attach"
+	DefaultPathRejectRE   = "^/api/.*/pods/.*/exec,^/api/.*/pods/.*/attach"
 	DefaultMethodRejectRE = "POST,PUT,PATCH"
 )
 

@@ -32,10 +32,11 @@ type Size struct {
 // GetSize returns the current size of the user's terminal. If it isn't a terminal,
 // nil is returned.
 func (t TTY) GetSize() *Size {
-	if !t.IsTerminalOut() {
+	outFd, isTerminal := term.GetFdInfo(t.Out)
+	if !isTerminal {
 		return nil
 	}
-	return GetSize(t.Out.(fd).Fd())
+	return GetSize(outFd)
 }
 
 // GetSize returns the current size of the terminal associated with fd.
@@ -57,7 +58,8 @@ func SetSize(fd uintptr, size Size) error {
 // MonitorSize monitors the terminal's size. It returns a TerminalSizeQueue primed with
 // initialSizes, or nil if there's no TTY present.
 func (t *TTY) MonitorSize(initialSizes ...*Size) TerminalSizeQueue {
-	if !t.IsTerminalOut() {
+	outFd, isTerminal := term.GetFdInfo(t.Out)
+	if !isTerminal {
 		return nil
 	}
 
@@ -69,7 +71,7 @@ func (t *TTY) MonitorSize(initialSizes ...*Size) TerminalSizeQueue {
 		stopResizing: make(chan struct{}),
 	}
 
-	t.sizeQueue.monitorSize(initialSizes...)
+	t.sizeQueue.monitorSize(outFd, initialSizes...)
 
 	return t.sizeQueue
 }
@@ -94,7 +96,7 @@ var _ TerminalSizeQueue = &sizeQueue{}
 
 // monitorSize primes resizeChan with initialSizes and then monitors for resize events. With each
 // new event, it sends the current terminal size to resizeChan.
-func (s *sizeQueue) monitorSize(initialSizes ...*Size) {
+func (s *sizeQueue) monitorSize(outFd uintptr, initialSizes ...*Size) {
 	// send the initial sizes
 	for i := range initialSizes {
 		if initialSizes[i] != nil {
@@ -104,7 +106,7 @@ func (s *sizeQueue) monitorSize(initialSizes ...*Size) {
 
 	resizeEvents := make(chan Size, 1)
 
-	monitorResizeEvents(s.t.Out.(fd).Fd(), resizeEvents, s.stopResizing)
+	monitorResizeEvents(outFd, resizeEvents, s.stopResizing)
 
 	// listen for resize events in the background
 	go func() {

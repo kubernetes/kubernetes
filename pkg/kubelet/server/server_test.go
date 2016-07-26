@@ -161,7 +161,7 @@ func (fk *fakeKubelet) ListVolumesForPod(podUID types.UID) (map[string]volume.Vo
 type fakeAuth struct {
 	authenticateFunc func(*http.Request) (user.Info, bool, error)
 	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
-	authorizeFunc    func(authorizer.Attributes) (err error)
+	authorizeFunc    func(authorizer.Attributes) (authorized bool, reason string, err error)
 }
 
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
@@ -170,7 +170,7 @@ func (f *fakeAuth) AuthenticateRequest(req *http.Request) (user.Info, bool, erro
 func (f *fakeAuth) GetRequestAttributes(u user.Info, req *http.Request) authorizer.Attributes {
 	return f.attributesFunc(u, req)
 }
-func (f *fakeAuth) Authorize(a authorizer.Attributes) (err error) {
+func (f *fakeAuth) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
 	return f.authorizeFunc(a)
 }
 
@@ -204,8 +204,8 @@ func newServerTest() *serverTestFramework {
 		attributesFunc: func(u user.Info, req *http.Request) authorizer.Attributes {
 			return &authorizer.AttributesRecord{User: u}
 		},
-		authorizeFunc: func(a authorizer.Attributes) (err error) {
-			return nil
+		authorizeFunc: func(a authorizer.Attributes) (authorized bool, reason string, err error) {
+			return true, "", nil
 		},
 	}
 	server := NewServer(
@@ -626,12 +626,12 @@ func TestAuthFilters(t *testing.T) {
 			}
 			return expectedAttributes
 		}
-		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (authorized bool, reason string, err error) {
 			calledAuthorize = true
 			if a != expectedAttributes {
 				t.Fatalf("%s: expected attributes %v, got %v", tc.Path, expectedAttributes, a)
 			}
-			return errors.New("Forbidden")
+			return false, "", nil
 		}
 
 		req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
@@ -665,6 +665,44 @@ func TestAuthFilters(t *testing.T) {
 	}
 }
 
+func TestAuthenticationError(t *testing.T) {
+	var (
+		expectedUser       = &user.DefaultInfo{Name: "test"}
+		expectedAttributes = &authorizer.AttributesRecord{User: expectedUser}
+
+		calledAuthenticate = false
+		calledAuthorize    = false
+		calledAttributes   = false
+	)
+
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+	fw.fakeAuth.authenticateFunc = func(req *http.Request) (user.Info, bool, error) {
+		calledAuthenticate = true
+		return expectedUser, true, nil
+	}
+	fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+		calledAttributes = true
+		return expectedAttributes
+	}
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (authorized bool, reason string, err error) {
+		calledAuthorize = true
+		return false, "", errors.New("Failed")
+	}
+
+	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusInternalServerError)
+
+	if !calledAuthenticate {
+		t.Fatalf("Authenticate was not called")
+	}
+	if !calledAttributes {
+		t.Fatalf("Attributes was not called")
+	}
+	if !calledAuthorize {
+		t.Fatalf("Authorize was not called")
+	}
+}
+
 func TestAuthenticationFailure(t *testing.T) {
 	var (
 		expectedUser       = &user.DefaultInfo{Name: "test"}
@@ -685,9 +723,9 @@ func TestAuthenticationFailure(t *testing.T) {
 		calledAttributes = true
 		return expectedAttributes
 	}
-	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (authorized bool, reason string, err error) {
 		calledAuthorize = true
-		return errors.New("not allowed")
+		return false, "", nil
 	}
 
 	assertHealthFails(t, fw.testHTTPServer.URL+"/healthz", http.StatusUnauthorized)
@@ -723,9 +761,9 @@ func TestAuthorizationSuccess(t *testing.T) {
 		calledAttributes = true
 		return expectedAttributes
 	}
-	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (err error) {
+	fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (authorized bool, reason string, err error) {
 		calledAuthorize = true
-		return nil
+		return true, "", nil
 	}
 
 	assertHealthIsOk(t, fw.testHTTPServer.URL+"/healthz")

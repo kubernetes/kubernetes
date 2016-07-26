@@ -107,7 +107,8 @@ func doMount(source string, target string, fstype string, options []string) erro
 	command := exec.Command("mount", mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
+		glog.Errorf("Mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n", err, source, target, fstype, options, string(output))
+		return fmt.Errorf("mount failed: %v\nMounting arguments: %s %s %s %v\nOutput: %s\n",
 			err, source, target, fstype, options, string(output))
 	}
 	return err
@@ -169,6 +170,56 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	}
 
 	return true, nil
+}
+
+// DeviceOpened checks if block device in use by calling Open with O_EXCL flag.
+// Returns true if open returns errno EBUSY, and false if errno is nil.
+// Returns an error if errno is any error other than EBUSY.
+// Returns with error if pathname is not a device.
+func (mounter *Mounter) DeviceOpened(pathname string) (bool, error) {
+	return exclusiveOpenFailsOnDevice(pathname)
+}
+
+// PathIsDevice uses FileInfo returned from os.Stat to check if path refers
+// to a device.
+func (mounter *Mounter) PathIsDevice(pathname string) (bool, error) {
+	return pathIsDevice(pathname)
+}
+
+func exclusiveOpenFailsOnDevice(pathname string) (bool, error) {
+	if isDevice, err := pathIsDevice(pathname); !isDevice {
+		return false, fmt.Errorf(
+			"PathIsDevice failed for path %q: %v",
+			pathname,
+			err)
+	}
+	fd, errno := syscall.Open(pathname, syscall.O_RDONLY|syscall.O_EXCL, 0)
+	// If the device is in use, open will return an invalid fd.
+	// When this happens, it is expected that Close will fail and throw an error.
+	defer syscall.Close(fd)
+	if errno == nil {
+		// device not in use
+		return false, nil
+	} else if errno == syscall.EBUSY {
+		// device is in use
+		return true, nil
+	}
+	// error during call to Open
+	return false, errno
+}
+
+func pathIsDevice(pathname string) (bool, error) {
+	finfo, err := os.Stat(pathname)
+	// err in call to os.Stat
+	if err != nil {
+		return false, err
+	}
+	// path refers to a device
+	if finfo.Mode()&os.ModeDevice != 0 {
+		return true, nil
+	}
+	// path does not refer to device
+	return false, nil
 }
 
 func listProcMounts(mountFilePath string) ([]MountPoint, error) {
@@ -249,6 +300,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	options = append(options, "defaults")
 
 	// Run fsck on the disk to fix repairable issues
+	glog.V(4).Infof("Checking for issues with fsck on disk: %s", source)
 	args := []string{"-a", source}
 	cmd := mounter.Runner.Command("fsck", args...)
 	out, err := cmd.CombinedOutput()
@@ -267,6 +319,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 	}
 
 	// Try to mount the disk
+	glog.V(4).Infof("Attempting to mount disk: %s %s %s", fstype, source, target)
 	err = mounter.Interface.Mount(source, target, fstype, options)
 	if err != nil {
 		// It is possible that this disk is not formatted. Double check using diskLooksUnformatted
@@ -281,12 +334,15 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 			if fstype == "ext4" || fstype == "ext3" {
 				args = []string{"-E", "lazy_itable_init=0,lazy_journal_init=0", "-F", source}
 			}
+			glog.Infof("Disk %q appears to be unformatted, attempting to format as type: %q with options: %v", source, fstype, args)
 			cmd := mounter.Runner.Command("mkfs."+fstype, args...)
 			_, err := cmd.CombinedOutput()
 			if err == nil {
 				// the disk has been formatted successfully try to mount it again.
+				glog.Infof("Disk successfully formatted (mkfs): %s - %s %s", fstype, source, target)
 				return mounter.Interface.Mount(source, target, fstype, options)
 			}
+			glog.Errorf("format of disk %q failed: type:(%q) target:(%q) options:(%q)error:(%v)", source, fstype, target, options, err)
 			return err
 		}
 	}
@@ -297,6 +353,7 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	args := []string{"-nd", "-o", "FSTYPE", disk}
 	cmd := mounter.Runner.Command("lsblk", args...)
+	glog.V(4).Infof("Attempting to determine if disk %q is formatted using lsblk with args: (%v)", disk, args)
 	dataOut, err := cmd.CombinedOutput()
 	output := strings.TrimSpace(string(dataOut))
 
@@ -304,6 +361,7 @@ func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, erro
 	// an error if so.
 
 	if err != nil {
+		glog.Errorf("Could not determine if disk %q is formatted (%v)", disk, err)
 		return false, err
 	}
 

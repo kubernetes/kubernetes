@@ -23,7 +23,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
 	"k8s.io/kubernetes/cmd/kubelet/app"
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
@@ -35,7 +34,6 @@ import (
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := options.NewKubeletServer()
 	s.AddFlags(pflag.CommandLine)
 

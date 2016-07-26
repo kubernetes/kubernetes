@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package deleter implements the deleter which listens for pod DELETE events
 // from the apiserver and kills tasks for deleted pods.
-package deleter
+package deleter // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter"

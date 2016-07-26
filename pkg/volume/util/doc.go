@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Contains utility code for use by volume plugins.
-package util
+package util // import "k8s.io/kubernetes/pkg/volume/util"

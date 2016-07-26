@@ -25,7 +25,6 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -536,11 +535,11 @@ func TestAuthModeAlwaysDeny(t *testing.T) {
 // TODO(etune): remove this test once a more comprehensive built-in authorizer is implemented.
 type allowAliceAuthorizer struct{}
 
-func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) error {
+func (allowAliceAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" {
-		return nil
+		return true, "", nil
 	}
-	return errors.New("I can't allow that.  Go ask alice.")
+	return false, "I can't allow that.  Go ask alice.", nil
 }
 
 // TestAliceNotForbiddenOrUnauthorized tests a user who is known to
@@ -703,24 +702,24 @@ func TestUnknownUserIsUnauthorized(t *testing.T) {
 type impersonateAuthorizer struct{}
 
 // alice can't act as anyone and bob can't do anything but act-as someone
-func (impersonateAuthorizer) Authorize(a authorizer.Attributes) error {
+func (impersonateAuthorizer) Authorize(a authorizer.Attributes) (bool, string, error) {
 	// alice can impersonate service accounts and do other actions
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" && a.GetVerb() == "impersonate" && a.GetResource() == "serviceaccounts" {
-		return nil
+		return true, "", nil
 	}
 	if a.GetUser() != nil && a.GetUser().GetName() == "alice" && a.GetVerb() != "impersonate" {
-		return nil
+		return true, "", nil
 	}
 	// bob can impersonate anyone, but that it
 	if a.GetUser() != nil && a.GetUser().GetName() == "bob" && a.GetVerb() == "impersonate" {
-		return nil
+		return true, "", nil
 	}
 	// service accounts can do everything
 	if a.GetUser() != nil && strings.HasPrefix(a.GetUser().GetName(), serviceaccount.ServiceAccountUsernamePrefix) {
-		return nil
+		return true, "", nil
 	}
 
-	return errors.New("I can't allow that.  Go ask alice.")
+	return false, "I can't allow that.  Go ask alice.", nil
 }
 
 func TestImpersonateIsForbidden(t *testing.T) {
@@ -862,9 +861,9 @@ type trackingAuthorizer struct {
 	requestAttributes []authorizer.Attributes
 }
 
-func (a *trackingAuthorizer) Authorize(attributes authorizer.Attributes) error {
+func (a *trackingAuthorizer) Authorize(attributes authorizer.Attributes) (bool, string, error) {
 	a.requestAttributes = append(a.requestAttributes, attributes)
-	return nil
+	return true, "", nil
 }
 
 // TestAuthorizationAttributeDetermination tests that authorization attributes are built correctly

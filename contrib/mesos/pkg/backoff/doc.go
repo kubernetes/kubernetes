@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package backoff provides backoff functionality with a simple API.
 // Originally copied from Kubernetes: plugin/pkg/scheduler/factory/factory.go
-package backoff
+package backoff // import "k8s.io/kubernetes/contrib/mesos/pkg/backoff"

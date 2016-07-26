@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
@@ -30,7 +29,6 @@ import (
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	s := service.NewKubeletExecutorServer()
 	s.AddFlags(pflag.CommandLine)

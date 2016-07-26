@@ -18,8 +18,9 @@ package runtime
 
 import (
 	"fmt"
-	"github.com/golang/glog"
 	"runtime"
+
+	"github.com/golang/glog"
 )
 
 var (
@@ -59,6 +60,11 @@ func HandleCrash(additionalHandlers ...func(interface{})) {
 
 // logPanic logs the caller tree when a panic occurs.
 func logPanic(r interface{}) {
+	callers := getCallers(r)
+	glog.Errorf("Observed a panic: %#v (%v)\n%v", r, r, callers)
+}
+
+func getCallers(r interface{}) string {
 	callers := ""
 	for i := 0; true; i++ {
 		_, file, line, ok := runtime.Caller(i)
@@ -67,7 +73,8 @@ func logPanic(r interface{}) {
 		}
 		callers = callers + fmt.Sprintf("%v:%v\n", file, line)
 	}
-	glog.Errorf("Observed a panic: %#v (%v)\n%v", r, r, callers)
+
+	return callers
 }
 
 // ErrorHandlers is a list of functions which will be invoked when an unreturnable
@@ -103,4 +110,19 @@ func GetCaller() string {
 		return fmt.Sprintf("Unable to find caller")
 	}
 	return f.Name()
+}
+
+// RecoverFromPanic replaces the specified error with an error containing the
+// original error, and  the call tree when a panic occurs. This enables error
+// handlers to handle errors and panics the same way.
+func RecoverFromPanic(err *error) {
+	if r := recover(); r != nil {
+		callers := getCallers(r)
+
+		*err = fmt.Errorf(
+			"recovered from panic %q. (err=%v) Call stack:\n%v",
+			r,
+			*err,
+			callers)
+	}
 }

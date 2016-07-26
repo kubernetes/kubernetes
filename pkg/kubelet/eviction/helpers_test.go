@@ -41,6 +41,7 @@ func TestParseThresholdConfig(t *testing.T) {
 		evictionHard            string
 		evictionSoft            string
 		evictionSoftGracePeriod string
+		evictionMinReclaim      string
 		expectErr               bool
 		expectThresholds        []Threshold
 	}{
@@ -48,6 +49,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "",
 			expectErr:               false,
 			expectThresholds:        []Threshold{},
 		},
@@ -55,18 +57,21 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "memory.available<150Mi",
 			evictionSoft:            "memory.available<300Mi",
 			evictionSoftGracePeriod: "memory.available=30s",
+			evictionMinReclaim:      "memory.available=0",
 			expectErr:               false,
 			expectThresholds: []Threshold{
 				{
-					Signal:   SignalMemoryAvailable,
-					Operator: OpLessThan,
-					Value:    quantityMustParse("150Mi"),
+					Signal:     SignalMemoryAvailable,
+					Operator:   OpLessThan,
+					Value:      quantityMustParse("150Mi"),
+					MinReclaim: quantityMustParse("0"),
 				},
 				{
 					Signal:      SignalMemoryAvailable,
 					Operator:    OpLessThan,
 					Value:       quantityMustParse("300Mi"),
 					GracePeriod: gracePeriod,
+					MinReclaim:  quantityMustParse("0"),
 				},
 			},
 		},
@@ -74,6 +79,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "mem.available<150Mi",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "",
 			expectErr:               true,
 			expectThresholds:        []Threshold{},
 		},
@@ -81,6 +87,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "memory.available<150Mi,memory.available<100Mi",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "",
 			expectErr:               true,
 			expectThresholds:        []Threshold{},
 		},
@@ -88,6 +95,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "memory.available<150Mi,invalid.foo<150Mi",
 			evictionSoft:            "",
 			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "",
 			expectErr:               true,
 			expectThresholds:        []Threshold{},
 		},
@@ -95,6 +103,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "",
 			evictionSoft:            "memory.available<150Mi",
 			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "",
 			expectErr:               true,
 			expectThresholds:        []Threshold{},
 		},
@@ -105,9 +114,25 @@ func TestParseThresholdConfig(t *testing.T) {
 			expectErr:               true,
 			expectThresholds:        []Threshold{},
 		},
+		"neg-reclaim": {
+			evictionHard:            "",
+			evictionSoft:            "",
+			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "memory.available=-300Mi",
+			expectErr:               true,
+			expectThresholds:        []Threshold{},
+		},
+		"duplicate-reclaim": {
+			evictionHard:            "",
+			evictionSoft:            "",
+			evictionSoftGracePeriod: "",
+			evictionMinReclaim:      "memory.available=-300Mi,memory.available=-100Mi",
+			expectErr:               true,
+			expectThresholds:        []Threshold{},
+		},
 	}
 	for testName, testCase := range testCases {
-		thresholds, err := ParseThresholdConfig(testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod)
+		thresholds, err := ParseThresholdConfig(testCase.evictionHard, testCase.evictionSoft, testCase.evictionSoftGracePeriod, testCase.evictionMinReclaim)
 		if testCase.expectErr != (err != nil) {
 			t.Errorf("Err not as expected, test: %v, error expected: %v, actual: %v", testName, testCase.expectErr, err)
 		}
@@ -150,7 +175,8 @@ func thresholdEqual(a Threshold, b Threshold) bool {
 	return a.GracePeriod == b.GracePeriod &&
 		a.Operator == b.Operator &&
 		a.Signal == b.Signal &&
-		a.Value.Cmp(*b.Value) == 0
+		a.Value.Cmp(*b.Value) == 0 &&
+		a.MinReclaim.Cmp(*b.MinReclaim) == 0
 }
 
 // TestOrderedByQoS ensures we order BestEffort < Burstable < Guaranteed

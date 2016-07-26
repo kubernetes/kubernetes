@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 // Package operationexecutor implements interfaces that enable execution of
-// attach, detach, mount, and unmount operations with a goroutinemap so that
-// more than one operation is never triggered on the same volume.
+// attach, detach, mount, and unmount operations with a nestedpendingoperations
+// so that more than one operation is never triggered on the same volume.
 package operationexecutor
 
 import (
@@ -27,13 +27,15 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 // OperationExecutor defines a set of operations for attaching, detaching,
-// mounting, or unmounting a volume that are executed with a goroutinemap which
+// mounting, or unmounting a volume that are executed with a NewNestedPendingOperations which
 // prevents more than one operation from being triggered on the same volume.
 //
 // These operations should be idempotent (for example, AttachVolume should
@@ -83,7 +85,7 @@ type OperationExecutor interface {
 	// UnmountDevice unmounts the volumes global mount path from the device (for
 	// attachable volumes only, freeing it for detach. It then updates the
 	// actual state of the world to reflect that.
-	UnmountDevice(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater) error
+	UnmountDevice(deviceToDetach AttachedVolume, actualStateOfWorld ActualStateOfWorldMounterUpdater, mounter mount.Interface) error
 
 	// VerifyControllerAttachedVolume checks if the specified volume is present
 	// in the specified nodes AttachedVolumes Status field. It uses kubeClient
@@ -105,7 +107,7 @@ func NewOperationExecutor(
 	return &operationExecutor{
 		kubeClient:      kubeClient,
 		volumePluginMgr: volumePluginMgr,
-		pendingOperations: goroutinemap.NewGoRoutineMap(
+		pendingOperations: nestedpendingoperations.NewNestedPendingOperations(
 			true /* exponentialBackOffOnError */),
 	}
 }
@@ -206,6 +208,10 @@ type AttachedVolume struct {
 	// PluginIsAttachable indicates that the plugin for this volume implements
 	// the volume.Attacher interface
 	PluginIsAttachable bool
+
+	// DevicePath contains the path on the node where the volume is attached.
+	// For non-attachable volumes this is empty.
+	DevicePath string
 }
 
 // MountedVolume represents a volume that has successfully been mounted to a pod.
@@ -323,7 +329,7 @@ type operationExecutor struct {
 
 	// pendingOperations keeps track of pending attach and detach operations so
 	// multiple operations are not started on the same volume
-	pendingOperations goroutinemap.GoRoutineMap
+	pendingOperations nestedpendingoperations.NestedPendingOperations
 }
 
 func (oe *operationExecutor) AttachVolume(
@@ -336,7 +342,7 @@ func (oe *operationExecutor) AttachVolume(
 	}
 
 	return oe.pendingOperations.Run(
-		string(volumeToAttach.VolumeName), attachFunc)
+		volumeToAttach.VolumeName, "" /* podName */, attachFunc)
 }
 
 func (oe *operationExecutor) DetachVolume(
@@ -350,7 +356,7 @@ func (oe *operationExecutor) DetachVolume(
 	}
 
 	return oe.pendingOperations.Run(
-		string(volumeToDetach.VolumeName), detachFunc)
+		volumeToDetach.VolumeName, "" /* podName */, detachFunc)
 }
 
 func (oe *operationExecutor) MountVolume(
@@ -363,8 +369,15 @@ func (oe *operationExecutor) MountVolume(
 		return err
 	}
 
+	podName := volumetypes.UniquePodName("")
+	if !volumeToMount.PluginIsAttachable {
+		// Non-attachable volume plugins can execute mount for multiple pods
+		// referencing the same volume in parallel
+		podName = volumehelper.GetUniquePodName(volumeToMount.Pod)
+	}
+
 	return oe.pendingOperations.Run(
-		string(volumeToMount.VolumeName), mountFunc)
+		volumeToMount.VolumeName, podName, mountFunc)
 }
 
 func (oe *operationExecutor) UnmountVolume(
@@ -376,21 +389,26 @@ func (oe *operationExecutor) UnmountVolume(
 		return err
 	}
 
+	// All volume plugins can execute mount for multiple pods referencing the
+	// same volume in parallel
+	podName := volumetypes.UniquePodName(volumeToUnmount.PodUID)
+
 	return oe.pendingOperations.Run(
-		string(volumeToUnmount.VolumeName), unmountFunc)
+		volumeToUnmount.VolumeName, podName, unmountFunc)
 }
 
 func (oe *operationExecutor) UnmountDevice(
 	deviceToDetach AttachedVolume,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	mounter mount.Interface) error {
 	unmountDeviceFunc, err :=
-		oe.generateUnmountDeviceFunc(deviceToDetach, actualStateOfWorld)
+		oe.generateUnmountDeviceFunc(deviceToDetach, actualStateOfWorld, mounter)
 	if err != nil {
 		return err
 	}
 
 	return oe.pendingOperations.Run(
-		string(deviceToDetach.VolumeName), unmountDeviceFunc)
+		deviceToDetach.VolumeName, "" /* podName */, unmountDeviceFunc)
 }
 
 func (oe *operationExecutor) VerifyControllerAttachedVolume(
@@ -404,7 +422,7 @@ func (oe *operationExecutor) VerifyControllerAttachedVolume(
 	}
 
 	return oe.pendingOperations.Run(
-		string(volumeToMount.VolumeName), verifyControllerAttachedVolumeFunc)
+		volumeToMount.VolumeName, "" /* podName */, verifyControllerAttachedVolumeFunc)
 }
 
 func (oe *operationExecutor) generateAttachVolumeFunc(
@@ -811,7 +829,8 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 
 func (oe *operationExecutor) generateUnmountDeviceFunc(
 	deviceToDetach AttachedVolume,
-	actualStateOfWorld ActualStateOfWorldMounterUpdater) (func() error, error) {
+	actualStateOfWorld ActualStateOfWorldMounterUpdater,
+	mounter mount.Interface) (func() error, error) {
 	// Get attacher plugin
 	attachableVolumePlugin, err :=
 		oe.volumePluginMgr.FindAttachablePluginBySpec(deviceToDetach.VolumeSpec)
@@ -862,6 +881,24 @@ func (oe *operationExecutor) generateUnmountDeviceFunc(
 				deviceToDetach.VolumeName,
 				deviceToDetach.VolumeSpec.Name(),
 				unmountDeviceErr)
+		}
+		// Before logging that UnmountDevice succeeded and moving on,
+		// use mounter.DeviceOpened to check if the device is in use anywhere
+		// else on the system. Retry if it returns true.
+		deviceOpened, deviceOpenedErr := mounter.DeviceOpened(deviceToDetach.DevicePath)
+		if deviceOpenedErr != nil {
+			return fmt.Errorf(
+				"UnmountDevice.DeviceOpened failed for volume %q (spec.Name: %q) with: %v",
+				deviceToDetach.VolumeName,
+				deviceToDetach.VolumeSpec.Name(),
+				deviceOpenedErr)
+		}
+		// The device is still in use elsewhere. Caller will log and retry.
+		if deviceOpened {
+			return fmt.Errorf(
+				"UnmountDevice failed for volume %q (spec.Name: %q) because the device is in use when it was no longer expected to be in use",
+				deviceToDetach.VolumeName,
+				deviceToDetach.VolumeSpec.Name())
 		}
 
 		glog.Infof(

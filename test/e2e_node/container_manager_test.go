@@ -29,14 +29,20 @@ import (
 )
 
 var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
-	f := NewDefaultFramework("kubelet-container-manager")
+	f := framework.NewDefaultFramework("kubelet-container-manager")
+	var podClient *framework.PodClient
+
+	BeforeEach(func() {
+		podClient = f.PodClient()
+	})
+
 	Describe("oom score adjusting", func() {
 		Context("when scheduling a busybox command that always fails in a pod", func() {
 			var podName string
 
 			BeforeEach(func() {
 				podName = "bin-false" + string(util.NewUUID())
-				f.CreatePodAsync(&api.Pod{
+				podClient.Create(&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name: podName,
 					},
@@ -56,7 +62,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 
 			It("should have an error terminated reason", func() {
 				Eventually(func() error {
-					podData, err := f.PodClient().Get(podName)
+					podData, err := podClient.Get(podName)
 					if err != nil {
 						return err
 					}
@@ -75,7 +81,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 			})
 
 			It("should be possible to delete", func() {
-				err := f.PodClient().Delete(podName, &api.DeleteOptions{})
+				err := podClient.Delete(podName, &api.DeleteOptions{})
 				Expect(err).To(BeNil(), fmt.Sprintf("Error deleting Pod %v", err))
 			})
 		})

@@ -125,7 +125,14 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 }
 
 // Unmount the global PD mount, which should be the only one, and delete it.
+// Does nothing if globalMountPath does not exist.
 func unmountPDAndRemoveGlobalPath(globalMountPath string, mounter mount.Interface) error {
+	if pathExists, pathErr := pathExists(globalMountPath); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.V(5).Infof("Warning: Unmount skipped because path does not exist: %v", globalMountPath)
+		return nil
+	}
 	err := mounter.Unmount(globalMountPath)
 	os.Remove(globalMountPath)
 	return err

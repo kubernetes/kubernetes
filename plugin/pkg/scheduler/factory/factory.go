@@ -48,6 +48,8 @@ import (
 
 const (
 	SchedulerAnnotationKey = "scheduler.alpha.kubernetes.io/name"
+	initialGetBackoff      = 100 * time.Millisecond
+	maximalGetBackoff      = time.Minute
 )
 
 // ConfigFactory knows how to fill out a scheduler config with its support functions.
@@ -531,12 +533,20 @@ func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue
 			}
 			// Get the pod again; it may have changed/been scheduled already.
 			pod = &api.Pod{}
-			err := factory.Client.Get().Namespace(podID.Namespace).Resource("pods").Name(podID.Name).Do().Into(pod)
-			if err != nil {
-				if !errors.IsNotFound(err) {
-					glog.Errorf("Error getting pod %v for retry: %v; abandoning", podID, err)
+			getBackoff := initialGetBackoff
+			for {
+				if err := factory.Client.Get().Namespace(podID.Namespace).Resource("pods").Name(podID.Name).Do().Into(pod); err == nil {
+					break
 				}
-				return
+				if errors.IsNotFound(err) {
+					glog.Warningf("A pod %v no longer exists", podID)
+					return
+				}
+				glog.Errorf("Error getting pod %v for retry: %v; retrying...", podID, err)
+				if getBackoff = getBackoff * 2; getBackoff > maximalGetBackoff {
+					getBackoff = maximalGetBackoff
+				}
+				time.Sleep(getBackoff)
 			}
 			if pod.Spec.NodeName == "" {
 				podQueue.AddIfNotPresent(pod)

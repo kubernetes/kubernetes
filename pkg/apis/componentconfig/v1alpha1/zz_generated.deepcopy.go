@@ -347,6 +347,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
 		out.EvictionPressureTransitionPeriod = in.EvictionPressureTransitionPeriod
 		out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
+		out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
 		out.PodsPerCore = in.PodsPerCore
 		if in.EnableControllerAttachDetach != nil {
 			in, out := &in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach

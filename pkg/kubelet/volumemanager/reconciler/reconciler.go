@@ -25,8 +25,10 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
-	"k8s.io/kubernetes/pkg/util/goroutinemap"
+	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/volume/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 )
 
@@ -62,6 +64,7 @@ type Reconciler interface {
 // operationExecutor - used to trigger attach/detach/mount/unmount operations
 //   safely (prevents more than one operation from being triggered on the same
 //   volume)
+// mounter - mounter passed in from kubelet, passed down unmount path
 func NewReconciler(
 	kubeClient internalclientset.Interface,
 	controllerAttachDetachEnabled bool,
@@ -70,7 +73,8 @@ func NewReconciler(
 	hostName string,
 	desiredStateOfWorld cache.DesiredStateOfWorld,
 	actualStateOfWorld cache.ActualStateOfWorld,
-	operationExecutor operationexecutor.OperationExecutor) Reconciler {
+	operationExecutor operationexecutor.OperationExecutor,
+	mounter mount.Interface) Reconciler {
 	return &reconciler{
 		kubeClient:                    kubeClient,
 		controllerAttachDetachEnabled: controllerAttachDetachEnabled,
@@ -80,6 +84,7 @@ func NewReconciler(
 		desiredStateOfWorld:           desiredStateOfWorld,
 		actualStateOfWorld:            actualStateOfWorld,
 		operationExecutor:             operationExecutor,
+		mounter:                       mounter,
 	}
 }
 
@@ -92,6 +97,7 @@ type reconciler struct {
 	desiredStateOfWorld           cache.DesiredStateOfWorld
 	actualStateOfWorld            cache.ActualStateOfWorld
 	operationExecutor             operationexecutor.OperationExecutor
+	mounter                       mount.Interface
 }
 
 func (rc *reconciler) Run(stopCh <-chan struct{}) {
@@ -117,9 +123,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 				err := rc.operationExecutor.UnmountVolume(
 					mountedVolume.MountedVolume, rc.actualStateOfWorld)
 				if err != nil &&
-					!goroutinemap.IsAlreadyExists(err) &&
-					!goroutinemap.IsExponentialBackoff(err) {
-					// Ignore goroutinemap.IsAlreadyExists and goroutinemap.IsExponentialBackoff errors, they are expected.
+					!nestedpendingoperations.IsAlreadyExists(err) &&
+					!exponentialbackoff.IsExponentialBackoff(err) {
+					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
 					glog.Errorf(
 						"operationExecutor.UnmountVolume failed for volume %q (spec.Name: %q) pod %q (UID: %q) controllerAttachDetachEnabled: %v with err: %v",
@@ -158,9 +164,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						rc.hostName,
 						rc.actualStateOfWorld)
 					if err != nil &&
-						!goroutinemap.IsAlreadyExists(err) &&
-						!goroutinemap.IsExponentialBackoff(err) {
-						// Ignore goroutinemap.IsAlreadyExists and goroutinemap.IsExponentialBackoff errors, they are expected.
+						!nestedpendingoperations.IsAlreadyExists(err) &&
+						!exponentialbackoff.IsExponentialBackoff(err) {
+						// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 						// Log all other errors.
 						glog.Errorf(
 							"operationExecutor.VerifyControllerAttachedVolume failed for volume %q (spec.Name: %q) pod %q (UID: %q) controllerAttachDetachEnabled: %v with err: %v",
@@ -193,9 +199,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						volumeToMount.Pod.UID)
 					err := rc.operationExecutor.AttachVolume(volumeToAttach, rc.actualStateOfWorld)
 					if err != nil &&
-						!goroutinemap.IsAlreadyExists(err) &&
-						!goroutinemap.IsExponentialBackoff(err) {
-						// Ignore goroutinemap.IsAlreadyExists and goroutinemap.IsExponentialBackoff errors, they are expected.
+						!nestedpendingoperations.IsAlreadyExists(err) &&
+						!exponentialbackoff.IsExponentialBackoff(err) {
+						// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 						// Log all other errors.
 						glog.Errorf(
 							"operationExecutor.AttachVolume failed for volume %q (spec.Name: %q) pod %q (UID: %q) controllerAttachDetachEnabled: %v with err: %v",
@@ -231,9 +237,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 					volumeToMount.VolumeToMount,
 					rc.actualStateOfWorld)
 				if err != nil &&
-					!goroutinemap.IsAlreadyExists(err) &&
-					!goroutinemap.IsExponentialBackoff(err) {
-					// Ignore goroutinemap.IsAlreadyExists and goroutinemap.IsExponentialBackoff errors, they are expected.
+					!nestedpendingoperations.IsAlreadyExists(err) &&
+					!exponentialbackoff.IsExponentialBackoff(err) {
+					// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 					// Log all other errors.
 					glog.Errorf(
 						"operationExecutor.MountVolume failed for volume %q (spec.Name: %q) pod %q (UID: %q) controllerAttachDetachEnabled: %v with err: %v",
@@ -264,11 +270,11 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						attachedVolume.VolumeName,
 						attachedVolume.VolumeSpec.Name())
 					err := rc.operationExecutor.UnmountDevice(
-						attachedVolume.AttachedVolume, rc.actualStateOfWorld)
+						attachedVolume.AttachedVolume, rc.actualStateOfWorld, rc.mounter)
 					if err != nil &&
-						!goroutinemap.IsAlreadyExists(err) &&
-						!goroutinemap.IsExponentialBackoff(err) {
-						// Ignore goroutinemap.IsAlreadyExists and goroutinemap.IsExponentialBackoff errors, they are expected.
+						!nestedpendingoperations.IsAlreadyExists(err) &&
+						!exponentialbackoff.IsExponentialBackoff(err) {
+						// Ignore nestedpendingoperations.IsAlreadyExists and exponentialbackoff.IsExponentialBackoff errors, they are expected.
 						// Log all other errors.
 						glog.Errorf(
 							"operationExecutor.UnmountDevice failed for volume %q (spec.Name: %q) controllerAttachDetachEnabled: %v with err: %v",
@@ -297,9 +303,9 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 						err := rc.operationExecutor.DetachVolume(
 							attachedVolume.AttachedVolume, false /* verifySafeToDetach */, rc.actualStateOfWorld)
 						if err != nil &&
-							!goroutinemap.IsAlreadyExists(err) &&
-							!goroutinemap.IsExponentialBackoff(err) {
-							// Ignore goroutinemap.IsAlreadyExists && goroutinemap.IsExponentialBackoff errors, they are expected.
+							!nestedpendingoperations.IsAlreadyExists(err) &&
+							!exponentialbackoff.IsExponentialBackoff(err) {
+							// Ignore nestedpendingoperations.IsAlreadyExists && exponentialbackoff.IsExponentialBackoff errors, they are expected.
 							// Log all other errors.
 							glog.Errorf(
 								"operationExecutor.DetachVolume failed for volume %q (spec.Name: %q) controllerAttachDetachEnabled: %v with err: %v",

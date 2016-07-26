@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // package capabilities manages system level capabilities
-package capabilities
+package capabilities // import "k8s.io/kubernetes/pkg/capabilities"

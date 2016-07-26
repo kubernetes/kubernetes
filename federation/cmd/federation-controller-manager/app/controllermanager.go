@@ -20,12 +20,13 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
 	"strconv"
 
-	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	federationclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
@@ -45,8 +46,18 @@ import (
 )
 
 const (
-	// "federation-apiserver-secret" is a reserved secret name which stores the kubeconfig for federation-apiserver.
-	FederationAPIServerSecretName = "federation-apiserver-secret"
+	// TODO(madhusudancs): Consider making this configurable via a flag.
+	// "federation-apiserver-kubeconfig" is a reserved secret name which
+	// stores the kubeconfig for federation-apiserver.
+	KubeconfigSecretName = "federation-apiserver-kubeconfig"
+	// "federation-apiserver-secret" was the old name we used to store
+	// Federation API server kubeconfig secret. Unfortunately, this name
+	// is very close to "federation-apiserver-secrets" and causes a lot
+	// of confusion, particularly while debugging. So deprecating it in
+	// favor of the new name but giving people time to migrate.
+	// TODO(madhusudancs): this name is deprecated in 1.4 and should be
+	// removed in 1.5. Remove it in 1.5.
+	DeprecatedKubeconfigSecretName = "federation-apiserver-secret"
 )
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
@@ -78,10 +89,17 @@ func Run(s *options.CMServer) error {
 		glog.Errorf("unable to register configz: %s", err)
 	}
 	// Create the config to talk to federation-apiserver.
-	kubeconfigGetter := util.KubeconfigGetterForSecret(FederationAPIServerSecretName)
+	kubeconfigGetter := util.KubeconfigGetterForSecret(KubeconfigSecretName)
 	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
-	if err != nil {
-		return err
+	if err != nil || restClientCfg == nil {
+		// Retry with the deprecated name in 1.4.
+		// TODO(madhusudancs): Remove this in 1.5.
+		var depErr error
+		kubeconfigGetter := util.KubeconfigGetterForSecret(DeprecatedKubeconfigSecretName)
+		restClientCfg, depErr = clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
+		if depErr != nil {
+			return fmt.Errorf("failed to find the secret containing Federation API server kubeconfig, tried the secret name %s and the deprecated name %s: %v, %v", KubeconfigSecretName, DeprecatedKubeconfigSecretName, err, depErr)
+		}
 	}
 
 	// Override restClientCfg qps/burst settings from flags
@@ -115,7 +133,6 @@ func Run(s *options.CMServer) error {
 }
 
 func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) error {
-
 	ccClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
 	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
 	dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)

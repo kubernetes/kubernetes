@@ -77,12 +77,21 @@ function setup-logrotate() {
     compress
     maxsize 10M
     daily
+    dateext
+    dateformat -%Y%m%d-%s
     create 0644 root root
 }
 EOF
 
   # Configuration for k8s services that redirect logs to /var/log/<service>.log
-  # files.
+  # files. Whenever logrotate is ran, this config will:
+  # * rotate the log file if its size is > 100Mb OR if one day has elapsed
+  # * save rotated logs into a gzipped timestamped backup
+  # * log file timestamp (controlled by 'dateformat') includes seconds too. this
+  #   ensures that logrotate can generate unique logfiles during each rotation
+  #   (otherwise it skips rotation if 'maxsize' is reached multiple times in a
+  #   day).
+  # * keep only 5 old (rotated) logs, and will discard older logs.
   local logrotate_files=( "kube-scheduler" "kube-proxy" "kube-apiserver" "kube-controller-manager" "kube-addons" )
   for file in "${logrotate_files[@]}" ; do
     cat > /etc/logrotate.d/${file} <<EOF
@@ -94,6 +103,8 @@ EOF
     compress
     maxsize 100M
     daily
+    dateext
+    dateformat -%Y%m%d-%s
     create 0644 root root
 }
 EOF
@@ -189,8 +200,13 @@ EOF
   fi
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
     use_cloud_config="true"
+    if [[ -n "${NODE_TAGS:-}" ]]; then
+      local -r node_tags="${NODE_TAGS}"
+    else
+      local -r node_tags="${NODE_INSTANCE_PREFIX}"
+    fi
     cat <<EOF >>/etc/gce.conf
-node-tags = ${NODE_INSTANCE_PREFIX}
+node-tags = ${node_tags}
 node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
   fi
@@ -621,7 +637,12 @@ function start-kube-apiserver {
     webhook_config_volume="{\"name\": \"webhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_authz.config\"}},"
   fi
   local -r src_dir="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty"
-  cp "${src_dir}/abac-authz-policy.jsonl" /etc/srv/kubernetes/
+
+  local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
+  remove-salt-config-comments "${abac_policy_json}"
+  sed -i -e "s@{{kube_user}}@${KUBE_USER}@g" "${abac_policy_json}"
+  cp "${abac_policy_json}" /etc/srv/kubernetes/
+
   src_file="${src_dir}/kube-apiserver.manifest"
   remove-salt-config-comments "${src_file}"
   # Evaluate variables.

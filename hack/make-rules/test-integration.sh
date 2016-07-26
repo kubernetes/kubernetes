@@ -60,7 +60,7 @@ runTests() {
   # TODO: Re-enable race detection when we switch to a thread-safe etcd client
   # KUBE_RACE="-race"
   make -C "${KUBE_ROOT}" test \
-      WHAT="$(kube::test::find_integration_test_dirs | paste -sd' ')" \
+      WHAT="$(kube::test::find_integration_test_dirs | paste -sd' ' -)" \
       KUBE_GOFLAGS="${KUBE_GOFLAGS:-} -tags 'integration no-docker'" \
       KUBE_RACE="" \
       KUBE_TIMEOUT="${KUBE_TIMEOUT}" \

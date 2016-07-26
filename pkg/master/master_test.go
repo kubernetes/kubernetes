@@ -136,9 +136,14 @@ func newMaster(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *ass
 // limitedAPIResourceConfigSource only enables the core group, the extensions group, the batch group, and the autoscaling group.
 func limitedAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret := genericapiserver.NewResourceConfig()
-	ret.EnableVersions(apiv1.SchemeGroupVersion, extensionsapiv1beta1.SchemeGroupVersion,
-		batchapiv1.SchemeGroupVersion, batchapiv2alpha1.SchemeGroupVersion,
-		appsapi.SchemeGroupVersion, autoscalingapiv1.SchemeGroupVersion)
+	ret.EnableVersions(
+		apiv1.SchemeGroupVersion,
+		extensionsapiv1beta1.SchemeGroupVersion,
+		batchapiv1.SchemeGroupVersion,
+		batchapiv2alpha1.SchemeGroupVersion,
+		appsapi.SchemeGroupVersion,
+		autoscalingapiv1.SchemeGroupVersion,
+	)
 	return ret
 }
 
@@ -493,7 +498,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		},
 	}
 
-	assert.Equal(3, len(groupList.Groups))
+	assert.Equal(4, len(groupList.Groups))
 	for _, group := range groupList.Groups {
 		if !expectGroupNames.Has(group.Name) {
 			t.Errorf("got unexpected group %s", group.Name)
@@ -520,7 +525,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	assert.Equal(4, len(groupList.Groups))
+	assert.Equal(5, len(groupList.Groups))
 
 	expectGroupNames.Insert("company.com")
 	expectVersions["company.com"] = []unversioned.GroupVersionForDiscovery{thirdPartyGV}
@@ -552,25 +557,75 @@ type FooList struct {
 }
 
 func initThirdParty(t *testing.T, version, name string) (*Master, *etcdtesting.EtcdTestServer, *httptest.Server, *assert.Assertions) {
+	return initThirdPartyMultiple(t, []string{version}, []string{name})
+}
+
+func initThirdPartyMultiple(t *testing.T, versions, names []string) (*Master, *etcdtesting.EtcdTestServer, *httptest.Server, *assert.Assertions) {
 	master, etcdserver, _, assert := newMaster(t)
-	api := &extensions.ThirdPartyResource{
-		ObjectMeta: api.ObjectMeta{
-			Name: name,
-		},
-		Versions: []extensions.APIVersion{
-			{
-				Name: version,
-			},
-		},
-	}
 	_, master.ServiceClusterIPRange, _ = net.ParseCIDR("10.0.0.0/24")
 
-	if !assert.NoError(master.InstallThirdPartyResource(api)) {
-		t.FailNow()
+	for ix := range names {
+		api := &extensions.ThirdPartyResource{
+			ObjectMeta: api.ObjectMeta{
+				Name: names[ix],
+			},
+			Versions: []extensions.APIVersion{
+				{
+					Name: versions[ix],
+				},
+			},
+		}
+		err := master.InstallThirdPartyResource(api)
+		if !assert.NoError(err) {
+			t.Logf("Failed to install API: %v", err)
+			t.FailNow()
+		}
 	}
 
 	server := httptest.NewServer(master.HandlerContainer.ServeMux)
 	return master, etcdserver, server, assert
+}
+
+func TestInstallMultipleAPIs(t *testing.T) {
+	names := []string{"foo.company.com", "bar.company.com"}
+	versions := []string{"v1", "v1"}
+
+	_, etcdserver, server, assert := initThirdPartyMultiple(t, versions, names)
+	defer server.Close()
+	defer etcdserver.Terminate(t)
+	for ix := range names {
+		kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(
+			&extensions.ThirdPartyResource{ObjectMeta: api.ObjectMeta{Name: names[ix]}})
+		assert.NoError(err, "Failed to extract group & kind")
+
+		plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+			Group:   group,
+			Version: versions[ix],
+			Kind:    kind,
+		})
+
+		resp, err := http.Get(
+			fmt.Sprintf("%s/apis/%s/%s/namespaces/default/%s", server.URL, group, versions[ix], plural.Resource))
+		if !assert.NoError(err, "Failed to do HTTP GET") {
+			return
+		}
+		defer resp.Body.Close()
+
+		assert.Equal(http.StatusOK, resp.StatusCode)
+
+		data, err := ioutil.ReadAll(resp.Body)
+		assert.NoError(err)
+
+		obj := map[string]interface{}{}
+		if err = json.Unmarshal(data, &obj); err != nil {
+			assert.NoError(err, fmt.Sprintf("unexpected error: %v", err))
+		}
+		kindOut, found := obj["kind"]
+		if !found {
+			t.Errorf("Missing 'kind' in %v", obj)
+		}
+		assert.Equal(kindOut, kind+"List")
+	}
 }
 
 func TestInstallThirdPartyAPIList(t *testing.T) {

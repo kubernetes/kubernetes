@@ -462,7 +462,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("updating the pod")
-		f.UpdatePod(name, func(pod *api.Pod) {
+		f.PodClient().Update(name, func(pod *api.Pod) {
 			value = strconv.Itoa(time.Now().Nanosecond())
 			pod.Labels["time"] = value
 		})
@@ -530,7 +530,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		Expect(len(pods.Items)).To(Equal(1))
 
 		By("updating the pod")
-		f.UpdatePod(name, func(pod *api.Pod) {
+		f.PodClient().Update(name, func(pod *api.Pod) {
 			newDeadline := int64(5)
 			pod.Spec.ActiveDeadlineSeconds = &newDeadline
 		})
@@ -1309,7 +1309,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		delay1, delay2 := startPodAndGetBackOffs(f, pod, podName, containerName, buildBackOffDuration)
 
 		By("updating the image")
-		f.UpdatePod(podName, func(pod *api.Pod) {
+		f.PodClient().Update(podName, func(pod *api.Pod) {
 			pod.Spec.Containers[0].Image = "gcr.io/google_containers/nginx-slim:0.7"
 		})
 

@@ -90,6 +90,7 @@ grains:
   docker_opts: '$(echo "$DOCKER_OPTS" | sed -e "s/'/''/g")'
   master_extra_sans: '$(echo "$MASTER_EXTRA_SANS" | sed -e "s/'/''/g")'
   keep_host_etcd: true
+  kube_user: '$(echo "$KUBE_USER" | sed -e "s/'/''/g")'
 EOF
 }
 

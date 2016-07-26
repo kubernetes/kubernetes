@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package node provides utilities to create and update nodes
-package node
+package node // import "k8s.io/kubernetes/contrib/mesos/pkg/node"

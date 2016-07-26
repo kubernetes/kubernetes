@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
@@ -30,7 +29,6 @@ import (
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	s := service.NewSchedulerServer()
 	s.AddStandaloneFlags(pflag.CommandLine)
 

@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package pod provides Registry interface and it's RESTStorage
 // implementation for storing Pod api objects.
-package pod
+package pod // import "k8s.io/kubernetes/pkg/registry/pod"

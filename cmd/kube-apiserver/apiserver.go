@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"runtime"
 	"time"
 
 	"k8s.io/kubernetes/cmd/kube-apiserver/app"
@@ -35,7 +34,6 @@ import (
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	rand.Seed(time.Now().UTC().UnixNano())
 
 	s := options.NewAPIServer()

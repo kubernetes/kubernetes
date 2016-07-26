@@ -29,7 +29,11 @@ func monitorResizeEvents(fd uintptr, resizeEvents chan<- Size, stop chan struct{
 	go func() {
 		defer runtime.HandleCrash()
 
-		var lastSize Size
+		size := GetSize(fd)
+		if size == nil {
+			return
+		}
+		lastSize := *size
 
 		for {
 			// see if we need to stop running

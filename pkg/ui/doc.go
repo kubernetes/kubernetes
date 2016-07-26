@@ -16,4 +16,4 @@ limitations under the License.
 
 // package ui contains utilities for accessing the static data files compiled in
 // the data/* subdirectories.
-package ui
+package ui // import "k8s.io/kubernetes/pkg/ui"

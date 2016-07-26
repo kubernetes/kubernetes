@@ -14,4 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ingress
+package ingress // import "k8s.io/kubernetes/pkg/registry/ingress"

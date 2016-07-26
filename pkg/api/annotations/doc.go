@@ -15,4 +15,4 @@ limitations under the License.
 */
 
 // Package annotations defines annotation keys that shared between server and client
-package annotations
+package annotations // import "k8s.io/kubernetes/pkg/api/annotations"

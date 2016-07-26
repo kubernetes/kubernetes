@@ -30,7 +30,7 @@ import (
 // Ported from test/e2e/downard_api_test.go
 
 var _ = framework.KubeDescribe("Downward API", func() {
-	f := NewDefaultFramework("downward-api")
+	f := framework.NewDefaultFramework("downward-api")
 	It("should provide pod name and namespace as env vars [Conformance]", func() {
 		podName := "downward-api-" + string(util.NewUUID())
 		env := []api.EnvVar{
@@ -140,7 +140,7 @@ func testDownwardAPI(f *framework.Framework, podName string, env []api.EnvVar, e
 			Containers: []api.Container{
 				{
 					Name:    "dapi-container",
-					Image:   "gcr.io/google_containers/busybox:1.24",
+					Image:   ImageRegistry[busyBoxImage],
 					Command: []string{"sh", "-c", "env"},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
@@ -158,7 +158,8 @@ func testDownwardAPI(f *framework.Framework, podName string, env []api.EnvVar, e
 			RestartPolicy: api.RestartPolicyNever,
 		},
 	}
-	f.MungePodSpec(pod)
+	// TODO(random-liu): Change TestContainerOutputRegexp to use PodClient and avoid MungeSpec explicitly
+	f.PodClient().MungeSpec(pod)
 
 	f.TestContainerOutputRegexp("downward api env vars", pod, 0, expectations)
 }
