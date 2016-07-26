@@ -1046,14 +1046,10 @@ func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]string
 
 	defaultSecurityOpts := []string{fmt.Sprintf(optFmt, "seccomp", defaultSeccompProfile)}
 
-	profile, profileOK := pod.ObjectMeta.Annotations[api.SeccompContainerAnnotationKeyPrefix+ctrName]
-	if !profileOK {
-		// try the pod profile
-		profile, profileOK = pod.ObjectMeta.Annotations[api.SeccompPodAnnotationKey]
-		if !profileOK {
-			// return early the default
-			return defaultSecurityOpts, nil
-		}
+	profile := profileForContainer(pod, ctrName)
+	if profile == "" {
+		// return early the default
+		return defaultSecurityOpts, nil
 	}
 
 	if profile == "unconfined" {
@@ -1083,6 +1079,24 @@ func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]string
 	}
 
 	return []string{fmt.Sprintf(optFmt, "seccomp", b.Bytes())}, nil
+}
+
+// profileForContainer returns the container's profile or if the container does not have a profile
+// defined it returns the pod profile.
+func profileForContainer(pod *api.Pod, containerName string) string {
+	profile := ""
+	for _, c := range pod.Spec.Containers {
+		if c.Name == containerName {
+			if c.SecurityContext != nil {
+				profile = c.SecurityContext.SeccompProfile
+				break
+			}
+		}
+	}
+	if profile == "" && pod.Spec.SecurityContext != nil {
+		profile = pod.Spec.SecurityContext.SeccompProfile
+	}
+	return profile
 }
 
 type dockerExitError struct {

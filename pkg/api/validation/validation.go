@@ -118,8 +118,6 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *fiel
 		allErrs = append(allErrs, ValidateDNS1123Label(subdomain, fldPath.Key(utilpod.PodSubdomainAnnotation))...)
 	}
 
-	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
-
 	return allErrs
 }
 
@@ -1494,7 +1492,7 @@ func validateContainers(containers []api.Container, volumes sets.String, fldPath
 		allErrs = append(allErrs, validateVolumeMounts(ctr.VolumeMounts, volumes, idxPath.Child("volumeMounts"))...)
 		allErrs = append(allErrs, validatePullPolicy(ctr.ImagePullPolicy, idxPath.Child("imagePullPolicy"))...)
 		allErrs = append(allErrs, ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
-		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"))...)
+		allErrs = append(allErrs, ValidateSecurityContext(ctr.SecurityContext, idxPath.Child("securityContext"), ctr.Name)...)
 	}
 	// Check for colliding ports across all containers.
 	allErrs = append(allErrs, checkHostPortConflicts(containers, fldPath)...)
@@ -1908,6 +1906,9 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 }
 
 func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
+	if p == "" {
+		return nil
+	}
 	if p == "docker/default" {
 		return nil
 	}
@@ -1918,20 +1919,6 @@ func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 		return validateSubPath(strings.TrimPrefix(p, "localhost/"), fldPath)
 	}
 	return field.ErrorList{field.Invalid(fldPath, p, "must be a valid seccomp profile")}
-}
-
-func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
-	allErrs := field.ErrorList{}
-	if p, exists := annotations[api.SeccompPodAnnotationKey]; exists {
-		allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
-	}
-	for k, p := range annotations {
-		if strings.HasPrefix(k, api.SeccompContainerAnnotationKeyPrefix) {
-			allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(k))...)
-		}
-	}
-
-	return allErrs
 }
 
 // ValidatePodSecurityContext test that the specified PodSecurityContext has valid data.
@@ -1955,6 +1942,8 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
 			}
 		}
+		// TODO when the versioned object is using feilds change this field path
+		allErrs = append(allErrs, ValidateSeccompProfile(securityContext.SeccompProfile, field.NewPath("pod", "metadata", "annotations", api.SeccompPodAnnotationKey))...)
 	}
 
 	return allErrs
@@ -3171,7 +3160,7 @@ func ValidateEndpointsUpdate(newEndpoints, oldEndpoints *api.Endpoints) field.Er
 }
 
 // ValidateSecurityContext ensure the security context contains valid settings
-func ValidateSecurityContext(sc *api.SecurityContext, fldPath *field.Path) field.ErrorList {
+func ValidateSecurityContext(sc *api.SecurityContext, fldPath *field.Path, containerName string) field.ErrorList {
 	allErrs := field.ErrorList{}
 	//this should only be true for testing since SecurityContext is defaulted by the api
 	if sc == nil {
@@ -3189,6 +3178,9 @@ func ValidateSecurityContext(sc *api.SecurityContext, fldPath *field.Path) field
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *sc.RunAsUser, isNegativeErrorMsg))
 		}
 	}
+
+	// TODO when the versioned object is using feilds change this field path
+	allErrs = append(allErrs, ValidateSeccompProfile(sc.SeccompProfile, field.NewPath("pod", "metadata", "annotations", api.SeccompContainerAnnotationKeyPrefix+containerName))...)
 	return allErrs
 }
 

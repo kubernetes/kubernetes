@@ -1826,11 +1826,11 @@ func TestUnconfinedSeccompProfileWithDockerV110(t *testing.T) {
 			UID:       "12345678",
 			Name:      "foo4",
 			Namespace: "new",
-			Annotations: map[string]string{
-				api.SeccompPodAnnotationKey: "unconfined",
-			},
 		},
 		Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{
+				SeccompProfile: "unconfined",
+			},
 			Containers: []api.Container{
 				{Name: "bar4"},
 			},
@@ -1868,11 +1868,11 @@ func TestDefaultSeccompProfileWithDockerV110(t *testing.T) {
 			UID:       "12345678",
 			Name:      "foo1",
 			Namespace: "new",
-			Annotations: map[string]string{
-				api.SeccompPodAnnotationKey: "docker/default",
-			},
 		},
 		Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{
+				SeccompProfile: "docker/default",
+			},
 			Containers: []api.Container{
 				{Name: "bar1"},
 			},
@@ -1910,14 +1910,18 @@ func TestSeccompContainerAnnotationTrumpsPod(t *testing.T) {
 			UID:       "12345678",
 			Name:      "foo2",
 			Namespace: "new",
-			Annotations: map[string]string{
-				api.SeccompPodAnnotationKey:                      "unconfined",
-				api.SeccompContainerAnnotationKeyPrefix + "bar2": "docker/default",
-			},
 		},
 		Spec: api.PodSpec{
+			SecurityContext: &api.PodSecurityContext{
+				SeccompProfile: "unconfined",
+			},
 			Containers: []api.Container{
-				{Name: "bar2"},
+				{
+					Name: "bar2",
+					SecurityContext: &api.SecurityContext{
+						SeccompProfile: "docker/default",
+					},
+				},
 			},
 		},
 	}
@@ -1948,26 +1952,20 @@ func TestSeccompContainerAnnotationTrumpsPod(t *testing.T) {
 
 func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 	tests := []struct {
-		annotations    map[string]string
+		profile        string
 		expectedSecOpt string
 		expectedError  string
 	}{
 		{
-			annotations: map[string]string{
-				api.SeccompPodAnnotationKey: "localhost/test",
-			},
+			profile:        "localhost/test",
 			expectedSecOpt: `seccomp={"foo":"bar"}`,
 		},
 		{
-			annotations: map[string]string{
-				api.SeccompPodAnnotationKey: "localhost/sub/subtest",
-			},
+			profile:        "localhost/sub/subtest",
 			expectedSecOpt: `seccomp={"abc":"def"}`,
 		},
 		{
-			annotations: map[string]string{
-				api.SeccompPodAnnotationKey: "localhost/not-existing",
-			},
+			profile:       "localhost/not-existing",
 			expectedError: "cannot load seccomp profile",
 		},
 	}
@@ -1979,12 +1977,14 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				UID:         "12345678",
-				Name:        "foo2",
-				Namespace:   "new",
-				Annotations: test.annotations,
+				UID:       "12345678",
+				Name:      "foo2",
+				Namespace: "new",
 			},
 			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: test.profile,
+				},
 				Containers: []api.Container{
 					{Name: "bar2"},
 				},

@@ -2371,15 +2371,49 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
+		{ // empty pod seccomp profile
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: "",
+				},
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // empty seccomp profile for a container
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:            "ctr",
+						Image:           "image",
+						ImagePullPolicy: "IfNotPresent",
+						SecurityContext: &api.SecurityContext{
+							SeccompProfile: "",
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
 		{ // docker default seccomp profile
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "docker/default",
-				},
 			},
 			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: "docker/default",
+				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -2389,11 +2423,11 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "unconfined",
-				},
 			},
 			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: "unconfined",
+				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -2403,11 +2437,11 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "localhost/foo",
-				},
 			},
 			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: "localhost/foo",
+				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -2417,12 +2451,18 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
-				},
 			},
 			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers: []api.Container{
+					{
+						Name:            "ctr",
+						Image:           "image",
+						ImagePullPolicy: "IfNotPresent",
+						SecurityContext: &api.SecurityContext{
+							SeccompProfile: "localhost/foo",
+						},
+					},
+				},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
@@ -2843,11 +2883,11 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "foo",
-				},
 			},
 			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: "foo",
+				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -2857,40 +2897,18 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
-				},
 			},
 			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
-		},
-		"must be a non-empty container name in seccomp annotation": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompContainerAnnotationKeyPrefix: "foo",
+				Containers: []api.Container{
+					{
+						Name:            "ctr",
+						Image:           "image",
+						ImagePullPolicy: "IfNotPresent",
+						SecurityContext: &api.SecurityContext{
+							SeccompProfile: "foo",
+						},
+					},
 				},
-			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
-		},
-		"must be a non-empty container profile in seccomp annotation": {
-			ObjectMeta: api.ObjectMeta{
-				Name:      "123",
-				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompContainerAnnotationKeyPrefix + "foo": "",
-				},
-			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
 			},
@@ -2899,11 +2917,11 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "localhost//foo",
-				},
 			},
 			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: "localhost//foo",
+				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -2913,11 +2931,11 @@ func TestValidatePod(t *testing.T) {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
-				Annotations: map[string]string{
-					api.SeccompPodAnnotationKey: "localhost/../foo",
-				},
 			},
 			Spec: api.PodSpec{
+				SecurityContext: &api.PodSecurityContext{
+					SeccompProfile: "localhost/../foo",
+				},
 				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 				RestartPolicy: api.RestartPolicyAlways,
 				DNSPolicy:     api.DNSClusterFirst,
@@ -6493,7 +6511,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		"no run as user":  {noRunAsUser},
 	}
 	for k, v := range successCases {
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) != 0 {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), ""); len(errs) != 0 {
 			t.Errorf("[%s] Expected success, got %v", k, errs)
 		}
 	}
@@ -6523,7 +6541,7 @@ func TestValidateSecurityContext(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
+		if errs := ValidateSecurityContext(v.sc, field.NewPath("field"), ""); len(errs) == 0 || errs[0].Type != v.errorType || !strings.Contains(errs[0].Detail, v.errorDetail) {
 			t.Errorf("[%s] Expected error type %q with detail %q, got %v", k, v.errorType, v.errorDetail, errs)
 		}
 	}

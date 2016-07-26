@@ -110,8 +110,10 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 	It("should support seccomp alpha unconfined annotation on the container [Feature:Seccomp]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+"test-container"] = "unconfined"
-		pod.Annotations[api.SeccompPodAnnotationKey] = "docker/default"
+		pod.Spec.Containers[0].SecurityContext = &api.SecurityContext{
+			SeccompProfile: "unconfined",
+		}
+		pod.Spec.SecurityContext.SeccompProfile = "docker/default"
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(api.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
@@ -119,7 +121,7 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 	It("should support seccomp alpha unconfined annotation on the pod [Feature:Seccomp]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[api.SeccompPodAnnotationKey] = "unconfined"
+		pod.Spec.SecurityContext.SeccompProfile = "unconfined"
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(api.SeccompPodAnnotationKey, pod, 0, []string{"0"}) // seccomp disabled
 	})
@@ -127,7 +129,9 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 	It("should support seccomp alpha docker/default annotation [Feature:Seccomp]", func() {
 		// TODO: port to SecurityContext as soon as seccomp is out of alpha
 		pod := scTestPod(false, false)
-		pod.Annotations[api.SeccompContainerAnnotationKeyPrefix+"test-container"] = "docker/default"
+		pod.Spec.Containers[0].SecurityContext = &api.SecurityContext{
+			SeccompProfile: "docker/default",
+		}
 		pod.Spec.Containers[0].Command = []string{"grep", "ecc", "/proc/self/status"}
 		f.TestContainerOutput(api.SeccompPodAnnotationKey, pod, 0, []string{"2"}) // seccomp filtered
 	})
