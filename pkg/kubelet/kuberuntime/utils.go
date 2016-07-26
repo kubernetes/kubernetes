@@ -49,6 +49,24 @@ func (p podSandboxByCreated) Len() int           { return len(p) }
 func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p podSandboxByCreated) Less(i, j int) bool { return *p[i].CreatedAt > *p[j].CreatedAt }
 
+type podsByID []*kubecontainer.Pod
+
+func (b podsByID) Len() int           { return len(b) }
+func (b podsByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b podsByID) Less(i, j int) bool { return b[i].ID < b[j].ID }
+
+type containersByID []*kubecontainer.Container
+
+func (b containersByID) Len() int           { return len(b) }
+func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
+
+type containerStatusByID []*kubecontainer.ContainerStatus
+
+func (b containerStatusByID) Len() int           { return len(b) }
+func (b containerStatusByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b containerStatusByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
+
 // toRuntimeContainerState converts kubecontainer.ContainerState to runtimeApi.ContainerState
 func toRuntimeContainerState(state kubecontainer.ContainerState) runtimeApi.ContainerState {
 	switch state {
