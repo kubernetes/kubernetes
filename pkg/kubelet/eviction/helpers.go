@@ -255,6 +255,7 @@ func memoryUsage(memStats *statsapi.MemoryStats) *resource.Quantity {
 }
 
 // localVolumeNames returns the set of volumes for the pod that are local
+// TODO: sumamry API should report what volumes consume local storage rather than hard-code here.
 func localVolumeNames(pod *api.Pod) []string {
 	result := []string{}
 	for _, volume := range pod.Spec.Volumes {
@@ -269,22 +270,23 @@ func localVolumeNames(pod *api.Pod) []string {
 }
 
 // podDiskUsage aggregates pod disk usage for the specified stats to measure.
-func podDiskUsage(podStats statsapi.PodStats, pod *api.Pod, statsToMeasure []fsStats) (api.ResourceList, error) {
+func podDiskUsage(podStats statsapi.PodStats, pod *api.Pod, statsToMeasure []fsStatsType) (api.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
-		if hasFsStats(statsToMeasure, fsStatsRoot) {
+		if hasFsStatsType(statsToMeasure, fsStatsRoot) {
 			disk.Add(*diskUsage(container.Rootfs))
 		}
-		if hasFsStats(statsToMeasure, fsStatsLogs) {
+		if hasFsStatsType(statsToMeasure, fsStatsLogs) {
 			disk.Add(*diskUsage(container.Logs))
 		}
 	}
-	if hasFsStats(statsToMeasure, fsStatsLocalVolumeSource) {
+	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
 		volumeNames := localVolumeNames(pod)
 		for _, volumeName := range volumeNames {
 			for _, volumeStats := range podStats.VolumeStats {
 				if volumeStats.Name == volumeName {
 					disk.Add(*diskUsage(&volumeStats.FsStats))
+					break
 				}
 			}
 		}
@@ -451,7 +453,7 @@ func memory(stats statsFunc) cmpFunc {
 }
 
 // disk compares pods by largest consumer of disk relative to request.
-func disk(stats statsFunc, fsStatsToMeasure []fsStats) cmpFunc {
+func disk(stats statsFunc, fsStatsToMeasure []fsStatsType) cmpFunc {
 	return func(p1, p2 *api.Pod) int {
 		p1Stats, found := stats(p1)
 		// if we have no usage stats for p1, we want p2 first
@@ -489,7 +491,7 @@ func rankMemoryPressure(pods []*api.Pod, stats statsFunc) {
 }
 
 // rankDiskPressureFunc returns a rankFunc that measures the specified fs stats.
-func rankDiskPressureFunc(fsStatsToMeasure []fsStats) rankFunc {
+func rankDiskPressureFunc(fsStatsToMeasure []fsStatsType) rankFunc {
 	return func(pods []*api.Pod, stats statsFunc) {
 		orderedBy(qosComparator, disk(stats, fsStatsToMeasure)).Sort(pods)
 	}
@@ -622,8 +624,8 @@ func nodeConditionsObservedSince(observedAt nodeConditionsObservedAt, period tim
 	return results
 }
 
-// hgasFsStats returns true if the fsStat is in the input list
-func hasFsStats(inputs []fsStats, item fsStats) bool {
+// hasFsStatsType returns true if the fsStat is in the input list
+func hasFsStatsType(inputs []fsStatsType, item fsStatsType) bool {
 	for _, input := range inputs {
 		if input == item {
 			return true
@@ -676,7 +678,7 @@ func isSoftEviction(thresholds []Threshold, starvedResource api.ResourceName) bo
 	return true
 }
 
-// buildresourceToRankFunc returns ranking functions associated with resources
+// buildResourceToRankFunc returns ranking functions associated with resources
 func buildResourceToRankFunc(withImageFs bool) map[api.ResourceName]rankFunc {
 	resourceToRankFunc := map[api.ResourceName]rankFunc{
 		api.ResourceMemory: rankMemoryPressure,
@@ -684,12 +686,12 @@ func buildResourceToRankFunc(withImageFs bool) map[api.ResourceName]rankFunc {
 	// usage of an imagefs is optional
 	if withImageFs {
 		// with an imagefs, nodefs pod rank func for eviction only includes logs and local volumes
-		resourceToRankFunc[resourceNodeFs] = rankDiskPressureFunc([]fsStats{fsStatsLogs, fsStatsLocalVolumeSource})
+		resourceToRankFunc[resourceNodeFs] = rankDiskPressureFunc([]fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource})
 		// with an imagefs, imagefs pod rank func for eviction only includes rootfs
-		resourceToRankFunc[resourceImageFs] = rankDiskPressureFunc([]fsStats{fsStatsRoot})
+		resourceToRankFunc[resourceImageFs] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot})
 	} else {
 		// without an imagefs, nodefs pod rank func for eviction looks at all fs stats
-		resourceToRankFunc[resourceNodeFs] = rankDiskPressureFunc([]fsStats{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})
+		resourceToRankFunc[resourceNodeFs] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})
 	}
 	return resourceToRankFunc
 }

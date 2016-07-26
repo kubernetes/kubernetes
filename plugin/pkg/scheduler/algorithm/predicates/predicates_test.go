@@ -2965,7 +2965,7 @@ func TestPodSchedulesOnNodeWithDiskPressureCondition(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		fits, err := CheckNodeDiskPressurePredicate(test.pod, test.nodeInfo)
+		fits, err := CheckNodeDiskPressurePredicate(test.pod, nil, test.nodeInfo)
 		if fits != test.fits {
 			t.Errorf("%s: expected %v got %v", test.name, test.fits, fits)
 		}
