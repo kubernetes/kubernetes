@@ -43,22 +43,24 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-// Maximum time a kube-proxy daemon on a node is allowed to not
-// notice a Service update, such as type=NodePort.
-// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
-// liberal. Fix tracked in #20567.
-const kubeProxyLagTimeout = 5 * time.Minute
+const (
+	// Maximum time a kube-proxy daemon on a node is allowed to not
+	// notice a Service update, such as type=NodePort.
+	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
+	// liberal. Fix tracked in #20567.
+	kubeProxyLagTimeout = 5 * time.Minute
 
-// Maximum time a load balancer is allowed to not respond after creation.
-const loadBalancerLagTimeoutDefault = 2 * time.Minute
+	// Maximum time a load balancer is allowed to not respond after creation.
+	loadBalancerLagTimeoutDefault = 2 * time.Minute
 
-// On AWS there is a delay between ELB creation and serving traffic;
-// a few minutes is typical, so use 10m.
-const loadBalancerLagTimeoutAWS = 10 * time.Minute
+	// On AWS there is a delay between ELB creation and serving traffic;
+	// a few minutes is typical, so use 10m.
+	loadBalancerLagTimeoutAWS = 10 * time.Minute
 
-// How long to wait for a load balancer to be created/modified.
-//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
-const loadBalancerCreateTimeout = 20 * time.Minute
+	// How long to wait for a load balancer to be created/modified.
+	//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	loadBalancerCreateTimeout = 20 * time.Minute
+)
 
 // This should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
