@@ -25,6 +25,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestPodResourceLimitsDefaulting(t *testing.T) {
@@ -38,6 +39,16 @@ func TestPodResourceLimitsDefaulting(t *testing.T) {
 	}, nil)
 	tk.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
 	tk.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+
+	// Resetting default cpu and memory reservation to 0, so that
+	// node capacity is same as node allocatable.
+	tk.kubelet.reservation = kubetypes.Reservation{
+		Kubernetes: api.ResourceList{
+			api.ResourceCPU:    resource.MustParse("0"),
+			api.ResourceMemory: resource.MustParse("0"),
+		},
+	}
+
 	cases := []struct {
 		pod      *api.Pod
 		expected *api.Pod
