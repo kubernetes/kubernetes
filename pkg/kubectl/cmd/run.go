@@ -196,7 +196,12 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	}
 
 	params["env"] = cmdutil.GetFlagStringSlice(cmd, "env")
-
+	port := cmdutil.GetFlagInt(cmd, "port")
+	if port != -1 || cmdutil.GetFlagBool(cmd, "expose") { //--port set or --expose=true
+		if port < 1 || port > 65535 {
+			return fmt.Errorf("--port must be a positive integer between 1 and 65535")
+		}
+	}
 	obj, _, mapper, mapping, err := createGeneratedObject(f, cmd, generator, names, params, cmdutil.GetFlagString(cmd, "overrides"), namespace)
 	if err != nil {
 		return err
