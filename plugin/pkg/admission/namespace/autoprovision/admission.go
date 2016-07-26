@@ -22,9 +22,11 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"fmt"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
@@ -39,8 +41,8 @@ func init() {
 // It is useful in deployments that do not want to restrict creation of a namespace prior to its usage.
 type provision struct {
 	*admission.Handler
-	client          clientset.Interface
-	informerFactory informers.SharedInformerFactory
+	client            clientset.Interface
+	namespaceInformer framework.SharedIndexInformer
 }
 
 var _ = admission.WantsInformerFactory(&provision{})
@@ -52,7 +54,10 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 	if len(a.GetNamespace()) == 0 || a.GetKind().GroupKind() == api.Kind("Namespace") {
 		return nil
 	}
-
+	// we need to wait for our caches to warm
+	if !p.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:      a.GetNamespace(),
@@ -60,7 +65,7 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, exists, err := p.informerFactory.Namespaces().Informer().GetStore().Get(namespace)
+	_, exists, err := p.namespaceInformer.GetStore().Get(namespace)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -83,12 +88,13 @@ func NewProvision(c clientset.Interface) admission.Interface {
 }
 
 func (p *provision) SetInformerFactory(f informers.SharedInformerFactory) {
-	p.informerFactory = f
+	p.namespaceInformer = f.Namespaces().Informer()
+	p.SetReadyFunc(p.namespaceInformer.HasSynced)
 }
 
 func (p *provision) Validate() error {
-	if p.informerFactory == nil {
-		return fmt.Errorf("namespace autoprovision plugin needs SharedInformerFactory")
+	if p.namespaceInformer == nil {
+		return fmt.Errorf("missing namespaceInformer")
 	}
 	return nil
 }
