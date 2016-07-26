@@ -311,7 +311,7 @@ func TestOrderedByDisk(t *testing.T) {
 		return result, found
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(disk(statsFn, []fsStats{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
 	expected := []*api.Pod{pod6, pod5, pod4, pod3, pod2, pod1}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -377,7 +377,7 @@ func TestOrderedByQoSDisk(t *testing.T) {
 		return result, found
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(qosComparator, disk(statsFn, []fsStats{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
+	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
 	expected := []*api.Pod{pod2, pod1, pod4, pod3, pod6, pod5}
 	for i := range expected {
 		if pods[i] != expected[i] {

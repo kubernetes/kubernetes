@@ -36,16 +36,16 @@ const (
 	SignalImageFsAvailable Signal = "imagefs.available"
 )
 
-// fsStats defines the types of filesystem stats to collect.
-type fsStats string
+// fsStatsType defines the types of filesystem stats to collect.
+type fsStatsType string
 
 const (
 	// fsStatsLocalVolumeSource identifies stats for pod local volume sources.
-	fsStatsLocalVolumeSource fsStats = "localVolumeSource"
+	fsStatsLocalVolumeSource fsStatsType = "localVolumeSource"
 	// fsStatsLogs identifies stats for pod logs.
-	fsStatsLogs fsStats = "logs"
+	fsStatsLogs fsStatsType = "logs"
 	// fsStatsRoot identifies stats for pod container writable layers.
-	fsStatsRoot fsStats = "root"
+	fsStatsRoot fsStatsType = "root"
 )
 
 // ThresholdOperator is the operator used to express a Threshold.
