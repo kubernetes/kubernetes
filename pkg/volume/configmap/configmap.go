@@ -60,7 +60,10 @@ func (plugin *configMapPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 		return "", fmt.Errorf("Spec does not reference a ConfigMap volume type")
 	}
 
-	return volumeSource.Name, nil
+	return fmt.Sprintf(
+		"%v/%v",
+		spec.Name(),
+		volumeSource.Name), nil
 }
 
 func (plugin *configMapPlugin) CanSupport(spec *volume.Spec) bool {
