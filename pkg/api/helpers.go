@@ -439,7 +439,7 @@ const (
 
 	// AppArmorContainerAnnotationKeyPrefix represents the key of an AppArmor profile applied to one
 	// container of a pod.
-	AppArmorContainerAnnotationKeyPrefix string = "apparmor.security.alpha.kubernetes.io/container/"
+	AppArmorContainerAnnotationKeyPrefix string = "container.apparmor.security.alpha.kubernetes.io/"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
