@@ -43,15 +43,6 @@ if [[ -z "$NETWORK_IF_NAME" ]]; then
   NETWORK_IF_NAME=${DEFAULT_NETWORK_IF_NAME}
 fi
 
-function release_not_found() {
-  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
-  echo "are running from a clone of the git repo, please run 'make quick-release'." >&2
-  echo "Note that this requires having Docker installed.  If you are running " >&2
-  echo "from a release tarball, something is wrong.  Look at " >&2
-  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
-  exit 1
-}
-
 # Setup hosts file to support ping by hostname to each node in the cluster from apiserver
 for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
   node=${NODE_NAMES[$i]}
