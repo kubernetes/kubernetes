@@ -106,8 +106,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,busybox
           kube-scheduler,busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-amd64:v3
-          federation-apiserver,busybox
-          federation-controller-manager,busybox
         );;
     "arm")
         local targets=(
@@ -115,8 +113,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,armel/busybox
           kube-scheduler,armel/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm:v3
-          federation-apiserver,armel/busybox
-          federation-controller-manager,armel/busybox
         );;
     "arm64")
         local targets=(
@@ -124,8 +120,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,aarch64/busybox
           kube-scheduler,aarch64/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-arm64:v3
-          federation-apiserver,aarch64/busybox
-          federation-controller-manager,aarch64/busybox
         );;
     "ppc64le")
         local targets=(
@@ -133,8 +127,6 @@ kube::build::get_docker_wrapped_binaries() {
           kube-controller-manager,ppc64le/busybox
           kube-scheduler,ppc64le/busybox
           kube-proxy,gcr.io/google_containers/debian-iptables-ppc64le:v3
-          federation-apiserver,ppc64le/busybox
-          federation-controller-manager,ppc64le/busybox
         );;
   esac
 
@@ -1553,8 +1545,6 @@ function kube::release::docker::release() {
     "kube-scheduler"
     "kube-proxy"
     "hyperkube"
-    "federation-apiserver"
-    "federation-controller-manager"
   )
 
   local docker_push_cmd=("${DOCKER[@]}")
