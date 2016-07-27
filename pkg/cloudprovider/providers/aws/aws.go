@@ -2297,10 +2297,10 @@ func buildListener(port api.ServicePort, annotations map[string]string, sslPorts
 }
 
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
-func (c *Cloud) EnsureLoadBalancer(apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations
-	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v)",
-		apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
+	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v, %v)",
+		clusterName, apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
 
 	if apiService.Spec.SessionAffinity != api.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
@@ -2472,7 +2472,7 @@ func (c *Cloud) EnsureLoadBalancer(apiService *api.Service, hosts []string) (*ap
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
-func (c *Cloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+func (c *Cloud) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
@@ -2688,7 +2688,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 }
 
 // EnsureLoadBalancerDeleted implements LoadBalancer.EnsureLoadBalancerDeleted.
-func (c *Cloud) EnsureLoadBalancerDeleted(service *api.Service) error {
+func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	lb, err := c.describeLoadBalancer(loadBalancerName)
 	if err != nil {
@@ -2784,7 +2784,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(service *api.Service) error {
 }
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
-func (c *Cloud) UpdateLoadBalancer(service *api.Service, hosts []string) error {
+func (c *Cloud) UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error {
 	hostSet := sets.NewString(hosts...)
 	instances, err := c.getInstancesByNodeNamesCached(hostSet)
 	if err != nil {

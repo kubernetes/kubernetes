@@ -121,7 +121,7 @@ func (f *FakeCloud) Routes() (cloudprovider.Routes, bool) {
 }
 
 // GetLoadBalancer is a stub implementation of LoadBalancer.GetLoadBalancer.
-func (f *FakeCloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+func (f *FakeCloud) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
 	status := &api.LoadBalancerStatus{}
 	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
 
@@ -130,7 +130,7 @@ func (f *FakeCloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStat
 
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) EnsureLoadBalancer(service *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
 	f.addCall("create")
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]FakeBalancer)
@@ -155,7 +155,7 @@ func (f *FakeCloud) EnsureLoadBalancer(service *api.Service, hosts []string) (*a
 
 // UpdateLoadBalancer is a test-spy implementation of LoadBalancer.UpdateLoadBalancer.
 // It adds an entry "update" into the internal method call record.
-func (f *FakeCloud) UpdateLoadBalancer(service *api.Service, hosts []string) error {
+func (f *FakeCloud) UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error {
 	f.addCall("update")
 	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{service, hosts})
 	return f.Err
@@ -163,7 +163,7 @@ func (f *FakeCloud) UpdateLoadBalancer(service *api.Service, hosts []string) err
 
 // EnsureLoadBalancerDeleted is a test-spy implementation of LoadBalancer.EnsureLoadBalancerDeleted.
 // It adds an entry "delete" into the internal method call record.
-func (f *FakeCloud) EnsureLoadBalancerDeleted(service *api.Service) error {
+func (f *FakeCloud) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
 	f.addCall("delete")
 	return f.Err
 }
