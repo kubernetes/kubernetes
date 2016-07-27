@@ -394,8 +394,11 @@ func TestAdmitHostPorts(t *testing.T) {
 		},
 	}
 
-	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+	for i := 0; i < 2; i++ {
+		for k, v := range tests {
+			v.pod.Spec.Containers, v.pod.Spec.InitContainers = v.pod.Spec.InitContainers, v.pod.Spec.Containers
+			testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		}
 	}
 }
 
