@@ -17240,6 +17240,10 @@
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
      },
+     "azureDisk": {
+      "$ref": "v1.AzureDiskVolumeSource",
+      "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -17625,6 +17629,36 @@
      }
     }
    },
+   "v1.AzureDiskVolumeSource": {
+    "id": "v1.AzureDiskVolumeSource",
+    "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+    "required": [
+     "diskName",
+     "diskURI"
+    ],
+    "properties": {
+     "diskName": {
+      "type": "string",
+      "description": "Data Disk Name"
+     },
+     "diskURI": {
+      "type": "string",
+      "description": "Data Disk URI"
+     },
+     "cachingMode": {
+      "type": "string",
+      "description": "Host Caching mode: None, Read Only, Read Write."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -17875,6 +17909,10 @@
      "vsphereVolume": {
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
+     "azureDisk": {
+      "$ref": "v1.AzureDiskVolumeSource",
+      "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
      }
     }
    },

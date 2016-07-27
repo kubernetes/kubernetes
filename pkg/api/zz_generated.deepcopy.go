@@ -31,6 +31,7 @@ import (
 )
 
 func init() {
+<<<<<<< HEAD
 	SchemeBuilder.Register(RegisterDeepCopies)
 }
 
@@ -193,6 +194,168 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_VsphereVirtualDiskVolumeSource, InType: reflect.TypeOf(&VsphereVirtualDiskVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_WeightedPodAffinityTerm, InType: reflect.TypeOf(&WeightedPodAffinityTerm{})},
 	)
+=======
+	if err := Scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_AWSElasticBlockStoreVolumeSource, InType: reflect.TypeOf(func() *AWSElasticBlockStoreVolumeSource { var x *AWSElasticBlockStoreVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Affinity, InType: reflect.TypeOf(func() *Affinity { var x *Affinity; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_AttachedVolume, InType: reflect.TypeOf(func() *AttachedVolume { var x *AttachedVolume; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_AvoidPods, InType: reflect.TypeOf(func() *AvoidPods { var x *AvoidPods; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_AzureDiskVolumeSource, InType: reflect.TypeOf(func() *AzureDiskVolumeSource { var x *AzureDiskVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_AzureFileVolumeSource, InType: reflect.TypeOf(func() *AzureFileVolumeSource { var x *AzureFileVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Binding, InType: reflect.TypeOf(func() *Binding { var x *Binding; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Capabilities, InType: reflect.TypeOf(func() *Capabilities { var x *Capabilities; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_CephFSVolumeSource, InType: reflect.TypeOf(func() *CephFSVolumeSource { var x *CephFSVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_CinderVolumeSource, InType: reflect.TypeOf(func() *CinderVolumeSource { var x *CinderVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ComponentCondition, InType: reflect.TypeOf(func() *ComponentCondition { var x *ComponentCondition; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ComponentStatus, InType: reflect.TypeOf(func() *ComponentStatus { var x *ComponentStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ComponentStatusList, InType: reflect.TypeOf(func() *ComponentStatusList { var x *ComponentStatusList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ConfigMap, InType: reflect.TypeOf(func() *ConfigMap { var x *ConfigMap; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ConfigMapKeySelector, InType: reflect.TypeOf(func() *ConfigMapKeySelector { var x *ConfigMapKeySelector; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ConfigMapList, InType: reflect.TypeOf(func() *ConfigMapList { var x *ConfigMapList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ConfigMapVolumeSource, InType: reflect.TypeOf(func() *ConfigMapVolumeSource { var x *ConfigMapVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Container, InType: reflect.TypeOf(func() *Container { var x *Container; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerImage, InType: reflect.TypeOf(func() *ContainerImage { var x *ContainerImage; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerPort, InType: reflect.TypeOf(func() *ContainerPort { var x *ContainerPort; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerState, InType: reflect.TypeOf(func() *ContainerState { var x *ContainerState; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStateRunning, InType: reflect.TypeOf(func() *ContainerStateRunning { var x *ContainerStateRunning; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStateTerminated, InType: reflect.TypeOf(func() *ContainerStateTerminated { var x *ContainerStateTerminated; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStateWaiting, InType: reflect.TypeOf(func() *ContainerStateWaiting { var x *ContainerStateWaiting; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ContainerStatus, InType: reflect.TypeOf(func() *ContainerStatus { var x *ContainerStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ConversionError, InType: reflect.TypeOf(func() *ConversionError { var x *ConversionError; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DaemonEndpoint, InType: reflect.TypeOf(func() *DaemonEndpoint { var x *DaemonEndpoint; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DeleteOptions, InType: reflect.TypeOf(func() *DeleteOptions { var x *DeleteOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DownwardAPIVolumeFile, InType: reflect.TypeOf(func() *DownwardAPIVolumeFile { var x *DownwardAPIVolumeFile; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_DownwardAPIVolumeSource, InType: reflect.TypeOf(func() *DownwardAPIVolumeSource { var x *DownwardAPIVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EmptyDirVolumeSource, InType: reflect.TypeOf(func() *EmptyDirVolumeSource { var x *EmptyDirVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EndpointAddress, InType: reflect.TypeOf(func() *EndpointAddress { var x *EndpointAddress; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EndpointPort, InType: reflect.TypeOf(func() *EndpointPort { var x *EndpointPort; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EndpointSubset, InType: reflect.TypeOf(func() *EndpointSubset { var x *EndpointSubset; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Endpoints, InType: reflect.TypeOf(func() *Endpoints { var x *Endpoints; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EndpointsList, InType: reflect.TypeOf(func() *EndpointsList { var x *EndpointsList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EnvVar, InType: reflect.TypeOf(func() *EnvVar { var x *EnvVar; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EnvVarSource, InType: reflect.TypeOf(func() *EnvVarSource { var x *EnvVarSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Event, InType: reflect.TypeOf(func() *Event { var x *Event; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EventList, InType: reflect.TypeOf(func() *EventList { var x *EventList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_EventSource, InType: reflect.TypeOf(func() *EventSource { var x *EventSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ExecAction, InType: reflect.TypeOf(func() *ExecAction { var x *ExecAction; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ExportOptions, InType: reflect.TypeOf(func() *ExportOptions { var x *ExportOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FCVolumeSource, InType: reflect.TypeOf(func() *FCVolumeSource { var x *FCVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FlexVolumeSource, InType: reflect.TypeOf(func() *FlexVolumeSource { var x *FlexVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FlockerVolumeSource, InType: reflect.TypeOf(func() *FlockerVolumeSource { var x *FlockerVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_GCEPersistentDiskVolumeSource, InType: reflect.TypeOf(func() *GCEPersistentDiskVolumeSource { var x *GCEPersistentDiskVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_GitRepoVolumeSource, InType: reflect.TypeOf(func() *GitRepoVolumeSource { var x *GitRepoVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_GlusterfsVolumeSource, InType: reflect.TypeOf(func() *GlusterfsVolumeSource { var x *GlusterfsVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HTTPGetAction, InType: reflect.TypeOf(func() *HTTPGetAction { var x *HTTPGetAction; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HTTPHeader, InType: reflect.TypeOf(func() *HTTPHeader { var x *HTTPHeader; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Handler, InType: reflect.TypeOf(func() *Handler { var x *Handler; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_HostPathVolumeSource, InType: reflect.TypeOf(func() *HostPathVolumeSource { var x *HostPathVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ISCSIVolumeSource, InType: reflect.TypeOf(func() *ISCSIVolumeSource { var x *ISCSIVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_KeyToPath, InType: reflect.TypeOf(func() *KeyToPath { var x *KeyToPath; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Lifecycle, InType: reflect.TypeOf(func() *Lifecycle { var x *Lifecycle; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LimitRange, InType: reflect.TypeOf(func() *LimitRange { var x *LimitRange; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LimitRangeItem, InType: reflect.TypeOf(func() *LimitRangeItem { var x *LimitRangeItem; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LimitRangeList, InType: reflect.TypeOf(func() *LimitRangeList { var x *LimitRangeList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LimitRangeSpec, InType: reflect.TypeOf(func() *LimitRangeSpec { var x *LimitRangeSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_List, InType: reflect.TypeOf(func() *List { var x *List; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ListOptions, InType: reflect.TypeOf(func() *ListOptions { var x *ListOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LoadBalancerIngress, InType: reflect.TypeOf(func() *LoadBalancerIngress { var x *LoadBalancerIngress; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LoadBalancerStatus, InType: reflect.TypeOf(func() *LoadBalancerStatus { var x *LoadBalancerStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_LocalObjectReference, InType: reflect.TypeOf(func() *LocalObjectReference { var x *LocalObjectReference; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NFSVolumeSource, InType: reflect.TypeOf(func() *NFSVolumeSource { var x *NFSVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Namespace, InType: reflect.TypeOf(func() *Namespace { var x *Namespace; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceList, InType: reflect.TypeOf(func() *NamespaceList { var x *NamespaceList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceSpec, InType: reflect.TypeOf(func() *NamespaceSpec { var x *NamespaceSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NamespaceStatus, InType: reflect.TypeOf(func() *NamespaceStatus { var x *NamespaceStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Node, InType: reflect.TypeOf(func() *Node { var x *Node; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeAddress, InType: reflect.TypeOf(func() *NodeAddress { var x *NodeAddress; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeAffinity, InType: reflect.TypeOf(func() *NodeAffinity { var x *NodeAffinity; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeCondition, InType: reflect.TypeOf(func() *NodeCondition { var x *NodeCondition; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeDaemonEndpoints, InType: reflect.TypeOf(func() *NodeDaemonEndpoints { var x *NodeDaemonEndpoints; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeList, InType: reflect.TypeOf(func() *NodeList { var x *NodeList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeProxyOptions, InType: reflect.TypeOf(func() *NodeProxyOptions { var x *NodeProxyOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeResources, InType: reflect.TypeOf(func() *NodeResources { var x *NodeResources; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeSelector, InType: reflect.TypeOf(func() *NodeSelector { var x *NodeSelector; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeSelectorRequirement, InType: reflect.TypeOf(func() *NodeSelectorRequirement { var x *NodeSelectorRequirement; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeSelectorTerm, InType: reflect.TypeOf(func() *NodeSelectorTerm { var x *NodeSelectorTerm; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeSpec, InType: reflect.TypeOf(func() *NodeSpec { var x *NodeSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeStatus, InType: reflect.TypeOf(func() *NodeStatus { var x *NodeStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeSystemInfo, InType: reflect.TypeOf(func() *NodeSystemInfo { var x *NodeSystemInfo; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectFieldSelector, InType: reflect.TypeOf(func() *ObjectFieldSelector { var x *ObjectFieldSelector; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectMeta, InType: reflect.TypeOf(func() *ObjectMeta { var x *ObjectMeta; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectReference, InType: reflect.TypeOf(func() *ObjectReference { var x *ObjectReference; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_OwnerReference, InType: reflect.TypeOf(func() *OwnerReference { var x *OwnerReference; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolume, InType: reflect.TypeOf(func() *PersistentVolume { var x *PersistentVolume; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaim, InType: reflect.TypeOf(func() *PersistentVolumeClaim { var x *PersistentVolumeClaim; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaimList, InType: reflect.TypeOf(func() *PersistentVolumeClaimList { var x *PersistentVolumeClaimList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaimSpec, InType: reflect.TypeOf(func() *PersistentVolumeClaimSpec { var x *PersistentVolumeClaimSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaimStatus, InType: reflect.TypeOf(func() *PersistentVolumeClaimStatus { var x *PersistentVolumeClaimStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeClaimVolumeSource, InType: reflect.TypeOf(func() *PersistentVolumeClaimVolumeSource { var x *PersistentVolumeClaimVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeList, InType: reflect.TypeOf(func() *PersistentVolumeList { var x *PersistentVolumeList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeSource, InType: reflect.TypeOf(func() *PersistentVolumeSource { var x *PersistentVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeSpec, InType: reflect.TypeOf(func() *PersistentVolumeSpec { var x *PersistentVolumeSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PersistentVolumeStatus, InType: reflect.TypeOf(func() *PersistentVolumeStatus { var x *PersistentVolumeStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Pod, InType: reflect.TypeOf(func() *Pod { var x *Pod; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodAffinity, InType: reflect.TypeOf(func() *PodAffinity { var x *PodAffinity; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodAffinityTerm, InType: reflect.TypeOf(func() *PodAffinityTerm { var x *PodAffinityTerm; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodAntiAffinity, InType: reflect.TypeOf(func() *PodAntiAffinity { var x *PodAntiAffinity; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodAttachOptions, InType: reflect.TypeOf(func() *PodAttachOptions { var x *PodAttachOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodCondition, InType: reflect.TypeOf(func() *PodCondition { var x *PodCondition; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodExecOptions, InType: reflect.TypeOf(func() *PodExecOptions { var x *PodExecOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodList, InType: reflect.TypeOf(func() *PodList { var x *PodList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodLogOptions, InType: reflect.TypeOf(func() *PodLogOptions { var x *PodLogOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodProxyOptions, InType: reflect.TypeOf(func() *PodProxyOptions { var x *PodProxyOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodSecurityContext, InType: reflect.TypeOf(func() *PodSecurityContext { var x *PodSecurityContext; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodSignature, InType: reflect.TypeOf(func() *PodSignature { var x *PodSignature; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodSpec, InType: reflect.TypeOf(func() *PodSpec { var x *PodSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodStatus, InType: reflect.TypeOf(func() *PodStatus { var x *PodStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodStatusResult, InType: reflect.TypeOf(func() *PodStatusResult { var x *PodStatusResult; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplate, InType: reflect.TypeOf(func() *PodTemplate { var x *PodTemplate; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplateList, InType: reflect.TypeOf(func() *PodTemplateList { var x *PodTemplateList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PodTemplateSpec, InType: reflect.TypeOf(func() *PodTemplateSpec { var x *PodTemplateSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Preconditions, InType: reflect.TypeOf(func() *Preconditions { var x *Preconditions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferAvoidPodsEntry, InType: reflect.TypeOf(func() *PreferAvoidPodsEntry { var x *PreferAvoidPodsEntry; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferredSchedulingTerm, InType: reflect.TypeOf(func() *PreferredSchedulingTerm { var x *PreferredSchedulingTerm; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Probe, InType: reflect.TypeOf(func() *Probe { var x *Probe; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_RBDVolumeSource, InType: reflect.TypeOf(func() *RBDVolumeSource { var x *RBDVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_RangeAllocation, InType: reflect.TypeOf(func() *RangeAllocation { var x *RangeAllocation; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationController, InType: reflect.TypeOf(func() *ReplicationController { var x *ReplicationController; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationControllerList, InType: reflect.TypeOf(func() *ReplicationControllerList { var x *ReplicationControllerList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationControllerSpec, InType: reflect.TypeOf(func() *ReplicationControllerSpec { var x *ReplicationControllerSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationControllerStatus, InType: reflect.TypeOf(func() *ReplicationControllerStatus { var x *ReplicationControllerStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ResourceFieldSelector, InType: reflect.TypeOf(func() *ResourceFieldSelector { var x *ResourceFieldSelector; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ResourceQuota, InType: reflect.TypeOf(func() *ResourceQuota { var x *ResourceQuota; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ResourceQuotaList, InType: reflect.TypeOf(func() *ResourceQuotaList { var x *ResourceQuotaList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ResourceQuotaSpec, InType: reflect.TypeOf(func() *ResourceQuotaSpec { var x *ResourceQuotaSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ResourceQuotaStatus, InType: reflect.TypeOf(func() *ResourceQuotaStatus { var x *ResourceQuotaStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ResourceRequirements, InType: reflect.TypeOf(func() *ResourceRequirements { var x *ResourceRequirements; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SELinuxOptions, InType: reflect.TypeOf(func() *SELinuxOptions { var x *SELinuxOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Secret, InType: reflect.TypeOf(func() *Secret { var x *Secret; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SecretKeySelector, InType: reflect.TypeOf(func() *SecretKeySelector { var x *SecretKeySelector; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SecretList, InType: reflect.TypeOf(func() *SecretList { var x *SecretList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SecretVolumeSource, InType: reflect.TypeOf(func() *SecretVolumeSource { var x *SecretVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SecurityContext, InType: reflect.TypeOf(func() *SecurityContext { var x *SecurityContext; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_SerializedReference, InType: reflect.TypeOf(func() *SerializedReference { var x *SerializedReference; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Service, InType: reflect.TypeOf(func() *Service { var x *Service; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceAccount, InType: reflect.TypeOf(func() *ServiceAccount { var x *ServiceAccount; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceAccountList, InType: reflect.TypeOf(func() *ServiceAccountList { var x *ServiceAccountList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceList, InType: reflect.TypeOf(func() *ServiceList { var x *ServiceList; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServicePort, InType: reflect.TypeOf(func() *ServicePort { var x *ServicePort; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceProxyOptions, InType: reflect.TypeOf(func() *ServiceProxyOptions { var x *ServiceProxyOptions; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceSpec, InType: reflect.TypeOf(func() *ServiceSpec { var x *ServiceSpec; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ServiceStatus, InType: reflect.TypeOf(func() *ServiceStatus { var x *ServiceStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_TCPSocketAction, InType: reflect.TypeOf(func() *TCPSocketAction { var x *TCPSocketAction; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Taint, InType: reflect.TypeOf(func() *Taint { var x *Taint; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Toleration, InType: reflect.TypeOf(func() *Toleration { var x *Toleration; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Volume, InType: reflect.TypeOf(func() *Volume { var x *Volume; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_VolumeMount, InType: reflect.TypeOf(func() *VolumeMount { var x *VolumeMount; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_VolumeSource, InType: reflect.TypeOf(func() *VolumeSource { var x *VolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_VsphereVirtualDiskVolumeSource, InType: reflect.TypeOf(func() *VsphereVirtualDiskVolumeSource { var x *VsphereVirtualDiskVolumeSource; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_WeightedPodAffinityTerm, InType: reflect.TypeOf(func() *WeightedPodAffinityTerm { var x *WeightedPodAffinityTerm; return x }())},
+	); err != nil {
+		// if one of the deep copy functions is malformed, detect it immediately.
+		panic(err)
+	}
+>>>>>>> support Azure data disk volume
 }
 
 func DeepCopy_api_AWSElasticBlockStoreVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
@@ -267,6 +430,19 @@ func DeepCopy_api_AvoidPods(in interface{}, out interface{}, c *conversion.Clone
 		} else {
 			out.PreferAvoidPods = nil
 		}
+		return nil
+	}
+}
+
+func DeepCopy_api_AzureDiskVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AzureDiskVolumeSource)
+		out := out.(*AzureDiskVolumeSource)
+		out.DiskName = in.DiskName
+		out.DataDiskURI = in.DataDiskURI
+		out.CachingMode = in.CachingMode
+		out.FSType = in.FSType
+		out.ReadOnly = in.ReadOnly
 		return nil
 	}
 }
@@ -2200,6 +2376,13 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		} else {
 			out.VsphereVolume = nil
 		}
+		if in.AzureDisk != nil {
+			in, out := &in.AzureDisk, &out.AzureDisk
+			*out = new(AzureDiskVolumeSource)
+			**out = **in
+		} else {
+			out.AzureDisk = nil
+		}
 		return nil
 	}
 }
@@ -3583,6 +3766,13 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			**out = **in
 		} else {
 			out.VsphereVolume = nil
+		}
+		if in.AzureDisk != nil {
+			in, out := &in.AzureDisk, &out.AzureDisk
+			*out = new(AzureDiskVolumeSource)
+			**out = **in
+		} else {
+			out.AzureDisk = nil
 		}
 		return nil
 	}
