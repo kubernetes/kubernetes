@@ -136,6 +136,44 @@ func TestParseResolvConf(t *testing.T) {
 	}
 }
 
+func TestComposeDNSSearch(t *testing.T) {
+	testCases := []struct {
+		dnsNames     []string
+		hostNames    []string
+		resultSearch []string
+	}{
+		{[]string{"default.svc.cluster.local", "svc.cluster.local", "cluster.local"},
+			[]string{}, []string{"default.svc.cluster.local", "svc.cluster.local", "cluster.local"}},
+
+		{[]string{"default.svc.cluster.local", "svc.cluster.local", "cluster.local"},
+			[]string{"svc.cluster.local", "foo", "cluster.local"},
+			[]string{"default.svc.cluster.local", "svc.cluster.local", "cluster.local", "foo"}},
+
+		{[]string{"cluster.local"},
+			[]string{"cluster.local",
+				"3.141592653589793238462643383279502884197169399375105820974944592.com",
+				"www.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk.com",
+				"www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com",
+				"toolongdomain.shouldnotbeapplied.thelimitisreachedatthispoint", "bar"},
+			[]string{"cluster.local",
+				"3.141592653589793238462643383279502884197169399375105820974944592.com",
+				"www.abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijk.com",
+				"www.llanfairpwllgwyngyllgogerychwyrndrobwyll-llantysiliogogogoch.com"}},
+
+		{[]string{"default.svc.cluster.local", "svc.cluster.local", "cluster.local"},
+			[]string{"svc.cluster.local", "foo1", "foo2", "cluster.local", "foo3", "maxdomainslimit.is reached", "foo4"},
+			[]string{"default.svc.cluster.local", "svc.cluster.local", "cluster.local", "foo1", "foo2", "foo3"}},
+	}
+
+	for i, tc := range testCases {
+		dnsSearch := composeDNSSearch(tc.dnsNames, tc.hostNames)
+
+		if !reflect.DeepEqual(dnsSearch, tc.resultSearch) {
+			t.Errorf("[%d] expected search line %#v, got %#v", i, tc.resultSearch, dnsSearch)
+		}
+	}
+}
+
 func TestCleanupBandwidthLimits(t *testing.T) {
 	testPod := func(name, ingress string) *api.Pod {
 		pod := podWithUidNameNs("", name, "")
