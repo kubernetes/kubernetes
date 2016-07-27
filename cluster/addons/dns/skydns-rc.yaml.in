@@ -16,7 +16,7 @@
 
 # TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
 
-# Warning: This is a file generated from the base underscore template file: skydns-rc.yaml.base
+# Warning: This is a file generated from the base template file: skydns-rc.yaml.base
 
 apiVersion: v1
 kind: ReplicationController

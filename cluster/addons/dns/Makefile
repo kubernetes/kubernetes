@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Makefile for the skydns underscore templates to Salt/Pillar and other formats.
+# Makefile for the skydns templates to Salt/Jinja and other formats.
 
 # If you update the *.base templates, please run this Makefile before pushing.
 #
@@ -22,11 +22,11 @@
 all: transform
 
 # .base -> .in pattern rule
-%.in: %.base
+%.in: %.base transforms2salt.sed
 	sed -f transforms2salt.sed $< | sed s/__SOURCE_FILENAME__/$</g > $@
 
 # .base -> .sed pattern rule
-%.sed: %.base
+%.sed: %.base transforms2sed.sed
 	sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
 
 transform: skydns-rc.yaml.in skydns-svc.yaml.in skydns-rc.yaml.sed skydns-svc.yaml.sed
