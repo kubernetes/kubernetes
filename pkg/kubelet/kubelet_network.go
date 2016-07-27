@@ -20,12 +20,14 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -87,6 +89,115 @@ func (kl *Kubelet) providerRequiresNetworkingConfiguration() bool {
 	}
 	_, supported := kl.cloud.Routes()
 	return supported
+}
+
+func wouldFit(kl *Kubelet, pod *v1.Pod, composedSearch []string, domain string) (bool, []string) {
+	searchLen := len(strings.Join(composedSearch, " "))
+
+	if searchLen == 0 || (searchLen+len(domain)+1 <= types.MaxSearchLineLen && len(composedSearch) < types.MaxSearchLineDNSDomains) {
+		return true, append(composedSearch, domain)
+	} else {
+		log := fmt.Sprintf("Search Line limits were exceeded, some dns names have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
+		kl.recorder.Event(pod, v1.EventTypeWarning, "DNSSearchForming", log)
+		glog.Error(log)
+	}
+	return false, composedSearch
+}
+
+func (kl *Kubelet) formDNSSearchForDNSDefault(hostSearch []string, pod *v1.Pod) []string {
+	if len(hostSearch) <= types.MaxSearchLineDNSDomains && len(strings.Join(hostSearch, " ")) <= types.MaxSearchLineLen {
+		return hostSearch
+	}
+
+	// form Search line which fits the resolver limits
+	composedSearch := []string{}
+	var proceed bool
+	for _, dnsDomain := range hostSearch {
+		if proceed, composedSearch = wouldFit(kl, pod, composedSearch, dnsDomain); !proceed {
+			return composedSearch
+		}
+	}
+	return composedSearch
+}
+
+func (kl *Kubelet) formDNSSearch(hostSearch []string, pod *v1.Pod) []string {
+	if kl.clusterDomain == "" {
+		return hostSearch
+	}
+
+	nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, kl.clusterDomain)
+	svcDomain := fmt.Sprintf("svc.%s", kl.clusterDomain)
+	dnsSearch := []string{nsSvcDomain, svcDomain, kl.clusterDomain}
+	composedSearch := []string{}
+	var proceed bool
+
+	//add dns domains with checking  search line limits
+	for _, dnsDomain := range dnsSearch {
+		if proceed, composedSearch = wouldFit(kl, pod, composedSearch, dnsDomain); !proceed {
+			return composedSearch
+		}
+	}
+
+	//add host domains excluding duplicates
+	for _, hostDomain := range hostSearch {
+		unique := true
+		for _, dnsDomain := range dnsSearch {
+			if hostDomain == dnsDomain {
+				unique = false
+				break
+			}
+		}
+		if !unique {
+			log := fmt.Sprintf("Found and omitted duplicated dns domain in host search line: '%s' during merging with cluster dns domains", hostDomain)
+			kl.recorder.Event(pod, v1.EventTypeWarning, "DNSSearchForming", log)
+			glog.Error(log)
+			continue
+		}
+		if proceed, composedSearch = wouldFit(kl, pod, composedSearch, hostDomain); !proceed {
+			return composedSearch
+		}
+	}
+
+	return composedSearch
+}
+
+func (kl *Kubelet) checkLimitsForResolvConf() {
+	f, err := os.Open(kl.resolverConfig)
+	if err != nil {
+		kl.recorder.Event(kl.nodeRef, v1.EventTypeWarning, "checkLimitsForResolvConf", err.Error())
+		glog.Error("checkLimitsForResolvConf: " + err.Error())
+		return
+	}
+	defer f.Close()
+
+	_, hostSearch, err := kl.parseResolvConf(f)
+	if err != nil {
+		kl.recorder.Event(kl.nodeRef, v1.EventTypeWarning, "checkLimitsForResolvConf", err.Error())
+		glog.Error("checkLimitsForResolvConf: " + err.Error())
+		return
+	}
+
+	domainCntLimit := types.MaxSearchLineDNSDomains
+
+	if kl.clusterDomain != "" {
+		domainCntLimit -= 3
+	}
+
+	if len(hostSearch) > domainCntLimit {
+		log := fmt.Sprintf("Resolv.conf file '%s' contains search line consisting of more than %d domains!", kl.resolverConfig, domainCntLimit)
+		kl.recorder.Event(kl.nodeRef, v1.EventTypeWarning, "checkLimitsForResolvConf", log)
+		glog.Error("checkLimitsForResolvConf: " + log)
+		return
+	}
+
+	if len(strings.Join(hostSearch, " ")) > types.MaxSearchLineLen {
+		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", kl.resolverConfig, types.MaxSearchLineLen)
+		kl.recorder.Event(kl.nodeRef, v1.EventTypeWarning, "checkLimitsForResolvConf", log)
+		glog.Error("checkLimitsForResolvConf: " + log)
+		return
+	}
+
+	return
 }
 
 // parseResolveConf reads a resolv.conf file from the given reader, and parses

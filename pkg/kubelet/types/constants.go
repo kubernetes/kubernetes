@@ -19,4 +19,7 @@ package types
 const (
 	// system default DNS resolver configuration
 	ResolvConfDefault = "/etc/resolv.conf"
+	// resolver file Search line current limitations
+	MaxSearchLineDNSDomains = 6
+	MaxSearchLineLen        = 255
 )
