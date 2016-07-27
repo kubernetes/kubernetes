@@ -203,18 +203,17 @@ func (le *LeaderElector) IsLeader() bool {
 // acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds.
 func (le *LeaderElector) acquire() {
 	stop := make(chan struct{})
-	wait.Until(func() {
+	wait.JitterUntil(func() {
 		succeeded := le.tryAcquireOrRenew()
 		le.maybeReportTransition()
 		if !succeeded {
 			glog.V(4).Infof("failed to renew lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
-			time.Sleep(wait.Jitter(le.config.RetryPeriod, JitterFactor))
 			return
 		}
 		le.config.EventRecorder.Eventf(&api.Endpoints{ObjectMeta: le.config.EndpointsMeta}, api.EventTypeNormal, "%v became leader", le.config.Identity)
 		glog.Infof("sucessfully acquired lease %v/%v", le.config.EndpointsMeta.Namespace, le.config.EndpointsMeta.Name)
 		close(stop)
-	}, 0, stop)
+	}, le.config.RetryPeriod, JitterFactor, true, stop)
 }
 
 // renew loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew fails.
