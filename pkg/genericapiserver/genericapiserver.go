@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -917,4 +918,19 @@ func (s *GenericAPIServer) InstallSwaggerAPI() {
 		},
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, s.HandlerContainer)
+}
+
+// NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
+// exposed for easier composition from other packages
+func NewDefaultAPIGroupInfo(group string) APIGroupInfo {
+	groupMeta := registered.GroupOrDie(group)
+
+	return APIGroupInfo{
+		GroupMeta:                    *groupMeta,
+		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
+		OptionsExternalVersion:       &registered.GroupOrDie(api.GroupName).GroupVersion,
+		Scheme:                       api.Scheme,
+		ParameterCodec:               api.ParameterCodec,
+		NegotiatedSerializer:         api.Codecs,
+	}
 }
