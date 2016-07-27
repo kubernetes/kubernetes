@@ -494,7 +494,7 @@ func (gce *GCECloud) waitForZoneOp(op *compute.Operation, zone string) error {
 }
 
 // GetLoadBalancer is an implementation of LoadBalancer.GetLoadBalancer
-func (gce *GCECloud) GetLoadBalancer(service *api.Service) (*api.LoadBalancerStatus, bool, error) {
+func (gce *GCECloud) GetLoadBalancer(clusterName string, service *api.Service) (*api.LoadBalancerStatus, bool, error) {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
 	fwd, err := gce.service.ForwardingRules.Get(gce.projectID, gce.region, loadBalancerName).Do()
 	if err == nil {
@@ -521,7 +521,7 @@ func isHTTPErrorCode(err error, code int) bool {
 // Due to an interesting series of design decisions, this handles both creating
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
-func (gce *GCECloud) EnsureLoadBalancer(apiService *api.Service, hostNames []string) (*api.LoadBalancerStatus, error) {
+func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, hostNames []string) (*api.LoadBalancerStatus, error) {
 	if len(hostNames) == 0 {
 		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
 	}
@@ -1193,7 +1193,7 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 }
 
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
-func (gce *GCECloud) UpdateLoadBalancer(service *api.Service, hostNames []string) error {
+func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *api.Service, hostNames []string) error {
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {
 		return err
@@ -1264,9 +1264,9 @@ func (gce *GCECloud) updateTargetPool(loadBalancerName string, existing sets.Str
 }
 
 // EnsureLoadBalancerDeleted is an implementation of LoadBalancer.EnsureLoadBalancerDeleted.
-func (gce *GCECloud) EnsureLoadBalancerDeleted(service *api.Service) error {
+func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, service *api.Service) error {
 	loadBalancerName := cloudprovider.GetLoadBalancerName(service)
-	glog.V(2).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v)", service.Namespace, service.Name, loadBalancerName,
+	glog.V(2).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v)", clusterName, service.Namespace, service.Name, loadBalancerName,
 		gce.region)
 
 	errs := utilerrors.AggregateGoroutines(

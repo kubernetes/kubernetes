@@ -31,6 +31,7 @@ import (
 const volumeAvailableStatus = "available"
 const volumeInUseStatus = "in-use"
 const volumeCreateTimeoutSeconds = 30
+const testClusterName = "testCluster"
 
 func WaitForVolumeStatus(t *testing.T, os *OpenStack, volumeName string, status string, timeoutSeconds int) {
 	timeout := timeoutSeconds
@@ -216,7 +217,7 @@ func TestLoadBalancer(t *testing.T) {
 		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 	}
 
-	_, exists, err := lb.GetLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
+	_, exists, err := lb.GetLoadBalancer(testClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
 	if err != nil {
 		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 	}
@@ -242,7 +243,7 @@ func TestLoadBalancerV2(t *testing.T) {
 		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
 	}
 
-	_, exists, err := lbaas.GetLoadBalancer(&api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
+	_, exists, err := lbaas.GetLoadBalancer(testClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
 	if err != nil {
 		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
 	}
