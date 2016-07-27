@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/util/integer"
+	intstrutil "k8s.io/kubernetes/pkg/util/intstr"
 )
 
 // rolloutRolling implements the logic for rolling a new replica set.
@@ -242,4 +243,27 @@ func (dc *DeploymentController) scaleDownOldReplicaSetsForRollingUpdate(allRSs [
 	}
 
 	return totalScaledDown, nil
+}
+
+// ShouldDeploymentPause checks if the deployment should be paused
+func (dc *DeploymentController) ShouldDeploymentPause(deployment *extensions.Deployment) bool {
+	newRS, _, err := dc.getAllReplicaSetsAndSyncRevision(deployment, true)
+	if err != nil {
+		return err
+	}
+	if !deploymentutil.IsRollingUpdate(deployment) || deployment.Spec.Strategy.RollingUpdate.PauseWhen == nil || newRS == nil {
+		return false
+	}
+	// Error caught by validation
+	maxAllowed, _ := intstrutil.GetValueFromIntOrPercent(deployment.Spec.Strategy.RollingUpdate.PauseWhen, int(deployment.Spec.Replicas), false)
+	return newRS.Spec.Replicas >= maxAllowed
+}
+
+func (dc *DeploymentController) pauseDeployment(deployment *extensions.Deployment) error {
+	if deployment.Spec.Paused == true {
+		return nil
+	}
+	deployment.Spec.Paused = true
+	_, err := dc.client.Extensions().Deployments(deployment.Namespace).Update(deployment)
+	return err
 }
