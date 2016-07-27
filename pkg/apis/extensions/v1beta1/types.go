@@ -992,6 +992,7 @@ var (
 	DownwardAPI           FSType = "downwardAPI"
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
+	AzureDisk             FSType = "azureDisk"
 	All                   FSType = "*"
 )
 
