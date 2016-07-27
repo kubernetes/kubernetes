@@ -35,6 +35,7 @@ func init() {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Affinity, InType: reflect.TypeOf(func() *Affinity { var x *Affinity; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AttachedVolume, InType: reflect.TypeOf(func() *AttachedVolume { var x *AttachedVolume; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AvoidPods, InType: reflect.TypeOf(func() *AvoidPods { var x *AvoidPods; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AzureDiskVolumeSource, InType: reflect.TypeOf(func() *AzureDiskVolumeSource { var x *AzureDiskVolumeSource; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AzureFileVolumeSource, InType: reflect.TypeOf(func() *AzureFileVolumeSource { var x *AzureFileVolumeSource; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Binding, InType: reflect.TypeOf(func() *Binding { var x *Binding; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Capabilities, InType: reflect.TypeOf(func() *Capabilities { var x *Capabilities; return x }())},
@@ -261,6 +262,19 @@ func DeepCopy_v1_AvoidPods(in interface{}, out interface{}, c *conversion.Cloner
 		} else {
 			out.PreferAvoidPods = nil
 		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_AzureDiskVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AzureDiskVolumeSource)
+		out := out.(*AzureDiskVolumeSource)
+		out.DiskName = in.DiskName
+		out.DataDiskURI = in.DataDiskURI
+		out.CachingMode = in.CachingMode
+		out.FSType = in.FSType
+		out.ReadOnly = in.ReadOnly
 		return nil
 	}
 }
@@ -2140,6 +2154,13 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 		} else {
 			out.VsphereVolume = nil
 		}
+		if in.AzureDisk != nil {
+			in, out := &in.AzureDisk, &out.AzureDisk
+			*out = new(AzureDiskVolumeSource)
+			**out = **in
+		} else {
+			out.AzureDisk = nil
+		}
 		return nil
 	}
 }
@@ -3546,6 +3567,13 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			**out = **in
 		} else {
 			out.VsphereVolume = nil
+		}
+		if in.AzureDisk != nil {
+			in, out := &in.AzureDisk, &out.AzureDisk
+			*out = new(AzureDiskVolumeSource)
+			**out = **in
+		} else {
+			out.AzureDisk = nil
 		}
 		return nil
 	}
