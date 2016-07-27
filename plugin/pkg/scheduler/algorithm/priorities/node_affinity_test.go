@@ -155,7 +155,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		list, err := CalculateNodeAffinityPriority(test.pod, schedulercache.CreateNodeNameToInfoMap(nil), test.nodes)
+		list, err := CalculateNodeAffinityPriority(test.pod, schedulercache.CreateNodeNameToInfoMap(nil, test.nodes), test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

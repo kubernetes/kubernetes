@@ -138,13 +138,7 @@ func TestZeroRequest(t *testing.T) {
 
 	const expectedPriority int = 25
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
-		for _, node := range test.nodes {
-			if _, ok := nodeNameToInfo[node.Name]; !ok {
-				nodeNameToInfo[node.Name] = schedulercache.NewNodeInfo()
-			}
-			nodeNameToInfo[node.Name].SetNode(node)
-		}
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		list, err := scheduler.PrioritizeNodes(
 			test.pod,
 			nodeNameToInfo,
@@ -395,13 +389,7 @@ func TestLeastRequested(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
-		for _, node := range test.nodes {
-			if _, ok := nodeNameToInfo[node.Name]; !ok {
-				nodeNameToInfo[node.Name] = schedulercache.NewNodeInfo()
-			}
-			nodeNameToInfo[node.Name].SetNode(node)
-		}
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		list, err := LeastRequestedPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -734,13 +722,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
-		for _, node := range test.nodes {
-			if _, ok := nodeNameToInfo[node.Name]; !ok {
-				nodeNameToInfo[node.Name] = schedulercache.NewNodeInfo()
-			}
-			nodeNameToInfo[node.Name].SetNode(node)
-		}
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		list, err := BalancedResourceAllocation(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -884,7 +866,7 @@ func TestImageLocalityPriority(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		list, err := ImageLocalityPriority(test.pod, nodeNameToInfo, test.nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
