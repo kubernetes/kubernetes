@@ -218,6 +218,20 @@ func SetDefaults_ISCSIVolumeSource(obj *ISCSIVolumeSource) {
 		obj.ISCSIInterface = "default"
 	}
 }
+func SetDefaults_AzureDiskVolumeSource(obj *AzureDiskVolumeSource) {
+	if obj.CachingMode == nil {
+		obj.CachingMode = new(AzureDataDiskCachingMode)
+		*obj.CachingMode = AzureDataDiskCachingNone
+	}
+	if obj.FSType == nil {
+		obj.FSType = new(string)
+		*obj.FSType = "ext4"
+	}
+	if obj.ReadOnly == nil {
+		obj.ReadOnly = new(bool)
+		*obj.ReadOnly = false
+	}
+}
 func SetDefaults_Endpoints(obj *Endpoints) {
 	for i := range obj.Subsets {
 		ss := &obj.Subsets[i]
