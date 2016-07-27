@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -119,6 +120,64 @@ func (kl *Kubelet) parseResolvConf(reader io.Reader) (nameservers []string, sear
 		scrubber = kl.cloud
 	}
 	return parseResolvConf(reader, scrubber)
+}
+
+func appendAndContinue(composedSearch []string, domain string) bool {
+	searchLen := len(strings.Join(composedSearch, " "))
+
+	if searchLen == 0 || (searchLen+len(domain)+1 <= types.MaxSearchLineLen && len(composedSearch) < types.MaxSearchLineDNSDomains) {
+		return true
+	}
+	return false
+}
+
+func composeDNSSearch(dnsSearch []string, hostSearch []string) []string {
+	composedSearch := []string{}
+
+	//add dns domains with checking  search line limits
+	for _, dnsDomain := range dnsSearch {
+		if appendAndContinue(composedSearch, dnsDomain) {
+			composedSearch = append(composedSearch, dnsDomain)
+		} else {
+			glog.V(8).Infof("Search Line limits were exceeded, some dns names have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
+			return composedSearch
+		}
+	}
+
+	//add host domains excluding duplicates
+	for _, hostDomain := range hostSearch {
+		unique := true
+		for _, dnsDomain := range dnsSearch {
+			if hostDomain == dnsDomain {
+				unique = false
+				break
+			}
+		}
+		if !unique {
+			glog.V(8).Infof("Found and omitted duplicated dns domain in host search line: '%s' during merging with cluster dns domains", hostDomain)
+			continue
+		}
+		if appendAndContinue(composedSearch, hostDomain) {
+			composedSearch = append(composedSearch, hostDomain)
+		} else {
+			glog.V(8).Infof("Search Line limits were exceeded, some dns names have been omitted, the applied search line is: %s", strings.Join(composedSearch, " "))
+			return composedSearch
+		}
+	}
+
+	return composedSearch
+}
+
+func (kl *Kubelet) formDNSSearch(hostSearch []string, namespace string) []string {
+	var dnsSearch []string
+	if kl.clusterDomain != "" {
+		nsSvcDomain := fmt.Sprintf("%s.svc.%s", namespace, kl.clusterDomain)
+		svcDomain := fmt.Sprintf("svc.%s", kl.clusterDomain)
+		dnsSearch = composeDNSSearch([]string{nsSvcDomain, svcDomain, kl.clusterDomain}, hostSearch)
+	} else {
+		dnsSearch = hostSearch
+	}
+	return dnsSearch
 }
 
 // A helper for testing.
