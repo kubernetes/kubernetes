@@ -1,3 +1,20 @@
+{% set cluster_state = 'new' -%}
+{% set host_name = pillar.get('master_name', '') -%}
+{% set etcd_cluster_array = pillar.get('initial_etcd_cluster', '').split(',') -%}
+{% set etcd_cluster = '' -%}
+{# We use vars dictionary to pass variables set inside the for loop, because jinja defines new variables inside the for loop that hide variables from the outside. #}
+{% set vars = {'etcd_cluster': '', 'cluster_state': cluster_state} -%}
+{% for host in etcd_cluster_array -%}
+  {% if etcd_cluster != '' -%}
+    {% set cluster_state = 'existing' -%}
+    {% set etcd_cluster = etcd_cluster ~ ',' -%}
+  {% endif -%}
+  {% set etcd_cluster = etcd_cluster ~ 'etcd-' ~ host ~ '=http://' ~ host ~ ':' ~ server_port -%}
+  {% do vars.update({'etcd_cluster': etcd_cluster, 'cluster_state': cluster_state}) -%}
+{% endfor -%}
+{% set etcd_cluster = vars.etcd_cluster -%}
+{% set cluster_state = vars.cluster_state -%}
+
 {
 "apiVersion": "v1",
 "kind": "Pod",
@@ -19,7 +36,7 @@
     "command": [
               "/bin/sh",
               "-c",
-              "/usr/local/bin/etcd --listen-peer-urls http://127.0.0.1:{{ server_port }} --advertise-client-urls http://127.0.0.1:{{ port }} --listen-client-urls http://127.0.0.1:{{ port }} --data-dir /var/etcd/data{{ suffix }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
+              "/usr/local/bin/etcd --name etcd-{{ host_name }} --listen-peer-urls http://{{ host_name }}:{{ server_port }} --initial-advertise-peer-urls http://{{ host_name }}:{{ server_port }} --advertise-client-urls http://127.0.0.1:{{ port }} --listen-client-urls http://127.0.0.1:{{ port }} --data-dir /var/etcd/data{{ suffix }} --initial-cluster {{ etcd_cluster }} --initial-cluster-state {{ cluster_state }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
             ],
     "livenessProbe": {
       "httpGet": {
