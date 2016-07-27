@@ -224,7 +224,7 @@ type nodeToUpdateStatusFor struct {
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
-	volumeSpec *volume.Spec, nodeName string, devicePath string) error {
+	_ api.UniqueVolumeName, volumeSpec *volume.Spec, nodeName string, devicePath string) error {
 	_, err := asw.AddVolumeNode(volumeSpec, nodeName, devicePath)
 	return err
 }
