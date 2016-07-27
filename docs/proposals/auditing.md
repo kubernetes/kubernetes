@@ -95,6 +95,8 @@ while
 - OpenStack's implementation of the CADF standard: https://www.dmtf.org/sites/default/files/standards/documents/DSP2038_1.1.0.pdf
 - Cloud Auditing Data Federation standard: https://www.dmtf.org/standards/cadf 
 - Ceilometer audit blueprint: https://wiki.openstack.org/wiki/Ceilometer/blueprints/support-standard-audit-formats 
+- Talk from IBM: An Introduction to DMTF Cloud Auditing using
+the CADF Event Model and Taxonomies https://wiki.openstack.org/w/images/e/e1/Introduction_to_Cloud_Auditing_using_CADF_Event_Model_and_Taxonomy_2013-10-22.pdf
 
 ## Proposed Design
 
