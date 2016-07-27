@@ -54,6 +54,7 @@ BRANCH ?=
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
 export KUBE_GOGCFLAGS GOGCFLAGS
 
+define ALL_HELP_INFO
 # Build code.
 #
 # Args:
@@ -72,18 +73,32 @@ export KUBE_GOGCFLAGS GOGCFLAGS
 #     Note: Use the -N -l options to disable compiler optimizations an inlining.
 #           Using these build options allows you to subsequently use source
 #           debugging tools like delve.
+endef
 .PHONY: all
-all: generated_files
+ifeq ($(PRINT_HELP),y)
+all:
+	@echo "$$ALL_HELP_INFO"
+else
+all:
 	hack/make-rules/build.sh $(WHAT)
+endif
 
+define GINKGO_HELP_INFO
 # Build ginkgo
 #
 # Example:
 # make ginkgo
+endef
 .PHONY: ginkgo
+ifeq ($(PRINT_HELP),y)
+ginkgo:
+	@echo "$$GINKGO_HELP_INFO"
+else
 ginkgo:
 	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
+endif
 
+define VERIFY_HELP_INFO
 # Runs all the presubmission verifications.
 #
 # Args:
@@ -92,11 +107,18 @@ ginkgo:
 # Example:
 #   make verify
 #   make verify BRANCH=branch_x
+endef
 .PHONY: verify
+ifeq ($(PRINT_HELP),y)
+verify:
+	@echo "$$VERIFY_HELP_INFO"
+else
 verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
 	hack/make-rules/vet.sh
+endif
 
+define CHECK_TEST_HELP_INFO
 # Build and run tests.
 #
 # Args:
@@ -111,26 +133,47 @@ verify:
 #   make check
 #   make test
 #   make check WHAT=pkg/kubelet GOFLAGS=-v
+endef
 .PHONY: check test
+ifeq ($(PRINT_HELP),y)
+check test:
+	@echo "$$CHECK_TEST_HELP_INFO"
+else
 check test: generated_files
 	hack/make-rules/test.sh $(WHAT) $(TESTS)
+endif
 
+define TEST_IT_HELP_INFO
 # Build and run integration tests.
 #
 # Example:
 #   make test-integration
+endef
 .PHONY: test-integration
+ifeq ($(PRINT_HELP),y)
+test-integration:
+	@echo "$$TEST_IT_HELP_INFO"
+else
 test-integration: generated_files
 	hack/make-rules/test-integration.sh
+endif
 
+define TEST_E2E_HELP_INFO
 # Build and run end-to-end tests.
 #
 # Example:
 #   make test-e2e
+endef
 .PHONY: test-e2e
+ifeq ($(PRINT_HELP),y)
+test-e2e:
+	@echo "$$TEST_E2E_HELP_INFO"
+else
 test-e2e: ginkgo generated_files
 	go run hack/e2e.go -v --build --up --test --down
+endif
 
+define TEST_E2E_NODE_HELP_INFO
 # Build and run node end-to-end tests.
 #
 # Args:
@@ -166,46 +209,81 @@ test-e2e: ginkgo generated_files
 #   make test-e2e-node REMOTE=true DELETE_INSTANCES=true
 #   make test-e2e-node TEST_ARGS="--cgroups-per-qos=true"
 # Build and run tests.
+endef
 .PHONY: test-e2e-node
+ifeq ($(PRINT_HELP),y)
+test-e2e-node:
+	@echo "$$TEST_E2E_NODE_HELP_INFO"
+else
 test-e2e-node: ginkgo generated_files
 	hack/make-rules/test-e2e-node.sh
+endif
 
+define TEST_CMD_HELP_INFO
 # Build and run cmdline tests.
 #
 # Example:
 #   make test-cmd
+endef
 .PHONY: test-cmd
+ifeq ($(PRINT_HELP),y)
+test-cmd:
+	@echo "$$TEST_CMD_HELP_INFO"
+else
 test-cmd: generated_files
 	hack/make-rules/test-cmd.sh
+endif
 
+define CLEAN_HELP_INFO
 # Remove all build artifacts.
 #
 # Example:
 #   make clean
 #
 # TODO(thockin): call clean_generated when we stop committing generated code.
+endef
 .PHONY: clean
+ifeq ($(PRINT_HELP),y)
+clean:
+	@echo "$$CLEAN_HELP_INFO"
+else
 clean: clean_meta
 	build/make-clean.sh
 	rm -rf $(OUT_DIR)
 	rm -rf Godeps/_workspace # Just until we are sure it is gone
+endif
 
+define CLEAN_META_HELP_INFO
 # Remove make-related metadata files.
 #
 # Example:
 #   make clean_meta
+endef
 .PHONY: clean_meta
+ifeq ($(PRINT_HELP),y)
+clean_meta:
+	@echo "$$CLEAN_META_HELP_INFO"
+else
 clean_meta:
 	rm -rf $(META_DIR)
+endif
 
+define CLEAN_GENERATED_HELP_INFO
 # Remove all auto-generated artifacts.
 #
 # Example:
 #   make clean_generated
+endef
 .PHONY: clean_generated
+ifeq ($(PRINT_HELP),y)
+clean_generated:
+	@echo "$$CLEAN_GENERATED_HELP_INFO"
+else
 clean_generated:
 	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
+endif
 
+define VET_HELP_INFO
 # Run 'go vet'.
 #
 # Args:
@@ -216,62 +294,136 @@ clean_generated:
 # Example:
 #   make vet
 #   make vet WHAT=pkg/kubelet
+endef
 .PHONY: vet
+ifeq ($(PRINT_HELP),y)
+vet:
+	@echo "$$VET_HELP_INFO"
+else
 vet:
 	hack/make-rules/vet.sh $(WHAT)
+endif
 
+define RELEASE_HELP_INFO
 # Build a release
 #
 # Example:
 #   make release
+endef
 .PHONY: release
+ifeq ($(PRINT_HELP),y)
+release:
+	@echo "$$RELEASE_HELP_INFO"
+else
 release:
 	build/release.sh
+endif
 
+define RELEASE_SKIP_TESTS_HELP_INFO
 # Build a release, but skip tests
 #
 # Example:
 #   make release-skip-tests
+endef
 .PHONY: release-skip-tests quick-release
+ifeq ($(PRINT_HELP),y)
+release-skip-tests quick-release:
+	@echo "$$RELEASE_SKIP_TESTS_HELP_INFO"
+else
 release-skip-tests quick-release:
 	KUBE_RELEASE_RUN_TESTS=n KUBE_FASTBUILD=true build/release.sh
+endif
 
+define CROSS_HELP_INFO
 # Cross-compile for all platforms
 #
 # Example:
 #   make cross
+endef
 .PHONY: cross
+ifeq ($(PRINT_HELP),y)
+cross:
+	@echo "$$CROSS_HELP_INFO"
+else
 cross:
 	hack/make-rules/cross.sh
+endif
 
+define CMD_HELP_INFO
 # Add rules for all directories in cmd/
 #
 # Example:
 #   make kubectl kube-proxy
-.PHONY: $(notdir $(abspath $(wildcard cmd/*/)))
-$(notdir $(abspath $(wildcard cmd/*/))): generated_files
+endef
+#TODO: make EXCLUDE_TARGET auto-generated when there are other files in cmd/
+#TODO: should we exclude the target "libs" but include "cmd/libs/go2idl/*"?
+EXCLUDE_TARGET=OWNERS
+.PHONY: $(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/))))
+ifeq ($(PRINT_HELP),y)
+$(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))):
+	@echo "$$CMD_HELP_INFO"
+else
+$(filter-out %$(EXCLUDE_TARGET),$(notdir $(abspath $(wildcard cmd/*/)))): generated_files
 	hack/make-rules/build.sh cmd/$@
+endif
 
+define PLUGIN_CMD_HELP_INFO
 # Add rules for all directories in plugin/cmd/
 #
 # Example:
 #   make kube-scheduler
+endef
 .PHONY: $(notdir $(abspath $(wildcard plugin/cmd/*/)))
+ifeq ($(PRINT_HELP),y)
+$(notdir $(abspath $(wildcard plugin/cmd/*/))):
+	@echo "$$PLUGIN_CMD_HELP_INFO"
+else
 $(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
 	hack/make-rules/build.sh plugin/cmd/$@
+endif
 
+define FED_CMD_HELP_INFO
 # Add rules for all directories in federation/cmd/
 #
 # Example:
 #   make federation-apiserver federation-controller-manager
+endef
 .PHONY: $(notdir $(abspath $(wildcard federation/cmd/*/)))
+ifeq ($(PRINT_HELP),y)
+$(notdir $(abspath $(wildcard federation/cmd/*/))):
+	@echo "$$FED_CMD_HELP_INFO"
+else
 $(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
 	hack/make-rules/build.sh federation/cmd/$@
+endif
 
+define GENEREATED_FILES_HELP_INFO
 # Produce auto-generated files needed for the build.
 #
 # Example:
 #   make generated_files
+endef
 .PHONY: generated_files
+ifeq ($(PRINT_HELP),y)
+generated_files:
+	@echo "$$GENEREATED_FILES_HELP_INFO"
+else
 generated_files:
 	$(MAKE) -f Makefile.$@ $@
+endif
+
+define HELP_INFO
+# Print make targets and help info
+#
+# Example:
+# make help
+endef
+#TODO: should we let help be the first/default target?
+.PHONY: help
+ifeq ($(PRINT_HELP),y)
+help:
+	@echo "$$HELP_INFO"
+else
+help:
+	hack/make-rules/make-help.sh
+endif
