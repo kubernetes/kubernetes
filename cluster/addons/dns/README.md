@@ -1,7 +1,7 @@
 # SkyDNS Replication Controllers and Service templates
 
 This directory contains the base UNDERSCORE templates that can be used
-to generate the skydns-rc.yaml.in and skydns.rc.yaml.in needed in Salt format.
+to generate the skydns-rc.yaml.in and skydns-svc.yaml.in needed in Salt format.
 
 Due to a varied preference in templating language choices, the transform
 Makefile in this directory should be enhanced to generate all required
