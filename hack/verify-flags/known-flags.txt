@@ -196,6 +196,7 @@ grace-period
 ha-domain
 hairpin-mode
 hard-pod-affinity-symmetric-weight
+hard
 healthz-bind-address
 healthz-port
 horizontal-pod-autoscaler-sync-period
@@ -418,6 +419,7 @@ save-config
 scheduler-config
 scheduler-name
 schema-cache-dir
+scopes
 seccomp-profile-root
 secure-port
 serialize-image-pulls
