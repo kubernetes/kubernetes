@@ -14,24 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1beta1
-
-type DaemonSetExpansion interface{}
-
-type DeploymentExpansion interface{}
-
-type HorizontalPodAutoscalerExpansion interface{}
-
-type IngressExpansion interface{}
-
-type JobExpansion interface{}
-
-type PodSecurityPolicyExpansion interface{}
-
-type ReplicaSetExpansion interface{}
-
-type ScaleExpansion interface{}
-
-type ThirdPartyResourceExpansion interface{}
-
-type StorageClassExpansion interface{}
+// Package storageClass provides Registry interface and its REST
+// implementation for storing storageclass api objects.
+package storageclass

@@ -58,6 +58,10 @@ func (c *FakeExtensions) Scales(namespace string) v1beta1.ScaleInterface {
 	return &FakeScales{c, namespace}
 }
 
+func (c *FakeExtensions) StorageClasses() v1beta1.StorageClassInterface {
+	return &FakeStorageClasses{c}
+}
+
 func (c *FakeExtensions) ThirdPartyResources() v1beta1.ThirdPartyResourceInterface {
 	return &FakeThirdPartyResources{c}
 }
