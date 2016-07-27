@@ -1243,6 +1243,11 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// handled by pod workers).
 	go wait.Until(kl.podKiller, 1*time.Second, wait.NeverStop)
 
+	// Start gorouting responsible for checking limits in resolv.conf
+	if kl.resolverConfig != "" {
+		go wait.Until(func() { kl.checkLimitsForResolvConf() }, 30*time.Second, wait.NeverStop)
+	}
+
 	// Start component sync loops.
 	kl.statusManager.Start()
 	kl.probeManager.Start()
@@ -1299,6 +1304,8 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
 		if kl.resolverConfig == "" {
 			hostDNS = []string{"127.0.0.1"}
 			hostSearch = []string{"."}
+		} else {
+			hostSearch = kl.formDNSSearchForDNSDefault(hostSearch, pod)
 		}
 		return hostDNS, hostSearch, nil
 	}
@@ -1307,15 +1314,7 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
 	// the pod. The cluster DNS server itself will forward queries to other nameservers that is configured to use,
 	// in case the cluster DNS server cannot resolve the DNS query itself
 	dns := []string{kl.clusterDNS.String()}
-
-	var dnsSearch []string
-	if kl.clusterDomain != "" {
-		nsSvcDomain := fmt.Sprintf("%s.svc.%s", pod.Namespace, kl.clusterDomain)
-		svcDomain := fmt.Sprintf("svc.%s", kl.clusterDomain)
-		dnsSearch = append([]string{nsSvcDomain, svcDomain, kl.clusterDomain}, hostSearch...)
-	} else {
-		dnsSearch = hostSearch
-	}
+	dnsSearch := kl.formDNSSearch(hostSearch, pod)
 	return dns, dnsSearch, nil
 }
 
