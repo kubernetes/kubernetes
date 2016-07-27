@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	testConfigAlfa = clientcmdapi.Config{
+	testConfigAlpha = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"red-user": {Token: "red-token"}},
 		Clusters: map[string]*clientcmdapi.Cluster{
@@ -67,7 +67,7 @@ var (
 			"gothic-context": {AuthInfo: "blue-user", Cluster: "chicken-cluster", Namespace: "plane-ns"}},
 	}
 
-	testConfigConflictAlfa = clientcmdapi.Config{
+	testConfigConflictAlpha = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"red-user":    {Token: "a-different-red-token"},
 			"yellow-user": {Token: "yellow-token"}},
@@ -76,8 +76,48 @@ var (
 			"donkey-cluster": {Server: "http://donkey.org:8080", InsecureSkipTLSVerify: true}},
 		CurrentContext: "federal-context",
 	}
+	testConfigTokenFileAlpha = clientcmdapi.Config{
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"red-user": {Token: "red-token"}},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"cow-cluster": {Server: "http://cow.org:8080"}},
+		Contexts: map[string]*clientcmdapi.Context{
+			"federal-context": {AuthInfo: "red-user", Cluster: "cow-cluster", Namespace: "hammer-ns"}},
+	}
 )
 
+func TestTokenFile(t *testing.T) {
+	token := "exampletoken"
+	f, err := ioutil.TempFile("", "tokenfile")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+	defer os.Remove(f.Name())
+	if err := ioutil.WriteFile(f.Name(), []byte(token), 0644); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+	testConfigTokenFileAlpha.AuthInfos["red-user"].TokenFile = f.Name()
+
+	sourceFile, _ := ioutil.TempFile("", "source")
+	defer os.Remove(sourceFile.Name())
+	WriteToFile(testConfigTokenFileAlpha, sourceFile.Name())
+
+	loadingRules := ClientConfigLoadingRules{
+		ExplicitPath: sourceFile.Name(),
+	}
+
+	config, err := loadingRules.Load();
+	if err != nil {
+		t.Errorf("unexpected error %v", err)
+	}
+	t.Logf("FOOBAR: %v", config)
+	if config.AuthInfos["red-user"].Token != token {
+		t.Errorf("Expected: %s, saw: %s", token, config.AuthInfos["red-user"].Token)
+	}
+}
+	
 func TestNonExistentCommandLineFile(t *testing.T) {
 	loadingRules := ClientConfigLoadingRules{
 		ExplicitPath: "bogus_file",
@@ -304,7 +344,7 @@ func TestMigratingFile(t *testing.T) {
 	// delete the file so that we'll write to it
 	os.Remove(destinationFile.Name())
 
-	WriteToFile(testConfigAlfa, sourceFile.Name())
+	WriteToFile(testConfigAlpha, sourceFile.Name())
 
 	loadingRules := ClientConfigLoadingRules{
 		MigrationRules: map[string]string{destinationFile.Name(): sourceFile.Name()},
@@ -337,7 +377,7 @@ func TestMigratingFileLeaveExistingFileAlone(t *testing.T) {
 	destinationFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(destinationFile.Name())
 
-	WriteToFile(testConfigAlfa, sourceFile.Name())
+	WriteToFile(testConfigAlpha, sourceFile.Name())
 
 	loadingRules := ClientConfigLoadingRules{
 		MigrationRules: map[string]string{destinationFile.Name(): sourceFile.Name()},
@@ -398,8 +438,8 @@ func Example_noMergingOnExplicitPaths() {
 	envVarFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(envVarFile.Name())
 
-	WriteToFile(testConfigAlfa, commandLineFile.Name())
-	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
+	WriteToFile(testConfigAlpha, commandLineFile.Name())
+	WriteToFile(testConfigConflictAlpha, envVarFile.Name())
 
 	loadingRules := ClientConfigLoadingRules{
 		ExplicitPath: commandLineFile.Name(),
@@ -445,8 +485,8 @@ func Example_mergingSomeWithConflict() {
 	envVarFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(envVarFile.Name())
 
-	WriteToFile(testConfigAlfa, commandLineFile.Name())
-	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
+	WriteToFile(testConfigAlpha, commandLineFile.Name())
+	WriteToFile(testConfigConflictAlpha, envVarFile.Name())
 
 	loadingRules := ClientConfigLoadingRules{
 		Precedence: []string{commandLineFile.Name(), envVarFile.Name()},
@@ -502,7 +542,7 @@ func Example_mergingEverythingNoConflicts() {
 	homeDirFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(homeDirFile.Name())
 
-	WriteToFile(testConfigAlfa, commandLineFile.Name())
+	WriteToFile(testConfigAlpha, commandLineFile.Name())
 	WriteToFile(testConfigBravo, envVarFile.Name())
 	WriteToFile(testConfigCharlie, currentDirFile.Name())
 	WriteToFile(testConfigDelta, homeDirFile.Name())

@@ -328,11 +328,19 @@ func LoadFromFile(filename string) (*clientcmdapi.Config, error) {
 		return nil, err
 	}
 	glog.V(6).Infoln("Config loaded from file", filename)
-
+		
 	// set LocationOfOrigin on every Cluster, User, and Context
 	for key, obj := range config.AuthInfos {
 		obj.LocationOfOrigin = filename
+		if len(obj.TokenFile) > 0 {
+			tokenBytes, err := ioutil.ReadFile(obj.TokenFile)
+			if err != nil {
+				return nil, err
+			}
+			obj.Token = string(tokenBytes)
+		}
 		config.AuthInfos[key] = obj
+
 	}
 	for key, obj := range config.Clusters {
 		obj.LocationOfOrigin = filename
