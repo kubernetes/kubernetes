@@ -144,7 +144,7 @@ type Event struct {
   URI string
   User string
   AsUser string
-  ObjectMeta runtime.ObjectMeta
+  Namespace, Name string
   GroupKind unversioned.GroupKind
 
   // request object
