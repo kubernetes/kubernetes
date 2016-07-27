@@ -93,6 +93,14 @@ func (n *NodeInfo) Pods() []*api.Pod {
 	return n.pods
 }
 
+// PodsWithAffinity return all pods with (anti)affinity constraints on this node.
+func (n *NodeInfo) PodsWithAffinity() []*api.Pod {
+	if n == nil {
+		return nil
+	}
+	return n.podsWithAffinity
+}
+
 func (n *NodeInfo) AllowedPodNumber() int {
 	if n == nil {
 		return 0
