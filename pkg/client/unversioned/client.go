@@ -44,6 +44,7 @@ type Interface interface {
 	PersistentVolumeClaimsNamespacer
 	ComponentStatusesInterface
 	ConfigMapsNamespacer
+	Apps() AppsInterface
 	Autoscaling() AutoscalingInterface
 	Batch() BatchInterface
 	Extensions() ExtensionsInterface
