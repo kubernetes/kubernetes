@@ -33,6 +33,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	endpointsapi "k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	ext "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	fake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -41,6 +42,7 @@ import (
 const (
 	testDomain    = "cluster.local."
 	testService   = "testservice"
+	testIngress   = "testingress"
 	testNamespace = "default"
 )
 
@@ -480,6 +482,87 @@ func TestFederationQueryWithCache(t *testing.T) {
 	testInvalidFederationQueries(t, kd)
 }
 
+func TestIngress(t *testing.T) {
+	kd := newKubeDNS()
+	testCases := []struct {
+		ing   *ext.Ingress
+		want  string
+		isErr bool
+	}{
+		{
+			newIngress(testNamespace, testIngress+"-0", "1.2.3.4", ""),
+			"1.2.3.4",
+			false,
+		},
+		{
+			newIngress(testNamespace, testIngress+"-1", "", "foo.bar.test"),
+			"foo.bar.test",
+			false,
+		},
+		{
+			newIngress(testNamespace, testIngress+"-2", "2.3.4.5", "baz.foo.example"),
+			"2.3.4.5",
+			false,
+		},
+		{
+			newIngress(testNamespace, testIngress+"-3", "", ""),
+			"",
+			true,
+		},
+	}
+
+	for _, tc := range testCases {
+		kd.newIngress(tc.ing)
+		query := fmt.Sprintf("%s.%s.ing.%s", tc.ing.Name, tc.ing.Namespace, kd.domain)
+		records, err := kd.Records(query, false)
+		if tc.isErr {
+			require.Error(t, err)
+			continue
+		}
+		require.NoError(t, err)
+		assert.Equal(t, 1, len(records))
+		assert.Equal(t, tc.want, records[0].Host)
+	}
+}
+
+func TestIngressWithMultipleLBs(t *testing.T) {
+	kd := newKubeDNS()
+	ing := newIngress(testNamespace, testIngress, "1.2.3.4", "")
+	lbis := []kapi.LoadBalancerIngress{
+		{
+			Hostname: "foo.bar.test",
+		},
+		{
+			IP:       "2.3.4.5",
+			Hostname: "baz.foo.example",
+		},
+		{
+			IP:       "",
+			Hostname: "",
+		},
+	}
+	ing.Status.LoadBalancer.Ingress = append(ing.Status.LoadBalancer.Ingress, lbis...)
+	want := sets.NewString("1.2.3.4", "foo.bar.test", "2.3.4.5")
+
+	kd.newIngress(ing)
+	query := fmt.Sprintf("%s.%s.ing.%s", ing.Name, ing.Namespace, kd.domain)
+	records, err := kd.Records(query, false)
+	require.NoError(t, err)
+
+	// We should expect records only for those statuses that were not
+	// completely empty, so len(lbi) - 1
+	assert.Equal(t, len(ing.Status.LoadBalancer.Ingress)-1, len(records))
+
+	// We asserted that the number of loadbalancerIngress entries are equal
+	// to the number of returned records. We ensure each entry exist in
+	// both the sets, the order doesn't matter.
+	for _, record := range records {
+		if !want.Has(record.Host) {
+			t.Errorf("Unexpected target host %s", record.Host)
+		}
+	}
+}
+
 func testValidFederationQueries(t *testing.T, kd *KubeDNS) {
 	queries := []struct {
 		q string
@@ -607,6 +690,25 @@ func newSubset() kapi.EndpointSubset {
 		Ports:     []kapi.EndpointPort{},
 	}
 	return subset
+}
+
+func newIngress(namespace, name, ip, hostname string) *ext.Ingress {
+	return &ext.Ingress{
+		ObjectMeta: kapi.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Status: ext.IngressStatus{
+			LoadBalancer: kapi.LoadBalancerStatus{
+				Ingress: []kapi.LoadBalancerIngress{
+					{
+						IP:       ip,
+						Hostname: hostname,
+					},
+				},
+			},
+		},
+	}
 }
 
 func assertSRVForHeadlessService(t *testing.T, kd *KubeDNS, s *kapi.Service, e *kapi.Endpoints) {
