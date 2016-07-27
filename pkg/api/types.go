@@ -241,6 +241,8 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -283,6 +285,8 @@ type PersistentVolumeSource struct {
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -791,6 +795,31 @@ type VsphereVirtualDiskVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty"`
+}
+
+type AzureDataDiskCachingMode string
+
+const (
+	AzureDataDiskCachingNone      AzureDataDiskCachingMode = "None"
+	AzureDataDiskCachingReadOnly  AzureDataDiskCachingMode = "ReadOnly"
+	AzureDataDiskCachingReadWrite AzureDataDiskCachingMode = "ReadWrite"
+)
+
+// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+type AzureDiskVolumeSource struct {
+	// The Name of the data disk in the blob storage
+	DiskName string `json:"diskName"`
+	// The URI the the data disk in the blob storage
+	DataDiskURI string `json:"diskURI"`
+	// Host Caching mode: None, Read Only, Read Write.
+	CachingMode *AzureDataDiskCachingMode `json:"cachingMode,omitempty"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType *string `json:"fsType,omitempty"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // Adapts a ConfigMap into a volume.
