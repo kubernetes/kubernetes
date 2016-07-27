@@ -170,8 +170,8 @@ func (im *realImageManager) detectImages(detectTime time.Time) error {
 	imagesInUse := sets.NewString()
 	for _, pod := range pods {
 		for _, container := range pod.Containers {
-			glog.V(5).Infof("Pod %s/%s, container %s uses image %s", pod.Namespace, pod.Name, container.Name, container.Image)
-			imagesInUse.Insert(container.Image)
+			glog.V(5).Infof("Pod %s/%s, container %s uses image %s(%s)", pod.Namespace, pod.Name, container.Name, container.Image, container.ImageID)
+			imagesInUse.Insert(container.ImageID)
 		}
 	}
 
@@ -341,14 +341,9 @@ func (ev byLastUsedAndDetected) Less(i, j int) bool {
 }
 
 func isImageUsed(image container.Image, imagesInUse sets.String) bool {
-	// Check the image ID and all the RepoTags and RepoDigests.
+	// Check the image ID.
 	if _, ok := imagesInUse[image.ID]; ok {
 		return true
-	}
-	for _, tag := range append(image.RepoTags, image.RepoDigests...) {
-		if _, ok := imagesInUse[tag]; ok {
-			return true
-		}
 	}
 	return false
 }

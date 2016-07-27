@@ -245,6 +245,8 @@ type Container struct {
 	// The image name of the container, this also includes the tag of the image,
 	// the expected form is "NAME:TAG".
 	Image string
+	// The id of the image used by the container.
+	ImageID string
 	// Hash of the container, used for comparison. Optional for containers
 	// not managed by kubelet.
 	Hash uint64

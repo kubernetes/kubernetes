@@ -59,15 +59,20 @@ func (im *realImageManager) getImageRecord(name string) (*imageRecord, bool) {
 	return &vCopy, ok
 }
 
+// Returns the id of the image with the given ID.
+func imageID(id int) string {
+	return fmt.Sprintf("image-%d", id)
+}
+
 // Returns the name of the image with the given ID.
 func imageName(id int) string {
-	return fmt.Sprintf("image-%d", id)
+	return imageID(id) + "-name"
 }
 
 // Make an image with the specified ID.
 func makeImage(id int, size int64) container.Image {
 	return container.Image{
-		ID:   imageName(id),
+		ID:   imageID(id),
 		Size: size,
 	}
 }
@@ -75,8 +80,9 @@ func makeImage(id int, size int64) container.Image {
 // Make a container with the specified ID. It will use the image with the same ID.
 func makeContainer(id int) *container.Container {
 	return &container.Container{
-		ID:    container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", id)},
-		Image: imageName(id),
+		ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", id)},
+		Image:   imageName(id),
+		ImageID: imageID(id),
 	}
 }
 
@@ -85,11 +91,21 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
+		makeImage(2, 2048),
 	}
 	fakeRuntime.AllPodList = []*containertest.FakePod{
 		{Pod: &container.Pod{
 			Containers: []*container.Container{
-				makeContainer(1),
+				{
+					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 1)},
+					ImageID: imageID(1),
+					// The image filed is not set to simulate a no-name image
+				},
+				{
+					ID:      container.ContainerID{Type: "test", ID: fmt.Sprintf("container-%d", 2)},
+					Image:   imageName(2),
+					ImageID: imageID(2),
+				},
 			},
 		}},
 	}
@@ -98,12 +114,16 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 	err := manager.detectImages(zero)
 	assert := assert.New(t)
 	require.NoError(t, err)
-	assert.Equal(manager.imageRecordsLen(), 2)
-	noContainer, ok := manager.getImageRecord(imageName(0))
+	assert.Equal(manager.imageRecordsLen(), 3)
+	noContainer, ok := manager.getImageRecord(imageID(0))
 	require.True(t, ok)
 	assert.Equal(zero, noContainer.firstDetected)
 	assert.Equal(zero, noContainer.lastUsed)
-	withContainer, ok := manager.getImageRecord(imageName(1))
+	withContainerUsingNoNameImage, ok := manager.getImageRecord(imageID(1))
+	require.True(t, ok)
+	assert.Equal(zero, withContainerUsingNoNameImage.firstDetected)
+	assert.True(withContainerUsingNoNameImage.lastUsed.After(startTime))
+	withContainer, ok := manager.getImageRecord(imageID(2))
 	require.True(t, ok)
 	assert.Equal(zero, withContainer.firstDetected)
 	assert.True(withContainer.lastUsed.After(startTime))
@@ -141,15 +161,15 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 	err = manager.detectImages(detectedTime)
 	require.NoError(t, err)
 	assert.Equal(manager.imageRecordsLen(), 3)
-	noContainer, ok := manager.getImageRecord(imageName(0))
+	noContainer, ok := manager.getImageRecord(imageID(0))
 	require.True(t, ok)
 	assert.Equal(zero, noContainer.firstDetected)
 	assert.Equal(zero, noContainer.lastUsed)
-	withContainer, ok := manager.getImageRecord(imageName(1))
+	withContainer, ok := manager.getImageRecord(imageID(1))
 	require.True(t, ok)
 	assert.Equal(zero, withContainer.firstDetected)
 	assert.True(withContainer.lastUsed.After(startTime))
-	newContainer, ok := manager.getImageRecord(imageName(2))
+	newContainer, ok := manager.getImageRecord(imageID(2))
 	require.True(t, ok)
 	assert.Equal(detectedTime, newContainer.firstDetected)
 	assert.Equal(zero, noContainer.lastUsed)
@@ -173,7 +193,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.Equal(manager.imageRecordsLen(), 2)
-	withContainer, ok := manager.getImageRecord(imageName(1))
+	withContainer, ok := manager.getImageRecord(imageID(1))
 	require.True(t, ok)
 
 	// Simulate container being stopped.
@@ -181,11 +201,11 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 	err = manager.detectImages(time.Now())
 	require.NoError(t, err)
 	assert.Equal(manager.imageRecordsLen(), 2)
-	container1, ok := manager.getImageRecord(imageName(0))
+	container1, ok := manager.getImageRecord(imageID(0))
 	require.True(t, ok)
 	assert.Equal(zero, container1.firstDetected)
 	assert.Equal(zero, container1.lastUsed)
-	container2, ok := manager.getImageRecord(imageName(1))
+	container2, ok := manager.getImageRecord(imageID(1))
 	require.True(t, ok)
 	assert.Equal(zero, container2.firstDetected)
 	assert.True(container2.lastUsed.Equal(withContainer.lastUsed))
@@ -328,62 +348,6 @@ func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
 	assert := assert.New(t)
 	require.NoError(t, err)
 	assert.EqualValues(2048, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 1)
-}
-
-func TestFreeSpaceImagesAlsoDoesLookupByRepoTags(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
-	fakeRuntime.ImageList = []container.Image{
-		makeImage(0, 1024),
-		{
-			ID:       "5678",
-			RepoTags: []string{"potato", "salad"},
-			Size:     2048,
-		},
-	}
-	fakeRuntime.AllPodList = []*containertest.FakePod{
-		{Pod: &container.Pod{
-			Containers: []*container.Container{
-				{
-					ID:    container.ContainerID{Type: "test", ID: "c5678"},
-					Image: "salad",
-				},
-			},
-		}},
-	}
-
-	spaceFreed, err := manager.freeSpace(1024, time.Now())
-	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(1024, spaceFreed)
-	assert.Len(fakeRuntime.ImageList, 1)
-}
-
-func TestFreeSpaceImagesAlsoDoesLookupByRepoDigests(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
-	fakeRuntime.ImageList = []container.Image{
-		makeImage(0, 1024),
-		{
-			ID:          "5678",
-			RepoDigests: []string{"potato", "salad"},
-			Size:        2048,
-		},
-	}
-	fakeRuntime.AllPodList = []*containertest.FakePod{
-		{Pod: &container.Pod{
-			Containers: []*container.Container{
-				{
-					ID:    container.ContainerID{Type: "test", ID: "c5678"},
-					Image: "salad",
-				},
-			},
-		}},
-	}
-
-	spaceFreed, err := manager.freeSpace(1024, time.Now())
-	assert := assert.New(t)
-	require.NoError(t, err)
-	assert.EqualValues(1024, spaceFreed)
 	assert.Len(fakeRuntime.ImageList, 1)
 }
 
