@@ -221,6 +221,16 @@ $ kube-apiserver --audit-output file:path=/var/log/apiserver-audit.log,rotate=1d
 
 ## Examples
 
+### Audit Policy
+
+- never log `*.Status`
+- never log `Secret.Spec`
+- never log `Endpoint`s
+- never log if user is "kubelet" or "master"
+- only log headers for WATCH, GET
+- only log the request object on POST and PUT
+- never log OPTIONS
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/sysctl.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
