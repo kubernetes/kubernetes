@@ -608,6 +608,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printQuobyteVolumeSource(volume.VolumeSource.Quobyte, out)
 		case volume.VolumeSource.DownwardAPI != nil:
 			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
+		case volume.VolumeSource.AzureDisk != nil:
+			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -724,6 +726,16 @@ func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer)
 			fmt.Fprintf(out, "      %v -> %v\n", mapping.ResourceFieldRef.Resource, mapping.Path)
 		}
 	}
+}
+
+func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tAzureDisk (an Azure Data Disk mount on the host and bind mount to the pod)\n"+
+		"    DiskName:\t%v\n"+
+		"    DiskURI:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    CachingMode:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		d.DiskName, d.DataDiskURI, *d.FSType, *d.CachingMode, *d.ReadOnly)
 }
 
 type PersistentVolumeDescriber struct {

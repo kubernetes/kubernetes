@@ -416,6 +416,20 @@ func FuzzerFor(t *testing.T, version unversioned.GroupVersion, src rand.Source) 
 			types := []api.PersistentVolumeClaimPhase{api.ClaimBound, api.ClaimPending, api.ClaimLost}
 			pvc.Status.Phase = types[c.Rand.Intn(len(types))]
 		},
+		func(obj *api.AzureDiskVolumeSource, c fuzz.Continue) {
+			if obj.CachingMode == nil {
+				obj.CachingMode = new(api.AzureDataDiskCachingMode)
+				*obj.CachingMode = api.AzureDataDiskCachingNone
+			}
+			if obj.FSType == nil {
+				obj.FSType = new(string)
+				*obj.FSType = "ext4"
+			}
+			if obj.ReadOnly == nil {
+				obj.ReadOnly = new(bool)
+				*obj.ReadOnly = false
+			}
+		},
 		func(s *api.NamespaceSpec, c fuzz.Continue) {
 			s.Finalizers = []api.FinalizerName{api.FinalizerKubernetes}
 		},

@@ -718,6 +718,7 @@ var (
 	ConfigMap             FSType = "configMap"
 	VsphereVolume         FSType = "vsphereVolume"
 	Quobyte               FSType = "quobyte"
+	AzureDisk             FSType = "azureDisk"
 	All                   FSType = "*"
 )
 
