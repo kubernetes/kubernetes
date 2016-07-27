@@ -31,6 +31,7 @@ import (
 	kapi "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	ext "k8s.io/kubernetes/pkg/apis/extensions"
 	kcache "k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	kframework "k8s.io/kubernetes/pkg/controller/framework"
@@ -50,6 +51,9 @@ const (
 
 	// A subdomain added to the user specified dmoain for all pods.
 	podSubdomain = "pod"
+
+	// A subdomain added to the user specified domain for all ingresses.
+	ingressSubdomain = "ing"
 
 	// arpaSuffix is the standard suffix for PTR IP reverse lookups.
 	arpaSuffix = ".in-addr.arpa."
@@ -88,6 +92,9 @@ type KubeDNS struct {
 	// A cache that contains all the services in the system.
 	servicesStore kcache.Store
 
+	// A cache that contains all the ingresses in the system.
+	ingressStore kcache.Store
+
 	// stores DNS records for the domain.
 	// A Records and SRV Records for (regular) services and headless Services.
 	cache *TreeCache
@@ -115,6 +122,9 @@ type KubeDNS struct {
 
 	// serviceController invokes registered callbacks when services change.
 	serviceController *kframework.Controller
+
+	// ingressController invokes registered callbacks when ingresses change.
+	ingressController *kframework.Controller
 
 	// Map of federation names that the cluster in which this kube-dns is running belongs to, to
 	// the corresponding domain names.
@@ -147,11 +157,13 @@ func NewKubeDNS(client clientset.Interface, domain string, federations map[strin
 	}
 	kd.setEndpointsStore()
 	kd.setServicesStore()
+	kd.setIngressStore()
 	return kd, nil
 }
 
 func (kd *KubeDNS) Start() {
 	go kd.endpointsController.Run(wait.NeverStop)
+	go kd.ingressController.Run(wait.NeverStop)
 	go kd.serviceController.Run(wait.NeverStop)
 	// Wait synchronously for the Kubernetes service and add a DNS record for it.
 	// This ensures that the Start function returns only after having received Service objects
@@ -229,6 +241,27 @@ func (kd *KubeDNS) setEndpointsStore() {
 	)
 }
 
+func (kd *KubeDNS) setIngressStore() {
+	// Returns a cache.ListWatch that gets all changes to ingress.
+	kd.ingressStore, kd.ingressController = kframework.NewInformer(
+		&kcache.ListWatch{
+			ListFunc: func(options kapi.ListOptions) (runtime.Object, error) {
+				return kd.kubeClient.Extensions().Ingresses(kapi.NamespaceAll).List(options)
+			},
+			WatchFunc: func(options kapi.ListOptions) (watch.Interface, error) {
+				return kd.kubeClient.Extensions().Ingresses(kapi.NamespaceAll).Watch(options)
+			},
+		},
+		&ext.Ingress{},
+		resyncPeriod,
+		kframework.ResourceEventHandlerFuncs{
+			AddFunc:    kd.newIngress,
+			DeleteFunc: kd.removeIngress,
+			UpdateFunc: kd.updateIngress,
+		},
+	)
+}
+
 func assertIsService(obj interface{}) (*kapi.Service, bool) {
 	if service, ok := obj.(*kapi.Service); ok {
 		return service, ok
@@ -266,6 +299,97 @@ func (kd *KubeDNS) removeService(obj interface{}) {
 
 func (kd *KubeDNS) updateService(oldObj, newObj interface{}) {
 	kd.newService(newObj)
+}
+
+func assertIsIngress(obj interface{}) (*ext.Ingress, bool) {
+	if ing, ok := obj.(*ext.Ingress); ok {
+		return ing, ok
+	} else {
+		glog.Errorf("Type assertion failed! Expected object of type \"Ingress\", got %T", obj)
+		return nil, ok
+	}
+}
+
+func (kd *KubeDNS) newIngress(obj interface{}) {
+	if ing, ok := assertIsIngress(obj); ok {
+		glog.V(4).Infof("Add/Update for ingress %v", ing.Name)
+		subCache := NewTreeCache()
+		subCachePath := append(kd.domainPath, ingressSubdomain, ing.Namespace)
+
+		ips := []string{}
+		ingFQDN := strings.Join([]string{ing.Name, ing.Namespace, ingressSubdomain, kd.domain}, ".")
+		reverseRecord, _ := getSkyMsg(ingFQDN, 0)
+		for _, lbi := range ing.Status.LoadBalancer.Ingress {
+			// We generate an A record if the Ingress loadbalancer IP is set and a
+			// CNAME record if the hostname is set. If both IP and hostname fields
+			// are set we favor IP over the hostname.
+			// TODO(madhusudancs): We would like to generate an empty record
+			// (NODATA response) if neither of these fields are set to indicate
+			// that we know that the Ingress resource exists but we do not know
+			// what it points to. It is not entirely clear how to make that work
+			// with SkyDNS because setting an empty host field in the service
+			// record seems to return all the A records as response. Need to
+			// figure this out.
+			if len(lbi.IP) > 0 {
+				kd.newIngressRecord(subCache, ing.Namespace, ing.Name, lbi.IP)
+				ips = append(ips, lbi.IP)
+			} else if len(lbi.Hostname) > 0 {
+				kd.newIngressRecord(subCache, ing.Namespace, ing.Name, lbi.Hostname)
+			} else {
+				glog.V(4).Infof("Ingress resource with neither an IP address nor a hostname: %+v", ing)
+			}
+		}
+
+		if subCache.numEntries() > 0 {
+			kd.cacheLock.Lock()
+			defer kd.cacheLock.Unlock()
+			kd.cache.setSubCache(ing.Name, subCache, subCachePath...)
+			// Update reverseRecordMap only for the targets which are IP addresses.
+			for _, ip := range ips {
+				kd.reverseRecordMap[ip] = reverseRecord
+			}
+		}
+	}
+}
+
+func (kd *KubeDNS) removeIngress(obj interface{}) {
+	if ing, ok := assertIsIngress(obj); ok {
+		subCachePath := append(kd.domainPath, ingressSubdomain, ing.Namespace, ing.Name)
+		// Pre-compute all the IPs to be removed from reverseRecordMap before hand to
+		// avoid doing long computations when holding the lock.
+		ips := []string{}
+		for _, lbi := range ing.Status.LoadBalancer.Ingress {
+			if len(lbi.IP) > 0 {
+				ips = append(ips, lbi.IP)
+			}
+		}
+
+		kd.cacheLock.Lock()
+		defer kd.cacheLock.Unlock()
+		kd.cache.deletePath(subCachePath...)
+		for _, ip := range ips {
+			delete(kd.reverseRecordMap, ip)
+		}
+	}
+}
+
+func (kd *KubeDNS) updateIngress(oldObj, newObj interface{}) {
+	// TODO(madhusudancs): Ensure we don't leave the records dangling from the
+	// previous update.
+	kd.newIngress(newObj)
+}
+
+// newIngressRecord creates an ingress DNS record of the form
+// myingress.mynamespace.ing.cluster.local. for the given target
+// TODO(madhusudancs): We do not generate SRV records for Ingresses. Ingresses
+// are restricted to port 80 for HTTP and 443 for HTTPS for now. So it is not
+// entirely clear how useful SRV records would be. Evaluate their usefulness
+// and set them if they are useful.
+func (kd *KubeDNS) newIngressRecord(subCache *TreeCache, namespace, name, target string) {
+	recordValue, recordLabel := getSkyMsg(target, 0)
+	domainLabels := append(kd.domainPath, ingressSubdomain, namespace, name, recordLabel)
+	fqdn := dns.Fqdn(strings.Join(reverseArray(domainLabels), "."))
+	subCache.setEntry(recordLabel, recordValue, fqdn)
 }
 
 func (kd *KubeDNS) handleEndpointAdd(obj interface{}) {
