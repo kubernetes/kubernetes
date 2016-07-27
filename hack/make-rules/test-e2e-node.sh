@@ -132,6 +132,21 @@ else
   if ! [[ $test_args =~ "--disable-kubenet" ]]; then
     test_args="$test_args --disable-kubenet=true"
   fi
+
+  # On selinux enabled systems, it might
+  # require to relabel /var/lib/kubelet
+  if which selinuxenabled &> /dev/null && \
+     selinuxenabled && \
+     which chcon > /dev/null ; then
+     mkdir -p /var/lib/kubelet
+     if [[ ! $(ls -Zd /var/lib/kubelet) =~ svirt_sandbox_file_t ]] ; then
+        echo "Applying SELinux label to /var/lib/kubelet directory."
+        if ! sudo chcon -Rt svirt_sandbox_file_t /var/lib/kubelet; then
+           echo "Failed to apply selinux label to /var/lib/kubelet."
+        fi
+     fi
+  fi
+
   # Test using the host the script was run on
   # Provided for backwards compatibility
   "${ginkgo}" --focus=$focus --skip=$skip "${KUBE_ROOT}/test/e2e_node/" --report-dir=${report} \
