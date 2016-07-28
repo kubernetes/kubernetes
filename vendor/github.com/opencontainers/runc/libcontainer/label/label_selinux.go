@@ -107,7 +107,7 @@ func SetFileLabel(path string, fileLabel string) error {
 	return nil
 }
 
-// SetFileCreateLabel tells the kernel the label for all files to be created
+// Tell the kernel the label for all files to be created
 func SetFileCreateLabel(fileLabel string) error {
 	if selinux.SelinuxEnabled() {
 		return selinux.Setfscreatecon(fileLabel)
@@ -115,7 +115,7 @@ func SetFileCreateLabel(fileLabel string) error {
 	return nil
 }
 
-// Relabel changes the label of path to the filelabel string.
+// Change the label of path to the filelabel string.
 // It changes the MCS label to s0 if shared is true.
 // This will allow all containers to share the content.
 func Relabel(path string, fileLabel string, shared bool) error {

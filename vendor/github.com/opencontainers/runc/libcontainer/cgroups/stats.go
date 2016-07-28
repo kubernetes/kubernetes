@@ -11,7 +11,6 @@ type ThrottlingData struct {
 	ThrottledTime uint64 `json:"throttled_time,omitempty"`
 }
 
-// CpuUsage denotes the usage of a CPU.
 // All CPU stats are aggregate since container inception.
 type CpuUsage struct {
 	// Total CPU time consumed.

@@ -50,11 +50,6 @@ func GetSize(fd uintptr) *Size {
 	return &Size{Width: winsize.Width, Height: winsize.Height}
 }
 
-// SetSize sets the terminal size associated with fd.
-func SetSize(fd uintptr, size Size) error {
-	return term.SetWinsize(fd, &term.Winsize{Height: size.Height, Width: size.Width})
-}
-
 // MonitorSize monitors the terminal's size. It returns a TerminalSizeQueue primed with
 // initialSizes, or nil if there's no TTY present.
 func (t *TTY) MonitorSize(initialSizes ...*Size) TerminalSizeQueue {

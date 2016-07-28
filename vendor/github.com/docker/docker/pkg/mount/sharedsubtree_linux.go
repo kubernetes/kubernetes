@@ -61,8 +61,7 @@ func ensureMountedAs(mountPoint, options string) error {
 			return err
 		}
 	}
-	mounted, err = Mounted(mountPoint)
-	if err != nil {
+	if _, err = Mounted(mountPoint); err != nil {
 		return err
 	}
 
