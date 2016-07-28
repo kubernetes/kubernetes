@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/iptables"
 )
 
 var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
@@ -140,28 +142,17 @@ func cbr0CidrCorrect(wantCIDR *net.IPNet) bool {
 	return wantCIDR.IP.Equal(cbr0IP) && bytes.Equal(wantCIDR.Mask, cbr0CIDR.Mask)
 }
 
-// TODO(dawnchen): Using pkg/util/iptables
-// nonMasqueradeCIDR is the CIDR for our internal IP range; traffic to IPs outside this range will use IP masquerade.
-func ensureIPTablesMasqRule(nonMasqueradeCIDR string) error {
-	// Check if the MASQUERADE rule exist or not
-	if err := exec.Command("iptables",
-		"-t", "nat",
-		"-C", "POSTROUTING",
-		"!", "-d", nonMasqueradeCIDR,
+// nonMasqueradeCIDR is the CIDR for our internal IP range; traffic to IPs
+// outside this range will use IP masquerade.
+func ensureIPTablesMasqRule(client iptables.Interface, nonMasqueradeCIDR string) error {
+	if _, err := client.EnsureRule(iptables.Append, iptables.TableNAT,
+		iptables.ChainPostrouting,
+		"-m", "comment", "--comment", "kubelet: SNAT outbound cluster traffic",
 		"-m", "addrtype", "!", "--dst-type", "LOCAL",
-		"-j", "MASQUERADE").Run(); err == nil {
-		// The MASQUERADE rule exists
-		return nil
-	}
-
-	glog.Infof("MASQUERADE rule doesn't exist, recreate it (with nonMasqueradeCIDR %s)", nonMasqueradeCIDR)
-	if err := exec.Command("iptables",
-		"-t", "nat",
-		"-A", "POSTROUTING",
 		"!", "-d", nonMasqueradeCIDR,
-		"-m", "addrtype", "!", "--dst-type", "LOCAL",
-		"-j", "MASQUERADE").Run(); err != nil {
-		return err
+		"-j", "MASQUERADE"); err != nil {
+		return fmt.Errorf("Failed to ensure masquerading for %s chain %s: %v",
+			iptables.TableNAT, iptables.ChainPostrouting, err)
 	}
 	return nil
 }
