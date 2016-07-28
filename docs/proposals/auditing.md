@@ -47,11 +47,11 @@ With this proposal we describe how the auditing functionality can be extended in
 - to allow deep payload inspection to allow
   - either real differential JSON output (which field of an object have changed from which value to which value)
   - or full object output of the new state (and optionally the old state)
-- to be extensibile in the future to fully comply with the Cloud Auditing Data Federation standard (https://www.dmtf.org/standards/cadf)
+- to be extensible in the future to fully comply with the Cloud Auditing Data Federation standard (https://www.dmtf.org/standards/cadf)
 - to allow filtering of the output
   - by kind, e.g. don't log endpoint objects
   - by object path (JSON path), e.g. to ignore all `*.status` changes
-  - by user, e.g. to only log enduser action, not those of the controller-manager and schedule
+  - by user, e.g. to only log end user action, not those of the controller-manager and scheduler
   - by level (request headers, request object, storage object)
 
 while
