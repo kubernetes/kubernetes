@@ -14,9 +14,7 @@
 
 # This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
 
-# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
-
-# Warning: This is a file generated from the base template file: skydns-rc.yaml.base
+# Warning: This is a file generated from the base template file: kubedns-rc.yaml.base
 
 apiVersion: v1
 kind: ReplicationController
@@ -28,7 +26,7 @@ metadata:
     version: v19
     kubernetes.io/cluster-service: "true"
 spec:
-  replicas: {{ pillar['dns_replicas'] }}
+  replicas: VAR_DNS_REPLICAS
   selector:
     k8s-app: kube-dns
     version: v19
@@ -73,9 +71,8 @@ spec:
           timeoutSeconds: 5
         args:
         # command = "/kube-dns"
-        - --domain={{ pillar['dns_domain'] }}.
+        - --domain=VAR_DNS_DOMAIN.
         - --dns-port=10053
-        {{ pillar['federations_domain_map'] }}
         ports:
         - containerPort: 10053
           name: dns-local
@@ -111,7 +108,7 @@ spec:
             # net memory requested by the pod constant.
             memory: 50Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.{{ pillar['dns_domain'] }} 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc.{{ pillar['dns_domain'] }} 127.0.0.1:10053 >/dev/null
+        - -cmd=nslookup kubernetes.default.svc.VAR_DNS_DOMAIN 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc.VAR_DNS_DOMAIN 127.0.0.1:10053 >/dev/null
         - -port=8080
         - -quiet
         ports:

@@ -416,21 +416,21 @@ function start_kubedns {
 
     if [[ "${ENABLE_CLUSTER_DNS}" = true ]]; then
         echo "Creating kube-system namespace"
-        sed -e "s/VAR_DNS_REPLICAS/${DNS_REPLICAS}/g;s/VAR_DNS_DOMAIN/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/skydns-rc.yaml.sed" >| skydns-rc.yaml
+        sed -e "s/VAR_DNS_REPLICAS/${DNS_REPLICAS}/g;s/VAR_DNS_DOMAIN/${DNS_DOMAIN}/g;" "${KUBE_ROOT}/cluster/addons/dns/kubedns-rc.yaml.sed" >| kubedns-rc.yaml
         if [[ "${FEDERATION:-}" == "true" ]]; then
           FEDERATIONS_DOMAIN_MAP="${FEDERATIONS_DOMAIN_MAP:-}"
           if [[ -z "${FEDERATIONS_DOMAIN_MAP}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
             FEDERATIONS_DOMAIN_MAP="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
           fi
           if [[ -n "${FEDERATIONS_DOMAIN_MAP}" ]]; then
-            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" skydns-rc.yaml
+            sed -i -e "s/{{ pillar\['federations_domain_map'\] }}/- --federations=${FEDERATIONS_DOMAIN_MAP}/g" kubedns-rc.yaml
           else
-            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+            sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-rc.yaml
           fi
         else
-          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" skydns-rc.yaml
+          sed -i -e "/{{ pillar\['federations_domain_map'\] }}/d" kubedns-rc.yaml
         fi
-        sed -e "s/VAR_DNS_SERVER_IP/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/skydns-svc.yaml.sed" >| skydns-svc.yaml
+        sed -e "s/VAR_DNS_SERVER_IP/${DNS_SERVER_IP}/g" "${KUBE_ROOT}/cluster/addons/dns/kubedns-svc.yaml.sed" >| kubedns-svc.yaml
         cat <<EOF >namespace.yaml
 apiVersion: v1
 kind: Namespace
@@ -442,9 +442,9 @@ EOF
         ${KUBECTL} config use-context local
 
         ${KUBECTL} create -f namespace.yaml
-        # use kubectl to create skydns rc and service
-        ${KUBECTL} --namespace=kube-system create -f skydns-rc.yaml
-        ${KUBECTL} --namespace=kube-system create -f skydns-svc.yaml
+        # use kubectl to create DNS rc and service
+        ${KUBECTL} --namespace=kube-system create -f kubedns-rc.yaml
+        ${KUBECTL} --namespace=kube-system create -f kubedns-svc.yaml
         echo "Kube-dns rc and service successfully deployed."
     fi
 

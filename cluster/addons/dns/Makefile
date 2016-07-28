@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Makefile for the skydns templates to Salt/Jinja and other formats.
+# Makefile for the DNS templates to Salt/Jinja and other formats.
 
 # If you update the *.base templates, please run this Makefile before pushing.
 #
@@ -29,6 +29,6 @@ all: transform
 %.sed: %.base transforms2sed.sed
 	sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
 
-transform: skydns-rc.yaml.jinja skydns-svc.yaml.jinja skydns-rc.yaml.sed skydns-svc.yaml.sed
+transform: kubedns-rc.yaml.jinja kubedns-svc.yaml.jinja kubedns-rc.yaml.sed kubedns-svc.yaml.sed
 
 .PHONY: transform

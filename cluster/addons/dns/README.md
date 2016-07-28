@@ -13,7 +13,7 @@ Here is one way you might find those scripts:
 
 ```
 cd kubernetes
-find . -type f | xargs grep skydns-rc.yaml
+find . -type f | xargs grep kubedns-rc.yaml
 ```
 
 ## Base Template files
@@ -21,22 +21,22 @@ find . -type f | xargs grep skydns-rc.yaml
 These are the authoritative base templates.
 Run `make' to generate the `salt` and `sed` yaml templates from these.
 
-skydns-rc.yaml.base
-skydns-svc.yaml.base
+kubedns-rc.yaml.base
+kubedns-svc.yaml.base
 
 ## Generated salt files
 
 These files are appropriate for use in our `salt` based installations.
 
-skydns-rc.yaml.jinja
-skydns-svc.yaml.jinja
+kubedns-rc.yaml.jinja
+kubedns-svc.yaml.jinja
 
 ## Generated sed files
 
 These files are appropriate for use where simple transformations are available,
 such as running them through `sed`.
 
-skydns-rc.yaml.sed
-skydns-svc.yaml.sed
+kubedns-rc.yaml.sed
+kubedns-svc.yaml.sed
 
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/cluster/addons/dns/README.md?pixel)]()

@@ -149,8 +149,8 @@ set:
 
 Second, you need to start the DNS server ReplicationController and Service. See
 the example files
-([ReplicationController](../../cluster/addns/dns/skydns-rc.yaml.sed) and
-[Service](../../cluster/addons/dns/skydns-svc.yaml.sed)), but keep in mind that
+([ReplicationController](../../cluster/addons/dns/kubedns-rc.yaml.sed) and
+[Service](../../cluster/addons/dns/kubedns-svc.yaml.sed)), but keep in mind that
 these are templated input.  You will need to replace the `VAR_*` blocks with
 your own values for the config variables mentioned above.  Other than the
 templating, these are normal kubernetes objects, and can be instantiated with

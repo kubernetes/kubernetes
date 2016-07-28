@@ -14,8 +14,6 @@
 
 # This file should be kept in sync with cluster/images/hyperkube/dns-rc.yaml
 
-# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
-
 # __MACHINE_GENERATED_WARNING__
 
 apiVersion: v1

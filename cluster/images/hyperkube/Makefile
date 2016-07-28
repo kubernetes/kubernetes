@@ -57,8 +57,8 @@ endif
 	mkdir -p ${TEMP_DIR}/cni ${TEMP_DIR}/addons
 	cp ../../saltbase/salt/helpers/safe_format_and_mount ${TEMP_DIR}
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
-	cp ../../addons/dns/skydns-rc.yaml.base ${TEMP_DIR}/addons/skydns-rc.yaml
-	cp ../../addons/dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/skydns-svc.yaml
+	cp ../../addons/dns/kubedns-rc.yaml.base ${TEMP_DIR}/addons/kubedns-rc.yaml
+	cp ../../addons/dns/kubedns-svc.yaml.base ${TEMP_DIR}/addons/kubedns-svc.yaml
 	cp ../../addons/dashboard/dashboard-controller.yaml ${TEMP_DIR}/addons
 	cp ../../addons/dashboard/dashboard-service.yaml ${TEMP_DIR}/addons
 	
@@ -72,8 +72,8 @@ endif
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" addons/*.yaml
-	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__REPLICAS__|1|g;s|__PILLAR__DNS__SERVER__|10.0.0.10|g;" addons/skydns*.yaml
-	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/skydns*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__REPLICAS__|1|g;s|__PILLAR__DNS__SERVER__|10.0.0.10|g;" addons/kubedns*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/kubedns*.yaml
 	rm ${TEMP_DIR}/addons/*.back
 
 	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer

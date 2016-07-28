@@ -14,9 +14,7 @@
 
 # This file should be kept in sync with cluster/images/hyperkube/dns-svc.yaml
 
-# TODO - At some point, we need to rename all skydns-*.yaml.* files to kubedns-*.yaml.*
-
-# Warning: This is a file generated from the base template file: skydns-svc.yaml.base
+# Warning: This is a file generated from the base template file: kubedns-svc.yaml.base
 
 apiVersion: v1
 kind: Service
@@ -30,7 +28,7 @@ metadata:
 spec:
   selector:
     k8s-app: kube-dns
-  clusterIP: {{ pillar['dns_server'] }}
+  clusterIP: VAR_DNS_SERVER_IP
   ports:
   - name: dns
     port: 53

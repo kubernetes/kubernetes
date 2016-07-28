@@ -786,10 +786,10 @@ start_kube_addons() {
   fi
   if [ "${ENABLE_CLUSTER_DNS:-}" = "true" ]; then
     setup_addon_manifests "addons" "dns"
-    dns_rc_file="${addon_dst_dir}/dns/skydns-rc.yaml"
-    dns_svc_file="${addon_dst_dir}/dns/skydns-svc.yaml"
-    mv "${addon_dst_dir}/dns/skydns-rc.yaml.jinja" "${dns_rc_file}"
-    mv "${addon_dst_dir}/dns/skydns-svc.yaml.jinja" "${dns_svc_file}"
+    dns_rc_file="${addon_dst_dir}/dns/kubedns-rc.yaml"
+    dns_svc_file="${addon_dst_dir}/dns/kubedns-svc.yaml"
+    mv "${addon_dst_dir}/dns/kubedns-rc.yaml.jinja" "${dns_rc_file}"
+    mv "${addon_dst_dir}/dns/kubedns-svc.yaml.jinja" "${dns_svc_file}"
     # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"
