@@ -56,3 +56,6 @@ make build do=destroy
    The bash script sets `set -e errexit` which causes the script to exit
    at the very first error. This should be the default mode for deploying
    components but not for destroying/cleanup.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/federation/README.md?pixel)]()
