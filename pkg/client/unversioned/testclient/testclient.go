@@ -277,6 +277,10 @@ func (c *Fake) Namespaces() client.NamespaceInterface {
 	return &FakeNamespaces{Fake: c}
 }
 
+func (c *Fake) Apps() client.AppsInterface {
+	return &FakeApps{c}
+}
+
 func (c *Fake) Autoscaling() client.AutoscalingInterface {
 	return &FakeAutoscaling{c}
 }
@@ -321,6 +325,19 @@ func (c *Fake) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDecl
 
 	c.Invokes(action, nil)
 	return &swagger.ApiDeclaration{}, nil
+}
+
+// NewSimpleFakeApps returns a client that will respond with the provided objects
+func NewSimpleFakeApps(objects ...runtime.Object) *FakeApps {
+	return &FakeApps{Fake: NewSimpleFake(objects...)}
+}
+
+type FakeApps struct {
+	*Fake
+}
+
+func (c *FakeApps) PetSets(namespace string) client.PetSetInterface {
+	return &FakePetSets{Fake: c, Namespace: namespace}
 }
 
 // NewSimpleFakeAutoscaling returns a client that will respond with the provided objects
