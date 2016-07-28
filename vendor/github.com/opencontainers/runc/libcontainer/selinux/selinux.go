@@ -16,6 +16,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/docker/docker/pkg/mount"
 	"github.com/opencontainers/runc/libcontainer/system"
 )
 
@@ -59,31 +60,16 @@ func getSelinuxMountPoint() string {
 	}
 	selinuxfs = ""
 
-	f, err := os.Open("/proc/self/mountinfo")
+	mounts, err := mount.GetMounts()
 	if err != nil {
 		return selinuxfs
 	}
-	defer f.Close()
-
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		// Safe as mountinfo encodes mountpoints with spaces as \040.
-		sepIdx := strings.Index(txt, " - ")
-		if sepIdx == -1 {
-			continue
+	for _, mount := range mounts {
+		if mount.Fstype == "selinuxfs" {
+			selinuxfs = mount.Mountpoint
+			break
 		}
-		if !strings.Contains(txt[sepIdx:], "selinuxfs") {
-			continue
-		}
-		fields := strings.Split(txt, " ")
-		if len(fields) < 5 {
-			continue
-		}
-		selinuxfs = fields[4]
-		break
 	}
-
 	if selinuxfs != "" {
 		var buf syscall.Statfs_t
 		syscall.Statfs(selinuxfs, &buf)
@@ -311,7 +297,7 @@ func IntToMcs(id int, catRange uint32) string {
 
 	for ORD > TIER {
 		ORD = ORD - TIER
-		TIER--
+		TIER -= 1
 	}
 	TIER = SETSIZE - TIER
 	ORD = ORD + TIER
@@ -452,7 +438,7 @@ func badPrefix(fpath string) error {
 	return nil
 }
 
-// Chcon changes the fpath file object to the SELinux label scon.
+// Change the fpath file object to the SELinux label scon.
 // If the fpath is a directory and recurse is true Chcon will walk the
 // directory tree setting the label
 func Chcon(fpath string, scon string, recurse bool) error {
@@ -486,14 +472,14 @@ func DupSecOpt(src string) []string {
 		con["level"] == "" {
 		return nil
 	}
-	return []string{"label=user:" + con["user"],
-		"label=role:" + con["role"],
-		"label=type:" + con["type"],
-		"label=level:" + con["level"]}
+	return []string{"label:user:" + con["user"],
+		"label:role:" + con["role"],
+		"label:type:" + con["type"],
+		"label:level:" + con["level"]}
 }
 
 // DisableSecOpt returns a security opt that can be used to disabling SELinux
 // labeling support for future container processes
 func DisableSecOpt() []string {
-	return []string{"label=disable"}
+	return []string{"label:disable"}
 }

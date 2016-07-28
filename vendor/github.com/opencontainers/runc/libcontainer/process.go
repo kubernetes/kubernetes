@@ -102,8 +102,8 @@ type IO struct {
 }
 
 // NewConsole creates new console for process and returns it
-func (p *Process) NewConsole(rootuid, rootgid int) (Console, error) {
-	console, err := NewConsole(rootuid, rootgid)
+func (p *Process) NewConsole(rootuid int) (Console, error) {
+	console, err := NewConsole(rootuid, rootuid)
 	if err != nil {
 		return nil, err
 	}

@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	ErrNotSupportStat = errors.New("stats are not supported for subsystem")
 	ErrNotValidFormat = errors.New("line is not a valid key value format")
 )
 

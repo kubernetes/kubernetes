@@ -33,7 +33,7 @@ type Seccomp struct {
 	Syscalls      []*Syscall `json:"syscalls"`
 }
 
-// Action is taken upon rule match in Seccomp
+// An action to be taken upon rule match in Seccomp
 type Action int
 
 const (
@@ -44,7 +44,7 @@ const (
 	Trace
 )
 
-// Operator is a comparison operator to be used when matching syscall arguments in Seccomp
+// A comparison operator to be used when matching syscall arguments in Seccomp
 type Operator int
 
 const (
@@ -57,7 +57,7 @@ const (
 	MaskEqualTo
 )
 
-// Arg is a rule to match a specific syscall argument in Seccomp
+// A rule to match a specific syscall argument in Seccomp
 type Arg struct {
 	Index    uint     `json:"index"`
 	Value    uint64   `json:"value"`
@@ -65,7 +65,7 @@ type Arg struct {
 	Op       Operator `json:"op"`
 }
 
-// Syscall is a rule to match a syscall in Seccomp
+// An rule to match a syscall in Seccomp
 type Syscall struct {
 	Name   string `json:"name"`
 	Action Action `json:"action"`
@@ -187,10 +187,6 @@ type Config struct {
 
 	// Labels are user defined metadata that is stored in the config and populated on the state
 	Labels []string `json:"labels"`
-
-	// NoNewKeyring will not allocated a new session keyring for the container.  It will use the
-	// callers keyring in this case.
-	NoNewKeyring bool `json:"no_new_keyring"`
 }
 
 type Hooks struct {
@@ -265,7 +261,7 @@ type Hook interface {
 	Run(HookState) error
 }
 
-// NewFunctionHook will call the provided function when the hook is run.
+// NewFunctionHooks will call the provided function when the hook is run.
 func NewFunctionHook(f func(HookState) error) FuncHook {
 	return FuncHook{
 		run: f,
@@ -288,7 +284,7 @@ type Command struct {
 	Timeout *time.Duration `json:"timeout"`
 }
 
-// NewCommandHook will execute the provided command when the hook is run.
+// NewCommandHooks will execute the provided command when the hook is run.
 func NewCommandHook(cmd Command) CommandHook {
 	return CommandHook{
 		Command: cmd,

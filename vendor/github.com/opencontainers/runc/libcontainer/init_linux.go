@@ -58,14 +58,13 @@ type initConfig struct {
 	PassedFilesCount int              `json:"passed_files_count"`
 	ContainerId      string           `json:"containerid"`
 	Rlimits          []configs.Rlimit `json:"rlimits"`
-	ExecFifoPath     string           `json:"start_pipe_path"`
 }
 
 type initer interface {
 	Init() error
 }
 
-func newContainerInit(t initType, pipe *os.File, stateDirFD int) (initer, error) {
+func newContainerInit(t initType, pipe *os.File) (initer, error) {
 	var config *initConfig
 	if err := json.NewDecoder(pipe).Decode(&config); err != nil {
 		return nil, err
@@ -80,10 +79,9 @@ func newContainerInit(t initType, pipe *os.File, stateDirFD int) (initer, error)
 		}, nil
 	case initStandard:
 		return &linuxStandardInit{
-			pipe:       pipe,
-			parentPid:  syscall.Getppid(),
-			config:     config,
-			stateDirFD: stateDirFD,
+			pipe:      pipe,
+			parentPid: syscall.Getppid(),
+			config:    config,
 		}, nil
 	}
 	return nil, fmt.Errorf("unknown init type %q", t)
