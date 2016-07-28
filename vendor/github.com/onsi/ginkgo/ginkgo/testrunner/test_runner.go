@@ -33,10 +33,11 @@ type TestRunner struct {
 	cover          bool
 	coverPkg       string
 	tags           string
+	gcFlags        string
 	additionalArgs []string
 }
 
-func New(suite testsuite.TestSuite, numCPU int, parallelStream bool, race bool, cover bool, coverPkg string, tags string, additionalArgs []string) *TestRunner {
+func New(suite testsuite.TestSuite, numCPU int, parallelStream bool, race bool, cover bool, coverPkg string, tags string, gcFlags string, additionalArgs []string) *TestRunner {
 	runner := &TestRunner{
 		Suite:          suite,
 		numCPU:         numCPU,
@@ -46,6 +47,7 @@ func New(suite testsuite.TestSuite, numCPU int, parallelStream bool, race bool, 
 		coverPkg:       coverPkg,
 		tags:           tags,
 		additionalArgs: additionalArgs,
+		gcFlags:        gcFlags,
 	}
 
 	if !suite.Precompiled {
@@ -84,6 +86,9 @@ func (t *TestRunner) CompileTo(path string) error {
 	}
 	if t.tags != "" {
 		args = append(args, fmt.Sprintf("-tags=%s", t.tags))
+	}
+	if t.gcFlags != "" {
+		args = append(args, fmt.Sprintf("-gcflags=%s", t.gcFlags))
 	}
 
 	cmd := exec.Command("go", args...)
