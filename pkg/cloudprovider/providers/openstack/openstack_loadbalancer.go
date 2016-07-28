@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/rackspace/gophercloud"
+	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/floatingips"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/members"
 	"github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/monitors"
@@ -53,6 +54,24 @@ type LbaasV1 struct {
 // LoadBalancer implementation for LBaaS v2
 type LbaasV2 struct {
 	LoadBalancer
+}
+
+func networkExtensions(client *gophercloud.ServiceClient) (map[string]bool, error) {
+	seen := make(map[string]bool)
+
+	pager := extensions.List(client)
+	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+		exts, err := extensions.ExtractExtensions(page)
+		if err != nil {
+			return false, err
+		}
+		for _, ext := range exts {
+			seen[ext.Alias] = true
+		}
+		return true, nil
+	})
+
+	return seen, err
 }
 
 func getPortIDByIP(client *gophercloud.ServiceClient, ipAddress string) (string, error) {

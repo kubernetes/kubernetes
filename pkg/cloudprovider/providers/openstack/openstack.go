@@ -83,7 +83,7 @@ type LoadBalancer struct {
 }
 
 type LoadBalancerOpts struct {
-	LBVersion         string     `gcfg:"lb-version"` // v1 or v2
+	LBVersion         string     `gcfg:"lb-version"` // overrides autodetection. v1 or v2
 	SubnetId          string     `gcfg:"subnet-id"`  // required
 	FloatingNetworkId string     `gcfg:"floating-network-id"`
 	LBMethod          string     `gcfg:"lb-method"`
@@ -526,13 +526,35 @@ func (os *OpenStack) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 		return nil, false
 	}
 
+	lbversion := os.lbOpts.LBVersion
+	if lbversion == "" {
+		// No version specified, try newest supported by server
+		netExts, err := networkExtensions(network)
+		if err != nil {
+			glog.Warningf("Failed to list neutron extensions: %v", err)
+			return nil, false
+		}
+
+		if netExts["lbaasv2"] {
+			lbversion = "v2"
+		} else if netExts["lbaas"] {
+			lbversion = "v1"
+		} else {
+			glog.Warningf("Failed to find neutron LBaaS extension (v1 or v2)")
+			return nil, false
+		}
+		glog.V(3).Infof("Using LBaaS extension %v", lbversion)
+	}
+
 	glog.V(1).Info("Claiming to support LoadBalancer")
 
 	if os.lbOpts.LBVersion == "v2" {
 		return &LbaasV2{LoadBalancer{network, compute, os.lbOpts}}, true
-	} else {
-
+	} else if lbversion == "v1" {
 		return &LbaasV1{LoadBalancer{network, compute, os.lbOpts}}, true
+	} else {
+		glog.Warningf("Config error: unrecognised lb-version \"%v\"", lbversion)
+		return nil, false
 	}
 }
 
