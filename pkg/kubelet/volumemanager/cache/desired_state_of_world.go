@@ -183,14 +183,27 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 			err)
 	}
 
-	volumeName, err :=
-		volumehelper.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
-	if err != nil {
-		return "", fmt.Errorf(
-			"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
-			volumeSpec.Name(),
-			volumePlugin.GetPluginName(),
-			err)
+	var volumeName api.UniqueVolumeName
+
+	// The unique volume name used depends on whether the volume is attachable
+	// or not.
+	attachable := dsw.isAttachableVolume(volumeSpec)
+	if attachable {
+		// For attachable volumes, use the unique volume name as reported by
+		// the plugin.
+		volumeName, err =
+			volumehelper.GetUniqueVolumeNameFromSpec(volumePlugin, volumeSpec)
+		if err != nil {
+			return "", fmt.Errorf(
+				"failed to GetUniqueVolumeNameFromSpec for volumeSpec %q using volume plugin %q err=%v",
+				volumeSpec.Name(),
+				volumePlugin.GetPluginName(),
+				err)
+		}
+	} else {
+		// For non-attachable volumes, generate a unique name based on the pod
+		// namespace and name and the name of the volume within the pod.
+		volumeName = volumehelper.GetUniqueVolumeNameForNonAttachableVolume(podName, volumePlugin, outerVolumeSpecName)
 	}
 
 	volumeObj, volumeExists := dsw.volumesToMount[volumeName]
@@ -198,7 +211,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 		volumeObj = volumeToMount{
 			volumeName:         volumeName,
 			podsToMount:        make(map[types.UniquePodName]podToMount),
-			pluginIsAttachable: dsw.isAttachableVolume(volumeSpec),
+			pluginIsAttachable: attachable,
 			volumeGidValue:     volumeGidValue,
 			reportedInUse:      false,
 		}

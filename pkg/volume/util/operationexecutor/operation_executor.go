@@ -15,8 +15,9 @@ limitations under the License.
 */
 
 // Package operationexecutor implements interfaces that enable execution of
-// attach, detach, mount, and unmount operations with a nestedpendingoperations
-// so that more than one operation is never triggered on the same volume.
+// attach, detach, mount, and unmount operations with a
+// nestedpendingoperations so that more than one operation is never triggered
+// on the same volume for the same pod.
 package operationexecutor
 
 import (
@@ -131,8 +132,14 @@ type ActualStateOfWorldMounterUpdater interface {
 // ActualStateOfWorldAttacherUpdater defines a set of operations updating the
 // actual state of the world cache after successful attach/detach/mount/unmount.
 type ActualStateOfWorldAttacherUpdater interface {
-	// Marks the specified volume as attached to the specified node
-	MarkVolumeAsAttached(volumeSpec *volume.Spec, nodeName string, devicePath string) error
+	// Marks the specified volume as attached to the specified node.  If the
+	// volume name is supplied, that volume name will be used.  If not, the
+	// volume name is computed using the result from querying the plugin.
+	//
+	// TODO: in the future, we should be able to remove the volumeName
+	// argument to this method -- since it is used only for attachable
+	// volumes.  See issue 29695.
+	MarkVolumeAsAttached(volumeName api.UniqueVolumeName, volumeSpec *volume.Spec, nodeName, devicePath string) error
 
 	// Marks the specified volume as detached from the specified node
 	MarkVolumeAsDetached(volumeName api.UniqueVolumeName, nodeName string)
@@ -370,6 +377,7 @@ func (oe *operationExecutor) MountVolume(
 	}
 
 	podName := volumetypes.UniquePodName("")
+	// TODO: remove this -- not necessary
 	if !volumeToMount.PluginIsAttachable {
 		// Non-attachable volume plugins can execute mount for multiple pods
 		// referencing the same volume in parallel
@@ -473,7 +481,7 @@ func (oe *operationExecutor) generateAttachVolumeFunc(
 
 		// Update actual state of world
 		addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-			volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
+			api.UniqueVolumeName(""), volumeToAttach.VolumeSpec, volumeToAttach.NodeName, devicePath)
 		if addVolumeNodeErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
@@ -931,12 +939,13 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 			// If the volume does not implement the attacher interface, it is
 			// assumed to be attached and the the actual state of the world is
 			// updated accordingly.
+
 			addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-				volumeToMount.VolumeSpec, nodeName, volumeToMount.DevicePath)
+				volumeToMount.VolumeName, volumeToMount.VolumeSpec, nodeName, "" /* devicePath */)
 			if addVolumeNodeErr != nil {
 				// On failure, return error. Caller will log and retry.
 				return fmt.Errorf(
-					"VerifyControllerAttachedVolume.MarkVolumeAsAttached failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v.",
+					"VerifyControllerAttachedVolume.MarkVolumeAsAttachedByUniqueVolumeName failed for volume %q (spec.Name: %q) pod %q (UID: %q) with: %v.",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
 					volumeToMount.PodName,
@@ -987,7 +996,7 @@ func (oe *operationExecutor) generateVerifyControllerAttachedVolumeFunc(
 		for _, attachedVolume := range node.Status.VolumesAttached {
 			if attachedVolume.Name == volumeToMount.VolumeName {
 				addVolumeNodeErr := actualStateOfWorld.MarkVolumeAsAttached(
-					volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
+					api.UniqueVolumeName(""), volumeToMount.VolumeSpec, nodeName, attachedVolume.DevicePath)
 				glog.Infof("Controller successfully attached volume %q (spec.Name: %q) pod %q (UID: %q) devicePath: %q",
 					volumeToMount.VolumeName,
 					volumeToMount.VolumeSpec.Name(),
