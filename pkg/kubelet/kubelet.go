@@ -428,6 +428,12 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
+			// If using "kubenet", the Kubernetes network plugin that wraps
+			// CNI's bridge plugin, it knows how to set the hairpin veth flag
+			// so we tell the container runtime to back away from setting it.
+			// If the kubelet is started with any other plugin we can't be
+			// sure it handles the hairpin case so we instruct the docker
+			// runtime to set the flag instead.
 			klet.hairpinMode == componentconfig.HairpinVeth && networkPluginName != "kubenet",
 			seccompProfileRoot,
 			containerRuntimeOptions...,
