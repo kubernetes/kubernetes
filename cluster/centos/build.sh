@@ -52,8 +52,8 @@ function download-releases() {
   echo "Download kubernetes release v${K8S_VERSION} ..."
   curl -L ${K8S_DOWNLOAD_URL} -o ${RELEASES_DIR}/kubernetes.tar.gz
 
-  echo "Download docker-latest ..."
-  curl -L https://get.docker.com/builds/Linux/x86_64/docker-latest -o ${RELEASES_DIR}/docker
+  echo "Download docker release v${DOCKER_VERSION} ..."
+  curl -L ${DOCKER_DOWNLOAD_URL} -o ${RELEASES_DIR}/docker
 }
 
 function unpack-releases() {
