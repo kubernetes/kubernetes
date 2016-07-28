@@ -28,7 +28,7 @@ import (
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
 
 var zero time.Time
@@ -445,7 +445,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 		}},
 	}
 
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	t.Log(fakeClock.Now())
 	require.NoError(t, manager.detectImages(fakeClock.Now()))
 	require.Equal(t, manager.imageRecordsLen(), 2)
