@@ -98,6 +98,26 @@ while
 - Talk from IBM: An Introduction to DMTF Cloud Auditing using
 the CADF Event Model and Taxonomies https://wiki.openstack.org/w/images/e/e1/Introduction_to_Cloud_Auditing_using_CADF_Event_Model_and_Taxonomy_2013-10-22.pdf
 
+## Architecture
+
+When implementing audit logging there are basically two options:
+
+1. put a logging proxy in front of the apiserver
+2. integrate audit logging into the apiserver itself
+
+Both approaches have advantages and disadvanteges:
+
+- **pro proxy**:
+  + keeps complexity out of the apiserver
+  + reuses existing solutions
+- **contra proxy**:
+  + has no deeper insight into the Kubernetes api
+  + has no knowledge of auth, authn, admission
+  + has no access to the storage level for diffential output
+  + has to terminate SSL and complicates client certificates based auth
+
+In the following the second approach is described without a proxy.
+
 ## Proposed Design
 
 The main concepts are those of
