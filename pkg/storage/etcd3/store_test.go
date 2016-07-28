@@ -23,7 +23,10 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 
@@ -188,15 +191,15 @@ func TestConditionalDelete(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", UID: "A"}})
-
+	gr := unversioned.GroupResource{Group: api.GroupName, Resource: "pods"}
 	tests := []struct {
-		precondition        *storage.Preconditions
+		precondition        rest.ObjectFunc
 		expectInvalidObjErr bool
 	}{{ // test conditional delete with UID match
-		precondition:        storage.NewUIDPreconditions("A"),
+		precondition:        rest.NewUIDObjectFunc("A", gr),
 		expectInvalidObjErr: false,
 	}, { // test conditional delete with UID mismatch
-		precondition:        storage.NewUIDPreconditions("B"),
+		precondition:        rest.NewUIDObjectFunc("B", gr),
 		expectInvalidObjErr: true,
 	}}
 
@@ -204,7 +207,7 @@ func TestConditionalDelete(t *testing.T) {
 		out := &api.Pod{}
 		err := store.Delete(ctx, key, out, tt.precondition)
 		if tt.expectInvalidObjErr {
-			if err == nil || !storage.IsInvalidObj(err) {
+			if err == nil || !errors.IsConflict(err) {
 				t.Errorf("#%d: expecting invalid UID error, but get: %s", i, err)
 			}
 			continue

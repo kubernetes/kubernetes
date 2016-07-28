@@ -137,7 +137,7 @@ type FailDeletionStorage struct {
 	Called *bool
 }
 
-func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition *storage.Preconditions) error {
+func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition rest.ObjectFunc) error {
 	*f.Called = true
 	return storage.NewKeyNotFoundError(key, 0)
 }
@@ -158,7 +158,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	defer server.Terminate(t)
 
 	// should fail if pod A is not created yet.
-	_, err := registry.Delete(testContext, pod.Name, nil)
+	_, err := registry.Delete(testContext, pod.Name, nil, nil)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -173,7 +173,7 @@ func TestIgnoreDeleteNotFound(t *testing.T) {
 	// registry shouldn't get any error since we ignore the NotFound error.
 	zero := int64(0)
 	opt := &api.DeleteOptions{GracePeriodSeconds: &zero}
-	obj, err := registry.Delete(testContext, pod.Name, opt)
+	obj, err := registry.Delete(testContext, pod.Name, opt, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

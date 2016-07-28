@@ -88,6 +88,6 @@ func (s *storage) UpdateReplicaSet(ctx api.Context, replicaSet *extensions.Repli
 }
 
 func (s *storage) DeleteReplicaSet(ctx api.Context, replicaSetID string) error {
-	_, err := s.Delete(ctx, replicaSetID, nil)
+	_, err := s.Delete(ctx, replicaSetID, nil, nil)
 	return err
 }

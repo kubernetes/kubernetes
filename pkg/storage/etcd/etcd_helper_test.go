@@ -27,8 +27,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
@@ -498,7 +500,7 @@ func TestDeleteUIDMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error %#v", err)
 	}
-	err = helper.Delete(context.TODO(), "/some/key", obj, storage.NewUIDPreconditions("B"))
+	err = helper.Delete(context.TODO(), "/some/key", obj, rest.NewUIDObjectFunc("B", unversioned.GroupResource{Group: api.GroupName, Resource: "pods"}))
 	if !storage.IsTestFailed(err) {
 		t.Fatalf("Expect a Test Failed (write conflict) error, got: %v", err)
 	}
@@ -549,7 +551,7 @@ func TestDeleteWithRetry(t *testing.T) {
 		t.Errorf("Unexpected error %#v", err)
 	}
 
-	err = helper.Delete(context.TODO(), "/some/key", obj, storage.NewUIDPreconditions("A"))
+	err = helper.Delete(context.TODO(), "/some/key", obj, rest.NewUIDObjectFunc("A", unversioned.GroupResource{Group: api.GroupName, Resource: "pods"}))
 	if err != nil {
 		t.Errorf("Unexpected error %#v", err)
 	}

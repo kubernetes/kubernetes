@@ -76,6 +76,6 @@ func (s *storage) GetClusterRoleBinding(ctx api.Context, name string) (*rbac.Clu
 }
 
 func (s *storage) DeleteClusterRoleBinding(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

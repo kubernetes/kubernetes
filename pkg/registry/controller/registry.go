@@ -87,6 +87,6 @@ func (s *storage) UpdateController(ctx api.Context, controller *api.ReplicationC
 }
 
 func (s *storage) DeleteController(ctx api.Context, controllerID string) error {
-	_, err := s.Delete(ctx, controllerID, nil)
+	_, err := s.Delete(ctx, controllerID, nil, nil)
 	return err
 }

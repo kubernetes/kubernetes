@@ -52,7 +52,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 	"k8s.io/kubernetes/plugin/pkg/admission/deny"
 
-	"github.com/emicklei/go-restful"
+	restful "github.com/emicklei/go-restful"
 )
 
 func convert(obj runtime.Object) (runtime.Object, error) {
@@ -466,15 +466,22 @@ func (storage *SimpleRESTStorage) checkContext(ctx api.Context) {
 	storage.actualNamespace, storage.namespacePresent = api.NamespaceFrom(ctx)
 }
 
-func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string, options *api.DeleteOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) Delete(ctx api.Context, id string, options *api.DeleteOptions, precondition rest.ObjectFunc) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	storage.deleted = id
 	storage.deleteOptions = options
+
 	if err := storage.errors["delete"]; err != nil {
 		return nil, err
 	}
-	var obj runtime.Object = &unversioned.Status{Status: unversioned.StatusSuccess}
+	status := &unversioned.Status{Status: unversioned.StatusSuccess}
+	var obj runtime.Object = status
 	var err error
+
+	if precondition != nil {
+		err = precondition(obj)
+	}
+
 	if storage.injectedFunction != nil {
 		obj, err = storage.injectedFunction(&apiservertesting.Simple{ObjectMeta: api.ObjectMeta{Name: id}})
 	}
@@ -614,7 +621,7 @@ type LegacyRESTStorage struct {
 }
 
 func (storage LegacyRESTStorage) Delete(ctx api.Context, id string) (runtime.Object, error) {
-	return storage.SimpleRESTStorage.Delete(ctx, id, nil)
+	return storage.SimpleRESTStorage.Delete(ctx, id, nil, nil)
 }
 
 type MetadataRESTStorage struct {
@@ -2015,6 +2022,61 @@ func TestDeleteMissing(t *testing.T) {
 
 	if response.StatusCode != http.StatusNotFound {
 		t.Errorf("Unexpected response %#v", response)
+	}
+}
+
+type testDeleteAdmission struct {
+	expectedObjectName string
+	admitCalled        bool
+}
+
+func (t *testDeleteAdmission) Handles(o admission.Operation) bool {
+	return true
+}
+
+func (t *testDeleteAdmission) Admit(a admission.Attributes) error {
+	obj := a.GetOldObject()
+	accessor, err := meta.Accessor(obj)
+	if err != nil {
+		return fmt.Errorf("unexpected error creating accessor for %#v: %s", obj, err)
+	}
+
+	if accessor.GetName() != t.expectedObjectName {
+		return fmt.Errorf("expected OldObject to be populated on attributes, got nil")
+	}
+
+	t.admitCalled = true
+	return nil
+}
+
+// TestDeletePopulateOldObject verifies that the OldObject field on
+// AdmissionAttributes is populated with the current state of the object being
+// deleted.
+func TestDeletePopulateOldObject(t *testing.T) {
+	storage := map[string]rest.Storage{}
+	simpleStorage := SimpleRESTStorage{}
+	ID := "id"
+	storage["simple"] = &simpleStorage
+	admit := &testDeleteAdmission{expectedObjectName: simpleStorage.item.Name}
+	handler := handleInternal(storage, admit, selfLinker)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	client := http.Client{}
+	request, err := http.NewRequest("DELETE", server.URL+"/"+prefix+"/"+testGroupVersion.Group+"/"+testGroupVersion.Version+"/namespaces/default/simple/"+ID, nil)
+	res, err := client.Do(request)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("unexpected response: expected status code %d and got %d", http.StatusOK, res.StatusCode)
+	}
+
+	if !admit.admitCalled {
+		t.Errorf("expected testDeleteAdmission.Admit() to be called during request, but it wasn't")
+	}
+	if simpleStorage.deleted != ID {
+		t.Errorf("Unexpected delete: %s, expected %s", simpleStorage.deleted, ID)
 	}
 }
 

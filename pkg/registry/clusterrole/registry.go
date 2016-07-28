@@ -76,6 +76,6 @@ func (s *storage) GetClusterRole(ctx api.Context, name string) (*rbac.ClusterRol
 }
 
 func (s *storage) DeleteClusterRole(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

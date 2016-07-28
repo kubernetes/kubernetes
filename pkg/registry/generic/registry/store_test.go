@@ -556,7 +556,7 @@ func TestStoreDelete(t *testing.T) {
 	defer server.Terminate(t)
 
 	// test failure condition
-	_, err := registry.Delete(testContext, podA.Name, nil)
+	_, err := registry.Delete(testContext, podA.Name, nil, nil)
 	if !errors.IsNotFound(err) {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -568,7 +568,7 @@ func TestStoreDelete(t *testing.T) {
 	}
 
 	// delete object
-	_, err = registry.Delete(testContext, podA.Name, nil)
+	_, err = registry.Delete(testContext, podA.Name, nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -600,7 +600,7 @@ func TestStoreHandleFinalizers(t *testing.T) {
 	}
 
 	// delete object with nil delete options doesn't delete the object
-	_, err = registry.Delete(testContext, podWithFinalizer.Name, nil)
+	_, err = registry.Delete(testContext, podWithFinalizer.Name, nil, nil)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -809,7 +809,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
-		_, err = registry.Delete(testContext, tc.pod.Name, tc.options)
+		_, err = registry.Delete(testContext, tc.pod.Name, tc.options, nil)
 		if err != nil {
 			t.Fatalf("Unexpected error: %v", err)
 		}
@@ -857,7 +857,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 	}
 
 	// Delete all pods.
-	deleted, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{})
+	deleted, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{}, nil)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -898,7 +898,7 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{})
+				_, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{}, nil)
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
@@ -936,7 +936,7 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 	defer watcher.Stop()
 
-	if _, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{}); err != nil {
+	if _, err := registry.DeleteCollection(testContext, nil, &api.ListOptions{}, nil); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 

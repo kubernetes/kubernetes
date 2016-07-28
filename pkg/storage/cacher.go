@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
@@ -259,8 +260,8 @@ func (c *Cacher) Create(ctx context.Context, key string, obj, out runtime.Object
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error {
-	return c.storage.Delete(ctx, key, out, preconditions)
+func (c *Cacher) Delete(ctx context.Context, key string, out runtime.Object, precondition rest.ObjectFunc) error {
+	return c.storage.Delete(ctx, key, out, precondition)
 }
 
 // Implements storage.Interface.

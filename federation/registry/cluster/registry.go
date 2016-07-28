@@ -75,6 +75,6 @@ func (s *storage) UpdateCluster(ctx api.Context, cluster *federation.Cluster) er
 }
 
 func (s *storage) DeleteCluster(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

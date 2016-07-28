@@ -76,6 +76,6 @@ func (s *storage) GetRole(ctx api.Context, name string) (*rbac.Role, error) {
 }
 
 func (s *storage) DeleteRole(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }

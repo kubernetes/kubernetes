@@ -262,10 +262,10 @@ func (e *Store) shouldDelete(ctx api.Context, key string, obj, existing runtime.
 	return len(newMeta.Finalizers) == 0 && oldMeta.DeletionGracePeriodSeconds != nil && *oldMeta.DeletionGracePeriodSeconds == 0
 }
 
-func (e *Store) deleteForEmptyFinalizers(ctx api.Context, name, key string, obj runtime.Object, preconditions *storage.Preconditions) (runtime.Object, bool, error) {
+func (e *Store) deleteForEmptyFinalizers(ctx api.Context, name, key string, obj runtime.Object, precondition rest.ObjectFunc) (runtime.Object, bool, error) {
 	out := e.NewFunc()
 	glog.V(6).Infof("going to delete %s from regitry, triggered by update", name)
-	if err := e.Storage.Delete(ctx, key, out, preconditions); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, precondition); err != nil {
 		// Deletion is racy, i.e., there could be multiple update
 		// requests to remove all finalizers from the object, so we
 		// ignore the NotFound error.
@@ -390,7 +390,11 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 	if err != nil {
 		// delete the object
 		if err == errEmptiedFinalizers {
-			return e.deleteForEmptyFinalizers(ctx, name, key, deleteObj, storagePreconditions)
+			var precondition rest.ObjectFunc
+			if storagePreconditions != nil && storagePreconditions.UID != nil {
+				precondition = rest.NewUIDObjectFunc(*storagePreconditions.UID, e.QualifiedResource)
+			}
+			return e.deleteForEmptyFinalizers(ctx, name, key, deleteObj, precondition)
 		}
 		if creating {
 			err = storeerr.InterpretCreateError(err, e.QualifiedResource, name)
@@ -490,13 +494,13 @@ func markAsDeleting(obj runtime.Object) (err error) {
 }
 
 // this functions need to be kept synced with updateForGracefulDeletionAndFinalizers.
-func (e *Store) updateForGracefulDeletion(ctx api.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+func (e *Store) updateForGracefulDeletion(ctx api.Context, name, key string, options *api.DeleteOptions, preconditions *storage.Preconditions, in runtime.Object, preconditionFunc rest.ObjectFunc) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	out = e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(
-		ctx, key, out, false, &preconditions,
+		ctx, key, out, false, preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
-			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
+			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options, preconditionFunc)
 			if err != nil {
 				return nil, err
 			}
@@ -537,14 +541,14 @@ func (e *Store) updateForGracefulDeletion(ctx api.Context, name, key string, opt
 }
 
 // this functions need to be kept synced with updateForGracefulDeletion.
-func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, key string, options *api.DeleteOptions, preconditions storage.Preconditions, in runtime.Object) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
+func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, key string, options *api.DeleteOptions, preconditions *storage.Preconditions, in runtime.Object, preconditionFunc rest.ObjectFunc) (err error, ignoreNotFound, deleteImmediately bool, out, lastExisting runtime.Object) {
 	lastGraceful := int64(0)
 	var pendingFinalizers bool
 	out = e.NewFunc()
 	err = e.Storage.GuaranteedUpdate(
-		ctx, key, out, false, &preconditions,
+		ctx, key, out, false, preconditions,
 		storage.SimpleUpdate(func(existing runtime.Object) (runtime.Object, error) {
-			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options)
+			graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, existing, options, preconditionFunc)
 			if err != nil {
 				return nil, err
 			}
@@ -613,7 +617,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, ke
 }
 
 // Delete removes the item from storage.
-func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions, precondition rest.ObjectFunc) (runtime.Object, error) {
 	key, err := e.KeyFunc(ctx, name)
 	if err != nil {
 		return nil, err
@@ -627,11 +631,11 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 	if options == nil {
 		options = api.NewDeleteOptions(0)
 	}
-	var preconditions storage.Preconditions
+	var storagePreconditions storage.Preconditions
 	if options.Preconditions != nil {
-		preconditions.UID = options.Preconditions.UID
+		storagePreconditions.UID = options.Preconditions.UID
 	}
-	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options)
+	graceful, pendingGraceful, err := rest.BeforeDelete(e.DeleteStrategy, ctx, obj, options, precondition)
 	if err != nil {
 		return nil, err
 	}
@@ -651,13 +655,13 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 	if !EnableGarbageCollector {
 		// TODO: remove the check on graceful, because we support no-op updates now.
 		if graceful {
-			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)
+			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, &storagePreconditions, obj, precondition)
 		}
 	} else {
 		shouldUpdateFinalizers, _ := shouldUpdateFinalizers(accessor, options)
 		// TODO: remove the check, because we support no-op updates now.
 		if graceful || pendingFinalizers || shouldUpdateFinalizers {
-			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)
+			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, &storagePreconditions, obj, precondition)
 		}
 	}
 	// !deleteImmediately covers all cases where err != nil. We keep both to be future-proof.
@@ -668,7 +672,7 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 	// delete immediately, or no graceful deletion supported
 	glog.V(6).Infof("going to delete %s from regitry: ", name)
 	out = e.NewFunc()
-	if err := e.Storage.Delete(ctx, key, out, &preconditions); err != nil {
+	if err := e.Storage.Delete(ctx, key, out, precondition); err != nil {
 		// Please refer to the place where we set ignoreNotFound for the reason
 		// why we ignore the NotFound error .
 		if storage.IsNotFound(err) && ignoreNotFound && lastExisting != nil {
@@ -691,7 +695,7 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 // are removing all objects of a given type) with the current API (it's technically
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Store) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error) {
+func (e *Store) DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions, precondition rest.ObjectFunc) (runtime.Object, error) {
 	listObj, err := e.List(ctx, listOptions)
 	if err != nil {
 		return nil, err
@@ -742,7 +746,7 @@ func (e *Store) DeleteCollection(ctx api.Context, options *api.DeleteOptions, li
 					errs <- err
 					return
 				}
-				if _, err := e.Delete(ctx, accessor.GetName(), options); err != nil && !kubeerr.IsNotFound(err) {
+				if _, err := e.Delete(ctx, accessor.GetName(), options, precondition); err != nil && !kubeerr.IsNotFound(err) {
 					glog.V(4).Infof("Delete %s in DeleteCollection failed: %v", accessor.GetName(), err)
 					errs <- err
 					return

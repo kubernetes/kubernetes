@@ -97,7 +97,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *FinalizeREST) {
 }
 
 // Delete enforces life-cycle rules for namespace termination
-func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions, precondition rest.ObjectFunc) (runtime.Object, error) {
 	nsObj, err := r.Get(ctx, name)
 	if err != nil {
 		return nil, err
@@ -106,22 +106,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 	namespace := nsObj.(*api.Namespace)
 
 	// Ensure we have a UID precondition
-	if options == nil {
-		options = api.NewDeleteOptions(0)
-	}
-	if options.Preconditions == nil {
-		options.Preconditions = &api.Preconditions{}
-	}
-	if options.Preconditions.UID == nil {
-		options.Preconditions.UID = &namespace.UID
-	} else if *options.Preconditions.UID != namespace.UID {
-		err = apierrors.NewConflict(
-			api.Resource("namespaces"),
-			name,
-			fmt.Errorf("Precondition failed: UID in precondition: %v, UID in object meta: %v", *options.Preconditions.UID, namespace.UID),
-		)
-		return nil, err
-	}
+	precondition = rest.AllFuncs(precondition, rest.NewUIDObjectFunc(namespace.UID, r.Store.QualifiedResource))
 
 	// upon first request to delete, we switch the phase to start namespace termination
 	// TODO: enhance graceful deletion's calls to DeleteStrategy to allow phase change and finalizer patterns
@@ -131,7 +116,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 			return nil, err
 		}
 
-		preconditions := storage.Preconditions{UID: options.Preconditions.UID}
+		preconditions := storage.Preconditions{UID: &namespace.UID}
 
 		out := r.Store.NewFunc()
 		err = r.Store.Storage.GuaranteedUpdate(
@@ -172,7 +157,7 @@ func (r *REST) Delete(ctx api.Context, name string, options *api.DeleteOptions) 
 		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
 		return nil, err
 	}
-	return r.Store.Delete(ctx, name, options)
+	return r.Store.Delete(ctx, name, options, precondition)
 }
 
 func (r *StatusREST) New() runtime.Object {

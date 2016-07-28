@@ -72,7 +72,7 @@ func (s *storage) GetService(ctx api.Context, name string) (*api.Service, error)
 }
 
 func (s *storage) DeleteService(ctx api.Context, name string) error {
-	_, err := s.Delete(ctx, name, nil)
+	_, err := s.Delete(ctx, name, nil, nil)
 	return err
 }
 

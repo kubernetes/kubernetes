@@ -128,7 +128,7 @@ type GracefulDeleter interface {
 	// returned error value err when the specified resource is not found.
 	// Delete *may* return the object that was deleted, or a status object indicating additional
 	// information about deletion.
-	Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error)
+	Delete(ctx api.Context, name string, options *api.DeleteOptions, precondition ObjectFunc) (runtime.Object, error)
 }
 
 // GracefulDeleteAdapter adapts the Deleter interface to GracefulDeleter
@@ -137,7 +137,7 @@ type GracefulDeleteAdapter struct {
 }
 
 // Delete implements RESTGracefulDeleter in terms of Deleter
-func (w GracefulDeleteAdapter) Delete(ctx api.Context, name string, options *api.DeleteOptions) (runtime.Object, error) {
+func (w GracefulDeleteAdapter) Delete(ctx api.Context, name string, options *api.DeleteOptions, precondition ObjectFunc) (runtime.Object, error) {
 	return w.Deleter.Delete(ctx, name)
 }
 
@@ -149,7 +149,7 @@ type CollectionDeleter interface {
 	// them or return an invalid request error.
 	// DeleteCollection may not be atomic - i.e. it may delete some objects and still
 	// return an error after it. On success, returns a list of deleted objects.
-	DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error)
+	DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions, precondition ObjectFunc) (runtime.Object, error)
 }
 
 // Creater is an object that can create an instance of a RESTful object.

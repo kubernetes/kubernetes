@@ -18,6 +18,8 @@ package storage
 
 import (
 	"golang.org/x/net/context"
+
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/watch"
@@ -127,7 +129,7 @@ type Interface interface {
 
 	// Delete removes the specified key and returns the value that existed at that spot.
 	// If key didn't exist, it will return NotFound storage error.
-	Delete(ctx context.Context, key string, out runtime.Object, preconditions *Preconditions) error
+	Delete(ctx context.Context, key string, out runtime.Object, precondition rest.ObjectFunc) error
 
 	// Watch begins watching the specified key. Events are decoded into API objects,
 	// and any items passing 'filter' are sent down to returned watch.Interface.
