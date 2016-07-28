@@ -169,7 +169,7 @@ type Event struct {
   Namespace, Name string
   GroupKind unversioned.GroupKind
 
-  // request object
+  // unmodified request object before authn, auth & admission
   RequestObject runtime.Unstructured
 
   // storage object
