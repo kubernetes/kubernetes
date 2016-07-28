@@ -32,7 +32,7 @@ type REST struct {
 
 // NewREST returns a registry which will store ThirdPartyResource in the given helper
 func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/thirdpartyresources"
+	prefix := "/" + opts.ResourcePrefix
 
 	// We explicitly do NOT do any decoration here yet.
 	storageInterface := opts.Storage

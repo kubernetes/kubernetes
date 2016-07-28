@@ -33,7 +33,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against persistent volume claims.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/persistentvolumeclaims"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.PersistentVolumeClaimList{} }
 	storageInterface := opts.Decorator(

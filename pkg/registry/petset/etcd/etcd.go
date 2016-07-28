@@ -35,7 +35,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/petsets"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &appsapi.PetSetList{} }
 	storageInterface := opts.Decorator(

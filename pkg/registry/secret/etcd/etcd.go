@@ -32,7 +32,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against secrets.
 func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/secrets"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.SecretList{} }
 	storageInterface := opts.Decorator(
