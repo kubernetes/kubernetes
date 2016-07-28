@@ -19,6 +19,7 @@ package cni
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/appc/cni/libcni"
 	cnitypes "github.com/appc/cni/pkg/types"
@@ -44,6 +45,8 @@ type cniNetworkPlugin struct {
 	host           network.Host
 	execer         utilexec.Interface
 	nsenterPath    string
+	mu             sync.Mutex
+	podMutexes     map[string]*sync.Mutex
 }
 
 type cniNetwork struct {
@@ -62,6 +65,7 @@ func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix str
 		defaultNetwork: network,
 		loNetwork:      getLoNetwork(vendorCNIDirPrefix),
 		execer:         utilexec.New(),
+		podMutexes:     make(map[string]*sync.Mutex),
 	})
 }
 
@@ -141,7 +145,23 @@ func (plugin *cniNetworkPlugin) Name() string {
 	return CNIPluginName
 }
 
+func (plugin *cniNetworkPlugin) lockPodMutex(id kubecontainer.ContainerID) *sync.Mutex {
+	plugin.mu.Lock()
+	defer plugin.mu.Unlock()
+
+	podMutex, ok := plugin.podMutexes[id.ID]
+	if !ok {
+		podMutex = &sync.Mutex{}
+		plugin.podMutexes[id.ID] = podMutex
+	}
+	podMutex.Lock()
+	return podMutex
+}
+
 func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	podMutex := plugin.lockPodMutex(id)
+	defer podMutex.Unlock()
+
 	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
@@ -163,6 +183,10 @@ func (plugin *cniNetworkPlugin) SetUpPod(namespace string, name string, id kubec
 }
 
 func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
+	podMutex := plugin.lockPodMutex(id)
+	defer podMutex.Unlock()
+	defer delete(plugin.podMutexes, id.ID)
+
 	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
@@ -174,6 +198,9 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 // TODO: Use the addToNetwork function to obtain the IP of the Pod. That will assume idempotent ADD call to the plugin.
 // Also fix the runtime's call to Status function to be done only in the case that the IP is lost, no need to do periodic calls
 func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name string, id kubecontainer.ContainerID) (*network.PodNetworkStatus, error) {
+	podMutex := plugin.lockPodMutex(id)
+	defer podMutex.Unlock()
+
 	netnsPath, err := plugin.host.GetRuntime().GetNetNS(id)
 	if err != nil {
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
