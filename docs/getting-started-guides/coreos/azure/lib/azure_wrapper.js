@@ -41,6 +41,8 @@ exports.run_task_queue = function (dummy) {
     return ret;
   };
 
+  var subscription = get_subscription();
+
   (function iter (task) {
     if (task.current === undefined) {
       if (conf.destroying === undefined) {
@@ -51,6 +53,9 @@ exports.run_task_queue = function (dummy) {
     } else {
       if (task.current.length !== 0) {
         console.log(clr.yellow('azure_wrapper/exec:'), clr.blue(inspect(task.current)));
+        if (subscription !== undefined) {
+            task.current.unshift(subscription)
+        }
         cp.fork('node_modules/azure-cli/bin/azure', task.current)
           .on('exit', function (code, signal) {
             tasks.done.push({
@@ -159,7 +164,7 @@ var get_vm_size = function () {
   }
 }
 
-var get_subscription= function () {
+var get_subscription = function () {
   if (process.env['AZ_SUBSCRIPTION']) {
     return '--subscription=' + process.env['AZ_SUBSCRIPTION'];
   }
@@ -170,7 +175,6 @@ exports.queue_default_network = function () {
     'network', 'vnet', 'create',
     get_location(),
     '--address-space=172.16.0.0',
-    get_subscription(),
     conf.resources['vnet'],
   ]);
 }
@@ -182,7 +186,6 @@ exports.queue_storage_if_needed = function() {
       'storage', 'account', 'create',
       '--type=LRS',
       get_location(),
-      get_subscription(),
       conf.resources['storage_account'],
     ]);
     process.env['AZURE_STORAGE_ACCOUNT'] = conf.resources['storage_account'];
@@ -202,8 +205,7 @@ exports.queue_machines = function (name_prefix, coreos_update_channel, cloud_con
     '--connect=' + conf.resources['service'],
     '--virtual-network-name=' + conf.resources['vnet'],
     '--no-ssh-password',
-    '--ssh-cert=' + conf.resources['ssh_key']['pem'],
-    get_subscription(),
+    '--ssh-cert=' + conf.resources['ssh_key']['pem']
   ];
 
   var cloud_config = cloud_config_creator(x, conf);
@@ -261,11 +263,11 @@ exports.destroy_cluster = function (state_file) {
 
   conf.destroying = true;
   task_queue = _.map(conf.hosts, function (host) {
-    return ['vm', 'delete', '--quiet', '--blob-delete', host.name, get_subscription()];
+    return ['vm', 'delete', '--quiet', '--blob-delete', host.name];
   });
 
-  task_queue.push(['network', 'vnet', 'delete', '--quiet', conf.resources['vnet'], get_subscription()]);
-  task_queue.push(['storage', 'account', 'delete', '--quiet', conf.resources['storage_account'], get_subscription()]);
+  task_queue.push(['network', 'vnet', 'delete', '--quiet', conf.resources['vnet']]);
+  task_queue.push(['storage', 'account', 'delete', '--quiet', conf.resources['storage_account']]);
 
   exports.run_task_queue();
 };
