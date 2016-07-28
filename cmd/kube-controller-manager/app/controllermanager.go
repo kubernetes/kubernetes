@@ -56,7 +56,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 	namespacecontroller "k8s.io/kubernetes/pkg/controller/namespace"
 	nodecontroller "k8s.io/kubernetes/pkg/controller/node"
-	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/persistentvolume"
 	petset "k8s.io/kubernetes/pkg/controller/petset"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
@@ -66,7 +65,8 @@ import (
 	routecontroller "k8s.io/kubernetes/pkg/controller/route"
 	servicecontroller "k8s.io/kubernetes/pkg/controller/service"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
-	"k8s.io/kubernetes/pkg/controller/volume"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
+	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/healthz"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -408,7 +408,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	attachDetachController, attachDetachControllerErr :=
-		volume.NewAttachDetachController(
+		attachdetach.NewAttachDetachController(
 			clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "attachdetach-controller")),
 			podInformer,
 			nodeInformer,

@@ -16,7 +16,7 @@ limitations under the License.
 
 // Package volume implements a controller to manage volume attach and detach
 // operations.
-package volume
+package attachdetach
 
 import (
 	"fmt"
@@ -28,10 +28,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/controller/volume/cache"
-	"k8s.io/kubernetes/pkg/controller/volume/populator"
-	"k8s.io/kubernetes/pkg/controller/volume/reconciler"
-	"k8s.io/kubernetes/pkg/controller/volume/statusupdater"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/reconciler"
+	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
