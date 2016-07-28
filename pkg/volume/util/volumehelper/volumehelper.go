@@ -52,6 +52,12 @@ func GetUniqueVolumeName(pluginName, volumeName string) api.UniqueVolumeName {
 	return api.UniqueVolumeName(fmt.Sprintf("%s/%s", pluginName, volumeName))
 }
 
+// GetUniqueVolumeNameForNonAttachableVolume returns the unique volume name
+// for a non-attachable volume.
+func GetUniqueVolumeNameForNonAttachableVolume(podName types.UniquePodName, volumePlugin volume.VolumePlugin, podSpecName string) api.UniqueVolumeName {
+	return api.UniqueVolumeName(fmt.Sprintf("%s/%v-%s", volumePlugin.GetPluginName(), podName, podSpecName))
+}
+
 // GetUniqueVolumeNameFromSpec uses the given VolumePlugin to generate a unique
 // name representing the volume defined in the specified volume spec.
 // This returned name can be used to uniquely reference the actual backing

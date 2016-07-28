@@ -29,7 +29,6 @@ import (
 )
 
 var _ = framework.KubeDescribe("ConfigMap", func() {
-
 	f := framework.NewDefaultFramework("configmap")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
@@ -199,6 +198,84 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 		framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
 			"CONFIG_DATA_1=value-1",
 		}, f.Namespace.Name)
+	})
+
+	It("should be consumable in multiple volumes in the same pod", func() {
+		var (
+			name             = "configmap-test-volume-" + string(util.NewUUID())
+			volumeName       = "configmap-volume"
+			volumeMountPath  = "/etc/configmap-volume"
+			volumeName2      = "configmap-volume-2"
+			volumeMountPath2 = "/etc/configmap-volume-2"
+			configMap        = newConfigMap(f, name)
+		)
+
+		By(fmt.Sprintf("Creating configMap with name %s", configMap.Name))
+		defer func() {
+			By("Cleaning up the configMap")
+			if err := f.Client.ConfigMaps(f.Namespace.Name).Delete(configMap.Name); err != nil {
+				framework.Failf("unable to delete configMap %v: %v", configMap.Name, err)
+			}
+		}()
+		var err error
+		if configMap, err = f.Client.ConfigMaps(f.Namespace.Name).Create(configMap); err != nil {
+			framework.Failf("unable to create test configMap %s: %v", configMap.Name, err)
+		}
+
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name: "pod-configmaps-" + string(util.NewUUID()),
+			},
+			Spec: api.PodSpec{
+				Volumes: []api.Volume{
+					{
+						Name: volumeName,
+						VolumeSource: api.VolumeSource{
+							ConfigMap: &api.ConfigMapVolumeSource{
+								LocalObjectReference: api.LocalObjectReference{
+									Name: name,
+								},
+							},
+						},
+					},
+					{
+						Name: volumeName2,
+						VolumeSource: api.VolumeSource{
+							ConfigMap: &api.ConfigMapVolumeSource{
+								LocalObjectReference: api.LocalObjectReference{
+									Name: name,
+								},
+							},
+						},
+					},
+				},
+				Containers: []api.Container{
+					{
+						Name:  "configmap-volume-test",
+						Image: "gcr.io/google_containers/mounttest:0.6",
+						Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
+						VolumeMounts: []api.VolumeMount{
+							{
+								Name:      volumeName,
+								MountPath: volumeMountPath,
+								ReadOnly:  true,
+							},
+							{
+								Name:      volumeName2,
+								MountPath: volumeMountPath2,
+								ReadOnly:  true,
+							},
+						},
+					},
+				},
+				RestartPolicy: api.RestartPolicyNever,
+			},
+		}
+
+		framework.TestContainerOutput("consume configMaps", f.Client, pod, 0, []string{
+			"content of file \"/etc/configmap-volume/data-1\": value-1",
+		}, f.Namespace.Name)
+
 	})
 })
 
