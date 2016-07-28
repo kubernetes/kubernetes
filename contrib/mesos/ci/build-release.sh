@@ -29,10 +29,24 @@ set -o errtrace
 
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE}")/../../.." && pwd)
 
-"${KUBE_ROOT}/contrib/mesos/ci/run.sh" make clean
-
-export KUBERNETES_CONTRIB=mesos
+export KUBERNETES_CONTRIB="${KUBERNETES_CONTRIB:-mesos}"
 export KUBE_RELEASE_RUN_TESTS="${KUBE_RELEASE_RUN_TESTS:-N}"
 export KUBE_SKIP_CONFIRMATIONS=Y
 
-"${KUBE_ROOT}/build/release.sh"
+## "${KUBE_ROOT}/build/release.sh" -- hacked to call our own build-cross
+source "$KUBE_ROOT/build/common.sh"
+
+KUBE_RELEASE_RUN_TESTS=${KUBE_RELEASE_RUN_TESTS-y}
+
+kube::build::verify_prereqs
+kube::build::build_image
+kube::build::run_build_command contrib/mesos/ci/build-cross.sh
+
+if [[ $KUBE_RELEASE_RUN_TESTS =~ ^[yY]$ ]]; then
+  kube::build::run_build_command hack/test-go.sh
+  kube::build::run_build_command hack/test-integration.sh
+fi
+
+# TODO:
+#kube::build::copy_output
+#kube::release::package_tarballs
