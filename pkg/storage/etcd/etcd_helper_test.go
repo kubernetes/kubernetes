@@ -460,7 +460,7 @@ func TestGuaranteedUpdateUIDMismatch(t *testing.T) {
 	err = helper.GuaranteedUpdate(context.TODO(), "/some/key", podPtr, true, storage.NewUIDPreconditions("B"), storage.SimpleUpdate(func(in runtime.Object) (runtime.Object, error) {
 		return obj, nil
 	}))
-	if !storage.IsTestFailed(err) {
+	if !storage.IsInvalidObj(err) {
 		t.Fatalf("Expect a Test Failed (write conflict) error, got: %v", err)
 	}
 }
@@ -499,7 +499,7 @@ func TestDeleteUIDMismatch(t *testing.T) {
 		t.Fatalf("Unexpected error %#v", err)
 	}
 	err = helper.Delete(context.TODO(), "/some/key", obj, storage.NewUIDPreconditions("B"))
-	if !storage.IsTestFailed(err) {
+	if !storage.IsInvalidObj(err) {
 		t.Fatalf("Expect a Test Failed (write conflict) error, got: %v", err)
 	}
 }
