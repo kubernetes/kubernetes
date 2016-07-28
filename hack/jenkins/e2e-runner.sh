@@ -121,13 +121,6 @@ function unpack_binaries() {
     tar -xzf kubernetes-test.tar.gz
 }
 
-# Get the latest GCI image in a family.
-function get_latest_gci_image() {
-    local -r image_project="$1"
-    local -r image_family="$2"
-    echo "$(gcloud compute images describe-from-family ${image_family} --project=${image_project} --format='value(name)')"
-}
-
 function get_latest_docker_release() {
   # Typical Docker release versions are like v1.11.2-rc1, v1.11.2, and etc.
   local -r version_re='.*\"tag_name\":[[:space:]]+\"v([0-9\.r|c-]+)\",.*'
@@ -186,6 +179,37 @@ function dump_cluster_logs() {
     fi
 }
 
+# GCI specific settings.
+# Assumes: JENKINS_GCI_IMAGE_FAMILY
+function setup_gci_vars() {
+  local -r gci_staging_project=container-vm-image-staging
+  local -r image_info="$(gcloud compute images describe-from-family ${JENKINS_GCI_IMAGE_FAMILY} --project=${gci_staging_project} --format=json)"
+  local -r image_description="$(echo ${image_info} | jq '.description')"
+  local -r image_name="$(echo ${image_info} | jq '.name')"
+
+  if [[ "${JENKINS_USE_GCI_VERSION:-}" =~ ^[yY]$ ]]; then
+    # GCI QA jobs use the builtin k8s version.
+    # Staged GCI images all include versions in their image descriptions so we
+    # extract builtin Kubernetes version from them.
+    local -r k8s_version_re='.*Kubernetes: ([0-9a-z.-]+),.*'
+    if [[ ${image_description} =~ ${k8s_version_re} ]]; then
+      export JENKINS_PUBLISHED_VERSION="release/${BASH_REMATCH[1]}"
+    else
+      echo "Failed to determine builtin k8s version for image ${image_name}: ${image_description}"
+      exit 1
+    fi
+  fi
+
+  export KUBE_GCE_MASTER_PROJECT="${gci_staging_project}"
+  export KUBE_GCE_MASTER_IMAGE="${image_name}"
+  export KUBE_MASTER_OS_DISTRIBUTION="gci"
+  if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-canary-test" ]]; then
+    # The family "gci-canary-test" is reserved for a special type of GCI images
+    # that are used to continuously validate Docker releases.
+    export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
+  fi
+}
+
 ### Pre Set Up ###
 if running_in_docker; then
     record_command "${STAGE_PRE}" "download_gcloud" curl -fsSL --retry 3 --keepalive-time 2 -o "${WORKSPACE}/google-cloud-sdk.tar.gz" 'https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz'
@@ -215,17 +239,9 @@ if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
     export CLOUDSDK_CONFIG=/var/lib/jenkins/.config/gcloud
 fi
 
-# We get the image project and name for GCI dynamically.
+# GCI specific settings.
 if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
-  GCI_STAGING_PROJECT=container-vm-image-staging
-  export KUBE_GCE_MASTER_PROJECT="${GCI_STAGING_PROJECT}"
-  export KUBE_GCE_MASTER_IMAGE="$(get_latest_gci_image "${GCI_STAGING_PROJECT}" "${JENKINS_GCI_IMAGE_FAMILY}")"
-  export KUBE_MASTER_OS_DISTRIBUTION="gci"
-  if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-canary-test" ]]; then
-    # The family "gci-canary-test" is reserved for a special type of GCI images
-    # that are used to continuously validate Docker releases.
-    export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
-  fi
+  setup_gci_vars
 fi
 
 if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
