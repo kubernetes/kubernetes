@@ -496,7 +496,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		interPodAffinity := InterPodAffinity{
 			info:                  FakeNodeListInfo(test.nodes),
 			nodeLister:            algorithm.FakeNodeLister(test.nodes),
@@ -585,7 +585,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		ipa := InterPodAffinity{
 			info:                  FakeNodeListInfo(test.nodes),
 			nodeLister:            algorithm.FakeNodeLister(test.nodes),
@@ -669,7 +669,7 @@ func TestSoftPodAntiAffinityWithFailureDomains(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods)
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
 		ipa := InterPodAffinity{
 			info:                  FakeNodeListInfo(test.nodes),
 			nodeLister:            algorithm.FakeNodeLister(test.nodes),
