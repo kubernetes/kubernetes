@@ -255,7 +255,7 @@ func (kl *Kubelet) syncNetworkStatus() {
 			}
 			kl.updatePodCIDR(podCIDR)
 		}
-		if err := ensureIPTablesMasqRule(kl.nonMasqueradeCIDR); err != nil {
+		if err := ensureIPTablesMasqRule(kl.iptClient, kl.nonMasqueradeCIDR); err != nil {
 			err = fmt.Errorf("Error on adding ip table rules: %v", err)
 			glog.Error(err)
 			kl.runtimeState.setNetworkState(err)
