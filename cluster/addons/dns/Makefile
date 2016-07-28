@@ -21,14 +21,14 @@
 
 all: transform
 
-# .base -> .in pattern rule
-%.in: %.base transforms2salt.sed
+# .base -> .jinja pattern rule
+%.jinja: %.base transforms2salt.sed
 	sed -f transforms2salt.sed $< | sed s/__SOURCE_FILENAME__/$</g > $@
 
 # .base -> .sed pattern rule
 %.sed: %.base transforms2sed.sed
 	sed -f transforms2sed.sed $<  | sed s/__SOURCE_FILENAME__/$</g > $@
 
-transform: skydns-rc.yaml.in skydns-svc.yaml.in skydns-rc.yaml.sed skydns-svc.yaml.sed
+transform: skydns-rc.yaml.jinja skydns-svc.yaml.jinja skydns-rc.yaml.sed skydns-svc.yaml.sed
 
 .PHONY: transform

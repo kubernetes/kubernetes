@@ -411,11 +411,11 @@ def render_files(reldata=None):
         # Render the files/manifests/master.json that contains parameters for
         # the apiserver, controller, and controller-manager
         render('master.json', target, context)
-        # Source: ...cluster/addons/dns/skydns-svc.yaml.in
+        # Source: ...cluster/addons/dns/skydns-svc.yaml.jinja
         target = os.path.join(rendered_manifest_dir, 'kubedns-svc.yaml')
         # Render files/kubernetes/kubedns-svc.yaml for the DNS service.
         render('kubedns-svc.yaml', target, context)
-        # Source: ...cluster/addons/dns/skydns-rc.yaml.in
+        # Source: ...cluster/addons/dns/skydns-rc.yaml.jinja
         target = os.path.join(rendered_manifest_dir, 'kubedns-rc.yaml')
         # Render files/kubernetes/kubedns-rc.yaml for the DNS pod.
         render('kubedns-rc.yaml', target, context)

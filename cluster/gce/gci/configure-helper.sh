@@ -875,8 +875,8 @@ function start-kube-addons {
     setup-addon-manifests "addons" "dns"
     local -r dns_rc_file="${dst_dir}/dns/skydns-rc.yaml"
     local -r dns_svc_file="${dst_dir}/dns/skydns-svc.yaml"
-    mv "${dst_dir}/dns/skydns-rc.yaml.in" "${dns_rc_file}"
-    mv "${dst_dir}/dns/skydns-svc.yaml.in" "${dns_svc_file}"
+    mv "${dst_dir}/dns/skydns-rc.yaml.jinja" "${dns_rc_file}"
+    mv "${dst_dir}/dns/skydns-svc.yaml.jinja" "${dns_svc_file}"
     # Replace the salt configurations with variable values.
     sed -i -e "s@{{ *pillar\['dns_replicas'\] *}}@${DNS_REPLICAS}@g" "${dns_rc_file}"
     sed -i -e "s@{{ *pillar\['dns_domain'\] *}}@${DNS_DOMAIN}@g" "${dns_rc_file}"

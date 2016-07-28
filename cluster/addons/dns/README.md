@@ -28,8 +28,8 @@ skydns-svc.yaml.base
 
 These files are appropriate for use in our `salt` based installations.
 
-skydns-rc.yaml.in
-skydns-svc.yaml.in
+skydns-rc.yaml.jinja
+skydns-svc.yaml.jinja
 
 ## Generated sed files
 

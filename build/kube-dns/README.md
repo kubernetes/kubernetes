@@ -148,13 +148,16 @@ set:
 ```
 
 Second, you need to start the DNS server ReplicationController and Service. See
-the example files ([ReplicationController](../../cluster/addns/dns/skydns-rc.yaml.in) and
-[Service](../../cluster/addons/dns/skydns-svc.yaml.in)), but keep in mind that these are templated for
-Salt.  You will need to replace the `{{ <param> }}` blocks with your own values
-for the config variables mentioned above.  Other than the templating, these are
-normal kubernetes objects, and can be instantiated with `kubectl create`.
+the example files
+([ReplicationController](../../cluster/addns/dns/skydns-rc.yaml.sed) and
+[Service](../../cluster/addons/dns/skydns-svc.yaml.sed)), but keep in mind that
+these are templated input.  You will need to replace the `VAR_*` blocks with
+your own values for the config variables mentioned above.  Other than the
+templating, these are normal kubernetes objects, and can be instantiated with
+`kubectl create`.
 
 ## How do I test if it is working?
+
 First deploy DNS as described above.
 
 ### 1 Create a simple Pod to use as a test environment.
