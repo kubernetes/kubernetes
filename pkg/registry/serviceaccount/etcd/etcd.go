@@ -32,7 +32,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against service accounts.
 func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/serviceaccounts"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.ServiceAccountList{} }
 	storageInterface := opts.Decorator(

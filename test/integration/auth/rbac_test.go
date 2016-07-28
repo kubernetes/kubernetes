@@ -81,7 +81,7 @@ func newRBACAuthorizer(t *testing.T, superUser string, config *master.Config) au
 		if err != nil {
 			t.Fatalf("failed to get storage: %v", err)
 		}
-		return generic.RESTOptions{Storage: storageInterface, Decorator: generic.UndecoratedStorage}
+		return generic.RESTOptions{Storage: storageInterface, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource}
 	}
 
 	roleRegistry := role.NewRegistry(roleetcd.NewREST(newRESTOptions("roles")))

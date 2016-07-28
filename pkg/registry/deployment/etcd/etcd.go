@@ -59,7 +59,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against deployments.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
-	prefix := "/deployments"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &extensions.DeploymentList{} }
 	storageInterface := opts.Decorator(

@@ -30,7 +30,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against events.
 func NewREST(opts generic.RESTOptions, ttl uint64) *REST {
-	prefix := "/events"
+	prefix := "/" + opts.ResourcePrefix
 
 	// We explicitly do NOT do any decoration here - switching on Cacher
 	// for events will lead to too high memory consumption.

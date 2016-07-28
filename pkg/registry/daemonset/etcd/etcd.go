@@ -35,7 +35,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against DaemonSets.
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
-	prefix := "/daemonsets"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &extensions.DaemonSetList{} }
 	storageInterface := opts.Decorator(

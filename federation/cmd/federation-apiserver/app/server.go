@@ -168,5 +168,6 @@ func createRESTOptionsOrDie(s *genericoptions.ServerRunOptions, g *genericapiser
 		Storage:                 storage,
 		Decorator:               g.StorageDecorator(),
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
+		ResourcePrefix:          f.ResourcePrefix(resource),
 	}
 }
