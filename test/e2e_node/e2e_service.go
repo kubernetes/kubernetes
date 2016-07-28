@@ -47,6 +47,8 @@ type e2eService struct {
 	nodeName            string
 	logFiles            map[string]logFileData
 	cgroupsPerQOS       bool
+	evictionHard        string
+	evictionSoft        string
 }
 
 type logFileData struct {
@@ -59,9 +61,11 @@ const (
 	LOG_VERBOSITY_LEVEL = "4"
 	// Etcd binary is expected to either be available via PATH, or at this location.
 	defaultEtcdPath = "/tmp/etcd"
+	// Soft eviciton grace period seconds
+	SOFT_EVICTION_GRACE_PERIOD = 20
 )
 
-func newE2eService(nodeName string, cgroupsPerQOS bool) *e2eService {
+func newE2eService(nodeName string, cgroupsPerQOS bool, evictionHard string, evictionSoft string) *e2eService {
 	// Special log files that need to be collected for additional debugging.
 	var logFiles = map[string]logFileData{
 		"kern.log":   {[]string{"/var/log/kern.log"}, []string{"-k"}},
@@ -72,6 +76,8 @@ func newE2eService(nodeName string, cgroupsPerQOS bool) *e2eService {
 		nodeName:      nodeName,
 		logFiles:      logFiles,
 		cgroupsPerQOS: cgroupsPerQOS,
+		evictionHard:  evictionHard,
+		evictionSoft:  evictionSoft,
 	}
 }
 
@@ -251,6 +257,9 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
+		"--eviction-hard", es.evictionHard,
+		"--eviction-soft", es.evictionSoft,
+		"--eviction-soft-grace-period", getSoftEvictionGracePeriod(),
 	)
 	if es.cgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
@@ -409,4 +418,8 @@ func newHealthCheckCommand(healthCheckUrl string, cmd *exec.Cmd, filename string
 
 func (hcc *healthCheckCommand) String() string {
 	return fmt.Sprintf("`%s` health-check: %s", strings.Join(append([]string{hcc.Path}, hcc.Args[1:]...), " "), hcc.HealthCheckUrl)
+}
+
+func getSoftEvictionGracePeriod() string {
+	return fmt.Sprintf("memory.available=%ds,nodefs.available=%ds", SOFT_EVICTION_GRACE_PERIOD, SOFT_EVICTION_GRACE_PERIOD)
 }

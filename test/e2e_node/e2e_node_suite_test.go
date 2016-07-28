@@ -103,7 +103,7 @@ var _ = BeforeSuite(func() {
 	maskLocksmithdOnCoreos()
 
 	if *startServices {
-		e2es = newE2eService(framework.TestContext.NodeName, framework.TestContext.CgroupsPerQOS)
+		e2es = newE2eService(framework.TestContext.NodeName, framework.TestContext.CgroupsPerQOS, framework.TestContext.EvictionHard, framework.TestContext.EvictionSoft)
 		if err := e2es.start(); err != nil {
 			Fail(fmt.Sprintf("Unable to start node services.\n%v", err))
 		}
