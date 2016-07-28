@@ -3449,7 +3449,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "too long name",
 			tweakSvc: func(s *api.Service) {
-				s.Name = strings.Repeat("a", 25)
+				s.Name = strings.Repeat("a", 64)
 			},
 			numErrs: 1,
 		},
@@ -3463,7 +3463,7 @@ func TestValidateService(t *testing.T) {
 		{
 			name: "too long generateName",
 			tweakSvc: func(s *api.Service) {
-				s.GenerateName = strings.Repeat("a", 25)
+				s.GenerateName = strings.Repeat("a", 64)
 			},
 			numErrs: 1,
 		},
