@@ -220,6 +220,9 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 			if len(list.Items) > 1 {
 				return cmdutil.UsageError(cmd, "%s specifies multiple items", filename)
 			}
+			if len(list.Items) == 0 {
+				return cmdutil.UsageError(cmd, "please make sure %s exists and is not empty", filename)
+			}
 			obj = list.Items[0]
 		}
 		newRc, ok = obj.(*api.ReplicationController)
