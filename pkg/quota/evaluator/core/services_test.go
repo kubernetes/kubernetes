@@ -71,11 +71,35 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 			service: &api.Service{
 				Spec: api.ServiceSpec{
 					Type: api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+					},
 				},
 			},
 			usage: api.ResourceList{
 				api.ResourceServices:          resource.MustParse("1"),
 				api.ResourceServicesNodePorts: resource.MustParse("1"),
+			},
+		},
+		"multi-nodeports": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+						{
+							Port: 27444,
+						},
+					},
+				},
+			},
+			usage: api.ResourceList{
+				api.ResourceServices:          resource.MustParse("1"),
+				api.ResourceServicesNodePorts: resource.MustParse("2"),
 			},
 		},
 	}
