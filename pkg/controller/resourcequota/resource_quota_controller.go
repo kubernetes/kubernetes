@@ -333,6 +333,7 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 	// there was a change observed by this controller that requires we update quota
 	if dirty {
 		_, err = rq.kubeClient.Core().ResourceQuotas(usage.Namespace).UpdateStatus(&usage)
+		glog.Errorf("Failed to update resource quota %#v : %v", &usage, err)
 		return err
 	}
 	return nil
