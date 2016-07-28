@@ -484,7 +484,7 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	}
 
 	thirdPartyGV := unversioned.GroupVersionForDiscovery{GroupVersion: "company.com/v1", Version: "v1"}
-	master.addThirdPartyResourceStorage("/apis/company.com/v1", nil,
+	master.addThirdPartyResourceStorage("/apis/company.com/v1", "foos", nil,
 		unversioned.APIGroup{
 			Name:             "company.com",
 			Versions:         []unversioned.GroupVersionForDiscovery{thirdPartyGV},
@@ -546,8 +546,18 @@ func initThirdParty(t *testing.T, version, name string) (*Master, *etcdtesting.E
 	}
 	_, master.ServiceClusterIPRange, _ = net.ParseCIDR("10.0.0.0/24")
 
-	if !assert.NoError(master.InstallThirdPartyResource(api)) {
-		t.FailNow()
+	hasRsrc, err := master.HasThirdPartyResource(api)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if !hasRsrc {
+		err := master.InstallThirdPartyResource(api)
+		if !assert.NoError(err) {
+			t.Errorf("Failed to install API: %v", err)
+			t.FailNow()
+		}
+	} else {
+		t.Errorf("Expected %s: %v not to be present!", name, api)
 	}
 
 	server := httptest.NewServer(master.HandlerContainer.ServeMux)
@@ -1004,7 +1014,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	}
 
 	path := makeThirdPartyPath("company.com")
-	master.RemoveThirdPartyResource(path)
+	master.RemoveThirdPartyResource(path + "/foos")
 
 	resp, err = http.Get(server.URL + "/apis/company.com/" + version + "/namespaces/default/foos/test")
 	if !assert.NoError(err) {

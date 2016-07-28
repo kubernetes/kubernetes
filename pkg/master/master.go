@@ -150,7 +150,7 @@ type Master struct {
 	// storage for third party objects
 	thirdPartyStorage storage.Interface
 	// map from api path to a tuple of (storage for the objects, APIGroup)
-	thirdPartyResources map[string]thirdPartyEntry
+	thirdPartyResources map[string]*thirdPartyEntry
 	// protects the map
 	thirdPartyResourcesLock sync.RWMutex
 	// Useful for reliable testing.  Shouldn't be used otherwise.
@@ -163,7 +163,8 @@ type Master struct {
 // thirdPartyEntry combines objects storage and API group into one struct
 // for easy lookup.
 type thirdPartyEntry struct {
-	storage *thirdpartyresourcedataetcd.REST
+	// Map from plural resource name to entry
+	storage map[string]*thirdpartyresourcedataetcd.REST
 	group   unversioned.APIGroup
 }
 
@@ -265,7 +266,7 @@ func (m *Master) InstallAPIs(c *Config) {
 		if err != nil {
 			glog.Fatalf("Error getting third party storage: %v", err)
 		}
-		m.thirdPartyResources = map[string]thirdPartyEntry{}
+		m.thirdPartyResources = map[string]*thirdPartyEntry{}
 
 		extensionResources := m.getExtensionResources(c)
 		extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
@@ -656,37 +657,60 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 
 // HasThirdPartyResource returns true if a particular third party resource currently installed.
 func (m *Master) HasThirdPartyResource(rsrc *extensions.ThirdPartyResource) (bool, error) {
-	_, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
+	kind, group, err := thirdpartyresourcedata.ExtractApiGroupAndKind(rsrc)
 	if err != nil {
 		return false, err
 	}
 	path := makeThirdPartyPath(group)
-	services := m.HandlerContainer.RegisteredWebServices()
-	for ix := range services {
-		if services[ix].RootPath() == path {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (m *Master) removeThirdPartyStorage(path string) error {
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
-	storage, found := m.thirdPartyResources[path]
-	if found {
-		if err := m.removeAllThirdPartyResources(storage.storage); err != nil {
-			return err
-		}
+	entry := m.thirdPartyResources[path]
+	if entry == nil {
+		return false, nil
+	}
+	plural, _ := meta.KindToResource(unversioned.GroupVersionKind{
+		Group:   group,
+		Version: rsrc.Versions[0].Name,
+		Kind:    kind,
+	})
+	_, found := entry.storage[plural.Resource]
+	return found, nil
+}
+
+func (m *Master) removeThirdPartyStorage(path, resource string) error {
+	m.thirdPartyResourcesLock.Lock()
+	defer m.thirdPartyResourcesLock.Unlock()
+	entry, found := m.thirdPartyResources[path]
+	if !found {
+		return nil
+	}
+	storage, found := entry.storage[resource]
+	if !found {
+		return nil
+	}
+	if err := m.removeAllThirdPartyResources(storage); err != nil {
+		return err
+	}
+	delete(entry.storage, resource)
+	if len(entry.storage) == 0 {
 		delete(m.thirdPartyResources, path)
 		m.RemoveAPIGroupForDiscovery(getThirdPartyGroupName(path))
+	} else {
+		m.thirdPartyResources[path] = entry
 	}
 	return nil
 }
 
 // RemoveThirdPartyResource removes all resources matching `path`.  Also deletes any stored data
 func (m *Master) RemoveThirdPartyResource(path string) error {
-	if err := m.removeThirdPartyStorage(path); err != nil {
+	ix := strings.LastIndex(path, "/")
+	if ix == -1 {
+		return fmt.Errorf("expected <api-group>/<resource-plural-name>, saw: %s", path)
+	}
+	resource := path[ix+1:]
+	path = path[0:ix]
+
+	if err := m.removeThirdPartyStorage(path, resource); err != nil {
 		return err
 	}
 
@@ -720,21 +744,51 @@ func (m *Master) removeAllThirdPartyResources(registry *thirdpartyresourcedataet
 }
 
 // ListThirdPartyResources lists all currently installed third party resources
+// The format is <path>/<resource-plural-name>
 func (m *Master) ListThirdPartyResources() []string {
 	m.thirdPartyResourcesLock.RLock()
 	defer m.thirdPartyResourcesLock.RUnlock()
 	result := []string{}
 	for key := range m.thirdPartyResources {
-		result = append(result, key)
+		for rsrc := range m.thirdPartyResources[key].storage {
+			result = append(result, key+"/"+rsrc)
+		}
 	}
 	return result
 }
 
-func (m *Master) addThirdPartyResourceStorage(path string, storage *thirdpartyresourcedataetcd.REST, apiGroup unversioned.APIGroup) {
+func (m *Master) getExistingThirdPartyResources(path string) []unversioned.APIResource {
+	result := []unversioned.APIResource{}
 	m.thirdPartyResourcesLock.Lock()
 	defer m.thirdPartyResourcesLock.Unlock()
-	m.thirdPartyResources[path] = thirdPartyEntry{storage, apiGroup}
-	m.AddAPIGroupForDiscovery(apiGroup)
+	entry := m.thirdPartyResources[path]
+	if entry != nil {
+		for key, obj := range entry.storage {
+			result = append(result, unversioned.APIResource{
+				Name:       key,
+				Namespaced: true,
+				Kind:       obj.Kind(),
+			})
+		}
+	}
+	return result
+}
+
+func (m *Master) addThirdPartyResourceStorage(path, resource string, storage *thirdpartyresourcedataetcd.REST, apiGroup unversioned.APIGroup) {
+	m.thirdPartyResourcesLock.Lock()
+	defer m.thirdPartyResourcesLock.Unlock()
+	entry, found := m.thirdPartyResources[path]
+	if entry == nil {
+		entry = &thirdPartyEntry{
+			group:   apiGroup,
+			storage: map[string]*thirdpartyresourcedataetcd.REST{},
+		}
+		m.thirdPartyResources[path] = entry
+	}
+	entry.storage[resource] = storage
+	if !found {
+		m.AddAPIGroupForDiscovery(apiGroup)
+	}
 }
 
 // InstallThirdPartyResource installs a third party resource specified by 'rsrc'.  When a resource is
@@ -754,12 +808,8 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Version: rsrc.Versions[0].Name,
 		Kind:    kind,
 	})
-
-	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name, plural.Resource)
-	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
-		glog.Fatalf("Unable to setup thirdparty api: %v", err)
-	}
 	path := makeThirdPartyPath(group)
+
 	groupVersion := unversioned.GroupVersionForDiscovery{
 		GroupVersion: group + "/" + rsrc.Versions[0].Name,
 		Version:      rsrc.Versions[0].Name,
@@ -769,9 +819,14 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 		Versions:         []unversioned.GroupVersionForDiscovery{groupVersion},
 		PreferredVersion: groupVersion,
 	}
+
+	thirdparty := m.thirdpartyapi(group, kind, rsrc.Versions[0].Name, plural.Resource)
+	if err := thirdparty.InstallREST(m.HandlerContainer); err != nil {
+		glog.Fatalf("Unable to setup thirdparty api: %v", err)
+	}
 	apiserver.AddGroupWebService(api.Codecs, m.HandlerContainer, path, apiGroup)
 
-	m.addThirdPartyResourceStorage(path, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
+	m.addThirdPartyResourceStorage(path, plural.Resource, thirdparty.Storage[plural.Resource].(*thirdpartyresourcedataetcd.REST), apiGroup)
 	apiserver.InstallServiceErrorHandler(api.Codecs, m.HandlerContainer, m.NewRequestInfoResolver(), []string{thirdparty.GroupVersion.String()})
 	return nil
 }
@@ -787,8 +842,6 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 		kind,
 	)
 
-	apiRoot := makeThirdPartyPath("")
-
 	storage := map[string]rest.Storage{
 		pluralResource: resourceStorage,
 	}
@@ -797,6 +850,7 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 	internalVersion := unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal}
 	externalVersion := unversioned.GroupVersion{Group: group, Version: version}
 
+	apiRoot := makeThirdPartyPath("")
 	return &apiserver.APIGroupVersion{
 		Root:                apiRoot,
 		GroupVersion:        externalVersion,
@@ -818,6 +872,8 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 		Context: m.RequestContextMapper,
 
 		MinRequestTimeout: m.MinRequestTimeout,
+
+		ResourceLister: dynamicLister{m, makeThirdPartyPath(group)},
 	}
 }
 
