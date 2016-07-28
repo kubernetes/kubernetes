@@ -14,6 +14,7 @@ type RunWatchAndBuildCommandFlags struct {
 	CoverPkg    string
 	SkipPackage string
 	Tags        string
+	GCFlags     string
 
 	//for run and watch commands
 	NumCPU         int
@@ -96,6 +97,7 @@ func (c *RunWatchAndBuildCommandFlags) flags(mode int) {
 	c.FlagSet.StringVar(&(c.CoverPkg), "coverpkg", "", "Run tests with coverage on the given external modules")
 	c.FlagSet.StringVar(&(c.SkipPackage), "skipPackage", "", "A comma-separated list of package names to be skipped.  If any part of the package's path matches, that package is ignored.")
 	c.FlagSet.StringVar(&(c.Tags), "tags", "", "A list of build tags to consider satisfied during the build")
+	c.FlagSet.StringVar(&(c.GCFlags), "gcflags", "", "Arguments to pass on each go tool compile invocation.")
 
 	if mode == runMode || mode == watchMode {
 		config.Flags(c.FlagSet, "", false)
