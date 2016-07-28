@@ -129,7 +129,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		LongRunningRequestRE:    defaultLongRunningRequestRE,
 		MasterCount:             1,
 		MasterServiceNamespace:  api.NamespaceDefault,
-		MaxRequestsInFlight:     400,
+		MaxRequestsInFlight:     4000,
 		MinRequestTimeout:       1800,
 		RuntimeConfig:           make(config.ConfigurationMap),
 		SecurePort:              6443,
