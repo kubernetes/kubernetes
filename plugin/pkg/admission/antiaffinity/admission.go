@@ -63,7 +63,7 @@ func (p *plugin) Admit(attributes admission.Attributes) (err error) {
 		glog.V(5).Infof("Invalid Affinity detected, but we will leave handling of this to validation phase")
 		return nil
 	}
-	if affinity.PodAntiAffinity != nil {
+	if affinity != nil && affinity.PodAntiAffinity != nil {
 		var podAntiAffinityTerms []api.PodAffinityTerm
 		if len(affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution) != 0 {
 			podAntiAffinityTerms = affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution

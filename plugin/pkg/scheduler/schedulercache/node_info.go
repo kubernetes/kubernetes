@@ -33,11 +33,13 @@ type NodeInfo struct {
 	// Overall node information.
 	node *api.Node
 
+	pods             []*api.Pod
+	podsWithAffinity []*api.Pod
+
 	// Total requested resource of all pods on this node.
 	// It includes assumed pods which scheduler sends binding to apiserver but
 	// didn't get it as scheduled yet.
 	requestedResource *Resource
-	pods              []*api.Pod
 	nonzeroRequest    *Resource
 	// We store allocatedResources (which is Node.Status.Allocatable.*) explicitly
 	// as int64, to avoid conversions and accessing map.
@@ -91,6 +93,14 @@ func (n *NodeInfo) Pods() []*api.Pod {
 	return n.pods
 }
 
+// PodsWithAffinity return all pods with (anti)affinity constraints on this node.
+func (n *NodeInfo) PodsWithAffinity() []*api.Pod {
+	if n == nil {
+		return nil
+	}
+	return n.podsWithAffinity
+}
+
 func (n *NodeInfo) AllowedPodNumber() int {
 	if n == nil {
 		return 0
@@ -126,12 +136,18 @@ func (n *NodeInfo) Clone() *NodeInfo {
 	pods := append([]*api.Pod(nil), n.pods...)
 	clone := &NodeInfo{
 		node:                n.node,
+		pods:                pods,
 		requestedResource:   &(*n.requestedResource),
 		nonzeroRequest:      &(*n.nonzeroRequest),
 		allocatableResource: &(*n.allocatableResource),
 		allowedPodNumber:    n.allowedPodNumber,
-		pods:                pods,
 		generation:          n.generation,
+	}
+	if len(n.pods) > 0 {
+		clone.pods = append([]*api.Pod(nil), n.pods...)
+	}
+	if len(n.podsWithAffinity) > 0 {
+		clone.podsWithAffinity = append([]*api.Pod(nil), n.podsWithAffinity...)
 	}
 	return clone
 }
@@ -145,6 +161,14 @@ func (n *NodeInfo) String() string {
 	return fmt.Sprintf("&NodeInfo{Pods:%v, RequestedResource:%#v, NonZeroRequest: %#v}", podKeys, n.requestedResource, n.nonzeroRequest)
 }
 
+func hasPodAffinityConstraints(pod *api.Pod) bool {
+	affinity, err := api.GetAffinityFromPodAnnotations(pod.Annotations)
+	if err != nil || affinity == nil {
+		return false
+	}
+	return affinity.PodAffinity != nil || affinity.PodAntiAffinity != nil
+}
+
 // addPod adds pod information to this NodeInfo.
 func (n *NodeInfo) addPod(pod *api.Pod) {
 	cpu, mem, nvidia_gpu, non0_cpu, non0_mem := calculateResource(pod)
@@ -154,6 +178,9 @@ func (n *NodeInfo) addPod(pod *api.Pod) {
 	n.nonzeroRequest.MilliCPU += non0_cpu
 	n.nonzeroRequest.Memory += non0_mem
 	n.pods = append(n.pods, pod)
+	if hasPodAffinityConstraints(pod) {
+		n.podsWithAffinity = append(n.podsWithAffinity, pod)
+	}
 	n.generation++
 }
 
@@ -164,6 +191,19 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 		return err
 	}
 
+	for i := range n.podsWithAffinity {
+		k2, err := getPodKey(n.podsWithAffinity[i])
+		if err != nil {
+			glog.Errorf("Cannot get pod key, err: %v", err)
+			continue
+		}
+		if k1 == k2 {
+			// delete the element
+			n.podsWithAffinity[i] = n.podsWithAffinity[len(n.podsWithAffinity)-1]
+			n.podsWithAffinity = n.podsWithAffinity[:len(n.podsWithAffinity)-1]
+			break
+		}
+	}
 	for i := range n.pods {
 		k2, err := getPodKey(n.pods[i])
 		if err != nil {
