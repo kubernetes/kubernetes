@@ -20,8 +20,6 @@ import (
 	"errors"
 	"math/rand"
 	"time"
-
-	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // For any test of the style:
@@ -64,13 +62,14 @@ func NonSlidingUntil(f func(), period time.Duration, stopCh <-chan struct{}) {
 // stop channel is already closed. Pass NeverStop to Until if you
 // don't want it stop.
 func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding bool, stopCh <-chan struct{}) {
-	select {
-	case <-stopCh:
-		return
-	default:
-	}
-
 	for {
+
+		select {
+		case <-stopCh:
+			return
+		default:
+		}
+
 		jitteredPeriod := period
 		if jitterFactor > 0.0 {
 			jitteredPeriod = Jitter(period, jitterFactor)
@@ -82,22 +81,18 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 		}
 
 		func() {
-			defer runtime.HandleCrash()
 			f()
 		}()
 
 		if sliding {
 			t = time.NewTimer(jitteredPeriod)
-		} else {
-			// The timer we created could already have fired, so be
-			// careful and check stopCh first.
-			select {
-			case <-stopCh:
-				return
-			default:
-			}
 		}
 
+		// NOTE: b/c there is no priority selection in golang
+		// it is possible for this to race, meaning we could
+		// trigger t.C and stopCh, and t.C select falls through.
+		// In order to mitigate we re-check stopCh at the beginning
+		// of every loop to prevent extra executions of f().
 		select {
 		case <-stopCh:
 			return
