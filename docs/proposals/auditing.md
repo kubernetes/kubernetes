@@ -37,7 +37,7 @@ This proposal aims at extending the auditing log capabilities of the apiserver.
 
 With https://github.com/kubernetes/kubernetes/pull/27087 basic audit logging is added to Kubernetes. It basically implements `access.log` like http handler based logging of all requests in the apiserver API. It does not do deeper inspection of the API calls or of their payloads. Moreover, it has no specific knowledge of the API objects which are modified. Hence, the log output does not answer the question how API objects actually change.
 
-The log output format of https://github.com/kubernetes/kubernetes/pull/27087 is fixed. It is text based, unstructured (e.g. non-JSON) data which must be parsed to be usable in any advanced external system used to analyse audit logs.
+The log output format of https://github.com/kubernetes/kubernetes/pull/27087 is fixed. It is text based, unstructured (e.g. non-JSON) data which must be parsed to be usable in any advanced external system used to analyze audit logs.
 
 The log output format does not follow any public standard like e.g. https://www.dmtf.org/standards/cadf.
 
