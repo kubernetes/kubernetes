@@ -28,7 +28,7 @@ metadata:
     version: v19
     kubernetes.io/cluster-service: "true"
 spec:
-  replicas: $DNS_REPLICAS
+  replicas: VAR_DNS_REPLICAS
   selector:
     k8s-app: kube-dns
     version: v19
@@ -73,7 +73,7 @@ spec:
           timeoutSeconds: 5
         args:
         # command = "/kube-dns"
-        - --domain=$DNS_DOMAIN.
+        - --domain=VAR_DNS_DOMAIN.
         - --dns-port=10053
         ports:
         - containerPort: 10053
@@ -110,7 +110,7 @@ spec:
             # net memory requested by the pod constant.
             memory: 50Mi
         args:
-        - -cmd=nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc.$DNS_DOMAIN 127.0.0.1:10053 >/dev/null
+        - -cmd=nslookup kubernetes.default.svc.VAR_DNS_DOMAIN 127.0.0.1 >/dev/null && nslookup kubernetes.default.svc.VAR_DNS_DOMAIN 127.0.0.1:10053 >/dev/null
         - -port=8080
         - -quiet
         ports:
