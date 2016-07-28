@@ -34,7 +34,6 @@ type Registry interface {
 }
 
 // storage puts strong typing around storage calls
-
 type storage struct {
 	rest.StandardStorage
 }
