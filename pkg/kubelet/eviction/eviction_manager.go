@@ -109,15 +109,8 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 
 // Start starts the control loop to observe and response to low compute resources.
 func (m *managerImpl) Start(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc, monitoringInterval time.Duration) error {
-	// build the ranking functions now that we can know if the imagefs is dedicated or not.
-	hasDedicatedImageFs, err := diskInfoProvider.HasDedicatedImageFs()
-	if err != nil {
-		return err
-	}
-	m.resourceToRankFunc = buildResourceToRankFunc(hasDedicatedImageFs)
-
 	// start the eviction manager monitoring
-	go wait.Until(func() { m.synchronize(podFunc) }, monitoringInterval, wait.NeverStop)
+	go wait.Until(func() { m.synchronize(diskInfoProvider, podFunc) }, monitoringInterval, wait.NeverStop)
 	return nil
 }
 
@@ -136,11 +129,22 @@ func (m *managerImpl) IsUnderDiskPressure() bool {
 }
 
 // synchronize is the main control loop that enforces eviction thresholds.
-func (m *managerImpl) synchronize(podFunc ActivePodsFunc) {
+func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc ActivePodsFunc) {
 	// if we have nothing to do, just return
 	thresholds := m.config.Thresholds
 	if len(thresholds) == 0 {
 		return
+	}
+
+	// build the ranking functions (if not yet known)
+	// TODO: have a function in cadvisor that lets us know if global housekeeping has completed
+	if len(m.resourceToRankFunc) == 0 {
+		// this may error if cadvisor has yet to complete housekeeping, so we will just try again in next pass.
+		hasDedicatedImageFs, err := diskInfoProvider.HasDedicatedImageFs()
+		if err != nil {
+			return
+		}
+		m.resourceToRankFunc = buildResourceToRankFunc(hasDedicatedImageFs)
 	}
 
 	// make observations and get a function to derive pod usage stats relative to those observations.
