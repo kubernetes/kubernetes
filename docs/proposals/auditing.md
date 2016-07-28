@@ -150,6 +150,8 @@ to a policy action. An policy action defines the level of audit logging to be pe
 
 When the http request is processed, the request handler will close the audit event by filling in the http response. Then it will pass the event to the configured policy backend.
 
+**Note:** for service creation and deletion there is special REST code in the apiserver which takes care of service/node port (de)allocation and removal of endpoints on service deletion. Hence, these operations are not visible on the API layer and cannot be audit logged therefore. **No other resources** (with the exception of componentstatus which is not of interest here) **implement this kind of custom CRUD operations.**
+
 ### Events
 
 ```go
