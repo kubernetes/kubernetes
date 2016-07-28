@@ -1912,7 +1912,12 @@ func (kl *Kubelet) HandlePodCleanups() error {
 func (kl *Kubelet) podKiller() {
 	killing := sets.NewString()
 	resultCh := make(chan types.UID)
-	defer close(resultCh)
+	defer func() {
+		close(resultCh)
+
+		// avoid possible memory leaking caused by blocking pod-killing goroutines.
+		for range resultCh {}
+	}()
 	for {
 		select {
 		case podPair, ok := <-kl.podKillingCh:
@@ -1927,6 +1932,10 @@ func (kl *Kubelet) podKiller() {
 			}
 			killing.Insert(string(runningPod.ID))
 			go func(apiPod *api.Pod, runningPod *kubecontainer.Pod, ch chan types.UID) {
+				defer func() {
+					// avoid crashing caused by writing into closed ch
+					recover()
+				}()
 				defer func() {
 					ch <- runningPod.ID
 				}()
