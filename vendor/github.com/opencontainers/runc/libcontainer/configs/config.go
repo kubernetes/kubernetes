@@ -33,7 +33,7 @@ type Seccomp struct {
 	Syscalls      []*Syscall `json:"syscalls"`
 }
 
-// An action to be taken upon rule match in Seccomp
+// Action is taken upon rule match in Seccomp
 type Action int
 
 const (
@@ -44,7 +44,7 @@ const (
 	Trace
 )
 
-// A comparison operator to be used when matching syscall arguments in Seccomp
+// Operator is a comparison operator to be used when matching syscall arguments in Seccomp
 type Operator int
 
 const (
@@ -57,7 +57,7 @@ const (
 	MaskEqualTo
 )
 
-// A rule to match a specific syscall argument in Seccomp
+// Arg is a rule to match a specific syscall argument in Seccomp
 type Arg struct {
 	Index    uint     `json:"index"`
 	Value    uint64   `json:"value"`
@@ -65,7 +65,7 @@ type Arg struct {
 	Op       Operator `json:"op"`
 }
 
-// An rule to match a syscall in Seccomp
+// Syscall is a rule to match a syscall in Seccomp
 type Syscall struct {
 	Name   string `json:"name"`
 	Action Action `json:"action"`
@@ -148,10 +148,6 @@ type Config struct {
 	// More information about kernel oom score calculation here: https://lwn.net/Articles/317814/
 	OomScoreAdj int `json:"oom_score_adj"`
 
-	// AdditionalGroups specifies the gids that should be added to supplementary groups
-	// in addition to those that the user belongs to.
-	AdditionalGroups []string `json:"additional_groups"`
-
 	// UidMappings is an array of User ID mappings for User Namespaces
 	UidMappings []IDMap `json:"uid_mappings"`
 
@@ -187,6 +183,10 @@ type Config struct {
 
 	// Labels are user defined metadata that is stored in the config and populated on the state
 	Labels []string `json:"labels"`
+
+	// NoNewKeyring will not allocated a new session keyring for the container.  It will use the
+	// callers keyring in this case.
+	NoNewKeyring bool `json:"no_new_keyring"`
 }
 
 type Hooks struct {
@@ -261,7 +261,7 @@ type Hook interface {
 	Run(HookState) error
 }
 
-// NewFunctionHooks will call the provided function when the hook is run.
+// NewFunctionHook will call the provided function when the hook is run.
 func NewFunctionHook(f func(HookState) error) FuncHook {
 	return FuncHook{
 		run: f,
@@ -284,7 +284,7 @@ type Command struct {
 	Timeout *time.Duration `json:"timeout"`
 }
 
-// NewCommandHooks will execute the provided command when the hook is run.
+// NewCommandHook will execute the provided command when the hook is run.
 func NewCommandHook(cmd Command) CommandHook {
 	return CommandHook{
 		Command: cmd,
