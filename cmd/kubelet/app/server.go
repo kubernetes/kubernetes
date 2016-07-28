@@ -989,14 +989,14 @@ func parseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) 
 	reservation := new(kubetypes.Reservation)
 	if rl, err := parseResourceList(kubeReserved); err != nil {
 		return nil, err
-	} else {
-		reservation.Kubernetes = rl
 	}
+	reservation.Kubernetes = rl
+
 	if rl, err := parseResourceList(systemReserved); err != nil {
 		return nil, err
-	} else {
-		reservation.System = rl
 	}
+	reservation.System = rl
+
 	return reservation, nil
 }
 
