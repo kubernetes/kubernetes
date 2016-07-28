@@ -114,7 +114,7 @@ type NodeController struct {
 	nodeStatusMap map[string]nodeStatusData
 	now           func() unversioned.Time
 	// Lock to access evictor workers
-	evictorLock *sync.Mutex
+	evictorLock sync.Mutex
 	// workers that evicts pods from unresponsive nodes.
 	zonePodEvictor         map[string]*RateLimitedTimedQueue
 	zoneTerminationEvictor map[string]*RateLimitedTimedQueue
@@ -181,7 +181,6 @@ func NewNodeController(
 			glog.Fatal("NodeController: Invalid clusterCIDR, mask size of clusterCIDR must be less than nodeCIDRMaskSize.")
 		}
 	}
-	evictorLock := sync.Mutex{}
 
 	nc := &NodeController{
 		cloud:                     cloud,
@@ -190,7 +189,6 @@ func NewNodeController(
 		recorder:                  recorder,
 		podEvictionTimeout:        podEvictionTimeout,
 		maximumGracePeriod:        5 * time.Minute,
-		evictorLock:               &evictorLock,
 		zonePodEvictor:            make(map[string]*RateLimitedTimedQueue),
 		zoneTerminationEvictor:    make(map[string]*RateLimitedTimedQueue),
 		nodeStatusMap:             make(map[string]nodeStatusData),
