@@ -135,9 +135,9 @@ func TestStructInput(t *testing.T) {
 		},
 		Bicycle: bicycle{"red", 19.95},
 		Labels: map[string]int{
-			"engieer":  10,
-			"web/html": 15,
-			"k8s-app":  20,
+			"engineer.ref": 10,
+			"web/html":     15,
+			"k8s-app":      20,
 		},
 		Employees: map[empName]job{
 			"jason": "manager",
@@ -157,6 +157,8 @@ func TestStructInput(t *testing.T) {
 		{"dict/", "{$.Employees.jason}", storeData, "manager"},
 		{"dict/", "{$.Employees.dan}", storeData, "clerk"},
 		{"dict-", "{.Labels.k8s-app}", storeData, "20"},
+		{"dict.", `{.Labels."engineer.ref"}`, storeData, "10"},
+		{"arraydict.", `{.Labels["engineer.ref"]}`, storeData, "10"},
 		{"nest", "{.Bicycle.Color}", storeData, "red"},
 		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville"},
 		{"allfileds", "{.Bicycle.*}", storeData, "red 19.95"},

@@ -249,6 +249,9 @@ Loop:
 	}
 	text := p.consumeText()
 	text = string(text[1 : len(text)-1])
+	if len(text) == 0 {
+		return fmt.Errorf("empty array")
+	}
 	if text == "*" {
 		text = ":"
 	}
@@ -268,9 +271,13 @@ Loop:
 		return p.parseInsideAction(cur)
 	}
 
-	// dict key
+	// dict key or literal dict key
 	reg := regexp.MustCompile(`^'([^']*)'$`)
 	value := reg.FindStringSubmatch(text)
+	if value == nil {
+		reg = regexp.MustCompile(`(^"[^"]*")$`)
+		value = reg.FindStringSubmatch(text)
+	}
 	if value != nil {
 		parser, err := parseAction("arraydict", fmt.Sprintf(".%s", value[1]))
 		if err != nil {
@@ -359,13 +366,12 @@ Loop:
 	return p.parseInsideAction(cur)
 }
 
-// parseQuote unquotes string inside double quote
-func (p *Parser) parseQuote(cur *ListNode) error {
+func (p *Parser) getQuoteText() (string, error) {
 Loop:
 	for {
 		switch p.next() {
 		case eof, '\n':
-			return fmt.Errorf("unterminated quoted string")
+			return "", fmt.Errorf("unterminated quoted string")
 		case '"':
 			break Loop
 		}
@@ -373,7 +379,16 @@ Loop:
 	value := p.consumeText()
 	s, err := strconv.Unquote(value)
 	if err != nil {
-		return fmt.Errorf("unquote string %s error %v", value, err)
+		return "", fmt.Errorf("unquote string %s error %v", value, err)
+	}
+	return s, nil
+}
+
+// parseQuote unquotes string inside double quote
+func (p *Parser) parseQuote(cur *ListNode) error {
+	s, err := p.getQuoteText()
+	if err != nil {
+		return err
 	}
 	cur.append(newText(s))
 	return p.parseInsideAction(cur)
@@ -383,14 +398,24 @@ Loop:
 func (p *Parser) parseField(cur *ListNode) error {
 	p.consumeText()
 	var r rune
-	for {
-		r = p.next()
-		if isTerminator(r) {
-			p.backup()
-			break
+	var value string
+	var err error
+	if p.next() == '"' {
+		value, err = p.getQuoteText()
+		if err != nil {
+			return err
 		}
+	} else {
+		p.backup()
+		for {
+			r = p.next()
+			if isTerminator(r) {
+				p.backup()
+				break
+			}
+		}
+		value = p.consumeText()
 	}
-	value := p.consumeText()
 	if value == "*" {
 		cur.append(newWildcard())
 	} else {
