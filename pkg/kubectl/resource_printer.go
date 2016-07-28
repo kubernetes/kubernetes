@@ -127,6 +127,7 @@ func GetPrinter(format, formatArgument string, noHeaders bool) (ResourcePrinter,
 		if err != nil {
 			return nil, false, fmt.Errorf("error reading template %s, %v\n", formatArgument, err)
 		}
+		defer file.Close()
 		if printer, err = NewCustomColumnsPrinterFromTemplate(file, api.Codecs.UniversalDecoder()); err != nil {
 			return nil, false, err
 		}
