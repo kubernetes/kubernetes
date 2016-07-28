@@ -42,22 +42,12 @@ func GetUniquePodName(pod *api.Pod) types.UniquePodName {
 	return types.UniquePodName(pod.UID)
 }
 
-// GetUniqueVolumeName returns a unique name representing the volume/plugin.
-// Caller should ensure that volumeName is a name/ID uniquely identifying the
-// actual backing device, directory, path, etc. for a particular volume.
-// The returned name can be used to uniquely reference the volume, for example,
-// to prevent operations (attach/detach or mount/unmount) from being triggered
-// on the same volume.
-func GetUniqueVolumeName(pluginName, volumeName string) api.UniqueVolumeName {
-	return api.UniqueVolumeName(fmt.Sprintf("%s/%s", pluginName, volumeName))
-}
-
-// GetUniqueVolumeNameFromSpec uses the given VolumePlugin to generate a unique
-// name representing the volume defined in the specified volume spec.
+// GetUniqueVolumeName uses the given VolumePlugin to generate a unique name
+// representing the volume defined in the specified volume spec.
 // This returned name can be used to uniquely reference the actual backing
 // device, directory, path, etc. referenced by the given volumeSpec.
 // If the given plugin does not support the volume spec, this returns an error.
-func GetUniqueVolumeNameFromSpec(
+func GetUniqueVolumeName(
 	volumePlugin volume.VolumePlugin,
 	volumeSpec *volume.Spec) (api.UniqueVolumeName, error) {
 	if volumePlugin == nil {
@@ -74,8 +64,6 @@ func GetUniqueVolumeNameFromSpec(
 			err)
 	}
 
-	return GetUniqueVolumeName(
-			volumePlugin.GetPluginName(),
-			volumeName),
-		nil
+	return api.UniqueVolumeName(
+		fmt.Sprintf("%s/%s", volumePlugin.GetPluginName(), volumeName)), nil
 }

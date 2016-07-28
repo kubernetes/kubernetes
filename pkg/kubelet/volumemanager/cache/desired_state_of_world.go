@@ -51,7 +51,7 @@ type DesiredStateOfWorld interface {
 	// added.
 	// If a pod with the same unique name already exists under the specified
 	// volume, this is a no-op.
-	AddPodToVolume(podName types.UniquePodName, pod *api.Pod, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGidValue string) (api.UniqueVolumeName, error)
+	AddPodToVolume(podName types.UniquePodName, pod *api.Pod, volumeSpec *volume.Spec, outerVolumeSpecName string, volumeGidValue string) (Key, error)
 
 	// MarkVolumesReportedInUse sets the ReportedInUse value to true for the
 	// reportedVolumes. For volumes not in the reportedVolumes list, the
@@ -72,7 +72,7 @@ type DesiredStateOfWorld interface {
 	// attached volumes, this is a no-op.
 	// If after deleting the pod, the specified volume contains no other child
 	// pods, the volume is also deleted.
-	DeletePodFromVolume(podName types.UniquePodName, volumeName api.UniqueVolumeName)
+	DeletePodFromVolume(key Key)
 
 	// VolumeExists returns true if the given volume exists in the list of
 	// volumes that should be attached to this node.
@@ -86,7 +86,7 @@ type DesiredStateOfWorld interface {
 	// volume, false is returned.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, false is returned.
-	PodExistsInVolume(podName types.UniquePodName, volumeName api.UniqueVolumeName) bool
+	PodExistsInVolume(key Key) bool
 
 	// GetVolumesToMount generates and returns a list of volumes that should be
 	// attached to this node and the pods they should be mounted to based on the
@@ -100,10 +100,15 @@ type VolumeToMount struct {
 	operationexecutor.VolumeToMount
 }
 
+type Key struct {
+	VolumeName api.UniqueVolumeName
+	podName    types.UniquePodName
+}
+
 // NewDesiredStateOfWorld returns a new instance of DesiredStateOfWorld.
 func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStateOfWorld {
 	return &desiredStateOfWorld{
-		volumesToMount:  make(map[api.UniqueVolumeName]volumeToMount),
+		volumesToMount:  make(map[Key]volumeToMount),
 		volumePluginMgr: volumePluginMgr,
 	}
 }
@@ -111,9 +116,9 @@ func NewDesiredStateOfWorld(volumePluginMgr *volume.VolumePluginMgr) DesiredStat
 type desiredStateOfWorld struct {
 	// volumesToMount is a map containing the set of volumes that should be
 	// attached to this node and mounted to the pods referencing it. The key in
-	// the map is the name of the volume and the value is a volume object
-	// containing more information about the volume.
-	volumesToMount map[api.UniqueVolumeName]volumeToMount
+	// the map is the name of the volume/pod UID and the value is a volume
+	// object containing more information about the volume.
+	volumesToMount map[Key]volumeToMount
 	// volumePluginMgr is the volume plugin manager used to create volume
 	// plugin objects.
 	volumePluginMgr *volume.VolumePluginMgr
@@ -171,7 +176,7 @@ func (dsw *desiredStateOfWorld) AddPodToVolume(
 	pod *api.Pod,
 	volumeSpec *volume.Spec,
 	outerVolumeSpecName string,
-	volumeGidValue string) (api.UniqueVolumeName, error) {
+	volumeGidValue string) (Key, error) {
 	dsw.Lock()
 	defer dsw.Unlock()
 
