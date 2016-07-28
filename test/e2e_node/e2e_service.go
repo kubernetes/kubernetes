@@ -87,7 +87,7 @@ func (e *E2EServices) Start() error {
 		"--eviction-hard", framework.TestContext.EvictionHard,
 	)
 	e.services = newServer("services", startCmd, nil, getHealthCheckURLs(), servicesLogFile)
-	return e.services.start()
+	return e.services.start(false)
 }
 
 // Stop stops the e2e services.
@@ -322,7 +322,7 @@ func (es *e2eService) startApiServer() (*server, error) {
 		nil,
 		[]string{apiserverHealthCheckURL},
 		"kube-apiserver.log")
-	return server, server.start()
+	return server, server.start(false)
 }
 
 func (es *e2eService) startKubeletServer() (*server, error) {
@@ -386,7 +386,7 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		killCommand,
 		[]string{kubeletHealthCheckURL},
 		"kubelet.log")
-	return server, server.start()
+	return server, server.start(true)
 }
 
 // server manages a server started and killed with commands.
@@ -403,6 +403,9 @@ type server struct {
 	// outFilename is the name of the log file. The stdout and stderr of the server
 	// will be redirected to this file.
 	outFilename string
+	// Writing to this channel, if it is not nil, stops the restart loop.
+	// When tearing down a server, you should check for this channel and write to it if it exists.
+	stopRestartingCh chan<- bool
 }
 
 func newServer(name string, start, kill *exec.Cmd, urls []string, filename string) *server {
@@ -431,7 +434,7 @@ func (s *server) String() string {
 // readinessCheck checks whether services are ready via the health check urls. Once there is
 // an error in errCh, the function will stop waiting and return the error.
 // TODO(random-liu): Move this to util
-func readinessCheck(urls []string, errCh <-chan error) error {
+func readinessCheck(urls []string, errCh <-chan error, allowRestartCh chan<- bool) error {
 	endTime := time.Now().Add(*serverStartTimeout)
 	blockCh := make(chan error)
 	defer close(blockCh)
@@ -464,6 +467,9 @@ func readinessCheck(urls []string, errCh <-chan error) error {
 				}
 			}
 			if ready {
+				if allowRestartCh != nil {
+					allowRestartCh <- true
+				}
 				return nil
 			}
 		}
@@ -471,8 +477,13 @@ func readinessCheck(urls []string, errCh <-chan error) error {
 	return fmt.Errorf("e2e service readiness check timeout %v", *serverStartTimeout)
 }
 
-func (s *server) start() error {
+func (s *server) start(restartOnExit bool) error {
 	errCh := make(chan error)
+	var allowRestartCh, stopRestartingCh chan bool
+	if restartOnExit {
+		allowRestartCh = make(chan bool)
+		stopRestartingCh = make(chan bool)
+	}
 	go func() {
 		defer close(errCh)
 
@@ -509,9 +520,57 @@ func (s *server) start() error {
 			errCh <- fmt.Errorf("failed to run server start command %q: %v", commandToString(cmd), err)
 			return
 		}
+
+		if restartOnExit {
+			// Prior to knowledge of health check completing, but no error from exit.
+			// Likely cmd.Run() waited on systemd-run. In this case we still want to wait
+			// for the health check to complete before restarting, in case the health check
+			// detects an error with the initial spin-up.
+
+			// TODO(mtaufen): Might want to find a way to detect systemd and then wait on the service.
+			//                Current strategy will wait for initial health check to complete, but will also
+			//                generate a lot of spurrious restart attempts with systemd, since it waits on
+			//                systemd-run rather than the service itself.
+
+			<-allowRestartCh
+
+			// Restart loop
+			for {
+				select {
+				// TODO(mtaufen): This could still be racy, if e.g. we're already in default when
+				// someone writes to stopRestartingCh and tries to shut down the server. In practice
+				// this possibility doesn't seem to be causing issues with test-suite teardown.
+				case <-stopRestartingCh:
+					glog.Infof("stopping restart loop for server start command: %q.", commandToString(cmd))
+					return
+				default:
+					cmd = &exec.Cmd{
+						Path:        cmd.Path,
+						Args:        cmd.Args,
+						Env:         cmd.Env,
+						Dir:         cmd.Dir,
+						Stdin:       cmd.Stdin,
+						Stdout:      cmd.Stdout,
+						Stderr:      cmd.Stderr,
+						ExtraFiles:  cmd.ExtraFiles,
+						SysProcAttr: cmd.SysProcAttr,
+					}
+					s.startCommand = cmd // Make sure this is set, might be used for turndown of a service!
+
+					// Restart cmd here.
+					glog.Infof("restarting server start command: %q.", commandToString(cmd))
+					err := cmd.Run()
+					if err != nil {
+						glog.Errorf("failed to restart server start command %q: %v", commandToString(cmd), err)
+					}
+					glog.Infof("server start command %q exited with state: %q.", commandToString(cmd), cmd.ProcessState.String())
+					time.Sleep(1 * time.Second) // Wait 1 second before restarting the Kubelet
+				}
+			}
+		}
 	}()
 
-	return readinessCheck(s.healthCheckUrls, errCh)
+	return readinessCheck(s.healthCheckUrls, errCh, allowRestartCh)
 }
 
 func (s *server) kill() error {
@@ -533,6 +592,11 @@ func (s *server) kill() error {
 	pid := cmd.Process.Pid
 	if pid <= 1 {
 		return fmt.Errorf("invalid PID %d for %q", pid, name)
+	}
+
+	// Stop any restart loops prior to trying to shut down the process.
+	if s.stopRestartingCh != nil {
+		s.stopRestartingCh <- true
 	}
 
 	// Attempt to shut down the process in a friendly manner before forcing it.
