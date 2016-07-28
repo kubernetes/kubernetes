@@ -28,7 +28,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
@@ -39,12 +39,12 @@ const (
 type TestGenericPLEG struct {
 	pleg    *GenericPLEG
 	runtime *containertest.FakeRuntime
-	clock   *util.FakeClock
+	clock   *clock.FakeClock
 }
 
 func newTestGenericPLEG() *TestGenericPLEG {
 	fakeRuntime := &containertest.FakeRuntime{}
-	clock := util.NewFakeClock(time.Time{})
+	clock := clock.NewFakeClock(time.Time{})
 	// The channel capacity should be large enough to hold all events in a
 	// single test.
 	pleg := &GenericPLEG{
@@ -246,7 +246,7 @@ func newTestGenericPLEGWithRuntimeMock() (*GenericPLEG, *containertest.Mock) {
 		eventChannel: make(chan *PodLifecycleEvent, 100),
 		podRecords:   make(podRecords),
 		cache:        kubecontainer.NewCache(),
-		clock:        util.RealClock{},
+		clock:        clock.RealClock{},
 	}
 	return pleg, runtimeMock
 }

@@ -61,7 +61,7 @@ import (
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -99,7 +99,7 @@ type TestKubelet struct {
 	fakeCadvisor     *cadvisortest.Mock
 	fakeKubeClient   *fake.Clientset
 	fakeMirrorClient *podtest.FakeMirrorClient
-	fakeClock        *util.FakeClock
+	fakeClock        *clock.FakeClock
 	mounter          mount.Interface
 	volumePlugin     *volumetest.FakeVolumePlugin
 }
@@ -198,7 +198,7 @@ func newTestKubeletWithImageList(
 		LowThresholdPercent:  80,
 	}
 	kubelet.imageManager, err = newImageManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
-	fakeClock := util.NewFakeClock(time.Now())
+	fakeClock := clock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
 	kubelet.podKillingCh = make(chan *kubecontainer.PodPair, 20)
@@ -211,7 +211,7 @@ func newTestKubeletWithImageList(
 	}
 	kubelet.workQueue = queue.NewBasicWorkQueue(fakeClock)
 	// Relist period does not affect the tests.
-	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, util.RealClock{})
+	kubelet.pleg = pleg.NewGenericPLEG(fakeRuntime, 100, time.Hour, nil, clock.RealClock{})
 	kubelet.clock = fakeClock
 	kubelet.setNodeStatusFuncs = kubelet.defaultNodeStatusFuncs()
 

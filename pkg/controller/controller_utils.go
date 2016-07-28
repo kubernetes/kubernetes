@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -167,12 +167,12 @@ func (r *ControllerExpectations) SatisfiedExpectations(controllerKey string) boo
 // TODO: Make this possible to disable in tests.
 // TODO: Support injection of clock.
 func (exp *ControlleeExpectations) isExpired() bool {
-	return util.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
+	return clock.RealClock{}.Since(exp.timestamp) > ExpectationsTimeout
 }
 
 // SetExpectations registers new expectations for the given controller. Forgets existing expectations.
 func (r *ControllerExpectations) SetExpectations(controllerKey string, add, del int) error {
-	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: util.RealClock{}.Now()}
+	exp := &ControlleeExpectations{add: int64(add), del: int64(del), key: controllerKey, timestamp: clock.RealClock{}.Now()}
 	glog.V(4).Infof("Setting expectations %#v", exp)
 	return r.Add(exp)
 }

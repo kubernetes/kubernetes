@@ -52,7 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	kubetypes "k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -998,7 +998,7 @@ func TestSyncPodWithRestartPolicy(t *testing.T) {
 }
 
 func TestSyncPodBackoff(t *testing.T) {
-	var fakeClock = util.NewFakeClock(time.Now())
+	var fakeClock = clock.NewFakeClock(time.Now())
 	startTime := fakeClock.Now()
 
 	dm, fakeDocker := newTestDockerManager()
