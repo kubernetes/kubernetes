@@ -104,3 +104,5 @@ kubernetes.tar.gz
 
 # make-related metadata
 /.make/
+# Just in time generated data in the source, should never be commited
+/test/e2e/generated/bindata.go
