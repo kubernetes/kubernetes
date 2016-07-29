@@ -2325,6 +2325,7 @@ type RuntimeServiceClient interface {
 	StopPodSandbox(ctx context.Context, in *StopPodSandboxRequest, opts ...grpc.CallOption) (*StopPodSandboxResponse, error)
 	// DeletePodSandbox deletes the sandbox. If there are any running containers in the
 	// sandbox, they should be force deleted.
+	// It should return success if the sandbox has already been deleted.
 	DeletePodSandbox(ctx context.Context, in *DeletePodSandboxRequest, opts ...grpc.CallOption) (*DeletePodSandboxResponse, error)
 	// PodSandboxStatus returns the Status of the PodSandbox.
 	PodSandboxStatus(ctx context.Context, in *PodSandboxStatusRequest, opts ...grpc.CallOption) (*PodSandboxStatusResponse, error)
@@ -2338,6 +2339,7 @@ type RuntimeServiceClient interface {
 	StopContainer(ctx context.Context, in *StopContainerRequest, opts ...grpc.CallOption) (*StopContainerResponse, error)
 	// RemoveContainer removes the container. If the container is running, the container
 	// should be force removed.
+	// It should return success if the container has already been removed.
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
 	ListContainers(ctx context.Context, in *ListContainersRequest, opts ...grpc.CallOption) (*ListContainersResponse, error)
@@ -2507,6 +2509,7 @@ type RuntimeServiceServer interface {
 	StopPodSandbox(context.Context, *StopPodSandboxRequest) (*StopPodSandboxResponse, error)
 	// DeletePodSandbox deletes the sandbox. If there are any running containers in the
 	// sandbox, they should be force deleted.
+	// It should return success if the sandbox has already been deleted.
 	DeletePodSandbox(context.Context, *DeletePodSandboxRequest) (*DeletePodSandboxResponse, error)
 	// PodSandboxStatus returns the Status of the PodSandbox.
 	PodSandboxStatus(context.Context, *PodSandboxStatusRequest) (*PodSandboxStatusResponse, error)
@@ -2520,6 +2523,7 @@ type RuntimeServiceServer interface {
 	StopContainer(context.Context, *StopContainerRequest) (*StopContainerResponse, error)
 	// RemoveContainer removes the container. If the container is running, the container
 	// should be force removed.
+	// It should return success if the container has already been removed.
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
 	ListContainers(context.Context, *ListContainersRequest) (*ListContainersResponse, error)
@@ -2776,6 +2780,7 @@ type ImageServiceClient interface {
 	// PullImage pulls a image with authentication config.
 	PullImage(ctx context.Context, in *PullImageRequest, opts ...grpc.CallOption) (*PullImageResponse, error)
 	// RemoveImage removes the image.
+	// It should return success if the image has already been removed.
 	RemoveImage(ctx context.Context, in *RemoveImageRequest, opts ...grpc.CallOption) (*RemoveImageResponse, error)
 }
 
@@ -2833,6 +2838,7 @@ type ImageServiceServer interface {
 	// PullImage pulls a image with authentication config.
 	PullImage(context.Context, *PullImageRequest) (*PullImageResponse, error)
 	// RemoveImage removes the image.
+	// It should return success if the image has already been removed.
 	RemoveImage(context.Context, *RemoveImageRequest) (*RemoveImageResponse, error)
 }
 
