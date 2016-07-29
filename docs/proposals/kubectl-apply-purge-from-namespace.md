@@ -19,7 +19,7 @@ The benefit of this is that no new abstraction (such as a new way of grouping re
 
 Therefore, the proposal is to introduce an optional `--purge-from-namespace` flag to `kubectl apply`, which will allow a user to automatically purge resources from the given namespace, if they haven't been explicitly declared in files that are arguments to the same `kubectl apply` invocation.
 
-All resources referred to must be explicitly labelled with a non-default namespace in order for the `--purge-from-namespace` argument to succeed.
+All resources referred to must be explicitly labelled with one non-default namespace in order for the `--purge-from-namespace` argument to succeed.
 
 This flag will require `--namespace` not to be set.
 All referenced resources must be explicitly defined as being in the same namespace, set in each of the resource definitions.
@@ -48,16 +48,16 @@ It should be possible to apply the same approach to any other applications, with
 The usage may look like this:
 
 ```
-kubectl apply --purge-from-namespace -f https://example.com/myapp1.json
+kubectl apply --purge-from-namespace -f https://example.com/myapp.json
 ```
 
-Given resources in `myapp1.json` set their namespaces explicitly, resource that are no longer in this file would be purged, if no longer defined.
+Given resources in `myapp.json` set their namespaces explicitly, resource that are no longer in this file would be purged, if no longer defined.
 
 ```
 kubectl apply --purge-from-namespace -f https://example.com/myapp-part1.json -f https://example.com/myapp-part2.json
 ```
 
-If `myapp1.json` and `myapp2.json` are in the same namespaces and it is explicitly defined, removing either of the URLs from the invocations arguments will result in all the resources that URL has defined to be purged.
+If `myapp-part1.json` and `myapp-part2.json` are in the same namespaces and it is explicitly defined, removing either of the URLs from the invocations arguments will result in all the resources that URL has defined to be purged.
 
 ## Flag Discovery User Experience
 
