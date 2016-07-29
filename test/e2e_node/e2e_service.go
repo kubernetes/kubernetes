@@ -252,6 +252,9 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
+		"--cgroup-root=/",
+		"--runtime-cgroups=/docker-daemon",
+		"--kubelet-cgroups=/kubelet",
 	)
 	if es.cgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
