@@ -1061,6 +1061,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("horizontalpodautoscalers"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("ingresses"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("jobs"),
+		extensionsapiv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"),
 	)
