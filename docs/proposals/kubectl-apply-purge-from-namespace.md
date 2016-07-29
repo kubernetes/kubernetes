@@ -21,8 +21,7 @@ Therefore, the proposal is to introduce an optional `--purge-from-namespace` fla
 
 All resources referred to must be explicitly labelled with one non-default namespace in order for the `--purge-from-namespace` argument to succeed.
 
-This flag will require `--namespace` not to be set.
-All referenced resources must be explicitly defined as being in the same namespace, set in each of the resource definitions.
+This flag will require `--namespace`, and will not accept namespaces set in the input resource definitions.
 
 The goal here is to avoid a negative user experience where the user accidentally deletes all the resources in some other namespace just because they accidentally refer to (e.g.) a single resource in some other namespace.
 
@@ -94,9 +93,9 @@ If no namespace, or conflicting namespaces are provided in the resource file(s),
 
 # Alternatives Considered
 
-A new Kubernetes API-level concept "Versioned ApplySets" could record all the `kubectl apply` commands that were ever executed against a cluster.
+A new Kubernetes API-level concept `VersionedApplySet` could record all the `kubectl apply` commands that were ever executed against a cluster.
 This would allow deletions to be automatically detected and applied between invocations of `kubectl apply` without the onus of having to put resources into namespaces.
 
-This adds complexity, since a new Kubernetes API object type would need to be invented.
+Also, a more general concept of `NamedList` could be considered, and may of some use in other areas, however that's quite close to the idea of namespaces, excpet that it wouldn't have any isolation properties.
 
-It's not obvious how to make this concept work correctly in the case where one user runs `kubectl apply X` and later `kubectl apply X'` and a different user runs `kubectl apply Y` where `X'` is intended as an update to `X`
+This adds complexity, since a new Kubernetes API object type would need to be invented.
