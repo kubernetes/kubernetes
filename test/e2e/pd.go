@@ -133,7 +133,7 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 		return
 	})
 
-	It("should schedule a pod w/ a readonly PD on two hosts, then remove both. [Slow]", func() {
+	It("[Flaky] should schedule a pod w/ a readonly PD on two hosts, then remove both. [Slow]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		By("creating PD")
