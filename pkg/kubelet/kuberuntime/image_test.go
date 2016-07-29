@@ -25,9 +25,10 @@ import (
 )
 
 func TestPullImage(t *testing.T) {
-	_, fakeManager := createTestFakeRuntimeManager()
+	_, fakeManager, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
 
-	err := fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
+	err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
 	assert.NoError(t, err)
 
 	images, err := fakeManager.ListImages()
@@ -37,7 +38,8 @@ func TestPullImage(t *testing.T) {
 }
 
 func TestListImages(t *testing.T) {
-	fakeRuntime, fakeManager := createTestFakeRuntimeManager()
+	fakeRuntime, fakeManager, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
 
 	images := []string{"1111", "2222", "3333"}
 	expected := sets.NewString(images...)
@@ -54,7 +56,8 @@ func TestListImages(t *testing.T) {
 }
 
 func TestIsImagePresent(t *testing.T) {
-	fakeRuntime, fakeManager := createTestFakeRuntimeManager()
+	fakeRuntime, fakeManager, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
 
 	image := "busybox"
 	fakeRuntime.SetFakeImages([]string{image})
@@ -64,9 +67,10 @@ func TestIsImagePresent(t *testing.T) {
 }
 
 func TestRemoveImage(t *testing.T) {
-	fakeRuntime, fakeManager := createTestFakeRuntimeManager()
+	fakeRuntime, fakeManager, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
 
-	err := fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
+	err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(fakeRuntime.Images))
 

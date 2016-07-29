@@ -26,6 +26,7 @@ import (
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -51,7 +52,7 @@ type ContainerWithState struct {
 	// the id of this container
 	containerID string
 	// the sandbox id of this container
-	podSandBoxID string
+	podSandboxID string
 	// the id of the image
 	imageID string
 	// the state of this container
@@ -179,7 +180,7 @@ func (r *fakeKubeRuntime) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.
 		return img, nil
 	}
 
-	return nil, fmt.Errorf("Image not found")
+	return nil, fmt.Errorf("image %q not found", image.GetImage())
 }
 
 func (r *fakeKubeRuntime) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
@@ -188,6 +189,8 @@ func (r *fakeKubeRuntime) PullImage(image *runtimeApi.ImageSpec, auth *runtimeAp
 
 	r.Called = append(r.Called, "PullImage")
 
+	// ImageID should be randomized for real container runtime, but here just use
+	// image's name for easily making fake images.
 	imageID := image.GetImage()
 	if _, ok := r.Images[imageID]; !ok {
 		r.Images[imageID] = makeFakeImage(image.GetImage())
@@ -229,57 +232,59 @@ func (r *fakeKubeRuntime) CreatePodSandbox(config *runtimeApi.PodSandboxConfig) 
 
 	r.Called = append(r.Called, "CreatePodSandbox")
 
-	sandboxID := config.GetName()
-	r.Sandboxes[sandboxID] = &PodSandboxWithState{
+	// PodSandboxID should be randomized for real container runtime, but here just use
+	// sandbox's name for easily making fake sandboxes.
+	podSandboxID := config.GetName()
+	r.Sandboxes[podSandboxID] = &PodSandboxWithState{
 		config:    config,
 		state:     runtimeApi.PodSandBoxState_READY,
 		createdAt: time.Now().Unix(),
 	}
 
-	return sandboxID, nil
+	return podSandboxID, nil
 }
 
-func (r *fakeKubeRuntime) StopPodSandbox(podSandBoxID string) error {
+func (r *fakeKubeRuntime) StopPodSandbox(podSandboxID string) error {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "StopPodSandbox")
 
-	if s, ok := r.Sandboxes[podSandBoxID]; ok {
+	if s, ok := r.Sandboxes[podSandboxID]; ok {
 		s.state = runtimeApi.PodSandBoxState_NOTREADY
 	} else {
-		return fmt.Errorf("PodSandbox not found")
+		return fmt.Errorf("pod sandbox %s not found", podSandboxID)
 	}
 
 	return nil
 }
 
-func (r *fakeKubeRuntime) DeletePodSandbox(podSandBoxID string) error {
+func (r *fakeKubeRuntime) DeletePodSandbox(podSandboxID string) error {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "DeletePodSandbox")
 
-	if _, ok := r.Sandboxes[podSandBoxID]; ok {
-		delete(r.Sandboxes, podSandBoxID)
+	if _, ok := r.Sandboxes[podSandboxID]; ok {
+		delete(r.Sandboxes, podSandboxID)
 	}
 
 	return nil
 }
 
-func (r *fakeKubeRuntime) PodSandboxStatus(podSandBoxID string) (*runtimeApi.PodSandboxStatus, error) {
+func (r *fakeKubeRuntime) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "PodSandboxStatus")
 
-	s, ok := r.Sandboxes[podSandBoxID]
+	s, ok := r.Sandboxes[podSandboxID]
 	if !ok {
-		return nil, fmt.Errorf("PodSandbox not found")
+		return nil, fmt.Errorf("pod sandbox %s not found", podSandboxID)
 	}
 
 	return &runtimeApi.PodSandboxStatus{
-		Id:        &podSandBoxID,
+		Id:        &podSandboxID,
 		Name:      s.config.Name,
 		CreatedAt: &s.createdAt,
 		State:     &s.state,
@@ -340,7 +345,7 @@ func (r *fakeKubeRuntime) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([
 	return result, nil
 }
 
-func (r *fakeKubeRuntime) CreateContainer(podSandBoxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
+func (r *fakeKubeRuntime) CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -354,14 +359,16 @@ func (r *fakeKubeRuntime) CreateContainer(podSandBoxID string, config *runtimeAp
 		}
 	}
 	if imageID == "" {
-		return "", fmt.Errorf("Image %s not found", config.Image.GetImage())
+		return "", fmt.Errorf("image %q not found", config.Image.GetImage())
 	}
 
+	// ContainerID should be randomized for real container runtime, but here just use
+	// container's name for easily making fake containers.
 	containerID := config.GetName()
 	r.Containers[containerID] = &ContainerWithState{
 		createdAt:       time.Now().Unix(),
 		containerID:     containerID,
-		podSandBoxID:    podSandBoxID,
+		podSandboxID:    podSandboxID,
 		containerConfig: config,
 		sandboxConfig:   sandboxConfig,
 		imageID:         imageID,
@@ -377,11 +384,13 @@ func (r *fakeKubeRuntime) StartContainer(rawContainerID string) error {
 
 	r.Called = append(r.Called, "StartContainer")
 
-	if c, ok := r.Containers[rawContainerID]; ok {
-		c.state = runtimeApi.ContainerState_RUNNING
-	} else {
-		return fmt.Errorf("Container not found")
+	c, ok := r.Containers[rawContainerID]
+	if !ok {
+		return fmt.Errorf("container %s not found", rawContainerID)
 	}
+
+	// Set container to running.
+	c.state = runtimeApi.ContainerState_RUNNING
 
 	return nil
 }
@@ -392,11 +401,13 @@ func (r *fakeKubeRuntime) StopContainer(rawContainerID string, timeout int64) er
 
 	r.Called = append(r.Called, "StopContainer")
 
-	if c, ok := r.Containers[rawContainerID]; ok {
-		c.state = runtimeApi.ContainerState_EXITED
-	} else {
-		return fmt.Errorf("Container not found")
+	c, ok := r.Containers[rawContainerID]
+	if !ok {
+		return fmt.Errorf("container %s not found", rawContainerID)
 	}
+
+	// Set container to exited.
+	c.state = runtimeApi.ContainerState_EXITED
 
 	return nil
 }
@@ -429,7 +440,7 @@ func (r *fakeKubeRuntime) ListContainers(filter *runtimeApi.ContainerFilter) ([]
 			if filter.Name != nil && filter.GetName() != s.containerConfig.GetName() {
 				continue
 			}
-			if filter.PodSandboxId != nil && filter.GetPodSandboxId() != s.podSandBoxID {
+			if filter.PodSandboxId != nil && filter.GetPodSandboxId() != s.podSandboxID {
 				continue
 			}
 			if filter.State != nil && filter.GetState() != s.state {
@@ -461,7 +472,7 @@ func (r *fakeKubeRuntime) ContainerStatus(rawContainerID string) (*runtimeApi.Co
 
 	c, ok := r.Containers[rawContainerID]
 	if !ok {
-		return nil, fmt.Errorf("Not found")
+		return nil, fmt.Errorf("container %s not found", rawContainerID)
 	}
 
 	return &runtimeApi.ContainerStatus{
@@ -483,8 +494,8 @@ func (r *fakeKubeRuntime) Exec(rawContainerID string, cmd []string, tty bool, st
 	return nil
 }
 
-// getContainerByKubeUID gets a list of ContainerWithState by pod UID
-func (r *fakeKubeRuntime) getContainersByKubeUID(uid string) []*ContainerWithState {
+// getContainersByPodUID gets a list of ContainerWithState by pod UID
+func (r *fakeKubeRuntime) getContainersByPodUID(uid string) []*ContainerWithState {
 	result := []*ContainerWithState{}
 
 	for _, c := range r.Containers {
@@ -513,7 +524,7 @@ func (r *fakeKubeRuntime) getPodSandboxByKubeUID(uid string) []*PodSandboxWithSt
 // getExpectedKubePodStatus get kubecontainer.PodStatus by api.Pod, should only be used after syncPod
 func (r *fakeKubeRuntime) getExpectedKubePodStatus(pod *api.Pod) (*kubecontainer.PodStatus, error) {
 	sandboxes := r.getPodSandboxByKubeUID(string(pod.UID))
-	containers := r.getContainersByKubeUID(string(pod.UID))
+	containers := r.getContainersByPodUID(string(pod.UID))
 
 	podSandboxStateuses := []*runtimeApi.PodSandboxStatus{}
 	for _, s := range sandboxes {
@@ -551,4 +562,20 @@ func (r *fakeKubeRuntime) getExpectedKubePodStatus(pod *api.Pod) (*kubecontainer
 		SandboxStatus:     podSandboxStateuses,
 		ContainerStatuses: containerStateuses,
 	}, nil
+}
+
+func (r *fakeKubeRuntime) getExpectedKubePod(pod *api.Pod) *kubecontainer.Pod {
+	containers := r.getContainersByPodUID(string(pod.UID))
+
+	expectedContainers := make([]*kubecontainer.Container, len(containers))
+	for i := range expectedContainers {
+		expectedContainers[i] = containers[i].toKubeContainer()
+	}
+
+	return &kubecontainer.Pod{
+		ID:         kubetypes.UID("12345678"),
+		Name:       "foo",
+		Namespace:  "new",
+		Containers: []*kubecontainer.Container{expectedContainers[0], expectedContainers[1]},
+	}
 }

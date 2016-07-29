@@ -24,10 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
-	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/images"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/types"
@@ -44,8 +41,7 @@ func (f *fakeHTTP) Get(url string) (*http.Response, error) {
 	return nil, f.err
 }
 
-// fakeRuntimeHelper implements kubecontainer.RuntimeHelper inter
-// faces for testing purposes.
+// fakeRuntimeHelper implements kubecontainer.RuntimeHelper interfaces for testing purposes.
 type fakeRuntimeHelper struct{}
 
 func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
@@ -77,7 +73,7 @@ func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int
 	return nil
 }
 
-func NewFakeKubeRuntimeManager(runtime *fakeKubeRuntime, host network.Host, osInterface kubecontainer.OSInterface) *kubeGenericRuntimeManager {
+func NewFakeKubeRuntimeManager(runtime *fakeKubeRuntime, host network.Host, osInterface kubecontainer.OSInterface) (*kubeGenericRuntimeManager, error) {
 	networkPlugin, _ := network.InitNetworkPlugin(
 		[]network.NetworkPlugin{},
 		"",
@@ -86,27 +82,18 @@ func NewFakeKubeRuntimeManager(runtime *fakeKubeRuntime, host network.Host, osIn
 		"10.0.0.0/8",
 	)
 
-	imageBackOff := flowcontrol.NewBackOff(time.Second, 300*time.Second)
-	recorder := &record.FakeRecorder{}
-	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		runtimeName:         fakeRuntimeName,
-		recorder:            recorder,
-		cpuCFSQuota:         false,
-		livenessManager:     proberesults.NewManager(),
-		containerRefManager: kubecontainer.NewRefManager(),
-		osInterface:         osInterface,
-		networkPlugin:       networkPlugin,
-		runtimeHelper:       &fakeRuntimeHelper{},
-		runtimeService:      runtime,
-		imageService:        runtime,
-		keyring:             credentialprovider.NewDockerKeyring(),
-	}
-	kubeRuntimeManager.imagePuller = images.NewImageManager(
-		kubecontainer.FilterEventRecorder(recorder),
-		kubeRuntimeManager,
-		imageBackOff,
-		false)
-	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(&fakeHTTP{}, kubeRuntimeManager, kubeRuntimeManager)
-
-	return kubeRuntimeManager
+	return NewKubeGenericRuntimeManager(
+		&record.FakeRecorder{},
+		proberesults.NewManager(),
+		kubecontainer.NewRefManager(),
+		osInterface,
+		networkPlugin,
+		&fakeRuntimeHelper{},
+		&fakeHTTP{},
+		flowcontrol.NewBackOff(time.Second, 300*time.Second),
+		false,
+		false,
+		runtime,
+		runtime,
+	)
 }

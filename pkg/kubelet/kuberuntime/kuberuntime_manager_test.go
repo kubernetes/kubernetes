@@ -28,40 +28,39 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
-	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
 
-func createTestFakeRuntimeManager() (*fakeKubeRuntime, *kubeGenericRuntimeManager) {
-	fakeRuntime, manager, _ := createTestFakeRuntimeManagerWithBackOff()
-	return fakeRuntime, manager
+func createTestFakeRuntimeManager() (*fakeKubeRuntime, *kubeGenericRuntimeManager, error) {
+	fakeRuntime, manager, _, err := createTestFakeRuntimeManagerWithBackOff()
+	return fakeRuntime, manager, err
 }
 
-func createTestFakeRuntimeManagerWithBackOff() (*fakeKubeRuntime, *kubeGenericRuntimeManager, *flowcontrol.Backoff) {
+func createTestFakeRuntimeManagerWithBackOff() (*fakeKubeRuntime, *kubeGenericRuntimeManager, *flowcontrol.Backoff, error) {
 	fakeRuntime := NewFakeKubeRuntime()
 	backOff := flowcontrol.NewBackOff(time.Second, time.Minute)
-	manager := NewFakeKubeRuntimeManager(fakeRuntime, nettest.NewFakeHost(nil), &containertest.FakeOS{})
-	return fakeRuntime, manager, backOff
+	manager, err := NewFakeKubeRuntimeManager(fakeRuntime, nettest.NewFakeHost(nil), &containertest.FakeOS{})
+	return fakeRuntime, manager, backOff, err
 }
 
-func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *fakeKubeRuntime, pod *api.Pod) (*PodSandboxWithState, []*ContainerWithState, error) {
+func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *fakeKubeRuntime, pod *api.Pod) error {
 	fakePodSandbox, err := makeFakePodSandboxWithState(m, pod)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	fakeContainers, err := makeFakeContainersWithState(m, pod, pod.Spec.Containers)
 	if err != nil {
-		return nil, nil, err
+		return err
 	}
 
 	fakeRuntime.SetFakeSandboxes([]*PodSandboxWithState{fakePodSandbox})
 	fakeRuntime.SetFakeContainers(fakeContainers)
-	return fakePodSandbox, fakeContainers, nil
+	return nil
 }
 
 func makeFakePodSandboxWithState(m *kubeGenericRuntimeManager, pod *api.Pod) (*PodSandboxWithState, error) {
-	config, err := m.generatePodSandboxConfig(pod)
+	config, err := m.generatePodSandboxConfig(pod, "")
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +73,12 @@ func makeFakePodSandboxWithState(m *kubeGenericRuntimeManager, pod *api.Pod) (*P
 }
 
 func makeFakeContainerWithState(m *kubeGenericRuntimeManager, pod *api.Pod, container api.Container) (*ContainerWithState, error) {
-	sandboxConfig, err := m.generatePodSandboxConfig(pod)
+	sandboxConfig, err := m.generatePodSandboxConfig(pod, "")
 	if err != nil {
 		return nil, err
 	}
 
-	containerConfig, err := m.generateContainerConfig(&container, pod, 0)
+	containerConfig, err := m.generateContainerConfig(&container, pod, 0, "")
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +86,7 @@ func makeFakeContainerWithState(m *kubeGenericRuntimeManager, pod *api.Pod, cont
 	return &ContainerWithState{
 		createdAt:       10000,
 		containerID:     containerConfig.GetName(),
-		podSandBoxID:    sandboxConfig.GetName(),
+		podSandboxID:    sandboxConfig.GetName(),
 		containerConfig: containerConfig,
 		sandboxConfig:   sandboxConfig,
 		imageID:         containerConfig.Image.GetImage(),
@@ -111,21 +110,27 @@ func makeFakeContainersWithState(m *kubeGenericRuntimeManager, pod *api.Pod, con
 }
 
 func TestNewKubeRuntimeManager(t *testing.T) {
-	_, m := createTestFakeRuntimeManager()
+	_, m, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
+
 	version, err := m.Version()
 	assert.NoError(t, err)
 	assert.Equal(t, kubeRuntimeAPIVersion, version.String())
 }
 
 func TestContainerRuntimeType(t *testing.T) {
-	_, m := createTestFakeRuntimeManager()
+	_, m, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
+
 	runtimeType := m.Type()
 	assert.Equal(t, fakeRuntimeName, runtimeType)
 }
 
 func TestContainerRuntimeStatus(t *testing.T) {
-	_, m := createTestFakeRuntimeManager()
-	err := m.Status()
+	_, m, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
+
+	err = m.Status()
 	assert.NoError(t, err)
 }
 
@@ -163,7 +168,8 @@ func verifyPodStatus(a, b *kubecontainer.PodStatus) bool {
 }
 
 func TestSyncPod(t *testing.T) {
-	fakeRuntime, m, backOff := createTestFakeRuntimeManagerWithBackOff()
+	fakeRuntime, m, backOff, err := createTestFakeRuntimeManagerWithBackOff()
+	assert.NoError(t, err)
 
 	containers := []api.Container{
 		{
@@ -202,7 +208,8 @@ func TestSyncPod(t *testing.T) {
 }
 
 func TestGetPods(t *testing.T) {
-	fakeRuntime, m := createTestFakeRuntimeManager()
+	fakeRuntime, m, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
 
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -225,32 +232,22 @@ func TestGetPods(t *testing.T) {
 			},
 		},
 	}
-	_, fakeContainers, err := makeAndSetFakePod(m, fakeRuntime, pod)
-	assert.NoError(t, err)
 
-	// make expected pod
-	expectedContainers := make([]*kubecontainer.Container, len(fakeContainers))
-	for i := range expectedContainers {
-		expectedContainers[i] = fakeContainers[i].toKubeContainer()
-	}
-	expected := []*kubecontainer.Pod{
-		{
-			ID:         types.UID("12345678"),
-			Name:       "foo",
-			Namespace:  "new",
-			Containers: []*kubecontainer.Container{expectedContainers[0], expectedContainers[1]},
-		},
-	}
+	err = makeAndSetFakePod(m, fakeRuntime, pod)
+	assert.NoError(t, err)
 
 	actual, err := m.GetPods(false)
 	assert.NoError(t, err)
+
+	expected := []*kubecontainer.Pod{fakeRuntime.getExpectedKubePod(pod)}
 	if !verifyPods(expected, actual) {
 		t.Errorf("expected %#q, got %#q", expected, actual)
 	}
 }
 
 func TestGetPodStatus(t *testing.T) {
-	fakeRuntime, m, backOff := createTestFakeRuntimeManagerWithBackOff()
+	fakeRuntime, m, backOff, err := createTestFakeRuntimeManagerWithBackOff()
+	assert.NoError(t, err)
 
 	containers := []api.Container{
 		{
@@ -288,7 +285,8 @@ func TestGetPodStatus(t *testing.T) {
 }
 
 func TestKillPod(t *testing.T) {
-	fakeRuntime, m := createTestFakeRuntimeManager()
+	fakeRuntime, m, err := createTestFakeRuntimeManager()
+	assert.NoError(t, err)
 
 	containers := []api.Container{
 		{
@@ -312,22 +310,12 @@ func TestKillPod(t *testing.T) {
 			Containers: containers,
 		},
 	}
-	_, fakeContainers, err := makeAndSetFakePod(m, fakeRuntime, pod)
+
+	err = makeAndSetFakePod(m, fakeRuntime, pod)
 	assert.NoError(t, err)
 
-	// make running pod
-	expectedContainers := make([]*kubecontainer.Container, len(fakeContainers))
-	for i := range expectedContainers {
-		expectedContainers[i] = fakeContainers[i].toKubeContainer()
-	}
-	runningPod := kubecontainer.Pod{
-		ID:         types.UID("12345678"),
-		Name:       "foo",
-		Namespace:  "new",
-		Containers: []*kubecontainer.Container{expectedContainers[0], expectedContainers[1]},
-	}
-
-	err = m.KillPod(pod, runningPod, nil)
+	runningPod := fakeRuntime.getExpectedKubePod(pod)
+	err = m.KillPod(pod, *runningPod, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(fakeRuntime.Containers))
 	assert.Equal(t, 1, len(fakeRuntime.Sandboxes))
