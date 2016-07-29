@@ -2054,7 +2054,7 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
 	// add the disk space predicate to predicates.GeneralPredicates.
 	if kl.isOutOfDisk() {
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to isOutOfDisk")
+		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to OutOfDisk")
 		return false, "OutOfDisk", "cannot be started due to lack of disk space."
 	}
 
