@@ -75,6 +75,41 @@ func TestParseThresholdConfig(t *testing.T) {
 				},
 			},
 		},
+		"disk flag values": {
+			evictionHard:            "imagefs.available<150Mi,nodefs.available<100Mi",
+			evictionSoft:            "imagefs.available<300Mi,nodefs.available<200Mi",
+			evictionSoftGracePeriod: "imagefs.available=30s,nodefs.available=30s",
+			evictionMinReclaim:      "imagefs.available=2Gi,nodefs.available=1Gi",
+			expectErr:               false,
+			expectThresholds: []Threshold{
+				{
+					Signal:     SignalImageFsAvailable,
+					Operator:   OpLessThan,
+					Value:      quantityMustParse("150Mi"),
+					MinReclaim: quantityMustParse("2Gi"),
+				},
+				{
+					Signal:     SignalNodeFsAvailable,
+					Operator:   OpLessThan,
+					Value:      quantityMustParse("100Mi"),
+					MinReclaim: quantityMustParse("1Gi"),
+				},
+				{
+					Signal:      SignalImageFsAvailable,
+					Operator:    OpLessThan,
+					Value:       quantityMustParse("300Mi"),
+					GracePeriod: gracePeriod,
+					MinReclaim:  quantityMustParse("2Gi"),
+				},
+				{
+					Signal:      SignalNodeFsAvailable,
+					Operator:    OpLessThan,
+					Value:       quantityMustParse("200Mi"),
+					GracePeriod: gracePeriod,
+					MinReclaim:  quantityMustParse("1Gi"),
+				},
+			},
+		},
 		"invalid-signal": {
 			evictionHard:            "mem.available<150Mi",
 			evictionSoft:            "",
@@ -127,6 +162,7 @@ func TestParseThresholdConfig(t *testing.T) {
 			evictionHard:            "",
 			evictionSoft:            "memory.available<150Mi",
 			evictionSoftGracePeriod: "memory.available=-30s",
+			evictionMinReclaim:      "",
 			expectErr:               true,
 			expectThresholds:        []Threshold{},
 		},
@@ -199,13 +235,13 @@ func thresholdEqual(a Threshold, b Threshold) bool {
 func TestOrderedByQoS(t *testing.T) {
 	bestEffort := newPod("best-effort", []api.Container{
 		newContainer("best-effort", newResourceList("", ""), newResourceList("", "")),
-	})
+	}, nil)
 	burstable := newPod("burstable", []api.Container{
 		newContainer("burstable", newResourceList("100m", "100Mi"), newResourceList("200m", "200Mi")),
-	})
+	}, nil)
 	guaranteed := newPod("guaranteed", []api.Container{
 		newContainer("guaranteed", newResourceList("200m", "200Mi"), newResourceList("200m", "200Mi")),
-	})
+	}, nil)
 
 	pods := []*api.Pod{guaranteed, burstable, bestEffort}
 	orderedBy(qosComparator).Sort(pods)
@@ -218,26 +254,158 @@ func TestOrderedByQoS(t *testing.T) {
 	}
 }
 
+// TestOrderedByDisk ensures we order pods by greediest disk consumer
+func TestOrderedByDisk(t *testing.T) {
+	pod1 := newPod("best-effort-high", []api.Container{
+		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod2 := newPod("best-effort-low", []api.Container{
+		newContainer("best-effort-low", newResourceList("", ""), newResourceList("", "")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod3 := newPod("burstable-high", []api.Container{
+		newContainer("burstable-high", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod4 := newPod("burstable-low", []api.Container{
+		newContainer("burstable-low", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod5 := newPod("guaranteed-high", []api.Container{
+		newContainer("guaranteed-high", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod6 := newPod("guaranteed-low", []api.Container{
+		newContainer("guaranteed-low", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	stats := map[*api.Pod]statsapi.PodStats{
+		pod1: newPodDiskStats(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
+		pod2: newPodDiskStats(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
+		pod3: newPodDiskStats(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
+		pod4: newPodDiskStats(pod4, resource.MustParse("300Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 450Mi
+		pod5: newPodDiskStats(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
+		pod6: newPodDiskStats(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
+	}
+	statsFn := func(pod *api.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
+	expected := []*api.Pod{pod6, pod5, pod4, pod3, pod2, pod1}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
+// TestOrderedByQoSDisk ensures we order pods by qos and then greediest disk consumer
+func TestOrderedByQoSDisk(t *testing.T) {
+	pod1 := newPod("best-effort-high", []api.Container{
+		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod2 := newPod("best-effort-low", []api.Container{
+		newContainer("best-effort-low", newResourceList("", ""), newResourceList("", "")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod3 := newPod("burstable-high", []api.Container{
+		newContainer("burstable-high", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod4 := newPod("burstable-low", []api.Container{
+		newContainer("burstable-low", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod5 := newPod("guaranteed-high", []api.Container{
+		newContainer("guaranteed-high", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	pod6 := newPod("guaranteed-low", []api.Container{
+		newContainer("guaranteed-low", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
+	}, []api.Volume{
+		newVolume("local-volume", api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		}),
+	})
+	stats := map[*api.Pod]statsapi.PodStats{
+		pod1: newPodDiskStats(pod1, resource.MustParse("50Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")),  // 200Mi
+		pod2: newPodDiskStats(pod2, resource.MustParse("100Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 300Mi
+		pod3: newPodDiskStats(pod3, resource.MustParse("200Mi"), resource.MustParse("150Mi"), resource.MustParse("50Mi")), // 400Mi
+		pod4: newPodDiskStats(pod4, resource.MustParse("300Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 450Mi
+		pod5: newPodDiskStats(pod5, resource.MustParse("400Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 550Mi
+		pod6: newPodDiskStats(pod6, resource.MustParse("500Mi"), resource.MustParse("100Mi"), resource.MustParse("50Mi")), // 650Mi
+	}
+	statsFn := func(pod *api.Pod) (statsapi.PodStats, bool) {
+		result, found := stats[pod]
+		return result, found
+	}
+	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
+	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
+	expected := []*api.Pod{pod2, pod1, pod4, pod3, pod6, pod5}
+	for i := range expected {
+		if pods[i] != expected[i] {
+			t.Errorf("Expected pod[%d]: %s, but got: %s", i, expected[i].Name, pods[i].Name)
+		}
+	}
+}
+
 // TestOrderedByMemory ensures we order pods by greediest memory consumer relative to request.
 func TestOrderedByMemory(t *testing.T) {
 	pod1 := newPod("best-effort-high", []api.Container{
 		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
-	})
+	}, nil)
 	pod2 := newPod("best-effort-low", []api.Container{
 		newContainer("best-effort-low", newResourceList("", ""), newResourceList("", "")),
-	})
+	}, nil)
 	pod3 := newPod("burstable-high", []api.Container{
 		newContainer("burstable-high", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
-	})
+	}, nil)
 	pod4 := newPod("burstable-low", []api.Container{
 		newContainer("burstable-low", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
-	})
+	}, nil)
 	pod5 := newPod("guaranteed-high", []api.Container{
 		newContainer("guaranteed-high", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
-	})
+	}, nil)
 	pod6 := newPod("guaranteed-low", []api.Container{
 		newContainer("guaranteed-low", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
-	})
+	}, nil)
 	stats := map[*api.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
 		pod2: newPodMemoryStats(pod2, resource.MustParse("300Mi")), // 300 relative to request
@@ -264,22 +432,22 @@ func TestOrderedByMemory(t *testing.T) {
 func TestOrderedByQoSMemory(t *testing.T) {
 	pod1 := newPod("best-effort-high", []api.Container{
 		newContainer("best-effort-high", newResourceList("", ""), newResourceList("", "")),
-	})
+	}, nil)
 	pod2 := newPod("best-effort-low", []api.Container{
 		newContainer("best-effort-low", newResourceList("", ""), newResourceList("", "")),
-	})
+	}, nil)
 	pod3 := newPod("burstable-high", []api.Container{
 		newContainer("burstable-high", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
-	})
+	}, nil)
 	pod4 := newPod("burstable-low", []api.Container{
 		newContainer("burstable-low", newResourceList("100m", "100Mi"), newResourceList("200m", "1Gi")),
-	})
+	}, nil)
 	pod5 := newPod("guaranteed-high", []api.Container{
 		newContainer("guaranteed-high", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
-	})
+	}, nil)
 	pod6 := newPod("guaranteed-low", []api.Container{
 		newContainer("guaranteed-low", newResourceList("100m", "1Gi"), newResourceList("100m", "1Gi")),
-	})
+	}, nil)
 	stats := map[*api.Pod]statsapi.PodStats{
 		pod1: newPodMemoryStats(pod1, resource.MustParse("500Mi")), // 500 relative to request
 		pod2: newPodMemoryStats(pod2, resource.MustParse("50Mi")),  // 50 relative to request
@@ -346,10 +514,20 @@ func TestMakeSignalObservations(t *testing.T) {
 		return pod
 	}
 	nodeAvailableBytes := uint64(1024 * 1024 * 1024)
+	imageFsAvailableBytes := uint64(1024 * 1024)
+	nodeFsAvailableBytes := uint64(1024)
 	fakeStats := &statsapi.Summary{
 		Node: statsapi.NodeStats{
 			Memory: &statsapi.MemoryStats{
 				AvailableBytes: &nodeAvailableBytes,
+			},
+			Runtime: &statsapi.RuntimeStats{
+				ImageFs: &statsapi.FsStats{
+					AvailableBytes: &imageFsAvailableBytes,
+				},
+			},
+			Fs: &statsapi.FsStats{
+				AvailableBytes: &nodeFsAvailableBytes,
 			},
 		},
 		Pods: []statsapi.PodStats{},
@@ -370,12 +548,26 @@ func TestMakeSignalObservations(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected err: %v", err)
 	}
-	quantity, found := actualObservations[SignalMemoryAvailable]
+	memQuantity, found := actualObservations[SignalMemoryAvailable]
 	if !found {
 		t.Errorf("Expected available memory observation: %v", err)
 	}
-	if expectedBytes := int64(nodeAvailableBytes); quantity.Value() != expectedBytes {
-		t.Errorf("Expected %v, actual: %v", expectedBytes, quantity.Value())
+	if expectedBytes := int64(nodeAvailableBytes); memQuantity.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, memQuantity.Value())
+	}
+	nodeFsQuantity, found := actualObservations[SignalNodeFsAvailable]
+	if !found {
+		t.Errorf("Expected available nodefs observation: %v", err)
+	}
+	if expectedBytes := int64(nodeFsAvailableBytes); nodeFsQuantity.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, nodeFsQuantity.Value())
+	}
+	imageFsQuantity, found := actualObservations[SignalImageFsAvailable]
+	if !found {
+		t.Errorf("Expected available imagefs observation: %v", err)
+	}
+	if expectedBytes := int64(imageFsAvailableBytes); imageFsQuantity.Value() != expectedBytes {
+		t.Errorf("Expected %v, actual: %v", expectedBytes, imageFsQuantity.Value())
 	}
 	for _, pod := range pods {
 		podStats, found := statsFunc(pod)
@@ -670,6 +862,18 @@ func TestReclaimResources(t *testing.T) {
 			},
 			result: []api.ResourceName{api.ResourceMemory},
 		},
+		"imagefs.available": {
+			inputs: []Threshold{
+				{Signal: SignalImageFsAvailable},
+			},
+			result: []api.ResourceName{resourceImageFs},
+		},
+		"nodefs.available": {
+			inputs: []Threshold{
+				{Signal: SignalNodeFsAvailable},
+			},
+			result: []api.ResourceName{resourceNodeFs},
+		},
 	}
 	for testName, testCase := range testCases {
 		actual := reclaimResources(testCase.inputs)
@@ -679,6 +883,40 @@ func TestReclaimResources(t *testing.T) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, expectedSet, actualSet)
 		}
 	}
+}
+
+// newPodDiskStats returns stats with specified usage amounts.
+func newPodDiskStats(pod *api.Pod, rootFsUsed, logsUsed, perLocalVolumeUsed resource.Quantity) statsapi.PodStats {
+	result := statsapi.PodStats{
+		PodRef: statsapi.PodReference{
+			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+		},
+	}
+
+	rootFsUsedBytes := uint64(rootFsUsed.Value())
+	logsUsedBytes := uint64(logsUsed.Value())
+	for range pod.Spec.Containers {
+		result.Containers = append(result.Containers, statsapi.ContainerStats{
+			Rootfs: &statsapi.FsStats{
+				UsedBytes: &rootFsUsedBytes,
+			},
+			Logs: &statsapi.FsStats{
+				UsedBytes: &logsUsedBytes,
+			},
+		})
+	}
+
+	perLocalVolumeUsedBytes := uint64(perLocalVolumeUsed.Value())
+	for _, volumeName := range localVolumeNames(pod) {
+		result.VolumeStats = append(result.VolumeStats, statsapi.VolumeStats{
+			Name: volumeName,
+			FsStats: statsapi.FsStats{
+				UsedBytes: &perLocalVolumeUsedBytes,
+			},
+		})
+	}
+
+	return result
 }
 
 func newPodMemoryStats(pod *api.Pod, workingSet resource.Quantity) statsapi.PodStats {
@@ -723,13 +961,21 @@ func newContainer(name string, requests api.ResourceList, limits api.ResourceLis
 	}
 }
 
-func newPod(name string, containers []api.Container) *api.Pod {
+func newVolume(name string, volumeSource api.VolumeSource) api.Volume {
+	return api.Volume{
+		Name:         name,
+		VolumeSource: volumeSource,
+	}
+}
+
+func newPod(name string, containers []api.Container, volumes []api.Volume) *api.Pod {
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
 		Spec: api.PodSpec{
 			Containers: containers,
+			Volumes:    volumes,
 		},
 	}
 }
