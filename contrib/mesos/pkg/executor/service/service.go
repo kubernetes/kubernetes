@@ -181,7 +181,6 @@ func (s *KubeletExecutorServer) runKubelet(
 		return decorated, nil
 	}
 	s.RuntimeCgroups = "" // don't move the docker daemon into a cgroup
-	kcfg.Hostname = s.HostnameOverride
 	kcfg.KubeClient = apiclient
 
 	// taken from KubeletServer#Run(*KubeletConfig)
@@ -198,7 +197,6 @@ func (s *KubeletExecutorServer) runKubelet(
 		return err
 	}
 
-	kcfg.NodeName = s.HostnameOverride
 	kcfg.PodConfig = kconfig.NewPodConfig(kconfig.PodConfigNotificationIncremental, kcfg.Recorder) // override the default pod source
 
 	s.SystemCgroups = "" // don't take control over other system processes.

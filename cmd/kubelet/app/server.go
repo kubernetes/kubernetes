@@ -493,31 +493,28 @@ func SimpleKubelet(client *clientset.Clientset,
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
 func RunKubelet(kcfg *kubelet.KubeletConfig, kcfg_new *componentconfig.KubeletConfiguration) error {
-	kcfg.Hostname = nodeutil.GetHostname(kcfg_new.HostnameOverride)
-
-	if len(kcfg.NodeName) == 0 {
-		// Query the cloud provider for our node name, default to Hostname
-		nodeName := kcfg.Hostname
-		if kcfg.Cloud != nil {
-			var err error
-			instances, ok := kcfg.Cloud.Instances()
-			if !ok {
-				return fmt.Errorf("failed to get instances from cloud provider")
-			}
-
-			nodeName, err = instances.CurrentNodeName(kcfg.Hostname)
-			if err != nil {
-				return fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-			}
-
-			glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+	hostname := nodeutil.GetHostname(kcfg_new.HostnameOverride)
+	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
+	// TODO(mtaufen): Was there actually any reason to check len(kcfg.NodeName) == 0?
+	//            --> Was anyone passing a kcfg.NodeName simultaneously with a non-nil kcfg.Cloud?
+	nodeName := hostname
+	if kcfg.Cloud != nil {
+		var err error
+		instances, ok := kcfg.Cloud.Instances()
+		if !ok {
+			return fmt.Errorf("failed to get instances from cloud provider")
 		}
 
-		kcfg.NodeName = nodeName
+		nodeName, err = instances.CurrentNodeName(hostname)
+		if err != nil {
+			return fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+		}
+
+		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
-	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: kcfg.NodeName})
+	kcfg.Recorder = eventBroadcaster.NewRecorder(api.EventSource{Component: "kubelet", Host: nodeName})
 	eventBroadcaster.StartLogging(glog.V(3).Infof)
 	if kcfg.EventClient != nil {
 		glog.V(4).Infof("Sending events to api server.")

@@ -86,6 +86,7 @@ import (
 	kubeio "k8s.io/kubernetes/pkg/util/io"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/mount"
+	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -197,8 +198,6 @@ type KubeletConfig struct {
 	Builder KubeletBuilder // requires some refactoring to remove
 
 	// Fields to still think about
-	Hostname                string
-	NodeName                string
 	ContainerRuntimeOptions []kubecontainer.Option
 	Options                 []Option
 
@@ -220,7 +219,7 @@ type KubeletConfig struct {
 	VolumePlugins     []volume.VolumePlugin
 }
 
-func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (*config.PodConfig, error) {
+func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration, nodeName string) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
 	if kc_new.ManifestURLHeader != "" {
 		pieces := strings.Split(kc_new.ManifestURLHeader, ":")
@@ -236,17 +235,17 @@ func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletC
 	// define file config source
 	if kc_new.PodManifestPath != "" {
 		glog.Infof("Adding manifest file: %v", kc_new.PodManifestPath)
-		config.NewSourceFile(kc_new.PodManifestPath, kc_old.NodeName, kc_new.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
+		config.NewSourceFile(kc_new.PodManifestPath, nodeName, kc_new.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
 	}
 
 	// define url config source
 	if kc_new.ManifestURL != "" {
 		glog.Infof("Adding manifest url %q with HTTP header %v", kc_new.ManifestURL, manifestURLHeader)
-		config.NewSourceURL(kc_new.ManifestURL, manifestURLHeader, kc_old.NodeName, kc_new.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
+		config.NewSourceURL(kc_new.ManifestURL, manifestURLHeader, nodeName, kc_new.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
 	}
 	if kc_old.KubeClient != nil {
 		glog.Infof("Watching apiserver")
-		config.NewSourceApiserver(kc_old.KubeClient, kc_old.NodeName, cfg.Channel(kubetypes.ApiserverSource))
+		config.NewSourceApiserver(kc_old.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource))
 	}
 	return cfg, nil
 }
@@ -254,6 +253,24 @@ func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletC
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
 func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (*Kubelet, error) {
+
+	hostname := nodeutil.GetHostname(kc_new.HostnameOverride)
+	// Query the cloud provider for our node name, default to hostname
+	nodeName := hostname
+	if kc_old.Cloud != nil {
+		var err error
+		instances, ok := kc_old.Cloud.Instances()
+		if !ok {
+			return nil, fmt.Errorf("failed to get instances from cloud provider")
+		}
+
+		nodeName, err = instances.CurrentNodeName(hostname)
+		if err != nil {
+			return nil, fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+		}
+
+		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+	}
 
 	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
 	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
@@ -269,7 +286,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		//                to apply as a default during the conversion between external
 		//                and internal KubeletConfiguration type.
 		var err error
-		kc_old.PodConfig, err = makePodSourceConfig(kc_old, kc_new)
+		kc_old.PodConfig, err = makePodSourceConfig(kc_old, kc_new, nodeName)
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +366,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	if kubeClient != nil {
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
-		fieldSelector := fields.Set{api.ObjectNameField: kc_old.NodeName}.AsSelector()
+		fieldSelector := fields.Set{api.ObjectNameField: nodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = fieldSelector
@@ -370,8 +387,8 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	// TODO: what is namespace for node?
 	nodeRef := &api.ObjectReference{
 		Kind:      "Node",
-		Name:      kc_old.NodeName,
-		UID:       types.UID(kc_old.NodeName),
+		Name:      nodeName,
+		UID:       types.UID(nodeName),
 		Namespace: "",
 	}
 
@@ -397,8 +414,8 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	}
 
 	klet := &Kubelet{
-		hostname:                       kc_old.Hostname,
-		nodeName:                       kc_old.NodeName,
+		hostname:                       hostname,
+		nodeName:                       nodeName,
 		dockerClient:                   kc_old.DockerClient,
 		kubeClient:                     kubeClient,
 		rootDirectory:                  kc_new.RootDirectory,
@@ -600,7 +617,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
 		kc_new.EnableControllerAttachDetach,
-		kc_old.NodeName,
+		nodeName,
 		klet.podManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,
