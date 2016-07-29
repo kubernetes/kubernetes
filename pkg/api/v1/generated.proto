@@ -2700,6 +2700,13 @@ message SecurityContextConstraints {
 
   // The groups that have permission to use this security context constraints
   repeated string groups = 19;
+
+  // SeccompProfiles lists the allowed profiles that may be set for the pod or
+  // container's seccomp annotations.  An unset (nil) or empty value means that no profiles may
+  // be specifid by the pod or container.	The wildcard '*' may be used to allow all profiles.  When
+  // used to generate a value for a pod the first non-wildcard profile will be used as
+  // the default.
+  repeated string seccompProfiles = 20;
 }
 
 // SecurityContextConstraintsList is a list of SecurityContextConstraints objects

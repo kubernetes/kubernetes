@@ -3405,6 +3405,13 @@ type SecurityContextConstraints struct {
 	Users []string `json:"users,omitempty" description:"users allowed to use this SecurityContextConstraints" protobuf:"bytes,18,rep,name=users"`
 	// The groups that have permission to use this security context constraints
 	Groups []string `json:"groups,omitempty" description:"groups allowed to use this SecurityContextConstraints" protobuf:"bytes,19,rep,name=groups"`
+
+	// SeccompProfiles lists the allowed profiles that may be set for the pod or
+	// container's seccomp annotations.  An unset (nil) or empty value means that no profiles may
+	// be specifid by the pod or container.	The wildcard '*' may be used to allow all profiles.  When
+	// used to generate a value for a pod the first non-wildcard profile will be used as
+	// the default.
+	SeccompProfiles []string `json:"seccompProfiles,omitempty" description:"seccomp profiles allowed to be used by pods and containers" protobuf:"bytes,20,opt,name=seccompProfiles"`
 }
 
 // FS Type gives strong typing to different file systems that are used by volumes.

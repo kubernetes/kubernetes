@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/capabilities"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/group"
+	"k8s.io/kubernetes/pkg/securitycontextconstraints/seccomp"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/selinux"
 	"k8s.io/kubernetes/pkg/securitycontextconstraints/user"
 	sccutil "k8s.io/kubernetes/pkg/securitycontextconstraints/util"
@@ -43,6 +44,7 @@ type simpleProvider struct {
 	fsGroupStrategy           group.GroupSecurityContextConstraintsStrategy
 	supplementalGroupStrategy group.GroupSecurityContextConstraintsStrategy
 	capabilitiesStrategy      capabilities.CapabilitiesSecurityContextConstraintsStrategy
+	seccompStrategy           seccomp.SeccompStrategy
 }
 
 // ensure we implement the interface correctly.
@@ -79,6 +81,11 @@ func NewSimpleProvider(scc *api.SecurityContextConstraints) (SecurityContextCons
 		return nil, err
 	}
 
+	seccompStrat, err := createSeccompStrategy(scc.SeccompProfiles)
+	if err != nil {
+		return nil, err
+	}
+
 	return &simpleProvider{
 		scc:                       scc,
 		runAsUserStrategy:         userStrat,
@@ -86,6 +93,7 @@ func NewSimpleProvider(scc *api.SecurityContextConstraints) (SecurityContextCons
 		fsGroupStrategy:           fsGroupStrat,
 		supplementalGroupStrategy: supGroupStrat,
 		capabilitiesStrategy:      capStrat,
+		seccompStrategy:           seccompStrat,
 	}, nil
 }
 
@@ -95,7 +103,7 @@ func NewSimpleProvider(scc *api.SecurityContextConstraints) (SecurityContextCons
 //
 // NOTE: this method works on a copy of the PodSecurityContext.  It is up to the caller to
 // apply the PSC if validation passes.
-func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, error) {
+func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error) {
 	var sc *api.PodSecurityContext = nil
 	if pod.Spec.SecurityContext != nil {
 		// work with a copy
@@ -105,10 +113,18 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 		sc = &api.PodSecurityContext{}
 	}
 
+	var annotationsCopy map[string]string = nil
+	if pod.Annotations != nil {
+		annotationsCopy = make(map[string]string, len(pod.Annotations))
+		for k, v := range pod.Annotations {
+			annotationsCopy[k] = v
+		}
+	}
+
 	if len(sc.SupplementalGroups) == 0 {
 		supGroups, err := s.supplementalGroupStrategy.Generate(pod)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.SupplementalGroups = supGroups
 	}
@@ -116,7 +132,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.FSGroup == nil {
 		fsGroup, err := s.fsGroupStrategy.GenerateSingle(pod)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.FSGroup = fsGroup
 	}
@@ -124,12 +140,30 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.SELinuxOptions == nil {
 		seLinux, err := s.seLinuxStrategy.Generate(pod, nil)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.SELinuxOptions = seLinux
 	}
 
-	return sc, nil
+	// we only generate a seccomp annotation for the entire pod.  Validation
+	// will catch any container annotations that are invalid and containers
+	// will inherit the pod annotation.
+	_, hasPodProfile := pod.Annotations[api.SeccompPodAnnotationKey]
+	if !hasPodProfile {
+		profile, err := s.seccompStrategy.Generate(pod)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if profile != "" {
+			if annotationsCopy == nil {
+				annotationsCopy = map[string]string{}
+			}
+			annotationsCopy[api.SeccompPodAnnotationKey] = profile
+		}
+	}
+
+	return sc, annotationsCopy, nil
 }
 
 // Create a SecurityContext based on the given constraints.  If a setting is already set on the
@@ -207,6 +241,7 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 	}
 	allErrs = append(allErrs, s.fsGroupStrategy.Validate(pod, fsGroups)...)
 	allErrs = append(allErrs, s.supplementalGroupStrategy.Validate(pod, pod.Spec.SecurityContext.SupplementalGroups)...)
+	allErrs = append(allErrs, s.seccompStrategy.ValidatePod(pod)...)
 
 	// make a dummy container context to reuse the selinux strategies
 	container := &api.Container{
@@ -244,6 +279,7 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	sc := container.SecurityContext
 	allErrs = append(allErrs, s.runAsUserStrategy.Validate(pod, container)...)
 	allErrs = append(allErrs, s.seLinuxStrategy.Validate(pod, container)...)
+	allErrs = append(allErrs, s.seccompStrategy.ValidateContainer(pod, container)...)
 
 	if !s.scc.AllowPrivilegedContainer && *sc.Privileged {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("privileged"), *sc.Privileged, "Privileged containers are not allowed"))
@@ -376,4 +412,9 @@ func createSupplementalGroupStrategy(opts *api.SupplementalGroupsStrategyOptions
 // createCapabilitiesStrategy creates a new capabilities strategy.
 func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []api.Capability) (capabilities.CapabilitiesSecurityContextConstraintsStrategy, error) {
 	return capabilities.NewDefaultCapabilities(defaultAddCaps, requiredDropCaps, allowedCaps)
+}
+
+// createSeccompStrategy creates a new seccomp strategy
+func createSeccompStrategy(allowedProfiles []string) (seccomp.SeccompStrategy, error) {
+	return seccomp.NewWithSeccompProfile(allowedProfiles)
 }

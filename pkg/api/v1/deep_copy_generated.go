@@ -3042,6 +3042,13 @@ func DeepCopy_v1_SecurityContextConstraints(in SecurityContextConstraints, out *
 	} else {
 		out.Groups = nil
 	}
+	if in.SeccompProfiles != nil {
+		in, out := in.SeccompProfiles, &out.SeccompProfiles
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.SeccompProfiles = nil
+	}
 	return nil
 }
 

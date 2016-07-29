@@ -6040,6 +6040,7 @@ func autoConvert_v1_SecurityContextConstraints_To_api_SecurityContextConstraints
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
 	out.Users = in.Users
 	out.Groups = in.Groups
+	out.SeccompProfiles = in.SeccompProfiles
 	return nil
 }
 
@@ -6105,6 +6106,7 @@ func autoConvert_api_SecurityContextConstraints_To_v1_SecurityContextConstraints
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+	out.SeccompProfiles = in.SeccompProfiles
 	out.Users = in.Users
 	out.Groups = in.Groups
 	return nil

@@ -3032,6 +3032,13 @@ func DeepCopy_api_SecurityContextConstraints(in SecurityContextConstraints, out 
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+	if in.SeccompProfiles != nil {
+		in, out := in.SeccompProfiles, &out.SeccompProfiles
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.SeccompProfiles = nil
+	}
 	if in.Users != nil {
 		in, out := in.Users, &out.Users
 		*out = make([]string, len(in))

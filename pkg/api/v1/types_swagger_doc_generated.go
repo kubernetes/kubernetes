@@ -1621,6 +1621,7 @@ var map_SecurityContextConstraints = map[string]string{
 	"readOnlyRootFilesystem":   "ReadOnlyRootFilesystem when set to true will force containers to run with a read only root file system.  If the container specifically requests to run with a non-read only root file system the SCC should deny the pod. If set to false the container may run with a read only root file system if it wishes but it will not be forced to.",
 	"users":                    "The users who have permissions to use this security context constraints",
 	"groups":                   "The groups that have permission to use this security context constraints",
+	"seccompProfiles":          "SeccompProfiles lists the allowed profiles that may be set for the pod or container's seccomp annotations.  An unset (nil) or empty value means that no profiles may be specifid by the pod or container.\tThe wildcard '*' may be used to allow all profiles.  When used to generate a value for a pod the first non-wildcard profile will be used as the default.",
 }
 
 func (SecurityContextConstraints) SwaggerDoc() map[string]string {

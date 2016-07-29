@@ -7364,6 +7364,23 @@ func (m *SecurityContextConstraints) MarshalTo(data []byte) (int, error) {
 			i += copy(data[i:], s)
 		}
 	}
+	if len(m.SeccompProfiles) > 0 {
+		for _, s := range m.SeccompProfiles {
+			data[i] = 0xa2
+			i++
+			data[i] = 0x1
+			i++
+			l = len(s)
+			for l >= 1<<7 {
+				data[i] = uint8(uint64(l)&0x7f | 0x80)
+				l >>= 7
+				i++
+			}
+			data[i] = uint8(l)
+			i++
+			i += copy(data[i:], s)
+		}
+	}
 	return i, nil
 }
 
@@ -10637,6 +10654,12 @@ func (m *SecurityContextConstraints) Size() (n int) {
 	}
 	if len(m.Groups) > 0 {
 		for _, s := range m.Groups {
+			l = len(s)
+			n += 2 + l + sovGenerated(uint64(l))
+		}
+	}
+	if len(m.SeccompProfiles) > 0 {
+		for _, s := range m.SeccompProfiles {
 			l = len(s)
 			n += 2 + l + sovGenerated(uint64(l))
 		}
@@ -33632,6 +33655,35 @@ func (m *SecurityContextConstraints) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.Groups = append(m.Groups, string(data[iNdEx:postIndex]))
+			iNdEx = postIndex
+		case 20:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field SeccompProfiles", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.SeccompProfiles = append(m.SeccompProfiles, string(data[iNdEx:postIndex]))
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
