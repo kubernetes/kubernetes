@@ -40,7 +40,7 @@ const (
 	StorageLogLevel
 )
 
-// Event holds all the information needs by audit output backend to create
+// Event holds all the information needed by an audit output backend to create
 // an audit log entry.
 type Event struct {
 	// the event unique id
