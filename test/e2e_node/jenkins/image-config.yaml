@@ -17,3 +17,4 @@ images:
   gci-dev:
     image: gci-dev-53-8530-29-0
     project: google-containers
+    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml"
