@@ -16,26 +16,17 @@ limitations under the License.
 
 package framework
 
+//go:generate ../../../hack/update-bindata.sh
+
+// See https://github.com/kubernetes/kubernetes/issues/23987
 import "k8s.io/kubernetes/test/e2e/generated"
 
 /*
-ReadOrDie reads a file from gobindata.  To generate gobindata, run
-
-# Install the program
-go get -u github.com/jteeuwen/go-bindata/...
-
-# Generate the bindata file.
-go-bindata \
-  -pkg generated -ignore .jpg -ignore .png -ignore .md \
-  ./examples/* ./docs/user-guide/* test/e2e/testing-manifests/kubectl/* test/images/*
-
-# Copy it into the generated directory if the results are what you expected.
-cp bindata.go test/e2e/generated
-
-# Don't forget to gofmt it
-gofmt -s -w test/e2e/generated/bindata.go
+ReadOrDie reads a file from gobindata.
+Relies heavily on the successful generation of build artifacts as per the go:generate directives above.
 */
 func ReadOrDie(filePath string) []byte {
+
 	fileBytes, err := generated.Asset(filePath)
 	if err != nil {
 		gobindata_msg := "An error occured, possibly gobindata doesn't know about the file you're opening. For questions on maintaining gobindata, contact the sig-testing group."
