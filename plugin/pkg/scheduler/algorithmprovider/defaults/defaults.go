@@ -151,6 +151,9 @@ func defaultPredicates() sets.String {
 
 		// Fit is determined by node memory pressure condition.
 		factory.RegisterFitPredicate("CheckNodeMemoryPressure", predicates.CheckNodeMemoryPressurePredicate),
+
+		// Fit is determined by node disk pressure condition.
+		factory.RegisterFitPredicate("CheckNodeDiskPressure", predicates.CheckNodeDiskPressurePredicate),
 	)
 }
 
