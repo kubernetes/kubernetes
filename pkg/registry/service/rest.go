@@ -112,15 +112,25 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	}
 
 	assignNodePorts := shouldAssignNodePorts(service)
+	reservePortProtocolMap := map[int]string{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
 		if servicePort.NodePort != 0 {
 			err := nodePortOp.Allocate(int(servicePort.NodePort))
 			if err != nil {
+				if err == portallocator.ErrAllocated {
+					protocol, exist := reservePortProtocolMap[int(servicePort.NodePort)]
+					if exist && protocol == string(servicePort.Protocol) {
+						el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
+						return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
+					}
+					continue
+				}
 				// TODO: when validation becomes versioned, this gets more complicated.
 				el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
 				return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
 			}
+			reservePortProtocolMap[int(servicePort.NodePort)] = string(servicePort.Protocol)
 		} else if assignNodePorts {
 			nodePort, err := nodePortOp.AllocateNext()
 			if err != nil {
