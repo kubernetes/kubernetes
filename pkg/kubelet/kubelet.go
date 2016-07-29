@@ -193,26 +193,31 @@ type KubeletBuilder func(kc_old *KubeletConfig, kc_new *componentconfig.KubeletC
 // KubeletConfig is all of the parameters necessary for running a kubelet.
 // TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
 type KubeletConfig struct {
-	Auth                    server.AuthInterface
-	Builder                 KubeletBuilder
-	CAdvisorInterface       cadvisor.Interface
-	Cloud                   cloudprovider.Interface
-	ContainerManager        cm.ContainerManager
-	DockerClient            dockertools.DockerInterface
-	EventClient             *clientset.Clientset
+	// Fields to remove
+	Builder KubeletBuilder // requires some refactoring to remove
+
+	// Fields to still think about
 	Hostname                string
-	KubeClient              *clientset.Clientset
-	Mounter                 mount.Interface
-	NetworkPlugins          []network.NetworkPlugin
 	NodeName                string
-	OOMAdjuster             *oom.OOMAdjuster
-	OSInterface             kubecontainer.OSInterface
-	PodConfig               *config.PodConfig
-	Recorder                record.EventRecorder
-	Writer                  kubeio.Writer
-	VolumePlugins           []volume.VolumePlugin
 	ContainerRuntimeOptions []kubecontainer.Option
 	Options                 []Option
+
+	// Injected Dependencies
+	Auth              server.AuthInterface
+	CAdvisorInterface cadvisor.Interface
+	Cloud             cloudprovider.Interface
+	ContainerManager  cm.ContainerManager
+	DockerClient      dockertools.DockerInterface
+	EventClient       *clientset.Clientset
+	KubeClient        *clientset.Clientset
+	Mounter           mount.Interface
+	NetworkPlugins    []network.NetworkPlugin
+	OOMAdjuster       *oom.OOMAdjuster
+	OSInterface       kubecontainer.OSInterface
+	PodConfig         *config.PodConfig
+	Recorder          record.EventRecorder
+	Writer            kubeio.Writer
+	VolumePlugins     []volume.VolumePlugin
 }
 
 func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (*config.PodConfig, error) {
