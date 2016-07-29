@@ -30,7 +30,7 @@ type instrumentedDockerInterface struct {
 }
 
 // Creates an instrumented DockerInterface from an existing DockerInterface.
-func newInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterface {
+func NewInstrumentedDockerInterface(dockerClient DockerInterface) DockerInterface {
 	return instrumentedDockerInterface{
 		client: dockerClient,
 	}
