@@ -363,6 +363,7 @@ func checkEvents(t *testing.T, expectedEvents []string, ctrl *PersistentVolumeCo
 	// Read recorded events - wait up to 1 minute to get all the expected ones
 	// (just in case some goroutines are slower with writing)
 	timer := time.NewTimer(time.Minute)
+	defer timer.Stop()
 
 	fakeRecorder := ctrl.eventRecorder.(*record.FakeRecorder)
 	gotEvents := []string{}
