@@ -109,7 +109,7 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 			if err == nil {
 				return nil
 			}
-			glog.Infof("Error ensuring DNS Records: %v", err)
+			glog.V(4).Infof("Error ensuring DNS Records: %v", err)
 			time.Sleep(cachedService.nextDNSUpdateDelay())
 		}
 	}
@@ -120,6 +120,7 @@ func (cc *clusterClientCache) processEndpointDeletion(cachedService *cachedServi
 // We do not care about the endpoint info, what we need to make sure here is len(endpoints.subsets)>0
 func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService, endpoint *v1.Endpoints, clusterName string, serviceController *ServiceController) error {
 	glog.V(4).Infof("Processing endpoint update for %s/%s, cluster %s", endpoint.Namespace, endpoint.Name, clusterName)
+	var err error
 	cachedService.rwlock.Lock()
 	var reachable bool
 	defer cachedService.rwlock.Unlock()
@@ -135,17 +136,15 @@ func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService
 			// first time get endpoints, update dns record
 			glog.V(4).Infof("Reachable endpoint was found for %s/%s, cluster %s, building endpointMap", endpoint.Namespace, endpoint.Name, clusterName)
 			cachedService.endpointMap[clusterName] = 1
-			if err := serviceController.ensureDnsRecords(clusterName, cachedService); err != nil {
-				glog.V(4).Infof("Error ensuring DNS Records: %v", err)
-				for i := 0; i < clientRetryCount; i++ {
-					time.Sleep(cachedService.nextDNSUpdateDelay())
-					err := serviceController.ensureDnsRecords(clusterName, cachedService)
-					if err == nil {
-						return nil
-					}
+			for i := 0; i < clientRetryCount; i++ {
+				err := serviceController.ensureDnsRecords(clusterName, cachedService)
+				if err == nil {
+					return nil
 				}
-				return err
+				glog.V(4).Infof("Error ensuring DNS Records: %v", err)
+				time.Sleep(cachedService.nextDNSUpdateDelay())
 			}
+			return err
 		}
 	} else {
 		for _, subset := range endpoint.Subsets {
@@ -158,17 +157,15 @@ func (cc *clusterClientCache) processEndpointUpdate(cachedService *cachedService
 			// first time get endpoints, update dns record
 			glog.V(4).Infof("Reachable endpoint was lost for %s/%s, cluster %s, deleting endpointMap", endpoint.Namespace, endpoint.Name, clusterName)
 			delete(cachedService.endpointMap, clusterName)
-			if err := serviceController.ensureDnsRecords(clusterName, cachedService); err != nil {
-				glog.V(4).Infof("Error ensuring DNS Records: %v", err)
-				for i := 0; i < clientRetryCount; i++ {
-					time.Sleep(cachedService.nextDNSUpdateDelay())
-					err := serviceController.ensureDnsRecords(clusterName, cachedService)
-					if err == nil {
-						return nil
-					}
+			for i := 0; i < clientRetryCount; i++ {
+				err := serviceController.ensureDnsRecords(clusterName, cachedService)
+				if err == nil {
+					return nil
 				}
-				return err
+				glog.V(4).Infof("Error ensuring DNS Records: %v", err)
+				time.Sleep(cachedService.nextDNSUpdateDelay())
 			}
+			return err
 		}
 	}
 	return nil
