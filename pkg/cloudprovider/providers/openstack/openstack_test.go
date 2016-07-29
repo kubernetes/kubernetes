@@ -166,6 +166,8 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
 	}
 
+	os.openStackInstance = &OpenStackInstance{InstanceID: "id", Hostname: "name"}
+
 	i, ok := os.Instances()
 	if !ok {
 		t.Fatalf("Instances() returned false")
@@ -297,7 +299,7 @@ func TestVolumes(t *testing.T) {
 
 	WaitForVolumeStatus(t, os, vol, volumeAvailableStatus, volumeCreateTimeoutSeconds)
 
-	diskId, err := os.AttachDisk(os.localInstanceID, vol)
+	diskId, err := os.AttachDisk(os.openStackInstance.InstanceID, vol)
 	if err != nil {
 		t.Fatalf("Cannot AttachDisk Cinder volume %s: %v", vol, err)
 	}
@@ -305,7 +307,7 @@ func TestVolumes(t *testing.T) {
 
 	WaitForVolumeStatus(t, os, vol, volumeInUseStatus, volumeCreateTimeoutSeconds)
 
-	err = os.DetachDisk(os.localInstanceID, vol)
+	err = os.DetachDisk(os.openStackInstance.InstanceID, vol)
 	if err != nil {
 		t.Fatalf("Cannot DetachDisk Cinder volume %s: %v", vol, err)
 	}
