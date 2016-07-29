@@ -225,7 +225,7 @@ func NewDockerManager(
 	seccompProfileRoot string,
 	options ...kubecontainer.Option) *DockerManager {
 	// Wrap the docker client with instrumentedDockerInterface
-	client = newInstrumentedDockerInterface(client)
+	client = NewInstrumentedDockerInterface(client)
 
 	// Work out the location of the Docker runtime, defaulting to /var/lib/docker
 	// if there are any problems.
