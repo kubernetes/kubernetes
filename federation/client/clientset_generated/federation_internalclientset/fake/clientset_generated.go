@@ -20,6 +20,8 @@ import (
 	clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	unversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned"
 	fakeunversionedcore "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/core/unversioned/fake"
+	unversionedextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/unversioned"
+	fakeunversionedextensions "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/extensions/unversioned/fake"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
 	fakeunversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned/fake"
 	"k8s.io/kubernetes/pkg/api"
@@ -72,4 +74,9 @@ func (c *Clientset) Federation() unversionedfederation.FederationInterface {
 // Core retrieves the CoreClient
 func (c *Clientset) Core() unversionedcore.CoreInterface {
 	return &fakeunversionedcore.FakeCore{Fake: &c.Fake}
+}
+
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
+	return &fakeunversionedextensions.FakeExtensions{Fake: &c.Fake}
 }
