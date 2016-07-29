@@ -75,5 +75,7 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&PodSecurityPolicyList{},
 		&NetworkPolicy{},
 		&NetworkPolicyList{},
+		&StorageClass{},
+		&StorageClassList{},
 	)
 }

@@ -411,6 +411,10 @@ func (c *FakeExperimental) NetworkPolicies(namespace string) client.NetworkPolic
 	return &FakeNetworkPolicies{Fake: c, Namespace: namespace}
 }
 
+func (c *FakeExperimental) StorageClasses() client.StorageClassInterface {
+	return &FakeStorageClasses{Fake: c}
+}
+
 func NewSimpleFakeRbac(objects ...runtime.Object) *FakeRbac {
 	return &FakeRbac{Fake: NewSimpleFake(objects...)}
 }

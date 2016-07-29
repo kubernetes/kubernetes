@@ -94,6 +94,8 @@ func init() {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_Scale, InType: reflect.TypeOf(func() *Scale { var x *Scale; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ScaleSpec, InType: reflect.TypeOf(func() *ScaleSpec { var x *ScaleSpec; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ScaleStatus, InType: reflect.TypeOf(func() *ScaleStatus { var x *ScaleStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StorageClass, InType: reflect.TypeOf(func() *StorageClass { var x *StorageClass; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_StorageClassList, InType: reflect.TypeOf(func() *StorageClassList { var x *StorageClassList; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SubresourceReference, InType: reflect.TypeOf(func() *SubresourceReference { var x *SubresourceReference; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SupplementalGroupsStrategyOptions, InType: reflect.TypeOf(func() *SupplementalGroupsStrategyOptions { var x *SupplementalGroupsStrategyOptions; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ThirdPartyResource, InType: reflect.TypeOf(func() *ThirdPartyResource { var x *ThirdPartyResource; return x }())},
@@ -1329,6 +1331,49 @@ func DeepCopy_v1beta1_ScaleStatus(in interface{}, out interface{}, c *conversion
 			out.Selector = nil
 		}
 		out.TargetSelector = in.TargetSelector
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_StorageClass(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*StorageClass)
+		out := out.(*StorageClass)
+		out.TypeMeta = in.TypeMeta
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+			return err
+		}
+		out.Provisioner = in.Provisioner
+		if in.Parameters != nil {
+			in, out := &in.Parameters, &out.Parameters
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		} else {
+			out.Parameters = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1beta1_StorageClassList(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*StorageClassList)
+		out := out.(*StorageClassList)
+		out.TypeMeta = in.TypeMeta
+		out.ListMeta = in.ListMeta
+		if in.Items != nil {
+			in, out := &in.Items, &out.Items
+			*out = make([]StorageClass, len(*in))
+			for i := range *in {
+				if err := DeepCopy_v1beta1_StorageClass(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.Items = nil
+		}
 		return nil
 	}
 }

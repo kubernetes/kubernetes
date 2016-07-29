@@ -2262,7 +2262,32 @@ __EOF__
   # Post-condition: no PVCs
   kube::test::get_object_assert pvc "{{range.items}}{{$id_field}}:{{end}}" ''
 
+  ############################
+  # Storage Classes #
+  ############################
 
+  ### Create and delete storage class
+  # Pre-condition: no storage classes currently exist
+  kube::test::get_object_assert storageclass "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command
+  kubectl create -f - "${kube_flags[@]}" << __EOF__
+{
+  "kind": "StorageClass",
+  "apiVersion": "extensions/v1beta1",
+  "metadata": {
+    "name": "storage-class-name"
+  },
+  "provisioner": "kubernetes.io/fake-provisioner-type",
+  "parameters": {
+    "zone":"us-east-1b",
+    "type":"ssd"
+  }
+}
+__EOF__
+  kube::test::get_object_assert storageclass "{{range.items}}{{$id_field}}:{{end}}" 'storage-class-name:'
+  kubectl delete storageclass storage-class-name "${kube_flags[@]}"
+  # Post-condition: no storage classes
+  kube::test::get_object_assert storageclass "{{range.items}}{{$id_field}}:{{end}}" ''
 
   #########
   # Nodes #
