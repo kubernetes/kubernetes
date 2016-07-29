@@ -4,6 +4,7 @@
   - [Downloads](#downloads)
   - [Changelog since v1.3.2](#changelog-since-v132)
     - [Other notable changes](#other-notable-changes)
+  - [Known Issues](#known-issues)
 - [v1.3.2](#v132)
   - [Downloads](#downloads-1)
   - [Changelog since v1.3.1](#changelog-since-v131)
@@ -100,7 +101,7 @@
     - [Other notable improvements](#other-notable-improvements)
     - [Experimental Features](#experimental-features-2)
     - [Action required](#action-required-8)
-    - [Known Issues](#known-issues)
+    - [Known Issues](#known-issues-1)
       - [Docker Known Issues](#docker-known-issues)
         - [1.9.1](#191)
     - [Provider-specific Notes](#provider-specific-notes-1)
@@ -137,6 +138,16 @@ binary | sha256 hash
 * Fix GPU resource validation ([#28743](https://github.com/kubernetes/kubernetes/pull/28743), [@therc](https://github.com/therc))
 * Scale kube-proxy conntrack limits by cores (new default behavior) ([#28876](https://github.com/kubernetes/kubernetes/pull/28876), [@thockin](https://github.com/thockin))
 * Don't recreate lb cloud resources on kcm restart ([#29082](https://github.com/kubernetes/kubernetes/pull/29082), [@bprashanth](https://github.com/bprashanth))
+
+## Known Issues
+
+There are a number of known issues that have been found and are being worked on.
+Please be aware of them as you test your workloads.
+
+* PVC Volume not detached if pod deleted via namespace deletion ([29051](https://github.com/kubernetes/kubernetes/issues/29051))
+* Google Compute Engine PD Detach fails if node no longer exists ([29358](https://github.com/kubernetes/kubernetes/issues/29358))
+* Mounting (only 'default-token') volume takes a long time when creating a batch of pods  (parallelization issue) ([28616](https://github.com/kubernetes/kubernetes/issues/28616))
+* Error while tearing down pod, "device or resource busy" on service account secret ([28750](https://github.com/kubernetes/kubernetes/issues/28750))
 
 
 
