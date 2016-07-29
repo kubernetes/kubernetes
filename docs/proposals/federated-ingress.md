@@ -1,4 +1,33 @@
-#Kubernetes Federated Ingress
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
+# Kubernetes Federated Ingress
 
 				  Requirements and High Level Design
 
@@ -57,7 +86,7 @@ In summary, all of [GCE L7 Load Balancer](https://cloud.google.com/compute/docs/
 
 1. Single global virtual (a.k.a. "anycast") IP address ("VIP" - no dependence on dynamic DNS)
 1. Geo-locality for both external and GCP-internal clients
-1. Load-based overflow to next-closest geo-locality (i.e. cluster).  Based on either queries per second, or CPU load (unfortunately on the first-hop target VM, not the final destination K8s Service). 
+1. Load-based overflow to next-closest geo-locality (i.e. cluster).  Based on either queries per second, or CPU load (unfortunately on the first-hop target VM, not the final destination K8s Service).
 1. URL-based request direction (different backend services can fulfill each different URL).
 1. HTTPS request termination (at the GCE load balancer, with server SSL certs)
 
@@ -65,8 +94,8 @@ In summary, all of [GCE L7 Load Balancer](https://cloud.google.com/compute/docs/
 
 1. Federation user creates (federated) Ingress object
 1. Federated Ingress Controller creates Ingress object in each cluster in the federation
-1. Each cluster-level Ingress Controller ("GLBC") creates Google L7 Load Balancer machinery (forwarding rules, target proxy, URL map, backend service, health check) which ensures that traffic to the Ingress (backed by a Service), is directed to one of the nodes in the cluster. 
-1. KubeProxy redirects to one of the backend Pods (currently round-robin, per KubeProxy instance) 
+1. Each cluster-level Ingress Controller ("GLBC") creates Google L7 Load Balancer machinery (forwarding rules, target proxy, URL map, backend service, health check) which ensures that traffic to the Ingress (backed by a Service), is directed to one of the nodes in the cluster.
+1. KubeProxy redirects to one of the backend Pods (currently round-robin, per KubeProxy instance)
 
 An alternative implementation approach involves lifting the current
 Federated Ingress Controller functionality up into the Federation
@@ -119,8 +148,8 @@ balancers
 
 1. Federation user creates (federated) Ingress object
 1. Federated Ingress Controller creates Ingress object in each cluster in the federation
-1. Each cluster-level AWS Ingress Controller creates/updates 
-   1. (regional) AWS Elastic Load Balancer machinery which ensures that traffic to the Ingress (backed by a Service), is directed to one of the nodes in one of the clusters in the region. 
+1. Each cluster-level AWS Ingress Controller creates/updates
+   1. (regional) AWS Elastic Load Balancer machinery which ensures that traffic to the Ingress (backed by a Service), is directed to one of the nodes in one of the clusters in the region.
    1. (global) AWS Route53 DNS machinery which ensures that clients are directed to the closest non-overloaded (regional) elastic load balancer.
 1. KubeProxy redirects to one of the backend Pods (currently round-robin, per KubeProxy instance) in the destination K8s cluster.
 
@@ -131,7 +160,7 @@ Most of this remains is currently unimplemented ([AWS Ingress controller](https:
 Route53](https://github.com/kubernetes/contrib/pull/841).
 
 1. K8s AWS Ingress Controller
-1.  Re-uses all of the non-GCE specific Federation machinery discussed above under "GCP-only...". 
+1.  Re-uses all of the non-GCE specific Federation machinery discussed above under "GCP-only...".
 
 ### Pros
 
@@ -151,7 +180,7 @@ Route53](https://github.com/kubernetes/contrib/pull/841).
 
 ### Summary
 
-Use GCP Federated Ingress machinery described above, augmented with additional HA-proxy backends in all GCP clusters to proxy to non-GCP clusters (via either Service External IP's, or VPN directly to KubeProxy or Pods). 
+Use GCP Federated Ingress machinery described above, augmented with additional HA-proxy backends in all GCP clusters to proxy to non-GCP clusters (via either Service External IP's, or VPN directly to KubeProxy or Pods).
 
 ### Features
 
@@ -172,11 +201,16 @@ Assuming that GCP-only (see above) is complete:
 
 1. Works for cross-cloud.
 
-### Cons 
+### Cons
 
-1. Traffic to non-GCP clusters proxies through GCP clusters.  Additional bandwidth costs (3x?) in those cases. 
+1. Traffic to non-GCP clusters proxies through GCP clusters.  Additional bandwidth costs (3x?) in those cases.
 
 ## Cross-cloud via AWS
 
-In theory the same approach as "Cross-cloud via GCP" above could be used, except that AWS infrastructure would be used to get traffic first to an AWS cluster, and then proxied onwards to non-AWS and/or on-prem clusters. 
+In theory the same approach as "Cross-cloud via GCP" above could be used, except that AWS infrastructure would be used to get traffic first to an AWS cluster, and then proxied onwards to non-AWS and/or on-prem clusters.
 Detail docs TBD.
+
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/federated-ingress.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
