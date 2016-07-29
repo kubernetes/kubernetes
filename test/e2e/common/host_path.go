@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
 	"fmt"
@@ -32,7 +32,7 @@ import (
 
 //TODO : Consolidate this code with the code for emptyDir.
 //This will require some smart.
-var _ = framework.KubeDescribe("hostPath", func() {
+var _ = framework.KubeDescribe("HostPath", func() {
 	f := framework.NewDefaultFramework("hostpath")
 	var c *client.Client
 	var namespace *api.Namespace
@@ -56,10 +56,9 @@ var _ = framework.KubeDescribe("hostPath", func() {
 			fmt.Sprintf("--fs_type=%v", volumePath),
 			fmt.Sprintf("--file_mode=%v", volumePath),
 		}
-		framework.TestContainerOutput("hostPath mode", c, pod, 0, []string{
+		f.TestContainerOutput("hostPath mode", pod, 0, []string{
 			"mode of file \"/test-volume\": dtrwxrwxrwx", // we expect the sticky bit (mode flag t) to be set for the dir
-		},
-			namespace.Name)
+		})
 	})
 
 	// This test requires mounting a folder into a container with write privileges.
@@ -83,10 +82,9 @@ var _ = framework.KubeDescribe("hostPath", func() {
 		}
 		//Read the content of the file with the second container to
 		//verify volumes  being shared properly among containers within the pod.
-		framework.TestContainerOutput("hostPath r/w", c, pod, 1, []string{
+		f.TestContainerOutput("hostPath r/w", pod, 1, []string{
 			"content of file \"/test-volume/test-file\": mount-tester new file",
-		}, namespace.Name,
-		)
+		})
 	})
 
 	It("should support subPath [Conformance]", func() {
@@ -115,9 +113,9 @@ var _ = framework.KubeDescribe("hostPath", func() {
 			fmt.Sprintf("--retry_time=%d", retryDuration),
 		}
 
-		framework.TestContainerOutput("hostPath subPath", c, pod, 1, []string{
+		f.TestContainerOutput("hostPath subPath", pod, 1, []string{
 			"content of file \"" + filePathInReader + "\": mount-tester new file",
-		}, namespace.Name)
+		})
 	})
 })
 

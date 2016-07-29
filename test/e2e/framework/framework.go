@@ -32,7 +32,6 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -137,21 +136,10 @@ func (f *Framework) BeforeEach() {
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.Client == nil {
 		By("Creating a kubernetes client")
-		var config *restclient.Config
-		if TestContext.NodeName != "" {
-			// This is a node e2e test, apply the node e2e configuration
-			config = &restclient.Config{
-				Host:  TestContext.Host,
-				QPS:   100,
-				Burst: 100,
-			}
-		} else {
-			var err error
-			config, err = LoadConfig()
-			Expect(err).NotTo(HaveOccurred())
-			config.QPS = f.options.ClientQPS
-			config.Burst = f.options.ClientBurst
-		}
+		config, err := LoadConfig()
+		Expect(err).NotTo(HaveOccurred())
+		config.QPS = f.options.ClientQPS
+		config.Burst = f.options.ClientBurst
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
@@ -385,14 +373,18 @@ func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
 	return WaitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name, "")
 }
 
-// Runs the given pod and verifies that the output of exact container matches the desired output.
+// TestContainerOutput runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a substring matcher.
 func (f *Framework) TestContainerOutput(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	TestContainerOutput(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
+	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, ContainSubstring)
 }
 
-// Runs the given pod and verifies that the output of exact container matches the desired regexps.
+// TestContainerOutputRegexp runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	testContainerOutputRegexp(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
+	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, MatchRegexp)
 }
 
 // WaitForAnEndpoint waits for at least one endpoint to become available in the

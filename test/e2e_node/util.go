@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"encoding/json"
 	"flag"
 )
 
@@ -26,3 +27,15 @@ var disableKubenet = flag.Bool("disable-kubenet", false, "If true, start kubelet
 var buildServices = flag.Bool("build-services", true, "If true, build local executables")
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
+
+type SharedContext struct {
+	PodConfigPath string
+}
+
+func (s *SharedContext) Encode() ([]byte, error) {
+	return json.Marshal(s)
+}
+
+func (s *SharedContext) Decode(data []byte) error {
+	return json.Unmarshal(data, s)
+}

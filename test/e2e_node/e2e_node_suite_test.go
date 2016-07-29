@@ -48,6 +48,12 @@ import (
 
 var e2es *e2eService
 
+// context is the test context shared by all parallel nodes.
+// No lock is needed, because context should only be initialized
+// in the first function in SynchronizedBeforeSuite. After that
+// it should never be modified.
+var context SharedContext
+
 var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 var junitFileNumber = flag.Int("junit-file-number", 1, "Used to create junit filename - e.g. junit_01.xml.")
 
@@ -77,16 +83,9 @@ func TestE2eNode(t *testing.T) {
 }
 
 // Setup the kubelet on the node
-var _ = BeforeSuite(func() {
+var _ = SynchronizedBeforeSuite(func() []byte {
 	if *buildServices {
 		buildGo()
-	}
-	if framework.TestContext.NodeName == "" {
-		output, err := exec.Command("hostname").CombinedOutput()
-		if err != nil {
-			glog.Fatalf("Could not get node name from hostname %v.  Output:\n%s", err, output)
-		}
-		framework.TestContext.NodeName = strings.TrimSpace(fmt.Sprintf("%s", output))
 	}
 
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
@@ -102,8 +101,9 @@ var _ = BeforeSuite(func() {
 	// We should mask locksmithd when provisioning the machine.
 	maskLocksmithdOnCoreos()
 
+	shared := &SharedContext{}
 	if *startServices {
-		e2es = newE2eService(framework.TestContext.NodeName, framework.TestContext.CgroupsPerQOS)
+		e2es = newE2eService(framework.TestContext.NodeName, framework.TestContext.CgroupsPerQOS, shared)
 		if err := e2es.start(); err != nil {
 			Fail(fmt.Sprintf("Unable to start node services.\n%v", err))
 		}
@@ -117,10 +117,28 @@ var _ = BeforeSuite(func() {
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
+
+	data, err := shared.Encode()
+	Expect(err).NotTo(HaveOccurred())
+
+	return data
+}, func(data []byte) {
+	// Set the shared context got from the synchronized initialize function
+	shared := &SharedContext{}
+	Expect(shared.Decode(data)).To(Succeed())
+	context = *shared
+
+	if framework.TestContext.NodeName == "" {
+		output, err := exec.Command("hostname").CombinedOutput()
+		if err != nil {
+			glog.Fatalf("Could not get node name from hostname %v.  Output:\n%s", err, output)
+		}
+		framework.TestContext.NodeName = strings.TrimSpace(fmt.Sprintf("%s", output))
+	}
 })
 
 // Tear down the kubelet on the node
-var _ = AfterSuite(func() {
+var _ = SynchronizedAfterSuite(func() {}, func() {
 	if e2es != nil {
 		e2es.getLogFiles()
 		if *startServices && *stopServices {
