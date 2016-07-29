@@ -1,13 +1,16 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing perissions and
+See the License for the specific language governing permissions and
 limitations under the License.
 */
 
@@ -16,7 +19,12 @@ package e2e_node
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"text/tabwriter"
@@ -24,10 +32,12 @@ import (
 
 	cadvisorclient "github.com/google/cadvisor/client/v2"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -39,15 +49,12 @@ const (
 	cadvisorImageName = "google/cadvisor:latest"
 	cadvisorPodName   = "cadvisor"
 	cadvisorPort      = 8090
+	// housekeeping interval of Cadvisor (second)
+	houseKeepingInterval = 1
 )
 
 var (
-	systemContainers = map[string]string{
-		//"root": "/",
-		//stats.SystemContainerMisc: "misc"
-		stats.SystemContainerKubelet: "kubelet",
-		stats.SystemContainerRuntime: "docker-daemon",
-	}
+	systemContainers map[string]string
 )
 
 type ResourceCollector struct {
@@ -69,6 +76,18 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 }
 
 func (r *ResourceCollector) Start() {
+	// Get the cgroup containers for kubelet and docker
+	kubeletContainer, err := getContainerNameForProcess(kubeletProcessName, "")
+	dockerContainer, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
+	if err == nil {
+		systemContainers = map[string]string{
+			stats.SystemContainerKubelet: kubeletContainer,
+			stats.SystemContainerRuntime: dockerContainer,
+		}
+	} else {
+		framework.Failf("Failed to get docker container name in test-e2e-node resource collector.")
+	}
+
 	wait.Poll(1*time.Second, 1*time.Minute, func() (bool, error) {
 		var err error
 		r.client, err = cadvisorclient.NewClient(fmt.Sprintf("http://localhost:%d/", cadvisorPort))
@@ -123,7 +142,7 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 			framework.Logf("Error getting container stats, err: %v", err)
 			return
 		}
-		cStats, ok := ret["/"+name]
+		cStats, ok := ret[name]
 		if !ok {
 			framework.Logf("Missing info/stats for container %q", name)
 			return
@@ -160,7 +179,7 @@ func (r *ResourceCollector) GetLatest() (framework.ResourceUsagePerContainer, er
 	for key, name := range systemContainers {
 		contStats, ok := r.buffers[name]
 		if !ok || len(contStats) == 0 {
-			return nil, fmt.Errorf("Resource usage is not ready yet")
+			return nil, fmt.Errorf("Resource usage of %s:%s is not ready yet", key, name)
 		}
 		stats[key] = contStats[len(contStats)-1]
 	}
@@ -257,11 +276,10 @@ func createCadvisorPod(f *framework.Framework) {
 	f.PodClient().CreateSync(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: cadvisorPodName,
-			//Labels: map[string]string{"type": cadvisorPodType, "name": cadvisorPodName},
 		},
 		Spec: api.PodSpec{
-			// Don't restart the Pod since it is expected to exit
-			RestartPolicy: api.RestartPolicyNever,
+			// It uses a host port for the tests to collect data.
+			// Currently we can not use port mapping in test-e2e-node.
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: true,
 			},
@@ -301,7 +319,7 @@ func createCadvisorPod(f *framework.Framework) {
 					},
 					Args: []string{
 						"--profiling",
-						"--housekeeping_interval=1s",
+						fmt.Sprintf("--housekeeping_interval=%ds", houseKeepingInterval),
 						fmt.Sprintf("--port=%d", cadvisorPort),
 					},
 				},
@@ -336,7 +354,7 @@ func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
 		go func(pod *api.Pod) {
 			defer wg.Done()
 
-			err := f.Client.Pods(ns).Delete(pod.ObjectMeta.Name, api.NewDeleteOptions(60))
+			err := f.Client.Pods(ns).Delete(pod.ObjectMeta.Name, api.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(framework.WaitForPodToDisappear(f.Client, ns, pod.ObjectMeta.Name, labels.Everything(),
@@ -348,9 +366,9 @@ func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
 	return
 }
 
-func newTestPods(podsPerNode int, imageName, podType string) []*api.Pod {
+func newTestPods(numPods int, imageName, podType string) []*api.Pod {
 	var pods []*api.Pod
-	for i := 0; i < podsPerNode; i++ {
+	for i := 0; i < numPods; i++ {
 		podName := "test-" + string(util.NewUUID())
 		labels := map[string]string{
 			"type": podType,
@@ -363,7 +381,8 @@ func newTestPods(podsPerNode int, imageName, podType string) []*api.Pod {
 					Labels: labels,
 				},
 				Spec: api.PodSpec{
-					RestartPolicy: api.RestartPolicyNever,
+					// ToDo: restart policy is always
+					// check whether pods restart at the end of tests
 					Containers: []api.Container{
 						{
 							Image: imageName,
@@ -374,4 +393,120 @@ func newTestPods(podsPerNode int, imageName, podType string) []*api.Pod {
 			})
 	}
 	return pods
+}
+
+// code for getting container name of docker
+const (
+	kubeletProcessName    = "kubelet"
+	dockerProcessName     = "docker"
+	dockerPidFile         = "/var/run/docker.pid"
+	containerdProcessName = "docker-containerd"
+	containerdPidFile     = "/run/docker/libcontainerd/docker-containerd.pid"
+)
+
+func getContainerNameForProcess(name, pidFile string) (string, error) {
+	pids, err := getPidsForProcess(name, pidFile)
+	if err != nil {
+		return "", fmt.Errorf("failed to detect process id for %q - %v", name, err)
+	}
+	if len(pids) == 0 {
+		return "", nil
+	}
+	cont, err := getContainer(pids[0])
+	if err != nil {
+		return "", err
+	}
+	return cont, nil
+}
+
+func getPidFromPidFile(pidFile string) (int, error) {
+	file, err := os.Open(pidFile)
+	if err != nil {
+		return 0, fmt.Errorf("error opening pid file %s: %v", pidFile, err)
+	}
+	defer file.Close()
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return 0, fmt.Errorf("error reading pid file %s: %v", pidFile, err)
+	}
+
+	pid, err := strconv.Atoi(string(data))
+	if err != nil {
+		return 0, fmt.Errorf("error parsing %s as a number: %v", string(data), err)
+	}
+
+	return pid, nil
+}
+
+func getPidsForProcess(name, pidFile string) ([]int, error) {
+	if len(pidFile) > 0 {
+		if pid, err := getPidFromPidFile(pidFile); err == nil {
+			return []int{pid}, nil
+		} else {
+			// log the error and fall back to pidof
+			runtime.HandleError(err)
+		}
+	}
+
+	out, err := exec.Command("pidof", name).Output()
+	if err != nil {
+		return []int{}, fmt.Errorf("failed to find pid of %q: %v", name, err)
+	}
+
+	// The output of pidof is a list of pids.
+	pids := []int{}
+	for _, pidStr := range strings.Split(strings.TrimSpace(string(out)), " ") {
+		pid, err := strconv.Atoi(pidStr)
+		if err != nil {
+			continue
+		}
+		pids = append(pids, pid)
+	}
+	return pids, nil
+}
+
+// getContainer returns the cgroup associated with the specified pid.
+// It enforces a unified hierarchy for memory and cpu cgroups.
+// On systemd environments, it uses the name=systemd cgroup for the specified pid.
+func getContainer(pid int) (string, error) {
+	cgs, err := cgroups.ParseCgroupFile(fmt.Sprintf("/proc/%d/cgroup", pid))
+	if err != nil {
+		return "", err
+	}
+
+	cpu, found := cgs["cpu"]
+	if !found {
+		return "", cgroups.NewNotFoundError("cpu")
+	}
+	memory, found := cgs["memory"]
+	if !found {
+		return "", cgroups.NewNotFoundError("memory")
+	}
+
+	// since we use this container for accounting, we need to ensure its a unified hierarchy.
+	if cpu != memory {
+		return "", fmt.Errorf("cpu and memory cgroup hierarchy not unified.  cpu: %s, memory: %s", cpu, memory)
+	}
+
+	// on systemd, every pid is in a unified cgroup hierarchy (name=systemd as seen in systemd-cgls)
+	// cpu and memory accounting is off by default, users may choose to enable it per unit or globally.
+	// users could enable CPU and memory accounting globally via /etc/systemd/system.conf (DefaultCPUAccounting=true DefaultMemoryAccounting=true).
+	// users could also enable CPU and memory accounting per unit via CPUAccounting=true and MemoryAccounting=true
+	// we only warn if accounting is not enabled for CPU or memory so as to not break local development flows where kubelet is launched in a terminal.
+	// for example, the cgroup for the user session will be something like /user.slice/user-X.slice/session-X.scope, but the cpu and memory
+	// cgroup will be the closest ancestor where accounting is performed (most likely /) on systems that launch docker containers.
+	// as a result, on those systems, you will not get cpu or memory accounting statistics for kubelet.
+	// in addition, you would not get memory or cpu accounting for the runtime unless accounting was enabled on its unit (or globally).
+	if systemd, found := cgs["name=systemd"]; found {
+		if systemd != cpu {
+			log.Printf("CPUAccounting not enabled for pid: %d", pid)
+		}
+		if systemd != memory {
+			log.Printf("MemoryAccounting not enabled for pid: %d", pid)
+		}
+		return systemd, nil
+	}
+
+	return cpu, nil
 }
