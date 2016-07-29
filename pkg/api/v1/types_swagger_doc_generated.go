@@ -730,6 +730,7 @@ var map_NFSVolumeSource = map[string]string{
 	"server":   "Server is the hostname or IP address of the NFS server. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs",
 	"path":     "Path that is exported by the NFS server. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs",
 	"readOnly": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs",
+	"options":  "Optional: comma delimited NFS mount options. Examples are: rsize=32768,vers=3,proto=tcp",
 }
 
 func (NFSVolumeSource) SwaggerDoc() map[string]string {

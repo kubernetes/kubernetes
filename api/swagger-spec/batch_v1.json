@@ -1571,6 +1571,10 @@
      "readOnly": {
       "type": "boolean",
       "description": "ReadOnly here will force the NFS export to be mounted with read-only permissions. Defaults to false. More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs"
+     },
+     "options": {
+      "type": "string",
+      "description": "Optional: comma delimited NFS mount options. Examples are: rsize=32768,vers=3,proto=tcp"
      }
     }
    },

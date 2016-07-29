@@ -2875,6 +2875,7 @@ func autoConvert_v1_NFSVolumeSource_To_api_NFSVolumeSource(in *NFSVolumeSource, 
 	out.Server = in.Server
 	out.Path = in.Path
 	out.ReadOnly = in.ReadOnly
+	out.Options = in.Options
 	return nil
 }
 
@@ -2886,6 +2887,7 @@ func autoConvert_api_NFSVolumeSource_To_v1_NFSVolumeSource(in *api.NFSVolumeSour
 	out.Server = in.Server
 	out.Path = in.Path
 	out.ReadOnly = in.ReadOnly
+	out.Options = in.Options
 	return nil
 }
 

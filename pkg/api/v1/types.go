@@ -788,6 +788,9 @@ type NFSVolumeSource struct {
 	// Defaults to false.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+	// Optional: comma delimited NFS mount options.
+	// Examples are: rsize=32768,vers=3,proto=tcp
+	Options string `json:"options,omitempty" protobuf:"bytes,4,opt,name=options"`
 }
 
 // Represents an ISCSI disk.
