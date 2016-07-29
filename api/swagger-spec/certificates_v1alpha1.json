@@ -692,6 +692,9 @@
   "models": {
    "v1alpha1.CertificateSigningRequestList": {
     "id": "v1alpha1.CertificateSigningRequestList",
+    "required": [
+     "items"
+    ],
     "properties": {
      "kind": {
       "type": "string",
