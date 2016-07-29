@@ -94,6 +94,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
 	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rolebinding/policybased"
+	scheduledjobetcd "k8s.io/kubernetes/pkg/registry/scheduledjob/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
@@ -869,6 +870,27 @@ func buildAutoscalingResources(apiResourceConfigSource genericapiserver.APIResou
 	return apiGroupInfo, true
 }
 
+// getBatchResources returns the resources for batch api
+func (m *Master) getBatchResources(c *Config, version unversioned.GroupVersion) map[string]rest.Storage {
+	restOptions := func(resource string) generic.RESTOptions {
+		return m.GetRESTOptionsOrDie(c, batch.Resource(resource))
+	}
+
+	storage := map[string]rest.Storage{}
+	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
+		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptions("jobs"))
+		storage["jobs"] = jobsStorage
+		storage["jobs/status"] = jobsStatusStorage
+	}
+	if version == batchapiv2alpha1.SchemeGroupVersion &&
+		c.APIResourceConfigSource.ResourceEnabled(version.WithResource("scheduledjobs")) {
+		scheduledJobsStorage, scheduledJobsStatusStorage := scheduledjobetcd.NewREST(restOptions("scheduledjobs"))
+		storage["scheduledjobs"] = scheduledJobsStorage
+		storage["scheduledjobs/status"] = scheduledJobsStatusStorage
+	}
+	return storage
+}
+
 func buildBatchResources(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := NewDefaultAPIGroupInfo(batch.GroupName)
 
@@ -1039,7 +1061,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 	ret.EnableVersions(
 		apiv1.SchemeGroupVersion,
 		extensionsapiv1beta1.SchemeGroupVersion,
-		batchapiv1.SchemeGroupVersion,
+		batchapiv1.SchemeGroupVersion, batchapiv2alpha1.SchemeGroupVersion,
 		autoscalingapiv1.SchemeGroupVersion,
 		appsapi.SchemeGroupVersion,
 		policyapiv1alpha1.SchemeGroupVersion,

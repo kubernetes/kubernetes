@@ -93,7 +93,11 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := runtime.Encode(codec, item)
 	if err != nil {
-		t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", item))
+		if runtime.IsNotRegisteredError(err) {
+			t.Logf("%v: not registered: %v (%s)", name, err, printer.Sprintf("%#v", item))
+		} else {
+			t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", item))
+		}
 		return
 	}
 
@@ -475,7 +479,7 @@ func BenchmarkEncodeCodecFromInternal(b *testing.B) {
 	width := len(items)
 	encodable := make([]api.Pod, width)
 	for i := range items {
-		if err := api.Scheme.Convert(&items[i], &encodable[i]); err != nil {
+		if err := api.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
 			b.Fatal(err)
 		}
 	}

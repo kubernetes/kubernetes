@@ -47,7 +47,7 @@ func init() {
 		api.Scheme,
 		jsonSerializer,
 		jsonSerializer,
-		[]unversioned.GroupVersion{{Version: Version}},
-		[]unversioned.GroupVersion{{Version: runtime.APIVersionInternal}},
+		unversioned.GroupVersion{Version: Version},
+		runtime.InternalGroupVersioner,
 	)
 }

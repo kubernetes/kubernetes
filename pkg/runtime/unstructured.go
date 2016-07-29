@@ -168,7 +168,7 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 // sane implementation for APIs that require an object converter.
 type UnstructuredObjectConverter struct{}
 
-func (UnstructuredObjectConverter) Convert(in, out interface{}) error {
+func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 	unstructIn, ok := in.(*Unstructured)
 	if !ok {
 		return fmt.Errorf("input type %T in not valid for unstructured conversion", in)
@@ -187,9 +187,10 @@ func (UnstructuredObjectConverter) Convert(in, out interface{}) error {
 	return nil
 }
 
-func (UnstructuredObjectConverter) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
-	if gvk := in.GetObjectKind().GroupVersionKind(); gvk.GroupVersion() != outVersion {
-		return nil, errors.New("unstructured converter cannot convert versions")
+func (UnstructuredObjectConverter) ConvertToVersion(in Object, target GroupVersioner) (Object, error) {
+	if gv, ok := PreferredGroupVersion(target); ok {
+		kind := in.GetObjectKind().GroupVersionKind()
+		in.GetObjectKind().SetGroupVersionKind(gv.WithKind(kind.Kind))
 	}
 	return in, nil
 }

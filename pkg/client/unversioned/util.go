@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -76,4 +78,14 @@ func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
 		err = lastConflictErr
 	}
 	return err
+}
+
+func isEnabledVersion(group string, gv *unversioned.GroupVersion) bool {
+	versions := registered.EnabledVersionsForGroup(group)
+	for _, v := range versions {
+		if v == *gv {
+			return true
+		}
+	}
+	return false
 }

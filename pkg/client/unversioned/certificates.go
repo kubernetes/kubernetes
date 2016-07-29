@@ -69,12 +69,10 @@ func setCertificatesDefaults(config *restclient.Config) error {
 	if config.UserAgent == "" {
 		config.UserAgent = restclient.DefaultKubernetesUserAgent()
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
-	config.GroupVersion = &copyGroupVersion
-	//}
-
+	if config.GroupVersion == nil || !isEnabledVersion(certificates.GroupName, config.GroupVersion) {
+		copyGroupVersion := g.GroupVersion
+		config.GroupVersion = &copyGroupVersion
+	}
 	config.NegotiatedSerializer = api.Codecs
 	if config.QPS == 0 {
 		config.QPS = 5
