@@ -23,6 +23,8 @@ All resources referred to must be explicitly labelled with one non-default names
 
 This flag will require `--namespace`, and will not accept namespaces set in the input resource definitions.
 
+There shall exist a well-known annotation (`kubectl.kubernetes.io/purge-from-namespace=false`) that can be used to exclude some resource(s) from being purged.
+
 The goal here is to avoid a negative user experience where the user accidentally deletes all the resources in some other namespace just because they accidentally refer to (e.g.) a single resource in some other namespace.
 
 ## Managing Add-ons
