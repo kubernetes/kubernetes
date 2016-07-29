@@ -43,6 +43,7 @@ import (
 	kconfig "k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util/oom"
 )
 
 // TODO(jdef): passing the value of envContainerID to all docker containers instantiated
@@ -182,6 +183,9 @@ func (s *KubeletExecutorServer) runKubelet(
 	kcfg.RuntimeCgroups = "" // don't move the docker daemon into a cgroup
 	kcfg.Hostname = kcfg.HostnameOverride
 	kcfg.KubeClient = apiclient
+
+	// we don't support this yet; Mesos should be in charge of managing OOM.
+	kcfg.OOMAdjuster = oom.NewFakeOOMAdjuster()
 
 	// taken from KubeletServer#Run(*KubeletConfig)
 	eventClientConfig, err := kubeletapp.CreateAPIServerClientConfig(s.KubeletServer)
