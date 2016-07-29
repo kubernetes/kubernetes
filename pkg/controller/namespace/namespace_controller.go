@@ -140,14 +140,12 @@ func (nm *NamespaceController) worker() {
 			t := estimate.Estimate/2 + 1
 			glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
 			nm.queue.AddAfter(key, time.Duration(t)*time.Second)
-
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
 			nm.queue.AddRateLimited(key)
 			utilruntime.HandleError(err)
 		}
 		return false
-
 	}
 
 	for {
