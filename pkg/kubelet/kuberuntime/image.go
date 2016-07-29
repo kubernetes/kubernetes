@@ -43,12 +43,20 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 		return err
 	}
 
-	creds, ok := keyring.Lookup(repoToPull)
-	if !ok {
+	imgSpec := &runtimeApi.ImageSpec{Image: &img}
+	creds, withCredentials := keyring.Lookup(repoToPull)
+	if !withCredentials {
 		glog.V(3).Infof("Pulling image %q without credentials", img)
+
+		err = m.imageService.PullImage(imgSpec, nil)
+		if err != nil {
+			glog.Errorf("Pull image %q failed: %v", img, err)
+			return err
+		}
+
+		return nil
 	}
 
-	imgSpec := &runtimeApi.ImageSpec{Image: &img}
 	var pullErrs []error
 	for _, currentCreds := range creds {
 		authConfig := credentialprovider.LazyProvide(currentCreds)
