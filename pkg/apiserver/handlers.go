@@ -168,7 +168,7 @@ func RecoverPanics(handler http.Handler) http.Handler {
 // determined by timeoutFunc. The new http.Handler calls h.ServeHTTP to handle
 // each request, but if a call runs for longer than its time limit, the
 // handler responds with a 503 Service Unavailable error and the message
-// provided. (If msg is empty, a suitable default message with be sent.) After
+// provided. (If msg is empty, a suitable default message will be sent.) After
 // the handler times out, writes by h to its http.ResponseWriter will return
 // http.ErrHandlerTimeout. If timeoutFunc returns a nil timeout channel, no
 // timeout will be enforced.
