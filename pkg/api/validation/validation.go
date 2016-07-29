@@ -3198,7 +3198,7 @@ func ValidateLoadBalancerStatus(status *api.LoadBalancerStatus, fldPath *field.P
 			}
 		}
 		if len(ingress.Hostname) > 0 {
-			for _, msg := range validation.IsDNS4592WildcardSubdomain(ingress.Hostname) {
+			for _, msg := range validation.IsDNS1123Subdomain(ingress.Hostname) {
 				allErrs = append(allErrs, field.Invalid(idxPath.Child("hostname"), ingress.Hostname, msg))
 			}
 			if isIP := (net.ParseIP(ingress.Hostname) != nil); isIP {
