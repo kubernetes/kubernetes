@@ -250,6 +250,14 @@ cross:
 $(notdir $(abspath $(wildcard cmd/*/))): generated_files
 	hack/make-rules/build.sh cmd/$@
 
+# Add rules for all directories in plugin/cmd/
+#
+# Example:
+#   make kube-scheduler
+.PHONY: $(notdir $(abspath $(wildcard plugin/cmd/*/)))
+$(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
+	hack/make-rules/build.sh plugin/cmd/$@
+
 # Add rules for all directories in federation/cmd/
 #
 # Example:
