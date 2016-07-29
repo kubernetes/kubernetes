@@ -18,6 +18,7 @@ package audit
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -27,18 +28,19 @@ import (
 	"github.com/pborman/uuid"
 
 	"k8s.io/kubernetes/pkg/api"
+	genericaudit "k8s.io/kubernetes/pkg/genericapiserver/audit"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 // auditResponseWriter implements http.ResponseWriter interface.
 type auditResponseWriter struct {
 	http.ResponseWriter
-	out io.Writer
-	id  string
+	out   io.Writer
+	event *genericaudit.Event
 }
 
 func (a *auditResponseWriter) WriteHeader(code int) {
-	fmt.Fprintf(a.out, "%s AUDIT: id=%q response=\"%d\"\n", time.Now().Format(time.RFC3339Nano), a.id, code)
+	a.event.Response = code
 	a.ResponseWriter.WriteHeader(code)
 }
 
@@ -83,26 +85,42 @@ var _ http.Hijacker = &fancyResponseWriterDelegator{}
 func WithAudit(handler http.Handler, requestContextMapper api.RequestContextMapper, out io.Writer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		ctx, _ := requestContextMapper.Get(req)
+
+		ev := genericaudit.Event{
+			Level:  genericaudit.StorageLogLevel,
+			ID:     uuid.NewRandom().String(),
+			Method: req.Method,
+			URI:    req.URL.String(),
+		}
+
 		user, _ := api.UserFrom(ctx)
-		asuser := req.Header.Get("Impersonate-User")
-		if len(asuser) == 0 {
-			asuser = "<self>"
+		ev.User = user.GetName()
+
+		ev.AsUser = req.Header.Get("Impersonate-User")
+		if len(ev.AsUser) == 0 {
+			ev.AsUser = ev.User
 		}
-		namespace := api.NamespaceValue(ctx)
-		if len(namespace) == 0 {
-			namespace = "<none>"
+
+		ev.Namespace = api.NamespaceValue(ctx)
+		if len(ev.Namespace) == 0 {
+			ev.Namespace = "<none>"
 		}
-		id := uuid.NewRandom().String()
+
+		requestContextMapper.Update(req, context.WithValue(ctx, genericaudit.EventContextKey, &ev))
 
 		fmt.Fprintf(out, "%s AUDIT: id=%q ip=%q method=%q user=%q as=%q namespace=%q uri=%q\n",
-			time.Now().Format(time.RFC3339Nano), id, utilnet.GetClientIP(req), req.Method, user.GetName(), asuser, namespace, req.URL)
-		respWriter := constructResponseWriter(w, out, id)
+			time.Now().Format(time.RFC3339Nano), ev.ID, utilnet.GetClientIP(req), req.Method, ev.User,
+			ev.AsUser, ev.Namespace, req.URL)
+
+		respWriter := constructResponseWriter(w, out, &ev) // catch response code
 		handler.ServeHTTP(respWriter, req)
+
+		fmt.Fprintf(out, "%s AUDIT: id=%q response=\"%d\" request=%v old=%v new=%v\n", time.Now().Format(time.RFC3339Nano), ev.ID, ev.Response, ev.RequestObject != nil, ev.OldObject != nil, ev.NewObject != nil)
 	})
 }
 
-func constructResponseWriter(responseWriter http.ResponseWriter, out io.Writer, id string) http.ResponseWriter {
-	delegate := &auditResponseWriter{ResponseWriter: responseWriter, out: out, id: id}
+func constructResponseWriter(responseWriter http.ResponseWriter, out io.Writer, ev *genericaudit.Event) http.ResponseWriter {
+	delegate := &auditResponseWriter{ResponseWriter: responseWriter, out: out, event: ev}
 	// check if the ResponseWriter we're wrapping is the fancy one we need
 	// or if the basic is sufficient
 	_, cn := responseWriter.(http.CloseNotifier)
