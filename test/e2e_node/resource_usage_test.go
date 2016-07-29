@@ -1,9 +1,12 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,36 +21,33 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Kubelet-perf [Serial] [Slow]", func() {
+var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 	const (
 		// Interval to poll /stats/container on a node
 		containerStatsPollingPeriod = 10 * time.Second
 		// The monitoring time for one test.
-		monitoringTime = 6 * time.Minute
+		monitoringTime = 10 * time.Minute
 		// The periodic reporting period.
-		reportingPeriod = 3 * time.Minute
+		reportingPeriod = 5 * time.Minute
 
 		sleepAfterCreatePods = 10 * time.Second
-		sleepAfterDeletePods = 120 * time.Second
 	)
 
 	var (
 		ns string
-		rm *ResourceCollector
+		rc *ResourceCollector
 		om *framework.RuntimeOperationMonitor
 	)
 
-	f := framework.NewDefaultFramework("kubelet-perf")
+	f := framework.NewDefaultFramework("resource-usage")
 
 	BeforeEach(func() {
 		ns = f.Namespace.Name
@@ -59,45 +59,22 @@ var _ = framework.KubeDescribe("Kubelet-perf [Serial] [Slow]", func() {
 		framework.Logf("runtime operation error metrics:\n%s", framework.FormatRuntimeOperationErrorRate(result))
 	})
 
+	// This test measures and verifies the steady resource usage of node is within limit
+	// It collects data from a standalone Cadvisor with housekeeping interval 1s.
+	// It verifies CPU percentiles and the lastest memory usage.
 	Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
-				podsPerNode: 0,
+				podsPerNode: 10,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.06, 0.95: 0.08},
-					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.06},
+					stats.SystemContainerKubelet: {0.50: 0.25, 0.95: 0.30},
+					stats.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
 				},
 				// We set the memory limits generously because the distribution
 				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
-				},
-			},
-			{
-				podsPerNode: 35,
-				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.12, 0.95: 0.14},
-					stats.SystemContainerRuntime: {0.50: 0.05, 0.95: 0.07},
-				},
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
-				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 150 * 1024 * 1024},
-				},
-			},
-			{
-				podsPerNode: 100,
-				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.17, 0.95: 0.22},
-					stats.SystemContainerRuntime: {0.50: 0.06, 0.95: 0.09},
-				},
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
-				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 80 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
+					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
 				},
 			},
 		}
@@ -111,9 +88,13 @@ var _ = framework.KubeDescribe("Kubelet-perf [Serial] [Slow]", func() {
 			It(name, func() {
 				expectedCPU, expectedMemory := itArg.cpuLimits, itArg.memLimits
 
+				// The test collects resource usage from a standalone Cadvisor pod.
+				// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
+				// show the resource usage spikes. But changing its interval increases the overhead
+				// of kubelet. Hence we use a Cadvisor pod.
 				createCadvisorPod(f)
-				rm = NewResourceCollector(containerStatsPollingPeriod)
-				rm.Start()
+				rc = NewResourceCollector(containerStatsPollingPeriod)
+				rc.Start()
 
 				By("Creating a batch of Pods")
 				pods := newTestPods(podsPerNode, ImageRegistry[pauseImage], "test_pod")
@@ -125,8 +106,8 @@ var _ = framework.KubeDescribe("Kubelet-perf [Serial] [Slow]", func() {
 				time.Sleep(sleepAfterCreatePods)
 
 				// Log once and flush the stats.
-				rm.LogLatest()
-				rm.Reset()
+				rc.LogLatest()
+				rc.Reset()
 
 				By("Start monitoring resource usage")
 				// Periodically dump the cpu summary until the deadline is met.
@@ -143,13 +124,15 @@ var _ = framework.KubeDescribe("Kubelet-perf [Serial] [Slow]", func() {
 					} else {
 						time.Sleep(reportingPeriod)
 					}
-					logPodsOnNodes(f.Client)
+					logPodsOnNode(f.Client)
 				}
 
-				By("Reporting overall resource usage")
-				logPodsOnNodes(f.Client)
+				rc.Stop()
 
-				usagePerContainer, err := rm.GetLatest()
+				By("Reporting overall resource usage")
+				logPodsOnNode(f.Client)
+
+				usagePerContainer, err := rc.GetLatest()
 				Expect(err).NotTo(HaveOccurred())
 
 				// TODO(random-liu): Remove the original log when we migrate to new perfdash
@@ -163,7 +146,7 @@ var _ = framework.KubeDescribe("Kubelet-perf [Serial] [Slow]", func() {
 				framework.PrintPerfData(framework.ResourceUsageToPerfData(usagePerNode))
 				verifyMemoryLimits(f.Client, expectedMemory, usagePerNode)
 
-				cpuSummary := rm.GetCPUSummary()
+				cpuSummary := rc.GetCPUSummary()
 				framework.Logf("%s", formatCPUSummary(cpuSummary))
 
 				// Log perf result
@@ -171,21 +154,6 @@ var _ = framework.KubeDescribe("Kubelet-perf [Serial] [Slow]", func() {
 				cpuSummaryPerNode[nodeName] = cpuSummary
 				framework.PrintPerfData(framework.CPUUsageToPerfData(cpuSummaryPerNode))
 				verifyCPULimits(expectedCPU, cpuSummaryPerNode)
-
-				// delete pods
-				By("Deleting a batch of pods")
-				deleteBatchPod(f, pods)
-
-				rm.Stop()
-
-				// tear down cadvisor
-				Expect(f.Client.Pods(ns).Delete(cadvisorPodName, api.NewDeleteOptions(30))).
-					NotTo(HaveOccurred())
-				Expect(framework.WaitForPodToDisappear(f.Client, ns, cadvisorPodName, labels.Everything(),
-					3*time.Second, 10*time.Minute)).
-					NotTo(HaveOccurred())
-
-				time.Sleep(sleepAfterDeletePods)
 			})
 		}
 	})
@@ -267,7 +235,7 @@ func verifyCPULimits(expected framework.ContainersCPUSummary, actual framework.N
 	}
 }
 
-func logPodsOnNodes(c *client.Client) {
+func logPodsOnNode(c *client.Client) {
 	nodeName := framework.TestContext.NodeName
 	podList, err := framework.GetKubeletRunningPods(c, nodeName)
 	if err != nil {

@@ -1,9 +1,12 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -42,15 +45,13 @@ const (
 	kubeletAddr = "localhost:10255"
 )
 
-var _ = framework.KubeDescribe("Density", func() {
+var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 	const (
 		// the data collection time of `resource collector' and the standalone cadvisor
 		// is not synchronizated. Therefore `resource collector' may miss data or
 		// collect duplicated data
 		monitoringInterval    = 500 * time.Millisecond
-		sleepBeforeEach       = 30 * time.Second
 		sleepBeforeCreatePods = 30 * time.Second
-		sleepAfterDeletePods  = 60 * time.Second
 	)
 
 	var (
@@ -67,7 +68,6 @@ var _ = framework.KubeDescribe("Density", func() {
 	})
 
 	AfterEach(func() {
-		time.Sleep(sleepAfterDeletePods)
 	})
 
 	Context("create a batch of pods", func() {
@@ -76,41 +76,21 @@ var _ = framework.KubeDescribe("Density", func() {
 				podsNr:   10,
 				interval: 0 * time.Millisecond,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.10, 0.95: 0.20},
-					stats.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.50},
+					stats.SystemContainerKubelet: {0.50: 0.20, 0.95: 0.30},
+					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 40 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 250 * 1024 * 1024},
+					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
 				},
 				// percentile limit of single pod startup latency
 				podStartupLimits: framework.LatencyMetric{
-					Perc50: 7 * time.Second,
-					Perc90: 10 * time.Second,
-					Perc99: 15 * time.Second,
+					Perc50: 10 * time.Second,
+					Perc90: 15 * time.Second,
+					Perc99: 20 * time.Second,
 				},
 				// upbound of startup latency of a batch of pods
-				podBatchStartupLimit: 20 * time.Second,
-			},
-			{
-				podsNr:   30,
-				interval: 0 * time.Millisecond,
-				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.10, 0.95: 0.35},
-					stats.SystemContainerRuntime: {0.50: 0.10, 0.95: 0.70},
-				},
-				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 40 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
-				},
-				// percentile limit of single pod startup latency
-				podStartupLimits: framework.LatencyMetric{
-					Perc50: 30 * time.Second,
-					Perc90: 35 * time.Second,
-					Perc99: 40 * time.Second,
-				},
-				// upbound of startup latency of a batch of pods
-				podBatchStartupLimit: 90 * time.Second,
+				podBatchStartupLimit: 25 * time.Second,
 			},
 		}
 
@@ -139,7 +119,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				controller := newInformerWatchPod(f, mutex, watchTimes, podType)
 				go controller.Run(stopCh)
 
-				// Zhou: In test we see kubelet starts while it is busy on sth, as a result `syncLoop'
+				// Zhou: In test we see kubelet starts while it is busy on something, as a result `syncLoop'
 				// does not response to pod creation immediately. Creating the first pod has a delay around 5s.
 				// The node status has been `ready' so `wait and check node being ready' does not help here.
 				// Now wait here for a grace period to have `syncLoop' be ready
@@ -153,14 +133,14 @@ var _ = framework.KubeDescribe("Density", func() {
 				// it returns a map[`pod name']`creation time' as the creation timestamps
 				createTimes := createBatchPodWithRateControl(f, pods, itArg.interval)
 
-				By("Waiting for all Pods begin observed by the watch...")
-				// checks every 10s util all pods are running. it timeouts ater 10min
+				By("Waiting for all Pods to be observed by the watch...")
+				// checks every 10s util all pods are running. it times out ater 10min
 				Eventually(func() bool {
 					return len(watchTimes) == itArg.podsNr
 				}, 10*time.Minute, 10*time.Second).Should(BeTrue())
 
 				if len(watchTimes) < itArg.podsNr {
-					framework.Failf("Timeout reached waiting for all Pods being observed by the watch.")
+					framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
 				}
 
 				// stop the watching controller, and the resource collector
@@ -204,18 +184,6 @@ var _ = framework.KubeDescribe("Density", func() {
 				// verify resource
 				By("Verifying resource")
 				verifyResource(f, testArg, rm)
-
-				// delete pods
-				By("Deleting a batch of pods")
-				deleteBatchPod(f, pods)
-
-				// tear down cadvisor
-				Expect(f.Client.Pods(ns).Delete(cadvisorPodName, api.NewDeleteOptions(30))).
-					NotTo(HaveOccurred())
-
-				Eventually(func() error {
-					return checkPodDeleted(f, cadvisorPodName)
-				}, 10*time.Minute, time.Second*3).Should(BeNil())
 			})
 		}
 	})
@@ -226,34 +194,17 @@ var _ = framework.KubeDescribe("Density", func() {
 				podsNr:   10,
 				bgPodsNr: 10,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.10, 0.95: 0.12},
-					stats.SystemContainerRuntime: {0.50: 0.16, 0.95: 0.20},
+					stats.SystemContainerKubelet: {0.50: 0.20, 0.95: 0.25},
+					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 40 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
+					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
 				},
 				podStartupLimits: framework.LatencyMetric{
-					Perc50: 1500 * time.Millisecond,
-					Perc90: 2500 * time.Millisecond,
-					Perc99: 3500 * time.Millisecond,
-				},
-			},
-			{
-				podsNr:   10,
-				bgPodsNr: 30,
-				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.12, 0.95: 0.15},
-					stats.SystemContainerRuntime: {0.50: 0.22, 0.95: 0.27},
-				},
-				memLimits: framework.ResourceUsagePerContainer{
-					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 40 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 300 * 1024 * 1024},
-				},
-				podStartupLimits: framework.LatencyMetric{
-					Perc50: 1500 * time.Millisecond,
-					Perc90: 2500 * time.Millisecond,
-					Perc99: 3500 * time.Millisecond,
+					Perc50: 3000 * time.Millisecond,
+					Perc90: 4000 * time.Millisecond,
+					Perc99: 5000 * time.Millisecond,
 				},
 			},
 		}
@@ -273,7 +224,7 @@ var _ = framework.KubeDescribe("Density", func() {
 				// all pods are running when it returns
 				f.PodClient().CreateBatch(bgPods)
 
-				//time.Sleep(sleepBeforeCreatePods)
+				time.Sleep(sleepBeforeCreatePods)
 
 				// starting resource monitoring
 				rm.Start()
@@ -290,18 +241,6 @@ var _ = framework.KubeDescribe("Density", func() {
 				// verify resource
 				By("Verifying resource")
 				verifyResource(f, testArg, rm)
-
-				// delete pods
-				By("Deleting a batch of pods")
-				deleteBatchPod(f, append(bgPods, testPods...))
-
-				// tear down cadvisor
-				Expect(f.Client.Pods(ns).Delete(cadvisorPodName, api.NewDeleteOptions(30))).
-					NotTo(HaveOccurred())
-
-				Eventually(func() error {
-					return checkPodDeleted(f, cadvisorPodName)
-				}, 10*time.Minute, time.Second*3).Should(BeNil())
 			})
 		}
 	})
@@ -309,7 +248,8 @@ var _ = framework.KubeDescribe("Density", func() {
 
 type DensityTest struct {
 	// number of pods
-	podsNr   int
+	podsNr int
+	// number of background pods
 	bgPodsNr int
 	// interval between creating pod (rate control)
 	interval time.Duration
