@@ -154,6 +154,22 @@ func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *repl
 	return s, rm, podInformer, clientSet
 }
 
+// wait for the podInformer to observe the pods. Call this function before
+// running the RC manager to prevent the rc manager from creating new pods
+// rather than adopting the existing ones.
+func waitToObservePods(t *testing.T, podInformer controllerframwork.SharedIndexInformer, podNum int) {
+	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
+		objects := podInformer.GetIndexer().List()
+		if len(objects) == podNum {
+			return true, nil
+		} else {
+			return false, nil
+		}
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestAdoption(t *testing.T) {
 	var trueVar = true
 	testCases := []struct {
@@ -226,23 +242,7 @@ func TestAdoption(t *testing.T) {
 
 		stopCh := make(chan struct{})
 		go podInformer.Run(stopCh)
-		// wait for the podInformer to observe the pod, otherwise the rc manager
-		// will try to create a new pod rather than adopting the existing one.
-		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
-			objects := podInformer.GetIndexer().List()
-			for _, object := range objects {
-				pod, ok := object.(*api.Pod)
-				if !ok {
-					t.Fatal("expect object to be a pod")
-				}
-				if pod.Name == podName {
-					return true, nil
-				}
-			}
-			return false, nil
-		}); err != nil {
-			t.Fatal(err)
-		}
+		waitToObservePods(t, podInformer, 1)
 		go rm.Run(5, stopCh)
 		if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
 			updatedPod, err := podClient.Get(pod.Name)
@@ -350,6 +350,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	go podInformer.Run(stopCh)
+	waitToObservePods(t, podInformer, 2)
 	go rm.Run(5, stopCh)
 	waitRCStable(t, clientSet, rc, ns.Name)
 
@@ -380,7 +381,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 
 func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 	// We have pod1, pod2 and rc. rc.spec.replicas=2. At first rc.Selector
-	// matches pod1 and pod2; change pod2's lables to non-matching. Verify
+	// matches pod1 and pod2; change pod2's labels to non-matching. Verify
 	// that rc creates one more pod, so there are 3 pods. Also verify that
 	// pod2's controllerRef is cleared.
 	s, rm, podInformer, clientSet := rmSetup(t, true)
@@ -422,7 +423,7 @@ func TestUpdateLabelToRemoveControllerRef(t *testing.T) {
 
 func TestUpdateLabelToBeAdopted(t *testing.T) {
 	// We have pod1, pod2 and rc. rc.spec.replicas=1. At first rc.Selector
-	// matches pod1 only; change pod2's lables to be matching. Verify the RC
+	// matches pod1 only; change pod2's labels to be matching. Verify the RC
 	// controller adopts pod2 and delete one of them, so there is only 1 pod
 	// left.
 	s, rm, podInformer, clientSet := rmSetup(t, true)
