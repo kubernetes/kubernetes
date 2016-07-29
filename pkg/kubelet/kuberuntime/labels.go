@@ -141,16 +141,18 @@ func newContainerAnnotations(container *api.Container, pod *api.Pod, restartCoun
 // getPodSandboxInfoFromLabels gets labeledPodSandboxInfo from labels.
 func getPodSandboxInfoFromLabels(labels map[string]string) *labeledPodSandboxInfo {
 	podSandboxInfo := &labeledPodSandboxInfo{
-		Labels:       labels,
+		Labels:       make(map[string]string),
 		PodName:      getStringValueFromLabel(labels, types.KubernetesPodNameLabel),
 		PodNamespace: getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
 		PodUID:       kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
 	}
 
 	// Remain only labels from api.Pod
-	delete(podSandboxInfo.Labels, types.KubernetesPodNameLabel)
-	delete(podSandboxInfo.Labels, types.KubernetesPodNamespaceLabel)
-	delete(podSandboxInfo.Labels, types.KubernetesPodUIDLabel)
+	for k, v := range labels {
+		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel {
+			podSandboxInfo.Labels[k] = v
+		}
+	}
 
 	return podSandboxInfo
 }
@@ -160,7 +162,7 @@ func getPodSandboxInfoFromAnnotations(annotations map[string]string) *annotatedP
 	var err error
 
 	podSandboxInfo := &annotatedPodSandboxInfo{
-		Annotations: annotations,
+		Annotations: make(map[string]string),
 	}
 
 	if podSandboxInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, kubernetesPodDeletionGracePeriodLabel); err != nil {
@@ -171,8 +173,11 @@ func getPodSandboxInfoFromAnnotations(annotations map[string]string) *annotatedP
 	}
 
 	// Remain only annotations from api.Pod
-	delete(podSandboxInfo.Annotations, kubernetesPodTerminationGracePeriodLabel)
-	delete(podSandboxInfo.Annotations, kubernetesPodDeletionGracePeriodLabel)
+	for k, v := range annotations {
+		if k != kubernetesPodTerminationGracePeriodLabel && k != kubernetesPodDeletionGracePeriodLabel {
+			podSandboxInfo.Annotations[k] = v
+		}
+	}
 
 	return podSandboxInfo
 }

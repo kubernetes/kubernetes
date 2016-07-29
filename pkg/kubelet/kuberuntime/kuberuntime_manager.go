@@ -103,7 +103,7 @@ func NewKubeGenericRuntimeManager(
 	cpuCFSQuota bool,
 	runtimeService kubecontainer.RuntimeService,
 	imageService kubecontainer.ImageManagerService,
-) (kubecontainer.Runtime, error) {
+) (*kubeGenericRuntimeManager, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
 		recorder:            recorder,
 		cpuCFSQuota:         cpuCFSQuota,
@@ -428,6 +428,20 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 		}
 	}
 
+	// We pass the value of the podIP down to generatePodSandboxConfig and
+	// generateContainerConfig, which in turn passes it to various other
+	// functions, in order to facilitate functionality that requires this
+	// value (hosts file and downward API) and avoid races determining
+	// the pod IP in cases where a container requires restart but the
+	// podIP isn't in the status manager yet.
+	//
+	// We default to the IP in the passed-in pod status, and overwrite it if the
+	// infra container needs to be (re)started.
+	podIP := ""
+	if podStatus != nil {
+		podIP = podStatus.IP
+	}
+
 	// Create PodSandbox
 	podSandboxID := podContainerChanges.PodSandBoxID
 	if podContainerChanges.CreateSandbox && len(podContainerChanges.ContainersToStart) > 0 {
@@ -435,7 +449,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 		startSandboxResult := kubecontainer.NewSyncResult(kubecontainer.StartPodSandbox, format.Pod(pod))
 		result.AddSyncResult(startSandboxResult)
 		var msg string
-		podSandboxID, msg, err = m.createPodSandbox(pod)
+		podSandboxID, msg, err = m.createPodSandbox(pod, podIP)
 		if err != nil {
 			startSandboxResult.Fail(kubecontainer.ErrCreatePodSandbox, msg)
 			glog.Errorf("Failed to create pod sandbox: %v; Skipping pod %q", err, format.Pod(pod))
@@ -465,13 +479,24 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 				}
 				return
 			}
+
+			podSandboxStatus, err := m.runtimeService.PodSandboxStatus(podSandboxID)
+			if err != nil {
+				glog.Errorf("Failed to get pod sandbox status: %v; Skipping pod %q", err, format.Pod(pod))
+				result.Fail(err)
+				return
+			}
+
+			// Overwrite the podIP passed in the pod status, since we just started the infra container.
+			podIP = m.determinePodSandboxIP(pod.Namespace, pod.Name, podSandboxStatus)
+			glog.V(4).Infof("Determined pod ip after infra change: %q: %q", format.Pod(pod), podIP)
 		}
 	}
 
 	// Get podSandboxConfig for containers to start
 	configPodSandboxResult := kubecontainer.NewSyncResult(kubecontainer.ConfigPodSandbox, podSandboxID)
 	result.AddSyncResult(configPodSandboxResult)
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod)
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, podIP)
 	if err != nil {
 		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
 		glog.Error(message)
@@ -495,7 +520,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 		}
 
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
-		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets); err != nil {
+		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			continue

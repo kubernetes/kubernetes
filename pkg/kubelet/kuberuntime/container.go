@@ -40,8 +40,8 @@ func getContainerLogsPath(containerName, podUID string) string {
 }
 
 // generateContainerConfig generates container config for kubelet runtime api.
-func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Container, pod *api.Pod, restartCount int) (*runtimeApi.ContainerConfig, error) {
-	opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, "")
+func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Container, pod *api.Pod, restartCount int, podIP string) (*runtimeApi.ContainerConfig, error) {
+	opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, container, podIP)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +155,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 // * Create the container
 // * Start the container
 // * Run the post start lifecycle hooks (if applicable)
-func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeApi.PodSandboxConfig, container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret) (string, error) {
+func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandboxConfig *runtimeApi.PodSandboxConfig, container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, podIP string) (string, error) {
 	err, msg := m.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
 		return msg, err
@@ -174,7 +174,7 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		restartCount = containerStatus.RestartCount + 1
 	}
 
-	containerConfig, err := m.generateContainerConfig(container, pod, restartCount)
+	containerConfig, err := m.generateContainerConfig(container, pod, restartCount, podIP)
 	if err != nil {
 		m.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create container with error: %v", err)
 		return "Generate Container Config Failed", err

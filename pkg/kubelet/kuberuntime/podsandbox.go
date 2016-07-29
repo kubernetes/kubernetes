@@ -62,7 +62,7 @@ func (m *kubeGenericRuntimeManager) getKubeletPodSandboxes(all bool) ([]*runtime
 }
 
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod) (*runtimeApi.PodSandboxConfig, error) {
+func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP string) (*runtimeApi.PodSandboxConfig, error) {
 	_, podName, _ := buildPodName(pod.Name, pod.Namespace, string(pod.UID))
 	podSandboxConfig := &runtimeApi.PodSandboxConfig{
 		Name:        &podName,
@@ -108,7 +108,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod) (*run
 			}
 		}
 
-		opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, "")
+		opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
 		if err != nil {
 			return nil, err
 		}
@@ -205,8 +205,8 @@ func generatePodSandboxLinuxConfig(pod *api.Pod, cgroupParent string) *runtimeAp
 }
 
 // createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error)
-func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod) (string, string, error) {
-	podSandboxConfig, err := m.generatePodSandboxConfig(pod)
+func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod, podIP string) (string, string, error) {
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, podIP)
 	if err != nil {
 		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
 		glog.Error(message)
