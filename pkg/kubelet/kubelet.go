@@ -194,10 +194,25 @@ type KubeletBuilder func(kc_old *KubeletConfig, kc_new *componentconfig.KubeletC
 // KubeletConfig is all of the parameters necessary for running a kubelet.
 // TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
 type KubeletConfig struct {
-	// Fields to remove
-	Builder KubeletBuilder // requires some refactoring to remove
+	// TOOD(mtaufen): KubeletBuilder:
+	//                Mesos currently uses this as a hook to let them make their own call to
+	//                let them wrap the KubeletBootstrap that CreateAndInitKubelet returns with
+	//                their own KubeletBootstrap. It's a useful hook. I need to think about what
+	//                a nice home for it would be. There seems to be a trend, between this and
+	//                the Options fields below, of providing hooks where you can add extra functionality
+	//                to the Kubelet for your solution. Maybe we should centralize these sorts of things?
+	Builder KubeletBuilder
 
-	// Fields to still think about
+	// TODO(mtaufen): ContainerRuntimeOptions and Options:
+	//                Arrays of functions that can do arbitrary things to the Kubelet and the Runtime
+	//                seem like a difficult path to trace when it's time to debug something.
+	//                I'm leaving these fields here for now, but there is likely an easier-to-follow
+	//                way to support their intended use cases. E.g. ContainerRuntimeOptions
+	//                is used by Mesos to set an environment variable in containers which has
+	//                some connection to their container GC. It seems that Mesos intends to use
+	//                Options to add additional node conditions that are updated as part of the
+	//                Kubelet lifecycle (see https://github.com/kubernetes/kubernetes/pull/21521).
+	//                We should think about providing more explicit ways of doing these things.
 	ContainerRuntimeOptions []kubecontainer.Option
 	Options                 []Option
 
