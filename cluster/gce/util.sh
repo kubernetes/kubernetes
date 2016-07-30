@@ -39,6 +39,7 @@ fi
 
 function get_latest_gci_image() {
   # GCI milestone to use
+  # Update the GCI image in test/e2e_node/jenkins/image-config.yaml before updating the milestone here.
   GCI_MILESTONE="53"
 
   # First try to find an active (non-deprecated) image on this milestone.
