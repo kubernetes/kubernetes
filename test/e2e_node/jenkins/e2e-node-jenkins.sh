@@ -28,12 +28,6 @@ set -x
 
 . $1
 
-if [ "$INSTALL_GODEP" = true ] ; then
-  go get -u github.com/tools/godep
-  go get -u github.com/onsi/ginkgo/ginkgo
-  go get -u github.com/onsi/gomega
-fi
-
 make generated_files
 
 # TODO converge build steps with hack/build-go some day if possible.
