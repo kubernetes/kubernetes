@@ -778,6 +778,7 @@ func validateLocalDescendingPath(targetPath string, fldPath *field.Path) field.E
 	for _, item := range parts {
 		if item == ".." {
 			allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not contain '..'"))
+			break // even for `../../..`, one error is sufficient to make the point
 		}
 	}
 	return allErrs
