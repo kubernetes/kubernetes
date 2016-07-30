@@ -27,6 +27,8 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -86,9 +88,13 @@ type ImageConfig struct {
 }
 
 type GCEImage struct {
-	Image    string `json:"image"`
-	Project  string `json:"project"`
-	Metadata string `json:"metadata"`
+	Image      string `json:"image, omitempty"`
+	Project    string `json:"project"`
+	Metadata   string `json:"metadata"`
+	ImageRegex string `json:"image_regex, omitempty"`
+	// Defaults to using only the latest image. Acceptible values are [0, # of images that match the regex).
+	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
+	PreviousImages int `json:"previous_images, omitempty"`
 }
 
 type internalImageConfig struct {
@@ -128,12 +134,23 @@ func main() {
 			glog.Fatalf("Could not parse image config file: %v", err)
 		}
 		for key, imageConfig := range externalImageConfig.Images {
-			gceImage := internalGCEImage{
-				image:    imageConfig.Image,
-				project:  imageConfig.Project,
-				metadata: getImageMetadata(imageConfig.Metadata),
+			var images []string
+			if imageConfig.ImageRegex != "" && imageConfig.Image == "" {
+				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.Project, imageConfig.PreviousImages)
+				if err != nil {
+					glog.Fatalf("Could not retrieve list of images based on image prefix %q: %v", imageConfig.ImageRegex, err)
+				}
+			} else {
+				images = []string{imageConfig.Image}
 			}
-			gceImages.images[key] = gceImage
+			for _, image := range images {
+				gceImage := internalGCEImage{
+					image:    image,
+					project:  imageConfig.Project,
+					metadata: getImageMetadata(imageConfig.Metadata),
+				}
+				gceImages.images[image] = gceImage
+			}
 		}
 	}
 
@@ -306,6 +323,55 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode b
 	}
 }
 
+type imageObj struct {
+	creationTime time.Time
+	name         string
+}
+
+func (io imageObj) string() string {
+	return fmt.Sprintf("%q created % %q", io.name, io.creationTime.String())
+}
+
+type byCreationTime []imageObj
+
+func (a byCreationTime) Len() int           { return len(a) }
+func (a byCreationTime) Less(i, j int) bool { return a[i].creationTime.After(a[j].creationTime) }
+func (a byCreationTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+// Returns a list of image names based on regex and number of previous images requested.
+func getGCEImages(imageRegex, project string, previousImages int) ([]string, error) {
+	ilc, err := computeService.Images.List(project).Do()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to list images in project %q and zone %q", project, zone)
+	}
+	imageObjs := []imageObj{}
+	imageRe := regexp.MustCompile(imageRegex)
+	for _, instance := range ilc.Items {
+		if imageRe.MatchString(instance.Name) {
+			creationTime, err := time.Parse(time.RFC3339, instance.CreationTimestamp)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to parse instance creation timestamp %q: %v", instance.CreationTimestamp, err)
+			}
+			io := imageObj{
+				creationTime: creationTime,
+				name:         instance.Name,
+			}
+			glog.V(4).Infof("Found image %q based on regex %q in project %q", io.string(), imageRegex, project)
+			imageObjs = append(imageObjs, io)
+		}
+	}
+	sort.Sort(byCreationTime(imageObjs))
+	images := []string{}
+	for _, imageObj := range imageObjs {
+		images = append(images, imageObj.name)
+		previousImages--
+		if previousImages < 0 {
+			break
+		}
+	}
+	return images, nil
+}
+
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
 func testImage(image *internalGCEImage, junitFilePrefix string) *TestResult {
@@ -327,6 +393,7 @@ func testImage(image *internalGCEImage, junitFilePrefix string) *TestResult {
 
 // Provision a gce instance using image
 func createInstance(image *internalGCEImage) (string, error) {
+	glog.V(1).Infof("Creating instance %+v", *image)
 	name := imageToInstanceName(image.image)
 	i := &compute.Instance{
 		Name:        name,
