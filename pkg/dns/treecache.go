@@ -17,7 +17,6 @@ limitations under the License.
 package dns
 
 import (
-	"bytes"
 	"encoding/json"
 	"strings"
 
@@ -37,18 +36,11 @@ func NewTreeCache() *TreeCache {
 }
 
 func (cache *TreeCache) Serialize() (string, error) {
-	b, err := json.Marshal(cache)
+	prettyJSON, err := json.MarshalIndent(cache, "", "\t")
 	if err != nil {
 		return "", err
 	}
-
-	var prettyJSON bytes.Buffer
-	err = json.Indent(&prettyJSON, b, "", "\t")
-
-	if err != nil {
-		return "", err
-	}
-	return string(prettyJSON.Bytes()), nil
+	return string(prettyJSON), nil
 }
 
 // setEntry creates the entire path if it doesn't already exist in the cache,
