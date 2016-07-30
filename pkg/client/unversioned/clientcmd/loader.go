@@ -26,6 +26,7 @@ import (
 	goruntime "runtime"
 	"strings"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/imdario/mergo"
 
@@ -190,15 +191,17 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 		kubeconfigs = append(kubeconfigs, config)
 	}
 
-	// first merge all of our maps
 	mapConfig := clientcmdapi.NewConfig()
+	nonMapConfig := clientcmdapi.NewConfig()
+
+	// first merge all of our maps
 	for _, kubeconfig := range kubeconfigs {
-		mergo.MergeWithOverwrite(mapConfig, kubeconfig)
+		mergo.Merge(mapConfig, kubeconfig)
 	}
 
 	// merge all of the struct values in the reverse order so that priority is given correctly
 	// errors are not added to the list the second time
-	nonMapConfig := clientcmdapi.NewConfig()
+
 	for i := len(kubeconfigs) - 1; i >= 0; i-- {
 		kubeconfig := kubeconfigs[i]
 		mergo.MergeWithOverwrite(nonMapConfig, kubeconfig)
@@ -207,7 +210,7 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
 	// get the values we expect.
 	config := clientcmdapi.NewConfig()
-	mergo.MergeWithOverwrite(config, mapConfig)
+	mergo.Merge(config, mapConfig)
 	mergo.MergeWithOverwrite(config, nonMapConfig)
 
 	if rules.ResolvePaths() {
@@ -217,6 +220,18 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 	}
 
 	return config, utilerrors.NewAggregate(errlist)
+}
+
+func printConfig(config *clientcmdapi.Config) {
+	json, err := runtime.Encode(clientcmdlatest.Codec, config)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	output, err := yaml.JSONToYAML(json)
+	if err != nil {
+		fmt.Printf("Unexpected error: %v", err)
+	}
+	fmt.Printf("%v", string(output))
 }
 
 // Migrate uses the MigrationRules map.  If a destination file is not present, then the source file is checked.
