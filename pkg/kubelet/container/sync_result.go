@@ -39,6 +39,8 @@ var (
 	ErrKillContainer    = errors.New("KillContainerError")
 	ErrVerifyNonRoot    = errors.New("VerifyNonRootError")
 	ErrRunInitContainer = errors.New("RunInitContainerError")
+	ErrCreatePodSandbox = errors.New("CreatePodSandboxError")
+	ErrKillPodSandbox   = errors.New("KillPodSandboxError")
 )
 
 var (
@@ -51,11 +53,14 @@ var (
 type SyncAction string
 
 const (
-	StartContainer  SyncAction = "StartContainer"
-	KillContainer   SyncAction = "KillContainer"
-	SetupNetwork    SyncAction = "SetupNetwork"
-	TeardownNetwork SyncAction = "TeardownNetwork"
-	InitContainer   SyncAction = "InitContainer"
+	StartContainer   SyncAction = "StartContainer"
+	KillContainer    SyncAction = "KillContainer"
+	SetupNetwork     SyncAction = "SetupNetwork"
+	TeardownNetwork  SyncAction = "TeardownNetwork"
+	InitContainer    SyncAction = "InitContainer"
+	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
+	StartPodSandbox  SyncAction = "StartPodSandbox"
+	KillPodSandbox   SyncAction = "KillPodSandbox"
 )
 
 // SyncResult is the result of sync action.

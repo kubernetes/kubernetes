@@ -172,7 +172,7 @@ message PodSandboxConfig {
     //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
     //     ContainerConfig.LogPath = `containerName_Instance#.log`
     //
-    // WARNING: Log managment and how kubelet should interface with the
+    // WARNING: Log management and how kubelet should interface with the
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
@@ -185,7 +185,7 @@ message PodSandboxConfig {
     // aggregate cpu/memory resources limits of all containers).
     // Note: On a Linux host, kubelet will create a pod-level cgroup and pass
     // it as the cgroup parent for the PodSandbox. For some runtimes, this is
-    // sufficent. For others, e.g., hypervisor-based runtimes, explicit
+    // sufficient. For others, e.g., hypervisor-based runtimes, explicit
     // resource limits for the sandbox are needed at creation time.
     optional PodSandboxResources resources  = 6;
     // Labels are key value pairs that may be used to scope and select individual resources.
@@ -421,7 +421,7 @@ message ContainerConfig {
     //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
     //     ContainerConfig.LogPath = `containerName_Instance#.log`
     //
-    // WARNING: Log managment and how kubelet should interface with the
+    // WARNING: Log management and how kubelet should interface with the
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
@@ -491,7 +491,7 @@ message ContainerFilter {
     optional string name = 1;
     // ID of the container.
     optional string id = 2;
-    // State of the contianer.
+    // State of the container.
     optional ContainerState state = 3;
     // The id of the pod sandbox
     optional string pod_sandbox_id = 4;
@@ -522,6 +522,9 @@ message Container {
     optional ContainerState state = 5;
     // Labels are key value pairs that may be used to scope and select individual resources.
     map<string, string> labels = 6;
+    // Annotations is an unstructured key value map that may be set by external
+    // tools to store and retrieve arbitrary metadata.
+    map<string, string> annotations = 7;
 }
 
 message ListContainersResponse {
