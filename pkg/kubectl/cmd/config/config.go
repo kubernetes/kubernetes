@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
+// NewCmdConfig creates a command object for the "config" action, and adds all child commands to it.
 func NewCmdConfig(pathOptions *clientcmd.PathOptions, out io.Writer) *cobra.Command {
 	if len(pathOptions.ExplicitFileFlag) == 0 {
 		pathOptions.ExplicitFileFlag = clientcmd.RecommendedConfigPathFlag
@@ -58,6 +59,9 @@ The loading order follows these rules:
 	cmd.AddCommand(NewCmdConfigCurrentContext(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigUseContext(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigGetContexts(out, pathOptions))
+	cmd.AddCommand(NewCmdConfigGetClusters(out, pathOptions))
+	cmd.AddCommand(NewCmdConfigDeleteCluster(out, pathOptions))
+	cmd.AddCommand(NewCmdConfigDeleteContext(out, pathOptions))
 
 	return cmd
 }
