@@ -776,6 +776,72 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	}
 }
 
+func TestValidateKeyToPath(t *testing.T) {
+	testCases := []struct {
+		kp      api.KeyToPath
+		ok      bool
+		errtype field.ErrorType
+	}{
+		{
+			kp: api.KeyToPath{Key: "k", Path: "p"},
+			ok: true,
+		},
+		{
+			kp: api.KeyToPath{Key: "k", Path: "p/p/p/p"},
+			ok: true,
+		},
+		{
+			kp: api.KeyToPath{Key: "k", Path: "p/..p/p../p..p"},
+			ok: true,
+		},
+		{
+			kp:      api.KeyToPath{Key: "", Path: "p"},
+			ok:      false,
+			errtype: field.ErrorTypeRequired,
+		},
+		{
+			kp:      api.KeyToPath{Key: "k", Path: ""},
+			ok:      false,
+			errtype: field.ErrorTypeRequired,
+		},
+		{
+			kp:      api.KeyToPath{Key: "k", Path: "..p"},
+			ok:      false,
+			errtype: field.ErrorTypeInvalid,
+		},
+		{
+			kp:      api.KeyToPath{Key: "k", Path: "../p"},
+			ok:      false,
+			errtype: field.ErrorTypeInvalid,
+		},
+		{
+			kp:      api.KeyToPath{Key: "k", Path: "p/../p"},
+			ok:      false,
+			errtype: field.ErrorTypeInvalid,
+		},
+		{
+			kp:      api.KeyToPath{Key: "k", Path: "p/.."},
+			ok:      false,
+			errtype: field.ErrorTypeInvalid,
+		},
+	}
+
+	for i, tc := range testCases {
+		errs := validateKeyToPath(&tc.kp, field.NewPath("field"))
+		if tc.ok && len(errs) > 0 {
+			t.Errorf("[%d] unexpected errors: %v", i, errs)
+		} else if !tc.ok && len(errs) == 0 {
+			t.Errorf("[%d] expected error type %v", i, tc.errtype)
+		} else if len(errs) > 1 {
+			t.Errorf("[%d] expected only one error, got %d", i, len(errs))
+		} else if !tc.ok {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d] expected error type %v, got %v", i, tc.errtype, errs[0].Type)
+			}
+		}
+	}
+}
+
 func TestValidateVolumes(t *testing.T) {
 	lun := int32(1)
 	successCase := []api.Volume{
@@ -787,8 +853,14 @@ func TestValidateVolumes(t *testing.T) {
 		{Name: "awsebs", VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}},
 		{Name: "gitrepo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Revision: "hashstring", Directory: "target"}}},
 		{Name: "gitrepodot", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Directory: "."}}},
+		{Name: "gitrepodotdotfoo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Directory: "..foo"}}},
 		{Name: "iscsidisk", VolumeSource: api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "127.0.0.1", IQN: "iqn.2015-02.example.com:test", Lun: 1, FSType: "ext4", ReadOnly: false}}},
-		{Name: "secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret"}}},
+		{Name: "secret1", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret"}}},
+		{Name: "secret2", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret", Items: []api.KeyToPath{{Key: "key", Path: "filename"}}}}},
+		{Name: "secret3", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret", Items: []api.KeyToPath{{Key: "key", Path: "dir/filename"}}}}},
+		{Name: "cfgmap1", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "my-cfgmap"}}}},
+		{Name: "cfgmap2", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "my-cfgmap"}, Items: []api.KeyToPath{{Key: "key", Path: "filename"}}}}},
+		{Name: "cfgmap3", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "my-cfgmap"}, Items: []api.KeyToPath{{Key: "key", Path: "dir/filename"}}}}},
 		{Name: "glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host1", Path: "path", ReadOnly: false}}},
 		{Name: "flocker", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "datasetName"}}},
 		{Name: "rbd", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "bar", FSType: "ext4"}}},
@@ -840,19 +912,23 @@ func TestValidateVolumes(t *testing.T) {
 	if len(errs) != 0 {
 		t.Errorf("expected success: %v", errs)
 	}
-	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret", "iscsidisk", "cinder", "cephfs", "flexvolume", "fc") {
+	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret1", "secret2", "secret3", "cfgmap1", "cfgmap2", "cfgmap3", "iscsidisk", "cinder", "cephfs", "flexvolume", "fc") {
 		t.Errorf("wrong names result: %v", names)
 	}
 	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}
 	emptyPortal := api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "", IQN: "iqn.2015-02.example.com:test", Lun: 1, FSType: "ext4", ReadOnly: false}}
 	emptyIQN := api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "127.0.0.1", IQN: "", Lun: 1, FSType: "ext4", ReadOnly: false}}
+	secretMissingPath := api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "s", Items: []api.KeyToPath{{Key: "key", Path: ""}}}}
+	secretDotDot := api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "s", Items: []api.KeyToPath{{Key: "key", Path: "../foo"}}}}
+	cfgmapMissingPath := api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "c"}, Items: []api.KeyToPath{{Key: "key", Path: ""}}}}
+	cfgmapDotDot := api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "c"}, Items: []api.KeyToPath{{Key: "key", Path: "../foo"}}}}
 	emptyHosts := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "", Path: "path", ReadOnly: false}}
 	emptyPath := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host", Path: "", ReadOnly: false}}
 	emptyName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: ""}}
 	emptyMon := api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{}, RBDImage: "bar", FSType: "ext4"}}
 	emptyImage := api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "", FSType: "ext4"}}
 	emptyCephFSMon := api.VolumeSource{CephFS: &api.CephFSVolumeSource{Monitors: []string{}}}
-	startsWithDots := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "..dots/bar"}}
+	startsWithDots := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "../dots/bar"}}
 	containsDots := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "dots/../bar"}}
 	absPath := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "/abstarget"}}
 	emptyPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "",
@@ -929,6 +1005,26 @@ func TestValidateVolumes(t *testing.T) {
 			field.ErrorTypeRequired,
 			"iscsi.iqn", "",
 		},
+		"secret with missing path": {
+			[]api.Volume{{Name: "secret-dot-dot", VolumeSource: secretMissingPath}},
+			field.ErrorTypeRequired,
+			"secret.items[0]", "",
+		},
+		"secret with ..": {
+			[]api.Volume{{Name: "secret-dot-dot", VolumeSource: secretDotDot}},
+			field.ErrorTypeInvalid,
+			"secret.items[0]", "",
+		},
+		"configmap with missing path": {
+			[]api.Volume{{Name: "cfgmap-dot-dot", VolumeSource: cfgmapMissingPath}},
+			field.ErrorTypeRequired,
+			"configMap.items[0]", "",
+		},
+		"configmap with ..": {
+			[]api.Volume{{Name: "cfgmap-dot-dot", VolumeSource: cfgmapDotDot}},
+			field.ErrorTypeInvalid,
+			"configMap.items[0]", "",
+		},
 		"empty hosts": {
 			[]api.Volume{{Name: "badhost", VolumeSource: emptyHosts}},
 			field.ErrorTypeRequired,
@@ -1002,7 +1098,7 @@ func TestValidateVolumes(t *testing.T) {
 		"starts with '..'": {
 			[]api.Volume{{Name: "badprefix", VolumeSource: startsWithDots}},
 			field.ErrorTypeInvalid,
-			"gitRepo.directory", `must not start with '..'`,
+			"gitRepo.directory", `must not contain '..'`,
 		},
 		"contains '..'": {
 			[]api.Volume{{Name: "containsdots", VolumeSource: containsDots}},

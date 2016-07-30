@@ -598,7 +598,7 @@ func validateGitRepoVolumeSource(gitRepo *api.GitRepoVolumeSource, fldPath *fiel
 		allErrs = append(allErrs, field.Required(fldPath.Child("repository"), ""))
 	}
 
-	pathErrs := validateVolumeSourcePath(gitRepo.Directory, fldPath.Child("directory"))
+	pathErrs := validateLocalDescendingPath(gitRepo.Directory, fldPath.Child("directory"))
 	allErrs = append(allErrs, pathErrs...)
 	return allErrs
 }
@@ -660,6 +660,11 @@ func validateSecretVolumeSource(secretSource *api.SecretVolumeSource, fldPath *f
 	if len(secretSource.SecretName) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("secretName"), ""))
 	}
+	itemsPath := fldPath.Child("items")
+	for i, kp := range secretSource.Items {
+		itemPath := itemsPath.Index(i)
+		allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
+	}
 	return allErrs
 }
 
@@ -668,6 +673,23 @@ func validateConfigMapVolumeSource(configMapSource *api.ConfigMapVolumeSource, f
 	if len(configMapSource.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), ""))
 	}
+	itemsPath := fldPath.Child("items")
+	for i, kp := range configMapSource.Items {
+		itemPath := itemsPath.Index(i)
+		allErrs = append(allErrs, validateKeyToPath(&kp, itemPath)...)
+	}
+	return allErrs
+}
+
+func validateKeyToPath(kp *api.KeyToPath, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(kp.Key) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("key"), ""))
+	}
+	if len(kp.Path) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
+	}
+	allErrs = append(allErrs, validateLocalNonReservedPath(kp.Path, fldPath.Child("path"))...)
 	return allErrs
 }
 
@@ -723,7 +745,7 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 		if len(downwardAPIVolumeFile.Path) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 		}
-		allErrs = append(allErrs, validateVolumeSourcePath(downwardAPIVolumeFile.Path, fldPath.Child("path"))...)
+		allErrs = append(allErrs, validateLocalNonReservedPath(downwardAPIVolumeFile.Path, fldPath.Child("path"))...)
 		if downwardAPIVolumeFile.FieldRef != nil {
 			allErrs = append(allErrs, validateObjectFieldSelector(downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
 			if downwardAPIVolumeFile.ResourceFieldRef != nil {
@@ -740,44 +762,32 @@ func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSou
 
 // This validate will make sure targetPath:
 // 1. is not abs path
-// 2. does not start with '../'
-// 3. does not contain '/../'
-// 4. does not end with '/..'
-func validateSubPath(targetPath string, fldPath *field.Path) field.ErrorList {
+// 2. does not have any element which is ".."
+func validateLocalDescendingPath(targetPath string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if path.IsAbs(targetPath) {
 		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must be a relative path"))
 	}
-	if strings.HasPrefix(targetPath, "../") {
-		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not start with '../'"))
-	}
-	if strings.Contains(targetPath, "/../") {
-		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not contain '/../'"))
-	}
-	if strings.HasSuffix(targetPath, "/..") {
-		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not end with '/..'"))
+
+	// TODO: this assumes the OS of apiserver & nodes are the same
+	parts := strings.Split(targetPath, string(os.PathSeparator))
+	for _, item := range parts {
+		if item == ".." {
+			allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not contain '..'"))
+		}
 	}
 	return allErrs
 }
 
 // This validate will make sure targetPath:
 // 1. is not abs path
-// 2. does not contain '..'
+// 2. does not contain any '..' elements
 // 3. does not start with '..'
-func validateVolumeSourcePath(targetPath string, fldPath *field.Path) field.ErrorList {
+func validateLocalNonReservedPath(targetPath string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if path.IsAbs(targetPath) {
-		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must be a relative path"))
-	}
-	// TODO assume OS of api server & nodes are the same for now
-	items := strings.Split(targetPath, string(os.PathSeparator))
-
-	for _, item := range items {
-		if item == ".." {
-			allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not contain '..'"))
-		}
-	}
-	if strings.HasPrefix(items[0], "..") && len(items[0]) > 2 {
+	allErrs = append(allErrs, validateLocalDescendingPath(targetPath, fldPath)...)
+	// Don't report this error if the check for .. elements already caught it.
+	if strings.HasPrefix(targetPath, "..") && !strings.HasPrefix(targetPath, "../") {
 		allErrs = append(allErrs, field.Invalid(fldPath, targetPath, "must not start with '..'"))
 	}
 	return allErrs
@@ -1262,7 +1272,7 @@ func validateVolumeMounts(mounts []api.VolumeMount, volumes sets.String, fldPath
 		}
 		mountpoints.Insert(mnt.MountPath)
 		if len(mnt.SubPath) > 0 {
-			allErrs = append(allErrs, validateSubPath(mnt.SubPath, fldPath.Child("subPath"))...)
+			allErrs = append(allErrs, validateLocalDescendingPath(mnt.SubPath, fldPath.Child("subPath"))...)
 		}
 	}
 	return allErrs
@@ -1918,7 +1928,7 @@ func validateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 		return nil
 	}
 	if strings.HasPrefix(p, "localhost/") {
-		return validateSubPath(strings.TrimPrefix(p, "localhost/"), fldPath)
+		return validateLocalDescendingPath(strings.TrimPrefix(p, "localhost/"), fldPath)
 	}
 	return field.ErrorList{field.Invalid(fldPath, p, "must be a valid seccomp profile")}
 }
