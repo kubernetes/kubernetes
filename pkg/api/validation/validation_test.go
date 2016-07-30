@@ -842,307 +842,977 @@ func TestValidateKeyToPath(t *testing.T) {
 	}
 }
 
+// helper
+func newInt32(val int) *int32 {
+	p := new(int32)
+	*p = int32(val)
+	return p
+}
+
+// This test is a little too top-to-bottom.  Ideally we would test each volume
+// type on its own, but we want to also make sure that the logic works through
+// the one-of wrapper, so we just do it all in one place.
 func TestValidateVolumes(t *testing.T) {
-	lun := int32(1)
-	successCase := []api.Volume{
-		{Name: "abc", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/mnt/path1"}}},
-		{Name: "123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/mnt/path2"}}},
-		{Name: "abc-123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/mnt/path3"}}},
-		{Name: "empty", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-		{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}},
-		{Name: "awsebs", VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}},
-		{Name: "gitrepo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Revision: "hashstring", Directory: "target"}}},
-		{Name: "gitrepodot", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Directory: "."}}},
-		{Name: "gitrepodotdotfoo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Directory: "..foo"}}},
-		{Name: "iscsidisk", VolumeSource: api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "127.0.0.1", IQN: "iqn.2015-02.example.com:test", Lun: 1, FSType: "ext4", ReadOnly: false}}},
-		{Name: "secret1", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret"}}},
-		{Name: "secret2", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret", Items: []api.KeyToPath{{Key: "key", Path: "filename"}}}}},
-		{Name: "secret3", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret", Items: []api.KeyToPath{{Key: "key", Path: "dir/filename"}}}}},
-		{Name: "cfgmap1", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "my-cfgmap"}}}},
-		{Name: "cfgmap2", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "my-cfgmap"}, Items: []api.KeyToPath{{Key: "key", Path: "filename"}}}}},
-		{Name: "cfgmap3", VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "my-cfgmap"}, Items: []api.KeyToPath{{Key: "key", Path: "dir/filename"}}}}},
-		{Name: "glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host1", Path: "path", ReadOnly: false}}},
-		{Name: "flocker", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "datasetName"}}},
-		{Name: "rbd", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "bar", FSType: "ext4"}}},
-		{Name: "cinder", VolumeSource: api.VolumeSource{Cinder: &api.CinderVolumeSource{VolumeID: "29ea5088-4f60-4757-962e-dba678767887", FSType: "ext4", ReadOnly: false}}},
-		{Name: "cephfs", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{Monitors: []string{"foo"}}}},
-		{Name: "downwardapi", VolumeSource: api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{
-			{Path: "labels", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "annotations", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.annotations"}},
-			{Path: "namespace", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.namespace"}},
-			{Path: "name", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.name"}},
-			{Path: "path/withslash/andslash", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "path/./withdot", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "path/with..dot", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "second-level-dirent-can-have/..dot", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "cpu_limit", ResourceFieldRef: &api.ResourceFieldSelector{
-				ContainerName: "test-container",
-				Resource:      "limits.cpu"}},
-			{Path: "cpu_request", ResourceFieldRef: &api.ResourceFieldSelector{
-				ContainerName: "test-container",
-				Resource:      "requests.cpu"}},
-			{Path: "memory_limit", ResourceFieldRef: &api.ResourceFieldSelector{
-				ContainerName: "test-container",
-				Resource:      "limits.memory"}},
-			{Path: "memory_request", ResourceFieldRef: &api.ResourceFieldSelector{
-				ContainerName: "test-container",
-				Resource:      "requests.memory"}},
-		}}}},
-		{Name: "fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"some_wwn"}, Lun: &lun, FSType: "ext4", ReadOnly: false}}},
-		{Name: "flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/blue", FSType: "ext4"}}},
-		{Name: "azure", VolumeSource: api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{SecretName: "key", ShareName: "share", ReadOnly: false}}},
-	}
-	names, errs := validateVolumes(successCase, field.NewPath("field"))
-	if len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
-	}
-	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret1", "secret2", "secret3", "cfgmap1", "cfgmap2", "cfgmap3", "iscsidisk", "cinder", "cephfs", "flexvolume", "fc") {
-		t.Errorf("wrong names result: %v", names)
-	}
-	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}
-	emptyPortal := api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "", IQN: "iqn.2015-02.example.com:test", Lun: 1, FSType: "ext4", ReadOnly: false}}
-	emptyIQN := api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "127.0.0.1", IQN: "", Lun: 1, FSType: "ext4", ReadOnly: false}}
-	secretMissingPath := api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "s", Items: []api.KeyToPath{{Key: "key", Path: ""}}}}
-	secretDotDot := api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "s", Items: []api.KeyToPath{{Key: "key", Path: "../foo"}}}}
-	cfgmapMissingPath := api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "c"}, Items: []api.KeyToPath{{Key: "key", Path: ""}}}}
-	cfgmapDotDot := api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: "c"}, Items: []api.KeyToPath{{Key: "key", Path: "../foo"}}}}
-	emptyHosts := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "", Path: "path", ReadOnly: false}}
-	emptyPath := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host", Path: "", ReadOnly: false}}
-	emptyName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: ""}}
-	emptyMon := api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{}, RBDImage: "bar", FSType: "ext4"}}
-	emptyImage := api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "", FSType: "ext4"}}
-	emptyCephFSMon := api.VolumeSource{CephFS: &api.CephFSVolumeSource{Monitors: []string{}}}
-	startsWithDots := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "../dots/bar"}}
-	containsDots := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "dots/../bar"}}
-	absPath := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "/abstarget"}}
-	emptyPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	absolutePathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "/absolutepath",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	dotDotInPath := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "../../passwd",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	dotDotPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "..badFileName",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	dotDotFirstLevelDirent := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "..badDirName/goodFileName",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	fieldRefandResourceFieldRef := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "test",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"},
-		ResourceFieldRef: &api.ResourceFieldSelector{
-			ContainerName: "test-container",
-			Resource:      "requests.memory"}}},
-	}}
-	zeroWWN := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{}, Lun: &lun, FSType: "ext4", ReadOnly: false}}
-	emptyLun := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"wwn"}, Lun: nil, FSType: "ext4", ReadOnly: false}}
-	slashInName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "foo/bar"}}
-	emptyAzureSecret := api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{SecretName: "", ShareName: "share", ReadOnly: false}}
-	emptyAzureShare := api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{SecretName: "name", ShareName: "", ReadOnly: false}}
-	errorCases := map[string]struct {
-		V []api.Volume
-		T field.ErrorType
-		F string
-		D string
+	testCases := []struct {
+		name      string
+		vol       api.Volume
+		errtype   field.ErrorType
+		errfield  string
+		errdetail string
 	}{
-		"zero-length name": {
-			[]api.Volume{{Name: "", VolumeSource: emptyVS}},
-			field.ErrorTypeRequired,
-			"name", "",
+		// EmptyDir and basic volume names
+		{
+			name: "valid alpha name",
+			vol: api.Volume{
+				Name: "empty",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{},
+				},
+			},
 		},
-		"name > 63 characters": {
-			[]api.Volume{{Name: strings.Repeat("a", 64), VolumeSource: emptyVS}},
-			field.ErrorTypeInvalid,
-			"name", "must be no more than",
+		{
+			name: "valid num name",
+			vol: api.Volume{
+				Name: "123",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{},
+				},
+			},
 		},
-		"name not a DNS label": {
-			[]api.Volume{{Name: "a.b.c", VolumeSource: emptyVS}},
-			field.ErrorTypeInvalid,
-			"name", "must match the regex",
+		{
+			name: "valid alphanum name",
+			vol: api.Volume{
+				Name: "empty-123",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{},
+				},
+			},
 		},
-		"name not unique": {
-			[]api.Volume{{Name: "abc", VolumeSource: emptyVS}, {Name: "abc", VolumeSource: emptyVS}},
-			field.ErrorTypeDuplicate,
-			"[1].name", "",
+		{
+			name: "valid numalpha name",
+			vol: api.Volume{
+				Name: "123-empty",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{},
+				},
+			},
 		},
-		"empty portal": {
-			[]api.Volume{{Name: "badportal", VolumeSource: emptyPortal}},
-			field.ErrorTypeRequired,
-			"iscsi.targetPortal", "",
+		{
+			name: "zero-length name",
+			vol: api.Volume{
+				Name:         "",
+				VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "name",
 		},
-		"empty iqn": {
-			[]api.Volume{{Name: "badiqn", VolumeSource: emptyIQN}},
-			field.ErrorTypeRequired,
-			"iscsi.iqn", "",
+		{
+			name: "name > 63 characters",
+			vol: api.Volume{
+				Name:         strings.Repeat("a", 64),
+				VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "name",
+			errdetail: "must be no more than",
 		},
-		"secret with missing path": {
-			[]api.Volume{{Name: "secret-dot-dot", VolumeSource: secretMissingPath}},
-			field.ErrorTypeRequired,
-			"secret.items[0]", "",
+		{
+			name: "name not a DNS label",
+			vol: api.Volume{
+				Name:         "a.b.c",
+				VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "name",
+			errdetail: "must match the regex",
 		},
-		"secret with ..": {
-			[]api.Volume{{Name: "secret-dot-dot", VolumeSource: secretDotDot}},
-			field.ErrorTypeInvalid,
-			"secret.items[0]", "",
+		// More than one source field specified.
+		{
+			name: "more than one source",
+			vol: api.Volume{
+				Name: "dups",
+				VolumeSource: api.VolumeSource{
+					EmptyDir: &api.EmptyDirVolumeSource{},
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/path",
+					},
+				},
+			},
+			errtype:   field.ErrorTypeForbidden,
+			errfield:  "hostPath",
+			errdetail: "may not specify more than 1 volume",
 		},
-		"configmap with missing path": {
-			[]api.Volume{{Name: "cfgmap-dot-dot", VolumeSource: cfgmapMissingPath}},
-			field.ErrorTypeRequired,
-			"configMap.items[0]", "",
+		// HostPath
+		{
+			name: "valid HostPath",
+			vol: api.Volume{
+				Name: "hostpath",
+				VolumeSource: api.VolumeSource{
+					HostPath: &api.HostPathVolumeSource{
+						Path: "/mnt/path",
+					},
+				},
+			},
 		},
-		"configmap with ..": {
-			[]api.Volume{{Name: "cfgmap-dot-dot", VolumeSource: cfgmapDotDot}},
-			field.ErrorTypeInvalid,
-			"configMap.items[0]", "",
+		// GcePersistentDisk
+		{
+			name: "valid GcePersistentDisk",
+			vol: api.Volume{
+				Name: "gce-pd",
+				VolumeSource: api.VolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+						PDName:    "my-PD",
+						FSType:    "ext4",
+						Partition: 1,
+						ReadOnly:  false,
+					},
+				},
+			},
 		},
-		"empty hosts": {
-			[]api.Volume{{Name: "badhost", VolumeSource: emptyHosts}},
-			field.ErrorTypeRequired,
-			"glusterfs.endpoints", "",
+		// AWSElasticBlockStore
+		{
+			name: "valid AWSElasticBlockStore",
+			vol: api.Volume{
+				Name: "aws-ebs",
+				VolumeSource: api.VolumeSource{
+					AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+						VolumeID:  "my-PD",
+						FSType:    "ext4",
+						Partition: 1,
+						ReadOnly:  false,
+					},
+				},
+			},
 		},
-		"empty path": {
-			[]api.Volume{{Name: "badpath", VolumeSource: emptyPath}},
-			field.ErrorTypeRequired,
-			"glusterfs.path", "",
+		// GitRepo
+		{
+			name: "valid GitRepo",
+			vol: api.Volume{
+				Name: "git-repo",
+				VolumeSource: api.VolumeSource{
+					GitRepo: &api.GitRepoVolumeSource{
+						Repository: "my-repo",
+						Revision:   "hashstring",
+						Directory:  "target",
+					},
+				},
+			},
 		},
-		"empty datasetName": {
-			[]api.Volume{{Name: "badname", VolumeSource: emptyName}},
-			field.ErrorTypeRequired,
-			"flocker.datasetName", "",
+		{
+			name: "valid GitRepo in .",
+			vol: api.Volume{
+				Name: "git-repo-dot",
+				VolumeSource: api.VolumeSource{
+					GitRepo: &api.GitRepoVolumeSource{
+						Repository: "my-repo",
+						Directory:  ".",
+					},
+				},
+			},
 		},
-		"empty mon": {
-			[]api.Volume{{Name: "badmon", VolumeSource: emptyMon}},
-			field.ErrorTypeRequired,
-			"rbd.monitors", "",
+		{
+			name: "valid GitRepo with .. in name",
+			vol: api.Volume{
+				Name: "git-repo-dot-dot-foo",
+				VolumeSource: api.VolumeSource{
+					GitRepo: &api.GitRepoVolumeSource{
+						Repository: "my-repo",
+						Directory:  "..foo",
+					},
+				},
+			},
 		},
-		"empty image": {
-			[]api.Volume{{Name: "badimage", VolumeSource: emptyImage}},
-			field.ErrorTypeRequired,
-			"rbd.image", "",
+		{
+			name: "GitRepo starts with ../",
+			vol: api.Volume{
+				Name: "gitrepo",
+				VolumeSource: api.VolumeSource{
+					GitRepo: &api.GitRepoVolumeSource{
+						Repository: "foo",
+						Directory:  "../dots/bar",
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "gitRepo.directory",
+			errdetail: `must not contain '..'`,
 		},
-		"empty cephfs mon": {
-			[]api.Volume{{Name: "badmon", VolumeSource: emptyCephFSMon}},
-			field.ErrorTypeRequired,
-			"cephfs.monitors", "",
+		{
+			name: "GitRepo contains ..",
+			vol: api.Volume{
+				Name: "gitrepo",
+				VolumeSource: api.VolumeSource{
+					GitRepo: &api.GitRepoVolumeSource{
+						Repository: "foo",
+						Directory:  "dots/../bar",
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "gitRepo.directory",
+			errdetail: `must not contain '..'`,
 		},
-		"empty metatada path": {
-			[]api.Volume{{Name: "emptyname", VolumeSource: emptyPathName}},
-			field.ErrorTypeRequired,
-			"downwardAPI.path", "",
+		{
+			name: "GitRepo absolute target",
+			vol: api.Volume{
+				Name: "gitrepo",
+				VolumeSource: api.VolumeSource{
+					GitRepo: &api.GitRepoVolumeSource{
+						Repository: "foo",
+						Directory:  "/abstarget",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "gitRepo.directory",
 		},
-		"absolute path": {
-			[]api.Volume{{Name: "absolutepath", VolumeSource: absolutePathName}},
-			field.ErrorTypeInvalid,
-			"downwardAPI.path", "",
+		// ISCSI
+		{
+			name: "valid ISCSI",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "iqn.2015-02.example.com:test",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
 		},
-		"dot dot path": {
-			[]api.Volume{{Name: "dotdotpath", VolumeSource: dotDotInPath}},
-			field.ErrorTypeInvalid,
-			"downwardAPI.path", `must not contain '..'`,
+		{
+			name: "empty portal",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "",
+						IQN:          "iqn.2015-02.example.com:test",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "iscsi.targetPortal",
 		},
-		"dot dot file name": {
-			[]api.Volume{{Name: "dotdotfilename", VolumeSource: dotDotPathName}},
-			field.ErrorTypeInvalid,
-			"downwardAPI.path", `must not start with '..'`,
+		{
+			name: "empty iqn",
+			vol: api.Volume{
+				Name: "iscsi",
+				VolumeSource: api.VolumeSource{
+					ISCSI: &api.ISCSIVolumeSource{
+						TargetPortal: "127.0.0.1",
+						IQN:          "",
+						Lun:          1,
+						FSType:       "ext4",
+						ReadOnly:     false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "iscsi.iqn",
 		},
-		"dot dot first level dirent": {
-			[]api.Volume{{Name: "dotdotdirfilename", VolumeSource: dotDotFirstLevelDirent}},
-			field.ErrorTypeInvalid,
-			"downwardAPI.path", `must not start with '..'`,
+		// Secret
+		{
+			name: "valid Secret",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName: "my-secret",
+					},
+				},
+			},
 		},
-		"empty wwn": {
-			[]api.Volume{{Name: "badimage", VolumeSource: zeroWWN}},
-			field.ErrorTypeRequired,
-			"fc.targetWWNs", "",
+		{
+			name: "valid Secret with projection",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName: "my-secret",
+						Items: []api.KeyToPath{{
+							Key:  "key",
+							Path: "filename",
+						}},
+					},
+				},
+			},
 		},
-		"empty lun": {
-			[]api.Volume{{Name: "badimage", VolumeSource: emptyLun}},
-			field.ErrorTypeRequired,
-			"fc.lun", "",
+		{
+			name: "valid Secret with subdir projection",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName: "my-secret",
+						Items: []api.KeyToPath{{
+							Key:  "key",
+							Path: "dir/filename",
+						}},
+					},
+				},
+			},
 		},
-		"slash in datasetName": {
-			[]api.Volume{{Name: "slashinname", VolumeSource: slashInName}},
-			field.ErrorTypeInvalid,
-			"flocker.datasetName", "must not contain '/'",
+		{
+			name: "secret with missing path",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName: "s",
+						Items:      []api.KeyToPath{{Key: "key", Path: ""}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "secret.items[0].path",
 		},
-		"starts with '..'": {
-			[]api.Volume{{Name: "badprefix", VolumeSource: startsWithDots}},
-			field.ErrorTypeInvalid,
-			"gitRepo.directory", `must not contain '..'`,
+		{
+			name: "secret with leading ..",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName: "s",
+						Items:      []api.KeyToPath{{Key: "key", Path: "../foo"}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "secret.items[0].path",
 		},
-		"contains '..'": {
-			[]api.Volume{{Name: "containsdots", VolumeSource: containsDots}},
-			field.ErrorTypeInvalid,
-			"gitRepo.directory", `must not contain '..'`,
+		{
+			name: "secret with .. inside",
+			vol: api.Volume{
+				Name: "secret",
+				VolumeSource: api.VolumeSource{
+					Secret: &api.SecretVolumeSource{
+						SecretName: "s",
+						Items:      []api.KeyToPath{{Key: "key", Path: "foo/../bar"}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "secret.items[0].path",
 		},
-		"absolute target": {
-			[]api.Volume{{Name: "absolutetarget", VolumeSource: absPath}},
-			field.ErrorTypeInvalid,
-			"gitRepo.directory", "",
+		// ConfigMap
+		{
+			name: "valid ConfigMap",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "my-cfgmap",
+						},
+					},
+				},
+			},
 		},
-		"empty secret": {
-			[]api.Volume{{Name: "emptyaccount", VolumeSource: emptyAzureSecret}},
-			field.ErrorTypeRequired,
-			"azureFile.secretName", "",
+		{
+			name: "valid ConfigMap with projection",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "my-cfgmap"},
+						Items: []api.KeyToPath{{
+							Key:  "key",
+							Path: "filename",
+						}},
+					},
+				},
+			},
 		},
-		"empty share": {
-			[]api.Volume{{Name: "emptyaccount", VolumeSource: emptyAzureShare}},
-			field.ErrorTypeRequired,
-			"azureFile.shareName", "",
+		{
+			name: "valid ConfigMap with subdir projection",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{
+							Name: "my-cfgmap"},
+						Items: []api.KeyToPath{{
+							Key:  "key",
+							Path: "dir/filename",
+						}},
+					},
+				},
+			},
 		},
-		"fieldRef and ResourceFieldRef together": {
-			[]api.Volume{{Name: "testvolume", VolumeSource: fieldRefandResourceFieldRef}},
-			field.ErrorTypeInvalid,
-			"downwardAPI", "fieldRef and resourceFieldRef can not be specified simultaneously",
+		{
+			name: "configmap with missing path",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "c"},
+						Items:                []api.KeyToPath{{Key: "key", Path: ""}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "configMap.items[0].path",
+		},
+		{
+			name: "configmap with leading ..",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "c"},
+						Items:                []api.KeyToPath{{Key: "key", Path: "../foo"}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "configMap.items[0].path",
+		},
+		{
+			name: "configmap with .. inside",
+			vol: api.Volume{
+				Name: "cfgmap",
+				VolumeSource: api.VolumeSource{
+					ConfigMap: &api.ConfigMapVolumeSource{
+						LocalObjectReference: api.LocalObjectReference{Name: "c"},
+						Items:                []api.KeyToPath{{Key: "key", Path: "foo/../bar"}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "configMap.items[0].path",
+		},
+		// Glusterfs
+		{
+			name: "valid Glusterfs",
+			vol: api.Volume{
+				Name: "glusterfs",
+				VolumeSource: api.VolumeSource{
+					Glusterfs: &api.GlusterfsVolumeSource{
+						EndpointsName: "host1",
+						Path:          "path",
+						ReadOnly:      false,
+					},
+				},
+			},
+		},
+		{
+			name: "empty hosts",
+			vol: api.Volume{
+				Name: "glusterfs",
+				VolumeSource: api.VolumeSource{
+					Glusterfs: &api.GlusterfsVolumeSource{
+						EndpointsName: "",
+						Path:          "path",
+						ReadOnly:      false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "glusterfs.endpoints",
+		},
+		{
+			name: "empty path",
+			vol: api.Volume{
+				Name: "glusterfs",
+				VolumeSource: api.VolumeSource{
+					Glusterfs: &api.GlusterfsVolumeSource{
+						EndpointsName: "host",
+						Path:          "",
+						ReadOnly:      false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "glusterfs.path",
+		},
+		// Flocker
+		{
+			name: "valid Flocker",
+			vol: api.Volume{
+				Name: "flocker",
+				VolumeSource: api.VolumeSource{
+					Flocker: &api.FlockerVolumeSource{
+						DatasetName: "datasetName",
+					},
+				},
+			},
+		},
+		{
+			name: "empty flocker datasetName",
+			vol: api.Volume{
+				Name: "flocker",
+				VolumeSource: api.VolumeSource{
+					Flocker: &api.FlockerVolumeSource{
+						DatasetName: "",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "flocker.datasetName",
+		},
+		{
+			name: "slash in flocker datasetName",
+			vol: api.Volume{
+				Name: "flocker",
+				VolumeSource: api.VolumeSource{
+					Flocker: &api.FlockerVolumeSource{
+						DatasetName: "foo/bar",
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "flocker.datasetName",
+			errdetail: "must not contain '/'",
+		},
+		// RBD
+		{
+			name: "valid RBD",
+			vol: api.Volume{
+				Name: "rbd",
+				VolumeSource: api.VolumeSource{
+					RBD: &api.RBDVolumeSource{
+						CephMonitors: []string{"foo"},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+					},
+				},
+			},
+		},
+		{
+			name: "empty rbd monitors",
+			vol: api.Volume{
+				Name: "rbd",
+				VolumeSource: api.VolumeSource{
+					RBD: &api.RBDVolumeSource{
+						CephMonitors: []string{},
+						RBDImage:     "bar",
+						FSType:       "ext4",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "rbd.monitors",
+		},
+		{
+			name: "empty image",
+			vol: api.Volume{
+				Name: "rbd",
+				VolumeSource: api.VolumeSource{
+					RBD: &api.RBDVolumeSource{
+						CephMonitors: []string{"foo"},
+						RBDImage:     "",
+						FSType:       "ext4",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "rbd.image",
+		},
+		// Cinder
+		{
+			name: "valid Cinder",
+			vol: api.Volume{
+				Name: "cinder",
+				VolumeSource: api.VolumeSource{
+					Cinder: &api.CinderVolumeSource{
+						VolumeID: "29ea5088-4f60-4757-962e-dba678767887",
+						FSType:   "ext4",
+						ReadOnly: false,
+					},
+				},
+			},
+		},
+		// CephFS
+		{
+			name: "valid CephFS",
+			vol: api.Volume{
+				Name: "cephfs",
+				VolumeSource: api.VolumeSource{
+					CephFS: &api.CephFSVolumeSource{
+						Monitors: []string{"foo"},
+					},
+				},
+			},
+		},
+		{
+			name: "empty cephfs monitors",
+			vol: api.Volume{
+				Name: "cephfs",
+				VolumeSource: api.VolumeSource{
+					CephFS: &api.CephFSVolumeSource{
+						Monitors: []string{},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "cephfs.monitors",
+		},
+		// DownwardAPI
+		{
+			name: "valid DownwardAPI",
+			vol: api.Volume{
+				Name: "downwardapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{
+							{
+								Path: "labels",
+								FieldRef: &api.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.labels",
+								},
+							},
+							{
+								Path: "annotations",
+								FieldRef: &api.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.annotations",
+								},
+							},
+							{
+								Path: "namespace",
+								FieldRef: &api.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.namespace",
+								},
+							},
+							{
+								Path: "name",
+								FieldRef: &api.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.name",
+								},
+							},
+							{
+								Path: "path/with/subdirs",
+								FieldRef: &api.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.labels",
+								},
+							},
+							{
+								Path: "path/./withdot",
+								FieldRef: &api.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.labels",
+								},
+							},
+							{
+								Path: "path/with/embedded..dotdot",
+								FieldRef: &api.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.labels",
+								},
+							},
+							{
+								Path: "path/with/leading/..dotdot",
+								FieldRef: &api.ObjectFieldSelector{
+									APIVersion: "v1",
+									FieldPath:  "metadata.labels",
+								},
+							},
+							{
+								Path: "cpu_limit",
+								ResourceFieldRef: &api.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "limits.cpu",
+								},
+							},
+							{
+								Path: "cpu_request",
+								ResourceFieldRef: &api.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "requests.cpu",
+								},
+							},
+							{
+								Path: "memory_limit",
+								ResourceFieldRef: &api.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "limits.memory",
+								},
+							},
+							{
+								Path: "memory_request",
+								ResourceFieldRef: &api.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "requests.memory",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "downapi empty metatada path",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Path: "",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "downwardAPI.path",
+		},
+		{
+			name: "downapi absolute path",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Path: "/absolutepath",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "downwardAPI.path",
+		},
+		{
+			name: "downapi dot dot path",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Path: "../../passwd",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "downwardAPI.path",
+			errdetail: `must not contain '..'`,
+		},
+		{
+			name: "downapi dot dot file name",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Path: "..badFileName",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "downwardAPI.path",
+			errdetail: `must not start with '..'`,
+		},
+		{
+			name: "downapi dot dot first level dirent",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Path: "..badDirName/goodFileName",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+						}},
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "downwardAPI.path",
+			errdetail: `must not start with '..'`,
+		},
+		{
+			name: "downapi fieldRef and ResourceFieldRef together",
+			vol: api.Volume{
+				Name: "downapi",
+				VolumeSource: api.VolumeSource{
+					DownwardAPI: &api.DownwardAPIVolumeSource{
+						Items: []api.DownwardAPIVolumeFile{{
+							Path: "test",
+							FieldRef: &api.ObjectFieldSelector{
+								APIVersion: "v1",
+								FieldPath:  "metadata.labels",
+							},
+							ResourceFieldRef: &api.ResourceFieldSelector{
+								ContainerName: "test-container",
+								Resource:      "requests.memory",
+							},
+						}},
+					},
+				},
+			},
+			errtype:   field.ErrorTypeInvalid,
+			errfield:  "downwardAPI",
+			errdetail: "fieldRef and resourceFieldRef can not be specified simultaneously",
+		},
+		// FC
+		{
+			name: "valid FC",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						TargetWWNs: []string{"some_wwn"},
+						Lun:        newInt32(1),
+						FSType:     "ext4",
+						ReadOnly:   false,
+					},
+				},
+			},
+		},
+		{
+			name: "fc empty wwn",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						TargetWWNs: []string{},
+						Lun:        newInt32(1),
+						FSType:     "ext4",
+						ReadOnly:   false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "fc.targetWWNs",
+		},
+		{
+			name: "fc empty lun",
+			vol: api.Volume{
+				Name: "fc",
+				VolumeSource: api.VolumeSource{
+					FC: &api.FCVolumeSource{
+						TargetWWNs: []string{"wwn"},
+						Lun:        nil,
+						FSType:     "ext4",
+						ReadOnly:   false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "fc.lun",
+		},
+		// FlexVolume
+		{
+			name: "valid FlexVolume",
+			vol: api.Volume{
+				Name: "flex-volume",
+				VolumeSource: api.VolumeSource{
+					FlexVolume: &api.FlexVolumeSource{
+						Driver: "kubernetes.io/blue",
+						FSType: "ext4",
+					},
+				},
+			},
+		},
+		// AzureFile
+		{
+			name: "valid AzureFile",
+			vol: api.Volume{
+				Name: "azure-file",
+				VolumeSource: api.VolumeSource{
+					AzureFile: &api.AzureFileVolumeSource{
+						SecretName: "key",
+						ShareName:  "share",
+						ReadOnly:   false,
+					},
+				},
+			},
+		},
+		{
+			name: "AzureFile empty secret",
+			vol: api.Volume{
+				Name: "azure-file",
+				VolumeSource: api.VolumeSource{
+					AzureFile: &api.AzureFileVolumeSource{
+						SecretName: "",
+						ShareName:  "share",
+						ReadOnly:   false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "azureFile.secretName",
+		},
+		{
+			name: "AzureFile empty share",
+			vol: api.Volume{
+				Name: "azure-file",
+				VolumeSource: api.VolumeSource{
+					AzureFile: &api.AzureFileVolumeSource{
+						SecretName: "name",
+						ShareName:  "",
+						ReadOnly:   false,
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "azureFile.shareName",
 		},
 	}
-	for k, v := range errorCases {
-		_, errs := validateVolumes(v.V, field.NewPath("field"))
-		if len(errs) == 0 {
-			t.Errorf("expected failure %s for %v", k, v.V)
-			continue
+
+	for i, tc := range testCases {
+		names, errs := validateVolumes([]api.Volume{tc.vol}, field.NewPath("field"))
+		if len(errs) > 0 && tc.errtype == "" {
+			t.Errorf("[%d: %q] unexpected error(s): %v", i, tc.name, errs)
+		} else if len(errs) > 1 {
+			t.Errorf("[%d: %q] expected 1 error, got %d: %v", i, tc.name, len(errs), errs)
+		} else if len(errs) == 0 && tc.errtype != "" {
+			t.Errorf("[%d: %q] expected error type %v", i, tc.name, tc.errtype)
+		} else if len(errs) == 1 {
+			if errs[0].Type != tc.errtype {
+				t.Errorf("[%d: %q] expected error type %v, got %v", i, tc.name, tc.errtype, errs[0].Type)
+			} else if !strings.HasSuffix(errs[0].Field, "."+tc.errfield) {
+				t.Errorf("[%d: %q] expected error on field %q, got %q", i, tc.name, tc.errfield, errs[0].Field)
+			} else if !strings.Contains(errs[0].Detail, tc.errdetail) {
+				t.Errorf("[%d: %q] expected error detail %q, got %q", i, tc.name, tc.errdetail, errs[0].Detail)
+			}
+		} else {
+			if len(names) != 1 || !names.Has(tc.vol.Name) {
+				t.Errorf("[%d: %q] wrong names result: %v", i, tc.name, names)
+			}
 		}
-		for i := range errs {
-			if errs[i].Type != v.T {
-				t.Errorf("%s: expected error to have type %q: %q", k, v.T, errs[i].Type)
-			}
-			if !strings.Contains(errs[i].Field, v.F) {
-				t.Errorf("%s: expected error field %q: %q", k, v.F, errs[i].Field)
-			}
-			if !strings.Contains(errs[i].Detail, v.D) {
-				t.Errorf("%s: expected error detail %q, got %q", k, v.D, errs[i].Detail)
-			}
-		}
+	}
+
+	dupsCase := []api.Volume{
+		{Name: "abc", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+		{Name: "abc", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+	}
+	_, errs := validateVolumes(dupsCase, field.NewPath("field"))
+	if len(errs) == 0 {
+		t.Errorf("expected error")
+	} else if len(errs) != 1 {
+		t.Errorf("expected 1 error, got %d: %v", len(errs), errs)
+	} else if errs[0].Type != field.ErrorTypeDuplicate {
+		t.Errorf("expected error type %v, got %v", field.ErrorTypeDuplicate, errs[0].Type)
 	}
 }
 
