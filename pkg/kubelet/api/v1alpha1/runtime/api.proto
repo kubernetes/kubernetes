@@ -16,6 +16,7 @@ service RuntimeService {
     rpc StopPodSandbox(StopPodSandboxRequest) returns (StopPodSandboxResponse) {}
     // DeletePodSandbox deletes the sandbox. If there are any running containers in the
     // sandbox, they should be force deleted.
+    // It should return success if the sandbox has already been deleted.
     rpc DeletePodSandbox(DeletePodSandboxRequest) returns (DeletePodSandboxResponse) {}
     // PodSandboxStatus returns the Status of the PodSandbox.
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
@@ -30,6 +31,7 @@ service RuntimeService {
     rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
     // RemoveContainer removes the container. If the container is running, the container
     // should be force removed.
+    // It should return success if the container has already been removed.
     rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
     // ListContainers lists all containers by filters.
     rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
@@ -49,6 +51,7 @@ service ImageService {
     // PullImage pulls a image with authentication config.
     rpc PullImage(PullImageRequest) returns (PullImageResponse) {}
     // RemoveImage removes the image.
+    // It should return success if the image has already been removed.
     rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse) {}
 }
 
