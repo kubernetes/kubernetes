@@ -33,21 +33,56 @@ import (
 	"github.com/golang/glog"
 )
 
+// ==================================================================
+// PLEASE DO NOT ATTEMPT TO SIMPLIFY THIS CODE.
+// KEEP THE SPACE SHUTTLE FLYING.
+// ==================================================================
+//
+// This controller is intentionally written in a very verbose style.  You will
+// notice:
+//
+// 1.  Every 'if' statement has a matching 'else' (exception: simple error
+//     checks for a client API call)
+// 2.  Things that may seem obvious are commented explicitly
+//
+// We call this style 'space shuttle style'.  Space shuttle style is meant to
+// ensure that every branch and condition is considered and accounted for -
+// the same way code is written at NASA for applications like the space
+// shuttle.
+//
+// Originally, the work of this controller was split amongst three
+// controllers.  This controller is the result a large effort to simplify the
+// PV subsystem.  During that effort, it became clear that we needed to ensure
+// that every single condition was handled and accounted for in the code, even
+// if it resulted in no-op code branches.
+//
+// As a result, the controller code may seem overly verbose, commented, and
+// 'branchy'.  However, a large amount of business knowledge and context is
+// recorded here in order to ensure that future maintainers can correctly
+// reason through the complexities of the binding behavior.  For that reason,
+// changes to this file should preserve and add to the space shuttle style.
+//
+// ==================================================================
+// PLEASE DO NOT ATTEMPT TO SIMPLIFY THIS CODE.
+// KEEP THE SPACE SHUTTLE FLYING.
+// ==================================================================
+
 // Design:
 //
 // The fundamental key to this design is the bi-directional "pointer" between
 // PersistentVolumes (PVs) and PersistentVolumeClaims (PVCs), which is
-// represented here as pvc.Spec.VolumeName and pv.Spec.ClaimRef. The bi-directionality
-// is complicated to manage in a transactionless system, but without it we
-// can't ensure sane behavior in the face of different forms of trouble.  For
-// example, a rogue HA controller instance could end up racing and making
-// multiple bindings that are indistinguishable, resulting in potential data
-// loss.
+// represented here as pvc.Spec.VolumeName and pv.Spec.ClaimRef. The bi-
+// directionality is complicated to manage in a transactionless system, but
+// without it we can't ensure sane behavior in the face of different forms of
+// trouble.  For example, a rogue HA controller instance could end up racing
+// and making multiple bindings that are indistinguishable, resulting in
+// potential data loss.
 //
-// This controller is designed to work in active-passive high availability mode.
-// It *could* work also in active-active HA mode, all the object transitions are
-// designed to cope with this, however performance could be lower as these two
-// active controllers will step on each other toes frequently.
+// This controller is designed to work in active-passive high availability
+// mode. It *could* work also in active-active HA mode, all the object
+// transitions are designed to cope with this, however performance could be
+// lower as these two active controllers will step on each other toes
+// frequently.
 //
 // This controller supports pre-bound (by the creator) objects in both
 // directions: a PVC that wants a specific PV or a PV that is reserved for a
@@ -55,10 +90,10 @@ import (
 //
 // The binding is two-step process. PV.Spec.ClaimRef is modified first and
 // PVC.Spec.VolumeName second. At any point of this transaction, the PV or PVC
-// can be modified by user or other controller or completelly deleted. Also, two
-// (or more) controllers may try to bind different volumes to different claims
-// at the same time. The controller must recover from any conflicts that may
-// arise from these conditions.
+// can be modified by user or other controller or completelly deleted. Also,
+// two (or more) controllers may try to bind different volumes to different
+// claims at the same time. The controller must recover from any conflicts
+// that may arise from these conditions.
 
 // annBindCompleted annotation applies to PVCs. It indicates that the lifecycle
 // of the PVC has passed through the initial setup. This information changes how
