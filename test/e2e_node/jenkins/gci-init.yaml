@@ -7,3 +7,4 @@ runcmd:
   - tar xzvf /tmp/etcd.tar.gz -C /tmp
   - cp /tmp/etcd-${ETCD_VERSION}-linux-amd64/etcd* /tmp/
   - rm -rf /tmp/etcd-${ETCD_VERSION}-linux-amd64/
+  - usermod -a -G docker jenkins
