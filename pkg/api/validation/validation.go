@@ -737,22 +737,26 @@ func validateFlockerVolumeSource(flocker *api.FlockerVolumeSource, fldPath *fiel
 	return allErrs
 }
 
-var validDownwardAPIFieldPathExpressions = sets.NewString("metadata.name", "metadata.namespace", "metadata.labels", "metadata.annotations")
+var validDownwardAPIFieldPathExpressions = sets.NewString(
+	"metadata.name",
+	"metadata.namespace",
+	"metadata.labels",
+	"metadata.annotations")
 
 func validateDownwardAPIVolumeSource(downwardAPIVolume *api.DownwardAPIVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	for _, downwardAPIVolumeFile := range downwardAPIVolume.Items {
-		if len(downwardAPIVolumeFile.Path) == 0 {
+	for _, file := range downwardAPIVolume.Items {
+		if len(file.Path) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("path"), ""))
 		}
-		allErrs = append(allErrs, validateLocalNonReservedPath(downwardAPIVolumeFile.Path, fldPath.Child("path"))...)
-		if downwardAPIVolumeFile.FieldRef != nil {
-			allErrs = append(allErrs, validateObjectFieldSelector(downwardAPIVolumeFile.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
-			if downwardAPIVolumeFile.ResourceFieldRef != nil {
+		allErrs = append(allErrs, validateLocalNonReservedPath(file.Path, fldPath.Child("path"))...)
+		if file.FieldRef != nil {
+			allErrs = append(allErrs, validateObjectFieldSelector(file.FieldRef, &validDownwardAPIFieldPathExpressions, fldPath.Child("fieldRef"))...)
+			if file.ResourceFieldRef != nil {
 				allErrs = append(allErrs, field.Invalid(fldPath, "resource", "fieldRef and resourceFieldRef can not be specified simultaneously"))
 			}
-		} else if downwardAPIVolumeFile.ResourceFieldRef != nil {
-			allErrs = append(allErrs, validateContainerResourceFieldSelector(downwardAPIVolumeFile.ResourceFieldRef, &validContainerResourceFieldPathExpressions, fldPath.Child("resourceFieldRef"), true)...)
+		} else if file.ResourceFieldRef != nil {
+			allErrs = append(allErrs, validateContainerResourceFieldSelector(file.ResourceFieldRef, &validContainerResourceFieldPathExpressions, fldPath.Child("resourceFieldRef"), true)...)
 		} else {
 			allErrs = append(allErrs, field.Required(fldPath, "one of fieldRef and resourceFieldRef is required"))
 		}
