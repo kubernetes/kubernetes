@@ -184,8 +184,8 @@ function dump_cluster_logs() {
 function setup_gci_vars() {
   local -r gci_staging_project=container-vm-image-staging
   local -r image_info="$(gcloud compute images describe-from-family ${JENKINS_GCI_IMAGE_FAMILY} --project=${gci_staging_project} --format=json)"
-  local -r image_description="$(echo ${image_info} | jq '.description')"
-  local -r image_name="$(echo ${image_info} | jq '.name')"
+  local -r image_description="$(echo ${image_info} | jq -r '.description')"
+  local -r image_name="$(echo ${image_info} | jq -r '.name')"
 
   if [[ "${JENKINS_USE_GCI_VERSION:-}" =~ ^[yY]$ ]]; then
     # GCI QA jobs use the builtin k8s version.
