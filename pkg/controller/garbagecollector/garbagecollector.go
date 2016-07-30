@@ -429,10 +429,10 @@ func (p *Propagator) processEvent() {
 // DeleteOptions.OrphanDependents=true.
 type GarbageCollector struct {
 	restMapper meta.RESTMapper
-	// compressingClientPool uses the compressing codec, which removes fields
-	// except for apiVersion, kind, and metadata when decode.
-	compressingClientPool dynamic.ClientPool
-	// clientPool uses the regular dynamic.Codec. We need it to update
+	// metaOnlyClientPool uses a special codec, which removes fields except for
+	// apiVersion, kind, and metadata during decoding.
+	metaOnlyClientPool dynamic.ClientPool
+	// clientPool uses the regular dynamicCodec. We need it to update
 	// finalizers. It can be removed if we support patching finalizers.
 	clientPool  dynamic.ClientPool
 	dirtyQueue  *workqueue.Type
@@ -466,13 +466,20 @@ func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionReso
 	}
 }
 
-func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (monitor, error) {
+func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource, kind unversioned.GroupVersionKind) (monitor, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
 	var monitor monitor
-	client, err := p.gc.compressingClientPool.ClientForGroupVersion(resource.GroupVersion())
+	client, err := p.gc.metaOnlyClientPool.ClientForGroupVersion(resource.GroupVersion())
 	if err != nil {
 		return monitor, err
+	}
+	setObjectTypeMeta := func(obj interface{}) {
+		runtimeObject, ok := obj.(runtime.Object)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
+		}
+		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
 	}
 	monitor.store, monitor.controller = framework.NewInformer(
 		gcListWatcher(client, resource),
@@ -481,6 +488,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 		framework.ResourceEventHandlerFuncs{
 			// add the event to the propagator's eventQueue.
 			AddFunc: func(obj interface{}) {
+				setObjectTypeMeta(obj)
 				event := event{
 					eventType: addEvent,
 					obj:       obj,
@@ -488,6 +496,8 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 				p.eventQueue.Add(event)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
+				setObjectTypeMeta(newObj)
+				setObjectTypeMeta(oldObj)
 				event := event{updateEvent, newObj, oldObj}
 				p.eventQueue.Add(event)
 			},
@@ -496,6 +506,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 					obj = deletedFinalStateUnknown.Obj
 				}
+				setObjectTypeMeta(obj)
 				event := event{
 					eventType: deleteEvent,
 					obj:       obj,
@@ -514,12 +525,12 @@ var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
 	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                {},
 }
 
-func NewGarbageCollector(compressingClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
+func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
 	gc := &GarbageCollector{
-		compressingClientPool: compressingClientPool,
-		clientPool:            clientPool,
-		dirtyQueue:            workqueue.New(),
-		orphanQueue:           workqueue.New(),
+		metaOnlyClientPool: metaOnlyClientPool,
+		clientPool:         clientPool,
+		dirtyQueue:         workqueue.New(),
+		orphanQueue:        workqueue.New(),
 		// TODO: should use a dynamic RESTMapper built from the discovery results.
 		restMapper: registered.RESTMapper(),
 	}
@@ -536,7 +547,11 @@ func NewGarbageCollector(compressingClientPool dynamic.ClientPool, clientPool dy
 			glog.V(6).Infof("ignore resource %#v", resource)
 			continue
 		}
-		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource)
+		kind, err := gc.restMapper.KindFor(resource)
+		if err != nil {
+			return nil, err
+		}
+		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource, kind)
 		if err != nil {
 			return nil, err
 		}

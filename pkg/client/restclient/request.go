@@ -1090,7 +1090,7 @@ func (r Result) Into(obj runtime.Object) error {
 	return runtime.DecodeInto(r.decoder, r.body, obj)
 }
 
-// Decode decodes the result.
+// Decode decodes the result to a runtime.Object as determined by the decoder.
 func (r Result) Decode() (obj runtime.Object, gvk *unversioned.GroupVersionKind, err error) {
 	if r.err != nil {
 		return nil, nil, r.err

@@ -196,11 +196,11 @@ func listCollection(
 
 	apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
 	obj, err := dynamicClient.Resource(&apiResource, namespace).List(&v1.ListOptions{})
-	unstructuredList, ok := obj.(*runtime.UnstructuredList)
-	if !ok {
-		return nil, false, fmt.Errorf("expected *runtime.UnstructuredList, got %#v", obj)
-	}
 	if err == nil {
+		unstructuredList, ok := obj.(*runtime.UnstructuredList)
+		if !ok {
+			return nil, false, fmt.Errorf("resource: %s, expected *runtime.UnstructuredList, got %#v", apiResource.Name, obj)
+		}
 		return unstructuredList, true, nil
 	}
 

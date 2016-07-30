@@ -21,9 +21,12 @@ import (
 	"reflect"
 	"testing"
 
+	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 func getPod() *v1.Pod {
@@ -74,29 +77,43 @@ func getPodListJson(t *testing.T) []byte {
 	return data
 }
 
-func verfiyMetadata(t *testing.T, in *MetaOnly) {
+func verfiyMetadata(description string, t *testing.T, in *MetaOnly) {
 	pod := getPod()
 	if e, a := pod.ObjectMeta, in.ObjectMeta; !reflect.DeepEqual(e, a) {
-		t.Errorf("expect %#v, got %#v", e, a)
-	}
-	if e, a := (unversioned.TypeMeta{APIVersion: "v1", Kind: "Pod"}), in.TypeMeta; e != a {
-		t.Errorf("expect %#v, got %#v", e, a)
+		t.Errorf("%s: expected %#v, got %#v", description, e, a)
 	}
 }
 
 func TestDecodeToMetaOnly(t *testing.T) {
 	data := getPodJson(t)
+	cf := serializer.DirectCodecFactory{CodecFactory: NewMetaOnlyCodecFactory()}
+	serializer, ok := cf.SerializerForMediaType(runtime.ContentTypeJSON, nil)
+	if !ok {
+		t.Fatalf("expected to get a JSON serializer")
+	}
+	codec := cf.DecoderToVersion(serializer, unversioned.GroupVersion{Group: "SOMEGROUP", Version: "SOMEVERSION"})
+	// decode with into
 	into := &MetaOnly{}
-	ret, _, err := MetaOnlyJSONScheme.Decode(data, nil, into)
+	ret, _, err := codec.Decode(data, nil, into)
 	if err != nil {
 		t.Fatal(err)
 	}
 	metaOnly, ok := ret.(*MetaOnly)
 	if !ok {
-		t.Fatalf("expect ret to be *runtime.MetaOnly")
+		t.Fatalf("expected ret to be *runtime.MetaOnly")
 	}
-	verfiyMetadata(t, metaOnly)
-	verfiyMetadata(t, into)
+	verfiyMetadata("check returned metaonly with into", t, metaOnly)
+	verfiyMetadata("check into", t, into)
+	// decode without into
+	ret, _, err = codec.Decode(data, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metaOnly, ok = ret.(*MetaOnly)
+	if !ok {
+		t.Fatalf("expected ret to be *runtime.MetaOnly")
+	}
+	verfiyMetadata("check returned metaonly without into", t, metaOnly)
 }
 
 func verifyListMetadata(t *testing.T, metaOnlyList *MetaOnlyList) {
@@ -107,23 +124,40 @@ func verifyListMetadata(t *testing.T, metaOnlyList *MetaOnlyList) {
 	for _, item := range items {
 		metaOnly, ok := item.(*MetaOnly)
 		if !ok {
-			t.Fatalf("expect item to be *MetaOnly")
+			t.Fatalf("expected item to be *MetaOnly")
 		}
-		verfiyMetadata(t, metaOnly)
+		verfiyMetadata("check list", t, metaOnly)
 	}
 }
 
 func TestDecodeToMetaOnlyList(t *testing.T) {
 	data := getPodListJson(t)
+	cf := serializer.DirectCodecFactory{CodecFactory: NewMetaOnlyCodecFactory()}
+	serializer, ok := cf.SerializerForMediaType(runtime.ContentTypeJSON, nil)
+	if !ok {
+		t.Fatalf("expected to get a JSON serializer")
+	}
+	codec := cf.DecoderToVersion(serializer, unversioned.GroupVersion{Group: "SOMEGROUP", Version: "SOMEVERSION"})
+	// decode with into
 	into := &MetaOnlyList{}
-	ret, _, err := MetaOnlyJSONScheme.Decode(data, nil, into)
+	ret, _, err := codec.Decode(data, nil, into)
 	if err != nil {
 		t.Fatal(err)
 	}
 	metaOnlyList, ok := ret.(*MetaOnlyList)
 	if !ok {
-		t.Fatalf("expect ret to be *runtime.UnstructuredList")
+		t.Fatalf("expected ret to be *runtime.UnstructuredList")
 	}
 	verifyListMetadata(t, metaOnlyList)
 	verifyListMetadata(t, into)
+	// decode without into
+	ret, _, err = codec.Decode(data, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metaOnlyList, ok = ret.(*MetaOnlyList)
+	if !ok {
+		t.Fatalf("expected ret to be *runtime.UnstructuredList")
+	}
+	verifyListMetadata(t, metaOnlyList)
 }

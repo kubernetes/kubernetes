@@ -45,21 +45,21 @@ func LegacyAPIPathResolverFunc(groupVersion unversioned.GroupVersion) string {
 
 // clientPoolImpl implements Factory
 type clientPoolImpl struct {
-	lock                sync.RWMutex
-	config              *restclient.Config
-	clients             map[unversioned.GroupVersion]*Client
-	apiPathResolverFunc APIPathResolverFunc
-	codec               runtime.Codec
+	lock                 sync.RWMutex
+	config               *restclient.Config
+	clients              map[unversioned.GroupVersion]*Client
+	apiPathResolverFunc  APIPathResolverFunc
+	negotiatedSerializer runtime.NegotiatedSerializer
 }
 
 // NewClientPool returns a ClientPool from the specified config
-func NewClientPool(config *restclient.Config, apiPathResolverFunc APIPathResolverFunc, codec runtime.Codec) ClientPool {
+func NewClientPool(config *restclient.Config, apiPathResolverFunc APIPathResolverFunc, negotiatedSerializer runtime.NegotiatedSerializer) ClientPool {
 	confCopy := *config
 	return &clientPoolImpl{
-		config:              &confCopy,
-		clients:             map[unversioned.GroupVersion]*Client{},
-		apiPathResolverFunc: apiPathResolverFunc,
-		codec:               codec,
+		config:               &confCopy,
+		clients:              map[unversioned.GroupVersion]*Client{},
+		apiPathResolverFunc:  apiPathResolverFunc,
+		negotiatedSerializer: negotiatedSerializer,
 	}
 }
 
@@ -83,15 +83,12 @@ func (c *clientPoolImpl) ClientForGroupVersion(groupVersion unversioned.GroupVer
 	// we need to make a client
 	conf.GroupVersion = &groupVersion
 
-	var codec runtime.Codec
-	if c.codec != nil {
-		codec = c.codec
+	if c.negotiatedSerializer != nil {
+		conf.NegotiatedSerializer = c.negotiatedSerializer
 	} else {
-		codec = Codec{}
+		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
 	}
-	conf.AcceptContentTypes = runtime.ContentTypeJSON
-	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-	conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo)
 
 	dynamicClient, err := NewClient(conf)
 	if err != nil {

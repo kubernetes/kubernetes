@@ -25,6 +25,7 @@ import (
 
 	_ "k8s.io/kubernetes/pkg/api/install"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
@@ -40,10 +41,10 @@ import (
 )
 
 func TestNewGarbageCollector(t *testing.T) {
-	compressingClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, metaonly.MetaOnlyJSONScheme)
+	metaOnlyClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()})
 	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, nil)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,9 +144,9 @@ func TestProcessItem(t *testing.T) {
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
-	compressingClientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, metaonly.MetaOnlyJSONScheme)
+	metaOnlyClientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()})
 	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, nil)
-	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,10 +297,10 @@ func TestProcessEvent(t *testing.T) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
-	compressingClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, metaonly.MetaOnlyJSONScheme)
+	metaOnlyClientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()})
 	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc, nil)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(compressingClientPool, clientPool, podResource)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}

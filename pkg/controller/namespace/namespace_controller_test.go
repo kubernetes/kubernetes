@@ -272,7 +272,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
 	response.Header().Set("Content-Type", runtime.ContentTypeJSON)
 	response.WriteHeader(f.statusCode)
-	response.Write([]byte("{\"kind\": \"List\"}"))
+	response.Write([]byte("{\"kind\": \"List\",\"items\":null}"))
 }
 
 // testGroupVersionResources returns a mocked up set of resources across different api groups for testing namespace controller.

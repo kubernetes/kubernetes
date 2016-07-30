@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	uclient "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -48,10 +47,6 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	client := uclient.NewOrDie(config)
-
-	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-	negotiatedSerializer := serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamic.Codec{}}, streamingInfo)
-	config.NegotiatedSerializer = negotiatedSerializer
 	dynamicClient, err := dynamic.NewClient(config)
 	_ = dynamicClient
 	if err != nil {
@@ -97,7 +92,11 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// check dynamic list
-	unstructuredList, err := dynamicClient.Resource(&resource, ns.Name).List(&v1.ListOptions{})
+	obj, err := dynamicClient.Resource(&resource, ns.Name).List(&v1.ListOptions{})
+	unstructuredList, ok := obj.(*runtime.UnstructuredList)
+	if !ok {
+		t.Fatalf("expected *runtime.UnstructuredList, got %#v", obj)
+	}
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}
@@ -112,7 +111,7 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(actual, got) {
-		t.Fatalf("unexpected pod in list. wanted %#v\ngot %#v", actual, got)
+		t.Fatalf("unexpected pod in list. wanted %#v, got %#v", actual, got)
 	}
 
 	// check dynamic get

@@ -56,6 +56,7 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
 	conf.ContentType = runtime.ContentTypeJSON
+	conf.AcceptContentTypes = runtime.ContentTypeJSON
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"
@@ -66,7 +67,7 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	}
 	if conf.NegotiatedSerializer == nil {
 		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: Codec{}}, streamingInfo)
+		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
 	}
 
 	cl, err := restclient.RESTClientFor(conf)
@@ -224,11 +225,11 @@ func (rc *ResourceClient) Patch(name string, pt api.PatchType, data []byte) (*ru
 	return result, err
 }
 
-// Codec is a codec that wraps the standard unstructured codec
+// dynamicCodec is a codec that wraps the standard unstructured codec
 // with special handling for Status objects.
-type Codec struct{}
+type dynamicCodec struct{}
 
-func (Codec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+func (dynamicCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	obj, gvk, err := runtime.UnstructuredJSONScheme.Decode(data, gvk, obj)
 	if err != nil {
 		return nil, nil, err
@@ -245,7 +246,7 @@ func (Codec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj runtime.
 	return obj, gvk, nil
 }
 
-func (Codec) Encode(obj runtime.Object, w io.Writer) error {
+func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 	return runtime.UnstructuredJSONScheme.Encode(obj, w)
 }
 
