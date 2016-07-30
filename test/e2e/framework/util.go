@@ -45,7 +45,6 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -1711,6 +1710,10 @@ func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 type ClientConfigGetter func() (*restclient.Config, error)
 
 func LoadConfig() (*restclient.Config, error) {
+	if TestContext.NodeName != "" {
+		// This is a node e2e test, apply the node e2e configuration
+		return &restclient.Config{Host: TestContext.Host}, nil
+	}
 	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
 		return nil, err
@@ -3628,10 +3631,6 @@ func IssueSSHCommand(cmd, provider string, node *api.Node) error {
 // NewHostExecPodSpec returns the pod spec of hostexec pod
 func NewHostExecPodSpec(ns, name string) *api.Pod {
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-		},
 		ObjectMeta: api.ObjectMeta{
 			Name:      name,
 			Namespace: ns,
@@ -4445,9 +4444,6 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 	containerName := fmt.Sprintf("%s-container", podName)
 	port := 8080
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind: "Pod",
-		},
 		ObjectMeta: api.ObjectMeta{
 			Name: podName,
 		},
@@ -4481,9 +4477,6 @@ func LaunchWebserverPod(f *Framework, podName, nodeName string) (ip string) {
 func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeout int) error {
 	contName := fmt.Sprintf("%s-container", podName)
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind: "Pod",
-		},
 		ObjectMeta: api.ObjectMeta{
 			Name: podName,
 		},

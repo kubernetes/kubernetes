@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
-	"fmt"
 	"strings"
 
 	. "github.com/onsi/ginkgo"
 	api "k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -106,32 +103,13 @@ func assertEtcHostsIsNotKubeletManaged(etcHostsContent string) {
 }
 
 func (config *KubeletManagedHostConfig) getEtcHostsContent(podName, containerName string) string {
-	cmd := framework.KubectlCmd("exec", fmt.Sprintf("--namespace=%v", config.f.Namespace.Name), podName, "-c", containerName, "cat", "/etc/hosts")
-	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
-	if err != nil {
-		framework.Failf("Failed to retrieve /etc/hosts, err: %q", err)
-	}
-	defer stdout.Close()
-	defer stderr.Close()
-
-	buf := make([]byte, 1000)
-	var n int
-	framework.Logf("reading from `kubectl exec` command's stdout")
-	if n, err = stdout.Read(buf); err != nil {
-		framework.Failf("Failed to read from kubectl exec stdout: %v", err)
-	}
-	return string(buf[:n])
+	return config.f.ExecCommandInContainer(podName, containerName, "cat", "/etc/hosts")
 }
 
 func (config *KubeletManagedHostConfig) createPodSpec(podName string) *api.Pod {
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-		},
 		ObjectMeta: api.ObjectMeta{
-			Name:      podName,
-			Namespace: config.f.Namespace.Name,
+			Name: podName,
 		},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
@@ -186,13 +164,8 @@ func (config *KubeletManagedHostConfig) createPodSpec(podName string) *api.Pod {
 
 func (config *KubeletManagedHostConfig) createPodSpecWithHostNetwork(podName string) *api.Pod {
 	pod := &api.Pod{
-		TypeMeta: unversioned.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: registered.GroupOrDie(api.GroupName).GroupVersion.String(),
-		},
 		ObjectMeta: api.ObjectMeta{
-			Name:      podName,
-			Namespace: config.f.Namespace.Name,
+			Name: podName,
 		},
 		Spec: api.PodSpec{
 			SecurityContext: &api.PodSecurityContext{
