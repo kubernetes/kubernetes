@@ -725,23 +725,25 @@ func (s *ServiceController) lockedUpdateDNSRecords(service *cachedService, clust
 		return nil
 	}
 
-	var err error
-	missedCount := 0
+	ensuredCount := 0
 	unensuredCount := 0
 	for key := range s.clusterCache.clientMap {
 		for _, clusterName := range clusterNames {
 			if key == clusterName {
-				if err = s.ensureDnsRecords(clusterName, service); err != nil {
+				err := s.ensureDnsRecords(clusterName, service)
+				if err != nil {
 					unensuredCount += 1
+					glog.V(4).Infof("Failed to update DNS records for service %v from cluster %s: %v", service, clusterName, err)
+				} else {
+					ensuredCount += 1
 				}
-			} else {
-				missedCount += 1
 			}
 		}
 	}
+	missedCount := len(clusterNames) - ensuredCount - unensuredCount
 	if missedCount > 0 || unensuredCount > 0 {
-		return fmt.Errorf("Failed to update DNS records for %d clusters for service %v due to missing clients[missed count: %d] or ensuring DNS records error[unensured count: %d] %v",
-			len(clusterNames), service, missedCount, unensuredCount, err)
+		return fmt.Errorf("Failed to update DNS records for %d clusters for service %v due to missing clients [missed count: %d] and/or failing to ensure DNS records [unensured count: %d]",
+			len(clusterNames), service, missedCount, unensuredCount)
 	}
 	return nil
 }
