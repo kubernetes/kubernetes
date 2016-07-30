@@ -178,7 +178,7 @@ type Option func(*Kubelet)
 
 // bootstrapping interface for kubelet, targets the initialization protocol
 type KubeletBootstrap interface {
-	GetConfig() *KubeletConfig
+	GetDeps() *KubeletDeps
 	GetConfiguration() *componentconfig.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
@@ -189,11 +189,12 @@ type KubeletBootstrap interface {
 }
 
 // create and initialize a Kubelet instance
-type KubeletBuilder func(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (KubeletBootstrap, error)
+// TODO(mtaufen): Swap the order of kubeDeps and kubeCfg in these args so it is (kubeCfg, kubeDeps)
+type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps) (KubeletBootstrap, error)
 
 // KubeletConfig is all of the parameters necessary for running a kubelet.
 // TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
-type KubeletConfig struct {
+type KubeletDeps struct {
 	// TOOD(mtaufen): KubeletBuilder:
 	//                Mesos currently uses this as a hook to let them make their own call to
 	//                let them wrap the KubeletBootstrap that CreateAndInitKubelet returns with
@@ -234,47 +235,47 @@ type KubeletConfig struct {
 	VolumePlugins     []volume.VolumePlugin
 }
 
-func makePodSourceConfig(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration, nodeName string) (*config.PodConfig, error) {
+func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName string) (*config.PodConfig, error) {
 	manifestURLHeader := make(http.Header)
-	if kc_new.ManifestURLHeader != "" {
-		pieces := strings.Split(kc_new.ManifestURLHeader, ":")
+	if kubeCfg.ManifestURLHeader != "" {
+		pieces := strings.Split(kubeCfg.ManifestURLHeader, ":")
 		if len(pieces) != 2 {
-			return nil, fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", kc_new.ManifestURLHeader)
+			return nil, fmt.Errorf("manifest-url-header must have a single ':' key-value separator, got %q", kubeCfg.ManifestURLHeader)
 		}
 		manifestURLHeader.Set(pieces[0], pieces[1])
 	}
 
 	// source of all configuration
-	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kc_old.Recorder)
+	cfg := config.NewPodConfig(config.PodConfigNotificationIncremental, kubeDeps.Recorder)
 
 	// define file config source
-	if kc_new.PodManifestPath != "" {
-		glog.Infof("Adding manifest file: %v", kc_new.PodManifestPath)
-		config.NewSourceFile(kc_new.PodManifestPath, nodeName, kc_new.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
+	if kubeCfg.PodManifestPath != "" {
+		glog.Infof("Adding manifest file: %v", kubeCfg.PodManifestPath)
+		config.NewSourceFile(kubeCfg.PodManifestPath, nodeName, kubeCfg.FileCheckFrequency.Duration, cfg.Channel(kubetypes.FileSource))
 	}
 
 	// define url config source
-	if kc_new.ManifestURL != "" {
-		glog.Infof("Adding manifest url %q with HTTP header %v", kc_new.ManifestURL, manifestURLHeader)
-		config.NewSourceURL(kc_new.ManifestURL, manifestURLHeader, nodeName, kc_new.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
+	if kubeCfg.ManifestURL != "" {
+		glog.Infof("Adding manifest url %q with HTTP header %v", kubeCfg.ManifestURL, manifestURLHeader)
+		config.NewSourceURL(kubeCfg.ManifestURL, manifestURLHeader, nodeName, kubeCfg.HTTPCheckFrequency.Duration, cfg.Channel(kubetypes.HTTPSource))
 	}
-	if kc_old.KubeClient != nil {
+	if kubeDeps.KubeClient != nil {
 		glog.Infof("Watching apiserver")
-		config.NewSourceApiserver(kc_old.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource))
+		config.NewSourceApiserver(kubeDeps.KubeClient, nodeName, cfg.Channel(kubetypes.ApiserverSource))
 	}
 	return cfg, nil
 }
 
 // NewMainKubelet instantiates a new Kubelet object along with all the required internal modules.
 // No initialization of Kubelet and its modules should happen here.
-func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfiguration) (*Kubelet, error) {
+func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps) (*Kubelet, error) {
 
-	hostname := nodeutil.GetHostname(kc_new.HostnameOverride)
+	hostname := nodeutil.GetHostname(kubeCfg.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname
 	nodeName := hostname
-	if kc_old.Cloud != nil {
+	if kubeDeps.Cloud != nil {
 		var err error
-		instances, ok := kc_old.Cloud.Instances()
+		instances, ok := kubeDeps.Cloud.Instances()
 		if !ok {
 			return nil, fmt.Errorf("failed to get instances from cloud provider")
 		}
@@ -291,74 +292,74 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
 	// a nil pointer to it when what we really want is a nil interface.
 	var kubeClient clientset.Interface
-	if kc_old.KubeClient != nil {
-		kubeClient = kc_old.KubeClient
+	if kubeDeps.KubeClient != nil {
+		kubeClient = kubeDeps.KubeClient
 		// TODO: remove this when we've refactored kubelet to only use clientset.
 	}
 
-	if kc_old.PodConfig == nil {
+	if kubeDeps.PodConfig == nil {
 		// TODO(mtaufen): This looks like something that would ultimately be appropriate
 		//                to apply as a default during the conversion between external
 		//                and internal KubeletConfiguration type.
 		var err error
-		kc_old.PodConfig, err = makePodSourceConfig(kc_old, kc_new, nodeName)
+		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	containerGCPolicy := kubecontainer.ContainerGCPolicy{
-		MinAge:             kc_new.MinimumGCAge.Duration,
-		MaxPerPodContainer: int(kc_new.MaxPerPodContainerCount),
-		MaxContainers:      int(kc_new.MaxContainerCount),
+		MinAge:             kubeCfg.MinimumGCAge.Duration,
+		MaxPerPodContainer: int(kubeCfg.MaxPerPodContainerCount),
+		MaxContainers:      int(kubeCfg.MaxContainerCount),
 	}
 
 	daemonEndpoints := &api.NodeDaemonEndpoints{
-		KubeletEndpoint: api.DaemonEndpoint{Port: kc_new.Port},
+		KubeletEndpoint: api.DaemonEndpoint{Port: kubeCfg.Port},
 	}
 
 	imageGCPolicy := images.ImageGCPolicy{
-		MinAge:               kc_new.ImageMinimumGCAge.Duration,
-		HighThresholdPercent: int(kc_new.ImageGCHighThresholdPercent),
-		LowThresholdPercent:  int(kc_new.ImageGCLowThresholdPercent),
+		MinAge:               kubeCfg.ImageMinimumGCAge.Duration,
+		HighThresholdPercent: int(kubeCfg.ImageGCHighThresholdPercent),
+		LowThresholdPercent:  int(kubeCfg.ImageGCLowThresholdPercent),
 	}
 
 	diskSpacePolicy := DiskSpacePolicy{
-		DockerFreeDiskMB: int(kc_new.LowDiskSpaceThresholdMB),
-		RootFreeDiskMB:   int(kc_new.LowDiskSpaceThresholdMB),
+		DockerFreeDiskMB: int(kubeCfg.LowDiskSpaceThresholdMB),
+		RootFreeDiskMB:   int(kubeCfg.LowDiskSpaceThresholdMB),
 	}
 
-	thresholds, err := eviction.ParseThresholdConfig(kc_new.EvictionHard, kc_new.EvictionSoft, kc_new.EvictionSoftGracePeriod, kc_new.EvictionMinimumReclaim)
+	thresholds, err := eviction.ParseThresholdConfig(kubeCfg.EvictionHard, kubeCfg.EvictionSoft, kubeCfg.EvictionSoftGracePeriod, kubeCfg.EvictionMinimumReclaim)
 	if err != nil {
 		return nil, err
 	}
 	evictionConfig := eviction.Config{
-		PressureTransitionPeriod: kc_new.EvictionPressureTransitionPeriod.Duration,
-		MaxPodGracePeriodSeconds: int64(kc_new.EvictionMaxPodGracePeriod),
+		PressureTransitionPeriod: kubeCfg.EvictionPressureTransitionPeriod.Duration,
+		MaxPodGracePeriodSeconds: int64(kubeCfg.EvictionMaxPodGracePeriod),
 		Thresholds:               thresholds,
 	}
 
-	reservation, err := ParseReservation(kc_new.KubeReserved, kc_new.SystemReserved)
+	reservation, err := ParseReservation(kubeCfg.KubeReserved, kubeCfg.SystemReserved)
 	if err != nil {
 		return nil, err
 	}
 
 	var dockerExecHandler dockertools.ExecHandler
-	switch kc_new.DockerExecHandlerName {
+	switch kubeCfg.DockerExecHandlerName {
 	case "native":
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	case "nsenter":
 		dockerExecHandler = &dockertools.NsenterExecHandler{}
 	default:
-		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", kc_new.DockerExecHandlerName)
+		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", kubeCfg.DockerExecHandlerName)
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	if kc_new.RootDirectory == "" {
-		return nil, fmt.Errorf("invalid root directory %q", kc_new.RootDirectory)
+	if kubeCfg.RootDirectory == "" {
+		return nil, fmt.Errorf("invalid root directory %q", kubeCfg.RootDirectory)
 	}
-	if kc_new.SyncFrequency.Duration <= 0 {
-		return nil, fmt.Errorf("invalid sync frequency %d", kc_new.SyncFrequency.Duration)
+	if kubeCfg.SyncFrequency.Duration <= 0 {
+		return nil, fmt.Errorf("invalid sync frequency %d", kubeCfg.SyncFrequency.Duration)
 	}
 
 	serviceStore := cache.NewStore(cache.MetaNamespaceKeyFunc)
@@ -407,13 +408,13 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		Namespace: "",
 	}
 
-	diskSpaceManager, err := newDiskSpaceManager(kc_old.CAdvisorInterface, diskSpacePolicy)
+	diskSpaceManager, err := newDiskSpaceManager(kubeDeps.CAdvisorInterface, diskSpacePolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize disk manager: %v", err)
 	}
 	containerRefManager := kubecontainer.NewRefManager()
 
-	oomWatcher := NewOOMWatcher(kc_old.CAdvisorInterface, kc_old.Recorder)
+	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
 
 	// TODO(mtaufen): This is an example of modification being done to the config. This may be necessary ATM, will investigate further.
 	//                I renamed configureCBR0 and flannelExperimentalOverlay to myConfigureCBR0 and myFlannelExperimentalOverlay to differentiate from kc sub-values.
@@ -421,9 +422,9 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	//                These values were originally args to this function, but no longer!
 	// TODO: remove when internal cbr0 implementation gets removed in favor
 	// of the kubenet network plugin
-	var myConfigureCBR0 bool = kc_new.ConfigureCBR0
-	var myFlannelExperimentalOverlay bool = kc_new.ExperimentalFlannelOverlay
-	if kc_new.NetworkPluginName == "kubenet" {
+	var myConfigureCBR0 bool = kubeCfg.ConfigureCBR0
+	var myFlannelExperimentalOverlay bool = kubeCfg.ExperimentalFlannelOverlay
+	if kubeCfg.NetworkPluginName == "kubenet" {
 		myConfigureCBR0 = false
 		myFlannelExperimentalOverlay = false
 	}
@@ -431,57 +432,57 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	klet := &Kubelet{
 		hostname:                       hostname,
 		nodeName:                       nodeName,
-		dockerClient:                   kc_old.DockerClient,
+		dockerClient:                   kubeDeps.DockerClient,
 		kubeClient:                     kubeClient,
-		rootDirectory:                  kc_new.RootDirectory,
-		resyncInterval:                 kc_new.SyncFrequency.Duration,
+		rootDirectory:                  kubeCfg.RootDirectory,
+		resyncInterval:                 kubeCfg.SyncFrequency.Duration,
 		containerRefManager:            containerRefManager,
 		httpClient:                     &http.Client{},
-		sourcesReady:                   config.NewSourcesReady(kc_old.PodConfig.SeenAllSources),
-		registerNode:                   kc_new.RegisterNode,
-		registerSchedulable:            kc_new.RegisterSchedulable,
-		standaloneMode:                 (len(kc_new.APIServerList) == 0),
-		clusterDomain:                  kc_new.ClusterDomain,
-		clusterDNS:                     net.ParseIP(kc_new.ClusterDNS),
+		sourcesReady:                   config.NewSourcesReady(kubeDeps.PodConfig.SeenAllSources),
+		registerNode:                   kubeCfg.RegisterNode,
+		registerSchedulable:            kubeCfg.RegisterSchedulable,
+		standaloneMode:                 (len(kubeCfg.APIServerList) == 0),
+		clusterDomain:                  kubeCfg.ClusterDomain,
+		clusterDNS:                     net.ParseIP(kubeCfg.ClusterDNS),
 		serviceLister:                  serviceLister,
 		nodeLister:                     nodeLister,
 		nodeInfo:                       nodeInfo,
-		masterServiceNamespace:         kc_new.MasterServiceNamespace,
-		streamingConnectionIdleTimeout: kc_new.StreamingConnectionIdleTimeout.Duration,
-		recorder:                       kc_old.Recorder,
-		cadvisor:                       kc_old.CAdvisorInterface,
+		masterServiceNamespace:         kubeCfg.MasterServiceNamespace,
+		streamingConnectionIdleTimeout: kubeCfg.StreamingConnectionIdleTimeout.Duration,
+		recorder:                       kubeDeps.Recorder,
+		cadvisor:                       kubeDeps.CAdvisorInterface,
 		diskSpaceManager:               diskSpaceManager,
-		cloud:                          kc_old.Cloud,
-		autoDetectCloudProvider:   (kubeExternal.AutoDetectCloudProvider == kc_new.CloudProvider),
+		cloud:                          kubeDeps.Cloud,
+		autoDetectCloudProvider:   (kubeExternal.AutoDetectCloudProvider == kubeCfg.CloudProvider),
 		nodeRef:                   nodeRef,
-		nodeLabels:                kc_new.NodeLabels,
-		nodeStatusUpdateFrequency: kc_new.NodeStatusUpdateFrequency.Duration,
-		os:                         kc_old.OSInterface,
+		nodeLabels:                kubeCfg.NodeLabels,
+		nodeStatusUpdateFrequency: kubeCfg.NodeStatusUpdateFrequency.Duration,
+		os:                         kubeDeps.OSInterface,
 		oomWatcher:                 oomWatcher,
-		cgroupsPerQOS:              kc_new.CgroupsPerQOS,
-		cgroupRoot:                 kc_new.CgroupRoot,
-		mounter:                    kc_old.Mounter,
-		writer:                     kc_old.Writer,
+		cgroupsPerQOS:              kubeCfg.CgroupsPerQOS,
+		cgroupRoot:                 kubeCfg.CgroupRoot,
+		mounter:                    kubeDeps.Mounter,
+		writer:                     kubeDeps.Writer,
 		configureCBR0:              myConfigureCBR0,
-		nonMasqueradeCIDR:          kc_new.NonMasqueradeCIDR,
-		reconcileCIDR:              kc_new.ReconcileCIDR,
-		maxPods:                    int(kc_new.MaxPods),
-		podsPerCore:                int(kc_new.PodsPerCore),
-		nvidiaGPUs:                 int(kc_new.NvidiaGPUs),
+		nonMasqueradeCIDR:          kubeCfg.NonMasqueradeCIDR,
+		reconcileCIDR:              kubeCfg.ReconcileCIDR,
+		maxPods:                    int(kubeCfg.MaxPods),
+		podsPerCore:                int(kubeCfg.PodsPerCore),
+		nvidiaGPUs:                 int(kubeCfg.NvidiaGPUs),
 		syncLoopMonitor:            atomic.Value{},
-		resolverConfig:             kc_new.ResolverConfig,
-		cpuCFSQuota:                kc_new.CPUCFSQuota,
+		resolverConfig:             kubeCfg.ResolverConfig,
+		cpuCFSQuota:                kubeCfg.CPUCFSQuota,
 		daemonEndpoints:            daemonEndpoints,
-		containerManager:           kc_old.ContainerManager,
+		containerManager:           kubeDeps.ContainerManager,
 		flannelExperimentalOverlay: myFlannelExperimentalOverlay,
 		flannelHelper:              nil,
-		nodeIP:                     net.ParseIP(kc_new.NodeIP),
+		nodeIP:                     net.ParseIP(kubeCfg.NodeIP),
 		clock:                      clock.RealClock{},
-		outOfDiskTransitionFrequency: kc_new.OutOfDiskTransitionFrequency.Duration,
+		outOfDiskTransitionFrequency: kubeCfg.OutOfDiskTransitionFrequency.Duration,
 		reservation:                  *reservation,
-		enableCustomMetrics:          kc_new.EnableCustomMetrics,
-		babysitDaemons:               kc_new.BabysitDaemons,
-		enableControllerAttachDetach: kc_new.EnableControllerAttachDetach,
+		enableCustomMetrics:          kubeCfg.EnableCustomMetrics,
+		babysitDaemons:               kubeCfg.BabysitDaemons,
+		enableControllerAttachDetach: kubeCfg.EnableControllerAttachDetach,
 		iptClient:                    utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
 	}
 
@@ -496,7 +497,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		glog.Infof("Using node IP: %q", klet.nodeIP.String())
 	}
 
-	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kc_new.HairpinMode), kc_new.ContainerRuntime, kc_new.ConfigureCBR0, kc_new.NetworkPluginName); err != nil {
+	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.ConfigureCBR0, kubeCfg.NetworkPluginName); err != nil {
 		// This is a non-recoverable error. Returning it up the callstack will just
 		// lead to retries of the same failure, so just fail hard.
 		glog.Fatalf("Invalid hairpin mode: %v", err)
@@ -505,7 +506,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	}
 	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
-	if plug, err := network.InitNetworkPlugin(kc_old.NetworkPlugins, kc_new.NetworkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR); err != nil {
+	if plug, err := network.InitNetworkPlugin(kubeDeps.NetworkPlugins, kubeCfg.NetworkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR); err != nil {
 		return nil, err
 	} else {
 		klet.networkPlugin = plug
@@ -525,53 +526,53 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
 	// Initialize the runtime.
-	switch kc_new.ContainerRuntime {
+	switch kubeCfg.ContainerRuntime {
 	case "docker":
 		// Only supported one for now, continue.
 		klet.containerRuntime = dockertools.NewDockerManager(
-			kc_old.DockerClient,
-			kubecontainer.FilterEventRecorder(kc_old.Recorder),
+			kubeDeps.DockerClient,
+			kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 			klet.livenessManager,
 			containerRefManager,
 			klet.podManager,
 			machineInfo,
-			kc_new.PodInfraContainerImage,
-			float32(kc_new.RegistryPullQPS),
-			int(kc_new.RegistryBurst),
+			kubeCfg.PodInfraContainerImage,
+			float32(kubeCfg.RegistryPullQPS),
+			int(kubeCfg.RegistryBurst),
 			containerLogsDir,
-			kc_old.OSInterface,
+			kubeDeps.OSInterface,
 			klet.networkPlugin,
 			klet,
 			klet.httpClient,
 			dockerExecHandler,
-			kc_old.OOMAdjuster,
+			kubeDeps.OOMAdjuster,
 			procFs,
 			klet.cpuCFSQuota,
 			imageBackOff,
-			kc_new.SerializeImagePulls,
-			kc_new.EnableCustomMetrics,
+			kubeCfg.SerializeImagePulls,
+			kubeCfg.EnableCustomMetrics,
 			// If using "kubenet", the Kubernetes network plugin that wraps
 			// CNI's bridge plugin, it knows how to set the hairpin veth flag
 			// so we tell the container runtime to back away from setting it.
 			// If the kubelet is started with any other plugin we can't be
 			// sure it handles the hairpin case so we instruct the docker
 			// runtime to set the flag instead.
-			klet.hairpinMode == componentconfig.HairpinVeth && kc_new.NetworkPluginName != "kubenet",
-			kc_new.SeccompProfileRoot,
-			kc_old.ContainerRuntimeOptions...,
+			klet.hairpinMode == componentconfig.HairpinVeth && kubeCfg.NetworkPluginName != "kubenet",
+			kubeCfg.SeccompProfileRoot,
+			kubeDeps.ContainerRuntimeOptions...,
 		)
 	case "rkt":
 		// TODO: Include hairpin mode settings in rkt?
 		conf := &rkt.Config{
-			Path:            kc_new.RktPath,
-			Stage1Image:     kc_new.RktStage1Image,
+			Path:            kubeCfg.RktPath,
+			Stage1Image:     kubeCfg.RktStage1Image,
 			InsecureOptions: "image,ondisk",
 		}
 		rktRuntime, err := rkt.New(
-			kc_new.RktAPIEndpoint,
+			kubeCfg.RktAPIEndpoint,
 			conf,
 			klet,
-			kc_old.Recorder,
+			kubeDeps.Recorder,
 			containerRefManager,
 			klet.podManager,
 			klet.livenessManager,
@@ -581,23 +582,23 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 			utilexec.New(),
 			kubecontainer.RealOS{},
 			imageBackOff,
-			kc_new.SerializeImagePulls,
-			kc_new.RuntimeRequestTimeout.Duration,
+			kubeCfg.SerializeImagePulls,
+			kubeCfg.RuntimeRequestTimeout.Duration,
 		)
 		if err != nil {
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
 	default:
-		return nil, fmt.Errorf("unsupported container runtime %q specified", kc_new.ContainerRuntime)
+		return nil, fmt.Errorf("unsupported container runtime %q specified", kubeCfg.ContainerRuntime)
 	}
 
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
-	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, kc_new.VolumeStatsAggPeriod.Duration, klet.containerRuntime)
+	klet.resourceAnalyzer = stats.NewResourceAnalyzer(klet, kubeCfg.VolumeStatsAggPeriod.Duration, klet.containerRuntime)
 
 	klet.pleg = pleg.NewGenericPLEG(klet.containerRuntime, plegChannelCapacity, plegRelistPeriod, klet.podCache, clock.RealClock{})
 	klet.runtimeState = newRuntimeState(maxWaitForContainerRuntime)
-	klet.updatePodCIDR(kc_new.PodCIDR)
+	klet.updatePodCIDR(kubeCfg.PodCIDR)
 
 	// setup containerGC
 	containerGC, err := kubecontainer.NewContainerGC(klet.containerRuntime, containerGCPolicy)
@@ -608,7 +609,7 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
-	imageManager, err := images.NewImageGCManager(klet.containerRuntime, kc_old.CAdvisorInterface, kc_old.Recorder, nodeRef, imageGCPolicy)
+	imageManager, err := images.NewImageGCManager(klet.containerRuntime, kubeDeps.CAdvisorInterface, kubeDeps.Recorder, nodeRef, imageGCPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -622,16 +623,16 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 		klet.livenessManager,
 		klet.runner,
 		containerRefManager,
-		kc_old.Recorder)
+		kubeDeps.Recorder)
 
 	klet.volumePluginMgr, err =
-		NewInitializedVolumePluginMgr(klet, kc_old.VolumePlugins)
+		NewInitializedVolumePluginMgr(klet, kubeDeps.VolumePlugins)
 	if err != nil {
 		return nil, err
 	}
 
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
-		kc_new.EnableControllerAttachDetach,
+		kubeCfg.EnableControllerAttachDetach,
 		nodeName,
 		klet.podManager,
 		klet.kubeClient,
@@ -646,14 +647,14 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	klet.runtimeCache = runtimeCache
 	klet.reasonCache = NewReasonCache()
 	klet.workQueue = queue.NewBasicWorkQueue(klet.clock)
-	klet.podWorkers = newPodWorkers(klet.syncPod, kc_old.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
+	klet.podWorkers = newPodWorkers(klet.syncPod, kubeDeps.Recorder, klet.workQueue, klet.resyncInterval, backOffPeriod, klet.podCache)
 
 	klet.backOff = flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 	klet.podKillingCh = make(chan *kubecontainer.PodPair, podKillingChannelCapacity)
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers), klet.imageManager, kc_old.Recorder, nodeRef, klet.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers), klet.imageManager, kubeDeps.Recorder, nodeRef, klet.clock)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize eviction manager: %v", err)
@@ -670,14 +671,14 @@ func NewMainKubelet(kc_old *KubeletConfig, kc_new *componentconfig.KubeletConfig
 	klet.AddPodSyncHandler(activeDeadlineHandler)
 
 	// apply functional Option's
-	for _, opt := range kc_old.Options {
+	for _, opt := range kubeDeps.Options {
 		opt(klet)
 	}
 
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
-	klet.kubeletConfig = kc_old
-	klet.kubeletConfiguration = kc_new
+	klet.kubeletDeps = kubeDeps
+	klet.kubeletConfiguration = kubeCfg
 	return klet, nil
 }
 
@@ -691,7 +692,7 @@ type nodeLister interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	kubeletConfig        *KubeletConfig
+	kubeletDeps          *KubeletDeps
 	kubeletConfiguration *componentconfig.KubeletConfiguration
 
 	hostname      string
@@ -3046,8 +3047,8 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 }
 
 // GetConfig returns the KubeletConfig used to configure the kubelet.
-func (kl *Kubelet) GetConfig() *KubeletConfig {
-	return kl.kubeletConfig
+func (kl *Kubelet) GetDeps() *KubeletDeps {
+	return kl.kubeletDeps
 }
 
 // GetConfig returns the KubeletConfiguration used to configure the kubelet.

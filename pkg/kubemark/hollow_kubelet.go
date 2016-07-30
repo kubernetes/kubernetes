@@ -35,8 +35,8 @@ import (
 )
 
 type HollowKubelet struct {
-	KubeletConfig_old        *kubelet.KubeletConfig
-	KubeletConfiguration_new *componentconfig.KubeletConfiguration
+	KubeletConfiguration *componentconfig.KubeletConfiguration
+	KubeletDeps          *kubelet.KubeletDeps
 }
 
 func NewHollowKubelet(
@@ -52,40 +52,43 @@ func NewHollowKubelet(
 	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
+	kubeCfg, kubeDeps := kubeletapp.SimpleKubelet(
+		client,
+		dockerClient,
+		nodeName,
+		testRootDir,
+		"",        /* manifest-url */
+		"0.0.0.0", /* bind address */
+		uint(kubeletPort),
+		uint(kubeletReadOnlyPort),
+		api.NamespaceDefault,
+		empty_dir.ProbeVolumePlugins(),
+		nil, /* tls-options */
+		cadvisorInterface,
+		manifestFilePath,
+		nil, /* cloud-provider */
+		&containertest.FakeOS{}, /* os-interface */
+		20*time.Second,          /* FileCheckFrequency */
+		20*time.Second,          /* HTTPCheckFrequency */
+		1*time.Minute,           /* MinimumGCAge */
+		10*time.Second,          /* NodeStatusUpdateFrequency */
+		10*time.Second,          /* SyncFrequency */
+		5*time.Minute,           /* OutOfDiskTransitionFrequency */
+		5*time.Minute,           /* EvictionPressureTransitionPeriod */
+		maxPods,
+		podsPerCore,
+		containerManager,
+		nil,
+	)
+
 	return &HollowKubelet{
-		KubeletConfig_old: kubeletapp.SimpleKubelet(
-			client,
-			dockerClient,
-			nodeName,
-			testRootDir,
-			"",        /* manifest-url */
-			"0.0.0.0", /* bind address */
-			uint(kubeletPort),
-			uint(kubeletReadOnlyPort),
-			api.NamespaceDefault,
-			empty_dir.ProbeVolumePlugins(),
-			nil, /* tls-options */
-			cadvisorInterface,
-			manifestFilePath,
-			nil, /* cloud-provider */
-			&containertest.FakeOS{}, /* os-interface */
-			20*time.Second,          /* FileCheckFrequency */
-			20*time.Second,          /* HTTPCheckFrequency */
-			1*time.Minute,           /* MinimumGCAge */
-			10*time.Second,          /* NodeStatusUpdateFrequency */
-			10*time.Second,          /* SyncFrequency */
-			5*time.Minute,           /* OutOfDiskTransitionFrequency */
-			5*time.Minute,           /* EvictionPressureTransitionPeriod */
-			maxPods,
-			podsPerCore,
-			containerManager,
-			nil,
-		),
+		KubeletConfiguration: kubeCfg,
+		KubeletDeps:          kubeDeps,
 	}
 }
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletConfig_old, hk.KubeletConfiguration_new)
+	kubeletapp.RunKubelet(hk.KubeletConfiguration, hk.KubeletDeps)
 	select {}
 }
