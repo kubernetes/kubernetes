@@ -653,11 +653,6 @@ func podFromManifest(filename string) (*api.Pod, error) {
 // Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
 // to flip to Ready, log its output and delete it.
 func RunKubernetesServiceTestContainer(c *client.Client, ns string) {
-	c, err := LoadClient()
-	if err != nil {
-		Logf("Failed to load client")
-		return
-	}
 	path := "test/images/clusterapi-tester/pod.yaml"
 	p, err := podFromManifest(path)
 	if err != nil {

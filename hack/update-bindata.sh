@@ -16,13 +16,12 @@
 
 set -o errexit
 set -o pipefail
+set -o nounset
 
-if [[ -z ${KUBE_ROOT} ]]; then
+if [[ -z "${KUBE_ROOT:-}" ]]; then
 	echo "KUBE_ROOT not detected, setting default."
 	KUBE_ROOT="../../../"
 fi
-
-set -o nounset
 
 if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
 	echo "${KUBE_ROOT}/examples not detected.  This script should be run from a location where the source dirs are available."
