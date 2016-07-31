@@ -278,6 +278,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		usedResources := api.ResourceList{}
 		usedResources[api.ResourceQuotas] = resource.MustParse("1")
 		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		usedResources[api.ResourceRequestsStorage] = resource.MustParse("0")
 		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -289,6 +290,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		By("Ensuring resource quota status captures persistent volume claimcreation")
 		usedResources = api.ResourceList{}
 		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("1")
+		usedResources[api.ResourceRequestsStorage] = resource.MustParse("1Gi")
 		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -298,6 +300,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 
 		By("Ensuring resource quota status released usage")
 		usedResources[api.ResourcePersistentVolumeClaims] = resource.MustParse("0")
+		usedResources[api.ResourceRequestsStorage] = resource.MustParse("0")
 		err = waitForResourceQuota(f.Client, f.Namespace.Name, quotaName, usedResources)
 		Expect(err).NotTo(HaveOccurred())
 	})
@@ -512,6 +515,7 @@ func newTestResourceQuota(name string) *api.ResourceQuota {
 	hard[api.ResourceConfigMaps] = resource.MustParse("2")
 	hard[api.ResourceSecrets] = resource.MustParse("10")
 	hard[api.ResourcePersistentVolumeClaims] = resource.MustParse("10")
+	hard[api.ResourceRequestsStorage] = resource.MustParse("10Gi")
 	return &api.ResourceQuota{
 		ObjectMeta: api.ObjectMeta{Name: name},
 		Spec:       api.ResourceQuotaSpec{Hard: hard},

@@ -134,6 +134,7 @@ var standardQuotaResources = sets.NewString(
 	string(ResourceMemory),
 	string(ResourceRequestsCPU),
 	string(ResourceRequestsMemory),
+	string(ResourceRequestsStorage),
 	string(ResourceLimitsCPU),
 	string(ResourceLimitsMemory),
 	string(ResourcePods),
