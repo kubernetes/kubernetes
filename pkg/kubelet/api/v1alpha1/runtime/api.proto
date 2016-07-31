@@ -1,4 +1,4 @@
-// api.pb.go could be generate by hack/update-generate-runtime.sh
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = 'proto2';
 
 package runtime;
@@ -112,24 +112,23 @@ message Mount {
     optional bool selinux_relabel = 5;
 }
 
-// ResourceRequirements contains a set of resources
-// Valid resources are:
-// - cpu, in cores. (500m = .5 cores)
-// - memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-message ResourceRequirements {
-    // The maximum amount of compute resources allowed.
-    optional double limits = 1;
-    // The minimum amount of compute resources required.
-    // If Request is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value
-    optional double requests = 2;
+// ScalarResourceRequirement describes a single scalar resource dimension.
+// Resource quantities should be expressed in base units. For example:
+// - cpu (in cores): 500m = .5 cores
+// - memory (in bytes): 500Gi = 500GiB = 500 * 1024 * 1024 * 1024
+message ScalarResourceRequirement {
+    // The maximum amount of a resource allowed.
+    optional double limit = 1;
+    // The minimum amount of a resource required.
+    // If Request is omitted for a container, it defaults to Limit if that is
+    // explicitly specified, otherwise to an implementation-defined value.
+    optional double request = 2;
 }
 
-// PodSandboxResources contains the CPU/memory resource requirements.
+// PodSandboxResources contains the requirements for each resource type.
 message PodSandboxResources {
-    // CPU resource requirement.
-    optional ResourceRequirements cpu = 1;
-    // Memory resource requirement.
-    optional ResourceRequirements memory = 2;
+    // Runtimes generally expect mappings for "cpu" and "memory".
+    map<string, ScalarResourceRequirement> scalarRequirements = 1;
 }
 
 // NamespaceOption provides options for Linux namespaces.
@@ -146,7 +145,7 @@ message NamespaceOption {
 // host platforms and Linux-based containers.
 message LinuxPodSandboxConfig {
     // The parent cgroup of the pod sandbox.
-    // The cgroupfs style syntax will be used, but the container runtime can 
+    // The cgroupfs style syntax will be used, but the container runtime can
     // convert it to systemd semantices if needed.
     optional string cgroup_parent = 1;
     // The configurations for the sandbox's namespaces.
@@ -318,8 +317,8 @@ message ListPodSandboxResponse {
 }
 
 // ImageSpec is an internal representation of an image.  Currently, it wraps the
-// value of a Container's Image field (e.g. imageName, imageName:tag, or 
-// imageName:digest), but in the future it will include more detailed 
+// value of a Container's Image field (e.g. imageName, imageName:tag, or
+// imageName:digest), but in the future it will include more detailed
 // information about the different image types.
 message ImageSpec {
     optional string image = 1;

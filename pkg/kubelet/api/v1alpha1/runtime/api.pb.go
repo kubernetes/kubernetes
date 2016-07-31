@@ -30,7 +30,7 @@ It has these top-level messages:
 	DNSOption
 	PortMapping
 	Mount
-	ResourceRequirements
+	ScalarResourceRequirement
 	PodSandboxResources
 	NamespaceOption
 	LinuxPodSandboxConfig
@@ -405,60 +405,52 @@ func (m *Mount) GetSelinuxRelabel() bool {
 	return false
 }
 
-// ResourceRequirements contains a set of resources
-// Valid resources are:
-// - cpu, in cores. (500m = .5 cores)
-// - memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-type ResourceRequirements struct {
-	// The maximum amount of compute resources allowed.
-	Limits *float64 `protobuf:"fixed64,1,opt,name=limits" json:"limits,omitempty"`
-	// The minimum amount of compute resources required.
-	// If Request is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value
-	Requests         *float64 `protobuf:"fixed64,2,opt,name=requests" json:"requests,omitempty"`
+// ScalarResourceRequirement describes a single scalar resource dimension.
+// Resource quantities should be expressed in base units. For example:
+// - cpu (in cores): 500m = .5 cores
+// - memory (in bytes): 500Gi = 500GiB = 500 * 1024 * 1024 * 1024
+type ScalarResourceRequirement struct {
+	// The maximum amount of a resource allowed.
+	Limit *float64 `protobuf:"fixed64,1,opt,name=limit" json:"limit,omitempty"`
+	// The minimum amount of a resource required.
+	// If Request is omitted for a container, it defaults to Limit if that is
+	// explicitly specified, otherwise to an implementation-defined value.
+	Request          *float64 `protobuf:"fixed64,2,opt,name=request" json:"request,omitempty"`
 	XXX_unrecognized []byte   `json:"-"`
 }
 
-func (m *ResourceRequirements) Reset()         { *m = ResourceRequirements{} }
-func (m *ResourceRequirements) String() string { return proto.CompactTextString(m) }
-func (*ResourceRequirements) ProtoMessage()    {}
+func (m *ScalarResourceRequirement) Reset()         { *m = ScalarResourceRequirement{} }
+func (m *ScalarResourceRequirement) String() string { return proto.CompactTextString(m) }
+func (*ScalarResourceRequirement) ProtoMessage()    {}
 
-func (m *ResourceRequirements) GetLimits() float64 {
-	if m != nil && m.Limits != nil {
-		return *m.Limits
+func (m *ScalarResourceRequirement) GetLimit() float64 {
+	if m != nil && m.Limit != nil {
+		return *m.Limit
 	}
 	return 0
 }
 
-func (m *ResourceRequirements) GetRequests() float64 {
-	if m != nil && m.Requests != nil {
-		return *m.Requests
+func (m *ScalarResourceRequirement) GetRequest() float64 {
+	if m != nil && m.Request != nil {
+		return *m.Request
 	}
 	return 0
 }
 
-// PodSandboxResources contains the CPU/memory resource requirements.
+// PodSandboxResources contains the requirements for each resource type.
 type PodSandboxResources struct {
-	// CPU resource requirement.
-	Cpu *ResourceRequirements `protobuf:"bytes,1,opt,name=cpu" json:"cpu,omitempty"`
-	// Memory resource requirement.
-	Memory           *ResourceRequirements `protobuf:"bytes,2,opt,name=memory" json:"memory,omitempty"`
-	XXX_unrecognized []byte                `json:"-"`
+	// Runtimes generally expect mappings for "cpu" and "memory".
+	ScalarRequirements map[string]*ScalarResourceRequirement `protobuf:"bytes,1,rep,name=scalarRequirements" json:"scalarRequirements,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	XXX_unrecognized   []byte                                `json:"-"`
 }
 
 func (m *PodSandboxResources) Reset()         { *m = PodSandboxResources{} }
 func (m *PodSandboxResources) String() string { return proto.CompactTextString(m) }
 func (*PodSandboxResources) ProtoMessage()    {}
 
-func (m *PodSandboxResources) GetCpu() *ResourceRequirements {
+func (m *PodSandboxResources) GetScalarRequirements() map[string]*ScalarResourceRequirement {
 	if m != nil {
-		return m.Cpu
-	}
-	return nil
-}
-
-func (m *PodSandboxResources) GetMemory() *ResourceRequirements {
-	if m != nil {
-		return m.Memory
+		return m.ScalarRequirements
 	}
 	return nil
 }
@@ -2246,7 +2238,7 @@ func init() {
 	proto.RegisterType((*DNSOption)(nil), "runtime.DNSOption")
 	proto.RegisterType((*PortMapping)(nil), "runtime.PortMapping")
 	proto.RegisterType((*Mount)(nil), "runtime.Mount")
-	proto.RegisterType((*ResourceRequirements)(nil), "runtime.ResourceRequirements")
+	proto.RegisterType((*ScalarResourceRequirement)(nil), "runtime.ScalarResourceRequirement")
 	proto.RegisterType((*PodSandboxResources)(nil), "runtime.PodSandboxResources")
 	proto.RegisterType((*NamespaceOption)(nil), "runtime.NamespaceOption")
 	proto.RegisterType((*LinuxPodSandboxConfig)(nil), "runtime.LinuxPodSandboxConfig")
