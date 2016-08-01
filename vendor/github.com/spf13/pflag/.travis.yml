@@ -3,9 +3,8 @@ sudo: false
 language: go
 
 go:
-        - 1.3
-        - 1.4
-        - 1.5
+        - 1.5.4
+        - 1.6.3
         - tip
 
 install:
@@ -14,5 +13,5 @@ install:
         - go install ./...
 
 script:
-        - verify/all.sh
+        - verify/all.sh -v
         - go test ./...
