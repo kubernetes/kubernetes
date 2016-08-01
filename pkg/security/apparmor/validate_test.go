@@ -28,7 +28,7 @@ import (
 func TestGetAppArmorFS(t *testing.T) {
 	// This test only passes on systems running AppArmor with the default configuration.
 	// The test should be manually run if modifying the getAppArmorFS function.
-	// t.Skip()
+	t.Skip()
 
 	const expectedPath = "/sys/kernel/security/apparmor"
 	actualPath, err := getAppArmorFS()
@@ -39,7 +39,7 @@ func TestGetAppArmorFS(t *testing.T) {
 func TestValidateHost(t *testing.T) {
 	// This test only passes on systems running AppArmor with the default configuration.
 	// The test should be manually run if modifying the getAppArmorFS function.
-	// t.Skip()
+	t.Skip()
 
 	assert.NoError(t, validateHost("docker"))
 	assert.Error(t, validateHost("rkt"))
