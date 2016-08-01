@@ -639,8 +639,12 @@ type CephFSVolumeSource struct {
 // Represents a Flocker volume mounted by the Flocker agent.
 // Flocker volumes do not support ownership management or SELinux relabeling.
 type FlockerVolumeSource struct {
-	// Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker
+	// One and only one of the following should be specified.
+	// Name of the dataset stored as metadata -> name on the dataset for Flocker
+	// should be considered as deprecated
 	DatasetName string `json:"datasetName" protobuf:"bytes,1,opt,name=datasetName"`
+	// UUID of the dataset. This is unique identifier of a Flocker dataset
+	DatasetUUID string `json:"datasetUUID" protobuf:"bytes,2,opt,name=datasetUUID"`
 }
 
 // StorageMedium defines ways that storage can be allocated to a volume.

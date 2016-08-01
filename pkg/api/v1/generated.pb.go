@@ -2885,6 +2885,10 @@ func (m *FlockerVolumeSource) MarshalTo(data []byte) (int, error) {
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.DatasetName)))
 	i += copy(data[i:], m.DatasetName)
+	data[i] = 0x12
+	i++
+	i = encodeVarintGenerated(data, i, uint64(len(m.DatasetUUID)))
+	i += copy(data[i:], m.DatasetUUID)
 	return i, nil
 }
 
@@ -8710,6 +8714,8 @@ func (m *FlockerVolumeSource) Size() (n int) {
 	_ = l
 	l = len(m.DatasetName)
 	n += 1 + l + sovGenerated(uint64(l))
+	l = len(m.DatasetUUID)
+	n += 1 + l + sovGenerated(uint64(l))
 	return n
 }
 
@@ -11175,6 +11181,7 @@ func (this *FlockerVolumeSource) String() string {
 	}
 	s := strings.Join([]string{`&FlockerVolumeSource{`,
 		`DatasetName:` + fmt.Sprintf("%v", this.DatasetName) + `,`,
+		`DatasetUUID:` + fmt.Sprintf("%v", this.DatasetUUID) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -19257,6 +19264,35 @@ func (m *FlockerVolumeSource) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			m.DatasetName = string(data[iNdEx:postIndex])
+			iNdEx = postIndex
+		case 2:
+			if wireType != 2 {
+				return fmt.Errorf("proto: wrong wireType = %d for field DatasetUUID", wireType)
+			}
+			var stringLen uint64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				stringLen |= (uint64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			intStringLen := int(stringLen)
+			if intStringLen < 0 {
+				return ErrInvalidLengthGenerated
+			}
+			postIndex := iNdEx + intStringLen
+			if postIndex > l {
+				return io.ErrUnexpectedEOF
+			}
+			m.DatasetUUID = string(data[iNdEx:postIndex])
 			iNdEx = postIndex
 		default:
 			iNdEx = preIndex
