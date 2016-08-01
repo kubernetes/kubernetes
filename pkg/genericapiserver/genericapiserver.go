@@ -585,16 +585,18 @@ func verifyEtcdServersList(options *options.ServerRunOptions) {
 	}
 }
 
-func verifySecurePort(options *options.ServerRunOptions) {
+func verifySecureAndInsecurePort(options *options.ServerRunOptions) {
 	if options.SecurePort < 0 || options.SecurePort > 65535 {
 		glog.Fatalf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", options.SecurePort)
 	}
-}
 
-// TODO: Allow 0 to turn off insecure port.
-func verifyInsecurePort(options *options.ServerRunOptions) {
+	// TODO: Allow 0 to turn off insecure port.
 	if options.InsecurePort < 1 || options.InsecurePort > 65535 {
 		glog.Fatalf("--insecure-port %v must be between 1 and 65535, inclusive.", options.InsecurePort)
+	}
+
+	if options.SecurePort == options.InsecurePort {
+		glog.Fatalf("--secure-port and --insecure-port cannot use the same port.")
 	}
 }
 
@@ -602,8 +604,7 @@ func ValidateRunOptions(options *options.ServerRunOptions) {
 	verifyClusterIPFlags(options)
 	verifyServiceNodePort(options)
 	verifyEtcdServersList(options)
-	verifySecurePort(options)
-	verifyInsecurePort(options)
+	verifySecureAndInsecurePort(options)
 }
 
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
