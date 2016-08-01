@@ -1,0 +1,46 @@
+---
+  apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    name: k8s-flannel
+    namespace: kube-system
+    labels:
+      name: k8s-flannel
+      version: v1
+      kubernetes.io/cluster-service: "true"
+  spec:
+    template:
+      metadata:
+        labels:
+          name: k8s-flannel
+          version: v1
+          kubernetes.io/cluster-service: "true"
+      spec:
+        hostNetwork: true
+        containers:
+          -
+            securityContext:
+              privileged: true
+            name: k8s-flannel
+            image: quay.io/coreos/flannel:0.5.5
+            command:
+              - /opt/bin/flanneld
+              - --ip-masq=true
+              - --iface=eth0
+              - --etcd-endpoints=http://MASTER_IP:4001
+            volumeMounts:
+              -
+                name: devnet
+                mountPath: /dev/net
+              -
+                name: flannel-subnet
+                mountPath: /run/flannel
+        volumes:
+          -
+            name: devnet
+            hostPath:
+              path: /dev/net
+          -
+            name: flannel-subnet
+            hostPath:
+              path: /run/flannel

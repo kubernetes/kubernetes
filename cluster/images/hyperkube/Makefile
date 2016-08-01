@@ -16,8 +16,8 @@
 #
 # Usage:
 #   [ARCH=amd64] [REGISTRY="gcr.io/google_containers"] make (build|push) VERSION={some_version_number e.g. v1.2.0}
-
-REGISTRY?=gcr.io/google_containers
+VERSION=v1.3.0
+REGISTRY?=taimir93
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 CNI_RELEASE=8a936732094c0941e1543ef5d292a1f4fffa1ac5
@@ -61,17 +61,17 @@ endif
 	cp ../../addons/dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/skydns-svc.yaml
 	cp ../../addons/dashboard/dashboard-controller.yaml ${TEMP_DIR}/addons
 	cp ../../addons/dashboard/dashboard-service.yaml ${TEMP_DIR}/addons
-	
+
 	# TODO: Move out kube-proxy to a DaemonSet again
 	#cp kube-proxy-ds.yaml ${TEMP_DIR}/addons/kube-proxy.yaml
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
 
-	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" addons/*.yaml static-pods/*.json
-	cd ${TEMP_DIR} && sed -i.back "s|REGISTRY|${REGISTRY}|g" addons/*.yaml static-pods/*.json
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" addons/*.yaml static-pods/*.json
+	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" daemonsets/*.yaml static-pods/*.json
+	cd ${TEMP_DIR} && sed -i.back "s|REGISTRY|${REGISTRY}|g" daemonsets/*.yaml static-pods/*.json
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" daemonsets/*.yaml static-pods/*.json
 	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
-	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" addons/*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" daemonsets/*.yaml
 	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__REPLICAS__|1|g;s|__PILLAR__DNS__SERVER__|10.0.0.10|g;" addons/skydns*.yaml
 	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/skydns*.yaml
 	rm ${TEMP_DIR}/addons/*.back

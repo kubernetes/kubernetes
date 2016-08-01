@@ -1,0 +1,19 @@
+#!/bin/bash
+export command=$@
+
+echo "Master ip: ${MASTER_IP}"
+echo "User CNI: ${USE_CNI}"
+
+sed -i -e "s#MASTER_IP_VALUE#${MASTER_IP}#g" /etc/kubernetes/manifests/addon-manager.json
+sed -i -e "s#USE_CNI_VALUE#${USE_CNI}#g" /etc/kubernetes/manifests/addon-manager.json
+sed -i -e "s#MASTER_IP_VALUE#${MASTER_IP}#g" /etc/kubernetes/manifests-multi/addon-manager.json
+sed -i -e "s#USE_CNI_VALUE#${USE_CNI}#g" /etc/kubernetes/manifests-multi/addon-manager.json
+
+if [[ ${USE_CNI} == true ]]; then
+  # remove kube-proxy static pod if present
+  rm -rf /etc/kubernetes/manifests-multi/kube-proxy.json
+  rm -rf etc/kubernetes/manifests/kube-proxy.json
+fi
+
+# RUN kubelet with specified command
+/hyperkube kubelet $command

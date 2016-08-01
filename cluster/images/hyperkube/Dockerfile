@@ -42,15 +42,11 @@ COPY hyperkube /hyperkube
 COPY static-pods/master.json /etc/kubernetes/manifests/
 COPY static-pods/etcd.json /etc/kubernetes/manifests/
 COPY static-pods/addon-manager.json /etc/kubernetes/manifests/
-
-# TODO: Move out kube-proxy to a DaemonSet again
 COPY static-pods/kube-proxy.json /etc/kubernetes/manifests/
 
 # Manifests for the docker-multinode guide
 COPY static-pods/master-multi.json /etc/kubernetes/manifests-multi/
 COPY static-pods/addon-manager.json /etc/kubernetes/manifests-multi/
-
-# TODO: Move out kube-proxy to a DaemonSet again
 COPY static-pods/kube-proxy.json /etc/kubernetes/manifests-multi/
 
 # Copy over all addons
@@ -70,6 +66,12 @@ COPY cni /opt/cni
 
 # Copy overlay configuration to default directory
 COPY cni-conf /etc/cni/net.d
+
+# Copy flannel and proxy daemonsets
+COPY daemonsets /daemonsets
+
+# Copy the kubelet wrapper
+COPY run-kubelet /
 
 # Create symlinks for each hyperkube server
 # TODO: this is unreliable for now (e.g. running "/kubelet" panics)
