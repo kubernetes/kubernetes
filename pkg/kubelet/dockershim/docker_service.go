@@ -21,6 +21,7 @@ import (
 	"io"
 
 	"k8s.io/kubernetes/pkg/api"
+	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
@@ -48,8 +49,8 @@ func NewDockerSevice(client dockertools.DockerInterface) DockerLegacyService {
 // RuntimeService and ImageService interfaces, while including legacy methods
 // for backward compatibility.
 type DockerLegacyService interface {
-	kubecontainer.RuntimeService
-	kubecontainer.ImageManagerService
+	internalApi.RuntimeService
+	internalApi.ImageManagerService
 
 	// Supporting legacy methods for docker.
 	GetContainerLogs(pod *api.Pod, containerID kubecontainer.ContainerID, logOptions *api.PodLogOptions, stdout, stderr io.Writer) (err error)
