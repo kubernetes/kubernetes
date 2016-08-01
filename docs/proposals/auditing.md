@@ -85,9 +85,11 @@ while
 
 1. As a cluster operator I want to **define log-rotation** of a file-based output backend.
 
-1. As a cluster operator I must be able to create a trace for **kubectl exec** and other non-CRUD access to a container.
+1. As a cluster operator I must be able to log non-CRUD access like **kubectl exec**, when it started, when it finished and with which initial parameters.
 
-1. As a cluster operator I must be able to get a trace of commands executed in **kubectl exec**. (TODO: out of scope?)
+### Out of scope use-cases
+
+1. As a cluster operator I must be able to get a trace of interactive commands executed in **kubectl exec**.
 
 ## Community Work
 
