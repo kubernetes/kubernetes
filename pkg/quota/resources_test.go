@@ -76,6 +76,41 @@ func TestEquals(t *testing.T) {
 	}
 }
 
+func TestMax(t *testing.T) {
+	testCases := map[string]struct {
+		a        api.ResourceList
+		b        api.ResourceList
+		expected api.ResourceList
+	}{
+		"noKeys": {
+			a:        api.ResourceList{},
+			b:        api.ResourceList{},
+			expected: api.ResourceList{},
+		},
+		"toEmpty": {
+			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			b:        api.ResourceList{},
+			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+		},
+		"matching": {
+			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("150m")},
+			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("150m")},
+		},
+		"matching(reverse)": {
+			a:        api.ResourceList{api.ResourceCPU: resource.MustParse("150m")},
+			b:        api.ResourceList{api.ResourceCPU: resource.MustParse("100m")},
+			expected: api.ResourceList{api.ResourceCPU: resource.MustParse("150m")},
+		},
+	}
+	for testName, testCase := range testCases {
+		sum := Max(testCase.a, testCase.b)
+		if result := Equals(testCase.expected, sum); !result {
+			t.Errorf("%s expected: %v, actual: %v", testName, testCase.expected, sum)
+		}
+	}
+}
+
 func TestAdd(t *testing.T) {
 	testCases := map[string]struct {
 		a        api.ResourceList
