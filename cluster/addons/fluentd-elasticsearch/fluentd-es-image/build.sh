@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,9 @@ apt-get install -y -q --no-install-recommends \
 sed -i -e "s/USER=td-agent/USER=root/" -e "s/GROUP=td-agent/GROUP=root/" /etc/init.d/td-agent
 
 # Install the Elasticsearch Fluentd plug-in.
-td-agent-gem install fluent-plugin-kubernetes_metadata_filter fluent-plugin-elasticsearch
+# http://docs.fluentd.org/articles/plugin-management
+td-agent-gem install --no-document fluent-plugin-kubernetes_metadata_filter -v 0.24.0
+td-agent-gem install --no-document fluent-plugin-elasticsearch -v 1.5.0
 
 # Remove docs and postgres references
 rm -rf /opt/td-agent/embedded/share/doc \
