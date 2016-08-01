@@ -33,7 +33,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -174,7 +173,7 @@ func (a *OIDCAuthenticator) client() (*oidc.Client, error) {
 	}
 
 	// Try to initialize client.
-	providerConfig, err := oidc.FetchProviderConfig(a.httpClient, strings.TrimSuffix(a.issuerURL, "/"))
+	providerConfig, err := oidc.FetchProviderConfig(a.httpClient, a.issuerURL)
 	if err != nil {
 		glog.Errorf("oidc authenticator: failed to fetch provider discovery data: %v", err)
 		return nil, fmt.Errorf("fetch provider config: %v", err)
