@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -270,27 +271,6 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", s.AllocateNodeCIDRs, s.ConfigureCloudRoutes)
 	}
 
-	resourceQuotaControllerClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "resourcequota-controller"))
-	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient)
-	groupKindsToReplenish := []unversioned.GroupKind{
-		api.Kind("Pod"),
-		api.Kind("Service"),
-		api.Kind("ReplicationController"),
-		api.Kind("PersistentVolumeClaim"),
-		api.Kind("Secret"),
-		api.Kind("ConfigMap"),
-	}
-	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
-		KubeClient:                resourceQuotaControllerClient,
-		ResyncPeriod:              controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
-		Registry:                  resourceQuotaRegistry,
-		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(podInformer, resourceQuotaControllerClient),
-		ReplenishmentResyncPeriod: ResyncPeriod(s),
-		GroupKindsToReplenish:     groupKindsToReplenish,
-	}
-	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(int(s.ConcurrentResourceQuotaSyncs), wait.NeverStop)
-	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
-
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
 	var versionStrings []string
@@ -388,6 +368,35 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	}
+
+	resourceQuotaControllerClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "resourcequota-controller"))
+	resourceQuotaRegistry := quotainstall.NewRegistry(resourceQuotaControllerClient)
+	groupKindsToReplenish := []unversioned.GroupKind{
+		api.Kind("Pod"),
+		api.Kind("Service"),
+		api.Kind("ReplicationController"),
+		api.Kind("PersistentVolumeClaim"),
+		api.Kind("Secret"),
+		api.Kind("ConfigMap"),
+	}
+	groupVersion = "extensions/v1beta1"
+	resources, found = resourceMap[groupVersion]
+	if containsVersion(versions, groupVersion) && found {
+		if containsResource(resources, "replicasets") {
+			glog.Infof("ResourceQuota controller will monitor replicasets")
+			groupKindsToReplenish = append(groupKindsToReplenish, extensions.Kind("ReplicaSet"))
+		}
+	}
+	resourceQuotaControllerOptions := &resourcequotacontroller.ResourceQuotaControllerOptions{
+		KubeClient:                resourceQuotaControllerClient,
+		ResyncPeriod:              controller.StaticResyncPeriodFunc(s.ResourceQuotaSyncPeriod.Duration),
+		Registry:                  resourceQuotaRegistry,
+		ControllerFactory:         resourcequotacontroller.NewReplenishmentControllerFactory(podInformer, resourceQuotaControllerClient),
+		ReplenishmentResyncPeriod: ResyncPeriod(s),
+		GroupKindsToReplenish:     groupKindsToReplenish,
+	}
+	go resourcequotacontroller.NewResourceQuotaController(resourceQuotaControllerOptions).Run(int(s.ConcurrentResourceQuotaSyncs), wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	provisioner, err := NewVolumeProvisioner(cloud, s.VolumeConfiguration)
 	if err != nil {
