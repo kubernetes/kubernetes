@@ -46,15 +46,15 @@ GENERATED_FILE_PREFIX := zz_generated.
 # Metadata for driving the build lives here.
 META_DIR := .make
 
+# Our build flags.
+# TODO(thockin): it would be nice to just use the native flags.  Can we EOL
+#                these "wrapper" flags?
 KUBE_GOFLAGS := $(GOFLAGS)
 KUBE_GOLDFLAGS := $(GOLDFLAGS)
-
-KUBE_VERBOSE ?= 1
-
-GOGCFLAGS ?=
-BRANCH ?=
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
-export KUBE_GOGCFLAGS GOGCFLAGS
+
+# This controls the verbosity of the build.  Higher numbers mean more output.
+KUBE_VERBOSE ?= 1
 
 # Build code.
 #
