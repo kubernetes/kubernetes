@@ -180,13 +180,13 @@ Enforcement of the policy is standard. See the
 
 ## Deploying profiles
 
-We will provide a reference implementation of a pod for loading profiles on nodes, but there will
-not be an official mechanism or API in the initial version (see
+We will provide a reference implementation of a DaemonSet pod for loading profiles on nodes, but
+there will not be an official mechanism or API in the initial version (see
 [future work](#deploying-profiles-1)).  The reference container will contain the `apparmor_parser`
 tool and a script for using the tool to load all profiles in a set of (configurable)
-directories. The initial implementation will be designed to run once to completion, as opposed to
-watching the directories for changes. It can be run in a DaemonSet to load the profiles onto all
-nodes. The pod will need to be run in privileged mode.
+directories. The initial implementation will poll (with a configurable interval) the directories for
+additions, but will not update or unload existing profiles. The pod can be run in a DaemonSet to
+load the profiles onto all nodes. The pod will need to be run in privileged mode.
 
 This simple design should be sufficient to deploy AppArmor profiles from any volume source, such as
 a ConfigMap or PersistentDisk. Users seeking more advanced features should be able extend this
