@@ -840,10 +840,15 @@ message FlexVolumeSource {
 }
 
 // Represents a Flocker volume mounted by the Flocker agent.
+// One and only one of datasetName and datasetUUID should be set.
 // Flocker volumes do not support ownership management or SELinux relabeling.
 message FlockerVolumeSource {
-  // Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker
+  // Name of the dataset stored as metadata -> name on the dataset for Flocker
+  // should be considered as deprecated
   optional string datasetName = 1;
+
+  // UUID of the dataset. This is unique identifier of a Flocker dataset
+  optional string datasetUUID = 2;
 }
 
 // Represents a Persistent Disk resource in Google Compute Engine.
