@@ -855,8 +855,12 @@ func validateGlusterfs(glusterfs *api.GlusterfsVolumeSource, fldPath *field.Path
 
 func validateFlockerVolumeSource(flocker *api.FlockerVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(flocker.DatasetName) == 0 {
-		allErrs = append(allErrs, field.Required(fldPath.Child("datasetName"), ""))
+	if len(flocker.DatasetName) == 0 && len(flocker.DatasetUUID) == 0 {
+		//TODO: consider adding a RequiredOneOf() error for this and similar cases
+		allErrs = append(allErrs, field.Required(fldPath, "one of datasetName and datasetUUID is required"))
+	}
+	if len(flocker.DatasetName) != 0 && len(flocker.DatasetUUID) != 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath, "resource", "datasetName and datasetUUID can not be specified simultaneously"))
 	}
 	if strings.Contains(flocker.DatasetName, "/") {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("datasetName"), flocker.DatasetName, "must not contain '/'"))
