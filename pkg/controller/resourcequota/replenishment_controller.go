@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/controller"
@@ -208,6 +209,38 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 				},
 			},
 			&api.ConfigMap{},
+			options.ResyncPeriod(),
+			framework.ResourceEventHandlerFuncs{
+				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
+			},
+		)
+	case extensions.Kind("ReplicaSet"):
+		_, result = framework.NewInformer(
+			&cache.ListWatch{
+				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Extensions().ReplicaSets(api.NamespaceAll).List(options)
+				},
+				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Extensions().ReplicaSets(api.NamespaceAll).Watch(options)
+				},
+			},
+			&extensions.ReplicaSet{},
+			options.ResyncPeriod(),
+			framework.ResourceEventHandlerFuncs{
+				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
+			},
+		)
+	case extensions.Kind("Deployment"):
+		_, result = framework.NewInformer(
+			&cache.ListWatch{
+				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+					return r.kubeClient.Extensions().Deployments(api.NamespaceAll).List(options)
+				},
+				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+					return r.kubeClient.Extensions().Deployments(api.NamespaceAll).Watch(options)
+				},
+			},
+			&extensions.Deployment{},
 			options.ResyncPeriod(),
 			framework.ResourceEventHandlerFuncs{
 				DeleteFunc: ObjectReplenishmentDeleteFunc(options),
