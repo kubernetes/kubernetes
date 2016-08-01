@@ -390,6 +390,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		oldReplicas         int
 		scaleExpected       bool
 		expectedOldReplicas int
+		errorExpected       bool
 	}{
 		{
 			deploymentReplicas:  10,
@@ -398,6 +399,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			oldReplicas:         10,
 			scaleExpected:       true,
 			expectedOldReplicas: 9,
+			errorExpected:       false,
 		},
 		{
 			deploymentReplicas:  10,
@@ -406,6 +408,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			oldReplicas:         10,
 			scaleExpected:       true,
 			expectedOldReplicas: 8,
+			errorExpected:       false,
 		},
 		{
 			deploymentReplicas: 10,
@@ -413,6 +416,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			readyPods:          8,
 			oldReplicas:        10,
 			scaleExpected:      false,
+			errorExpected:      false,
 		},
 		{
 			deploymentReplicas: 10,
@@ -420,6 +424,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			readyPods:          10,
 			oldReplicas:        0,
 			scaleExpected:      false,
+			errorExpected:      true,
 		},
 		{
 			deploymentReplicas: 10,
@@ -427,6 +432,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			readyPods:          1,
 			oldReplicas:        10,
 			scaleExpected:      false,
+			errorExpected:      false,
 		},
 	}
 
@@ -466,7 +472,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 			eventRecorder: &record.FakeRecorder{},
 		}
 		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, &deployment)
-		if err != nil {
+		if !test.errorExpected && err != nil {
 			t.Errorf("unexpected error: %v", err)
 			continue
 		}
