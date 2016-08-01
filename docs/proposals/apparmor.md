@@ -106,8 +106,8 @@ but an official supported mechanism for deploying profiles is out of scope for a
 
 ## Overview
 
-An AppArmor profile can be specified for either a pod or container through the Kubernetes API with a
-pod annotation. If a profile is specified, the Kubelet will verify that the node meets the required
+An AppArmor profile can be specified for a container through the Kubernetes API with a pod
+annotation. If a profile is specified, the Kubelet will verify that the node meets the required
 [prerequisites](#prerequisites) (e.g. the profile is already configured on the node) before starting
 the container, and will not run the container if the profile cannot be applied. If the requirements
 are met, the container runtime will configure the appropriate options to apply the profile. Profile
@@ -142,13 +142,12 @@ Ubuntu system. The profiles can be found at `{securityfs}/apparmor/profiles`
 
 The intial alpha support of AppArmor will follow the pattern
 [used by seccomp](https://github.com/kubernetes/kubernetes/pull/25324) and specify profiles through
-annotations. Profiles can be specified through pod annotations, as either a container
-profile, a pod profile (applied to all pod containers), or both (in which case the container
-annotation overrides the pod annotation). The annotation format is a URI key, and a profile name
-value:
+annotations. Profiles can be specified per-container through pod annotations. The annotation format
+is a key matching the container, and a profile name value:
 
-- `apparmor.security.alpha.kubernetes.io/container/<container_name>`
-- `apparmor.security.alpha.kubernetes.io/pod`
+```
+container.apparmor.security.alpha.kubernetes.io/<container_name>=<profile_name>
+```
 
 The profiles can be specified in the following formats (following the convention used by [seccomp](../../docs/design/seccomp.md#api-changes)):
 
@@ -165,7 +164,7 @@ The profiles can be specified in the following formats (following the convention
 ### Pod Security Policy
 
 The [PodSecurityPolicy](security-context-constraints.md) allows cluster administrators to control
-the security context for a pod its containers. An annotation can be specified on the
+the security context for a pod and its containers. An annotation can be specified on the
 PodSecurityPolicy to restrict which AppArmor profiles can be used, and specify a default if no
 profile is specified.
 
@@ -205,8 +204,6 @@ e2e test suite on an AppArmor enabled node. The cases we should test are:
 - *Node AppArmor enforcement* - These tests need to run on AppArmor enabled nodes, in the node e2e
   suite.
   - A valid container profile gets applied
-  - A valid pod profile is applied to all containers
-  - A valid pod and container profile uses the container profile
   - An unloaded profile will be rejected
 
 # Future work
