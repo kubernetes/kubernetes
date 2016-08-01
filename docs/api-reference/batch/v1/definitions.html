@@ -2272,7 +2272,14 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">datasetName</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Required: the volume name. This is going to be store on metadata &#8594; name on the payload for Flocker</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">One and only one of the following should be specified. Name of the dataset stored as metadata &#8594; name on the dataset for Flocker should be considered as deprecated</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">datasetUUID</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UUID of the dataset. This is unique identifier of a Flocker dataset</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4287,7 +4294,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-08-23 13:11:42 UTC
+Last updated 2016-08-25 08:20:04 UTC
 </div>
 </div>
 </body>

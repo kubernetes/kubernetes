@@ -1150,6 +1150,7 @@ func DeepCopy_v1_FlockerVolumeSource(in interface{}, out interface{}, c *convers
 		in := in.(*FlockerVolumeSource)
 		out := out.(*FlockerVolumeSource)
 		out.DatasetName = in.DatasetName
+		out.DatasetUUID = in.DatasetUUID
 		return nil
 	}
 }

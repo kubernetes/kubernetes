@@ -530,7 +530,8 @@ func (FlexVolumeSource) SwaggerDoc() map[string]string {
 
 var map_FlockerVolumeSource = map[string]string{
 	"":            "Represents a Flocker volume mounted by the Flocker agent. Flocker volumes do not support ownership management or SELinux relabeling.",
-	"datasetName": "Required: the volume name. This is going to be store on metadata -> name on the payload for Flocker",
+	"datasetName": "One and only one of the following should be specified. Name of the dataset stored as metadata -> name on the dataset for Flocker should be considered as deprecated",
+	"datasetUUID": "UUID of the dataset. This is unique identifier of a Flocker dataset",
 }
 
 func (FlockerVolumeSource) SwaggerDoc() map[string]string {

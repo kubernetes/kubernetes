@@ -1815,12 +1815,17 @@
     "id": "v1.FlockerVolumeSource",
     "description": "Represents a Flocker volume mounted by the Flocker agent. Flocker volumes do not support ownership management or SELinux relabeling.",
     "required": [
-     "datasetName"
+     "datasetName",
+     "datasetUUID"
     ],
     "properties": {
      "datasetName": {
       "type": "string",
-      "description": "Required: the volume name. This is going to be store on metadata -\u003e name on the payload for Flocker"
+      "description": "One and only one of the following should be specified. Name of the dataset stored as metadata -\u003e name on the dataset for Flocker should be considered as deprecated"
+     },
+     "datasetUUID": {
+      "type": "string",
+      "description": "UUID of the dataset. This is unique identifier of a Flocker dataset"
      }
     }
    },
