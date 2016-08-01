@@ -74,11 +74,11 @@ echo "Provider: ${KUBERNETES_PROVIDER:-}"
 # List resources related to instances, filtering by the instance prefix if
 # provided.
 gcloud-compute-list instance-templates --regexp="${INSTANCE_PREFIX}.*"
-gcloud-compute-list instance-groups ${ZONE:+"--zone=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
-gcloud-compute-list instances ${ZONE:+"--zone=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
+gcloud-compute-list instance-groups ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
+gcloud-compute-list instances ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
 
 # List disk resources, filterying by instance prefix if provided.
-gcloud-compute-list disks ${ZONE:+"--zone=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
+gcloud-compute-list disks ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
 
 # List network resources. We include names starting with "a", corresponding to
 # those that Kubernetes creates.
