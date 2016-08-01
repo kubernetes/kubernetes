@@ -265,7 +265,7 @@ func (s *podStorage) merge(source string, change interface{}) (adds, updates, de
 		updatePodsFunc(update.Pods, pods, pods)
 
 	case kubetypes.REMOVE:
-		glog.V(4).Infof("Removing a pod %v", update)
+		glog.V(4).Infof("Removing pods from source %s : %v", source, update.Pods)
 		for _, value := range update.Pods {
 			name := kubecontainer.GetPodFullName(value)
 			if existing, found := pods[name]; found {
