@@ -82,6 +82,17 @@ function fetch_server_version_tars() {
     unset CLUSTER_API_VERSION
 }
 
+function fetch_gci_version_tars() {
+    if ! [[ "${JENKINS_USE_GCI_VERSION:-}" =~ ^[yY]$ ]]; then
+        echo "JENKINS_USE_GCI_VERSION must be set."
+        exit 1
+    fi
+    local -r gci_k8s_version="$(get_gci_k8s_version)"
+    echo "Using GCI builtin version: ${gci_k8s_version}"
+    fetch_tars_from_gcs "gs://${KUBE_GCS_RELEASE_BUCKET}/release" "${gci_k8s_version}"
+    unpack_binaries
+}
+
 # Use a published version like "ci/latest" (default), "release/latest",
 # "release/latest-1", or "release/stable"
 function fetch_published_version_tars() {
@@ -179,35 +190,35 @@ function dump_cluster_logs() {
     fi
 }
 
-# GCI specific settings.
-# Assumes: JENKINS_GCI_IMAGE_FAMILY
-function setup_gci_vars() {
-  local -r gci_staging_project=container-vm-image-staging
-  local -r image_info="$(gcloud compute images describe-from-family ${JENKINS_GCI_IMAGE_FAMILY} --project=${gci_staging_project} --format=json)"
-  local -r image_description="$(echo ${image_info} | jq -r '.description')"
-  local -r image_name="$(echo ${image_info} | jq -r '.name')"
-
-  if [[ "${JENKINS_USE_GCI_VERSION:-}" =~ ^[yY]$ ]]; then
-    # GCI QA jobs use the builtin k8s version.
+# Figures out the builtin k8s version of a GCI image.
+function get_gci_k8s_version() {
+    local -r image_description=$(gcloud compute images describe ${KUBE_GCE_MASTER_IMAGE} --project=${KUBE_GCE_MASTER_PROJECT})
     # Staged GCI images all include versions in their image descriptions so we
     # extract builtin Kubernetes version from them.
     local -r k8s_version_re='.*Kubernetes: ([0-9a-z.-]+),.*'
     if [[ ${image_description} =~ ${k8s_version_re} ]]; then
-      export JENKINS_PUBLISHED_VERSION="release/${BASH_REMATCH[1]}"
+        local -r gci_k8s_version="v${BASH_REMATCH[1]}"
     else
-      echo "Failed to determine builtin k8s version for image ${image_name}: ${image_description}"
-      exit 1
+        echo "Failed to determine builtin k8s version for image ${image_name}: ${image_description}"
+        exit 1
     fi
-  fi
+    echo "${gci_k8s_version}"
+}
 
-  export KUBE_GCE_MASTER_PROJECT="${gci_staging_project}"
-  export KUBE_GCE_MASTER_IMAGE="${image_name}"
-  export KUBE_MASTER_OS_DISTRIBUTION="gci"
-  if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-canary-test" ]]; then
-    # The family "gci-canary-test" is reserved for a special type of GCI images
-    # that are used to continuously validate Docker releases.
-    export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
-  fi
+# GCI specific settings.
+# Assumes: JENKINS_GCI_IMAGE_FAMILY
+function setup_gci_vars() {
+    local -r gci_staging_project=container-vm-image-staging
+    local -r image_name="$(gcloud compute images describe-from-family ${JENKINS_GCI_IMAGE_FAMILY} --project=${gci_staging_project} --format='value(name)')"
+
+    export KUBE_GCE_MASTER_PROJECT="${gci_staging_project}"
+    export KUBE_GCE_MASTER_IMAGE="${image_name}"
+    export KUBE_MASTER_OS_DISTRIBUTION="gci"
+    if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-canary-test" ]]; then
+        # The family "gci-canary-test" is reserved for a special type of GCI images
+        # that are used to continuously validate Docker releases.
+        export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
+    fi
 }
 
 ### Pre Set Up ###
@@ -294,6 +305,9 @@ elif [[ "${JENKINS_USE_SERVER_VERSION:-}" =~ ^[yY]$ ]]; then
     # test what's running in GKE by default rather than some CI build.
     clean_binaries
     fetch_server_version_tars
+elif [[ "${JENKINS_USE_GCI_VERSION:-}" =~ ^[yY]$ ]]; then
+    clean_binaries
+    fetch_gci_version_tars
 else
     # use JENKINS_PUBLISHED_VERSION, default to 'ci/latest', since that's
     # usually what we're testing.
