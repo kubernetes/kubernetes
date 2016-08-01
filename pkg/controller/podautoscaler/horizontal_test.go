@@ -665,7 +665,7 @@ func TestZeroReplicas(t *testing.T) {
 		minReplicas:         3,
 		maxReplicas:         5,
 		initialReplicas:     0,
-		desiredReplicas:     3,
+		desiredReplicas:     0,
 		CPUTarget:           90,
 		reportedLevels:      []uint64{},
 		reportedCPURequests: []resource.Quantity{},
