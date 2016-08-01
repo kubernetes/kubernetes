@@ -16,22 +16,34 @@ limitations under the License.
 
 package apparmor
 
-import "k8s.io/kubernetes/pkg/api"
+import (
+	"strings"
 
-// Values used by function stubs for testing.
-var (
-	isRequiredStub     = false
-	getProfileNameStub = ""
+	"k8s.io/kubernetes/pkg/api"
+)
+
+// TODO: Move these values into the API package.
+const (
+	// The prefix to an annotation key specifying a container profile.
+	ContainerAnnotationKeyPrefix = "container.apparmor.security.alpha.kubernetes.io/"
+
+	// The profile specifying the runtime default.
+	ProfileRuntimeDefault = "runtime/default"
+	// The prefix for specifying profiles loaded on the node.
+	ProfileNamePrefix = "local/"
 )
 
 // Checks whether app armor is required for pod to be run.
 func isRequired(pod *api.Pod) bool {
-	// TODO: Replace this stub once an AppArmor API is merged.
-	return isRequiredStub
+	for key := range pod.Annotations {
+		if strings.HasPrefix(key, ContainerAnnotationKeyPrefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // Returns the name of the profile to use with the container.
-func getProfileName(container *api.Container) string {
-	// TODO: Replace this stub once an AppArmor API is merged.
-	return getProfileNameStub
+func GetProfileName(pod *api.Pod, containerName string) string {
+	return pod.Annotations[ContainerAnnotationKeyPrefix+containerName]
 }

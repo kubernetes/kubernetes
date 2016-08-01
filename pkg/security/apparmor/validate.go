@@ -73,7 +73,7 @@ func (v *validator) Validate(pod *api.Pod) error {
 	}
 
 	for _, container := range pod.Spec.Containers {
-		if err := validateProfile(getProfileName(&container), loadedProfiles); err != nil {
+		if err := validateProfile(GetProfileName(pod, container.Name), loadedProfiles); err != nil {
 			return err
 		}
 	}
@@ -103,20 +103,14 @@ func validateHost(runtime string) error {
 
 // Verify that the profile is valid and loaded.
 func validateProfile(profile string, loadedProfiles map[string]bool) error {
-	// TODO: Use shared constants once an AppArmor API is merged.
-	const (
-		runtimeDefault = "runtime/default"
-		localPrefix    = "local/"
-	)
-
-	if profile == "" || profile == runtimeDefault {
+	if profile == "" || profile == ProfileRuntimeDefault {
 		return nil
 	}
-	if !strings.HasPrefix(profile, localPrefix) {
+	if !strings.HasPrefix(profile, ProfileNamePrefix) {
 		return fmt.Errorf("invalid AppArmor profile name: %q", profile)
 	}
 
-	profileName := strings.TrimPrefix(profile, localPrefix)
+	profileName := strings.TrimPrefix(profile, ProfileNamePrefix)
 	if !loadedProfiles[profileName] {
 		return fmt.Errorf("profile %q is not loaded", profileName)
 	}
