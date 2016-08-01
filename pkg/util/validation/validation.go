@@ -121,6 +121,23 @@ func IsDNS1123Subdomain(value string) []string {
 	return errs
 }
 
+const dns4592WildcardFmt string = "(\\*\\.)?"
+
+var dns4592WildcardSubdomainRegexp = regexp.MustCompile("^" + dns4592WildcardFmt + dns1123SubdomainFmt + "$")
+
+//IsDNS4592WildcardSubdomain tests for a string that conforms to the definition
+// of a subdomain in DNS (RFC 4592)
+func isDNS4592WildcardSubdomain(value string) []string {
+	var errs []string
+	if len(value) > DNS1123SubdomainMaxLength {
+		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
+	}
+	if !dns4592WildcardSubdomainRegexp.MatchString(value) {
+		errs = append(errs, RegexError(dns4592WildcardFmt+dns1123SubdomainFmt, "*.example.com"))
+	}
+	return errs
+}
+
 const dns952LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
 const DNS952LabelMaxLength int = 24
 
