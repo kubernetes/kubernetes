@@ -601,7 +601,14 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
-			klet.hairpinMode == componentconfig.HairpinVeth,
+			// If using "kubenet", the Kubernetes network plugin that wraps
+			// CNI's bridge plugin, it knows how to set the hairpin veth flag
+			// so we tell the container runtime to back away from setting it.
+			// If the kubelet is started with any other plugin we can't be
+			// sure it handles the hairpin case so we instruct the docker
+			// runtime to set the flag instead.
+			klet.hairpinMode == componentconfig.HairpinVeth && networkPluginName != "kubenet",
+			seccompProfileRoot,
 			containerRuntimeOptions...,
 		)
 	case "rkt":
@@ -1398,7 +1405,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
-	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
+	// hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	hostname, _, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, err

@@ -230,15 +230,16 @@ func NewWindowsDockerManager(
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
 	runtimeHelper kubecontainer.RuntimeHelper,
-	httpClient kubetypes.HttpGetter,
+	httpClient types.HttpGetter,
 	execHandler ExecHandler,
 	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFSInterface,
 	cpuCFSQuota bool,
-	imageBackOff *util.Backoff,
+	imageBackOff *flowcontrol.Backoff,
 	serializeImagePulls bool,
 	enableCustomMetrics bool,
 	hairpinMode bool,
+	seccompProfileRoot string,
 	options ...kubecontainer.Option) *WindowsDockerManager {
 	dockerManager := NewDockerManager(client,
 		recorder,
@@ -262,6 +263,7 @@ func NewWindowsDockerManager(
 		serializeImagePulls,
 		enableCustomMetrics,
 		hairpinMode,
+		seccompProfileRoot,
 		options...)
 
 	return &WindowsDockerManager{
@@ -685,6 +687,7 @@ func (dm *DockerManager) runContainer(
 		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
 	}
 	var devices []dockercontainer.DeviceMapping
+	_ = devices
 	if nvidiaGPULimit.Value() != 0 {
 		// Experimental. For now, we hardcode /dev/nvidia0 no matter what the user asks for
 		// (we only support one device per node).
@@ -2553,7 +2556,7 @@ func findActiveInitContainer(pod *api.Pod, podStatus *kubecontainer.PodStatus) (
 }
 
 // Sync the running pod to match the specified desired pod.
-func (dm *WindowsDockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *util.Backoff) (result kubecontainer.PodSyncResult) {
+func (dm *WindowsDockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("SyncPod").Observe(metrics.SinceInMicroseconds(start))
@@ -2606,7 +2609,7 @@ func (dm *WindowsDockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus
 			}
 			killContainerResult := kubecontainer.NewSyncResult(kubecontainer.KillContainer, containerStatus.Name)
 			result.AddSyncResult(killContainerResult)
-			if err := dm.KillContainerInPod(containerStatus.ID, podContainer, pod, killMessage); err != nil {
+			if err := dm.KillContainerInPod(containerStatus.ID, podContainer, pod, killMessage, nil); err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
 				glog.Errorf("Error killing container %q(id=%q) for pod %q: %v", containerStatus.Name, containerStatus.ID, format.Pod(pod), err)
 				return

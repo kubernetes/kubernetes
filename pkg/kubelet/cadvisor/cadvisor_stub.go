@@ -29,7 +29,7 @@ type cadvisorStub struct {
 
 var _ Interface = new(cadvisorStub)
 
-func New(port uint) (Interface, error) {
+func New(port uint, runtime string) (Interface, error) {
 	return &cadvisorStub{}, nil
 }
 
@@ -61,7 +61,7 @@ func (cu *cadvisorStub) VersionInfo() (*cadvisorapi.VersionInfo, error) {
 	return &cadvisorapi.VersionInfo{}, nil
 }
 
-func (cu *cadvisorStub) DockerImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
+func (cu *cadvisorStub) ImagesFsInfo() (cadvisorapiv2.FsInfo, error) {
 	return cadvisorapiv2.FsInfo{}, nil
 }
 
