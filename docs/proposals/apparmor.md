@@ -39,6 +39,8 @@ Documentation for other releases can be found at
     - [Pod Security Policy](#pod-security-policy)
   - [Deploying profiles](#deploying-profiles)
   - [Testing](#testing)
+- [Beta Design](#beta-design)
+  - [API Changes](#api-changes-1)
 - [Future work](#future-work)
   - [System component profiles](#system-component-profiles)
   - [Deploying profiles](#deploying-profiles-1)
@@ -93,16 +95,16 @@ and is supported on several
 
 # Alpha Design
 
-This document describes the proposed design for
+This section describes the proposed design for
 [alpha-level](../../docs/devel/api_changes.md#alpha-beta-and-stable-versions) support, although
-post-alpha features are described in [future work](#future-work). For AppArmor alpha support
+additional features are described in [future work](#future-work). For AppArmor alpha support
 (targeted for Kubernetes 1.4) we will enable:
 
 - Specifying a pre-loaded profile to apply to a pod container
 - Restricting pod containers to a set of profiles (admin use case)
 
-We will also provide a reference implementation of a pod for loading profiles on nodes,
-but an official supported mechanism for deploying profiles is out of scope for alpha.
+We will also provide a reference implementation of a pod for loading profiles on nodes, but an
+official supported mechanism for deploying profiles is out of scope for alpha.
 
 ## Overview
 
@@ -123,8 +125,8 @@ the prerequisites are not met. The prerequisites are:
 
 1. **Kernel support** - The AppArmor kernel module is loaded. Can be checked by
    [libcontainer](https://github.com/opencontainers/runc/blob/4dedd0939638fc27a609de1cb37e0666b3cf2079/libcontainer/apparmor/apparmor.go#L17).
-2. **Runtime support** - For alpha, Docker will be required (rkt does not currently have AppArmor
-   support). All supported Docker versions include AppArmor support. See
+2. **Runtime support** - For the initial implementation, Docker will be required (rkt does not
+   currently have AppArmor support). All supported Docker versions include AppArmor support. See
    [Container Runtime Interface](#container-runtime-interface) for other runtimes.
 3. **Installed profile** - The target profile must be loaded prior to starting the container. Loaded
    profiles can be found in the AppArmor securityfs \[1\].
@@ -179,12 +181,12 @@ Enforcement of the policy is standard. See the
 ## Deploying profiles
 
 We will provide a reference implementation of a pod for loading profiles on nodes, but there will
-not be an official mechanism or API in the alpha version (see [future work](#deploying-profiles-1)).
-The reference container will contain the `apparmor_parser` tool and a script for using the tool to
-load all profiles in a set of (configurable) directories. The initial implementation will be
-designed to run once to completion, as opposed to watching the directories for changes. It can be
-run in a DaemonSet to load the profiles onto all nodes. The pod will need to be run in privileged
-mode.
+not be an official mechanism or API in the initial version (see
+[future work](#deploying-profiles-1)).  The reference container will contain the `apparmor_parser`
+tool and a script for using the tool to load all profiles in a set of (configurable)
+directories. The initial implementation will be designed to run once to completion, as opposed to
+watching the directories for changes. It can be run in a DaemonSet to load the profiles onto all
+nodes. The pod will need to be run in privileged mode.
 
 This simple design should be sufficient to deploy AppArmor profiles from any volume source, such as
 a ConfigMap or PersistentDisk. Users seeking more advanced features should be able extend this
@@ -206,9 +208,61 @@ e2e test suite on an AppArmor enabled node. The cases we should test are:
   - A valid container profile gets applied
   - An unloaded profile will be rejected
 
+# Beta Design
+
+The only part of the design that changes for beta is the API, which is upgraded from
+annotation-based to first class fields.
+
+## API Changes
+
+AppArmor profiles will be specified in the container's SecurityContext, as part of an
+`AppArmorOptions` struct. The options struct makes the API more flexible to future additions.
+
+```go
+type SecurityContext struct {
+    ...
+    // The AppArmor options to be applied to the container.
+    AppArmorOptions *AppArmorOptions `json:"appArmorOptions,omitempty"`
+    ...
+}
+
+// Reference to an AppArmor profile loaded on the host.
+type AppArmorProfileName string
+
+// Options specifying how to run Containers with AppArmor.
+type AppArmorOptions struct {
+    // The profile the Container must be run with.
+    Profile AppArmorProfileName `json:"profile"`
+}
+```
+
+The `AppArmorProfileName` format matches the format for the profile annotation values describe
+[above](#api-changes).
+
+The `PodSecurityPolicySpec` receives a similar treatment with the addition of an
+`AppArmorStrategyOptions` struct. Here the `DefaultProfile` is separated from the `AllowedProfiles`
+in the interest of making the behavior more explicit.
+
+```go
+type PodSecurityPolicySpec struct {
+    ...
+    AppArmorStrategyOptions *AppArmorStrategyOptions `json:"appArmorStrategyOptions,omitempty"`
+    ...
+}
+
+// AppArmorStrategyOptions specifies AppArmor restrictions and requirements for pods and containers.
+type AppArmorStrategyOptions struct {
+    // If non-empty, all pod containers must be run with one of the profiles in this list.
+    AllowedProfiles []AppArmorProfileName `json:"allowedProfiles,omitempty"`
+    // The default profile to use if a profile is not specified for a container.
+    // Defaults to "runtime/default". Must be allowed by AllowedProfiles.
+    DefaultProfile AppArmorProfileName `json:"defaultProfile,omitempty"`
+}
+```
+
 # Future work
 
-Post-alpha feature ideas. These are not fully-fleshed designs.
+Post-1.4 feature ideas. These are not fully-fleshed designs.
 
 ## System component profiles
 
