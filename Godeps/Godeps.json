@@ -66,10 +66,6 @@
 			"Rev": "2492d97b402e00797833c03ac5fa1c572c7bb29a"
 		},
 		{
-			"ImportPath": "github.com/ClusterHQ/flocker-go",
-			"Rev": "1c0a791b33bdc01d062b376612aa04e27eed7eb3"
-		},
-		{
 			"ImportPath": "github.com/Microsoft/go-winio",
 			"Comment": "v0.1.0",
 			"Rev": "8f9387ea7efabb228a981b9c381142be7667967f"
@@ -330,6 +326,10 @@
 			"ImportPath": "github.com/cloudflare/cfssl/signer/local",
 			"Comment": "1.2.0",
 			"Rev": "db0d0650b6496bfe8061ec56a92edd32d8e75c30"
+		},
+		{
+			"ImportPath": "github.com/clusterhq/flocker-go",
+			"Rev": "2b8b7259d3139c96c4a6871031355808ab3fd3b3"
 		},
 		{
 			"ImportPath": "github.com/codegangsta/negroni",
