@@ -122,3 +122,19 @@ func convertResourceMemoryToString(memory *resource.Quantity, divisor resource.Q
 	m := int64(math.Ceil(float64(memory.Value()) / float64(divisor.Value())))
 	return strconv.FormatInt(m, 10), nil
 }
+
+// MergeContainerResourceLimitsWithCapacity checks if a limit is applied for
+// the container, and if not, it sets the limit based on the capacity.
+func MergeContainerResourceLimitsWithCapacity(container *api.Container,
+	capacity api.ResourceList) {
+	if container.Resources.Limits == nil {
+		container.Resources.Limits = make(api.ResourceList)
+	}
+	for _, resource := range []api.ResourceName{api.ResourceCPU, api.ResourceMemory} {
+		if quantity, exists := container.Resources.Limits[resource]; !exists || quantity.IsZero() {
+			if cap, exists := capacity[resource]; exists {
+				container.Resources.Limits[resource] = *cap.Copy()
+			}
+		}
+	}
+}

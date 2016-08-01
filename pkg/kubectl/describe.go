@@ -501,10 +501,18 @@ func (d *PodDescriber) Describe(namespace, name string, describerSettings Descri
 		}
 	}
 
-	return describePod(pod, events)
+	var nodeCapacity api.ResourceList
+	node, err := d.Nodes().Get(pod.Spec.NodeName)
+	if err != nil {
+		glog.Errorf("unable to retrieve node capacity for resource limits: %v", err)
+	} else {
+		nodeCapacity = node.Status.Capacity
+	}
+
+	return describePod(pod, events, nodeCapacity)
 }
 
-func describePod(pod *api.Pod, events *api.EventList) (string, error) {
+func describePod(pod *api.Pod, events *api.EventList, nodeCapacity api.ResourceList) (string, error) {
 	return tabbedString(func(out io.Writer) error {
 		fmt.Fprintf(out, "Name:\t%s\n", pod.Name)
 		fmt.Fprintf(out, "Namespace:\t%s\n", pod.Namespace)
@@ -528,9 +536,9 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		fmt.Fprintf(out, "IP:\t%s\n", pod.Status.PodIP)
 		fmt.Fprintf(out, "Controllers:\t%s\n", printControllers(pod.Annotations))
 		if len(pod.Spec.InitContainers) > 0 {
-			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), out, "")
+			describeContainers("Init Containers", pod.Spec.InitContainers, pod.Status.InitContainerStatuses, EnvValueRetriever(pod), out, "", nodeCapacity)
 		}
-		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), out, "")
+		describeContainers("Containers", pod.Spec.Containers, pod.Status.ContainerStatuses, EnvValueRetriever(pod), out, "", nodeCapacity)
 		if len(pod.Status.Conditions) > 0 {
 			fmt.Fprint(out, "Conditions:\n  Type\tStatus\n")
 			for _, c := range pod.Status.Conditions {
@@ -809,7 +817,7 @@ func (d *PersistentVolumeClaimDescriber) Describe(namespace, name string, descri
 }
 
 // TODO: Do a better job at indenting, maybe by using a prefix writer
-func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus, resolverFn EnvVarResolverFunc, out io.Writer, space string) {
+func describeContainers(label string, containers []api.Container, containerStatuses []api.ContainerStatus, resolverFn EnvVarResolverFunc, out io.Writer, space string, nodeCapacity api.ResourceList) {
 	statuses := map[string]api.ContainerStatus{}
 	for _, status := range containerStatuses {
 		statuses[status.Name] = status
@@ -927,6 +935,9 @@ func describeContainers(label string, containers []api.Container, containerStatu
 				}
 				fmt.Fprintf(out, "      %s:\t%s (%s:%s)\n", e.Name, valueFrom, e.ValueFrom.FieldRef.APIVersion, e.ValueFrom.FieldRef.FieldPath)
 			case e.ValueFrom.ResourceFieldRef != nil:
+				if nodeCapacity != nil {
+					fieldpath.MergeContainerResourceLimitsWithCapacity(&container, nodeCapacity)
+				}
 				valueFrom, err := fieldpath.ExtractContainerResourceValue(e.ValueFrom.ResourceFieldRef, &container)
 				if err != nil {
 					valueFrom = ""
@@ -1091,9 +1102,9 @@ func DescribePodTemplate(template *api.PodTemplateSpec, out io.Writer) {
 		fmt.Fprintf(out, "  Service Account:\t%s\n", template.Spec.ServiceAccountName)
 	}
 	if len(template.Spec.InitContainers) > 0 {
-		describeContainers("Init Containers", template.Spec.InitContainers, nil, nil, out, "  ")
+		describeContainers("Init Containers", template.Spec.InitContainers, nil, nil, out, "  ", nil)
 	}
-	describeContainers("Containers", template.Spec.Containers, nil, nil, out, "  ")
+	describeContainers("Containers", template.Spec.Containers, nil, nil, out, "  ", nil)
 	describeVolumes(template.Spec.Volumes, out, "  ")
 }
 
