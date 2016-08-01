@@ -57,7 +57,7 @@
 		},
 		{
 			"ImportPath": "github.com/ClusterHQ/flocker-go",
-			"Rev": "1c0a791b33bdc01d062b376612aa04e27eed7eb3"
+			"Rev": "f89ca6fe8e3282ae09b2b9f28cfab7d5961c4156"
 		},
 		{
 			"ImportPath": "github.com/Microsoft/go-winio",
