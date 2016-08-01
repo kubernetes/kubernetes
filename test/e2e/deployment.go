@@ -1042,7 +1042,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, d.Spec.Replicas-2))
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
 	err = framework.WaitForDeploymentStatus(c, deployment, true)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1063,7 +1063,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, d.Spec.Replicas-2))
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
 	err = framework.WaitForDeploymentStatus(c, deployment, false)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1104,7 +1104,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, d.Spec.Replicas-2))
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
 	err = framework.WaitForDeploymentStatus(c, deployment, true)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1122,7 +1122,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, d.Spec.Replicas-2))
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
 	err = framework.WaitForDeploymentStatus(c, deployment, false)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -1163,7 +1163,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, d.Spec.Replicas-2))
+	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
 	err = framework.WaitForDeploymentStatus(c, deployment, true)
 	Expect(err).NotTo(HaveOccurred())
 }
