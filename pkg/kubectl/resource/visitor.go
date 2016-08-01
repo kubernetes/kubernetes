@@ -207,10 +207,6 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 	if schema == nil {
 		return nil
 	}
-	data, err := yaml.ToJSON(data)
-	if err != nil {
-		return fmt.Errorf("error converting to YAML: %v", err)
-	}
 	if err := schema.ValidateBytes(data); err != nil {
 		return fmt.Errorf("error validating data: %v; %s", err, stopValidateMessage)
 	}
