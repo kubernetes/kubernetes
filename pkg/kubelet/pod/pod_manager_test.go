@@ -70,7 +70,7 @@ func TestGetSetPods(t *testing.T) {
 	podManager, _ := newTestManager()
 	podManager.SetPods(updates)
 
-	// Tests that all regular pods are recorded corrrectly.
+	// Tests that all regular pods are recorded correctly.
 	actualPods := podManager.GetPods()
 	if len(actualPods) != len(expectedPods) {
 		t.Errorf("expected %d pods, got %d pods; expected pods %#v, got pods %#v", len(expectedPods), len(actualPods),

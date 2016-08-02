@@ -3785,7 +3785,7 @@ type testPodSyncHandler struct {
 	podsToEvict []*api.Pod
 	// the reason for the eviction
 	reason string
-	// the mesage for the eviction
+	// the message for the eviction
 	message string
 }
 

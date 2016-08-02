@@ -72,7 +72,7 @@ const (
 	DockerType = "docker"
 
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker verison should be at least 1.9.x
+	// docker version should be at least 1.9.x
 	minimumDockerAPIVersion = "1.21"
 
 	// Remote API version for docker daemon version v1.10
@@ -619,12 +619,12 @@ func (dm *DockerManager) runContainer(
 	_, containerName, cid := BuildDockerName(dockerName, container)
 	if opts.PodContainerDir != "" && len(container.TerminationMessagePath) != 0 {
 		// Because the PodContainerDir contains pod uid and container name which is unique enough,
-		// here we just add an unique container id to make the path unique for different instances
+		// here we just add a unique container id to make the path unique for different instances
 		// of the same container.
 		containerLogPath := path.Join(opts.PodContainerDir, cid)
 		fs, err := os.Create(containerLogPath)
 		if err != nil {
-			// TODO: Clean up the previouly created dir? return the error?
+			// TODO: Clean up the previously created dir? return the error?
 			glog.Errorf("Error on creating termination-log file %q: %v", containerLogPath, err)
 		} else {
 			fs.Close() // Close immediately; we're just doing a `touch` here
@@ -2304,7 +2304,7 @@ func (dm *DockerManager) isImageRoot(image string) (bool, error) {
 	return uid == 0, nil
 }
 
-// getUidFromUser splits the uid out of a uid:gid string.
+// getUidFromUser splits the uid out of an uid:gid string.
 func getUidFromUser(id string) string {
 	if id == "" {
 		return id
