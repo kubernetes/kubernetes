@@ -51,6 +51,7 @@ type FakeDockerClient struct {
 
 	// Created, Stopped and Removed all container docker ID
 	Created         []string
+	Started         []string
 	Stopped         []string
 	Removed         []string
 	VersionInfo     dockertypes.Version
@@ -229,6 +230,17 @@ func (f *FakeDockerClient) AssertCreated(created []string) error {
 	return nil
 }
 
+func (f *FakeDockerClient) AssertStarted(started []string) error {
+	f.Lock()
+	defer f.Unlock()
+	sort.StringSlice(started).Sort()
+	sort.StringSlice(f.Started).Sort()
+	if !reflect.DeepEqual(started, f.Started) {
+		return fmt.Errorf("expected %#v, got %#v", started, f.Started)
+	}
+	return nil
+}
+
 func (f *FakeDockerClient) AssertStopped(stopped []string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -339,6 +351,7 @@ func (f *FakeDockerClient) StartContainer(id string) error {
 	if err := f.popError("start"); err != nil {
 		return err
 	}
+	f.Started = append(f.Started, id)
 	container, ok := f.ContainerMap[id]
 	if !ok {
 		container = convertFakeContainer(&FakeContainer{ID: id, Name: id})

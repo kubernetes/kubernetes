@@ -35,15 +35,17 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	opts := dockertypes.ContainerListOptions{All: true}
 
 	opts.Filter = dockerfilters.NewArgs()
+	f := newDockerFilter(&opts.Filter)
+
 	if filter != nil {
 		if filter.Name != nil {
-			opts.Filter.Add("name", filter.GetName())
+			f.Add("name", filter.GetName())
 		}
 		if filter.Id != nil {
-			opts.Filter.Add("id", filter.GetId())
+			f.Add("id", filter.GetId())
 		}
 		if filter.State != nil {
-			opts.Filter.Add("status", toDockerContainerStatus(filter.GetState()))
+			f.Add("status", toDockerContainerStatus(filter.GetState()))
 		}
 		if filter.PodSandboxId != nil {
 			// TODO: implement this after sandbox functions are implemented.
@@ -51,9 +53,11 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 
 		if filter.LabelSelector != nil {
 			for k, v := range filter.LabelSelector {
-				opts.Filter.Add("label", fmt.Sprintf("%s=%s", k, v))
+				f.AddLabel(k, v)
 			}
 		}
+		// Filter out sandbox containers.
+		f.AddLabel(containerTypeLabelKey, containerTypeLabelContainer)
 	}
 	containers, err := ds.client.ListContainers(opts)
 	if err != nil {
@@ -81,14 +85,9 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 	// Merge annotations and labels because docker supports only labels.
 	// TODO: add a prefix to annotations so that we can distinguish labels and
 	// annotations when reading back them from the docker container.
-	// TODO: should we apply docker-specific labels?
-	labels := config.GetLabels()
-	for k, v := range config.GetAnnotations() {
-		if _, ok := labels[k]; !ok {
-			// Only write to labels if the key doesn't exist.
-			labels[k] = v
-		}
-	}
+	labels := makeLabels(config.GetLabels(), config.GetAnnotations())
+	// Apply a the container type label.
+	labels[containerTypeLabelKey] = containerTypeLabelContainer
 
 	image := ""
 	if iSpec := config.GetImage(); iSpec != nil {
@@ -163,10 +162,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		// Note: ShmSize is handled in kube_docker_client.go
 	}
 
-	// TODO: Seccomp support. Need to figure out how to pass seccomp options
-	// through the runtime API (annotations?).See dockerManager.getSecurityOpts()
-	// for the details. Always set the default seccomp profile for now.
-	hc.SecurityOpt = []string{fmt.Sprintf("%s=%s", "seccomp", defaultSeccompProfile)}
+	hc.SecurityOpt = []string{getSeccompOpts()}
 	// TODO: Add or drop capabilities.
 
 	createConfig.HostConfig = hc

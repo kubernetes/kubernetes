@@ -36,7 +36,17 @@ const (
 	// '{{.HostConfig.NetworkMode}}'.
 	namespaceModeHost = "host"
 
+	dockerNetNSFmt = "/proc/%v/ns/net"
+
 	defaultSeccompProfile = "unconfined"
+
+	// Internal docker labels used to identify whether a container is a sandbox
+	// or a regular container.
+	// TODO: This is not backward compatible with older containers. We will
+	// need to add filtering based on names.
+	containerTypeLabelKey       = "io.kubernetes.docker.type"
+	containerTypeLabelSandbox   = "podsandbox"
+	containerTypeLabelContainer = "container"
 )
 
 func NewDockerSevice(client dockertools.DockerInterface) DockerLegacyService {
