@@ -442,12 +442,12 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 
 func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclient.Config, error) {
 	authInfo, err := clientauth.LoadFromFile(s.AuthPath.Value())
-	if err != nil && !useDefaults {
-		return nil, err
-	}
 	// If loading the default auth path, for backwards compatibility keep going
 	// with the default auth.
 	if err != nil {
+		if !useDefaults {
+			return nil, err
+		}
 		glog.Warningf("Could not load kubernetes auth path %s: %v. Continuing with defaults.", s.AuthPath, err)
 	}
 	if authInfo == nil {
@@ -987,16 +987,18 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 
 func parseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
 	reservation := new(kubetypes.Reservation)
-	if rl, err := parseResourceList(kubeReserved); err != nil {
+	rl, err := parseResourceList(kubeReserved)
+	if err != nil {
 		return nil, err
-	} else {
-		reservation.Kubernetes = rl
 	}
-	if rl, err := parseResourceList(systemReserved); err != nil {
+	reservation.Kubernetes = rl
+
+	rl, err = parseResourceList(systemReserved)
+	if err != nil {
 		return nil, err
-	} else {
-		reservation.System = rl
 	}
+	reservation.System = rl
+
 	return reservation, nil
 }
 
