@@ -36,7 +36,7 @@ type Scaler interface {
 	// retries in the event of resource version mismatch (if retry is not nil),
 	// and optionally waits until the status of the resource matches newSize (if wait is not nil)
 	Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, wait *RetryParams) error
-	// ScaleSimple does a simple one-shot attempt at scaling - not useful on it's own, but
+	// ScaleSimple does a simple one-shot attempt at scaling - not useful on its own, but
 	// a necessary building block for Scale
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error
 }
