@@ -294,10 +294,10 @@ func TestRunExposeService(t *testing.T) {
 		},
 		{
 			name: "truncate-name",
-			args: []string{"pod", "a-name-that-is-toooo-big-for-a-service"},
+			args: []string{"pod", "a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters"},
 			ns:   "test",
 			calls: map[string]string{
-				"GET":  "/namespaces/test/pods/a-name-that-is-toooo-big-for-a-service",
+				"GET":  "/namespaces/test/pods/a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters",
 				"POST": "/namespaces/test/services",
 			},
 			input: &api.Pod{
@@ -305,7 +305,7 @@ func TestRunExposeService(t *testing.T) {
 			},
 			flags: map[string]string{"selector": "svc=frompod", "port": "90", "labels": "svc=frompod", "generator": "service/v2"},
 			output: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "a-name-that-is-toooo-big", Namespace: "", Labels: map[string]string{"svc": "frompod"}},
+				ObjectMeta: api.ObjectMeta{Name: "a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters", Namespace: "", Labels: map[string]string{"svc": "frompod"}},
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{
 						{
@@ -317,7 +317,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"svc": "frompod"},
 				},
 			},
-			expected: "service \"a-name-that-is-toooo-big\" exposed",
+			expected: "service \"a-name-that-is-toooo-big-for-a-service-because-it-can-only-hand\" exposed",
 			status:   200,
 		},
 		{
