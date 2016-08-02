@@ -600,7 +600,7 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 	}
 
 	for _, item := range table {
-		nodeController, _ := NewNodeController(nil, item.fakeNodeHandler,
+		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler,
 			evictionTimeout, testRateLimiterQPS, testNodeMonitorGracePeriod,
 			testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
@@ -673,7 +673,7 @@ func TestCloudProviderNoRateLimit(t *testing.T) {
 		Clientset:      fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node0")}}),
 		deleteWaitChan: make(chan struct{}),
 	}
-	nodeController, _ := NewNodeController(nil, fnh, 10*time.Minute,
+	nodeController, _ := NewNodeControllerFromClient(nil, fnh, 10*time.Minute,
 		testRateLimiterQPS,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
 		testNodeMonitorPeriod, nil, nil, 0, false)
@@ -907,7 +907,7 @@ func TestMonitorNodeStatusUpdateStatus(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController, _ := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, testRateLimiterQPS,
+		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute, testRateLimiterQPS,
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1057,7 +1057,7 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 	}
 
 	for i, item := range table {
-		nodeController, _ := NewNodeController(nil, item.fakeNodeHandler, 5*time.Minute, testRateLimiterQPS,
+		nodeController, _ := NewNodeControllerFromClient(nil, item.fakeNodeHandler, 5*time.Minute, testRateLimiterQPS,
 			testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
 		nodeController.now = func() unversioned.Time { return fakeNow }
 		if err := nodeController.monitorNodeStatus(); err != nil {
@@ -1139,7 +1139,7 @@ func TestNodeDeletion(t *testing.T) {
 		Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0"), *newPod("pod1", "node1")}}),
 	}
 
-	nodeController, _ := NewNodeController(nil, fakeNodeHandler, 5*time.Minute, testRateLimiterQPS,
+	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler, 5*time.Minute, testRateLimiterQPS,
 		testNodeMonitorGracePeriod, testNodeStartupGracePeriod,
 		testNodeMonitorPeriod, nil, nil, 0, false)
 	nodeController.now = func() unversioned.Time { return fakeNow }
@@ -1243,7 +1243,7 @@ func TestCheckPod(t *testing.T) {
 		},
 	}
 
-	nc, _ := NewNodeController(nil, nil, 0, 0, 0, 0, 0, nil, nil, 0, false)
+	nc, _ := NewNodeControllerFromClient(nil, nil, 0, 0, 0, 0, 0, nil, nil, 0, false)
 	nc.nodeStore.Store = cache.NewStore(cache.MetaNamespaceKeyFunc)
 	nc.nodeStore.Store.Add(&api.Node{
 		ObjectMeta: api.ObjectMeta{
@@ -1288,12 +1288,12 @@ func TestCheckPod(t *testing.T) {
 
 	for i, tc := range tcs {
 		var deleteCalls int
-		forcefullyDeletePodsFunc := func(_ *api.Pod) error {
+		nc.forcefullyDeletePod = func(_ *api.Pod) error {
 			deleteCalls++
 			return nil
 		}
 
-		nc.maybeDeleteTerminatingPod(&tc.pod, nc.nodeStore.Store, forcefullyDeletePodsFunc)
+		nc.maybeDeleteTerminatingPod(&tc.pod)
 
 		if tc.prune && deleteCalls != 1 {
 			t.Errorf("[%v] expected number of delete calls to be 1 but got %v", i, deleteCalls)
@@ -1310,7 +1310,7 @@ func TestCleanupOrphanedPods(t *testing.T) {
 		newPod("b", "bar"),
 		newPod("c", "gone"),
 	}
-	nc, _ := NewNodeController(nil, nil, 0, 0, 0, 0, 0, nil, nil, 0, false)
+	nc, _ := NewNodeControllerFromClient(nil, nil, 0, 0, 0, 0, 0, nil, nil, 0, false)
 
 	nc.nodeStore.Store.Add(newNode("foo"))
 	nc.nodeStore.Store.Add(newNode("bar"))
