@@ -3,12 +3,11 @@ kind: PetSet
 metadata:
   name: monitoring-influxdb-grafana-v3
   namespace: kube-system
-  labels:
+  labels: 
     k8s-app: influxGrafana
     version: v3
     kubernetes.io/cluster-service: "true"
 spec: 
-  serviceName: monitoring-influxdb
   replicas: 1
   template: 
     metadata: 
@@ -32,7 +31,7 @@ spec:
             - containerPort: 8083
             - containerPort: 8086
           volumeMounts:
-          - name: influxdb-ps
+          - name: influxdb-persistent-storage
             mountPath: /data
         - image: gcr.io/google_containers/heapster_grafana:v2.6.0-2
           name: grafana
@@ -59,25 +58,15 @@ spec:
               value: "true"
             - name: GF_AUTH_ANONYMOUS_ORG_ROLE
               value: Admin
-              # This is kubernetes specific endpoint where the service may be reached.
-              # It is embeded in "kube-system" namespace.
             - name: GF_SERVER_ROOT_URL
               value: /api/v1/proxy/namespaces/kube-system/services/monitoring-grafana/
           volumeMounts:
           - name: grafana-persistent-storage
             mountPath: /var
       volumes:
+      - name: influxdb-persistent-storage
+        persistentVolumeClaim:
+          claimName: influxdb-claim
       - name: grafana-persistent-storage
         emptyDir: {}
-  volumeClaimTemplates:
-  - metadata:
-      name: influxdb-ps
-      annotations:
-        volume.alpha.kubernetes.io/storage-class: anything
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 10Gi
-
+  serviceName: monitoring-influxdb
