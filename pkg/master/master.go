@@ -33,13 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/apps"
 	appsapi "k8s.io/kubernetes/pkg/apis/apps/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	autoscalingapiv1 "k8s.io/kubernetes/pkg/apis/autoscaling/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchapiv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
-	batchapiv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	certificatesapiv1alpha1 "k8s.io/kubernetes/pkg/apis/certificates/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
@@ -48,60 +46,35 @@ import (
 	policyapiv1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
-	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/healthz"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
-	certificateetcd "k8s.io/kubernetes/pkg/registry/certificates/etcd"
-	"k8s.io/kubernetes/pkg/registry/clusterrole"
-	clusterroleetcd "k8s.io/kubernetes/pkg/registry/clusterrole/etcd"
-	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/clusterrole/policybased"
-	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
-	clusterrolebindingetcd "k8s.io/kubernetes/pkg/registry/clusterrolebinding/etcd"
-	clusterrolebindingpolicybased "k8s.io/kubernetes/pkg/registry/clusterrolebinding/policybased"
 	"k8s.io/kubernetes/pkg/registry/componentstatus"
 	configmapetcd "k8s.io/kubernetes/pkg/registry/configmap/etcd"
 	controlleretcd "k8s.io/kubernetes/pkg/registry/controller/etcd"
-	deploymentetcd "k8s.io/kubernetes/pkg/registry/deployment/etcd"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	endpointsetcd "k8s.io/kubernetes/pkg/registry/endpoint/etcd"
 	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
-	expcontrolleretcd "k8s.io/kubernetes/pkg/registry/experimental/controller/etcd"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	ingressetcd "k8s.io/kubernetes/pkg/registry/ingress/etcd"
-	jobetcd "k8s.io/kubernetes/pkg/registry/job/etcd"
 	limitrangeetcd "k8s.io/kubernetes/pkg/registry/limitrange/etcd"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
-	networkpolicyetcd "k8s.io/kubernetes/pkg/registry/networkpolicy/etcd"
 	"k8s.io/kubernetes/pkg/registry/node"
 	nodeetcd "k8s.io/kubernetes/pkg/registry/node/etcd"
 	pvetcd "k8s.io/kubernetes/pkg/registry/persistentvolume/etcd"
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
-	petsetetcd "k8s.io/kubernetes/pkg/registry/petset/etcd"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
-	poddisruptionbudgetetcd "k8s.io/kubernetes/pkg/registry/poddisruptionbudget/etcd"
-	pspetcd "k8s.io/kubernetes/pkg/registry/podsecuritypolicy/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
-	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
-	"k8s.io/kubernetes/pkg/registry/role"
-	roleetcd "k8s.io/kubernetes/pkg/registry/role/etcd"
-	rolepolicybased "k8s.io/kubernetes/pkg/registry/role/policybased"
-	"k8s.io/kubernetes/pkg/registry/rolebinding"
-	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
-	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rolebinding/policybased"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
 	etcdallocator "k8s.io/kubernetes/pkg/registry/service/allocator/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	serviceaccountetcd "k8s.io/kubernetes/pkg/registry/serviceaccount/etcd"
-	storageclassetcd "k8s.io/kubernetes/pkg/registry/storageclass/etcd"
-	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -109,10 +82,6 @@ import (
 	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/wait"
-
-	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
-	horizontalpodautoscaleretcd "k8s.io/kubernetes/pkg/registry/horizontalpodautoscaler/etcd"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -189,7 +158,10 @@ type thirdPartyEntry struct {
 }
 
 type RESTOptionsGetter func(resource unversioned.GroupResource) generic.RESTOptions
-type RESTStorageProvider func(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+
+type RESTStorageProvider interface {
+	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+}
 
 // New returns a new instance of Master from the given config.
 // Certain config fields will be set to a default value if unset.
@@ -218,12 +190,16 @@ func New(c *Config) (*Master, error) {
 	if c.RESTStorageProviders == nil {
 		c.RESTStorageProviders = map[string]RESTStorageProvider{}
 	}
-	c.RESTStorageProviders[autoscaling.GroupName] = buildAutoscalingResources
-	c.RESTStorageProviders[batch.GroupName] = buildBatchResources
-	c.RESTStorageProviders[policy.GroupName] = buildPolicyResources
-	c.RESTStorageProviders[appsapi.GroupName] = buildAppsResources
-	c.RESTStorageProviders[rbac.GroupName] = buildRBACResources(c.AuthorizerRBACSuperUser)
-	c.RESTStorageProviders[certificates.GroupName] = buildCertificateResources
+	c.RESTStorageProviders[appsapi.GroupName] = AppsRESTStorageProvider{}
+	c.RESTStorageProviders[autoscaling.GroupName] = AutoscalingRESTStorageProvider{}
+	c.RESTStorageProviders[batch.GroupName] = BatchRESTStorageProvider{}
+	c.RESTStorageProviders[certificates.GroupName] = CertificatesRESTStorageProvider{}
+	c.RESTStorageProviders[extensions.GroupName] = ExtensionsRESTStorageProvider{
+		ResourceInterface:                     m,
+		DisableThirdPartyControllerForTesting: m.disableThirdPartyControllerForTesting,
+	}
+	c.RESTStorageProviders[policy.GroupName] = PolicyRESTStorageProvider{}
+	c.RESTStorageProviders[rbac.GroupName] = RBACRESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
 	m.InstallAPIs(c)
 
 	// TODO: Attempt clean shutdown?
@@ -290,29 +266,15 @@ func (m *Master) InstallAPIs(c *Config) {
 		m.MuxHelper.HandleFunc("/metrics", defaultMetricsHandler)
 	}
 
-	// Install extensions unless disabled.
-	if c.APIResourceConfigSource.AnyResourcesForVersionEnabled(extensionsapiv1beta1.SchemeGroupVersion) {
+	// Install third party resource support if requested
+	// TODO seems like this bit ought to be unconditional and the REST API is controlled by the config
+	if c.APIResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources")) {
 		var err error
 		m.thirdPartyStorage, err = c.StorageFactory.New(extensions.Resource("thirdpartyresources"))
 		if err != nil {
 			glog.Fatalf("Error getting third party storage: %v", err)
 		}
 		m.thirdPartyResources = map[string]thirdPartyEntry{}
-
-		extensionResources := m.getExtensionResources(c)
-		extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
-
-		apiGroupInfo := genericapiserver.APIGroupInfo{
-			GroupMeta: *extensionsGroupMeta,
-			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-				"v1beta1": extensionResources,
-			},
-			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
-			Scheme:                 api.Scheme,
-			ParameterCodec:         api.ParameterCodec,
-			NegotiatedSerializer:   api.Codecs,
-		}
-		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 
 	restOptionsGetter := func(resource unversioned.GroupResource) generic.RESTOptions {
@@ -326,7 +288,7 @@ func (m *Master) InstallAPIs(c *Config) {
 			continue
 		}
 		restStorageBuilder := c.RESTStorageProviders[group]
-		apiGroupInfo, enabled := restStorageBuilder(c.APIResourceConfigSource, restOptionsGetter)
+		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(c.APIResourceConfigSource, restOptionsGetter)
 		if !enabled {
 			continue
 		}
@@ -733,259 +695,6 @@ func (m *Master) GetRESTOptionsOrDie(c *Config, resource unversioned.GroupResour
 		Decorator:               m.StorageDecorator(),
 		DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		ResourcePrefix:          c.StorageFactory.ResourcePrefix(resource),
-	}
-}
-
-// getExperimentalResources returns the resources for extensions api
-func (m *Master) getExtensionResources(c *Config) map[string]rest.Storage {
-	restOptions := func(resource string) generic.RESTOptions {
-		return m.GetRESTOptionsOrDie(c, extensions.Resource(resource))
-	}
-
-	// TODO update when we support more than one version of this group
-	version := extensionsapiv1beta1.SchemeGroupVersion
-
-	storage := map[string]rest.Storage{}
-
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
-		hpaStorage, hpaStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptions("horizontalpodautoscalers"))
-		storage["horizontalpodautoscalers"] = hpaStorage
-		storage["horizontalpodautoscalers/status"] = hpaStatusStorage
-
-		controllerStorage := expcontrolleretcd.NewStorage(m.GetRESTOptionsOrDie(c, api.Resource("replicationControllers")))
-		storage["replicationcontrollers"] = controllerStorage.ReplicationController
-		storage["replicationcontrollers/scale"] = controllerStorage.Scale
-	}
-	thirdPartyResourceStorage := thirdpartyresourceetcd.NewREST(restOptions("thirdpartyresources"))
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("thirdpartyresources")) {
-		thirdPartyControl := ThirdPartyController{
-			master: m,
-			thirdPartyResourceRegistry: thirdPartyResourceStorage,
-		}
-		if !m.disableThirdPartyControllerForTesting {
-			go wait.Forever(func() {
-				if err := thirdPartyControl.SyncResources(); err != nil {
-					glog.Warningf("third party resource sync failed: %v", err)
-				}
-			}, 10*time.Second)
-		}
-		storage["thirdpartyresources"] = thirdPartyResourceStorage
-	}
-
-	daemonSetStorage, daemonSetStatusStorage := daemonetcd.NewREST(restOptions("daemonsets"))
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("daemonsets")) {
-		storage["daemonsets"] = daemonSetStorage
-		storage["daemonsets/status"] = daemonSetStatusStorage
-	}
-	deploymentStorage := deploymentetcd.NewStorage(restOptions("deployments"))
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("deployments")) {
-		storage["deployments"] = deploymentStorage.Deployment
-		storage["deployments/status"] = deploymentStorage.Status
-		storage["deployments/rollback"] = deploymentStorage.Rollback
-		storage["deployments/scale"] = deploymentStorage.Scale
-	}
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptions("jobs"))
-		storage["jobs"] = jobsStorage
-		storage["jobs/status"] = jobsStatusStorage
-	}
-	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(restOptions("ingresses"))
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("ingresses")) {
-		storage["ingresses"] = ingressStorage
-		storage["ingresses/status"] = ingressStatusStorage
-	}
-	podSecurityPolicyStorage := pspetcd.NewREST(restOptions("podsecuritypolicy"))
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("podsecuritypolicy")) {
-		storage["podSecurityPolicies"] = podSecurityPolicyStorage
-	}
-	replicaSetStorage := replicasetetcd.NewStorage(restOptions("replicasets"))
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("replicasets")) {
-		storage["replicasets"] = replicaSetStorage.ReplicaSet
-		storage["replicasets/status"] = replicaSetStorage.Status
-		storage["replicasets/scale"] = replicaSetStorage.Scale
-	}
-	networkPolicyStorage := networkpolicyetcd.NewREST(restOptions("networkpolicies"))
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
-		storage["networkpolicies"] = networkPolicyStorage
-	}
-	storageClassStorage := storageclassetcd.NewREST(restOptions("storageclasses"))
-	if c.APIResourceConfigSource.ResourceEnabled(version.WithResource("storageclasses")) {
-		storage["storageclasses"] = storageClassStorage
-	}
-
-	return storage
-}
-
-// NewDefaultAPIGroupInfo returns a complete APIGroupInfo stubbed with "normal" values
-// exposed for easier composition from other packages
-func NewDefaultAPIGroupInfo(group string) genericapiserver.APIGroupInfo {
-	groupMeta := registered.GroupOrDie(group)
-
-	return genericapiserver.APIGroupInfo{
-		GroupMeta:                    *groupMeta,
-		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
-		OptionsExternalVersion:       &registered.GroupOrDie(api.GroupName).GroupVersion,
-		Scheme:                       api.Scheme,
-		ParameterCodec:               api.ParameterCodec,
-		NegotiatedSerializer:         api.Codecs,
-	}
-}
-
-func buildCertificateResources(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := NewDefaultAPIGroupInfo(certificates.GroupName)
-
-	storageForVersion := func(version unversioned.GroupVersion) map[string]rest.Storage {
-		storage := map[string]rest.Storage{}
-		if apiResourceConfigSource.ResourceEnabled(version.WithResource("certificatesigningrequests")) {
-			csrStorage, csrStatusStorage, csrApprovalStorage := certificateetcd.NewREST(restOptionsGetter(certificates.Resource("certificatesigningrequests")))
-			storage["certificatesigningrequests"] = csrStorage
-			storage["certificatesigningrequests/status"] = csrStatusStorage
-			storage["certificatesigningrequests/approval"] = csrApprovalStorage
-		}
-		return storage
-	}
-
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(certificatesapiv1alpha1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[certificatesapiv1alpha1.SchemeGroupVersion.Version] = storageForVersion(certificatesapiv1alpha1.SchemeGroupVersion)
-		apiGroupInfo.GroupMeta.GroupVersion = certificatesapiv1alpha1.SchemeGroupVersion
-	}
-
-	return apiGroupInfo, true
-}
-
-func buildAutoscalingResources(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := NewDefaultAPIGroupInfo(autoscaling.GroupName)
-
-	storageForVersion := func(version unversioned.GroupVersion) map[string]rest.Storage {
-		storage := map[string]rest.Storage{}
-		if apiResourceConfigSource.ResourceEnabled(version.WithResource("horizontalpodautoscalers")) {
-			hpaStorage, hpaStatusStorage := horizontalpodautoscaleretcd.NewREST(restOptionsGetter(autoscaling.Resource("horizontalpodautoscalers")))
-			storage["horizontalpodautoscalers"] = hpaStorage
-			storage["horizontalpodautoscalers/status"] = hpaStatusStorage
-		}
-		return storage
-	}
-
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(autoscalingapiv1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[autoscalingapiv1.SchemeGroupVersion.Version] = storageForVersion(autoscalingapiv1.SchemeGroupVersion)
-		apiGroupInfo.GroupMeta.GroupVersion = autoscalingapiv1.SchemeGroupVersion
-	}
-
-	return apiGroupInfo, true
-}
-
-func buildBatchResources(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := NewDefaultAPIGroupInfo(batch.GroupName)
-
-	storageForVersion := func(version unversioned.GroupVersion) map[string]rest.Storage {
-		storage := map[string]rest.Storage{}
-		if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
-			jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter(batch.Resource("jobs")))
-			storage["jobs"] = jobsStorage
-			storage["jobs/status"] = jobsStatusStorage
-		}
-		return storage
-	}
-
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv2alpha1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[batchapiv2alpha1.SchemeGroupVersion.Version] = storageForVersion(batchapiv2alpha1.SchemeGroupVersion)
-		apiGroupInfo.GroupMeta.GroupVersion = batchapiv2alpha1.SchemeGroupVersion
-	}
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(batchapiv1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[batchapiv1.SchemeGroupVersion.Version] = storageForVersion(batchapiv1.SchemeGroupVersion)
-		apiGroupInfo.GroupMeta.GroupVersion = batchapiv1.SchemeGroupVersion
-	}
-
-	return apiGroupInfo, true
-}
-
-func buildPolicyResources(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := NewDefaultAPIGroupInfo(policy.GroupName)
-
-	storageForVersion := func(version unversioned.GroupVersion) map[string]rest.Storage {
-		storage := map[string]rest.Storage{}
-		if apiResourceConfigSource.ResourceEnabled(version.WithResource("poddisruptionbudgets")) {
-			poddisruptionbudgetStorage, poddisruptionbudgetStatusStorage := poddisruptionbudgetetcd.NewREST(restOptionsGetter(policy.Resource("poddisruptionbudgets")))
-			storage["poddisruptionbudgets"] = poddisruptionbudgetStorage
-			storage["poddisruptionbudgets/status"] = poddisruptionbudgetStatusStorage
-		}
-		return storage
-	}
-
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(policyapiv1alpha1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[policyapiv1alpha1.SchemeGroupVersion.Version] = storageForVersion(policyapiv1alpha1.SchemeGroupVersion)
-		apiGroupInfo.GroupMeta.GroupVersion = policyapiv1alpha1.SchemeGroupVersion
-	}
-
-	return apiGroupInfo, true
-}
-
-func buildAppsResources(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-	apiGroupInfo := NewDefaultAPIGroupInfo(appsapi.GroupName)
-
-	storageForVersion := func(version unversioned.GroupVersion) map[string]rest.Storage {
-		storage := map[string]rest.Storage{}
-		if apiResourceConfigSource.ResourceEnabled(version.WithResource("petsets")) {
-			petsetStorage, petsetStatusStorage := petsetetcd.NewREST(restOptionsGetter(apps.Resource("petsets")))
-			storage["petsets"] = petsetStorage
-			storage["petsets/status"] = petsetStatusStorage
-		}
-		return storage
-	}
-
-	if apiResourceConfigSource.AnyResourcesForVersionEnabled(appsapi.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[appsapi.SchemeGroupVersion.Version] = storageForVersion(appsapi.SchemeGroupVersion)
-		apiGroupInfo.GroupMeta.GroupVersion = appsapi.SchemeGroupVersion
-	}
-
-	return apiGroupInfo, true
-}
-
-func buildRBACResources(authorizerRBACSuperUser string) RESTStorageProvider {
-	return func(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
-		apiGroupInfo := NewDefaultAPIGroupInfo(rbac.GroupName)
-
-		storageForVersion := func(version unversioned.GroupVersion) map[string]rest.Storage {
-			once := new(sync.Once)
-			var authorizationRuleResolver rbacvalidation.AuthorizationRuleResolver
-			newRuleValidator := func() rbacvalidation.AuthorizationRuleResolver {
-				once.Do(func() {
-					authorizationRuleResolver = rbacvalidation.NewDefaultRuleResolver(
-						role.NewRegistry(roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles")))),
-						rolebinding.NewRegistry(rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))),
-						clusterrole.NewRegistry(clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))),
-						clusterrolebinding.NewRegistry(clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))),
-					)
-				})
-				return authorizationRuleResolver
-			}
-
-			storage := map[string]rest.Storage{}
-			if apiResourceConfigSource.ResourceEnabled(version.WithResource("roles")) {
-				rolesStorage := roleetcd.NewREST(restOptionsGetter(rbac.Resource("roles")))
-				storage["roles"] = rolepolicybased.NewStorage(rolesStorage, newRuleValidator(), authorizerRBACSuperUser)
-			}
-			if apiResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
-				roleBindingsStorage := rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))
-				storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), authorizerRBACSuperUser)
-			}
-			if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
-				clusterRolesStorage := clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))
-				storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), authorizerRBACSuperUser)
-			}
-			if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
-				clusterRoleBindingsStorage := clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))
-				storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, newRuleValidator(), authorizerRBACSuperUser)
-			}
-			return storage
-		}
-
-		if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapi.SchemeGroupVersion) {
-			apiGroupInfo.VersionedResourcesStorageMap[rbacapi.SchemeGroupVersion.Version] = storageForVersion(rbacapi.SchemeGroupVersion)
-			apiGroupInfo.GroupMeta.GroupVersion = rbacapi.SchemeGroupVersion
-		}
-
-		return apiGroupInfo, true
 	}
 }
 
