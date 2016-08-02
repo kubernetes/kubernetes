@@ -80,7 +80,8 @@ A PR is considered "ready for merging" if it matches the following:
      * Jenkins GCE e2e
      * Jenkins unit/integration
   * The PR cannot have any prohibited future milestones (such as a v1.5 milestone during v1.4 code freeze)
-  * The PR must have the "lgtm" label
+  * The PR must have the "lgtm" label. The "lgtm" label is automatically applied
+    following a review comment consisting of only "LGTM" (case-insensitive)
   * The PR must not have been updated since the "lgtm" label was applied
   * The PR must not have the "do-not-merge" label
 
