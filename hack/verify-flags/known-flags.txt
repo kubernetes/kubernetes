@@ -17,6 +17,8 @@ api-token
 api-version
 apiserver-count
 auth-path
+auth-provider
+auth-provider-arg
 authentication-token-webhook-cache-ttl
 authentication-token-webhook-config-file
 authorization-mode
