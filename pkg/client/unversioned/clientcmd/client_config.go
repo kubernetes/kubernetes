@@ -111,10 +111,6 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	// only try to read the auth information if we are secure
 	if restclient.IsConfigTransportTLS(*clientConfig) {
 		var err error
-
-		// mergo is a first write wins for map value and a last writing wins for interface values
-		// NOTE: This behavior changed with https://github.com/imdario/mergo/commit/d304790b2ed594794496464fadd89d2bb266600a.
-		//       Our mergo.Merge version is older than this change.
 		var persister restclient.AuthProviderConfigPersister
 		if config.configAccess != nil {
 			persister = PersisterForUser(config.configAccess, config.getAuthInfoName())
@@ -323,8 +319,8 @@ func (config *DirectClientConfig) getCluster() clientcmdapi.Cluster {
 	clusterInfoName := config.getClusterName()
 
 	var mergedClusterInfo clientcmdapi.Cluster
-	mergo.MergeWithOverwrite(&mergedClusterInfo, DefaultCluster)
 	mergo.MergeWithOverwrite(&mergedClusterInfo, EnvVarCluster)
+	mergo.MergeWithOverwrite(&mergedClusterInfo, DefaultCluster)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
 		mergo.MergeWithOverwrite(&mergedClusterInfo, configClusterInfo)
 	}

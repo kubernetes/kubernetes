@@ -448,6 +448,9 @@ func Example_mergingSomeWithConflict() {
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
 
+	printConfig(&testConfigAlfa)
+	printConfig(&testConfigConflictAlfa)
+
 	loadingRules := ClientConfigLoadingRules{
 		Precedence: []string{commandLineFile.Name(), envVarFile.Name()},
 	}

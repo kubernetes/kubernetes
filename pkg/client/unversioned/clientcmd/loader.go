@@ -196,23 +196,27 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 
 	// first merge all of our maps
 	for _, kubeconfig := range kubeconfigs {
-		mergo.Merge(mapConfig, kubeconfig)
+		mergo.MergeWithOverwrite(mapConfig, kubeconfig)
+		printConfig(kubeconfig)
 	}
 
+	printConfig(mapConfig)
 	// merge all of the struct values in the reverse order so that priority is given correctly
 	// errors are not added to the list the second time
 
 	for i := len(kubeconfigs) - 1; i >= 0; i-- {
 		kubeconfig := kubeconfigs[i]
 		mergo.MergeWithOverwrite(nonMapConfig, kubeconfig)
+		printConfig(kubeconfig)
 	}
-
+	printConfig(nonMapConfig)
 	// since values are overwritten, but maps values are not, we can merge the non-map config on top of the map config and
 	// get the values we expect.
 	config := clientcmdapi.NewConfig()
-	mergo.Merge(config, mapConfig)
+	mergo.MergeWithOverwrite(config, mapConfig)
+	printConfig(config)
 	mergo.MergeWithOverwrite(config, nonMapConfig)
-
+	printConfig(config)
 	if rules.ResolvePaths() {
 		if err := ResolveLocalPaths(config); err != nil {
 			errlist = append(errlist, err)
