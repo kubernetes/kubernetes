@@ -58,6 +58,7 @@ cloud-provider
 cluster-cidr
 cluster-dns
 cluster-domain
+cluster-ip
 cluster-name
 cluster-tag
 cluster-monitor-period
