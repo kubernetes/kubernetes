@@ -204,6 +204,12 @@ type KubeletConfiguration struct {
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string `json:"certDirectory"`
+	// BootstrapAuthToken is a string token that is used for getting a x509
+	// certificate from the API server that matches the private key generated
+	// by kubelet.
+	// The result certificate will be stored in tlsCertFile, and the generated
+	// private key file will be stored in tlsPrivateKeyFile.
+	BootstrapAuthToken string `json:"bootstrapAuthToken"`
 	// hostnameOverride is the hostname used to identify the kubelet instead
 	// of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`

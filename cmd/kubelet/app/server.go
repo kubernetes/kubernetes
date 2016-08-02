@@ -19,6 +19,7 @@ package app
 
 import (
 	"crypto/tls"
+	"crypto/x509/pkix"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -26,6 +27,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -38,11 +40,14 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubeExternal "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -62,6 +67,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/crypto"
@@ -75,6 +81,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -418,11 +425,10 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
 		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if crypto.ShouldGenSelfSignedCerts(s.TLSCertFile, s.TLSPrivateKeyFile) {
-			if err := crypto.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err != nil {
-				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
+		if !crypto.FoundCertOrKey(s.TLSCertFile, s.TLSPrivateKeyFile) {
+			if err := createCertAndKey(s); err != nil {
+				return nil, err
 			}
-			glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
 		}
 	}
 	tlsOptions := &server.TLSOptions{
@@ -438,6 +444,132 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 		KeyFile:  s.TLSPrivateKeyFile,
 	}
 	return tlsOptions, nil
+}
+
+// createCertAndKey tries to:
+// Use the boostrap auth token to get x509 certs if the token is set.
+// If this fails or the token is empty, then self-generates cert and key pair.
+func createCertAndKey(s *options.KubeletServer) error {
+	var err error
+	if s.BootstrapAuthToken != "" {
+		if err = getCertFromAPIServer(s); err != nil {
+			// Clean up cert and key.
+			if err := os.Remove(s.TLSCertFile); err != nil {
+				glog.Warningf("Failed to clean up TLS cert file %q: %v", s.TLSCertFile, err)
+			}
+			if err := os.Remove(s.TLSPrivateKeyFile); err != nil {
+				glog.Warningf("Failed to clean up TLS private key file %q: %v", s.TLSPrivateKeyFile, err)
+			}
+			return fmt.Errorf("Cannot get cert from API server: %v", err)
+		}
+
+		glog.V(4).Infof("Using cert got from the API server (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
+		return nil
+	}
+
+	if err = crypto.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err == nil {
+		glog.V(4).Infof("Using self-signed cert (%s, %s)", s.TLSCertFile, s.TLSPrivateKeyFile)
+		return nil
+	}
+	return fmt.Errorf("unable to generate self-signed cert: %v", err)
+}
+
+// getCertFromAPIServer will:
+// (1) Create a restful client for doing the certificate signing request.
+// (2) Generate key pair and certificate signing request.
+//     The private key is stored to disk.
+// (3) Send request to API server and watch for the issued certificate.
+// (4) Once (3) succeeds, dump the certificate to disk.
+func getCertFromAPIServer(s *options.KubeletServer) error {
+	// (1).
+	clientConfig, err := CreateAPIServerClientConfig(s)
+	if err != nil {
+		return fmt.Errorf("unable to create API server client config: %v", err)
+	}
+	// Embed our bootstrap auth token in each request.
+	clientConfig.BearerToken = s.BootstrapAuthToken
+
+	certificatesclient, err := unversionedcertificates.NewForConfig(clientConfig)
+	if err != nil {
+		return fmt.Errorf("unable to create certificates client: %v", err)
+	}
+
+	// (2).
+	hostname := nodeutil.GetHostname(s.HostnameOverride)
+
+	var ips []net.IP
+	nodeIP := net.ParseIP(s.NodeIP)
+	if nodeIP != nil {
+		ips = []net.IP{nodeIP}
+	}
+
+	commonName := fmt.Sprintf("kubelet-%s", hostname)
+	req, err := utilcertificates.NewCertificateRequest(s.TLSPrivateKeyFile, &pkix.Name{CommonName: commonName}, []string{hostname}, ips)
+	if err != nil {
+		return fmt.Errorf("unable to generate certificate request: %v", err)
+	}
+
+	// (3).
+	certificate, err := requestCertificate(certificatesclient, req, 3600) // Make a default timeout = 3600s
+	if err != nil {
+		return fmt.Errorf("unable to request certificate from API server: %v", err)
+	}
+
+	// (4).
+	if err := crypto.WriteCertToPath(s.TLSCertFile, certificate); err != nil {
+		return fmt.Errorf("unable to create certificate file on disk: %v", err)
+	}
+
+	return nil
+}
+
+// requestCertificate sends the certificate signing request to API server and watches the object's status.
+// It returns the API server's issued certificate (pem-encoded) on success.
+// If there is any errors, or the watch timeouts, it returns an error.
+func requestCertificate(client unversionedcertificates.CertificateSigningRequestsGetter, request []byte, defaultTimeoutSeconds int64) (certificate []byte, err error) {
+	if _, err = client.CertificateSigningRequests().Create(&certificates.CertificateSigningRequest{
+		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
+		ObjectMeta: api.ObjectMeta{GenerateName: "csr-"},
+
+		// Username, UID, Groups will be injected by API server.
+		Spec: certificates.CertificateSigningRequestSpec{Request: request},
+	}); err != nil {
+		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
+
+	}
+
+	resultCh, err := client.CertificateSigningRequests().Watch(api.ListOptions{
+		Watch:          true,
+		TimeoutSeconds: &defaultTimeoutSeconds,
+		// Label and field selector are not used now.
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
+	}
+
+	var status certificates.CertificateSigningRequestStatus
+	ch := resultCh.ResultChan()
+
+	for {
+		event, ok := <-ch
+		if !ok {
+			break
+		}
+
+		if event.Type == watch.Modified {
+			status = event.Object.(*certificates.CertificateSigningRequest).Status
+			for _, c := range status.Conditions {
+				if c.Type == certificates.CertificateDenied {
+					return nil, fmt.Errorf("certificate signing request is not approved: %v, %v", c.Reason, c.Message)
+				}
+				if c.Type == certificates.CertificateApproved && status.Certificate != nil {
+					return status.Certificate, nil
+				}
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("watch channel closed")
 }
 
 func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclient.Config, error) {
