@@ -37,6 +37,8 @@ kube::golang::server_targets() {
     cmd/kubelet
     cmd/kubemark
     cmd/hyperkube
+    federation/cmd/federation-apiserver
+    federation/cmd/federation-controller-manager
     plugin/cmd/kube-scheduler
   )
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
@@ -167,7 +169,8 @@ readonly KUBE_STATIC_LIBRARIES=(
   kube-scheduler
   kube-proxy
   kubectl
-  hyperkube
+  federation-apiserver
+  federation-controller-manager
 )
 
 kube::golang::is_statically_linked_library() {
