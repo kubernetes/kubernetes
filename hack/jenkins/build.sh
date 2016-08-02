@@ -60,20 +60,21 @@ go run ./hack/e2e.go -v --build
 # Push to GCS?
 if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
   echo "Not pushed to GCS..."
-elif $RELEASE_INFRA_PUSH; then
-  git clone https://github.com/kubernetes/release $WORKSPACE/release
-  readonly release_infra_clone=$WORKSPACE/release
+elif ${RELEASE_INFRA_PUSH-}; then
+  readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
+  mkdir -p ${WORKSPACE}/_tmp
+  git clone https://github.com/kubernetes/release ${release_infra_clone}
 
-  if [[ ! -x $release_infra_clone/push-ci-build.sh ]]; then
+  if [[ ! -x ${release_infra_clone}/push-ci-build.sh ]]; then
     echo "FATAL: Something went wrong." \
-         "$release_infra_clone/push-ci-build.sh isn't available. Exiting..." >&2
+         "${release_infra_clone}/push-ci-build.sh isn't available. Exiting..." >&2
     exit 1
   fi
 
-  $FEDERATION && federation_flag="--federation"
+  ${FEDERATION} && federation_flag="--federation"
   # Use --nomock to do the real thing
   #$release_infra_clone/push-ci-build.sh --nomock ${federation_flag-}
-  $release_infra_clone/push-ci-build.sh ${federation_flag-}
+  ${release_infra_clone}/push-ci-build.sh ${federation_flag-}
 else
   ./build/push-ci-build.sh
 fi
