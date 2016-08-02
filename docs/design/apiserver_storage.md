@@ -48,7 +48,7 @@ type Storage interface {
 
 	// Delete a key and its object based on the given conditions.
 	// See docs on Conditions for more details.
-	Delete(ctx context.Context, key string, conditions *Conditions) (cur runtime.Object, err error)
+	Delete(ctx context.Context, key string, conditions *Conditions) (old runtime.Object, err error)
 
 	// Get gets the most recent version of a key.
 	// If no object exists on the key, it will return not found error.
@@ -68,10 +68,10 @@ type Storage interface {
 	WatchPrefix(ctx context.Context, prefix string, version uint64, ss ...Selector) (WatchChan, error)
 
 	// AddIndex adds a new index.
-	// An index indicates a field(s) of a type of an object that would be queried frequently and
+	// An index indicates a field(s) of a type of an object that would be queried or watched frequently and
 	// thus require better efficiency and performance.
 	// If an index exists for a field, complexity of a query on it should be no more than O(logN)
-	// where N is the total number of objects.
+	// where N is the total number of objects for List or watchers for watch event delivery.
 	// See FieldValueGetFunc for more details on field value retrieving.
 	AddIndex(indexName, field string, g FieldValueGetFunc) error
 	// DeleteIndex deletes an index.
