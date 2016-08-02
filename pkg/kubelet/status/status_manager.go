@@ -504,10 +504,10 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 }
 
 // We add this function, because apiserver only supports *RFC3339* now, which means that the timestamp returned by
-// apiserver has no nanosecond infromation. However, the timestamp returned by unversioned.Now() contains nanosecond,
+// apiserver has no nanosecond information. However, the timestamp returned by unversioned.Now() contains nanosecond,
 // so when we do comparison between status from apiserver and cached status, isStatusEqual() will always return false.
 // There is related issue #15262 and PR #15263 about this.
-// In fact, the best way to solve this is to do it on api side. However for now, we normalize the status locally in
+// In fact, the best way to solve this is to do it on api side. However, for now, we normalize the status locally in
 // kubelet temporarily.
 // TODO(random-liu): Remove timestamp related logic after apiserver supports nanosecond or makes it consistent.
 func normalizeStatus(pod *api.Pod, status *api.PodStatus) *api.PodStatus {

@@ -31,7 +31,7 @@ import (
 )
 
 // GenericPLEG is an extremely simple generic PLEG that relies solely on
-// periodic listing to discover container changes. It should be be used
+// periodic listing to discover container changes. It should be used
 // as temporary replacement for container runtimes do not support a proper
 // event generator yet.
 //
@@ -41,7 +41,7 @@ import (
 // container. In the case of relisting failure, the window may become longer.
 // Note that this assumption is not unique -- many kubelet internal components
 // rely on terminated containers as tombstones for bookkeeping purposes. The
-// garbage collector is implemented to work with such situtations. However, to
+// garbage collector is implemented to work with such situations. However, to
 // guarantee that kubelet can handle missing container events, it is
 // recommended to set the relist period short and have an auxiliary, longer
 // periodic sync in kubelet as the safety net.

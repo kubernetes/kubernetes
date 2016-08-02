@@ -250,7 +250,7 @@ func (p throttledDockerPuller) IsImagePresent(name string) (bool, error) {
 }
 
 // Creates a name which can be reversed to identify both full pod name and container name.
-// This function returns stable name, unique name and an unique id.
+// This function returns stable name, unique name and a unique id.
 // Although rand.Uint32() is not really unique, but it's enough for us because error will
 // only occur when instances of the same container in the same pod have the same UID. The
 // chance is really slim.

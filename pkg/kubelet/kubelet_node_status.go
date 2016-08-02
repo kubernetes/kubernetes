@@ -733,7 +733,7 @@ func (kl *Kubelet) setNodeVolumesInUseStatus(node *api.Node) {
 // setNodeStatus fills in the Status fields of the given Node, overwriting
 // any fields that are currently set.
 // TODO(madhusudancs): Simplify the logic for setting node conditions and
-// refactor the node status condtion code out to a different file.
+// refactor the node status condition code out to a different file.
 func (kl *Kubelet) setNodeStatus(node *api.Node) error {
 	for _, f := range kl.setNodeStatusFuncs {
 		if err := f(node); err != nil {
