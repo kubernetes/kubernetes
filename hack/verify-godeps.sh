@@ -104,5 +104,12 @@ if ! _out="$(diff -Naupr --ignore-matching-lines='^\s*\"GoVersion\":' --ignore-m
   exit 1
 fi
 
+if ! _out="$(diff -Naupr ${KUBE_ROOT}/vendor ${_kubetmp}/vendor)"; then
+  echo "Your vendored results are different:"
+  echo "${_out}"
+  echo "Godeps Verify failed."
+  exit 1
+fi
+
 echo "Godeps Verified."
 # ex: ts=2 sw=2 et filetype=sh
