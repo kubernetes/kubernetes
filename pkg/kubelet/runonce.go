@@ -73,18 +73,20 @@ func (kl *Kubelet) runOnce(pods []*api.Pod, retryDelay time.Duration) (results [
 		// Check if we can admit the pod.
 		if ok, reason, message := kl.canAdmitPod(admitted, pod); !ok {
 			kl.rejectPod(pod, reason, message)
-		} else {
-			admitted = append(admitted, pod)
+			results = append(results, RunPodResult{pod, nil})
+			continue
 		}
+
+		admitted = append(admitted, pod)
 		go func(pod *api.Pod) {
 			err := kl.runPod(pod, retryDelay)
 			ch <- RunPodResult{pod, err}
 		}(pod)
 	}
 
-	glog.Infof("waiting for %d pods", len(pods))
+	glog.Infof("Waiting for %d pods", len(admitted))
 	failedPods := []string{}
-	for i := 0; i < len(pods); i++ {
+	for i := 0; i < len(admitted); i++ {
 		res := <-ch
 		results = append(results, res)
 		if res.Err != nil {
