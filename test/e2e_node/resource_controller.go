@@ -36,8 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -369,7 +369,7 @@ func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
 func newTestPods(numPods int, imageName, podType string) []*api.Pod {
 	var pods []*api.Pod
 	for i := 0; i < numPods; i++ {
-		podName := "test-" + string(util.NewUUID())
+		podName := "test-" + string(uuid.NewUUID())
 		labels := map[string]string{
 			"type": podType,
 			"name": podName,
