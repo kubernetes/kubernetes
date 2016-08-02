@@ -88,6 +88,9 @@ func enableVersions(externalVersions []unversioned.GroupVersion) error {
 	return nil
 }
 
+// userResources is a group of resources mostly used by a kubectl user
+var userResources = []string{"rc", "svc", "pods", "pvc"}
+
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
 	// the list of kinds that are scoped at the root of the api hierarchy
 	// if a kind is not enumerated here, it is assumed to have a namespace scope
@@ -113,7 +116,11 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 		"ThirdPartyResourceData",
 		"ThirdPartyResourceList")
 
-	return api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	mapper := api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	// setup aliases for groups of resources
+	mapper.AddResourceAlias("all", userResources...)
+
+	return mapper
 }
 
 // InterfacesFor returns the default Codec and ResourceVersioner for a given version
