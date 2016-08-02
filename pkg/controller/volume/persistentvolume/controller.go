@@ -324,7 +324,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 	} else {
 		volume, ok := obj.(*api.PersistentVolume)
 		if !ok {
-			return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, obj)
+			return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
 		}
 
 		glog.V(4).Infof("synchronizing bound PersistentVolumeClaim[%s]: volume %q found: %s", claimToClaimKey(claim), claim.Spec.VolumeName, getVolumeStatusForLogging(volume))
@@ -407,7 +407,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 			var ok bool
 			claim, ok = obj.(*api.PersistentVolumeClaim)
 			if !ok {
-				return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, obj)
+				return fmt.Errorf("Cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, obj)
 			}
 			glog.V(4).Infof("synchronizing PersistentVolume[%s]: claim %s found: %s", volume.Name, claimrefToClaimKey(volume.Spec.ClaimRef), getClaimStatusForLogging(claim))
 		}
@@ -891,7 +891,7 @@ func (ctrl *PersistentVolumeController) reclaimVolume(volume *api.PersistentVolu
 func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) {
 	volume, ok := arg.(*api.PersistentVolume)
 	if !ok {
-		glog.Errorf("Cannot convert recycleVolumeOperation argument to volume, got %+v", arg)
+		glog.Errorf("Cannot convert recycleVolumeOperation argument to volume, got %#v", arg)
 		return
 	}
 	glog.V(4).Infof("recycleVolumeOperation [%s] started", volume.Name)
@@ -979,7 +979,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) {
 	volume, ok := arg.(*api.PersistentVolume)
 	if !ok {
-		glog.Errorf("Cannot convert deleteVolumeOperation argument to volume, got %+v", arg)
+		glog.Errorf("Cannot convert deleteVolumeOperation argument to volume, got %#v", arg)
 		return
 	}
 	glog.V(4).Infof("deleteVolumeOperation [%s] started", volume.Name)
@@ -1057,7 +1057,7 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *api.PersistentV
 		var ok bool
 		claim, ok = obj.(*api.PersistentVolumeClaim)
 		if !ok {
-			return false, fmt.Errorf("Cannot convert object from claim cache to claim!?: %+v", obj)
+			return false, fmt.Errorf("Cannot convert object from claim cache to claim!?: %#v", obj)
 		}
 	}
 	if claim != nil && claim.UID == volume.Spec.ClaimRef.UID {
@@ -1117,7 +1117,7 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *api.PersistentVolu
 func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interface{}) {
 	claim, ok := claimObj.(*api.PersistentVolumeClaim)
 	if !ok {
-		glog.Errorf("Cannot convert provisionClaimOperation argument to claim, got %+v", claimObj)
+		glog.Errorf("Cannot convert provisionClaimOperation argument to claim, got %#v", claimObj)
 		return
 	}
 	glog.V(4).Infof("provisionClaimOperation [%s] started", claimToClaimKey(claim))

@@ -234,7 +234,7 @@ func storeVersion(t *testing.T, prefix string, c cache.Store, version string, ex
 	}
 	pv, ok := pvObj.(*api.PersistentVolume)
 	if !ok {
-		t.Errorf("expected volume in the cache, got different object instead: %+v", pvObj)
+		t.Errorf("expected volume in the cache, got different object instead: %#v", pvObj)
 	}
 
 	if ret {

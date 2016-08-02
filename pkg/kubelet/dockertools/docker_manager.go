@@ -1775,7 +1775,7 @@ func (dm *DockerManager) computePodContainerChanges(pod *api.Pod, podStatus *kub
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("computePodContainerChanges").Observe(metrics.SinceInMicroseconds(start))
 	}()
-	glog.V(5).Infof("Syncing Pod %q: %+v", format.Pod(pod), pod)
+	glog.V(5).Infof("Syncing Pod %q: %#v", format.Pod(pod), pod)
 
 	containersToStart := make(map[int]string)
 	containersToKeep := make(map[kubecontainer.DockerID]int)
@@ -2062,10 +2062,10 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			initContainerResult.Fail(kubecontainer.ErrRunInitContainer, fmt.Sprintf("init container %q exited with %d", status.Name, status.ExitCode))
 			result.AddSyncResult(initContainerResult)
 			if pod.Spec.RestartPolicy == api.RestartPolicyNever {
-				utilruntime.HandleError(fmt.Errorf("error running pod %q init container %q, restart=Never: %+v", format.Pod(pod), status.Name, status))
+				utilruntime.HandleError(fmt.Errorf("error running pod %q init container %q, restart=Never: %#v", format.Pod(pod), status.Name, status))
 				return
 			}
-			utilruntime.HandleError(fmt.Errorf("Error running pod %q init container %q, restarting: %+v", format.Pod(pod), status.Name, status))
+			utilruntime.HandleError(fmt.Errorf("Error running pod %q init container %q, restarting: %#v", format.Pod(pod), status.Name, status))
 		}
 	}
 

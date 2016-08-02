@@ -159,10 +159,10 @@ func pcbKeyFunc(obj interface{}) (string, error) {
 	}
 	p, ok := obj.(*pcb)
 	if !ok {
-		return "", fmt.Errorf("not a valid pet control block %+v", p)
+		return "", fmt.Errorf("not a valid pet control block %#v", p)
 	}
 	if p.parent == nil {
-		return "", fmt.Errorf("cannot compute pet control block key without parent pointer %+v", p)
+		return "", fmt.Errorf("cannot compute pet control block key without parent pointer %#v", p)
 	}
 	return controller.KeyFunc(p.parent)
 }

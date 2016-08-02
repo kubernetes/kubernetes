@@ -109,7 +109,7 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if len(result) != 2 {
-		t.Errorf("Expected 2 elements, received: %+v", result)
+		t.Errorf("Expected 2 elements, received: %#v", result)
 	}
 	mockCadvisor.AssertExpectations(t)
 }
