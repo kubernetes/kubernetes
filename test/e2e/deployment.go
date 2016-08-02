@@ -83,7 +83,7 @@ var _ = framework.KubeDescribe("Deployment", func() {
 	It("paused deployment should be able to scale", func() {
 		testScalePausedDeployment(f)
 	})
-	It("scaled rollout should not block on annotation check", func() {
+	It("scaled rollout deployment should not block on annotation check", func() {
 		testScaledRolloutDeployment(f)
 	})
 	// TODO: add tests that cover deployment.Spec.MinReadySeconds once we solved clock-skew issues
@@ -236,7 +236,7 @@ func testNewDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", nginxImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deploy, true)
+	err = framework.WaitForDeploymentStatus(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
@@ -285,7 +285,7 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", redisImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deploy, true)
+	err = framework.WaitForDeploymentStatus(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	// There should be 1 old RS (nginx-controller, which is adopted)
@@ -341,7 +341,7 @@ func testRollingUpdateDeploymentEvents(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", redisImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deploy, true)
+	err = framework.WaitForDeploymentStatus(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
@@ -397,7 +397,7 @@ func testRecreateDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", redisImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deploy, true)
+	err = framework.WaitForDeploymentStatus(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Verify that the pods were scaled up and down as expected. We use events to verify that.
@@ -557,7 +557,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 }
 
@@ -685,7 +685,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deploy, true)
+	err = framework.WaitForDeploymentStatus(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "create"
@@ -711,7 +711,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "update"
@@ -734,7 +734,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3", deploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "create", after the rollback
@@ -755,7 +755,7 @@ func testRollbackDeployment(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "4", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Current newRS annotation should be "update", after the rollback
@@ -804,7 +804,7 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deploy, true)
+	err = framework.WaitForDeploymentStatus(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Check that the replica set we created still doesn't contain revision information
@@ -846,7 +846,7 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "2", updatedDeploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// 4. Update the deploymentRollback to rollback to revision 1
@@ -866,7 +866,7 @@ func testRollbackDeploymentRSNoRevision(f *framework.Framework) {
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3", deploymentImage)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// 5. Update the deploymentRollback to rollback to revision 10
@@ -938,7 +938,7 @@ func testDeploymentLabelAdopted(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	// The RS and pods should be relabeled before the status is updated by syncRollingUpdateDeployment
-	err = framework.WaitForDeploymentStatus(c, deploy, true)
+	err = framework.WaitForDeploymentStatus(c, deploy)
 	Expect(err).NotTo(HaveOccurred())
 
 	// There should be no old RSs (overlapping RS)
@@ -1043,7 +1043,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatusValid(c, deployment, true)
 	Expect(err).NotTo(HaveOccurred())
 
 	first, err := deploymentutil.GetNewReplicaSet(deployment, c)
@@ -1064,7 +1064,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatus(c, deployment, false)
+	err = framework.WaitForDeploymentStatusValid(c, deployment, false)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Checking that the replica sets for %q are synced", deploymentName))
@@ -1105,7 +1105,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	}
 
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatusValid(c, deployment, true)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Update the deployment with a non-existent image so that the new replica set will be blocked.
@@ -1123,7 +1123,7 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatus(c, deployment, false)
+	err = framework.WaitForDeploymentStatusValid(c, deployment, false)
 	Expect(err).NotTo(HaveOccurred())
 
 	By(fmt.Sprintf("Checking that the replica sets for %q are synced", deploymentName))
@@ -1164,6 +1164,6 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	}
 
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatus(c, deployment, true)
+	err = framework.WaitForDeploymentStatusValid(c, deployment, true)
 	Expect(err).NotTo(HaveOccurred())
 }
