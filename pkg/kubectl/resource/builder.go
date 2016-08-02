@@ -317,7 +317,7 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 	}
 	if len(args) > 0 {
 		// Try replacing aliases only in types
-		args[0] = b.ReplaceAliases(args[0])
+		args[0] = b.replaceAliases(args[0])
 	}
 	switch {
 	case len(args) > 2:
@@ -338,9 +338,9 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 	return b
 }
 
-// ReplaceAliases accepts an argument and tries to expand any existing
+// replaceAliases accepts an argument and tries to expand any existing
 // aliases found in it
-func (b *Builder) ReplaceAliases(input string) string {
+func (b *Builder) replaceAliases(input string) string {
 	replaced := []string{}
 	for _, arg := range strings.Split(input, ",") {
 		if aliases, ok := b.mapper.AliasesForResource(arg); ok {
