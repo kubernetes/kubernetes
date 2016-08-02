@@ -168,10 +168,14 @@ When the http request is processed, the request handler will close the audit eve
 ```go
 package audit
 
-type Event struct {
-  Level Level
+// LogLevel defines the amount of information logged for auditing
+type LogLevel int
 
-  // opening
+
+type Event struct {
+  Level LogLevel
+
+  // http header level (RequestLogLevel and higher)
   ID string
   Timestamp time.Timestamp
   IP string
@@ -181,16 +185,15 @@ type Event struct {
   AsUser string
   Namespace, Name string
   GroupKind unversioned.GroupKind
+  Response int
 
-  // unmodified request object before authn, auth & admission
-  RequestObject runtime.Unstructured
+  // CRUD level (RequestLogLevel and higher)
+  RequestObject runtime.Unstructured // before admission
 
-  // storage object
+  // Storage level (StorageLogLevel and higher)
   OldObject runtime.Object
   NewObject runtime.Object
-
-  // closing
-  Response string
+  Patch     []byte
 }
 ```
 
@@ -203,20 +206,22 @@ TODO: define (and maybe adapt interface) how synchronization of the writable aud
 ```go
 package audit
 
-type Level string
-
 const (
-  // only logs http request level information without payload inspection
-  HttpHeadersLevel = "HttpHeaders"
-  // in addition to `HttpHeaders` the request payload is logged (if the output backend decides so)
-  RequestObjectLevel = "RequestObject"
-  // in addition to `RequestObject` the old and new object are intercepted on
-  // the storage layer and passed to the output backend. The output backend can // decide whether full objects are logged or a differential output is produced.
-  StorageObjectLevel = "StorageObject"
+  // DontLogLevel means to not log at all
+  DontLogLevel LogLevel = iota
+
+  // HeaderLogLevel means to log only information from the http headers, not from the body
+  HeaderLogLevel
+
+  // RequestLogLevel adds the user request in the body
+  RequestLogLevel
+
+  // StorageLogLevel adds the old and the new object that is received from and sent to the storage layer
+  StorageLogLevel
 )
 
 type Action interface {
-  Level() Level
+  Level() LogLevel
   Value(key string) string
 }
 
