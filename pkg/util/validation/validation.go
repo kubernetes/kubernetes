@@ -121,20 +121,20 @@ func IsDNS1123Subdomain(value string) []string {
 	return errs
 }
 
-const dns952LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
-const DNS952LabelMaxLength int = 24
+const dns1035LabelFmt string = "[a-z]([-a-z0-9]*[a-z0-9])?"
+const DNS1035LabelMaxLength int = 63
 
-var dns952LabelRegexp = regexp.MustCompile("^" + dns952LabelFmt + "$")
+var dns1035LabelRegexp = regexp.MustCompile("^" + dns1035LabelFmt + "$")
 
-// IsDNS952Label tests for a string that conforms to the definition of a label in
-// DNS (RFC 952).
-func IsDNS952Label(value string) []string {
+// IsDNS1035Label tests for a string that conforms to the definition of a label in
+// DNS (RFC 1035).
+func IsDNS1035Label(value string) []string {
 	var errs []string
-	if len(value) > DNS952LabelMaxLength {
-		errs = append(errs, MaxLenError(DNS952LabelMaxLength))
+	if len(value) > DNS1035LabelMaxLength {
+		errs = append(errs, MaxLenError(DNS1035LabelMaxLength))
 	}
-	if !dns952LabelRegexp.MatchString(value) {
-		errs = append(errs, RegexError(dns952LabelFmt, "my-name", "abc-123"))
+	if !dns1035LabelRegexp.MatchString(value) {
+		errs = append(errs, RegexError(dns1035LabelFmt, "my-name", "abc-123"))
 	}
 	return errs
 }
