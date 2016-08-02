@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -30,7 +30,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 	f := framework.NewDefaultFramework("secrets")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
-		name := "secret-test-" + string(util.NewUUID())
+		name := "secret-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
 		secret := secretForTest(f.Namespace.Name, name)
@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-secrets-" + string(util.NewUUID()),
+				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
@@ -93,7 +93,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 		// volumes in the same pod.  This test case exists to prevent
 		// regressions that break this use-case.
 		var (
-			name             = "secret-test-" + string(util.NewUUID())
+			name             = "secret-test-" + string(uuid.NewUUID())
 			volumeName       = "secret-volume"
 			volumeMountPath  = "/etc/secret-volume"
 			volumeName2      = "secret-volume-2"
@@ -115,7 +115,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-secrets-" + string(util.NewUUID()),
+				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
@@ -168,7 +168,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 	})
 
 	It("should be consumable from pods in env vars [Conformance]", func() {
-		name := "secret-test-" + string(util.NewUUID())
+		name := "secret-test-" + string(uuid.NewUUID())
 		secret := secretForTest(f.Namespace.Name, name)
 
 		By(fmt.Sprintf("Creating secret with name %s", secret.Name))
@@ -185,7 +185,7 @@ var _ = framework.KubeDescribe("Secrets", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-secrets-" + string(util.NewUUID()),
+				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{

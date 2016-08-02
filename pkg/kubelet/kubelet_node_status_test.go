@@ -35,9 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/rand"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 )
@@ -48,7 +48,7 @@ func generateTestingImageList(count int) ([]kubecontainer.Image, []api.Container
 	var imageList []kubecontainer.Image
 	for ; count > 0; count-- {
 		imageItem := kubecontainer.Image{
-			ID:       string(util.NewUUID()),
+			ID:       string(uuid.NewUUID()),
 			RepoTags: generateImageTags(),
 			Size:     rand.Int63nRange(minImgSize, maxImgSize+1),
 		}

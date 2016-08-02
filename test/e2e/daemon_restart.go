@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -187,7 +187,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("daemonrestart")
-	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())
+	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(uuid.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string

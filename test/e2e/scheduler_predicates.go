@@ -25,9 +25,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/system"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -464,7 +464,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		By("Trying to apply a random label on the found node.")
-		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
+		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
 		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
 		framework.ExpectNodeHasLabel(c, nodeName, k, v)
@@ -597,7 +597,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		By("Trying to apply a random label on the found node.")
-		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
+		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
 		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
 		framework.ExpectNodeHasLabel(c, nodeName, k, v)
@@ -714,7 +714,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	// part of podAffinity,so validation fails.
 	It("validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid", func() {
 		By("Trying to launch a pod with an invalid pod Affinity data.")
-		podName := "without-label-" + string(util.NewUUID())
+		podName := "without-label-" + string(uuid.NewUUID())
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -765,7 +765,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	// Test Nodes does not have any pod, hence it should be impossible to schedule a Pod with pod affinity.
 	It("validates that Inter-pod-Affinity is respected if not matching [Feature:PodAffinity]", func() {
 		By("Trying to schedule Pod with nonempty Pod Affinity.")
-		podName := "without-label-" + string(util.NewUUID())
+		podName := "without-label-" + string(uuid.NewUUID())
 
 		waitForStableCluster(c)
 
@@ -816,7 +816,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -849,7 +849,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity.")
-		labelPodName := "with-podaffinity-" + string(util.NewUUID())
+		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
 		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -902,7 +902,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -935,7 +935,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity with same Labels.")
-		labelPodName := "with-podaffinity-" + string(util.NewUUID())
+		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
 		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -986,7 +986,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1019,7 +1019,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
-		labelPodName := "with-podaffinity-" + string(util.NewUUID())
+		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
 		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1080,7 +1080,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1113,7 +1113,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
-		labelPodName := "with-podantiaffinity-" + string(util.NewUUID())
+		labelPodName := "with-podantiaffinity-" + string(uuid.NewUUID())
 		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1177,7 +1177,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1264,7 +1264,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		By("Trying to apply a random taint on the found node.")
-		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(util.NewUUID()))
+		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID()))
 		taintValue := "testing-taint-value"
 		taintEffect := api.TaintEffectNoSchedule
 		framework.AddOrUpdateTaintOnNode(c, nodeName, api.Taint{Key: taintName, Value: taintValue, Effect: taintEffect})
@@ -1272,7 +1272,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveTaintOffNode(c, nodeName, taintName)
 
 		By("Trying to apply a random label on the found node.")
-		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(util.NewUUID()))
+		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
 		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
 		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
@@ -1359,7 +1359,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		By("Trying to apply a random taint on the found node.")
-		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(util.NewUUID()))
+		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID()))
 		taintValue := "testing-taint-value"
 		taintEffect := api.TaintEffectNoSchedule
 		framework.AddOrUpdateTaintOnNode(c, nodeName, api.Taint{Key: taintName, Value: taintValue, Effect: taintEffect})
@@ -1367,7 +1367,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveTaintOffNode(c, nodeName, taintName)
 
 		By("Trying to apply a random label on the found node.")
-		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(util.NewUUID()))
+		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
 		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
 		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)

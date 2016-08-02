@@ -18,7 +18,7 @@ package e2e
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -30,7 +30,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	f := framework.NewDefaultFramework("var-expansion")
 
 	It("should allow composing env vars into new env vars [Conformance]", func() {
-		podName := "var-expansion-" + string(util.NewUUID())
+		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   podName,
@@ -70,7 +70,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	It("should allow substituting values in a container's command [Conformance]", func() {
-		podName := "var-expansion-" + string(util.NewUUID())
+		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   podName,
@@ -100,7 +100,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 	})
 
 	It("should allow substituting values in a container's args [Conformance]", func() {
-		podName := "var-expansion-" + string(util.NewUUID())
+		podName := "var-expansion-" + string(uuid.NewUUID())
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   podName,
