@@ -67,7 +67,7 @@ func (s objectReference) String() string {
 type node struct {
 	identity objectReference
 	// dependents will be read by the orphan() routine, we need to protect it with a lock.
-	dependentsLock *sync.RWMutex
+	dependentsLock sync.RWMutex
 	dependents     map[*node]struct{}
 	// When processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
@@ -151,8 +151,7 @@ func (p *Propagator) addDependentToOwners(n *node, owners []metatypes.OwnerRefer
 					OwnerReference: owner,
 					Namespace:      n.identity.Namespace,
 				},
-				dependentsLock: &sync.RWMutex{},
-				dependents:     make(map[*node]struct{}),
+				dependents: make(map[*node]struct{}),
 			}
 			p.uidToNode.Write(ownerNode)
 			p.gc.dirtyQueue.Add(ownerNode)
@@ -378,9 +377,8 @@ func (p *Propagator) processEvent() {
 				},
 				Namespace: accessor.GetNamespace(),
 			},
-			dependentsLock: &sync.RWMutex{},
-			dependents:     make(map[*node]struct{}),
-			owners:         accessor.GetOwnerReferences(),
+			dependents: make(map[*node]struct{}),
+			owners:     accessor.GetOwnerReferences(),
 		}
 		p.insertNode(newNode)
 		// the underlying delta_fifo may combine a creation and deletion into one event
