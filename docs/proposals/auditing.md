@@ -60,7 +60,7 @@ while
 
 ## Constraints and Assumptions
 
-* it is not the goal to implement all output formats one can imagine. The  main goal is to be extensible with a clear golang interface. Implementations of e.g. CADF must be possible, but won't be discussed there.
+* it is not the goal to implement all output formats one can imagine. The  main goal is to be extensible with a clear golang interface. Implementations of e.g. CADF must be possible, but won't be discussed here.
 * dynamic loading of backends for new output formats are out of scope.
 
 ## Use Cases
@@ -89,14 +89,14 @@ while
 
 ### Out of scope use-cases
 
-1. As a cluster operator I must be able to get a trace of interactive commands executed in **kubectl exec**.
+1. As a cluster operator I must be able to get a trace of interactive commands executed in **kubectl exec**, **attach** or **run**.
 
 ## Community Work
 
-- Kubernetes basic audit log PR: https://github.com/kubernetes/kubernetes/pull/27087/ 
+- Kubernetes basic audit log PR: https://github.com/kubernetes/kubernetes/pull/27087/
 - OpenStack's implementation of the CADF standard: https://www.dmtf.org/sites/default/files/standards/documents/DSP2038_1.1.0.pdf
-- Cloud Auditing Data Federation standard: https://www.dmtf.org/standards/cadf 
-- Ceilometer audit blueprint: https://wiki.openstack.org/wiki/Ceilometer/blueprints/support-standard-audit-formats 
+- Cloud Auditing Data Federation standard: https://www.dmtf.org/standards/cadf
+- Ceilometer audit blueprint: https://wiki.openstack.org/wiki/Ceilometer/blueprints/support-standard-audit-formats
 - Talk from IBM: An Introduction to DMTF Cloud Auditing using
 the CADF Event Model and Taxonomies https://wiki.openstack.org/w/images/e/e1/Introduction_to_Cloud_Auditing_using_CADF_Event_Model_and_Taxonomy_2013-10-22.pdf
 
@@ -123,12 +123,13 @@ In the following the second approach is described without a proxy.
 ## Proposed Design
 
 The main concepts are those of
+
 - an audit *event*,
 - an audit *policy*,
-- an audit *policy action*
+- an audit *policy action*,
 - an audit *output backend*.
 
-An audit event holds all the data necessary for an *output backend* to produce a audit log entry. The *event* is independent of the *output backend*.
+An audit event holds all the data necessary for an *output backend* to produce an audit log entry. The *event* is independent of the *output backend*.
 
 The audit event struct is passed through the apiserver layers as an `*audit.Event` pointer inside the http context. It might be `nil` in case auditing is completely disabled.
 
@@ -144,11 +145,19 @@ func AuditEventFrom(ctx Context) (*audit.Event, bool)
 Depending on the audit policy, different layers of the apiserver (e.g. http handler, storage) will fill the `audit.Event` struct. Certain fields might stay empty or `nil` if the policy does not require that field. E.g. in the case only http headers are supposed to be audit logged, no `OldObject` or `NewObject` is to be retrieved on the storage layer.
 
 The audit policy is a partial mapping from
+
 - kind,
 - namespace,
 - method,
 - and user
-to a policy action. An policy action defines the level of audit logging to be performed. The audit level can be `HttpHeaders`, `RequestObject`, `StorageObject`. In addition the policy action can contain a number of output backend dependent key/values e.g. to define JSON object paths which should be logged or excluded from logging. For portable policy actions, a number of key/values are standardised and ought to be supported by output backends.
+
+to a policy action. An policy action defines the level of audit logging to be performed. The audit level can be
+
+- `HttpHeaders`,
+- `RequestObject`,
+- `StorageObject`.
+
+In addition the policy action can contain a number of output backend dependent key/values e.g. to define JSON object paths which should be logged or excluded from logging. For portable policy actions, a number of key/values are standardised and ought to be supported by output backends.
 
 When the http request is processed, the request handler will close the audit event by filling in the http response. Then it will pass the event to the configured policy backend.
 
