@@ -34,6 +34,14 @@
     "description": "get information of a group"
    },
    {
+    "path": "/apis/authorization.k8s.io/v1beta1",
+    "description": "API at /apis/authorization.k8s.io/v1beta1"
+   },
+   {
+    "path": "/apis/authorization.k8s.io",
+    "description": "get information of a group"
+   },
+   {
     "path": "/apis/autoscaling/v1",
     "description": "API at /apis/autoscaling/v1"
    },

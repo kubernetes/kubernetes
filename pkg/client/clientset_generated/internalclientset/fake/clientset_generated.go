@@ -22,6 +22,8 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned"
 	fakeunversionedauthentication "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authentication/unversioned/fake"
+	unversionedauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/unversioned"
+	fakeunversionedauthorization "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/authorization/unversioned/fake"
 	unversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned"
 	fakeunversionedautoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/autoscaling/unversioned/fake"
 	unversionedbatch "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/batch/unversioned"
@@ -79,9 +81,14 @@ func (c *Clientset) Core() unversionedcore.CoreInterface {
 	return &fakeunversionedcore.FakeCore{Fake: &c.Fake}
 }
 
-// Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
-	return &fakeunversionedextensions.FakeExtensions{Fake: &c.Fake}
+// Authentication retrieves the AuthenticationClient
+func (c *Clientset) Authentication() unversionedauthentication.AuthenticationInterface {
+	return &fakeunversionedauthentication.FakeAuthentication{Fake: &c.Fake}
+}
+
+// Authorization retrieves the AuthorizationClient
+func (c *Clientset) Authorization() unversionedauthorization.AuthorizationInterface {
+	return &fakeunversionedauthorization.FakeAuthorization{Fake: &c.Fake}
 }
 
 // Autoscaling retrieves the AutoscalingClient
@@ -89,22 +96,22 @@ func (c *Clientset) Autoscaling() unversionedautoscaling.AutoscalingInterface {
 	return &fakeunversionedautoscaling.FakeAutoscaling{Fake: &c.Fake}
 }
 
-// Authentication retrieves the AuthenticationClient
-func (c *Clientset) Authentication() unversionedauthentication.AuthenticationInterface {
-	return &fakeunversionedauthentication.FakeAuthentication{Fake: &c.Fake}
-}
-
 // Batch retrieves the BatchClient
 func (c *Clientset) Batch() unversionedbatch.BatchInterface {
 	return &fakeunversionedbatch.FakeBatch{Fake: &c.Fake}
 }
 
-// Rbac retrieves the RbacClient
-func (c *Clientset) Rbac() unversionedrbac.RbacInterface {
-	return &fakeunversionedrbac.FakeRbac{Fake: &c.Fake}
-}
-
 // Certificates retrieves the CertificatesClient
 func (c *Clientset) Certificates() unversionedcertificates.CertificatesInterface {
 	return &fakeunversionedcertificates.FakeCertificates{Fake: &c.Fake}
+}
+
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() unversionedextensions.ExtensionsInterface {
+	return &fakeunversionedextensions.FakeExtensions{Fake: &c.Fake}
+}
+
+// Rbac retrieves the RbacClient
+func (c *Clientset) Rbac() unversionedrbac.RbacInterface {
+	return &fakeunversionedrbac.FakeRbac{Fake: &c.Fake}
 }
