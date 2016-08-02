@@ -63,21 +63,27 @@ readonly gcs_acl="public-read"
 readonly results_url=${gcs_build_path//"gs:/"/"https://console.cloud.google.com/storage/browser"}
 readonly timestamp=$(date +%s)
 
-function upload_version() {
-  echo -n 'Run starting at '; date -d "@${timestamp}"
-
-  # Try to discover the kubernetes version.
-  local version=""
+#########################################################################
+# Try to discover the kubernetes version.
+# prints version
+function find_version() {
   if [[ -e "version" ]]; then
-    version=$(cat "version")
+    cat version
   elif [[ -e "hack/lib/version.sh" ]]; then
-    version=$(
-      export KUBE_ROOT="."
-      source "hack/lib/version.sh"
-      kube::version::get_version_vars
-      echo "${KUBE_GIT_VERSION-}"
+    (
+    export KUBE_ROOT="."
+    source "hack/lib/version.sh"
+    kube::version::get_version_vars
+    echo "${KUBE_GIT_VERSION-}"
     )
   fi
+}
+
+function upload_version() {
+  local -r version=$(find_version)
+  local upload_attempt
+
+  echo -n 'Run starting at '; date -d "@${timestamp}"
 
   if [[ -n "${version}" ]]; then
     echo "Found Kubernetes version: ${version}"
@@ -99,8 +105,52 @@ function upload_version() {
   done
 }
 
+#########################################################################
+# Maintain a single file storing the full build version, Jenkins' job number
+# build state.  Limit its size so it does not grow unbounded.
+# This is primarily used for and by the
+# github.com/kubernetes/release/find_green_build tool.
+# @param build_result - the state of the build
+#
+function update_job_result_cache() {
+  local -r build_result=$1
+  local -r version=$(find_version)
+  local -r job_results=${gcs_job_path}/jobResultsCache.json
+  local -r tmp_results="${WORKSPACE}/_tmp/jobResultsCache.tmp"
+  local -r cache_size=200
+  local upload_attempt
+
+  if [[ -n "${version}" ]]; then
+    echo "Found Kubernetes version: ${version}"
+  else
+    echo "Could not find Kubernetes version"
+  fi
+
+  mkdir -p ${tmp_results%/*}
+
+  for upload_attempt in $(seq 3); do
+    echo "Copying ${job_results} to ${tmp_results} (attempt ${upload_attempt})"
+    gsutil -q cp ${job_results} ${tmp_results} 2>&- || continue
+    break
+  done
+
+  echo "{\"version\": \"${version}\", \"buildnumber\": \"${BUILD_NUMBER}\"," \
+       "\"result\": \"${build_result}\"}" >> ${tmp_results}
+
+  for upload_attempt in $(seq 3); do
+    echo "Copying ${tmp_results} to ${job_results} (attempt ${upload_attempt})"
+    gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" \
+           <(tail -${cache_size} ${tmp_results}) ${job_results} || continue
+    break
+  done
+
+  rm -f ${tmp_results}
+}
+
 function upload_artifacts_and_build_result() {
   local -r build_result=$1
+  local upload_attempt
+
   echo -n 'Run finished at '; date -d "@${timestamp}"
 
   for upload_attempt in $(seq 3); do
@@ -150,6 +200,7 @@ if [[ -n "${JENKINS_BUILD_STARTED:-}" ]]; then
   upload_version
 elif [[ -n "${JENKINS_BUILD_FINISHED:-}" ]]; then
   upload_artifacts_and_build_result ${JENKINS_BUILD_FINISHED}
+  update_job_result_cache ${JENKINS_BUILD_FINISHED}
 else
   echo "Called without JENKINS_BUILD_STARTED or JENKINS_BUILD_FINISHED set."
   echo "Assuming a legacy invocation."
