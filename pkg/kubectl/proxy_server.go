@@ -63,7 +63,7 @@ type FilterServer struct {
 	delegate http.Handler
 }
 
-// Splits a comma separated list of regexps into a array of Regexp objects.
+// Splits a comma separated list of regexps into an array of Regexp objects.
 func MakeRegexpArray(str string) ([]*regexp.Regexp, error) {
 	parts := strings.Split(str, ",")
 	result := make([]*regexp.Regexp, len(parts))

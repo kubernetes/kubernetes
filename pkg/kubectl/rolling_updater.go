@@ -214,7 +214,7 @@ func (r *RollingUpdater) Update(config *RollingUpdaterConfig) error {
 	if desired > 0 && maxUnavailable == 0 && maxSurge == 0 {
 		return fmt.Errorf("one of maxSurge or maxUnavailable must be specified")
 	}
-	// The minumum pods which must remain available througout the update
+	// The minimum pods which must remain available throughout the update
 	// calculated for internal convenience.
 	minAvailable := int32(integer.IntMax(0, int(desired-maxUnavailable)))
 	// If the desired new scale is 0, then the max unavailable is necessarily
