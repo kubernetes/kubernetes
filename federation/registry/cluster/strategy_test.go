@@ -19,13 +19,14 @@ package cluster
 import (
 	"testing"
 
+	"reflect"
+
 	"k8s.io/kubernetes/federation/apis/federation"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"reflect"
 )
 
 func validNewCluster() *federation.Cluster {

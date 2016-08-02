@@ -30,6 +30,7 @@ import (
 	"strings"
 
 	"gopkg.in/gcfg.v1"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )

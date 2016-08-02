@@ -19,9 +19,10 @@ package service
 import (
 	"testing"
 
+	"strings"
+
 	"k8s.io/kubernetes/pkg/api"
 	netsets "k8s.io/kubernetes/pkg/util/net/sets"
-	"strings"
 )
 
 func TestGetLoadBalancerSourceRanges(t *testing.T) {
