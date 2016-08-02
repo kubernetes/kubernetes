@@ -976,7 +976,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, labelPodName, 1, 1, ns)
+		verifyResult(c, labelPodName, 1, 0, ns)
 	})
 
 	// test the pod affinity successful matching scenario with multiple Label Operators.
