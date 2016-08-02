@@ -40,8 +40,8 @@ type Fs struct {
 	Capacity   uint64
 	Free       uint64
 	Available  uint64
-	Inodes     uint64
-	InodesFree uint64
+	Inodes     *uint64
+	InodesFree *uint64
 	DiskStats  DiskStats
 }
 

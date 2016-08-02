@@ -118,15 +118,17 @@ func TestBuildSummary(t *testing.T) {
 		"/pod2-c0": summaryTestContainerInfo(seedPod2Container, pName2, namespace2, cName20),
 	}
 
+	freeRootfsInodes := rootfsInodesFree
 	rootfs := v2.FsInfo{
 		Capacity:   rootfsCapacity,
 		Available:  rootfsAvailable,
-		InodesFree: rootfsInodesFree,
+		InodesFree: &freeRootfsInodes,
 	}
+	freeImagefsInodes := imagefsInodesFree
 	imagefs := v2.FsInfo{
 		Capacity:   imagefsCapacity,
 		Available:  imagefsAvailable,
-		InodesFree: imagefsInodesFree,
+		InodesFree: &freeImagefsInodes,
 	}
 
 	// memory limit overrides for each container (used to test available bytes if a memory limit is known)
