@@ -125,7 +125,7 @@ func TestControllerExpectations(t *testing.T) {
 	// RC fires off adds and deletes at apiserver, then sets expectations
 	rcKey, err := KeyFunc(rc)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", rc, err)
+		t.Errorf("Couldn't get key for object %#v: %v", rc, err)
 	}
 	e.SetExpectations(rcKey, adds, dels)
 	var wg sync.WaitGroup
@@ -202,7 +202,7 @@ func TestUIDExpectations(t *testing.T) {
 		podList := newPodList(nil, 5, api.PodRunning, rc)
 		rcKey, err := KeyFunc(rc)
 		if err != nil {
-			t.Fatalf("Couldn't get key for object %+v: %v", rc, err)
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
 		}
 		rcKeys = append(rcKeys, rcKey)
 		rcPodNames := []string{}

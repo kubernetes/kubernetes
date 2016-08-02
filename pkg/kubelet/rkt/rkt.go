@@ -306,7 +306,7 @@ func (r *Runtime) RunCommand(config *Config, args ...string) ([]string, error) {
 	if config == nil {
 		config = r.config
 	}
-	glog.V(4).Infof("rkt: Run command: %q with config: %+v", args, config)
+	glog.V(4).Infof("rkt: Run command: %q with config: %#v", args, config)
 
 	var stdout, stderr bytes.Buffer
 

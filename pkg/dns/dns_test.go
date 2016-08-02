@@ -125,7 +125,7 @@ func assertARecordsMatchIPs(t *testing.T, records []dns.RR, ips ...string) {
 	gotEndpoints := sets.NewString()
 	for _, r := range records {
 		if a, ok := r.(*dns.A); !ok {
-			t.Errorf("Expected A record, got %+v", a)
+			t.Errorf("Expected A record, got %#v", a)
 		} else {
 			gotEndpoints.Insert(a.A.String())
 		}

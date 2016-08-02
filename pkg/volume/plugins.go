@@ -385,7 +385,7 @@ func (pm *VolumePluginMgr) FindPluginByName(name string) (VolumePlugin, error) {
 func (pm *VolumePluginMgr) FindPersistentPluginBySpec(spec *Spec) (PersistentVolumePlugin, error) {
 	volumePlugin, err := pm.FindPluginBySpec(spec)
 	if err != nil {
-		return nil, fmt.Errorf("Could not find volume plugin for spec: %+v", spec)
+		return nil, fmt.Errorf("Could not find volume plugin for spec: %#v", spec)
 	}
 	if persistentVolumePlugin, ok := volumePlugin.(PersistentVolumePlugin); ok {
 		return persistentVolumePlugin, nil

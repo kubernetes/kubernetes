@@ -272,7 +272,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 	}
 	podKey, err := keyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		glog.Errorf("Couldn't get key for object %#v: %v", obj, err)
 		return
 	}
 	glog.Infof("Pod %q was deleted but we don't have a record of its final state, so it will take up to %v before it will be removed from all endpoint records.", podKey, FullServiceResyncPeriod)
