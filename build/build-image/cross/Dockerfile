@@ -62,11 +62,11 @@ RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.
 # work around 64MB tmpfs size in Docker 1.6
 ENV TMPDIR /tmp.k8s
 
-# Get the code coverage tool and godep
+# Get the code coverage tool, godep, and go-bindata
 RUN mkdir $TMPDIR \
   && chmod a+rwx $TMPDIR \
   && chmod o+t $TMPDIR \
-  && go get golang.org/x/tools/cmd/cover github.com/tools/godep
+  && go get golang.org/x/tools/cmd/cover github.com/tools/godep github.com/jteeuwen/go-bindata/go-bindata
 
 # Download and symlink etcd. We need this for our integration tests.
 RUN export ETCD_VERSION=v2.2.1; \
