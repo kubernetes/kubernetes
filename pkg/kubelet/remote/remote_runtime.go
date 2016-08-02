@@ -20,6 +20,7 @@ import (
 	"io"
 	"time"
 
+	"fmt"
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
@@ -54,8 +55,7 @@ func (r *RemoteRuntimeService) Version(apiVersion string) (*runtimeApi.VersionRe
 
 	typedVersion, err := r.runtimeClient.Version(ctx, &runtimeApi.VersionRequest{
 		Version: &apiVersion,
-	},
-	)
+	})
 	if err != nil {
 		glog.Errorf("Version from runtime service failed: %v", err)
 		return nil, err
@@ -90,7 +90,7 @@ func (r *RemoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
 		PodSandboxId: &podSandBoxID,
 	})
 	if err != nil {
-		glog.Errorf("StopPodSandbox from runtime service failed: %v", err)
+		glog.Errorf("StopPodSandbox %q from runtime service failed: %v", podSandBoxID, err)
 		return err
 	}
 
@@ -107,7 +107,7 @@ func (r *RemoteRuntimeService) DeletePodSandbox(podSandBoxID string) error {
 		PodSandboxId: &podSandBoxID,
 	})
 	if err != nil {
-		glog.Errorf("DeletePodSandbox from runtime service failed: %v", err)
+		glog.Errorf("DeletePodSandbox %q from runtime service failed: %v", podSandBoxID, err)
 		return err
 	}
 
@@ -123,7 +123,7 @@ func (r *RemoteRuntimeService) PodSandboxStatus(podSandBoxID string) (*runtimeAp
 		PodSandboxId: &podSandBoxID,
 	})
 	if err != nil {
-		glog.Errorf("PodSandboxStatus from runtime service failed: %v", err)
+		glog.Errorf("PodSandboxStatus %q from runtime service failed: %v", podSandBoxID, err)
 		return nil, err
 	}
 
@@ -139,7 +139,7 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilte
 		Filter: filter,
 	})
 	if err != nil {
-		glog.Errorf("ListPodSandbox from runtime service failed: %v", err)
+		glog.Errorf("ListPodSandbox with filter %q from runtime service failed: %v", filter, err)
 		return nil, err
 	}
 
@@ -157,7 +157,7 @@ func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runt
 		SandboxConfig: sandboxConfig,
 	})
 	if err != nil {
-		glog.Errorf("CreateContainer from runtime service failed: %v", err)
+		glog.Errorf("CreateContainer in sandbox %q from runtime service failed: %v", podSandBoxID, err)
 		return "", err
 	}
 
@@ -173,7 +173,7 @@ func (r *RemoteRuntimeService) StartContainer(rawContainerID string) error {
 		ContainerId: &rawContainerID,
 	})
 	if err != nil {
-		glog.Errorf("StartContainer from runtime service failed: %v", err)
+		glog.Errorf("StartContainer %q from runtime service failed: %v", rawContainerID, err)
 		return err
 	}
 
@@ -190,7 +190,7 @@ func (r *RemoteRuntimeService) StopContainer(rawContainerID string, timeout int6
 		Timeout:     &timeout,
 	})
 	if err != nil {
-		glog.Errorf("StopContainer from runtime service failed: %v", err)
+		glog.Errorf("StopContainer %q from runtime service failed: %v", rawContainerID, err)
 		return err
 	}
 
@@ -207,7 +207,7 @@ func (r *RemoteRuntimeService) RemoveContainer(rawContainerID string) error {
 		ContainerId: &rawContainerID,
 	})
 	if err != nil {
-		glog.Errorf("RemoveContainer from runtime service failed: %v", err)
+		glog.Errorf("RemoveContainer %q from runtime service failed: %v", rawContainerID, err)
 		return err
 	}
 
@@ -223,7 +223,7 @@ func (r *RemoteRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter
 		Filter: filter,
 	})
 	if err != nil {
-		glog.Errorf("ListContainers from runtime service failed: %v", err)
+		glog.Errorf("ListContainers with filter %q from runtime service failed: %v", filter, err)
 		return nil, err
 	}
 
@@ -239,7 +239,7 @@ func (r *RemoteRuntimeService) ContainerStatus(rawContainerID string) (*runtimeA
 		ContainerId: &rawContainerID,
 	})
 	if err != nil {
-		glog.Errorf("ContainerStatus from runtime service failed: %v", err)
+		glog.Errorf("ContainerStatus %q from runtime service failed: %v", rawContainerID, err)
 		return nil, err
 	}
 
@@ -249,112 +249,5 @@ func (r *RemoteRuntimeService) ContainerStatus(rawContainerID string) (*runtimeA
 // Exec executes a command in the container.
 // TODO: support terminal resizing for exec, refer https://github.com/kubernetes/kubernetes/issues/29579.
 func (r *RemoteRuntimeService) Exec(rawContainerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
-	ctx, cancel := getContextWithTimeout(r.timeout)
-	defer cancel()
-
-	stream, err := r.runtimeClient.Exec(ctx)
-	if err != nil {
-		glog.Errorf("Get remote runtime client stream failed: %v", err)
-		return err
-	}
-
-	request := &runtimeApi.ExecRequest{
-		ContainerId: &rawContainerID,
-		Cmd:         cmd,
-		Tty:         &tty,
-	}
-	err = stream.Send(request)
-	if err != nil {
-		glog.Errorf("Send exec request to remote runtime failed: %v", err)
-		return err
-	}
-
-	errChanOut := make(chan error, 1)
-	errChanIn := make(chan error, 1)
-	exit := make(chan bool)
-
-	go func(stdout, stderr io.WriteCloser) {
-		defer close(errChanOut)
-		defer close(exit)
-
-		for {
-			resp, err := stream.Recv()
-			if err != nil && err != io.EOF {
-				errChanOut <- err
-				return
-			}
-
-			if resp != nil && len(resp.Stdout) > 0 && stdout != nil {
-				nw, err := stdout.Write(resp.Stdout)
-				if err != nil {
-					errChanOut <- err
-					return
-				}
-				if nw != len(resp.Stdout) {
-					errChanOut <- io.ErrShortWrite
-					return
-				}
-				if err == io.EOF {
-					break
-				}
-			}
-
-			if resp != nil && len(resp.Stderr) > 0 && stderr != nil {
-				nw, err := stderr.Write(resp.Stderr)
-				if err != nil {
-					errChanOut <- err
-					return
-				}
-				if nw != len(resp.Stderr) {
-					errChanOut <- io.ErrShortWrite
-					return
-				}
-				if err == io.EOF {
-					break
-				}
-			}
-		}
-	}(stdout, stderr)
-
-	if stdin != nil {
-		go func(stdin io.Reader) {
-			defer close(errChanIn)
-			buffer := make([]byte, 256)
-
-			for {
-				nr, err := stdin.Read(buffer)
-				if nr > 0 {
-					request.Stdin = buffer[:nr]
-					err := stream.Send(request)
-					if err != nil {
-						errChanIn <- err
-						return
-					}
-				}
-
-				if err == io.EOF {
-					break
-				}
-
-				if err != nil {
-					errChanIn <- err
-					return
-				}
-			}
-		}(stdin)
-	}
-
-	<-exit
-	select {
-	case err = <-errChanIn:
-		if err != nil {
-			glog.Errorf("Exec send stream error: %v", err)
-		}
-		return err
-	case err = <-errChanOut:
-		if err != nil {
-			glog.Errorf("Exec receive stream error: %v", err)
-		}
-		return err
-	}
+	return fmt.Errorf("Not implemented")
 }
