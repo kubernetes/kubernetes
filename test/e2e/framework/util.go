@@ -3200,9 +3200,10 @@ func waitForReplicaSetPodsGone(c *client.Client, rs *extensions.ReplicaSet) erro
 	})
 }
 
-// Waits for the deployment status to sync (i.e. max unavailable and max surge aren't violated anymore).
-// If expectComplete, wait until all its replicas become up-to-date.
-func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deployment, expectComplete bool) error {
+// Waits for the deployment status to become valid (i.e. max unavailable and max surge aren't violated anymore).
+// Note that the status should stay valid at all times unless shortly after a scaling event or the deployment is just created.
+// To verify that the deployment status is valid and wait for the rollout to finish, use WaitForDeploymentStatus instead.
+func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deployment) error {
 	var (
 		oldRSs, allOldRSs, allRSs []*extensions.ReplicaSet
 		newRS                     *extensions.ReplicaSet
@@ -3252,20 +3253,7 @@ func WaitForDeploymentStatusValid(c clientset.Interface, d *extensions.Deploymen
 			Logf(reason)
 			return false, nil
 		}
-
-		if !expectComplete {
-			return true, nil
-		}
-
-		// When the deployment status and its underlying resources reach the desired state, we're done
-		if deployment.Status.Replicas == deployment.Spec.Replicas &&
-			deployment.Status.UpdatedReplicas == deployment.Spec.Replicas &&
-			deploymentutil.GetReplicaCountForReplicaSets(oldRSs) == 0 &&
-			deploymentutil.GetReplicaCountForReplicaSets([]*extensions.ReplicaSet{newRS}) == deployment.Spec.Replicas {
-			return true, nil
-		}
-		reason = fmt.Sprintf("deployment %q is yet to complete: %#v", deployment.Name, deployment.Status)
-		return false, nil
+		return true, nil
 	})
 
 	if err == wait.ErrWaitTimeout {
