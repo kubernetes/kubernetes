@@ -59,7 +59,8 @@ const (
 
 	// How long to wait for a load balancer to be created/modified.
 	//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
-	loadBalancerCreateTimeout = 20 * time.Minute
+	loadBalancerCreateTimeoutDefault = 20 * time.Minute
+	loadBalancerCreateTimeoutLarge   = time.Hour
 )
 
 // This should match whatever the default/configured range is
@@ -414,6 +415,11 @@ var _ = framework.KubeDescribe("Services", func() {
 		if framework.ProviderIs("aws") {
 			loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
 		}
+		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
+		largeClusterMinNodesNumber := 100
+		if nodes := framework.GetReadySchedulableNodesOrDie(c); len(nodes.Items) > largeClusterMinNodesNumber {
+			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
+		}
 
 		// This test is more monolithic than we'd like because LB turnup can be
 		// very slow, so we lumped all the tests into one LB lifecycle.
@@ -516,7 +522,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
-		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name)
+		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name, loadBalancerCreateTimeout)
 		jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
@@ -547,7 +553,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		if loadBalancerSupportsUDP {
 			By("waiting for the UDP service to have a load balancer")
 			// 2nd one should be faster since they ran in parallel.
-			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
+			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name, loadBalancerCreateTimeout)
 			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
 			if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
 				framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
@@ -689,7 +695,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			s.Spec.Ports[0].NodePort = 0
 		})
 		// Wait for the load balancer to be destroyed asynchronously
-		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort)
+		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
 
 		By("changing UDP service back to type=ClusterIP")
@@ -699,7 +705,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		})
 		if loadBalancerSupportsUDP {
 			// Wait for the load balancer to be destroyed asynchronously
-			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort)
+			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 			jig.SanityCheckService(udpService, api.ServiceTypeClusterIP)
 		}
 
@@ -1682,9 +1688,9 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 	return service
 }
 
-func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string) *api.Service {
+func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *api.Service {
 	var service *api.Service
-	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", loadBalancerCreateTimeout, name)
+	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Services(namespace).Get(name)
 		if err != nil {
@@ -1696,13 +1702,13 @@ func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string) *api.
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediate(framework.Poll, loadBalancerCreateTimeout, pollFunc); err != nil {
+	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
 		framework.Failf("Timeout waiting for service %q to have a load balancer", name)
 	}
 	return service
 }
 
-func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int) *api.Service {
+func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int, timeout time.Duration) *api.Service {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
 		if err := framework.EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
@@ -1711,7 +1717,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 	}()
 
 	var service *api.Service
-	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", loadBalancerCreateTimeout, name)
+	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Services(namespace).Get(name)
 		if err != nil {
@@ -1723,7 +1729,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediate(framework.Poll, loadBalancerCreateTimeout, pollFunc); err != nil {
+	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
 		framework.Failf("Timeout waiting for service %q to have no load balancer", name)
 	}
 	return service
