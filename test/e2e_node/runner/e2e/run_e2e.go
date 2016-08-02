@@ -31,14 +31,14 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/test/e2e_node"
-
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/compute/v1"
+
+	"k8s.io/kubernetes/test/e2e_node/runner/e2e/remote"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
@@ -106,7 +106,7 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		e2e_node.CreateTestArchive()
+		remote.CreateTestArchive()
 		return
 	}
 
@@ -235,7 +235,7 @@ func main() {
 }
 
 func (a *Archive) getArchive() (string, error) {
-	a.Do(func() { a.path, a.err = e2e_node.CreateTestArchive() })
+	a.Do(func() { a.path, a.err = remote.CreateTestArchive() })
 	return a.path, a.err
 }
 
@@ -286,7 +286,7 @@ func testHost(host string, deleteFiles bool, junitFileNum int, setupNode bool) *
 	}
 	externalIp := getExternalIp(instance)
 	if len(externalIp) > 0 {
-		e2e_node.AddHostnameIp(host, externalIp)
+		remote.AddHostnameIp(host, externalIp)
 	}
 
 	path, err := arc.getArchive()
@@ -297,7 +297,7 @@ func testHost(host string, deleteFiles bool, junitFileNum int, setupNode bool) *
 		}
 	}
 
-	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFileNum, setupNode, *testArgs)
+	output, exitOk, err := remote.RunRemote(path, host, deleteFiles, junitFileNum, setupNode, *testArgs)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -376,10 +376,10 @@ func createInstance(image *internalGCEImage) (string, error) {
 		}
 		externalIp := getExternalIp(instance)
 		if len(externalIp) > 0 {
-			e2e_node.AddHostnameIp(name, externalIp)
+			remote.AddHostnameIp(name, externalIp)
 		}
 		var output string
-		output, err = e2e_node.RunSshCommand("ssh", e2e_node.GetHostnameOrIp(name), "--", "sudo", "docker", "version")
+		output, err = remote.RunSshCommand("ssh", remote.GetHostnameOrIp(name), "--", "sudo", "docker", "version")
 		if err != nil {
 			err = fmt.Errorf("instance %s not running docker daemon - Command failed: %s", name, output)
 			continue

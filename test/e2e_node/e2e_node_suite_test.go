@@ -99,10 +99,6 @@ func TestE2eNode(t *testing.T) {
 
 // Setup the kubelet on the node
 var _ = SynchronizedBeforeSuite(func() []byte {
-	if *buildServices {
-		buildGo()
-	}
-
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
 	if *prePullImages {
@@ -196,5 +192,6 @@ func startNamespaceController() {
 	resources, err := client.Discovery().ServerPreferredNamespacedResources()
 	Expect(err).NotTo(HaveOccurred())
 	nc := namespacecontroller.NewNamespaceController(client, clientPool, resources, ncResyncPeriod, api.FinalizerKubernetes)
+	// TODO(random-liu): Stop namespace controller in after suite.
 	go nc.Run(ncConcurrency, wait.NeverStop)
 }

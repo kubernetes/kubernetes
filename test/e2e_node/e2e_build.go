@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,6 +29,7 @@ import (
 	"github.com/golang/glog"
 )
 
+// TODO(random-liu): Move this to build directory.
 var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet and kube-apiserver binaries.")
 
 var buildTargets = []string{
@@ -37,7 +39,9 @@ var buildTargets = []string{
 	"vendor/github.com/onsi/ginkgo/ginkgo",
 }
 
-func buildGo() {
+const outputDir = "_output/local/go/bin"
+
+func BuildGo() {
 	glog.Infof("Building k8s binaries...")
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
@@ -51,6 +55,55 @@ func buildGo() {
 	if err != nil {
 		glog.Fatalf("Failed to build go packages %v\n", err)
 	}
+}
+
+const (
+	buildImageCommon = "build/common.sh"
+	buildImageFunc   = "kube::release::create_docker_images_for_server"
+	imageRegistery   = "gcr.io/google_containers"
+)
+
+// Currently we only build container image for apiserver.
+var buildImageTargets = []string{
+	"kube-apiserver",
+}
+
+type ImageInfo struct {
+	Tag string
+	Tar string
+}
+
+// BuildContainerImage builds all target images, saves to tarballs,
+// returns the tags and tarball paths of the images.
+func BuildContainerImage() map[string]ImageInfo {
+	glog.Info("Building k8s container images...")
+	k8sRoot, err := getK8sRootDir()
+	if err != nil {
+		glog.Fatalf("Failed to locate kubernetes root directory %v.", err)
+	}
+	buildScript := fmt.Sprintf("source %s;  %s %s %s %s",
+		filepath.Join(k8sRoot, buildImageCommon), buildImageFunc, filepath.Join(k8sRoot, outputDir),
+		runtime.GOARCH, strings.Join(buildImageTargets, " "))
+	cmd := exec.Command("bash", "-c", buildScript)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err = cmd.Run()
+	if err != nil {
+		glog.Fatalf("Failed to build container images %v\n", err)
+	}
+	tags := map[string]ImageInfo{}
+	for _, target := range buildImageTargets {
+		tagFile := filepath.Join(k8sRoot, outputDir, target+".docker_tag")
+		tag, err := ioutil.ReadFile(tagFile)
+		if err != nil {
+			glog.Fatalf("Failed to read tag file %q: %v", tagFile, tag)
+		}
+		tags[target] = ImageInfo{
+			Tag: fmt.Sprintf("%s/%s:%s", imageRegistery, target, strings.TrimSpace(string(tag))),
+			Tar: filepath.Join(k8sRoot, outputDir, target+".tar"),
+		}
+	}
+	return tags
 }
 
 func getK8sBin(bin string) (string, error) {
@@ -74,7 +127,7 @@ func getK8sBin(bin string) (string, error) {
 		return filepath.Join(path, bin), nil
 	}
 
-	buildOutputDir, err := getK8sBuildOutputDir()
+	buildOutputDir, err := GetK8sBuildOutputDir()
 	if err != nil {
 		return "", err
 	}
@@ -101,19 +154,19 @@ func getK8sRootDir() (string, error) {
 	return "", fmt.Errorf("Could not find kubernetes source root directory.")
 }
 
-func getK8sBuildOutputDir() (string, error) {
+func GetK8sBuildOutputDir() (string, error) {
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
 		return "", err
 	}
-	buildOutputDir := filepath.Join(k8sRoot, "_output/local/go/bin")
+	buildOutputDir := filepath.Join(k8sRoot, outputDir)
 	if _, err := os.Stat(buildOutputDir); err != nil {
 		return "", err
 	}
 	return buildOutputDir, nil
 }
 
-func getK8sNodeTestDir() (string, error) {
+func GetK8sNodeTestDir() (string, error) {
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
 		return "", err
@@ -137,6 +190,14 @@ func getApiServerBin() string {
 	bin, err := getK8sBin("kube-apiserver")
 	if err != nil {
 		glog.Fatalf("Could not locate kube-apiserver binary %v.", err)
+	}
+	return bin
+}
+
+func GetGinkgoBin() string {
+	bin, err := getK8sBin("ginkgo")
+	if err != nil {
+		glog.Fatalf("Could not locate ginkgo binary %v.", err)
 	}
 	return bin
 }

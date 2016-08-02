@@ -824,6 +824,8 @@ function kube::release::sha1() {
 # Args:
 #  $1 - binary_dir, the directory to save the tared images to.
 #  $2 - arch, architecture for which we are building docker images.
+#  $3 - bulid_targets, the binaries we are building docker image for,
+#  separated by comma.
 function kube::release::create_docker_images_for_server() {
   # Create a sub-shell so that we don't pollute the outer environment
   (
@@ -831,6 +833,15 @@ function kube::release::create_docker_images_for_server() {
     local arch="$2"
     local binary_name
     local binaries=($(kube::build::get_docker_wrapped_binaries ${arch}))
+
+    # If $3 is defined, get all build targets into build_targets
+    if [[ ! -z ${3+x} ]]; then
+      local build_targets=
+      local oldifs=$IFS
+      IFS=","
+      read -r -a build_targets <<< $3
+      IFS=$oldifs
+    fi
 
     for wrappable in "${binaries[@]}"; do
 
@@ -841,6 +852,12 @@ function kube::release::create_docker_images_for_server() {
 
       local binary_name="$1"
       local base_image="$2"
+
+      # If build_targets is defined, check whether the current binary is in
+      # build_targets. Only continue building if it is in build_targets.
+      if [[ ! -z ${build_targets+x} ]] && [[ ! ${build_targets[@]} =~ $binary_name ]];then
+        continue
+      fi
 
       kube::log::status "Starting Docker build for image: ${binary_name}"
 

@@ -15,7 +15,9 @@ api-server-port
 api-servers
 api-token
 api-version
+apiserver-binary
 apiserver-count
+apiserver-image
 auth-path
 authentication-token-webhook-cache-ttl
 authentication-token-webhook-config-file
@@ -35,8 +37,9 @@ bind-address
 bind-pods-burst
 bind-pods-qps
 bounding-dirs
+build-dependencies
+build-images
 build-only
-build-services
 build-tag
 cadvisor-port
 cert-dir
@@ -132,9 +135,11 @@ enable-hostpath-provisioner
 enable-server
 enable-swagger-ui
 enable-garbage-collector
+etcd-binary
 etcd-cafile
 etcd-certfile
 etcd-config
+etcd-image
 etcd-keyfile
 etcd-mutation-timeout
 etcd-prefix
@@ -470,6 +475,7 @@ system-reserved
 target-port
 tcp-services
 terminated-pod-gc-threshold
+test-flags
 test-timeout
 tls-cert-file
 tls-private-key-file
