@@ -36,6 +36,8 @@ We also believe we should start a side-by-side storage implementation to reach t
 
 ```go
 
+// Storage stores and persists objects.
+// Storage provides read-write access to the objects based on string keys.
 type Storage interface {
 	// Wait waits until the storage has seen any version >= given version.
 	Wait(ctx context.Context, version uint64)
@@ -49,12 +51,13 @@ type Storage interface {
 	Delete(ctx context.Context, key string, conditions *Conditions) (cur runtime.Object, err error)
 
 	// Get gets the most recent version of a key.
-	// A key that was modified by this interface will be reflected on read after write succeeded.
 	// If no object exists on the key, it will return not found error.
-	Get(ctx context.Context, key string) (cur runtime.Object, err error)
+	// If version > 0, it will get the current state of the key at the time the given version is committed.
+	Get(ctx context.Context, key string, version uint64) (cur runtime.Object, err error)
 
 	// List lists all objects that has given prefix and satisfies selectors.
-	List(ctx context.Context, prefix string, ss ...Selector) (objects []runtime.Object, globalRev uint64, err error)
+	// If version > 0, same as Get().
+	List(ctx context.Context, prefix string, version uint64, ss ...Selector) (objects []runtime.Object, globalRev uint64, err error)
 
 	// WatchPrefix watches a prefix after given version. If version is 0, we will watch from current state.
 	// It returns notifications of any keys that has given prefix.
@@ -64,25 +67,24 @@ type Storage interface {
 	// immediately before it's closed.
 	WatchPrefix(ctx context.Context, prefix string, version uint64, ss ...Selector) (WatchChan, error)
 
-	// AddIndex adds a new object index.
-	// See docs on FieldValueGetFunc for more details.
+	// AddIndex adds a new index.
+	// An index indicates a field(s) of a type of an object that would be queried frequently and
+	// thus require better efficiency and performance.
+	// If an index exists for a field, complexity of a query on it should be no more than O(logN)
+	// where N is the total number of objects.
+	// See FieldValueGetFunc for more details on field value retrieving.
 	AddIndex(indexName, field string, g FieldValueGetFunc) error
-	// DeleteIndex deletes an object index.
+	// DeleteIndex deletes an index.
 	DeleteIndex(indexName string)
-
-	// AddWatcherIndex adds a new watcher index.
-	// See docs on FieldValueGetFunc for more details.
-	AddWatcherIndex(indexName, field string, g FieldValueGetFunc) error
-	// DeleteWatcherIndex deletes a watcher index.
-	DeleteWatcherIndex(indexName string)
 }
 
 
 // Conditions is used in do atomic conditional operations.
-// PrevVersion is used to compare with existing object’s version.
-// Compare would only succeed if versions were matched.
-// Note that PrevVersion=0 means no previous object existed.
+// If compare failed, corresponding method should return storage version conflict error.
 type Conditions struct {
+	// PrevVersion is used to compare with existing object’s version.
+	// Compare would only succeed if versions were matched.
+	// Note that PrevVersion=0 means no previous object existed.
 	PrevVersion unit64
 }
 
