@@ -46,7 +46,7 @@ processes.
 In an effort to
    * reduce load on core developers
    * maintain e2e stability
-   * load test githubs label feature
+   * load test github's label feature
 
 We have added an automated [submit-queue]
 (https://github.com/kubernetes/contrib/blob/master/mungegithub/mungers/submit-queue.go)
@@ -99,7 +99,7 @@ green when this PR finishes retesting.
 
 ## Github Munger
 
-We run a [github "munger"](https://github.com/kubernetes/contrib/tree/master/mungegithub).
+We run [github "mungers"](https://github.com/kubernetes/contrib/tree/master/mungegithub).
 
 This runs repeatedly over github pulls and issues and runs modular "mungers"
 similar to "mungedocs." The mungers include the 'submit-queue' referenced above along
