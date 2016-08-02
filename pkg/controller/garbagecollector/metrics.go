@@ -17,9 +17,11 @@ limitations under the License.
 package garbagecollector
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -30,6 +32,7 @@ const (
 	EventProcessingLatencyKey  = "event_processing_latency_microseconds"
 	DirtyProcessingLatencyKey  = "dirty_processing_latency_microseconds"
 	OrphanProcessingLatencyKey = "orphan_processing_latency_microseconds"
+	DeletionToWatchLatencyKey  = "deletion_to_watch_latency_microseconds"
 )
 
 var (
@@ -54,6 +57,13 @@ var (
 			Help:      "Time in microseconds of an item spend in the orphanQueue",
 		},
 	)
+	DeletionToWatchLatency = prometheus.NewSummary(
+		prometheus.SummaryOpts{
+			Subsystem: GarbageCollectSubsystem,
+			Name:      DeletionToWatchLatencyKey,
+			Help:      "Time in microseconds between GC deletes an item and GC observes the deletion via reflector",
+		},
+	)
 )
 
 var registerMetrics sync.Once
@@ -65,9 +75,47 @@ func Register() {
 		prometheus.MustRegister(EventProcessingLatency)
 		prometheus.MustRegister(DirtyProcessingLatency)
 		prometheus.MustRegister(OrphanProcessingLatency)
+		prometheus.MustRegister(DeletionToWatchLatency)
 	})
 }
 
 func sinceInMicroseconds(clock clock.Clock, start time.Time) float64 {
 	return float64(clock.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
+}
+
+func NewDeletionToWatchTracker(limit int) *uidToDeletionTime {
+	return &uidToDeletionTime{
+		items: make(map[types.UID]time.Time),
+		lock:  sync.Mutex{},
+		limit: limit,
+	}
+}
+
+type uidToDeletionTime struct {
+	items map[types.UID]time.Time
+	lock  sync.Mutex
+	limit int
+}
+
+// DeletionSent should be called when the deletion request is sent.
+func (u *uidToDeletionTime) DeletionSent(uid types.UID, start time.Time) error {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+	if len(u.items) >= u.limit {
+		return fmt.Errorf("limit %d is reached", u.limit)
+	}
+	u.items[uid] = start
+	return nil
+}
+
+// DeletionObserved should be called when the deletion is observed through the reflector.
+func (u *uidToDeletionTime) DeletionObserved(uid types.UID, end time.Time) (float64, error) {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+	start, ok := u.items[uid]
+	if !ok {
+		return 0, fmt.Errorf("cannot find uid %s", uid)
+	}
+	delete(u.items, uid)
+	return float64(end.Sub(start).Nanoseconds() / time.Microsecond.Nanoseconds()), nil
 }
