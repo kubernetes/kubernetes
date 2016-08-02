@@ -46,7 +46,7 @@ func NewRemoteImageService(addr string, connectionTimout time.Duration) (interna
 	}, nil
 }
 
-// ListImages lists pulled images.
+// ListImages lists available images.
 func (r *RemoteImageService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeApi.Image, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
@@ -55,7 +55,7 @@ func (r *RemoteImageService) ListImages(filter *runtimeApi.ImageFilter) ([]*runt
 		Filter: filter,
 	})
 	if err != nil {
-		glog.Errorf("ListImages from image service failed: %v", err)
+		glog.Errorf("ListImages with filter %q from image service failed: %v", filter, err)
 		return nil, err
 	}
 
@@ -71,7 +71,7 @@ func (r *RemoteImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeA
 		Image: image,
 	})
 	if err != nil {
-		glog.Errorf("ImageStatus from image service failed: %v", err)
+		glog.Errorf("ImageStatus %q from image service failed: %v", image.GetImage(), err)
 		return nil, err
 	}
 
@@ -88,7 +88,7 @@ func (r *RemoteImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtim
 		Auth:  auth,
 	})
 	if err != nil {
-		glog.Errorf("PullImage from image service failed: %v", err)
+		glog.Errorf("PullImage %q from image service failed: %v", image.GetImage(), err)
 		return err
 	}
 
@@ -104,7 +104,7 @@ func (r *RemoteImageService) RemoveImage(image *runtimeApi.ImageSpec) error {
 		Image: image,
 	})
 	if err != nil {
-		glog.Errorf("RemoveImage from image service failed: %v", err)
+		glog.Errorf("RemoveImage %q from image service failed: %v", image.GetImage(), err)
 		return err
 	}
 
