@@ -19,10 +19,11 @@ package apiserver
 import (
 	"net/http"
 
+	"time"
+
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"time"
 )
 
 const (

@@ -19,9 +19,10 @@ package petset
 import (
 	"fmt"
 
+	"testing"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"testing"
 )
 
 func TestPetQueueCreates(t *testing.T) {
