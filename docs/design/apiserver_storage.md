@@ -37,27 +37,28 @@ We also believe we should start a side-by-side storage implementation to reach t
 ```go
 
 // Storage stores and persists objects.
-// Storage provides read-write access to the objects based on string keys.
+// Storage provides read-write access to the objects based on string key.
+// key/prefix consists of multiple paths and after being joined by "/" become a unique path.
 type Storage interface {
 	// Wait waits until the storage has seen any version >= given version.
 	Wait(ctx context.Context, version uint64)
 
 	// Put puts an object with a key based on the given conditions.
 	// See docs on Conditions for more details.
-	Put(ctx context.Context, key string, obj runtime.Object, conditions *Conditions) (cur runtime.Object, err error)
+	Put(ctx context.Context, key []string, obj runtime.Object, conditions *Conditions) (cur runtime.Object, err error)
 
 	// Delete a key and its object based on the given conditions.
 	// See docs on Conditions for more details.
-	Delete(ctx context.Context, key string, conditions *Conditions) (old runtime.Object, err error)
+	Delete(ctx context.Context, key []string, conditions *Conditions) (old runtime.Object, err error)
 
 	// Get gets the most recent version of a key.
 	// If no object exists on the key, it will return not found error.
 	// If version > 0, it will get the current state of the key at the time the given version is committed.
-	Get(ctx context.Context, key string, version uint64) (cur runtime.Object, err error)
+	Get(ctx context.Context, key []string, version uint64) (cur runtime.Object, err error)
 
 	// List lists all objects that has given prefix and satisfies selectors.
 	// If version > 0, same as Get().
-	List(ctx context.Context, prefix string, version uint64, ss ...Selector) (objects []runtime.Object, globalRev uint64, err error)
+	List(ctx context.Context, prefix []string, version uint64, ss ...Selector) (objects []runtime.Object, globalRev uint64, err error)
 
 	// WatchPrefix watches a prefix after given version. If version is 0, we will watch from current state.
 	// It returns notifications of any keys that has given prefix.
@@ -65,7 +66,7 @@ type Storage interface {
 	// If there is any problem establishing the watch channel, it will return error.
 	// After channel is established, any error that happened will be returned from WatchChan
 	// immediately before it's closed.
-	WatchPrefix(ctx context.Context, prefix string, version uint64, ss ...Selector) (WatchChan, error)
+	WatchPrefix(ctx context.Context, prefix []string, version uint64, ss ...Selector) (WatchChan, error)
 
 	// AddIndex adds a new index.
 	// An index indicates a field(s) of a type of an object that would be queried or watched frequently and
