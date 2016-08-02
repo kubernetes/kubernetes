@@ -18,30 +18,104 @@ package testing
 
 import (
 	"fmt"
+	"sync"
 
-	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 )
 
-type fakeImageService struct {
+var (
+	fakeImageSize uint64 = 1
+)
+
+type FakeImageService struct {
+	sync.Mutex
+
+	Called []string
+	Images map[string]*runtimeApi.Image
 }
 
-func NewFakeImageService() internalApi.ImageManagerService {
-	return &fakeImageService{}
+func (r *FakeImageService) SetFakeImages(images []string) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Images = make(map[string]*runtimeApi.Image)
+	for _, image := range images {
+		r.Images[image] = makeFakeImage(image)
+	}
 }
 
-func (r *fakeImageService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeApi.Image, error) {
-	return nil, fmt.Errorf("not implemented")
+func NewFakeImageService() *FakeImageService {
+	return &FakeImageService{
+		Called: make([]string, 0),
+		Images: make(map[string]*runtimeApi.Image),
+	}
 }
 
-func (r *fakeImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.Image, error) {
-	return nil, fmt.Errorf("not implemented")
+func makeFakeImage(image string) *runtimeApi.Image {
+	return &runtimeApi.Image{
+		Id:       &image,
+		Size_:    &fakeImageSize,
+		RepoTags: []string{image},
+	}
 }
 
-func (r *fakeImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
-	return fmt.Errorf("not implemented")
+func (r *FakeImageService) ListImages(filter *runtimeApi.ImageFilter) ([]*runtimeApi.Image, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ListImages")
+
+	images := make([]*runtimeApi.Image, 0)
+	for _, img := range r.Images {
+		if filter != nil && filter.Image != nil {
+			if !sliceutils.StringInSlice(filter.Image.GetImage(), img.RepoTags) {
+				continue
+			}
+		}
+
+		images = append(images, img)
+	}
+	return images, nil
 }
 
-func (r *fakeImageService) RemoveImage(image *runtimeApi.ImageSpec) error {
-	return fmt.Errorf("not implemented")
+func (r *FakeImageService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.Image, error) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "ImageStatus")
+
+	if img, ok := r.Images[image.GetImage()]; ok {
+		return img, nil
+	}
+
+	return nil, fmt.Errorf("image %q not found", image.GetImage())
+}
+
+func (r *FakeImageService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "PullImage")
+
+	// ImageID should be randomized for real container runtime, but here just use
+	// image's name for easily making fake images.
+	imageID := image.GetImage()
+	if _, ok := r.Images[imageID]; !ok {
+		r.Images[imageID] = makeFakeImage(image.GetImage())
+	}
+
+	return nil
+}
+
+func (r *FakeImageService) RemoveImage(image *runtimeApi.ImageSpec) error {
+	r.Lock()
+	defer r.Unlock()
+
+	r.Called = append(r.Called, "RemoveImage")
+
+	// Remove the image
+	delete(r.Images, image.GetImage())
+
+	return nil
 }
