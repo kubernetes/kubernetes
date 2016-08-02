@@ -601,12 +601,12 @@ func CountAvailablePodsForReplicaSets(podList *api.PodList, rss []*extensions.Re
 }
 
 // GetAvailablePodsForDeployment returns the number of available pods (listed from clientset) corresponding to the given deployment.
-func GetAvailablePodsForDeployment(c clientset.Interface, deployment *extensions.Deployment, minReadySeconds int32) (int32, error) {
+func GetAvailablePodsForDeployment(c clientset.Interface, deployment *extensions.Deployment) (int32, error) {
 	podList, err := listPods(deployment, c)
 	if err != nil {
 		return 0, err
 	}
-	return countAvailablePods(podList.Items, minReadySeconds), nil
+	return countAvailablePods(podList.Items, deployment.Spec.MinReadySeconds), nil
 }
 
 func countAvailablePods(pods []api.Pod, minReadySeconds int32) int32 {
