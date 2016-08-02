@@ -153,6 +153,9 @@ const (
 	// How long a pod is allowed to become "running" and "ready" after a node
 	// restart before test is considered failed.
 	RestartPodReadyAgainTimeout = 5 * time.Minute
+
+	// Number of times we want to retry Updates in case of conflict
+	UpdateRetries = 5
 )
 
 var (
@@ -2826,7 +2829,20 @@ func WaitForAllNodesSchedulable(c *client.Client) error {
 
 func AddOrUpdateLabelOnNode(c *client.Client, nodeName string, labelKey string, labelValue string) {
 	patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, labelKey, labelValue)
-	err := c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
+	var err error
+	for attempt := 0; attempt < UpdateRetries; attempt++ {
+		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
+		if err != nil {
+			if !apierrs.IsConflict(err) {
+				ExpectNoError(err)
+			} else {
+				Logf("Conflict when trying to add a label %v:%v to %v", labelKey, labelValue, nodeName)
+			}
+		} else {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
 	ExpectNoError(err)
 }
 
@@ -2841,13 +2857,28 @@ func ExpectNodeHasLabel(c *client.Client, nodeName string, labelKey string, labe
 // won't fail if target label doesn't exist or has been removed.
 func RemoveLabelOffNode(c *client.Client, nodeName string, labelKey string) {
 	By("removing the label " + labelKey + " off the node " + nodeName)
-	node, err := c.Nodes().Get(nodeName)
-	ExpectNoError(err)
-	if node.Labels == nil || len(node.Labels[labelKey]) == 0 {
-		return
+	var nodeUpdated *api.Node
+	var node *api.Node
+	var err error
+	for attempt := 0; attempt < UpdateRetries; attempt++ {
+		node, err = c.Nodes().Get(nodeName)
+		ExpectNoError(err)
+		if node.Labels == nil || len(node.Labels[labelKey]) == 0 {
+			return
+		}
+		delete(node.Labels, labelKey)
+		nodeUpdated, err = c.Nodes().Update(node)
+		if err != nil {
+			if !apierrs.IsConflict(err) {
+				ExpectNoError(err)
+			} else {
+				Logf("Conflict when trying to remove a label %v from %v", labelKey, nodeName)
+			}
+		} else {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
-	delete(node.Labels, labelKey)
-	nodeUpdated, err := c.Nodes().Update(node)
 	ExpectNoError(err)
 
 	By("verifying the node doesn't have the label " + labelKey)
