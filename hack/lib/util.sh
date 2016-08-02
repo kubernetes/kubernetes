@@ -197,8 +197,13 @@ kube::util::gen-docs() {
   "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
   "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
   "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
+
+  # We don't really need federation-apiserver and federation-controller-manager
+  # binaries to generate the docs. We just pass their names to decide which docs
+  # to generate. The actual binary for running federation is hyperkube.
   "${genfeddocs}" "${dest}/docs/admin/" "federation-apiserver"
   "${genfeddocs}" "${dest}/docs/admin/" "federation-controller-manager"
+
   mkdir -p "${dest}/docs/man/man1/"
   "${genman}" "${dest}/docs/man/man1/"
   mkdir -p "${dest}/docs/yaml/kubectl/"
