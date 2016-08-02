@@ -30,7 +30,8 @@ OWNERS_PATH = os.path.abspath(
     os.path.join(BASE_DIR, '..', 'test', 'test_owners.csv'))
 GCS_URL_BASE = 'https://storage.googleapis.com/kubernetes-test-history/'
 SKIP_MAINTAINERS = {
-    'a-robinson', 'aronchick', 'bgrant0607-nocc', 'goltermann', 'sarahnovotny'}
+    'a-robinson', 'aronchick', 'bgrant0607-nocc', 'david-mcmahon',
+    'goltermann', 'sarahnovotny'}
 
 def get_test_history():
     url = time.strftime(GCS_URL_BASE + 'logs/%Y-%m-%d.json')
