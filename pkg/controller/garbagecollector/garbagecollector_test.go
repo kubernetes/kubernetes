@@ -301,7 +301,7 @@ func TestDependentsRace(t *testing.T) {
 	}
 
 	const updates = 100
-	owner := &node{dependentsLock: &sync.RWMutex{}, dependents: make(map[*node]struct{})}
+	owner := &node{dependents: make(map[*node]struct{})}
 	ownerUID := types.UID("owner")
 	gc.propagator.uidToNode.Write(owner)
 	go func() {
