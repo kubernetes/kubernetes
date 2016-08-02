@@ -264,7 +264,7 @@ $ kube-apiserver --audit-output file:path=/var/log/apiserver-audit.log,rotate=1d
 ### Audit Policy
 
 - never log `*.Status`
-- never log `Secret.Spec`
+- never log `Secret.Data`
 - never log `Endpoint`s
 - never log if user is "kubelet" or "master"
 - only log headers for WATCH, GET
