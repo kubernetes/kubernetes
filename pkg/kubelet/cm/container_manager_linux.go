@@ -188,12 +188,13 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 // Create a cgroup container manager.
 func createManager(containerName string) *fs.Manager {
+	allowAllDevices := true
 	return &fs.Manager{
 		Cgroups: &configs.Cgroup{
 			Parent: "/",
 			Name:   containerName,
 			Resources: &configs.Resources{
-				AllowAllDevices: true,
+				AllowAllDevices: &allowAllDevices,
 			},
 		},
 	}
@@ -319,7 +320,7 @@ func (cm *containerManagerImpl) setupNode() error {
 			}
 
 			glog.V(2).Infof("Configure resource-only container %s with memory limit: %d", cm.RuntimeCgroupsName, memoryLimit)
-
+			allowAllDevices := true
 			dockerContainer := &fs.Manager{
 				Cgroups: &configs.Cgroup{
 					Parent: "/",
@@ -327,7 +328,7 @@ func (cm *containerManagerImpl) setupNode() error {
 					Resources: &configs.Resources{
 						Memory:          memoryLimit,
 						MemorySwap:      -1,
-						AllowAllDevices: true,
+						AllowAllDevices: &allowAllDevices,
 					},
 				},
 			}
@@ -370,12 +371,13 @@ func (cm *containerManagerImpl) setupNode() error {
 
 	if cm.KubeletCgroupsName != "" {
 		cont := newSystemCgroups(cm.KubeletCgroupsName)
+		allowAllDevices := true
 		manager := fs.Manager{
 			Cgroups: &configs.Cgroup{
 				Parent: "/",
 				Name:   cm.KubeletCgroupsName,
 				Resources: &configs.Resources{
-					AllowAllDevices: true,
+					AllowAllDevices: &allowAllDevices,
 				},
 			},
 		}
