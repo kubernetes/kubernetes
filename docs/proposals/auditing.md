@@ -175,7 +175,7 @@ type LogLevel int
 type Event struct {
   Level LogLevel
 
-  // http header level (RequestLogLevel and higher)
+  // http header level (HeaderLogLevel and higher)
   ID string
   Timestamp time.Timestamp
   IP string
