@@ -276,7 +276,7 @@ type Connecter interface {
 // instead of decoded directly.
 type ResourceStreamer interface {
 	// InputStream should return an io.ReadCloser if the provided object supports streaming. The desired
-	// api version and a accept header (may be empty) are passed to the call. If no error occurs,
+	// api version and an accept header (may be empty) are passed to the call. If no error occurs,
 	// the caller may return a flag indicating whether the result should be flushed as writes occur
 	// and a content type string that indicates the type of the stream.
 	// If a null stream is returned, a StatusNoContent response wil be generated.

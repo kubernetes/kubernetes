@@ -61,7 +61,7 @@ func InterpretCreateError(err error, qualifiedResource unversioned.GroupResource
 	}
 }
 
-// InterpretUpdateError converts a generic error on a update
+// InterpretUpdateError converts a generic error on an update
 // operation into the appropriate API error.
 func InterpretUpdateError(err error, qualifiedResource unversioned.GroupResource, name string) error {
 	switch {

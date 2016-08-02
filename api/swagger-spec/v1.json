@@ -16784,7 +16784,7 @@
    },
    "v1.NodeCondition": {
     "id": "v1.NodeCondition",
-    "description": "NodeCondition contains condition infromation for a node.",
+    "description": "NodeCondition contains condition information for a node.",
     "required": [
      "type",
      "status"
@@ -17229,7 +17229,7 @@
      },
      "flexVolume": {
       "$ref": "v1.FlexVolumeSource",
-      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future."
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future."
      },
      "azureFile": {
       "$ref": "v1.AzureFileVolumeSource",
@@ -17252,7 +17252,7 @@
      },
      "persistentVolumeReclaimPolicy": {
       "type": "string",
-      "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recyling must be supported by the volume plugin underlying this persistent volume. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#recycling-policy"
+      "description": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#recycling-policy"
      }
     }
    },
@@ -17526,7 +17526,7 @@
       "items": {
        "type": "string"
       },
-      "description": "Required: FC target world wide names (WWNs)"
+      "description": "Required: FC target worldwide names (WWNs)"
      },
      "lun": {
       "type": "integer",
@@ -17558,7 +17558,7 @@
    },
    "v1.FlexVolumeSource": {
     "id": "v1.FlexVolumeSource",
-    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
     "required": [
      "driver"
     ],
@@ -17841,7 +17841,7 @@
      },
      "flexVolume": {
       "$ref": "v1.FlexVolumeSource",
-      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future."
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future."
      },
      "cinder": {
       "$ref": "v1.CinderVolumeSource",

@@ -88,7 +88,7 @@ func TestCompatibility(
 		keys := strings.Split(absentKey, ".")
 		actualValue, ok, err := getJSONValue(generic, keys...)
 		if err == nil || ok {
-			t.Errorf("Unexpected value found for for key %s: %v", absentKey, actualValue)
+			t.Errorf("Unexpected value found for key %s: %v", absentKey, actualValue)
 			hasError = true
 		}
 	}

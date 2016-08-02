@@ -551,7 +551,7 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 	}
 	if source.FlexVolume != nil {
 		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("flexVolume"), "may not specifiy more than 1 volume type"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("flexVolume"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateFlexVolumeSource(source.FlexVolume, fldPath.Child("flexVolume"))...)
@@ -559,7 +559,7 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 	}
 	if source.ConfigMap != nil {
 		if numVolumes > 0 {
-			allErrs = append(allErrs, field.Forbidden(fldPath.Child("configMap"), "may not specifiy more than 1 volume type"))
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("configMap"), "may not specify more than 1 volume type"))
 		} else {
 			numVolumes++
 			allErrs = append(allErrs, validateConfigMapVolumeSource(source.ConfigMap, fldPath.Child("configMap"))...)
