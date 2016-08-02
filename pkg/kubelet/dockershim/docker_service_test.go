@@ -20,8 +20,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 )
 
-func newFakeDockerSevice() *dockerService {
-	return &dockerService{
-		client: dockertools.NewFakeDockerClient(),
-	}
+func newTestDockerSevice() (*dockerService, *dockertools.FakeDockerClient) {
+	c := dockertools.NewFakeDockerClient()
+	return &dockerService{client: c}, c
 }
