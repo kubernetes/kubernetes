@@ -133,10 +133,10 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 	}, nil
 }
 
-// Run runs the specified KubeletServer for the given KubeletConfig.  This should never exit.
-// The kcfg argument may be nil - if so, it is initialized from the settings on KubeletServer.
-// Otherwise, the caller is assumed to have set up the KubeletConfig object and all defaults
-// will be ignored.
+// Run runs the specified KubeletServer with the given KubeletDeps.  This should never exit.
+// The kubeDeps argument may be nil - if so, it is initialized from the settings on KubeletServer.
+// Otherwise, the caller is assumed to have set up the KubeletDeps object and a default one will
+// not be generated.
 func Run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) error {
 	err := run(s, kubeDeps)
 	if err != nil {

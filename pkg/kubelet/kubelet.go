@@ -189,13 +189,13 @@ type KubeletBootstrap interface {
 }
 
 // create and initialize a Kubelet instance
-// TODO(mtaufen): Swap the order of kubeDeps and kubeCfg in these args so it is (kubeCfg, kubeDeps)
 type KubeletBuilder func(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps) (KubeletBootstrap, error)
 
-// KubeletConfig is all of the parameters necessary for running a kubelet.
-// TODO: This should probably be merged with KubeletServer.  The extra object is a consequence of refactoring.
+// KubeletDeps is a bin for things we might condier "injected dependencies" -- objects constructed
+// at runtime that are necessary for running the Kubelet. This is a temporary solution for grouping
+// these objects while we figure out a more comprehensive dependency injection story for the Kubelet.
 type KubeletDeps struct {
-	// TOOD(mtaufen): KubeletBuilder:
+	// TODO(mtaufen): KubeletBuilder:
 	//                Mesos currently uses this as a hook to let them make their own call to
 	//                let them wrap the KubeletBootstrap that CreateAndInitKubelet returns with
 	//                their own KubeletBootstrap. It's a useful hook. I need to think about what
@@ -288,7 +288,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
 	}
 
-	// TODO: KubeletConfig.KubeClient should be a client interface, but client interface misses certain methods
+	// TODO: KubeletDeps.KubeClient should be a client interface, but client interface misses certain methods
 	// used by kubelet. Since NewMainKubelet expects a client interface, we need to make sure we are not passing
 	// a nil pointer to it when what we really want is a nil interface.
 	var kubeClient clientset.Interface
@@ -3046,12 +3046,12 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 	return kl.runner.PortForward(&pod, port, stream)
 }
 
-// GetConfig returns the KubeletConfig used to configure the kubelet.
+// GetDeps returns the KubeletDeps used to provide kubelet dependencies.
 func (kl *Kubelet) GetDeps() *KubeletDeps {
 	return kl.kubeletDeps
 }
 
-// GetConfig returns the KubeletConfiguration used to configure the kubelet.
+// GetConfiguration returns the KubeletConfiguration used to configure the kubelet.
 func (kl *Kubelet) GetConfiguration() *componentconfig.KubeletConfiguration {
 	return kl.kubeletConfiguration
 }
