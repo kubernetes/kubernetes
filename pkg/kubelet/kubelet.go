@@ -233,6 +233,7 @@ type KubeletDeps struct {
 	Recorder          record.EventRecorder
 	Writer            kubeio.Writer
 	VolumePlugins     []volume.VolumePlugin
+	TLSOptions        *server.TLSOptions
 }
 
 func makePodSourceConfig(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *KubeletDeps, nodeName string) (*config.PodConfig, error) {

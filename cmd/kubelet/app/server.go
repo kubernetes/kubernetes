@@ -72,7 +72,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/volume"
 )
 
 // NewKubeletCommand creates a *cobra.Command object with default parameters
@@ -109,6 +108,12 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 // is not valid.  It will not start any background processes, and does not include authentication/authorization
 func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error) {
 
+	// Initialize the TLS Options
+	tlsOptions, err := InitializeTLS(&s.KubeletConfiguration)
+	if err != nil {
+		return nil, err
+	}
+
 	mounter := mount.New()
 	var writer kubeio.Writer = &kubeio.StdWriter{}
 	if s.Containerized {
@@ -130,6 +135,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		OSInterface:       kubecontainer.RealOS{},
 		Writer:            writer,
 		VolumePlugins:     ProbeVolumePlugins(s.VolumePluginDir),
+		TLSOptions:        tlsOptions,
 	}, nil
 }
 
@@ -388,103 +394,6 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 	}
 }
 
-// SimpleRunKubelet is a simple way to start a Kubelet talking to dockerEndpoint, using an API Client.
-// Under the hood it calls RunKubelet (below)
-func SimpleKubelet(client *clientset.Clientset,
-	dockerClient dockertools.DockerInterface,
-	hostname, rootDir, manifestURL, address string,
-	port uint,
-	readOnlyPort uint,
-	masterServiceNamespace string,
-	volumePlugins []volume.VolumePlugin,
-	tlsOptions *server.TLSOptions,
-	cadvisorInterface cadvisor.Interface,
-	configFilePath string,
-	cloud cloudprovider.Interface,
-	osInterface kubecontainer.OSInterface,
-	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency, outOfDiskTransitionFrequency, evictionPressureTransitionPeriod time.Duration,
-	maxPods int, podsPerCore int,
-	containerManager cm.ContainerManager, clusterDNS net.IP) (*componentconfig.KubeletConfiguration, *kubelet.KubeletDeps) {
-	// imageGCPolicy := images.ImageGCPolicy{
-	// 	HighThresholdPercent: 90,
-	// 	LowThresholdPercent:  80,
-	// }
-	// diskSpacePolicy := kubelet.DiskSpacePolicy{
-	// 	DockerFreeDiskMB: 256,
-	// 	RootFreeDiskMB:   256,
-	// }
-	// evictionConfig := eviction.Config{
-	// 	PressureTransitionPeriod: evictionPressureTransitionPeriod,
-	// }
-
-	// TODO(mtaufen): Transfer the default values from kcfg into
-	//                this KubeletConfiguration e.g. CgroupRoot = ""
-	kubeCfg := componentconfig.KubeletConfiguration{}
-	kubeDeps := kubelet.KubeletDeps{
-		//		Address:                      net.ParseIP(address),
-		CAdvisorInterface: cadvisorInterface,
-		// VolumeStatsAggPeriod:         time.Minute,
-		// CgroupRoot:                   "",
-		Cloud: cloud,
-		// ClusterDNS:                   clusterDNS,
-		// ConfigFile:                   configFilePath,
-		ContainerManager: containerManager,
-		// ContainerRuntime:             "docker",
-		// CPUCFSQuota:                  true,
-		// DiskSpacePolicy: diskSpacePolicy,
-		DockerClient: dockerClient,
-		// RuntimeCgroups:               "",
-		// DockerExecHandler: &dockertools.NativeExecHandler{},
-		// EnableControllerAttachDetach: false,
-		// EnableCustomMetrics:          false,
-		// EnableDebuggingHandlers:      true,
-		// EnableServer:                 true,
-		// CgroupsPerQOS:                false,
-		// FileCheckFrequency:           fileCheckFrequency,
-		// Since this kubelet runs with --configure-cbr0=false, it needs to use
-		// hairpin-veth to allow hairpin packets. Note that this deviates from
-		// what the "real" kubelet currently does, because there's no way to
-		// set promiscuous mode on docker0.
-		// HairpinMode:               componentconfig.HairpinVeth,
-		// HostnameOverride:          hostname,
-		// HTTPCheckFrequency:        httpCheckFrequency,
-		// ImageGCPolicy: imageGCPolicy,
-		KubeClient: client,
-		// ManifestURL:               manifestURL,
-		// MasterServiceNamespace:    masterServiceNamespace,
-		// MaxContainerCount:       100,
-		// MaxOpenFiles: 1024,
-		// MaxPerPodContainerCount: 2,
-		// MaxPods:                 maxPods,
-		// NvidiaGPUs:              0,
-		// MinimumGCAge:              minimumGCAge,
-		// Mounter:                   mount.New(),
-		// NodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
-		OOMAdjuster: oom.NewFakeOOMAdjuster(),
-		OSInterface: osInterface,
-		// PodInfraContainerImage:    c.PodInfraContainerImage,
-		// Port:         port,
-		// ReadOnlyPort: readOnlyPort,
-		// RegisterNode:        true,
-		// RegisterSchedulable: true,
-		// RegistryBurst:   10,
-		// RegistryPullQPS: 5.0,
-		// ResolverConfig:      kubetypes.ResolvConfDefault,
-		// KubeletCgroups:      "/kubelet",
-		// RootDirectory:       rootDir,
-		// SerializeImagePulls: true,
-		// SyncFrequency:       syncFrequency,
-		// SystemCgroups:       "",
-		// TLSOptions:    tlsOptions,
-		VolumePlugins: volumePlugins,
-		Writer:        &kubeio.StdWriter{},
-		// OutOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
-		// EvictionConfig: evictionConfig,
-		// PodsPerCore:    podsPerCore,
-	}
-	return &kubeCfg, &kubeDeps
-}
-
 // RunKubelet is responsible for setting up and running a kubelet.  It is used in three different applications:
 //   1 Integration tests
 //   2 Kubelet binary
@@ -621,19 +530,13 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 // TODO(mtaufen): I think we can actually get podCfg out of kubeDeps now. Remember to look into this.
 func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps) error {
 
-	// Initialize the TLS Options
-	tlsOptions, err := InitializeTLS(kubeCfg)
-	if err != nil {
-		return err
-	}
-
 	// start the kubelet
 	go wait.Until(func() { k.Run(podCfg.Updates()) }, 0, wait.NeverStop)
 
 	// start the kubelet server
 	if kubeCfg.EnableServer {
 		go wait.Until(func() {
-			k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), tlsOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers)
+			k.ListenAndServe(net.ParseIP(kubeCfg.Address), uint(kubeCfg.Port), kubeDeps.TLSOptions, kubeDeps.Auth, kubeCfg.EnableDebuggingHandlers)
 		}, 0, wait.NeverStop)
 	}
 	if kubeCfg.ReadOnlyPort > 0 {
