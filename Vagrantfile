@@ -149,7 +149,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   def customize_vm(config, vm_mem)
 
     if $use_nfs then
-      config.vm.synced_folder ".", "/vagrant", nfs: true
+      config.vm.synced_folder ".", "/vagrant", nfs: true, mount_options: ['vers=3']
     end
 
     # Try VMWare Fusion first (see
