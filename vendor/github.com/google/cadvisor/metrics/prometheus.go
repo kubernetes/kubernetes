@@ -493,11 +493,17 @@ func (c *PrometheusCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect fetches the stats from all containers and delivers them as
 // Prometheus metrics. It implements prometheus.PrometheusCollector.
 func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
+	c.errors.Set(0)
 	c.collectMachineInfo(ch)
 	c.collectVersionInfo(ch)
 	c.collectContainersInfo(ch)
 	c.errors.Collect(ch)
 }
+
+const (
+	containerLabelPrefix = "container_label_"
+	containerEnvPrefix   = "container_env_"
+)
 
 func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric) {
 	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
@@ -529,11 +535,11 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 		}
 
 		for k, v := range container.Spec.Labels {
-			baseLabels = append(baseLabels, sanitizeLabelName(k))
+			baseLabels = append(baseLabels, sanitizeLabelName(containerLabelPrefix+k))
 			baseLabelValues = append(baseLabelValues, v)
 		}
 		for k, v := range container.Spec.Envs {
-			baseLabels = append(baseLabels, sanitizeLabelName(k))
+			baseLabels = append(baseLabels, sanitizeLabelName(containerEnvPrefix+k))
 			baseLabelValues = append(baseLabelValues, v)
 		}
 

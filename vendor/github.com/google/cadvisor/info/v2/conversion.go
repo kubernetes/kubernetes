@@ -24,18 +24,18 @@ import (
 
 func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
 	var result []MachineFsStats
-	for _, stat := range fsStats {
+	for i := range fsStats {
+		stat := fsStats[i]
 		readDuration := time.Millisecond * time.Duration(stat.ReadTime)
 		writeDuration := time.Millisecond * time.Duration(stat.WriteTime)
 		ioDuration := time.Millisecond * time.Duration(stat.IoTime)
 		weightedDuration := time.Millisecond * time.Duration(stat.WeightedIoTime)
-		result = append(result, MachineFsStats{
-			Device:     stat.Device,
-			Type:       stat.Type,
-			Capacity:   &stat.Limit,
-			Usage:      &stat.Usage,
-			Available:  &stat.Available,
-			InodesFree: &stat.InodesFree,
+		machineFsStat := MachineFsStats{
+			Device:    stat.Device,
+			Type:      stat.Type,
+			Capacity:  &stat.Limit,
+			Usage:     &stat.Usage,
+			Available: &stat.Available,
 			DiskStats: DiskStats{
 				ReadsCompleted:     &stat.ReadsCompleted,
 				ReadsMerged:        &stat.ReadsMerged,
@@ -49,7 +49,11 @@ func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
 				IoDuration:         &ioDuration,
 				WeightedIoDuration: &weightedDuration,
 			},
-		})
+		}
+		if stat.HasInodes {
+			machineFsStat.InodesFree = &stat.InodesFree
+		}
+		result = append(result, machineFsStat)
 	}
 	return result
 }
@@ -57,7 +61,8 @@ func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
 func MachineStatsFromV1(cont *v1.ContainerInfo) []MachineStats {
 	var stats []MachineStats
 	var last *v1.ContainerStats
-	for _, val := range cont.Stats {
+	for i := range cont.Stats {
+		val := cont.Stats[i]
 		stat := MachineStats{
 			Timestamp: val.Timestamp,
 		}
