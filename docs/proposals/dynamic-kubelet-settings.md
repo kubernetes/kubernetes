@@ -44,9 +44,10 @@ The Kubelet is currently configured via command-line flags. This is painful for 
 
 - Add a well-defined, versioned configmap object for Kubelet configuration.
 - Add/Remove/Update global and per-node Kubelet config on the fly via the API server.
-- Provide a REST API to get the config currently in use by a given Kubelet.
+- Provide a reliable way to get the configuration of a given Kubelet along with its source (remote or on disk or flags).
 - We want the Kubelet to work with the built-in defaults on all distros we test against.
 - Work towards deprecating flags in favor of on-disk config and config from the API server. Master nodes will be bootstrapped from on-disk config.
+- Make it possible to opt-out of remote configuration e.g. to protect the master from bad config updates.
 
 ## Design
 
@@ -62,7 +63,9 @@ The Kubelet is currently configured via command-line flags. This is painful for 
 ### Well-defined configmap type for Kubelet configuration
 
 - There is an alpha version of the `KubeletConfiguration` type: external in `pkg/componentconfig/v1alpha1/types.go`, internal in `pkg/componentconfig/types.go`.
-- We likely want to group related fields of the `KubeletConfiguration` into substructures. @timstclair and I did some brainstorming and came up with some rough potential categories:
+- We likely want to group related fields of the `KubeletConfiguration` into substructures. Please note that `v1alpha1` will not be regrouped, but eventually we will start working on this.
+
+@timstclair and I did some brainstorming and came up with some rough potential categories:
 
 ---
 - Networking
@@ -102,14 +105,14 @@ Once the master is ready, the user creates some configs via the API:
 - Start the Kubelet with `minimal-config`
 - If `<current-node-name>-kubelet-config` exists on the API server, download and use the `<current-node-name>-kubelet-config`
 - else if `global-kubelet-config` exists on the API server, download and use the `global-kubelet-config`.
-- else if e.g. an `on-disk-config` flag is set, defer to the node's on-disk config. (Note: Eventually, flags will be deprecated and on-disk config will be the final fallback.)
+- else if e.g. an `on-disk-config` flag is set, defer to the node's on-disk config.
 - else defer to config from flags
 - Finally, start the configuration sync loop in a background thread
 
 
 ### Storing config locally (checkpointing)
 
-Initially, the Kubelet will store the most recent configmap it got from the API server internally, and compare that to new values it gets from the API server. It will restart when these configmaps differ in order to apply the new config.
+Initially, the Kubelet will store the most recent configmap it got from the API server internally in memory, and compare that to new values it gets from the API server. It will restart when these configmaps differ in order to apply the new config.
 
 This is a rudimentary solution, and @aaronlevy brought up some good reasons to checkpoint the config, and store it externally from the Kubelet:
 >Without being privy to prior discussions, I might argue for saving the config state outside the kubelet (and reboot simply picks up this local / on-disk config).
