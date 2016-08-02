@@ -32,14 +32,14 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 func newCluster(clusterName string, serverUrl string) *federation_v1beta1.Cluster {
 	cluster := federation_v1beta1.Cluster{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Federation.GroupVersion().String()},
 		ObjectMeta: v1.ObjectMeta{
-			UID:  util.NewUUID(),
+			UID:  uuid.NewUUID(),
 			Name: clusterName,
 		},
 		Spec: federation_v1beta1.ClusterSpec{

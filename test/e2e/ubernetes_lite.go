@@ -26,9 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -187,7 +187,7 @@ func checkZoneSpreading(c *client.Client, pods *api.PodList, zoneNames []string)
 
 // Check that the pods comprising a replication controller get spread evenly across available zones
 func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
-	name := "ubelite-spread-rc-" + string(util.NewUUID())
+	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := f.Client.ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{

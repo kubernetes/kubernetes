@@ -63,9 +63,9 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/version"
@@ -211,7 +211,7 @@ func GetServicesProxyRequest(c *client.Client, request *restclient.Request) (*re
 }
 
 // unique identifier of the e2e run
-var RunId = util.NewUUID()
+var RunId = uuid.NewUUID()
 
 type CreateTestingNSFn func(baseName string, c *client.Client, labels map[string]string) (*api.Namespace, error)
 
@@ -2601,7 +2601,7 @@ func StartPods(c *client.Client, replicas int, namespace string, podNamePrefix s
 	if replicas < 1 {
 		panic("StartPods: number of replicas must be non-zero")
 	}
-	startPodsID := string(util.NewUUID()) // So that we can label and find them
+	startPodsID := string(uuid.NewUUID()) // So that we can label and find them
 	for i := 0; i < replicas; i++ {
 		podName := fmt.Sprintf("%v-%v", podNamePrefix, i)
 		pod.ObjectMeta.Name = podName

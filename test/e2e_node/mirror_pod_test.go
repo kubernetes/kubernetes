@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -40,7 +40,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 		var ns, staticPodName, mirrorPodName string
 		BeforeEach(func() {
 			ns = f.Namespace.Name
-			staticPodName = "static-pod-" + string(util.NewUUID())
+			staticPodName = "static-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
 			By("create the static pod")

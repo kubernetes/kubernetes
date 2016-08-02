@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -124,7 +124,7 @@ func getRestartCount(p *api.Pod) int {
 
 func makePodSpec(readinessProbe, livenessProbe *api.Probe) *api.Pod {
 	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "test-webserver-" + string(util.NewUUID())},
+		ObjectMeta: api.ObjectMeta{Name: "test-webserver-" + string(uuid.NewUUID())},
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{

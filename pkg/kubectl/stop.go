@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -290,7 +291,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	// daemon pods. Once it's done deleting the daemon pods, it's safe to delete
 	// the DaemonSet.
 	ds.Spec.Template.Spec.NodeSelector = map[string]string{
-		string(util.NewUUID()): string(util.NewUUID()),
+		string(uuid.NewUUID()): string(uuid.NewUUID()),
 	}
 	// force update to avoid version conflict
 	ds.ResourceVersion = ""

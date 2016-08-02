@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -41,7 +41,7 @@ var _ = framework.KubeDescribe("Kubelet Container Manager", func() {
 			var podName string
 
 			BeforeEach(func() {
-				podName = "bin-false" + string(util.NewUUID())
+				podName = "bin-false" + string(uuid.NewUUID())
 				podClient.Create(&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name: podName,

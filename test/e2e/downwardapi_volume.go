@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -35,7 +35,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 
 	f := framework.NewDefaultFramework("downward-api")
 	It("should provide podname only [Conformance]", func() {
-		podName := "downwardapi-volume-" + string(util.NewUUID())
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
 
 		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 	})
 
 	It("should provide podname as non-root with fsgroup [Feature:FSGroup]", func() {
-		podName := "metadata-volume-" + string(util.NewUUID())
+		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
 		gid := int64(1234)
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
@@ -62,7 +62,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		labels["key1"] = "value1"
 		labels["key2"] = "value2"
 
-		podName := "labelsupdate" + string(util.NewUUID())
+		podName := "labelsupdate" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForUpdateTest(podName, labels, map[string]string{}, "/etc/labels")
 		containerName := "client-container"
 		defer func() {
@@ -94,7 +94,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 	It("should update annotations on modification [Conformance]", func() {
 		annotations := map[string]string{}
 		annotations["builder"] = "bar"
-		podName := "annotationupdate" + string(util.NewUUID())
+		podName := "annotationupdate" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForUpdateTest(podName, map[string]string{}, annotations, "/etc/annotations")
 
 		containerName := "client-container"
@@ -127,7 +127,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 	})
 
 	It("should provide container's cpu limit", func() {
-		podName := "downwardapi-volume-" + string(util.NewUUID())
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/cpu_limit")
 
 		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
@@ -136,7 +136,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 	})
 
 	It("should provide container's memory limit", func() {
-		podName := "downwardapi-volume-" + string(util.NewUUID())
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/memory_limit")
 
 		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
@@ -145,7 +145,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 	})
 
 	It("should provide container's cpu request", func() {
-		podName := "downwardapi-volume-" + string(util.NewUUID())
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/cpu_request")
 
 		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
@@ -154,7 +154,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 	})
 
 	It("should provide container's memory request", func() {
-		podName := "downwardapi-volume-" + string(util.NewUUID())
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumeForContainerResources(podName, "/etc/memory_request")
 
 		framework.TestContainerOutput("downward API volume plugin", f.Client, pod, 0, []string{
