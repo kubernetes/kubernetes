@@ -17,6 +17,8 @@ limitations under the License.
 package discovery
 
 import (
+	"sync"
+
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -129,3 +131,131 @@ func GetAPIGroupResources(cl DiscoveryInterface) ([]*APIGroupResources, error) {
 	}
 	return result, nil
 }
+
+// DeferredDiscoveryRESTMapper is a RESTMapper that will defer
+// initialization of the RESTMapper until the first mapping is
+// requested.
+type DeferredDiscoveryRESTMapper struct {
+	initMu           sync.Mutex
+	delegate         meta.RESTMapper
+	cl               DiscoveryInterface
+	versionInterface meta.VersionInterfacesFunc
+}
+
+// NewDeferredDiscoveryRESTMapper returns a
+// DeferredDiscoveryRESTMapper that will lazily query the provided
+// client for discovery information to do REST mappings.
+func NewDeferredDiscoveryRESTMapper(cl DiscoveryInterface, versionInterface meta.VersionInterfacesFunc) *DeferredDiscoveryRESTMapper {
+	return &DeferredDiscoveryRESTMapper{
+		cl:               cl,
+		versionInterface: versionInterface,
+	}
+}
+
+func (d *DeferredDiscoveryRESTMapper) getDelegate() (meta.RESTMapper, error) {
+	d.initMu.Lock()
+	defer d.initMu.Unlock()
+
+	if d.delegate != nil {
+		return d.delegate, nil
+	}
+
+	groupResources, err := GetAPIGroupResources(d.cl)
+	if err != nil {
+		return nil, err
+	}
+
+	d.delegate = NewRESTMapper(groupResources, d.versionInterface)
+	return d.delegate, err
+}
+
+// Reset resets the internally cached Discovery information and will
+// cause the next mapping request to re-discover.
+func (d *DeferredDiscoveryRESTMapper) Reset() {
+	d.initMu.Lock()
+	d.delegate = nil
+	d.initMu.Unlock()
+}
+
+// KindFor takes a partial resource and returns back the single match.
+// It returns an error if there are multiple matches.
+func (d *DeferredDiscoveryRESTMapper) KindFor(resource unversioned.GroupVersionResource) (unversioned.GroupVersionKind, error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return unversioned.GroupVersionKind{}, err
+	}
+	return del.KindFor(resource)
+}
+
+// KindsFor takes a partial resource and returns back the list of
+// potential kinds in priority order.
+func (d *DeferredDiscoveryRESTMapper) KindsFor(resource unversioned.GroupVersionResource) ([]unversioned.GroupVersionKind, error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.KindsFor(resource)
+}
+
+// ResourceFor takes a partial resource and returns back the single
+// match. It returns an error if there are multiple matches.
+func (d *DeferredDiscoveryRESTMapper) ResourceFor(input unversioned.GroupVersionResource) (unversioned.GroupVersionResource, error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return unversioned.GroupVersionResource{}, err
+	}
+	return del.ResourceFor(input)
+}
+
+// ResourcesFor takes a partial resource and returns back the list of
+// potential resource in priority order.
+func (d *DeferredDiscoveryRESTMapper) ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.ResourcesFor(input)
+}
+
+// RESTMapping identifies a preferred resource mapping for the
+// provided group kind.
+func (d *DeferredDiscoveryRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (*meta.RESTMapping, error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.RESTMapping(gk, versions...)
+}
+
+// RESTMappings returns the RESTMappings for the provided group kind
+// in a rough internal preferred order. If no kind is found, it will
+// return a NoResourceMatchError.
+func (d *DeferredDiscoveryRESTMapper) RESTMappings(gk unversioned.GroupKind) ([]*meta.RESTMapping, error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, err
+	}
+	return del.RESTMappings(gk)
+}
+
+// AliasesForResource returns whether a resource has an alias or not.
+func (d *DeferredDiscoveryRESTMapper) AliasesForResource(resource string) ([]string, bool) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return nil, false
+	}
+	return del.AliasesForResource(resource)
+}
+
+// ResourceSingularizer converts a resource name from plural to
+// singular (e.g., from pods to pod).
+func (d *DeferredDiscoveryRESTMapper) ResourceSingularizer(resource string) (singular string, err error) {
+	del, err := d.getDelegate()
+	if err != nil {
+		return resource, err
+	}
+	return del.ResourceSingularizer(resource)
+}
+
+// Make sure it satisfies the interface
+var _ meta.RESTMapper = &DeferredDiscoveryRESTMapper{}
