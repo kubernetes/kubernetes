@@ -41,9 +41,11 @@ type Storage interface {
 	Wait(ctx context.Context, version uint64)
 
 	// Put puts an object with a key based on the given conditions.
+	// See docs on Conditions for more details.
 	Put(ctx context.Context, key string, obj runtime.Object, conditions *Conditions) (cur runtime.Object, err error)
 
 	// Delete a key and its object based on the given conditions.
+	// See docs on Conditions for more details.
 	Delete(ctx context.Context, key string, conditions *Conditions) (cur runtime.Object, err error)
 
 	// Get gets the most recent version of a key.
@@ -63,11 +65,13 @@ type Storage interface {
 	WatchPrefix(ctx context.Context, prefix string, version uint64, ss ...Selector) (WatchChan, error)
 
 	// AddIndex adds a new object index.
+	// See docs on FieldValueGetFunc for more details.
 	AddIndex(indexName, field string, g FieldValueGetFunc) error
 	// DeleteIndex deletes an object index.
 	DeleteIndex(indexName string)
 
 	// AddWatcherIndex adds a new watcher index.
+	// See docs on FieldValueGetFunc for more details.
 	AddWatcherIndex(indexName, field string, g FieldValueGetFunc) error
 	// DeleteWatcherIndex deletes a watcher index.
 	DeleteWatcherIndex(indexName string)
@@ -82,8 +86,14 @@ type Conditions struct {
 	PrevVersion unit64
 }
 
+// FieldValueGetFunc returns the value in the object corresponding to given field.
+// field is uniquely indicating a field of a type of object.
+// It returns (value, true) if field exists in the object. Otherwise it returns ("", false).
 type FieldValueGetFunc func(field string, obj runtime.Object) (string, bool)
 
+// Selector is used to express one selection predicate.
+// Op is the operator relating corresponding field's value to given values.
+// See FieldValueGetFunc for details on Field and FVGetFunc.
 type Selector struct {
 	Op        Operator
 	Field     string
@@ -117,7 +127,7 @@ Now that we have the three basic elements to use the indexing, and also the meth
 
 #### 2. Remove unnecessary helper functions from the interface itself
 
-We remove GuaranteedUpdate() from the Interface. It only uses the existing APIs and does not need to be part of the core storage API. One of the goals is to make storage API minimum and isolated to be more maintainable. So we decide to move it out of the Storage API and implement the same functionality as helper function. 
+We remove GuaranteedUpdate() from the Interface. It only uses the existing APIs and does not need to be part of the core storage API. One of the goals is to make storage API minimum and isolated to be more maintainable. So we decide to move it out of the Storage API and implement the same functionality as helper function.
 
 ``` go
 GuaranteedUpdate(Storage, ...)
