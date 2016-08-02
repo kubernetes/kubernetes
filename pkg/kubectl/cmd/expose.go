@@ -120,6 +120,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("name", "", "The name for the newly created object.")
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
+	cmd.Flags().String("cluster-ip", "", "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.")
 
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
