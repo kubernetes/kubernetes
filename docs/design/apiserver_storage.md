@@ -43,22 +43,22 @@ type Storage interface {
 	// Wait waits until the storage has seen any version >= given version.
 	Wait(ctx context.Context, version uint64)
 
-	// Put puts an object with a key based on the given conditions.
+	// Put puts an object with a key based on given conditions.
 	// See docs on Conditions for more details.
 	Put(ctx context.Context, key []string, obj runtime.Object, conditions *Conditions) (cur runtime.Object, err error)
 
-	// Delete a key and its object based on the given conditions.
+	// Delete a key and its object based on given conditions.
 	// See docs on Conditions for more details.
 	Delete(ctx context.Context, key []string, conditions *Conditions) (old runtime.Object, err error)
 
-	// Get gets the most recent version of a key.
+	// Get gets the current object of given key.
+	// If version = 0, a key that was modified by this interface will be reflected on read after write succeeded.
+	// If version > 0, it will get the current state of the key at the time  given version is committed.
 	// If no object exists on the key, it will return not found error.
-	// If version > 0, it will get the current state of the key at the time the given version is committed.
 	Get(ctx context.Context, key []string, version uint64) (cur runtime.Object, err error)
 
 	// List lists all objects that has given prefix and satisfies selectors.
-	// If version > 0, same as Get().
-	List(ctx context.Context, prefix []string, version uint64, ss ...Selector) (objects []runtime.Object, globalRev uint64, err error)
+	List(ctx context.Context, prefix []string, ss ...Selector) (objects []runtime.Object, globalVersion uint64, err error)
 
 	// WatchPrefix watches a prefix after given version. If version is 0, we will watch from current state.
 	// It returns notifications of any keys that has given prefix.
