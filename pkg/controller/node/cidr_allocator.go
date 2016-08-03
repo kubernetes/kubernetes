@@ -192,17 +192,17 @@ func (r *rangeAllocator) AllocateOrOccupyCIDR(node *api.Node) error {
 
 // ReleaseCIDR releases the CIDR of the removed node
 func (r *rangeAllocator) ReleaseCIDR(node *api.Node) error {
-	if node.Spec.PodCIDR == "" {
+	if node == nil || node.Spec.PodCIDR == "" {
 		return nil
 	}
 	_, podCIDR, err := net.ParseCIDR(node.Spec.PodCIDR)
 	if err != nil {
-		return fmt.Errorf("Failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
+		return fmt.Errorf("Failed to parse CIDR %s on Node %v: %v", node.Spec.PodCIDR, node.Name, err)
 	}
 
-	glog.V(4).Infof("recycle node %s CIDR %s", node.Name, podCIDR)
+	glog.V(4).Infof("release CIDR %s", node.Spec.PodCIDR)
 	if err = r.cidrs.release(podCIDR); err != nil {
-		return fmt.Errorf("Failed to release cidr: %v", err)
+		return fmt.Errorf("Error when releasing CIDR %v: %v", node.Spec.PodCIDR, err)
 	}
 	return err
 }
@@ -230,10 +230,18 @@ func (r *rangeAllocator) updateCIDRAllocation(data nodeAndCIDR) error {
 	for rep := 0; rep < podCIDRUpdateRetry; rep++ {
 		// TODO: change it to using PATCH instead of full Node updates.
 		node, err = r.client.Core().Nodes().Get(data.nodeName)
-		glog.Infof("Got Node: %v", node)
 		if err != nil {
 			glog.Errorf("Failed while getting node %v to retry updating Node.Spec.PodCIDR: %v", data.nodeName, err)
 			continue
+		}
+		if node.Spec.PodCIDR != "" {
+			glog.Errorf("Node %v already has allocated CIDR %v. Releasing assigned one if different.", node.Name, node.Spec.PodCIDR)
+			if node.Spec.PodCIDR != data.cidr.String() {
+				if err := r.cidrs.release(data.cidr); err != nil {
+					glog.Errorf("Error when releasing CIDR %v", data.cidr.String())
+				}
+			}
+			return nil
 		}
 		node.Spec.PodCIDR = data.cidr.String()
 		if _, err := r.client.Core().Nodes().Update(node); err != nil {
