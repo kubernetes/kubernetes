@@ -627,7 +627,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			By("Removing additional replication controllers if any")
 			for i := 1; i <= nodeCount; i++ {
 				name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-				c.ReplicationControllers(ns).Delete(name)
+				c.ReplicationControllers(ns).Delete(name, nil)
 			}
 		})
 	}
