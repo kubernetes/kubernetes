@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/wait"
 	vol "k8s.io/kubernetes/pkg/volume"
 )
 
@@ -297,7 +298,7 @@ func (r *volumeReactor) injectReactError(action core.Action) error {
 
 // checkVolumes compares all expectedVolumes with set of volumes at the end of
 // the test and reports differences.
-func (r *volumeReactor) checkVolumes(t *testing.T, expectedVolumes []*api.PersistentVolume) error {
+func (r *volumeReactor) checkVolumes(expectedVolumes []*api.PersistentVolume) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -329,7 +330,7 @@ func (r *volumeReactor) checkVolumes(t *testing.T, expectedVolumes []*api.Persis
 
 // checkClaims compares all expectedClaims with set of claims at the end of the
 // test and reports differences.
-func (r *volumeReactor) checkClaims(t *testing.T, expectedClaims []*api.PersistentVolumeClaim) error {
+func (r *volumeReactor) checkClaims(expectedClaims []*api.PersistentVolumeClaim) error {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 
@@ -455,9 +456,9 @@ func (r *volumeReactor) getChangeCount() int {
 	return r.changedSinceLastSync
 }
 
-// waitTest waits until all tests, controllers and other goroutines do their
+// waitForIdle waits until all tests, controllers and other goroutines do their
 // job and no new actions are registered for 10 milliseconds.
-func (r *volumeReactor) waitTest() {
+func (r *volumeReactor) waitForIdle() {
 	r.ctrl.runningOperations.Wait()
 	// Check every 10ms if the controller does something and stop if it's
 	// idle.
@@ -471,6 +472,32 @@ func (r *volumeReactor) waitTest() {
 		}
 		oldChanges = changes
 	}
+}
+
+// waitTest waits until all tests, controllers and other goroutines do their
+// job and list of current volumes/claims is equal to list of expected
+// volumes/claims (with ~10 second timeout).
+func (r *volumeReactor) waitTest(test controllerTest) error {
+	// start with 10 ms, multiply by 2 each step, 10 steps = 10.23 seconds
+	backoff := wait.Backoff{
+		Duration: 10 * time.Millisecond,
+		Jitter:   0,
+		Factor:   2,
+		Steps:    10,
+	}
+	err := wait.ExponentialBackoff(backoff, func() (done bool, err error) {
+		// Finish all operations that are in progress
+		r.ctrl.runningOperations.Wait()
+
+		// Return 'true' if the reactor reached the expected state
+		err1 := r.checkClaims(test.expectedClaims)
+		err2 := r.checkVolumes(test.expectedVolumes)
+		if err1 == nil && err2 == nil {
+			return true, nil
+		}
+		return false, nil
+	})
+	return err
 }
 
 // deleteVolumeEvent simulates that a volume has been deleted in etcd and
@@ -807,11 +834,11 @@ func wrapTestWithInjectedOperation(toWrap testCall, injectBeforeOperation func(c
 
 func evaluateTestResults(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest, t *testing.T) {
 	// Evaluate results
-	if err := reactor.checkClaims(t, test.expectedClaims); err != nil {
+	if err := reactor.checkClaims(test.expectedClaims); err != nil {
 		t.Errorf("Test %q: %v", test.name, err)
 
 	}
-	if err := reactor.checkVolumes(t, test.expectedVolumes); err != nil {
+	if err := reactor.checkVolumes(test.expectedVolumes); err != nil {
 		t.Errorf("Test %q: %v", test.name, err)
 	}
 
@@ -849,8 +876,11 @@ func runSyncTests(t *testing.T, tests []controllerTest) {
 			t.Errorf("Test %q failed: %v", test.name, err)
 		}
 
-		// Wait for all goroutines to finish
-		reactor.waitTest()
+		// Wait for the target state
+		err = reactor.waitTest(test)
+		if err != nil {
+			t.Errorf("Test %q failed: %v", test.name, err)
+		}
 
 		evaluateTestResults(ctrl, reactor, test, t)
 	}
@@ -907,7 +937,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest) {
 			}
 
 			// Wait for all goroutines to finish
-			reactor.waitTest()
+			reactor.waitForIdle()
 
 			obj := reactor.popChange()
 			if obj == nil {
