@@ -1301,6 +1301,7 @@ message NodeStatus {
 
   // NodePhase is the recently observed lifecycle phase of the node.
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase
+  // The field is never populated, and now is deprecated.
   optional string phase = 3;
 
   // Conditions is an array of current observed node conditions.
