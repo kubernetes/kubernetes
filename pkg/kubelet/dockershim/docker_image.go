@@ -63,7 +63,7 @@ func (ds *dockerService) ImageStatus(image *runtimeApi.ImageSpec) (*runtimeApi.I
 	return images[0], nil
 }
 
-// PullImage pulls a image with authentication config.
+// PullImage pulls an image with authentication config.
 func (ds *dockerService) PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error {
 	// TODO: add default tags for images or should this be done by kubelet?
 	return ds.client.PullImage(image.GetImage(),

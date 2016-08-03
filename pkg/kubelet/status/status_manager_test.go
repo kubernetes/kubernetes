@@ -616,11 +616,11 @@ func TestSetContainerReadiness(t *testing.T) {
 	status = expectPodStatus(t, m, pod)
 	verifyReadiness("all ready", &status, true, true, true)
 
-	t.Log("Setting non-existant container readiness should fail.")
+	t.Log("Setting non-existent container readiness should fail.")
 	m.SetContainerReadiness(pod.UID, kubecontainer.ContainerID{Type: "test", ID: "foo"}, true)
 	verifyUpdates(t, m, 0)
 	status = expectPodStatus(t, m, pod)
-	verifyReadiness("ignore non-existant", &status, true, true, true)
+	verifyReadiness("ignore non-existent", &status, true, true, true)
 }
 
 func TestSyncBatchCleanupVersions(t *testing.T) {

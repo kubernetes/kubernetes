@@ -212,6 +212,6 @@ type UserDefinedMetric struct {
 	// The time at which these stats were updated.
 	Time unversioned.Time `json:"time"`
 	// Value of the metric. Float64s have 53 bit precision.
-	// We do not forsee any metrics exceeding that value.
+	// We do not foresee any metrics exceeding that value.
 	Value float64 `json:"value"`
 }

@@ -304,9 +304,9 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 
 	done := make(chan struct{})
 	if s.LockFilePath != "" {
-		glog.Infof("aquiring lock on %q", s.LockFilePath)
+		glog.Infof("acquiring lock on %q", s.LockFilePath)
 		if err := flock.Acquire(s.LockFilePath); err != nil {
-			return fmt.Errorf("unable to aquire file lock on %q: %v", s.LockFilePath, err)
+			return fmt.Errorf("unable to acquire file lock on %q: %v", s.LockFilePath, err)
 		}
 		if s.ExitOnLockContention {
 			glog.Infof("watching for inotify events for: %v", s.LockFilePath)

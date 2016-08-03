@@ -542,13 +542,13 @@ type PodSandboxConfig struct {
 	// By default the log of a container going into the LogDirectory will be
 	// hooked up to STDOUT and STDERR. However, the LogDirectory may contain
 	// binary log files with structured logging data from the individual
-	// containers. For example the files might be newline seperated JSON
+	// containers. For example, the files might be newline separated JSON
 	// structured logs, systemd-journald journal files, gRPC trace files, etc.
 	// E.g.,
 	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
 	//     ContainerConfig.LogPath = `containerName_Instance#.log`
 	//
-	// WARNING: Log managment and how kubelet should interface with the
+	// WARNING: Log management and how kubelet should interface with the
 	// container logs are under active discussion in
 	// https://issues.k8s.io/24677. There *may* be future change of direction
 	// for logging as the discussion carries on.
@@ -561,7 +561,7 @@ type PodSandboxConfig struct {
 	// aggregate cpu/memory resources limits of all containers).
 	// Note: On a Linux host, kubelet will create a pod-level cgroup and pass
 	// it as the cgroup parent for the PodSandbox. For some runtimes, this is
-	// sufficent. For others, e.g., hypervisor-based runtimes, explicit
+	// sufficient. For others, e.g., hypervisor-based runtimes, explicit
 	// resource limits for the sandbox are needed at creation time.
 	Resources *PodSandboxResources `protobuf:"bytes,6,opt,name=resources" json:"resources,omitempty"`
 	// Labels are key value pairs that may be used to scope and select individual resources.
@@ -1326,7 +1326,7 @@ type ContainerConfig struct {
 	//     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
 	//     ContainerConfig.LogPath = `containerName_Instance#.log`
 	//
-	// WARNING: Log managment and how kubelet should interface with the
+	// WARNING: Log management and how kubelet should interface with the
 	// container logs are under active discussion in
 	// https://issues.k8s.io/24677. There *may* be future change of direction
 	// for logging as the discussion carries on.
@@ -2777,7 +2777,7 @@ type ImageServiceClient interface {
 	ListImages(ctx context.Context, in *ListImagesRequest, opts ...grpc.CallOption) (*ListImagesResponse, error)
 	// ImageStatus returns the status of the image.
 	ImageStatus(ctx context.Context, in *ImageStatusRequest, opts ...grpc.CallOption) (*ImageStatusResponse, error)
-	// PullImage pulls a image with authentication config.
+	// PullImage pulls an image with authentication config.
 	PullImage(ctx context.Context, in *PullImageRequest, opts ...grpc.CallOption) (*PullImageResponse, error)
 	// RemoveImage removes the image.
 	// It should return success if the image has already been removed.
@@ -2835,7 +2835,7 @@ type ImageServiceServer interface {
 	ListImages(context.Context, *ListImagesRequest) (*ListImagesResponse, error)
 	// ImageStatus returns the status of the image.
 	ImageStatus(context.Context, *ImageStatusRequest) (*ImageStatusResponse, error)
-	// PullImage pulls a image with authentication config.
+	// PullImage pulls an image with authentication config.
 	PullImage(context.Context, *PullImageRequest) (*PullImageResponse, error)
 	// RemoveImage removes the image.
 	// It should return success if the image has already been removed.
