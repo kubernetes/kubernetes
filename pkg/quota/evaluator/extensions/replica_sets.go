@@ -28,7 +28,7 @@ import (
 
 // NewReplicaSetEvaluator returns an evaluator that can evaluate replica sets
 func NewReplicaSetEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{"replicasets"}
+	allResources := []api.ResourceName{extensionsapi.ResourceReplicaSets}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.ReplicaSet",
 		InternalGroupKind: extensionsapi.Kind("ReplicaSet"),
@@ -37,8 +37,8 @@ func NewReplicaSetEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc("replicasets"),
-		UsageFunc:            generic.ObjectCountUsageFunc("replicasets"),
+		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(extensionsapi.ResourceReplicaSets),
+		UsageFunc:            generic.ObjectCountUsageFunc(extensionsapi.ResourceReplicaSets),
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
 			return kubeClient.Extensions().ReplicaSets(namespace).List(options)
 		},

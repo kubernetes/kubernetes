@@ -19,7 +19,7 @@ package extensions
 import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
-	extensionapi "k8s.io/kubernetes/pkg/apis/extensions"
+	extensionsapi "k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
@@ -28,17 +28,17 @@ import (
 
 // NewDeploymentEvaluator returns an evaluator that can evaluate deployments
 func NewDeploymentEvaluator(kubeClient clientset.Interface) quota.Evaluator {
-	allResources := []api.ResourceName{"deployments"}
+	allResources := []api.ResourceName{extensionsapi.ResourceDeployments}
 	return &generic.GenericEvaluator{
 		Name:              "Evaluator.Deployment",
-		InternalGroupKind: extensionapi.Kind("Deployment"),
+		InternalGroupKind: extensionsapi.Kind("Deployment"),
 		InternalOperationResources: map[admission.Operation][]api.ResourceName{
 			admission.Create: allResources,
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc("deployments"),
-		UsageFunc:            generic.ObjectCountUsageFunc("deployments"),
+		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(extensionsapi.ResourceDeployments),
+		UsageFunc:            generic.ObjectCountUsageFunc(extensionsapi.ResourceDeployments),
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
 			return kubeClient.Extensions().Deployments(namespace).List(options)
 		},
