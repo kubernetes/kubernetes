@@ -38,35 +38,36 @@ We also believe we should start a side-by-side storage implementation to reach t
 
 // Storage stores and persists objects.
 // Storage provides read-write access to the objects based on string key.
-// key/prefix consists of multiple paths and after being joined by "/" become a unique path.
 type Storage interface {
 	// Wait waits until the storage has seen any version >= given version.
 	Wait(ctx context.Context, version uint64)
 
-	// Put puts an object with a key based on given conditions.
-	// See docs on Conditions for more details.
-	Put(ctx context.Context, key []string, obj runtime.Object, conditions *Conditions) (cur runtime.Object, err error)
+	// Put puts an object with a key.
+	// If conditions is not nil, it will do atomic Put. Whether conditions are satisfied or not, it will
+	// return current object on given key.
+	// See "Conditions" docs for more details on compare logic and returned error.
+	Put(ctx context.Context, key StorageKey, obj runtime.Object, conditions *Conditions) (cur runtime.Object, err error)
 
-	// Delete a key and its object based on given conditions.
-	// See docs on Conditions for more details.
-	Delete(ctx context.Context, key []string, conditions *Conditions) (old runtime.Object, err error)
+	// Delete deletes a key and its object.
+	// conditions has the same guarantee as Put().
+	Delete(ctx context.Context, key StorageKey, conditions *Conditions) (old runtime.Object, err error)
 
 	// Get gets the current object of given key.
-	// If version = 0, a key that was modified by this interface will be reflected on read after write succeeded.
-	// If version > 0, it will get the current state of the key at the time  given version is committed.
+	// If version = 0, it will serve data from local cache.
+	// If version > 0, it will get the current state of the key at the time given version is committed.
 	// If no object exists on the key, it will return not found error.
-	Get(ctx context.Context, key []string, version uint64) (cur runtime.Object, err error)
+	Get(ctx context.Context, key StorageKey, version uint64) (cur runtime.Object, err error)
 
-	// List lists all objects that has given prefix and satisfies selectors.
-	List(ctx context.Context, prefix []string, ss ...Selector) (objects []runtime.Object, globalVersion uint64, err error)
+	// List lists all objects that has give prefix in keys and satisfies selectors.
+	// version has the same guarantee as Get().
+	List(ctx context.Context, prefix StorageKey, version uint64, ss ...Selector) (objects []runtime.Object, globalVersion uint64, err error)
 
 	// WatchPrefix watches a prefix after given version. If version is 0, we will watch from current state.
 	// It returns notifications of any keys that has given prefix.
 	// Given selectors, it returns events that contained object of interest, either of current and previous.
 	// If there is any problem establishing the watch channel, it will return error.
-	// After channel is established, any error that happened will be returned from WatchChan
-	// immediately before it's closed.
-	WatchPrefix(ctx context.Context, prefix []string, version uint64, ss ...Selector) (WatchChan, error)
+	// After channel is established, any error will be returned from WatchChan immediately before it's closed.
+	WatchPrefix(ctx context.Context, prefix StorageKey, version uint64, ss ...Selector) (WatchChan, error)
 
 	// AddIndex adds a new index.
 	// An index indicates a field(s) of a type of an object that would be queried or watched frequently and
@@ -78,7 +79,6 @@ type Storage interface {
 	// DeleteIndex deletes an index.
 	DeleteIndex(indexName string)
 }
-
 
 // Conditions is used in do atomic conditional operations.
 // If compare failed, corresponding method should return storage version conflict error.
@@ -112,6 +112,9 @@ type WatchResponse struct {
 	PrevObject runtime.Object
 	Err        error
 }
+
+// StorageKey consists of multiple paths and after being joined by "/" become a unique path.
+type StorageKey []string
 ```
 
 We made the following changes based on the current Storage.Interface:
@@ -148,7 +151,6 @@ func WaitAndList(storage, version, ...) ... {
 #### 3. Simplify conditional check
 
 We replace the UID filed in the precondition with version. UID and other fields all depends on the version of the objects. By comparing the versions between objects, we effectively compare its UID. We might add more preconditions if needed.
-
 
 
 ## What we have done to prove the proposed API works
