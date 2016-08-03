@@ -44,10 +44,14 @@ func (r *RBACAuthorizer) Authorize(attr authorizer.Attributes) (bool, string, er
 	// Frame the authorization request as a privilege escalation check.
 	var requestedRule rbac.PolicyRule
 	if attr.IsResourceRequest() {
+		resource := attr.GetResource()
+		if len(attr.GetSubresource()) > 0 {
+			resource = attr.GetResource() + "/" + attr.GetSubresource()
+		}
 		requestedRule = rbac.PolicyRule{
 			Verbs:         []string{attr.GetVerb()},
 			APIGroups:     []string{attr.GetAPIGroup()}, // TODO(ericchiang): add api version here too?
-			Resources:     []string{attr.GetResource()},
+			Resources:     []string{resource},
 			ResourceNames: []string{attr.GetName()},
 		}
 	} else {
