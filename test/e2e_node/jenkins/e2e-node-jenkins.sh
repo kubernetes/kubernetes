@@ -28,6 +28,7 @@ set -x
 
 . $1
 
+go get -u github.com/jteeuwen/go-bindata/go-bindata
 make generated_files
 
 # TODO converge build steps with hack/build-go some day if possible.
