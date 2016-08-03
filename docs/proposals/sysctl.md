@@ -106,6 +106,12 @@ Some real-world examples for the use of sysctls:
   It is noted that
   > tuning settings described here will actually decrease performance of hosts connected at rates of OC3 (155 Mbps) or less.
 
+- For integration of a web-backend with the load-balancer retry mechanics it is suggested in http://serverfault.com/questions/518862/will-increasing-net-core-somaxconn-make-a-difference:
+
+  > Sometimes it's preferable to fail fast and let the load-balancer to do it's job(retry) than to make user wait - for that purpose we set net.core.somaxconn any value, and limit application backlog to e.g. 10 and set net.ipv4.tcp_abort_on_overflow to 1.
+
+  In other words, sysctls change the observable application behavior from the view of the load-balancer radically.
+
 ## Constraints and Assumptions
 
 * Only namespaced kernel parameters can be modified
