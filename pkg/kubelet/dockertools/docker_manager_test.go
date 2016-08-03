@@ -100,6 +100,10 @@ func (f *fakeRuntimeHelper) GetPodDir(kubetypes.UID) string {
 	return ""
 }
 
+func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+	return nil
+}
+
 func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerClient) (*DockerManager, *FakeDockerClient) {
 	if fakeHTTPClient == nil {
 		fakeHTTPClient = &fakeHTTP{}
@@ -109,7 +113,13 @@ func createTestDockerManager(fakeHTTPClient *fakeHTTP, fakeDocker *FakeDockerCli
 	}
 	fakeRecorder := &record.FakeRecorder{}
 	containerRefManager := kubecontainer.NewRefManager()
-	networkPlugin, _ := network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, "10.0.0.0/8")
+	networkPlugin, _ := network.InitNetworkPlugin(
+		[]network.NetworkPlugin{},
+		"",
+		nettest.NewFakeHost(nil),
+		componentconfig.HairpinNone,
+		"10.0.0.0/8")
+
 	dockerManager := NewFakeDockerManager(
 		fakeDocker,
 		fakeRecorder,
