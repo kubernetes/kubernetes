@@ -214,6 +214,35 @@ Issues:
 
 * https://github.com/coreos/rkt/issues/2075
 
+## Design Alternatives and Considerations
+
+- Each pod has its own network stack that is shared amongs its containers.
+  A privileged side-kick or init container (compare https://github.com/kubernetes/contrib/blob/master/ingress/controllers/nginx/examples/sysctl/change-proc-values-rc.yaml#L80)
+  is able to set `net.*` sysctls.
+
+  Clearly, this is completely uncontrolled by the kubelet, but is a usable work-around if privileged
+  containers are permitted in the environment. As privileged container permissions (in the admission controller) are an all-or-nothing
+  decision and the actual code executed in them is not limited, allowing privileged container might be a security threat.
+
+  The same work-around als works for shared memory and message queue sysctls as they are shared among the containers of a pod
+  in their ipc namespace.
+
+- Instead of giving the user a way to set sysctls for his pods, an alternative seems to be to set high values
+  for the limits of interest from the beginning inside the kubelet or the runtime. Then - so the theory - the
+  user's pods operate under quasi unlimited bounds.
+
+  This might be true for some of the sysctls, which purely set limits for some host resources, but
+
+  - some sysctls influence the behavior of the application, e.g.:
+    - `kernel.shm_rmid_forced` adds a garbage collection semantics to shared memory segments when possessing processes die.
+      This is against the System V standard though.
+    - `net.ipv4.tcp_abort_on_overflow` makes the kernel send RST packets when the application is overloaded, giving a load-balancer
+      the chance to reschedule a request to another backend.
+  - some sysctls lead to changed resource requirement characteristics, e.g.:
+    - `net.ipv4.tcp_rmem`/`net.ipv4.tcp_wmem` not only define min and max values, but also the default tcp window buffer size
+      for each socket. While large values are necessary for certain environments and applications, they lead to waste of resources
+      in the 90% case.
+
 ## Proposed Design
 
 Sysctls in pods and `PodSecurityPolicy` are first introduced as an alpha feature for Kubernetes 1.4. This means that the following changes apply to the internal unversioned API only. The externally visible v1 API will model these as annotations, with the plan to turn those in first class citizens in a later release.
