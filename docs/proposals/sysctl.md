@@ -112,22 +112,7 @@ Some real-world examples for the use of sysctls:
 
   In other words, sysctls change the observable application behavior from the view of the load-balancer radically.
 
-## Constraints and Assumptions
-
-* Only namespaced kernel parameters can be modified
-* Built on-top of the existing security context work
-* Be container-runtime agnostic
-  - on the API level
-  - the implementation (and the set of supported sysctls) will depend on the runtime
-* Kernel parameters can be set during a container creation process only.
-
-## Further work (out of scope for this proposal)
-
-* Update kernel parameters in running containers.
-* Integration with new container runtime proposal: https://github.com/kubernetes/kubernetes/pull/25899.
-* Hugepages support (compare [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-77426026)) - while also partly configured through sysctls (`vm.nr_hugepages`, compare http://andrigoss.blogspot.de/2008/02/jvm-performance-tuning.html) - is out-of-scope for this proposal as it is not namespaced and as a limited resource (similar to normal memory) needs deeper integration e.g. with the scheduler.
-
-## Use Cases
+## Abstract Use Cases
 
 As an administrator I want to set customizable kernel parameters for a container
 
@@ -146,6 +131,21 @@ As an administrator I want to set customizable kernel parameters for a container
    1. to enable containerized execution of special purpose applications without
       the need to enable those kernel features host wide, e.g. ip forwarding for
       network router daemons
+
+## Constraints and Assumptions
+
+* Only namespaced kernel parameters can be modified
+* Built on-top of the existing security context work
+* Be container-runtime agnostic
+  - on the API level
+  - the implementation (and the set of supported sysctls) will depend on the runtime
+* Kernel parameters can be set during a container creation process only.
+
+## Further work (out of scope for this proposal)
+
+* Update kernel parameters in running containers.
+* Integration with new container runtime proposal: https://github.com/kubernetes/kubernetes/pull/25899.
+* Hugepages support (compare [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-77426026)) - while also partly configured through sysctls (`vm.nr_hugepages`, compare http://andrigoss.blogspot.de/2008/02/jvm-performance-tuning.html) - is out-of-scope for this proposal as it is not namespaced and as a limited resource (similar to normal memory) needs deeper integration e.g. with the scheduler.
 
 ## Community Work
 
