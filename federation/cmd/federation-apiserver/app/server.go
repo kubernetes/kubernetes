@@ -59,6 +59,7 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *genericoptions.ServerRunOptions) error {
+	genericapiserver.VerifyEtcdServersList(s)
 	genericapiserver.DefaultAndValidateRunOptions(s)
 
 	// TODO: register cluster federation resources here.

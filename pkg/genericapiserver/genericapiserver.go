@@ -580,12 +580,6 @@ func verifyServiceNodePort(options *options.ServerRunOptions) {
 	}
 }
 
-func verifyEtcdServersList(options *options.ServerRunOptions) {
-	if len(options.StorageConfig.ServerList) == 0 {
-		glog.Fatalf("--etcd-servers must be specified")
-	}
-}
-
 func verifySecureAndInsecurePort(options *options.ServerRunOptions) {
 	if options.SecurePort < 0 || options.SecurePort > 65535 {
 		glog.Fatalf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", options.SecurePort)
@@ -601,10 +595,15 @@ func verifySecureAndInsecurePort(options *options.ServerRunOptions) {
 	}
 }
 
+func VerifyEtcdServersList(options *options.ServerRunOptions) {
+	if len(options.StorageConfig.ServerList) == 0 {
+		glog.Fatalf("--etcd-servers must be specified")
+	}
+}
+
 func ValidateRunOptions(options *options.ServerRunOptions) {
 	verifyClusterIPFlags(options)
 	verifyServiceNodePort(options)
-	verifyEtcdServersList(options)
 	verifySecureAndInsecurePort(options)
 }
 

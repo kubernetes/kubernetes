@@ -81,6 +81,7 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.APIServer) error {
+	genericapiserver.VerifyEtcdServersList(s.ServerRunOptions)
 	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 
 	capabilities.Initialize(capabilities.Capabilities{
