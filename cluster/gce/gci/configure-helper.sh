@@ -635,6 +635,10 @@ function start-kube-apiserver {
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   fi
+  if [[ -n "${NUM_NODES:-}" ]]; then
+    # Heuristic used to compute machine capacity based on number of nodes.
+    params+=" --expected-ram-capacity-mb=$((${NUM_NODES} * 60))"
+  fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi

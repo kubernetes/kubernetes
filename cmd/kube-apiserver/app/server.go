@@ -282,6 +282,7 @@ func Run(s *options.APIServer) error {
 	}
 
 	if s.EnableWatchCache {
+		glog.V(2).Infof("Initalizing cache sizes based on %dMB capacity", s.ExpectedRAMCapacityMB)
 		cachesize.InitializeWatchCacheSizes(s.ExpectedRAMCapacityMB)
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}

@@ -519,6 +519,10 @@ start_kube_apiserver() {
   params="${params} --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
 
+  if [ -n "${NUM_NODES:-}" ]; then
+    # Heuristic used to compute machine capacity based on number of nodes.
+    params="${params} --expected-ram-capacity-mb=$((${NUM_NODES} * 60))"
+  fi
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
