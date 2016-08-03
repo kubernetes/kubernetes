@@ -39,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -47,6 +46,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
@@ -158,7 +158,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	if config.ResourceContainer != "" {
 		// Run in its own container.
-		if err := util.RunInResourceContainer(config.ResourceContainer); err != nil {
+		if err := resourcecontainer.RunInResourceContainer(config.ResourceContainer); err != nil {
 			glog.Warningf("Failed to start in resource-only container %q: %v", config.ResourceContainer, err)
 		} else {
 			glog.V(2).Infof("Running in resource-only container %q", config.ResourceContainer)
