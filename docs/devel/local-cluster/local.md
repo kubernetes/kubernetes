@@ -27,19 +27,6 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
----
-assignees:
-- erictune
-- mikedanese
-- thockin
-
----
-
-
-
-* TOC
-{:toc}
-
 **Stop. This guide has been superseded by [Minikube](https://github.com/kubernetes/minikube) which is the recommended method of running Kubernetes on your local machine.**
 
 ### Requirements
