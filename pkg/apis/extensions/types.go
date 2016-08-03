@@ -35,6 +35,15 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
+// The following identify resource constants for Kubernetes object types
+var (
+	// ReplicaSets, number
+	ResourceReplicaSets api.ResourceName = GroupName + "/replicasets"
+
+	// Deployments, number
+	ResourceDeployments api.ResourceName = GroupName + "/deployments"
+)
+
 // describes the attributes of a scale subresource
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.

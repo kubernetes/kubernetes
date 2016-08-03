@@ -47,6 +47,11 @@ func AddToScheme(scheme *runtime.Scheme) {
 
 // Adds the list of known types to api.Scheme.
 func addKnownTypes(scheme *runtime.Scheme) {
+	// Add known resource names introduced in this API
+	api.AddStandardResourceNames(ResourceDeployments, ResourceReplicaSets)
+	api.AddStandardQuotaResourceNames(ResourceDeployments, ResourceReplicaSets)
+	api.AddIntegerResourceNames(ResourceDeployments, ResourceReplicaSets)
+
 	// TODO this gets cleaned up when the types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Deployment{},
