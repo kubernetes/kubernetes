@@ -53,22 +53,25 @@ apiserver=$(kube::util::find-binary "kube-apiserver")
 TMP_DIR=$(mktemp -d /tmp/update-swagger-spec.XXXX)
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-4001}
+ETCD_PROTO=${ETCD_PROTO:-"http"}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
 
-kube::etcd::start
+kube::etcd::ensure
 
 # Start kube-apiserver
 kube::log::status "Starting kube-apiserver"
 "${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
   --insecure-bind-address="127.0.0.1" \
+  $(kube::etcd::kubesec) \
   --bind-address="127.0.0.1" \
   --insecure-port="${API_PORT}" \
-  --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
+  --etcd-servers="${ETCD_PROTO}://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
   --cert-dir="${TMP_DIR}/certs" \
   --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-api-server.log 2>&1 &
+
 APISERVER_PID=$!
 
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "

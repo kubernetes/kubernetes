@@ -18,19 +18,51 @@
 
 ETCD_VERSION=${ETCD_VERSION:-2.2.1}
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
+ETCD_PROTO=${ETCD_PROTO:-"http"}
 ETCD_PORT=${ETCD_PORT:-4001}
 
+kube::etcd::kubesec() {
+  if [[ ! -z "${ETCD_CERT_PATH:-}" ]] && [[ ! -z "${ETCD_KEY_PATH:-}" ]]
+  then
+    echo "--etcd-certfile=$ETCD_CERT_PATH --etcd-keyfile=$ETCD_KEY_PATH"
+  fi
+  echo ""
+}
+
+kube::etcd::sec() {
+  if [[ ! -z "${ETCD_CERT_PATH:-}" ]] && [[ ! -z "${ETCD_KEY_PATH:-}" ]]
+  then
+    echo "--cert-file=$ETCD_CERT_PATH --key-file=$ETCD_KEY_PATH"
+  fi
+  echo ""
+}
+
 kube::etcd::start() {
+  local host=${ETCD_HOST:-127.0.0.1}
+  local port=${ETCD_PORT:-4001}
+  local proto=${ETCD_PROTO:-http}
+
   which etcd >/dev/null || {
     kube::log::usage "etcd must be in your PATH"
     exit 1
   }
 
+  which etcdctl >/dev/null || {
+    kube::log::usage "etcdctl must be in your PATH"
+    exit 1
+  }
+
   if pgrep etcd >/dev/null 2>&1; then
     kube::log::usage "etcd appears to already be running on this machine (`pgrep -l etcd`) (or its a zombie and you need to kill its parent)."
-    kube::log::usage "retry after you resolve this etcd error."
+    kube::log::usage "retry after you resolve this error"
     exit 1
-  fi
+  fi 
+    # Start etcd
+  
+  ETCD_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t test-etcd.XXXXXX)
+  kube::log::info "etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null"
+  etcd -addr ${ETCD_HOST}:${ETCD_PORT} -data-dir ${ETCD_DIR} --bind-addr ${ETCD_HOST}:${ETCD_PORT} >/dev/null 2>/dev/null &
+  ETCD_PID=$!
 
   version=$(etcd -version | cut -d " " -f 3)
   if [[ "${version}" < "${ETCD_VERSION}" ]]; then
@@ -50,9 +82,24 @@ kube::etcd::start() {
   etcd --advertise-client-urls http://${ETCD_HOST}:${ETCD_PORT} --data-dir ${ETCD_DIR} --listen-client-urls http://${ETCD_HOST}:${ETCD_PORT} --debug 2> "${ETCD_LOGFILE}" >/dev/null &
   ETCD_PID=$!
 
+  kube::etcd::check
+}
+
+kube::etcd::check() {
   echo "Waiting for etcd to come up."
-  kube::util::wait_for_url "http://${ETCD_HOST}:${ETCD_PORT}/v2/machines" "etcd: " 0.25 80
-  curl -fs -X PUT "http://${ETCD_HOST}:${ETCD_PORT}/v2/keys/_test"
+  kube::util::wait_for_cmd 0.25 80 etcdctl $(kube::etcd::sec) --endpoint="${ETCD_PROTO}://${ETCD_HOST}:${ETCD_PORT}" ls || {
+    kube::log::usage "etcdctl could not communicate with the etcd cluster."
+    exit 1
+  }
+}
+
+kube::etcd::ensure() {
+  if [[ "${ETCD_USE_EXISTING:-false}" == "true" ]]; then
+    kube::etcd::check
+  else
+    echo "Starting etcd"
+    kube::etcd::start
+  fi
 }
 
 kube::etcd::stop() {
@@ -81,8 +128,9 @@ kube::etcd::install() {
     else
       curl -fsSL --retry 3 --keepalive-time 2 https://github.com/coreos/etcd/releases/download/v${ETCD_VERSION}/etcd-v${ETCD_VERSION}-linux-amd64.tar.gz | tar xzf -
       ln -fns "etcd-v${ETCD_VERSION}-linux-amd64" etcd
+      ln -fs "etcd-v${ETCD_VERSION}-linux-amd64/etcdctl" etcdctl
     fi
-    kube::log::info "etcd v${ETCD_VERSION} installed. To use:"
+    kube::log::info "etcd and etcdctl v${ETCD_VERSION} installed. To use:"
     kube::log::info "export PATH=\${PATH}:$(pwd)/etcd"
   )
 }
