@@ -39,10 +39,12 @@ func init() {
 	if _, found := testapi.Groups[testgroup.SchemeGroupVersion.Group]; found {
 		return
 	}
+	externalGroupVersion := registered.GroupOrDie(testgroup.SchemeGroupVersion.Group).GroupVersion
 	testapi.Groups[testgroup.SchemeGroupVersion.Group] = testapi.NewTestGroup(
-		registered.GroupOrDie(testgroup.SchemeGroupVersion.Group).GroupVersion,
+		externalGroupVersion,
 		testgroup.SchemeGroupVersion,
-		api.Scheme.KnownTypes(testgroup.SchemeGroupVersion))
+		api.Scheme.KnownTypes(testgroup.SchemeGroupVersion),
+		api.Scheme.KnownTypes(externalGroupVersion))
 	testHelper = testapi.Groups[testgroup.SchemeGroupVersion.Group]
 }
 
