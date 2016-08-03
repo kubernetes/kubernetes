@@ -2083,40 +2083,25 @@ func TryKill(cmd *exec.Cmd) {
 	}
 }
 
-// TestContainerOutput runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using a substring matcher.
-func TestContainerOutput(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
-	testContainerOutputMatcher(scenarioName, c, pod, containerIndex, expectedOutput, ns, ContainSubstring)
-}
-
-// testContainerOutputRegexp runs the given pod in the given namespace and waits
-// for all of the containers in the podSpec to move into the 'Success' status, and tests
-// the specified container log against the given expected output using a regexp matcher.
-func testContainerOutputRegexp(scenarioName string, c *client.Client, pod *api.Pod, containerIndex int, expectedOutput []string, ns string) {
-	testContainerOutputMatcher(scenarioName, c, pod, containerIndex, expectedOutput, ns, MatchRegexp)
-}
-
 // testContainerOutputMatcher runs the given pod in the given namespace and waits
 // for all of the containers in the podSpec to move into the 'Success' status, and tests
 // the specified container log against the given expected output using the given matcher.
-func testContainerOutputMatcher(scenarioName string,
-	c *client.Client,
+func (f *Framework) testContainerOutputMatcher(scenarioName string,
 	pod *api.Pod,
 	containerIndex int,
-	expectedOutput []string, ns string,
+	expectedOutput []string,
 	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
+	podClient := f.PodClient()
+	ns := f.Namespace.Name
 
-	defer c.Pods(ns).Delete(pod.Name, api.NewDeleteOptions(0))
-	if _, err := c.Pods(ns).Create(pod); err != nil {
-		Failf("Failed to create pod: %v", err)
-	}
+	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+	podClient.Create(pod)
 
 	// Wait for client pod to complete.
 	var containerName string
 	for id, container := range pod.Spec.Containers {
-		ExpectNoError(WaitForPodSuccessInNamespace(c, pod.Name, container.Name, ns))
+		ExpectNoError(WaitForPodSuccessInNamespace(f.Client, pod.Name, container.Name, ns))
 		if id == containerIndex {
 			containerName = container.Name
 		}
@@ -2126,7 +2111,7 @@ func testContainerOutputMatcher(scenarioName string,
 	}
 
 	// Grab its logs.  Get host first.
-	podStatus, err := c.Pods(ns).Get(pod.Name)
+	podStatus, err := podClient.Get(pod.Name)
 	if err != nil {
 		Failf("Failed to get pod status: %v", err)
 	}
@@ -2139,7 +2124,7 @@ func testContainerOutputMatcher(scenarioName string,
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
 	for time.Now().Sub(start) < (60 * time.Second) {
 		err = nil
-		logs, err = GetPodLogs(c, ns, pod.Name, containerName)
+		logs, err = GetPodLogs(f.Client, ns, pod.Name, containerName)
 		if err != nil {
 			By(fmt.Sprintf("Warning: Failed to get logs from node %q pod %q container %q. %v",
 				podStatus.Spec.NodeName, podStatus.Name, containerName, err))

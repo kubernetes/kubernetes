@@ -82,10 +82,10 @@ var _ = framework.KubeDescribe("Secrets", func() {
 			},
 		}
 
-		framework.TestContainerOutput("consume secrets", f.Client, pod, 0, []string{
+		f.TestContainerOutput("consume secrets", pod, 0, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			"mode of file \"/etc/secret-volume/data-1\": -rw-r--r--",
-		}, f.Namespace.Name)
+		})
 	})
 
 	It("should be consumable in multiple volumes in a pod [Conformance]", func() {
@@ -161,10 +161,10 @@ var _ = framework.KubeDescribe("Secrets", func() {
 			},
 		}
 
-		framework.TestContainerOutput("consume secrets", f.Client, pod, 0, []string{
+		f.TestContainerOutput("consume secrets", pod, 0, []string{
 			"content of file \"/etc/secret-volume/data-1\": value-1",
 			"mode of file \"/etc/secret-volume/data-1\": -rw-r--r--",
-		}, f.Namespace.Name)
+		})
 	})
 
 	It("should be consumable from pods in env vars [Conformance]", func() {
@@ -212,9 +212,9 @@ var _ = framework.KubeDescribe("Secrets", func() {
 			},
 		}
 
-		framework.TestContainerOutput("consume secrets", f.Client, pod, 0, []string{
+		f.TestContainerOutput("consume secrets", pod, 0, []string{
 			"SECRET_DATA=value-1",
-		}, f.Namespace.Name)
+		})
 	})
 })
 
