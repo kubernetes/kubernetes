@@ -696,7 +696,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-labels"
-		testPodPath := string(framework.ReadOrDie("test/e2e/testing-manifests/node-selection/pod-with-node-affinity.yaml"))
+		testPodPath := "test/e2e/testing-manifests/node-selection/pod-with-node-affinity.yaml"
 		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
@@ -1211,7 +1211,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-newlabels"
-		testPodPath := string(framework.ReadOrDie("test/e2e/testing-manifests/node-selection/pos-with-node-affinity.yaml"))
+		testPodPath := "test/e2e/testing-manifests/node-selection/pod-with-pod-affinity.yaml"
 		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
