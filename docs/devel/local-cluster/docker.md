@@ -27,14 +27,6 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
----
-assignees:
-- asridharan
-- brendandburns
-- fgrzadkowski
-
----
-
 **Stop. This guide has been superseded by [Minikube](https://github.com/kubernetes/minikube) which is the recommended method of running Kubernetes on your local machine.**
 
 
@@ -43,9 +35,6 @@ The following instructions show you how to set up a simple, single node Kubernet
 Here's a diagram of what the final result will look like:
 
 ![Kubernetes Single Node on Docker](../../getting-started-guides/k8s-singlenode-docker.png)
-
-* TOC
-{:toc}
 
 ## Prerequisites
 
@@ -224,6 +213,10 @@ On OS X, since docker is running inside a VM, run the following command instead:
 ```shell
 docker-machine ssh `docker-machine active` curl $ip
 ```
+
+## Deploy a DNS
+
+Read [documentation for manually deploying a DNS](http://kubernetes.io/docs/getting-started-guides/docker-multinode/#deploy-dns-manually-for-v12x) for instructions.
 
 ### Turning down your cluster
 
