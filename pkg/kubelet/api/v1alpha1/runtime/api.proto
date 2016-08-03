@@ -1,4 +1,4 @@
-// api.pb.go could be generate by hack/update-generate-runtime.sh
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = 'proto2';
 
 package runtime;
@@ -11,14 +11,14 @@ service RuntimeService {
     // CreatePodSandbox creates a pod-level sandbox.
     // The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
     rpc CreatePodSandbox(CreatePodSandboxRequest) returns (CreatePodSandboxResponse) {}
-    // StopPodSandbox stops the sandbox. If there are any running containers in the
-    // sandbox, they should be force terminated.
+    // StopPodSandbox stops the running sandbox. If there are any running
+    // containers in the sandbox, they should be forcibly terminated.
     rpc StopPodSandbox(StopPodSandboxRequest) returns (StopPodSandboxResponse) {}
-    // DeletePodSandbox deletes the sandbox. If there are any running containers in the
-    // sandbox, they should be force deleted.
-    // It should return success if the sandbox has already been deleted.
-    rpc DeletePodSandbox(DeletePodSandboxRequest) returns (DeletePodSandboxResponse) {}
-    // PodSandboxStatus returns the Status of the PodSandbox.
+    // RemovePodSandbox removes the sandbox. If there are any running containers in the
+    // sandbox, they should be forcibly removed.
+    // It should return success if the sandbox has already been removed.
+    rpc RemovePodSandbox(RemovePodSandboxRequest) returns (RemovePodSandboxResponse) {}
+    // PodSandboxStatus returns the status of the PodSandbox.
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
     // ListPodSandbox returns a list of SandBox.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
@@ -29,8 +29,8 @@ service RuntimeService {
     rpc StartContainer(StartContainerRequest) returns (StartContainerResponse) {}
     // StopContainer stops a running container with a grace period (i.e., timeout).
     rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
-    // RemoveContainer removes the container. If the container is running, the container
-    // should be force removed.
+    // RemoveContainer removes the container. If the container is running, the
+    // container should be forcibly removed.
     // It should return success if the container has already been removed.
     rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
     // ListContainers lists all containers by filters.
@@ -214,12 +214,12 @@ message StopPodSandboxRequest {
 
 message StopPodSandboxResponse {}
 
-message DeletePodSandboxRequest {
+message RemovePodSandboxRequest {
     // The id of the PodSandBox
     optional string pod_sandbox_id = 1;
 }
 
-message DeletePodSandboxResponse {}
+message RemovePodSandboxResponse {}
 
 message PodSandboxStatusRequest {
     // The id of the PodSandBox
@@ -318,8 +318,8 @@ message ListPodSandboxResponse {
 }
 
 // ImageSpec is an internal representation of an image.  Currently, it wraps the
-// value of a Container's Image field (e.g. imageName, imageName:tag, or 
-// imageName:digest), but in the future it will include more detailed 
+// value of a Container's Image field (e.g. imageName, imageName:tag, or
+// imageName:digest), but in the future it will include more detailed
 // information about the different image types.
 message ImageSpec {
     optional string image = 1;

@@ -39,8 +39,8 @@ It has these top-level messages:
 	CreatePodSandboxResponse
 	StopPodSandboxRequest
 	StopPodSandboxResponse
-	DeletePodSandboxRequest
-	DeletePodSandboxResponse
+	RemovePodSandboxRequest
+	RemovePodSandboxResponse
 	PodSandboxStatusRequest
 	PodSandboxNetworkStatus
 	Namespace
@@ -700,30 +700,30 @@ func (m *StopPodSandboxResponse) Reset()         { *m = StopPodSandboxResponse{}
 func (m *StopPodSandboxResponse) String() string { return proto.CompactTextString(m) }
 func (*StopPodSandboxResponse) ProtoMessage()    {}
 
-type DeletePodSandboxRequest struct {
+type RemovePodSandboxRequest struct {
 	// The id of the PodSandBox
 	PodSandboxId     *string `protobuf:"bytes,1,opt,name=pod_sandbox_id" json:"pod_sandbox_id,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
 
-func (m *DeletePodSandboxRequest) Reset()         { *m = DeletePodSandboxRequest{} }
-func (m *DeletePodSandboxRequest) String() string { return proto.CompactTextString(m) }
-func (*DeletePodSandboxRequest) ProtoMessage()    {}
+func (m *RemovePodSandboxRequest) Reset()         { *m = RemovePodSandboxRequest{} }
+func (m *RemovePodSandboxRequest) String() string { return proto.CompactTextString(m) }
+func (*RemovePodSandboxRequest) ProtoMessage()    {}
 
-func (m *DeletePodSandboxRequest) GetPodSandboxId() string {
+func (m *RemovePodSandboxRequest) GetPodSandboxId() string {
 	if m != nil && m.PodSandboxId != nil {
 		return *m.PodSandboxId
 	}
 	return ""
 }
 
-type DeletePodSandboxResponse struct {
+type RemovePodSandboxResponse struct {
 	XXX_unrecognized []byte `json:"-"`
 }
 
-func (m *DeletePodSandboxResponse) Reset()         { *m = DeletePodSandboxResponse{} }
-func (m *DeletePodSandboxResponse) String() string { return proto.CompactTextString(m) }
-func (*DeletePodSandboxResponse) ProtoMessage()    {}
+func (m *RemovePodSandboxResponse) Reset()         { *m = RemovePodSandboxResponse{} }
+func (m *RemovePodSandboxResponse) String() string { return proto.CompactTextString(m) }
+func (*RemovePodSandboxResponse) ProtoMessage()    {}
 
 type PodSandboxStatusRequest struct {
 	// The id of the PodSandBox
@@ -2255,8 +2255,8 @@ func init() {
 	proto.RegisterType((*CreatePodSandboxResponse)(nil), "runtime.CreatePodSandboxResponse")
 	proto.RegisterType((*StopPodSandboxRequest)(nil), "runtime.StopPodSandboxRequest")
 	proto.RegisterType((*StopPodSandboxResponse)(nil), "runtime.StopPodSandboxResponse")
-	proto.RegisterType((*DeletePodSandboxRequest)(nil), "runtime.DeletePodSandboxRequest")
-	proto.RegisterType((*DeletePodSandboxResponse)(nil), "runtime.DeletePodSandboxResponse")
+	proto.RegisterType((*RemovePodSandboxRequest)(nil), "runtime.RemovePodSandboxRequest")
+	proto.RegisterType((*RemovePodSandboxResponse)(nil), "runtime.RemovePodSandboxResponse")
 	proto.RegisterType((*PodSandboxStatusRequest)(nil), "runtime.PodSandboxStatusRequest")
 	proto.RegisterType((*PodSandboxNetworkStatus)(nil), "runtime.PodSandboxNetworkStatus")
 	proto.RegisterType((*Namespace)(nil), "runtime.Namespace")
@@ -2320,14 +2320,14 @@ type RuntimeServiceClient interface {
 	// CreatePodSandbox creates a pod-level sandbox.
 	// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
 	CreatePodSandbox(ctx context.Context, in *CreatePodSandboxRequest, opts ...grpc.CallOption) (*CreatePodSandboxResponse, error)
-	// StopPodSandbox stops the sandbox. If there are any running containers in the
-	// sandbox, they should be force terminated.
+	// StopPodSandbox stops the running sandbox. If there are any running
+	// containers in the sandbox, they should be forcibly terminated.
 	StopPodSandbox(ctx context.Context, in *StopPodSandboxRequest, opts ...grpc.CallOption) (*StopPodSandboxResponse, error)
-	// DeletePodSandbox deletes the sandbox. If there are any running containers in the
-	// sandbox, they should be force deleted.
-	// It should return success if the sandbox has already been deleted.
-	DeletePodSandbox(ctx context.Context, in *DeletePodSandboxRequest, opts ...grpc.CallOption) (*DeletePodSandboxResponse, error)
-	// PodSandboxStatus returns the Status of the PodSandbox.
+	// RemovePodSandbox removes the sandbox. If there are any running containers in the
+	// sandbox, they should be forcibly removed.
+	// It should return success if the sandbox has already been removed.
+	RemovePodSandbox(ctx context.Context, in *RemovePodSandboxRequest, opts ...grpc.CallOption) (*RemovePodSandboxResponse, error)
+	// PodSandboxStatus returns the status of the PodSandbox.
 	PodSandboxStatus(ctx context.Context, in *PodSandboxStatusRequest, opts ...grpc.CallOption) (*PodSandboxStatusResponse, error)
 	// ListPodSandbox returns a list of SandBox.
 	ListPodSandbox(ctx context.Context, in *ListPodSandboxRequest, opts ...grpc.CallOption) (*ListPodSandboxResponse, error)
@@ -2337,8 +2337,8 @@ type RuntimeServiceClient interface {
 	StartContainer(ctx context.Context, in *StartContainerRequest, opts ...grpc.CallOption) (*StartContainerResponse, error)
 	// StopContainer stops a running container with a grace period (i.e., timeout).
 	StopContainer(ctx context.Context, in *StopContainerRequest, opts ...grpc.CallOption) (*StopContainerResponse, error)
-	// RemoveContainer removes the container. If the container is running, the container
-	// should be force removed.
+	// RemoveContainer removes the container. If the container is running, the
+	// container should be forcibly removed.
 	// It should return success if the container has already been removed.
 	RemoveContainer(ctx context.Context, in *RemoveContainerRequest, opts ...grpc.CallOption) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
@@ -2384,9 +2384,9 @@ func (c *runtimeServiceClient) StopPodSandbox(ctx context.Context, in *StopPodSa
 	return out, nil
 }
 
-func (c *runtimeServiceClient) DeletePodSandbox(ctx context.Context, in *DeletePodSandboxRequest, opts ...grpc.CallOption) (*DeletePodSandboxResponse, error) {
-	out := new(DeletePodSandboxResponse)
-	err := grpc.Invoke(ctx, "/runtime.RuntimeService/DeletePodSandbox", in, out, c.cc, opts...)
+func (c *runtimeServiceClient) RemovePodSandbox(ctx context.Context, in *RemovePodSandboxRequest, opts ...grpc.CallOption) (*RemovePodSandboxResponse, error) {
+	out := new(RemovePodSandboxResponse)
+	err := grpc.Invoke(ctx, "/runtime.RuntimeService/RemovePodSandbox", in, out, c.cc, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2504,14 +2504,14 @@ type RuntimeServiceServer interface {
 	// CreatePodSandbox creates a pod-level sandbox.
 	// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
 	CreatePodSandbox(context.Context, *CreatePodSandboxRequest) (*CreatePodSandboxResponse, error)
-	// StopPodSandbox stops the sandbox. If there are any running containers in the
-	// sandbox, they should be force terminated.
+	// StopPodSandbox stops the running sandbox. If there are any running
+	// containers in the sandbox, they should be forcibly terminated.
 	StopPodSandbox(context.Context, *StopPodSandboxRequest) (*StopPodSandboxResponse, error)
-	// DeletePodSandbox deletes the sandbox. If there are any running containers in the
-	// sandbox, they should be force deleted.
-	// It should return success if the sandbox has already been deleted.
-	DeletePodSandbox(context.Context, *DeletePodSandboxRequest) (*DeletePodSandboxResponse, error)
-	// PodSandboxStatus returns the Status of the PodSandbox.
+	// RemovePodSandbox removes the sandbox. If there are any running containers in the
+	// sandbox, they should be forcibly removed.
+	// It should return success if the sandbox has already been removed.
+	RemovePodSandbox(context.Context, *RemovePodSandboxRequest) (*RemovePodSandboxResponse, error)
+	// PodSandboxStatus returns the status of the PodSandbox.
 	PodSandboxStatus(context.Context, *PodSandboxStatusRequest) (*PodSandboxStatusResponse, error)
 	// ListPodSandbox returns a list of SandBox.
 	ListPodSandbox(context.Context, *ListPodSandboxRequest) (*ListPodSandboxResponse, error)
@@ -2521,8 +2521,8 @@ type RuntimeServiceServer interface {
 	StartContainer(context.Context, *StartContainerRequest) (*StartContainerResponse, error)
 	// StopContainer stops a running container with a grace period (i.e., timeout).
 	StopContainer(context.Context, *StopContainerRequest) (*StopContainerResponse, error)
-	// RemoveContainer removes the container. If the container is running, the container
-	// should be force removed.
+	// RemoveContainer removes the container. If the container is running, the
+	// container should be forcibly removed.
 	// It should return success if the container has already been removed.
 	RemoveContainer(context.Context, *RemoveContainerRequest) (*RemoveContainerResponse, error)
 	// ListContainers lists all containers by filters.
@@ -2573,12 +2573,12 @@ func _RuntimeService_StopPodSandbox_Handler(srv interface{}, ctx context.Context
 	return out, nil
 }
 
-func _RuntimeService_DeletePodSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
-	in := new(DeletePodSandboxRequest)
+func _RuntimeService_RemovePodSandbox_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error) (interface{}, error) {
+	in := new(RemovePodSandboxRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
-	out, err := srv.(RuntimeServiceServer).DeletePodSandbox(ctx, in)
+	out, err := srv.(RuntimeServiceServer).RemovePodSandbox(ctx, in)
 	if err != nil {
 		return nil, err
 	}
@@ -2724,8 +2724,8 @@ var _RuntimeService_serviceDesc = grpc.ServiceDesc{
 			Handler:    _RuntimeService_StopPodSandbox_Handler,
 		},
 		{
-			MethodName: "DeletePodSandbox",
-			Handler:    _RuntimeService_DeletePodSandbox_Handler,
+			MethodName: "RemovePodSandbox",
+			Handler:    _RuntimeService_RemovePodSandbox_Handler,
 		},
 		{
 			MethodName: "PodSandboxStatus",

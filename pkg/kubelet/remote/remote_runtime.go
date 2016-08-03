@@ -97,17 +97,17 @@ func (r *RemoteRuntimeService) StopPodSandbox(podSandBoxID string) error {
 	return nil
 }
 
-// DeletePodSandbox deletes the sandbox. If there are any containers in the
-// sandbox, they should be forced to deletion.
-func (r *RemoteRuntimeService) DeletePodSandbox(podSandBoxID string) error {
+// RemovePodSandbox removes the sandbox. If there are any containers in the
+// sandbox, they should be forcibly removed.
+func (r *RemoteRuntimeService) RemovePodSandbox(podSandBoxID string) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
-	_, err := r.runtimeClient.DeletePodSandbox(ctx, &runtimeApi.DeletePodSandboxRequest{
+	_, err := r.runtimeClient.RemovePodSandbox(ctx, &runtimeApi.RemovePodSandboxRequest{
 		PodSandboxId: &podSandBoxID,
 	})
 	if err != nil {
-		glog.Errorf("DeletePodSandbox %q from runtime service failed: %v", podSandBoxID, err)
+		glog.Errorf("RemovePodSandbox %q from runtime service failed: %v", podSandBoxID, err)
 		return err
 	}
 
