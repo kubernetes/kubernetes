@@ -134,8 +134,9 @@ specific actions that create, update, delete, or get.
 2. **Lists** are collections of **resources** of one (usually) or more
 (occasionally) kinds.
 
-   Lists have a limited set of common metadata. All lists use the "items" field
-to contain the array of objects they return.
+   The name of a list kind must end with "List". Lists have a limited set of
+common metadata. All lists use the required "items" field to contain the array
+of objects they return. Any kind that has the "items" field must be a list kind.
 
    Most objects defined in the system should have an endpoint that returns the
 full set of resources, as well as zero or more endpoints that return subsets of
