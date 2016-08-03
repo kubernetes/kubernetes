@@ -155,6 +155,17 @@ func IsStandardQuotaResourceName(str string) bool {
 	return standardQuotaResources.Has(str)
 }
 
+// AddStandardQuotaResourceNames add the resource names into the list of
+// resources known to the quota tracking system
+func AddStandardQuotaResourceNames(names ...ResourceName) {
+	for _, name := range names {
+		if len(strings.Split(string(name), "/")) != 2 {
+			panic(fmt.Sprintf("invalid standard quota resource name format %q, must be <groupName>/<resource>", name))
+		}
+		standardQuotaResources.Insert(string(name))
+	}
+}
+
 var standardResources = sets.NewString(
 	string(ResourceCPU),
 	string(ResourceMemory),
@@ -177,6 +188,18 @@ func IsStandardResourceName(str string) bool {
 	return standardResources.Has(str)
 }
 
+// AddStandardResourceNames add the resource names into the list of resources
+// known to the system.
+// External resource names must be in "groupname/resourcename" format.
+func AddStandardResourceNames(names ...ResourceName) {
+	for _, name := range names {
+		if len(strings.Split(string(name), "/")) != 2 {
+			panic(fmt.Sprintf("invalid standard resource name format %q, must be <groupName>/<resource>", name))
+		}
+		standardResources.Insert(string(name))
+	}
+}
+
 var integerResources = sets.NewString(
 	string(ResourcePods),
 	string(ResourceQuotas),
@@ -192,6 +215,17 @@ var integerResources = sets.NewString(
 // IsIntegerResourceName returns true if the resource is measured in integer values
 func IsIntegerResourceName(str string) bool {
 	return integerResources.Has(str)
+}
+
+// AddIntegerResourceNames add the resource names into the list of resources
+// measured in integer values
+func AddIntegerResourceNames(names ...ResourceName) {
+	for _, name := range names {
+		if len(strings.Split(string(name), "/")) != 2 {
+			panic(fmt.Sprintf("invalid integer resource name format %q, must be <groupName>/<resource>", name))
+		}
+		integerResources.Insert(string(name))
+	}
 }
 
 // NewDeleteOptions returns a DeleteOptions indicating the resource should
