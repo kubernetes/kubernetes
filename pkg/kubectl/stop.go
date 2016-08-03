@@ -398,9 +398,10 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	for _, rc := range rsList.Items {
 		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
 			scaleGetErr, ok := err.(*ScaleError)
-			if !errors.IsNotFound(err) || ok && !errors.IsNotFound(scaleGetErr.ActualError) {
-				errList = append(errList, err)
+			if errors.IsNotFound(err) || (ok && errors.IsNotFound(scaleGetErr.ActualError)) {
+				continue
 			}
+			errList = append(errList, err)
 		}
 	}
 	if len(errList) > 0 {
