@@ -289,6 +289,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	}
 
 	sorting, err := cmd.Flags().GetString("sort-by")
+	if err != nil {
+		return err
+	}
 	var sorter *kubectl.RuntimeSort
 	if err == nil && len(sorting) > 0 && len(objs) > 1 {
 		clientConfig, err := f.ClientConfig()
