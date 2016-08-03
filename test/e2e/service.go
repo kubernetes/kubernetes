@@ -1970,7 +1970,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		// TODO(mikedanese): Wait.
 
 		// Then, delete the RC altogether.
-		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName); err != nil {
+		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
 			errs = append(errs, err)
 		}
 	}
