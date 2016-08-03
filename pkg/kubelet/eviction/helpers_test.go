@@ -872,7 +872,7 @@ func TestHasNodeConditions(t *testing.T) {
 	}
 }
 
-func TestReclaimResources(t *testing.T) {
+func TestGetStarvedResources(t *testing.T) {
 	testCases := map[string]struct {
 		inputs []Threshold
 		result []api.ResourceName
@@ -897,7 +897,7 @@ func TestReclaimResources(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := reclaimResources(testCase.inputs)
+		actual := getStarvedResources(testCase.inputs)
 		actualSet := quota.ToSet(actual)
 		expectedSet := quota.ToSet(testCase.result)
 		if !actualSet.Equal(expectedSet) {
