@@ -316,7 +316,6 @@ func TestUpdateSelectorToAdopt(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	go podInformer.Run(stopCh)
-	waitToObservePods(t, podInformer, 2)
 	go rm.Run(5, stopCh)
 	waitRSStable(t, clientSet, rs, ns.Name)
 
@@ -354,6 +353,7 @@ func TestUpdateSelectorToRemoveControllerRef(t *testing.T) {
 
 	stopCh := make(chan struct{})
 	go podInformer.Run(stopCh)
+	waitToObservePods(t, podInformer, 2)
 	go rm.Run(5, stopCh)
 	waitRSStable(t, clientSet, rs, ns.Name)
 
