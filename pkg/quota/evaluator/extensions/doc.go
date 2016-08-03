@@ -14,20 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package install
-
-import (
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/quota/evaluator/extensions"
-)
-
-// NewRegistry returns a registry that knows how to deal kubernetes resources
-// across API groups
-func NewRegistry(kubeClient clientset.Interface) quota.Registry {
-	return &quota.UnionRegistry{
-		core.NewRegistry(kubeClient),
-		extensions.NewRegistry(kubeClient),
-	}
-}
+// extensions contains modules that interface with the extensions api group
+package extensions // import "k8s.io/kubernetes/pkg/quota/evaluator/extensions"
