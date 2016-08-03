@@ -207,7 +207,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Cloud:                        nil, // cloud provider might start background processes
 		ClusterDNS:                   net.ParseIP(s.ClusterDNS),
 		ClusterDomain:                s.ClusterDomain,
-		ConfigFile:                   s.Config,
+		ConfigFile:                   s.PodManifestPath,
 		ConfigureCBR0:                s.ConfigureCBR0,
 		ContainerManager:             nil,
 		ContainerRuntime:             s.ContainerRuntime,
