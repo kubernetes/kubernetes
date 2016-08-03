@@ -258,7 +258,7 @@ var _ = framework.KubeDescribe("ResourceQuota", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Deleting a ReplicationController")
-		err = f.Client.ReplicationControllers(f.Namespace.Name).Delete(replicationController.Name)
+		err = f.Client.ReplicationControllers(f.Namespace.Name).Delete(replicationController.Name, nil)
 		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring resource quota status released usage")
