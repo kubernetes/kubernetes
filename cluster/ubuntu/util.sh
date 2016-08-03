@@ -318,6 +318,7 @@ EOF
 
 # Create ~/kube/default/flanneld with proper contents.
 # $1: The one hostname or IP address at which the etcd leader listens.
+# $2: The IP address or network interface for the local Flannel daemon to use
 function create-flanneld-opts() {
   cat <<EOF > ~/kube/default/flanneld
 FLANNEL_OPTS="--etcd-endpoints=http://${1}:4001 \
