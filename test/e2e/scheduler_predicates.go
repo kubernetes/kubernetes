@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package e2e
 import (
 	"fmt"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -27,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/system"
@@ -54,7 +52,9 @@ func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.
 				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
 				Expect(scheduledCondition != nil).To(Equal(true))
 				Expect(scheduledCondition.Status).To(Equal(api.ConditionFalse))
-				notScheduledPods = append(notScheduledPods, pod)
+				if scheduledCondition.Reason == "Unschedulable" {
+					notScheduledPods = append(notScheduledPods, pod)
+				}
 			}
 		}
 	}
@@ -69,37 +69,11 @@ func getRequestedCPU(pod api.Pod) int64 {
 	return result
 }
 
-func verifyResult(c *client.Client, podName string, ns string) {
-	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
+// TODO: upgrade calls in PodAffinity tests when we're able to run them
+func verifyResult(c *client.Client, podName string, expectedScheduled int, expectedNotScheduled int, ns string) {
+	allPods, err := c.Pods(ns).List(api.ListOptions{})
 	framework.ExpectNoError(err)
 	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
-
-	selector := fields.Set{
-		"involvedObject.kind":      "Pod",
-		"involvedObject.name":      podName,
-		"involvedObject.namespace": ns,
-		"source":                   api.DefaultSchedulerName,
-		"reason":                   "FailedScheduling",
-	}.AsSelector()
-	options := api.ListOptions{FieldSelector: selector}
-	schedEvents, err := c.Events(ns).List(options)
-	framework.ExpectNoError(err)
-	// If we failed to find event with a capitalized first letter of reason
-	// try looking for one starting with a small one for backward compatibility.
-	// If we don't do it we end up in #15806.
-	// TODO: remove this block when we don't care about supporting v1.0 too much.
-	if len(schedEvents.Items) == 0 {
-		selector := fields.Set{
-			"involvedObject.kind":      "Pod",
-			"involvedObject.name":      podName,
-			"involvedObject.namespace": ns,
-			"source":                   "scheduler",
-			"reason":                   "failedScheduling",
-		}.AsSelector()
-		options := api.ListOptions{FieldSelector: selector}
-		schedEvents, err = c.Events(ns).List(options)
-		framework.ExpectNoError(err)
-	}
 
 	printed := false
 	printOnce := func(msg string) string {
@@ -111,8 +85,8 @@ func verifyResult(c *client.Client, podName string, ns string) {
 		}
 	}
 
-	Expect(len(notScheduledPods)).To(Equal(1), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
-	Expect(schedEvents.Items).ToNot(BeEmpty(), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
+	Expect(len(notScheduledPods)).To(Equal(expectedNotScheduled), printOnce(fmt.Sprintf("Not scheduled Pods: %#v", notScheduledPods)))
+	Expect(len(scheduledPods)).To(Equal(expectedScheduled), printOnce(fmt.Sprintf("Scheduled Pods: %#v", scheduledPods)))
 }
 
 func cleanupPods(c *client.Client, ns string) {
@@ -122,23 +96,6 @@ func cleanupPods(c *client.Client, ns string) {
 	opt := api.NewDeleteOptions(0)
 	for _, p := range pods.Items {
 		framework.ExpectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
-	}
-}
-
-func removeLabelOffNode(c *client.Client, nodeName string, labelKey string) {
-	By("removing the label " + labelKey + " off the node " + nodeName)
-	node, err := c.Nodes().Get(nodeName)
-	framework.ExpectNoError(err)
-	if node.Labels == nil || len(node.Labels[labelKey]) == 0 {
-		return
-	}
-	delete(node.Labels, labelKey)
-	nodeUpdated, err := c.Nodes().Update(node)
-	framework.ExpectNoError(err)
-
-	By("verifying the node doesn't have the label " + labelKey)
-	if nodeUpdated.Labels != nil && len(nodeUpdated.Labels[labelKey]) != 0 {
-		framework.Failf("Failed removing label " + labelKey + " of the node " + nodeName)
 	}
 }
 
@@ -197,7 +154,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		c = f.Client
 		ns = f.Namespace.Name
 		nodeList = &api.NodeList{}
-		nodes, err := c.Nodes().List(api.ListOptions{})
+		nodes := framework.GetReadySchedulableNodesOrDie(c)
 		masterNodes = sets.NewString()
 		for _, node := range nodes.Items {
 			if system.IsMasterNode(&node) {
@@ -207,7 +164,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.CheckTestingNSDeletedExcept(c, ns)
+		err := framework.CheckTestingNSDeletedExcept(c, ns)
 		framework.ExpectNoError(err)
 
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
@@ -222,7 +179,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			}
 		}
 
-		err = framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels, false)
+		err = framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(systemPodsNo), framework.PodReadyBeforeTimeout, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
 
 		for _, node := range nodeList.Items {
@@ -252,24 +209,29 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
 
-		framework.StartPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
-			TypeMeta: unversioned.TypeMeta{
-				Kind: "Pod",
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name:   "",
-				Labels: map[string]string{"name": ""},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "",
-						Image: framework.GetPauseImageName(f.Client),
+		// As the pods are distributed randomly among nodes,
+		// it can easily happen that all nodes are satured
+		// and there is no need to create additional pods.
+		// StartPods requires at least one pod to replicate.
+		if podsNeededForSaturation > 0 {
+			framework.StartPods(c, podsNeededForSaturation, ns, "maxp", api.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					Kind: "Pod",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:   "",
+					Labels: map[string]string{"name": ""},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "",
+							Image: framework.GetPauseImageName(f.Client),
+						},
 					},
 				},
-			},
-		}, true)
-
+			}, true)
+		}
 		podName := "additional-pod"
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -294,7 +256,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, podsNeededForSaturation, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -329,32 +291,37 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster CPU and trying to start another one", podsNeededForSaturation))
 
-		framework.StartPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
-			TypeMeta: unversioned.TypeMeta{
-				Kind: "Pod",
-			},
-			ObjectMeta: api.ObjectMeta{
-				Name:   "",
-				Labels: map[string]string{"name": ""},
-			},
-			Spec: api.PodSpec{
-				Containers: []api.Container{
-					{
-						Name:  "",
-						Image: framework.GetPauseImageName(f.Client),
-						Resources: api.ResourceRequirements{
-							Limits: api.ResourceList{
-								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
-							},
-							Requests: api.ResourceList{
-								"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+		// As the pods are distributed randomly among nodes,
+		// it can easily happen that all nodes are saturated
+		// and there is no need to create additional pods.
+		// StartPods requires at least one pod to replicate.
+		if podsNeededForSaturation > 0 {
+			framework.StartPods(c, podsNeededForSaturation, ns, "overcommit", api.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					Kind: "Pod",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name:   "",
+					Labels: map[string]string{"name": ""},
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{
+							Name:  "",
+							Image: framework.GetPauseImageName(f.Client),
+							Resources: api.ResourceRequirements{
+								Limits: api.ResourceList{
+									"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+								},
+								Requests: api.ResourceList{
+									"cpu": *resource.NewMilliQuantity(milliCpuPerPod, "DecimalSI"),
+								},
 							},
 						},
 					},
 				},
-			},
-		}, true)
-
+			}, true)
+		}
 		podName := "additional-pod"
 		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -384,7 +351,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, podsNeededForSaturation, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -422,7 +389,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, 0, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -503,14 +470,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
 		v := "42"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -600,7 +562,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, 0, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -641,14 +603,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
 		v := "42"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to relaunch the pod, now with labels.")
 		labelPodName := "with-labels"
@@ -737,14 +694,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "kubernetes.io/e2e-az-name"
 		v := "e2e-az1"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-labels"
@@ -862,7 +814,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podName, ns)
+		verifyResult(c, podName, 0, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -902,14 +854,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "china-e2etest"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -994,14 +941,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "china-e2etest"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity with same Labels.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -1044,7 +986,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, labelPodName, ns)
+		verifyResult(c, labelPodName, 1, 1, ns)
 		cleanupPods(c, ns)
 	})
 
@@ -1084,14 +1026,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "kubernetes-e2e"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
 		labelPodName := "with-podaffinity-" + string(util.NewUUID())
@@ -1185,14 +1122,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "e2e-testing"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
 		labelPodName := "with-podantiaffinity-" + string(util.NewUUID())
@@ -1289,14 +1221,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
 		v := "e2e-az1"
-		patch := fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, k, v)
-		err = c.Patch(api.MergePatchType).Resource("nodes").Name(nodeName).Body([]byte(patch)).Do().Error()
-		framework.ExpectNoError(err)
-
-		node, err := c.Nodes().Get(nodeName)
-		framework.ExpectNoError(err)
-		Expect(node.Labels[k]).To(Equal(v))
-		defer removeLabelOffNode(c, nodeName, k)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+		framework.ExpectNodeHasLabel(c, nodeName, k, v)
+		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
 		labelPodName := "with-newlabels"
@@ -1355,30 +1282,17 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random taint on the found node.")
 		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(util.NewUUID()))
 		taintValue := "testing-taint-value"
-		taintEffect := string(api.TaintEffectNoSchedule)
-		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
-		By("verifying the node has the taint " + taintName + " with the value " + taintValue)
-		output := framework.RunKubectlOrDie("describe", "node", nodeName)
-		requiredStrings := [][]string{
-			{"Name:", nodeName},
-			{"Taints:"},
-			{taintName, taintValue, taintEffect},
-		}
-		checkOutput(output, requiredStrings)
+		taintEffect := api.TaintEffectNoSchedule
+		framework.AddOrUpdateTaintOnNode(c, nodeName, api.Taint{Key: taintName, Value: taintValue, Effect: taintEffect})
+		framework.ExpectNodeHasTaint(c, nodeName, taintName)
+		defer framework.RemoveTaintOffNode(c, nodeName, taintName)
 
 		By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(util.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.RunKubectlOrDie("label", "nodes", nodeName, labelKey+"="+labelValue)
-		By("verifying the node has the label " + labelKey + " with the value " + labelValue)
-		labelOutput := framework.RunKubectlOrDie("describe", "node", nodeName)
-		labelOutputRequiredStrings := [][]string{
-			{"Name:", nodeName},
-			{"Labels:"},
-			{labelKey + "=" + labelValue},
-		}
-		checkOutput(labelOutput, labelOutputRequiredStrings)
-		defer removeLabelOffNode(c, nodeName, labelKey)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
+		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
+		defer framework.RemoveLabelOffNode(c, nodeName, labelKey)
 
 		By("Trying to relaunch the pod, now with tolerations.")
 		tolerationPodName := "with-tolerations"
@@ -1394,7 +1308,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 							{
 								"key": "` + taintName + `",
 								"value": "` + taintValue + `",
-								"effect": "` + taintEffect + `"
+								"effect": "` + string(taintEffect) + `"
 							}
 						]`,
 				},
@@ -1421,14 +1335,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		deployedPod, err := c.Pods(ns).Get(tolerationPodName)
 		framework.ExpectNoError(err)
 		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
-
-		By("removing the taint " + taintName + " off the node " + nodeName)
-		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
-		By("verifying the node doesn't have the taint " + taintName)
-		output = framework.RunKubectlOrDie("describe", "node", nodeName)
-		if strings.Contains(output, taintName) {
-			framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
-		}
 	})
 
 	// 1. Run a pod to get an available node, then delete the pod
@@ -1470,30 +1376,17 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to apply a random taint on the found node.")
 		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(util.NewUUID()))
 		taintValue := "testing-taint-value"
-		taintEffect := string(api.TaintEffectNoSchedule)
-		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
-		By("verifying the node has the taint " + taintName + " with the value " + taintValue)
-		output := framework.RunKubectlOrDie("describe", "node", nodeName)
-		requiredStrings := [][]string{
-			{"Name:", nodeName},
-			{"Taints:"},
-			{taintName, taintValue, taintEffect},
-		}
-		checkOutput(output, requiredStrings)
+		taintEffect := api.TaintEffectNoSchedule
+		framework.AddOrUpdateTaintOnNode(c, nodeName, api.Taint{Key: taintName, Value: taintValue, Effect: taintEffect})
+		framework.ExpectNodeHasTaint(c, nodeName, taintName)
+		defer framework.RemoveTaintOffNode(c, nodeName, taintName)
 
 		By("Trying to apply a random label on the found node.")
 		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(util.NewUUID()))
 		labelValue := "testing-label-value"
-		framework.RunKubectlOrDie("label", "nodes", nodeName, labelKey+"="+labelValue)
-		By("verifying the node has the label " + labelKey + " with the value " + labelValue)
-		labelOutput := framework.RunKubectlOrDie("describe", "node", nodeName)
-		labelOutputRequiredStrings := [][]string{
-			{"Name:", nodeName},
-			{"Labels:"},
-			{labelKey + "=" + labelValue},
-		}
-		checkOutput(labelOutput, labelOutputRequiredStrings)
-		defer removeLabelOffNode(c, nodeName, labelKey)
+		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
+		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
+		defer framework.RemoveLabelOffNode(c, nodeName, labelKey)
 
 		By("Trying to relaunch the pod, still no tolerations.")
 		podNameNoTolerations := "still-no-tolerations"
@@ -1521,30 +1414,23 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, podNameNoTolerations, ns)
+		verifyResult(c, podNameNoTolerations, 0, 1, ns)
 		cleanupPods(c, ns)
 
-		By("removing the taint " + taintName + " off the node " + nodeName)
-		framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
-		By("verifying the node doesn't have the taint " + taintName)
-		output = framework.RunKubectlOrDie("describe", "node", nodeName)
-		if strings.Contains(output, taintName) {
-			framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
-		}
+		// TODO(@kevin-wangzefeng) Figure out how to do it correctly
+		// By("Trying to relaunch the same.")
+		// _, err = c.Pods(ns).Create(&podNoTolerations)
+		// framework.ExpectNoError(err)
+		// defer c.Pods(ns).Delete(podNameNoTolerations, api.NewDeleteOptions(0))
 
-		By("Trying to relaunch the same.")
-		_, err = c.Pods(ns).Create(&podNoTolerations)
-		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(podNameNoTolerations, api.NewDeleteOptions(0))
-
-		// check that pod got scheduled. We intentionally DO NOT check that the
-		// pod is running because this will create a race condition with the
-		// kubelet and the scheduler: the scheduler might have scheduled a pod
-		// already when the kubelet does not know about its new taint yet. The
-		// kubelet will then refuse to launch the pod.
-		framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podNameNoTolerations))
-		deployedPod, err := c.Pods(ns).Get(podNameNoTolerations)
-		framework.ExpectNoError(err)
-		Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
+		// // check that pod got scheduled. We intentionally DO NOT check that the
+		// // pod is running because this will create a race condition with the
+		// // kubelet and the scheduler: the scheduler might have scheduled a pod
+		// // already when the kubelet does not know about its new taint yet. The
+		// // kubelet will then refuse to launch the pod.
+		// framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podNameNoTolerations))
+		// deployedPod, err := c.Pods(ns).Get(podNameNoTolerations)
+		// framework.ExpectNoError(err)
+		// Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
 	})
 })
