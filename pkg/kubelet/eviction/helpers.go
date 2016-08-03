@@ -534,7 +534,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period
-func thresholdsMet(thresholds []Threshold, observations signalObservations) []Threshold {
+func thresholdsMet(thresholds []Threshold, observations signalObservations, enforceMinReclaim bool) []Threshold {
 	results := []Threshold{}
 	for i := range thresholds {
 		threshold := thresholds[i]
@@ -545,7 +545,12 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations) []Th
 		}
 		// determine if we have met the specified threshold
 		thresholdMet := false
-		thresholdResult := threshold.Value.Cmp(*observed)
+		quantity := threshold.Value.Copy()
+		// if enforceMinReclaim is specified, we compare relative to value - minreclaim
+		if enforceMinReclaim && threshold.MinReclaim != nil {
+			quantity.Add(*threshold.MinReclaim)
+		}
+		thresholdResult := quantity.Cmp(*observed)
 		switch threshold.Operator {
 		case OpLessThan:
 			thresholdMet = thresholdResult > 0
@@ -589,7 +594,9 @@ func nodeConditions(thresholds []Threshold) []api.NodeConditionType {
 	results := []api.NodeConditionType{}
 	for _, threshold := range thresholds {
 		if nodeCondition, found := signalToNodeCondition[threshold.Signal]; found {
-			results = append(results, nodeCondition)
+			if !hasNodeCondition(results, nodeCondition) {
+				results = append(results, nodeCondition)
+			}
 		}
 	}
 	return results
@@ -644,7 +651,18 @@ func hasNodeCondition(inputs []api.NodeConditionType, item api.NodeConditionType
 	return false
 }
 
-// hasThreshold returns true if the node condition is in the input list
+// mergeThresholds will merge both threshold lists eliminating duplicates.
+func mergeThresholds(inputsA []Threshold, inputsB []Threshold) []Threshold {
+	results := inputsA
+	for _, threshold := range inputsB {
+		if !hasThreshold(results, threshold) {
+			results = append(results, threshold)
+		}
+	}
+	return results
+}
+
+// hasThreshold returns true if the threshold is in the input list
 func hasThreshold(inputs []Threshold, item Threshold) bool {
 	for _, input := range inputs {
 		if input.GracePeriod == item.GracePeriod && input.Operator == item.Operator && input.Signal == item.Signal && input.Value.Cmp(*item.Value) == 0 {
