@@ -282,6 +282,13 @@ Issues:
     > The values has been chosen to be larger than necessary for any known configuration. ([linux/sem.h](http://lxr.free-electrons.com/source/include/uapi/linux/sem.h#L69))
 
 - `net.*`: configure the network stack
+  - `net.core.somaxconn`: maximum queue length specifiable by listen.
+    * [x] namespaced in net ns
+    * [ ] **might have application influence** for high values as it limits the socker queue length
+    * [ ] TODO: accounting? No evidence found until now.
+  - `net.ipv4.tcp_wmem`/`net.ipv4.tcp_wmem`/`net.core.rmem_max`/`net.core.wmem_max`: socket buffer sizes
+    * [ ] **not namespaced in net ns**, and they are not even available under `/sys/net`
+
 
 ## Proposed Design
 
