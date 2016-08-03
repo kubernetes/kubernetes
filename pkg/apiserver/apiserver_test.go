@@ -1100,6 +1100,29 @@ func TestList(t *testing.T) {
 	}
 }
 
+func TestLogs(t *testing.T) {
+	handler := handle(map[string]rest.Storage{})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	client := http.Client{}
+
+	request, err := http.NewRequest("GET", server.URL+"/logs", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	response, err := client.Do(request)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	t.Logf("Data: %s", string(body))
+}
+
 func TestErrorList(t *testing.T) {
 	storage := map[string]rest.Storage{}
 	simpleStorage := SimpleRESTStorage{
