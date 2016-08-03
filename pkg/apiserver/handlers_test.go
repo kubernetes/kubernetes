@@ -71,7 +71,7 @@ func pathWithPrefix(prefix, resource, namespace, name string) string {
 // - we correctly recover after some "short" requests finish, i.e. we can process new ones.
 func TestMaxInFlight(t *testing.T) {
 	const AllowedInflightRequestsNo = 3
-	// Size of inflightRequestsChannel determines how many concurent inflight requests
+	// Size of inflightRequestsChannel determines how many concurrent inflight requests
 	// are allowed.
 	inflightRequestsChannel := make(chan bool, AllowedInflightRequestsNo)
 	// notAccountedPathsRegexp specifies paths requests to which we don't account into

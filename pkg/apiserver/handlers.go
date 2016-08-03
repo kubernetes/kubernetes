@@ -413,7 +413,7 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	return &attribs
 }
 
-func WithImpersonation(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
+func WithImpersonation(handler http.Handler, requestContextMapper api.RequestContextMapper, an authorizer.Authorizer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		requestedSubject := req.Header.Get("Impersonate-User")
 		if len(requestedSubject) == 0 {
@@ -483,7 +483,7 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 }
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
-func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGetter, a authorizer.Authorizer) http.Handler {
+func WithAuthorizationCheck(handler http.Handler, getAttribs RequestAttributeGetter, an authorizer.Authorizer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		authorized, reason, err := a.Authorize(getAttribs.GetAttribs(req))
 		if err != nil {

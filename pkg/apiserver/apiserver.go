@@ -90,7 +90,7 @@ type APIGroupVersion struct {
 
 	Typer     runtime.ObjectTyper
 	Creater   runtime.ObjectCreater
-	Convertor runtime.ObjectConvertor
+	Converter runtime.ObjectConvertor
 	Copier    runtime.ObjectCopier
 	Linker    runtime.SelfLinker
 
