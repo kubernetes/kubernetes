@@ -243,6 +243,19 @@ Issues:
       for each socket. While large values are necessary for certain environments and applications, they lead to waste of resources
       in the 90% case.
 
+## Analysis of Sysctls on the initial Whitelist
+
+       "kernel.msgmax":          {},
+       "kernel.msgmnb":          {},
+       "kernel.msgmni":          {},
+       "kernel.sem":             {},
+       "kernel.shmall":          {},
+       "kernel.shmmax":          {},
+       "kernel.shmmni":          {},
+       "kernel.shm_rmid_forced": {},
+       "net.*",
+       "fs.mqueue.*",
+
 ## Proposed Design
 
 Sysctls in pods and `PodSecurityPolicy` are first introduced as an alpha feature for Kubernetes 1.4. This means that the following changes apply to the internal unversioned API only. The externally visible v1 API will model these as annotations, with the plan to turn those in first class citizens in a later release.
