@@ -14,21 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package install
+package extensions
 
 import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/controller/informers"
 	"k8s.io/kubernetes/pkg/quota"
-	"k8s.io/kubernetes/pkg/quota/evaluator/core"
-	"k8s.io/kubernetes/pkg/quota/evaluator/extensions"
+	"k8s.io/kubernetes/pkg/quota/generic"
 )
 
-// NewRegistry returns a registry of quota evaluators.
-// If a shared informer factory is provided, it is used by evaluators rather than performing direct queries.
-func NewRegistry(kubeClient clientset.Interface, f informers.SharedInformerFactory) quota.Registry {
-	return &quota.UnionRegistry{
-		core.NewRegistry(kubeClient, f),
-		extensions.NewRegistry(kubeClient, f),
+// NewRegistry returns a registry that knows how to deal with extensions kubernetes resources
+func NewRegistry(kubeClient clientset.Interface) quota.Registry {
+	replicaSet := NewReplicaSetEvaluator(kubeClient)
+	deployment := NewDeploymentEvaluator(kubeClient)
+	return &generic.GenericRegistry{
+		InternalEvaluators: map[unversioned.GroupKind]quota.Evaluator{
+			replicaSet.GroupKind(): replicaSet,
+			deployment.GroupKind(): deployment,
+		},
 	}
 }

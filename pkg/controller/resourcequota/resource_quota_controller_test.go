@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -411,7 +412,12 @@ func TestAddQuota(t *testing.T) {
 	}
 	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
 
-	delete(quotaController.registry.(*generic.GenericRegistry).InternalEvaluators, api.Kind("Service"))
+	newRegistry := quota.UnionRegistry{}
+	for _, r := range *quotaController.registry.(*quota.UnionRegistry) {
+		delete(r.(*generic.GenericRegistry).InternalEvaluators, api.Kind("Service"))
+		newRegistry = append(newRegistry, r)
+	}
+	quotaController.registry = &newRegistry
 
 	testCases := []struct {
 		name string
