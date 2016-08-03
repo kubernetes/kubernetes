@@ -1082,7 +1082,7 @@ function kube::release::gcs::verify_prereqs() {
   fi
 
   if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
-    GCLOUD_ACCOUNT=$(gcloud auth list 2>/dev/null | awk '/(active)/ { print $2 }')
+    GCLOUD_ACCOUNT=$(gcloud config list --format='value(core.account)' 2>/dev/null)
   fi
   if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
     echo "No account authorized through gcloud.  Please fix with:"
@@ -1092,7 +1092,7 @@ function kube::release::gcs::verify_prereqs() {
   fi
 
   if [[ -z "${GCLOUD_PROJECT-}" ]]; then
-    GCLOUD_PROJECT=$(gcloud config list project | awk '{project = $3} END {print project}')
+    GCLOUD_PROJECT=$(gcloud config list --format='value(core.project)' 2>/dev/null)
   fi
   if [[ -z "${GCLOUD_PROJECT-}" ]]; then
     echo "No account authorized through gcloud.  Please fix with:"
@@ -1594,7 +1594,7 @@ function kube::release::docker::release() {
 
 function kube::release::has_gcloud_account() {
   local -r account="${1-}"
-  if [[ -n $(gcloud auth list --filter-account $account 2>/dev/null) ]]; then
+  if [[ "$(gcloud config list --format='value(core.account)')" == "${account}" ]]; then
     return 0
   else
     return 1
