@@ -22,10 +22,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"os/exec"
 	"path"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -42,6 +40,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/procfs"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
@@ -526,22 +525,7 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 			runtime.HandleError(err)
 		}
 	}
-
-	out, err := exec.Command("pidof", name).Output()
-	if err != nil {
-		return []int{}, fmt.Errorf("failed to find pid of %q: %v", name, err)
-	}
-
-	// The output of pidof is a list of pids.
-	pids := []int{}
-	for _, pidStr := range strings.Split(strings.TrimSpace(string(out)), " ") {
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil {
-			continue
-		}
-		pids = append(pids, pid)
-	}
-	return pids, nil
+	return procfs.PidOf(name), nil
 }
 
 // Ensures that the Docker daemon is in the desired container.

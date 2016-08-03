@@ -18,7 +18,12 @@ package procfs
 
 import (
 	"io/ioutil"
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func verifyContainerName(procCgroupText, expectedName string, expectedErr bool, t *testing.T) {
@@ -55,4 +60,13 @@ func TestContainerNameFromProcCgroup(t *testing.T) {
 
 	procCgroupInvalid := "devices:docker/kubelet\ncpuacct:pkg/kubectl"
 	verifyContainerName(procCgroupInvalid, "", true, t)
+}
+
+func TestPidOf(t *testing.T) {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
+	}
+	pids := PidOf(filepath.Base(os.Args[0]))
+	assert.NotZero(t, pids)
+	assert.Contains(t, pids, os.Getpid())
 }
