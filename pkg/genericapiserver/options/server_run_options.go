@@ -98,6 +98,7 @@ type ServerRunOptions struct {
 	// these; you can change this if you want to change the defaults (e.g.,
 	// for testing). This is not actually exposed as a flag.
 	DefaultStorageVersions string
+	TargetRAMMB            int
 	TLSCertFile            string
 	TLSPrivateKeyFile      string
 	TokenAuthFile          string
@@ -303,6 +304,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
+
+	fs.IntVar(&s.TargetRAMMB, "target-ram-mb", s.TargetRAMMB,
+		"Memory limit for apiserver in MB (used to configure sizes of caches, etc.)")
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")

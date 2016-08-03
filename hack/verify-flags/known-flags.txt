@@ -471,6 +471,7 @@ system-container
 system-pods-startup-timeout
 system-reserved
 target-port
+target-ram-mb
 tcp-services
 terminated-pod-gc-threshold
 test-timeout

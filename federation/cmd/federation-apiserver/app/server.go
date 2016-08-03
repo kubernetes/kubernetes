@@ -142,6 +142,7 @@ func Run(s *genericoptions.ServerRunOptions) error {
 
 	// TODO: Move this to generic api server (Need to move the command line flag).
 	if s.EnableWatchCache {
+		cachesize.InitializeWatchCacheSizes(s.TargetRAMMB)
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
