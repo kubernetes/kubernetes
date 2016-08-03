@@ -5980,7 +5980,7 @@ func TestValidateSecret(t *testing.T) {
 	overMaxSize.Data = map[string][]byte{
 		"over": make([]byte, api.MaxSecretSize+1),
 	}
-	invalidKey.Data["a..b"] = []byte("whoops")
+	invalidKey.Data["a*b"] = []byte("whoops")
 	leadingDotKey.Data[".key"] = []byte("bar")
 	dotKey.Data["."] = []byte("bar")
 	doubleDotKey.Data[".."] = []byte("bar")
@@ -6585,7 +6585,7 @@ func TestValidateConfigMap(t *testing.T) {
 		invalidName      = newConfigMap("NoUppercaseOrSpecialCharsLike=Equals", "validns", nil)
 		emptyNs          = newConfigMap("validname", "", nil)
 		invalidNs        = newConfigMap("validname", "NoUppercaseOrSpecialCharsLike=Equals", nil)
-		invalidKey       = newConfigMap("validname", "validns", map[string]string{"a..b": "value"})
+		invalidKey       = newConfigMap("validname", "validns", map[string]string{"a*b": "value"})
 		leadingDotKey    = newConfigMap("validname", "validns", map[string]string{".ab": "value"})
 		dotKey           = newConfigMap("validname", "validns", map[string]string{".": "value"})
 		doubleDotKey     = newConfigMap("validname", "validns", map[string]string{"..": "value"})
