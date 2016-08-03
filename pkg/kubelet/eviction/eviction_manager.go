@@ -54,6 +54,8 @@ type managerImpl struct {
 	summaryProvider stats.SummaryProvider
 	// records when a threshold was first observed
 	thresholdsFirstObservedAt thresholdsObservedAt
+	// records the set of thresholds that have been met (including graceperiod) but not yet resolved
+	thresholdsMet []Threshold
 	// resourceToRankFunc maps a resource to ranking function for that resource.
 	resourceToRankFunc map[api.ResourceName]rankFunc
 }
@@ -158,7 +160,13 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	now := m.clock.Now()
 
 	// determine the set of thresholds met independent of grace period
-	thresholds = thresholdsMet(thresholds, observations)
+	thresholds = thresholdsMet(thresholds, observations, false)
+
+	// determine the set of thresholds previously met that have not yet satisfied the associated min-reclaim
+	if len(m.thresholdsMet) > 0 {
+		thresholdsNotYetResolved := thresholdsMet(m.thresholdsMet, observations, true)
+		thresholds = mergeThresholds(thresholds, thresholdsNotYetResolved)
+	}
 
 	// track when a threshold was first observed
 	thresholdsFirstObservedAt := thresholdsFirstObservedAt(thresholds, m.thresholdsFirstObservedAt, now)
@@ -180,6 +188,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.nodeConditions = nodeConditions
 	m.thresholdsFirstObservedAt = thresholdsFirstObservedAt
 	m.nodeConditionsLastObservedAt = nodeConditionsLastObservedAt
+	m.thresholdsMet = thresholds
 	m.Unlock()
 
 	// determine the set of resources under starvation
