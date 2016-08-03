@@ -90,7 +90,21 @@ Some real-world examples for the use of sysctls:
   `net.core.somaxconn`.
 - a containerized IPv6 routing daemon requires e.g. `/proc/sys/net/ipv6/conf/all/forwarding` and
   `/proc/sys/net/ipv6/conf/all/accept_redirects` (compare
-  [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-98653017)).
+  [docker#4717](https://github.com/docker/docker/issues/4717#issuecomment-98653017))
+- the [nginx ingress controller in kubernetes/contrib](https://github.com/kubernetes/contrib/blob/master/ingress/controllers/nginx/examples/sysctl/change-proc-values-rc.yaml#L80)
+  uses a privileged sidekick container to set `net.core.somaxconn` and `net.ipv4.ip_local_port_range`.
+- a huge software-as-a-service provider uses shared memory (`kernel.shm*`) and message queues (`kernel.msg*`) to
+  communicate between containers of their web-serving pods, configuring up to 20 GB of shared memory.
+
+  For optimal network layer performance they set `net.core.rmem_max`, `net.core.wmem_max`,
+  `net.ipv4.tcp_rmem` and `net.ipv4.tcp_wmem` to much higher values than kernel defaults.
+
+- In [Linux Tuning guides for 10G ethernet](https://fasterdata.es.net/host-tuning/linux/) it is suggested to
+  set `net.core.rmem_max`/`net.core.wmem_max` to values as high as 64 MB and similar dimensions for
+  `net.ipv4.tcp_rmem`/`net.ipv4.tcp_wmem`.
+
+  It is noted that
+  > tuning settings described here will actually decrease performance of hosts connected at rates of OC3 (155 Mbps) or less.
 
 ## Constraints and Assumptions
 
