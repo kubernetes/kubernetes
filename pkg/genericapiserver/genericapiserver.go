@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/crypto"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -221,7 +222,7 @@ type GenericAPIServer struct {
 	PublicReadWritePort  int
 	ServiceReadWriteIP   net.IP
 	ServiceReadWritePort int
-	masterServices       *util.Runner
+	masterServices       *async.Runner
 	ExtraServicePorts    []api.ServicePort
 	ExtraEndpointPorts   []api.EndpointPort
 

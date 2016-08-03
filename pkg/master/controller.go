@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/service/portallocator/controller"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -68,7 +68,7 @@ type Controller struct {
 	PublicServicePort         int
 	KubernetesServiceNodePort int
 
-	runner *util.Runner
+	runner *async.Runner
 }
 
 // Start begins the core controller loops that must exist for bootstrapping
@@ -95,7 +95,7 @@ func (c *Controller) Start() {
 		glog.Errorf("Unable to perform initial Kubernetes service initialization: %v", err)
 	}
 
-	c.runner = util.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
+	c.runner = async.NewRunner(c.RunKubernetesNamespaces, c.RunKubernetesService, repairClusterIPs.RunUntil, repairNodePorts.RunUntil)
 	c.runner.Start()
 }
 
