@@ -41,15 +41,21 @@ type diskSpaceManager interface {
 type DiskSpacePolicy struct {
 	// free disk space threshold for filesystem holding docker images.
 	DockerFreeDiskMB int
+	// free inode threshold for filesystem holding docker images.
+	DockerFreeInodePercent int
 	// free disk space threshold for root filesystem. Host volumes are created on root fs.
 	RootFreeDiskMB int
+	// free indoe threshold for root filesystem.
+	RootFreeInodePercent int
 }
 
 type fsInfo struct {
-	Usage     int64
-	Capacity  int64
-	Available int64
-	Timestamp time.Time
+	Usage      int64
+	Capacity   int64
+	Available  int64
+	Timestamp  time.Time
+	InodesFree *uint64
+	Inodes     *uint64
 }
 
 type realDiskSpaceManager struct {
@@ -78,20 +84,22 @@ func (dm *realDiskSpaceManager) getFsInfo(fsType string, f func() (cadvisorapi.F
 		fsi.Usage = int64(fs.Usage)
 		fsi.Capacity = int64(fs.Capacity)
 		fsi.Available = int64(fs.Available)
+		fsi.InodesFree = fs.InodesFree
+		fsi.Inodes = fs.Inodes
 		dm.cachedInfo[fsType] = fsi
 	}
 	return fsi, nil
 }
 
 func (dm *realDiskSpaceManager) IsRuntimeDiskSpaceAvailable() (bool, error) {
-	return dm.isSpaceAvailable("runtime", dm.policy.DockerFreeDiskMB, dm.cadvisor.ImagesFsInfo)
+	return dm.isSpaceAvailable("runtime", dm.policy.DockerFreeDiskMB, dm.policy.DockerFreeInodePercent, dm.cadvisor.ImagesFsInfo)
 }
 
 func (dm *realDiskSpaceManager) IsRootDiskSpaceAvailable() (bool, error) {
-	return dm.isSpaceAvailable("root", dm.policy.RootFreeDiskMB, dm.cadvisor.RootFsInfo)
+	return dm.isSpaceAvailable("root", dm.policy.RootFreeDiskMB, dm.policy.RootFreeInodePercent, dm.cadvisor.RootFsInfo)
 }
 
-func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f func() (cadvisorapi.FsInfo, error)) (bool, error) {
+func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, sizeThreshold int, inodePercentThreshold int, f func() (cadvisorapi.FsInfo, error)) (bool, error) {
 	fsInfo, err := dm.getFsInfo(fsType, f)
 	if err != nil {
 		return true, fmt.Errorf("failed to get fs info for %q: %v", fsType, err)
@@ -103,9 +111,16 @@ func (dm *realDiskSpaceManager) isSpaceAvailable(fsType string, threshold int, f
 		return true, fmt.Errorf("wrong available space for %q: %+v", fsType, fsInfo)
 	}
 
-	if fsInfo.Available < int64(threshold)*mb {
-		glog.Infof("Running out of space on disk for %q: available %d MB, threshold %d MB", fsType, fsInfo.Available/mb, threshold)
+	if fsInfo.Available < int64(sizeThreshold)*mb {
+		glog.Infof("Running out of space on disk for %q: available %d MB, threshold %d MB", fsType, fsInfo.Available/mb, sizeThreshold)
 		return false, nil
+	}
+	if fsInfo.InodesFree != nil && fsInfo.Inodes != nil {
+		freeInodePercent := 100 * (*fsInfo.InodesFree) / (*fsInfo.Inodes)
+		if freeInodePercent < uint64(inodePercentThreshold) {
+			glog.Infof("Free inodes %v%% is lower than the threshold %v%%", freeInodePercent, inodePercentThreshold)
+			return false, nil
+		}
 	}
 	return true, nil
 }

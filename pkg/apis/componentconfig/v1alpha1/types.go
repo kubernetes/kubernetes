@@ -301,6 +301,9 @@ type KubeletConfiguration struct {
 	// maintain. When disk space falls below this threshold, new pods would
 	// be rejected.
 	LowDiskSpaceThresholdMB int32 `json:"lowDiskSpaceThresholdMB"`
+	// LowDiskSpaceFreeInodeThresholdPercent is the percentage of free inodes comapring to the total
+	// inodes. When the free inode ratio falls below this threshold, new pods would be rejected.
+	LowDiskSpaceFreeInodeThresholdPercent int32 `json:"lowDiskSpaceFreeInodeThresholdPercent"`
 	// How frequently to calculate and cache volume disk usage for all pods
 	VolumeStatsAggPeriod unversioned.Duration `json:"volumeStatsAggPeriod"`
 	// networkPluginName is the name of the network plugin to be invoked for

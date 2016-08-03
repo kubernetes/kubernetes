@@ -28,8 +28,10 @@ import (
 
 func testPolicy() DiskSpacePolicy {
 	return DiskSpacePolicy{
-		DockerFreeDiskMB: 250,
-		RootFreeDiskMB:   250,
+		DockerFreeDiskMB:       250,
+		DockerFreeInodePercent: 5,
+		RootFreeDiskMB:         250,
+		RootFreeInodePercent:   5,
 	}
 }
 
@@ -61,14 +63,20 @@ func TestSpaceAvailable(t *testing.T) {
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
+	inodes := uint64(100)
+	inodesFree := uint64(50)
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapi.FsInfo{
-		Usage:     400 * mb,
-		Capacity:  1000 * mb,
-		Available: 600 * mb,
+		Usage:      400 * mb,
+		Capacity:   1000 * mb,
+		Available:  600 * mb,
+		Inodes:     &inodes,
+		InodesFree: &inodesFree,
 	}, nil)
 	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
-		Usage:    9 * mb,
-		Capacity: 10 * mb,
+		Usage:      9 * mb,
+		Capacity:   10 * mb,
+		Inodes:     &inodes,
+		InodesFree: &inodesFree,
 	}, nil)
 
 	ok, err := dm.IsRuntimeDiskSpaceAvailable()
@@ -81,17 +89,21 @@ func TestSpaceAvailable(t *testing.T) {
 }
 
 // TestIsRuntimeDiskSpaceAvailableWithSpace verifies IsRuntimeDiskSpaceAvailable results when
-// space is available.
+// space and inodes are available.
 func TestIsRuntimeDiskSpaceAvailableWithSpace(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	require.NoError(t, err)
 
+	inodes := uint64(100)
+	inodesFree := uint64(50)
 	// 500MB available
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapi.FsInfo{
-		Usage:     9500 * mb,
-		Capacity:  10000 * mb,
-		Available: 500 * mb,
+		Usage:      9500 * mb,
+		Capacity:   10000 * mb,
+		Available:  500 * mb,
+		Inodes:     &inodes,
+		InodesFree: &inodesFree,
 	}, nil)
 
 	ok, err := dm.IsRuntimeDiskSpaceAvailable()
@@ -118,19 +130,46 @@ func TestIsRuntimeDiskSpaceAvailableWithoutSpace(t *testing.T) {
 	assert.False(ok)
 }
 
+// TestIsRuntimeDiskSpaceAvailableWithoutInode verifies IsRuntimeDiskSpaceAvailable results when
+// inode is not available.
+func TestIsRuntimeDiskSpaceAvailableWithoutInode(t *testing.T) {
+	// 1MB available
+	assert, policy, mockCadvisor := setUp(t)
+	inodes := uint64(100)
+	inodesFree := uint64(1)
+	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapi.FsInfo{
+		Usage:      999 * mb,
+		Capacity:   1000 * mb,
+		Available:  500 * mb,
+		Inodes:     &inodes,
+		InodesFree: &inodesFree,
+	}, nil)
+
+	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	require.NoError(t, err)
+
+	ok, err := dm.IsRuntimeDiskSpaceAvailable()
+	assert.NoError(err)
+	assert.False(ok)
+}
+
 // TestIsRootDiskSpaceAvailableWithSpace verifies IsRootDiskSpaceAvailable results when
-// space is available.
+// space and inodes are available.
 func TestIsRootDiskSpaceAvailableWithSpace(t *testing.T) {
 	assert, policy, mockCadvisor := setUp(t)
 	policy.RootFreeDiskMB = 10
 	dm, err := newDiskSpaceManager(mockCadvisor, policy)
 	assert.NoError(err)
 
+	inodes := uint64(100)
+	inodesFree := uint64(50)
 	// 999MB available
 	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
-		Usage:     1 * mb,
-		Capacity:  1000 * mb,
-		Available: 999 * mb,
+		Usage:      1 * mb,
+		Capacity:   1000 * mb,
+		Available:  999 * mb,
+		Inodes:     &inodes,
+		InodesFree: &inodesFree,
 	}, nil)
 
 	ok, err := dm.IsRootDiskSpaceAvailable()
@@ -151,6 +190,29 @@ func TestIsRootDiskSpaceAvailableWithoutSpace(t *testing.T) {
 		Usage:     990 * mb,
 		Capacity:  1000 * mb,
 		Available: 9 * mb,
+	}, nil)
+
+	ok, err := dm.IsRootDiskSpaceAvailable()
+	assert.NoError(err)
+	assert.False(ok)
+}
+
+// TestIsRootDiskSpaceAvailableWithoutInode verifies IsRootDiskSpaceAvailable results when
+// inode is not available.
+func TestIsRootDiskSpaceAvailableWithoutInode(t *testing.T) {
+	assert, policy, mockCadvisor := setUp(t)
+	policy.RootFreeDiskMB = 10
+	dm, err := newDiskSpaceManager(mockCadvisor, policy)
+	assert.NoError(err)
+
+	inodes := uint64(100)
+	inodesFree := uint64(1)
+	mockCadvisor.On("RootFsInfo").Return(cadvisorapi.FsInfo{
+		Usage:      990 * mb,
+		Capacity:   1000 * mb,
+		Available:  500 * mb,
+		Inodes:     &inodes,
+		InodesFree: &inodesFree,
 	}, nil)
 
 	ok, err := dm.IsRootDiskSpaceAvailable()
@@ -235,7 +297,7 @@ func Test_getFsInfo(t *testing.T) {
 		cachedInfo: map[string]fsInfo{},
 	}
 
-	available, err := dm.isSpaceAvailable("root", 10, dm.cadvisor.RootFsInfo)
+	available, err := dm.isSpaceAvailable("root", 10, 0, dm.cadvisor.RootFsInfo)
 	assert.True(available)
 	assert.NoError(err)
 
@@ -252,7 +314,7 @@ func Test_getFsInfo(t *testing.T) {
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
 	}
-	available, err = dm.isSpaceAvailable("root", 10, dm.cadvisor.RootFsInfo)
+	available, err = dm.isSpaceAvailable("root", 10, 0, dm.cadvisor.RootFsInfo)
 	assert.False(available)
 	assert.NoError(err)
 
@@ -268,7 +330,7 @@ func Test_getFsInfo(t *testing.T) {
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
 	}
-	available, err = dm.isSpaceAvailable("root", 10, dm.cadvisor.RootFsInfo)
+	available, err = dm.isSpaceAvailable("root", 10, 0, dm.cadvisor.RootFsInfo)
 	assert.True(available)
 	assert.NoError(err)
 
@@ -285,7 +347,7 @@ func Test_getFsInfo(t *testing.T) {
 		policy:     policy,
 		cachedInfo: map[string]fsInfo{},
 	}
-	available, err = dm.isSpaceAvailable("root", 10, dm.cadvisor.RootFsInfo)
+	available, err = dm.isSpaceAvailable("root", 10, 0, dm.cadvisor.RootFsInfo)
 	assert.True(available)
 	assert.Error(err)
 	assert.Contains(fmt.Sprintf("%s", err), "could not determine capacity")

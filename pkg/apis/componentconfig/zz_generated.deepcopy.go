@@ -246,6 +246,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.ImageGCHighThresholdPercent = in.ImageGCHighThresholdPercent
 		out.ImageGCLowThresholdPercent = in.ImageGCLowThresholdPercent
 		out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
+		out.LowDiskSpaceFreeInodeThresholdPercent = in.LowDiskSpaceFreeInodeThresholdPercent
 		out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 		out.NetworkPluginName = in.NetworkPluginName
 		out.NetworkPluginDir = in.NetworkPluginDir

@@ -226,6 +226,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 		return err
 	}
 	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
+	out.LowDiskSpaceFreeInodeThresholdPercent = in.LowDiskSpaceFreeInodeThresholdPercent
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.NetworkPluginName = in.NetworkPluginName
 	out.NetworkPluginDir = in.NetworkPluginDir
@@ -390,6 +391,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 		return err
 	}
 	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
+	out.LowDiskSpaceFreeInodeThresholdPercent = in.LowDiskSpaceFreeInodeThresholdPercent
 	out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 	out.NetworkPluginName = in.NetworkPluginName
 	out.NetworkPluginDir = in.NetworkPluginDir
