@@ -144,11 +144,11 @@ func (r *FakeRuntimeService) StopPodSandbox(podSandboxID string) error {
 	return nil
 }
 
-func (r *FakeRuntimeService) DeletePodSandbox(podSandboxID string) error {
+func (r *FakeRuntimeService) RemovePodSandbox(podSandboxID string) error {
 	r.Lock()
 	defer r.Unlock()
 
-	r.Called = append(r.Called, "DeletePodSandbox")
+	r.Called = append(r.Called, "RemovePodSandbox")
 
 	// Remove the pod sandbox
 	delete(r.Sandboxes, podSandboxID)
