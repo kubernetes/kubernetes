@@ -114,7 +114,7 @@ func TestRunOnce(t *testing.T) {
 	fakeKillPodFunc := func(pod *api.Pod, podStatus api.PodStatus, gracePeriodOverride *int64) error {
 		return nil
 	}
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, kb.recorder, nodeRef, kb.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, kb.recorder, nodeRef, kb.clock)
 	if err != nil {
 		t.Fatalf("failed to initialize eviction manager: %v", err)
 	}
