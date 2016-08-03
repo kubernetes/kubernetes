@@ -1,0 +1,33 @@
+{
+  "swaggerVersion": "1.2",
+  "apiVersion": "",
+  "basePath": "https://10.10.10.10:6443",
+  "resourcePath": "/logs",
+  "apis": [
+   {
+    "path": "/logs/{logpath}",
+    "description": "get log files",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "nickname": "logFileHandler",
+      "parameters": []
+     }
+    ]
+   },
+   {
+    "path": "/logs",
+    "description": "get log files",
+    "operations": [
+     {
+      "type": "void",
+      "method": "GET",
+      "nickname": "logFileListHandler",
+      "parameters": []
+     }
+    ]
+   }
+  ],
+  "models": {}
+ }
