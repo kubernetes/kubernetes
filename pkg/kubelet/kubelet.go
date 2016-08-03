@@ -1031,7 +1031,7 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
 	// Kubernetes only mounts on /etc/hosts if :
 	// - container does not use hostNetwork and
-	// - container is not a infrastructure(pause) container
+	// - container is not an infrastructure(pause) container
 	// - container is not already mounting on /etc/hosts
 	// When the pause container is being created, its IP is still unknown. Hence, PodIP will not have been set.
 	mountEtcHostsFile := (pod.Spec.SecurityContext == nil || !pod.Spec.SecurityContext.HostNetwork) && len(podIP) > 0
@@ -1041,7 +1041,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName,
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
 		vol, ok := podVolumes[mount.Name]
 		if !ok {
-			glog.Warningf("Mount cannot be satisified for container %q, because the volume is missing: %q", container.Name, mount)
+			glog.Warningf("Mount cannot be satisfied for container %q, because the volume is missing: %q", container.Name, mount)
 			continue
 		}
 
@@ -1449,7 +1449,7 @@ func (kl *Kubelet) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	if !useClusterFirstPolicy {
 		// When the kubelet --resolv-conf flag is set to the empty string, use
 		// DNS settings that override the docker default (which is to use
-		// /etc/resolv.conf) and effectivly disable DNS lookups. According to
+		// /etc/resolv.conf) and effectively disable DNS lookups. According to
 		// the bind documentation, the behavior of the DNS client library when
 		// "nameservers" are not specified is to "use the nameserver on the
 		// local machine". A nameserver setting of localhost is equivalent to
@@ -2373,7 +2373,7 @@ func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
 }
 
 // validateContainerLogStatus returns the container ID for the desired container to retrieve logs for, based on the state
-// of the container. The previous flag will only return the logs for the the last terminated container, otherwise, the current
+// of the container. The previous flag will only return the logs for the last terminated container, otherwise, the current
 // running container is preferred over a previous termination. If info about the container is not available then a specific
 // error is returned to the end user.
 func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *api.PodStatus, containerName string, previous bool) (containerID kubecontainer.ContainerID, err error) {

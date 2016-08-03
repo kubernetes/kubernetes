@@ -132,7 +132,7 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 }
 
 // buildHeaderMap takes a list of HTTPHeader <name, value> string
-// pairs and returns a a populated string->[]string http.Header map.
+// pairs and returns a populated string->[]string http.Header map.
 func buildHeader(headerList []api.HTTPHeader) http.Header {
 	headers := make(http.Header)
 	for _, header := range headerList {

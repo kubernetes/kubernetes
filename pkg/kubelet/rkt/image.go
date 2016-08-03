@@ -196,7 +196,7 @@ func (r *Runtime) getImageManifest(image string) (*appcschema.ImageManifest, err
 	return &manifest, json.Unmarshal(images[0].Manifest, &manifest)
 }
 
-// TODO(yifan): This is very racy, unefficient, and unsafe, we need to provide
+// TODO(yifan): This is very racy, inefficient, and unsafe, we need to provide
 // different namespaces. See: https://github.com/coreos/rkt/issues/836.
 func (r *Runtime) writeDockerAuthConfig(image string, credsSlice []credentialprovider.LazyAuthConfiguration, userConfigDir string) error {
 	if len(credsSlice) == 0 {

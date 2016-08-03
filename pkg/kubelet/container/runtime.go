@@ -110,7 +110,7 @@ type Runtime interface {
 	// by all containers in the pod.
 	GetNetNS(containerID ContainerID) (string, error)
 	// Returns the container ID that represents the Pod, as passed to network
-	// plugins. For example if the runtime uses an infra container, returns
+	// plugins. For example, if the runtime uses an infra container, returns
 	// the infra container's ContainerID.
 	// TODO: Change ContainerID to a Pod ID, see GetNetNS()
 	GetPodContainerID(*Pod) (ContainerID, error)

@@ -724,7 +724,7 @@ func (r *Runtime) makeContainerLogMount(opts *kubecontainer.RunContainerOptions,
 	// In docker runtime, the container log path contains the container ID.
 	// However, for rkt runtime, we cannot get the container ID before the
 	// the container is launched, so here we generate a random uuid to enable
-	// us to map a container's termination message path to an unique log file
+	// us to map a container's termination message path to a unique log file
 	// on the disk.
 	randomUID := uuid.NewUUID()
 	containerLogPath := path.Join(opts.PodContainerDir, string(randomUID))

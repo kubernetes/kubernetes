@@ -168,7 +168,7 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 }
 
 // cleanupBandwidthLimits updates the status of bandwidth-limited containers
-// and ensures that only the the appropriate CIDRs are active on the node.
+// and ensures that only the appropriate CIDRs are active on the node.
 func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 	if kl.shaper == nil {
 		return nil

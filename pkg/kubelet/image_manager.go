@@ -65,7 +65,7 @@ type ImageGCPolicy struct {
 	// This is the lowest threshold we will try to garbage collect to.
 	LowThresholdPercent int
 
-	// Minimum age at which a image can be garbage collected.
+	// Minimum age at which an image can be garbage collected.
 	MinAge time.Duration
 }
 
