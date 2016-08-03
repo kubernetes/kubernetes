@@ -352,7 +352,7 @@ SchedulerPredicates validates that NodeSelector is respected if matching,gmarek,
 SchedulerPredicates validates that NodeSelector is respected if not matching,gmarek,0
 SchedulerPredicates validates that a pod with an invalid NodeAffinity is rejected,deads2k,1
 SchedulerPredicates validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid,smarterclayton,1
-SchedulerPredicates validates that embedding the JSON NodeAffinity setting as a string in the annotation value work,yifan-gu,1
+SchedulerPredicates validates that embedding the JSON NodeAffinity setting as a string in the annotation value work,kevin-wangzefeng,1
 SchedulerPredicates validates that embedding the JSON PodAffinity and PodAntiAffinity setting as a string in the annotation value work,hurf,1
 SchedulerPredicates validates that required NodeAffinity setting is respected if matching,mml,1
 SchedulerPredicates validates that taints-tolerations is respected if matching,jlowdermilk,1
