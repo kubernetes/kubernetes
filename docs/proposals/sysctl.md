@@ -242,6 +242,15 @@ Issues:
     * `net.ipv4.tcp_rmem`/`net.ipv4.tcp_wmem` not only define min and max values, but also the default tcp window buffer size
       for each socket. While large values are necessary for certain environments and applications, they lead to waste of resources
       in the 90% case.
+  * some sysctls have a different error behavior, e.g.:
+    * creating a shared memory segment will fail immediately when `kernel.shmmax` is too small.
+
+      With a large `kernel.shmmax` default, the creation of a segment always succeeds, but the OOM killer will
+      do its job when a shared memory segment exceeds the memory request of the container.
+
+  The high values that could be set by the kubelet on launch might depend on the node's capacity and capabilities. But for
+  portability of workloads it is helpful to have a common baseline of sysctls settings one can expect on every node. The
+  kernel defaults (which are active if the kubelet does not change defaults) are such a (natural) baseline.
 
 ## Analysis of Sysctls on the initial Whitelist
 
