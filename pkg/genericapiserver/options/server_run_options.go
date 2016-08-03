@@ -73,6 +73,7 @@ type ServerRunOptions struct {
 	EnableSwaggerUI           bool
 	EnableWatchCache          bool
 	EtcdServersOverrides      []string
+	ExpectedRAMCapacityMB     int
 	StorageConfig             storagebackend.Config
 	ExternalHost              string
 	InsecureBindAddress       net.IP
@@ -303,6 +304,9 @@ func (s *ServerRunOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringSliceVar(&s.EtcdServersOverrides, "etcd-servers-overrides", s.EtcdServersOverrides, ""+
 		"Per-resource etcd servers overrides, comma separated. The individual override "+
 		"format: group/resource#servers, where servers are http://ip:port, semicolon separated.")
+
+	fs.IntVar(&s.ExpectedRAMCapacityMB, "expected-ram-capacity-mb", s.ExpectedRAMCapacityMB,
+		"Expected RAM capacity for apiserver in MB (used to configure sizes of caches, etc.)")
 
 	fs.StringVar(&s.ExternalHost, "external-hostname", s.ExternalHost,
 		"The hostname to use when generating externalized URLs for this master (e.g. Swagger API Docs).")

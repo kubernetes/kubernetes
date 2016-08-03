@@ -159,6 +159,7 @@ executor-logv
 executor-path
 executor-suicide-timeout
 exit-on-lock-contention
+expected-ram-capacity-mb
 experimental-flannel-overlay
 experimental-keystone-url
 experimental-nvidia-gpus

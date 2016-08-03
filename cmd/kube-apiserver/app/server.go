@@ -282,6 +282,7 @@ func Run(s *options.APIServer) error {
 	}
 
 	if s.EnableWatchCache {
+		cachesize.InitializeWatchCacheSizes(s.ExpectedRAMCapacityMB)
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
