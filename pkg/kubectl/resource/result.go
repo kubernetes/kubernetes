@@ -274,13 +274,13 @@ func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder
 
 // tryConvert attempts to convert the given object to the provided versions in order. This function assumes
 // the object is in internal version.
-func tryConvert(convertor runtime.ObjectConvertor, object runtime.Object, versions ...unversioned.GroupVersion) (runtime.Object, error) {
+func tryConvert(converter runtime.ObjectConvertor, object runtime.Object, versions ...unversioned.GroupVersion) (runtime.Object, error) {
 	var last error
 	for _, version := range versions {
 		if version.IsEmpty() {
 			return object, nil
 		}
-		obj, err := convertor.ConvertToVersion(object, version)
+		obj, err := converter.ConvertToVersion(object, version)
 		if err != nil {
 			last = err
 			continue

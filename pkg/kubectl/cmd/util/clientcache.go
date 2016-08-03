@@ -88,7 +88,7 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 	}
 
 	// `version` does not necessarily equal `config.Version`.  However, we know that we call this method again with
-	// `config.Version`, we should get the the config we've just built.
+	// `config.Version`, we should get the config we've just built.
 	configCopy := config
 	c.configs[*config.GroupVersion] = &configCopy
 

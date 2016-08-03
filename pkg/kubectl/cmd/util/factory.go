@@ -316,8 +316,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 						multiMapper = append(meta.MultiRESTMapper{thirdPartyMapper}, multiMapper...)
 					}
 					priorityMapper.Delegate = multiMapper
-					// Re-assign to the RESTMapper here because priorityMapper is actually a copy, so if we
-					// don't re-assign, the above assignement won't actually update mapper.RESTMapper
+					// Reassign to the RESTMapper here because priorityMapper is actually a copy, so if we
+					// don't reassign, the above assignement won't actually update mapper.RESTMapper
 					mapper.RESTMapper = priorityMapper
 				}
 			}
@@ -1006,7 +1006,7 @@ func getSchemaAndValidate(c schemaClient, data []byte, prefix, groupVersion, cac
 	}
 	err = schema.ValidateBytes(data)
 	if _, ok := err.(validation.TypeNotFoundError); ok && !firstSeen {
-		// As a temporay hack, kubectl would re-get the schema if validation
+		// As a temporary hack, kubectl would re-get the schema if validation
 		// fails for type not found reason.
 		// TODO: runtime-config settings needs to make into the file's name
 		schemaData, err = downloadSchemaAndStore(c, cacheDir, fullDir, cacheFile, prefix, groupVersion)
@@ -1106,7 +1106,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 
 // DefaultClientConfig creates a clientcmd.ClientConfig with the following hierarchy:
 //   1.  Use the kubeconfig builder.  The number of merges and overrides here gets a little crazy.  Stay with me.
-//       1.  Merge together the kubeconfig itself.  This is done with the following hierarchy rules:
+//       1.  Merge the kubeconfig itself.  This is done with the following hierarchy rules:
 //           1.  CommandLineLocation - this parsed from the command line, so it must be late bound.  If you specify this,
 //               then no other kubeconfig files are merged.  This file must exist.
 //           2.  If $KUBECONFIG is set, then it is treated as a list of files that should be merged.
