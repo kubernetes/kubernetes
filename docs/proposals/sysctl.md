@@ -233,13 +233,13 @@ Issues:
 
   This might be true for some of the sysctls, which purely set limits for some host resources, but
 
-  - some sysctls influence the behavior of the application, e.g.:
-    - `kernel.shm_rmid_forced` adds a garbage collection semantics to shared memory segments when possessing processes die.
+  * some sysctls influence the behavior of the application, e.g.:
+    * `kernel.shm_rmid_forced` adds a garbage collection semantics to shared memory segments when possessing processes die.
       This is against the System V standard though.
-    - `net.ipv4.tcp_abort_on_overflow` makes the kernel send RST packets when the application is overloaded, giving a load-balancer
+    * `net.ipv4.tcp_abort_on_overflow` makes the kernel send RST packets when the application is overloaded, giving a load-balancer
       the chance to reschedule a request to another backend.
-  - some sysctls lead to changed resource requirement characteristics, e.g.:
-    - `net.ipv4.tcp_rmem`/`net.ipv4.tcp_wmem` not only define min and max values, but also the default tcp window buffer size
+  * some sysctls lead to changed resource requirement characteristics, e.g.:
+    * `net.ipv4.tcp_rmem`/`net.ipv4.tcp_wmem` not only define min and max values, but also the default tcp window buffer size
       for each socket. While large values are necessary for certain environments and applications, they lead to waste of resources
       in the 90% case.
 
