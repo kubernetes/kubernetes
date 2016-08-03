@@ -181,7 +181,6 @@ func (cc *clusterClientCache) delFromClusterSet(obj interface{}) {
 // addToClusterSet inserts the new cluster to clusterSet and creates a corresponding
 // restclient to map clusterKubeClientMap
 func (cc *clusterClientCache) addToClientMap(obj interface{}) {
-	cluster := obj.(*v1beta1.Cluster)
 	cc.rwlock.Lock()
 	defer cc.rwlock.Unlock()
 	cluster, ok := obj.(*v1beta1.Cluster)
