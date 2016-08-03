@@ -1,0 +1,36 @@
+#cloud-config
+
+users:
+  - name: "jenkins"
+    groups: 
+      - "docker"
+      - "sudo"
+
+
+coreos:
+  units:
+    - name: "docker.service"
+      enable: true
+      drop-ins:
+        - name: 10-disable-systemd-cgroup-driver.conf
+          content: |
+            [Service]
+            CPUAccounting=yes
+            MemoryAccounting=yes
+            # Temporary, remove after https://github.com/coreos/bugs/issues/1435 is resolved
+            Environment="DOCKER_CGROUPS="
+    - name: "update-engine.service"
+      mask: true
+    - name: "locksmithd.service"
+      mask: true
+    - name: "node-e2e-test-setup.service"
+      command: "start"
+      content: |
+        [Unit]
+        Description=Setup a vanilla CoreOS image for use by Node e2e
+        WantedBy=multi-user.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        # chain `ExecStartPre`'s here to do any setup
+        ExecStart=/bin/true
