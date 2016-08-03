@@ -181,11 +181,28 @@ func InstallVersionHandler(mux Mux, container *restful.Container) {
 	container.Add(versionWS)
 }
 
-// InstallLogsSupport registers the APIServer log support function into a mux.
-func InstallLogsSupport(mux Mux) {
-	// TODO: use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
+// InstallLogsSupport registers the APIServer's `/logs` into a mux.
+func InstallLogsSupport(mux Mux, container *restful.Container) {
+	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
-	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+	ws := new(restful.WebService)
+	ws.Path("/logs")
+	ws.Doc("logs files")
+	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler))
+	ws.Route(ws.GET("/").To(logFileListHandler))
+
+	container.Add(ws)
+}
+
+func logFileHandler(req *restful.Request, resp *restful.Response) {
+	logdir := "/var/log"
+	actual := path.Join(logdir, req.PathParameter("logpath"))
+	http.ServeFile(resp.ResponseWriter, req.Request, actual)
+}
+
+func logFileListHandler(req *restful.Request, resp *restful.Response) {
+	logdir := "/var/log"
+	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
 }
 
 // TODO: needs to perform response type negotiation, this is probably the wrong way to recover panics
