@@ -255,27 +255,27 @@ Issues:
 ## Analysis of Sysctls on the initial Whitelist
 
 - `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`: configure System V shared memory
-  * [x] namespaced in ipc ns
+  * [x] **namespaced** in ipc ns
   * [x] **accounted for** as user memory in memcg, using sparse allocation (like tmpfs)
     uses [Resizable virtual memory filesystem](https://github.com/torvalds/linux/blob/master/mm/shmem.c)
   * [x] hence **safe to customize**
   * [x] **no application influence** with high values
   * **defaults to** [unlimited pages, unlimited size, 4096 segments on today's kernels](https://github.com/torvalds/linux/blob/0e06f5c0deeef0332a5da2ecb8f1fcf3e024d958/include/uapi/linux/shm.h#L20). This make **customization practically unneccessary**.
 - `kernel.shm_rmid_forced`: enforce removal of shared memory segments on process shutdown
-  * [x] namespaced in ipc ns
+  * [x] **namespaced** in ipc ns
 - `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`: configure System V messages
-  * [x] namespaced in ipc ns
+  * [x] **namespaced** in ipc ns
   * [ ] [temporarily **allocated in kmem** in a linked message list](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58), but **not accounted for** in memcg
   * [ ] **defaults to** [8kb, 16384 messages, 32000 queues](http://lxr.linux.no/linux+v4.7/include/uapi/linux/msg.h#L75), **which might be too small** for certain applications
   * [ ] arbitrary values [up to INT_MAX](http://lxr.linux.no/linux+v4.7/ipc/ipc_sysctl.c#L135). Hence, **potential DoS attack vector** against the host
 - `fs.mqueue.*`: configure POSIX message queues
-  * [x] namespaced in ipc ns
-  * [ ] uses the same [`load_msg`](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58) as System V messages, i.e. **no acconuting**
+  * [x] **namespaced** in ipc ns
+  * [ ] uses the same [`load_msg`](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58) as System V messages, i.e. **no accounting**
   * does [strict checking again rlimits](http://lxr.free-electrons.com/source/ipc/mqueue.c#L278) though
   * [ ] **defaults to** [256 queues, max queue length 10, message size 8kb](http://lxr.free-electrons.com/source/include/linux/ipc_namespace.h#L102)
   * [ ] can be customized via sysctls up to 64k max queue length, message size 16MB. Hence, **potential DoS attack vector** against the host
 - `kernel.sem`: configure System V semaphores
-  * [x] namespaced in ipc ns
+  * [x] **namespaced** in ipc ns
   * [ ] uses [plain kmalloc and vmalloc](http://lxr.free-electrons.com/source/ipc/util.c#L404) **without accounting**
   * [x] **defaults to** [32000 ids and 32000 semaphores per id](http://lxr.free-electrons.com/source/include/uapi/linux/sem.h#L78), probably enough for all applications:
 
@@ -283,8 +283,8 @@ Issues:
 
 - `net.*`: configure the network stack
   - `net.core.somaxconn`: maximum queue length specifiable by listen.
-    * [x] namespaced in net ns
-    * [ ] **might have application influence** for high values as it limits the socker queue length
+    * [x] **namespaced** in net ns
+    * [ ] **might have application influence** for high values as it limits the socket queue length
     * [ ] TODO: accounting? No evidence found until now.
   - `net.ipv4.tcp_wmem`/`net.ipv4.tcp_wmem`/`net.core.rmem_max`/`net.core.wmem_max`: socket buffer sizes
     * [ ] **not namespaced in net ns**, and they are not even available under `/sys/net`
