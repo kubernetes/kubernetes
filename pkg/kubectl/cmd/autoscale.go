@@ -45,10 +45,10 @@ var (
 		An autoscaler can automatically increase or decrease number of pods deployed within the system as needed.`)
 
 	autoscaleExample = dedent.Dedent(`
-		# Auto scale a deployment "foo", with the number of pods between 2 to 10, target CPU utilization specified so a default autoscaling policy will be used:
+		# Auto scale a deployment "foo", with the number of pods between 2 and 10, target CPU utilization specified so a default autoscaling policy will be used:
 		kubectl autoscale deployment foo --min=2 --max=10
 
-		# Auto scale a replication controller "foo", with the number of pods between 1 to 5, target CPU utilization at 80%:
+		# Auto scale a replication controller "foo", with the number of pods between 1 and 5, target CPU utilization at 80%:
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`)
 )
 

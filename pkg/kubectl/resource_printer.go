@@ -165,15 +165,15 @@ func (fn ResourcePrinterFunc) HandledResources() []string {
 // prior to being passed to a nested printer.
 type VersionedPrinter struct {
 	printer   ResourcePrinter
-	convertor runtime.ObjectConvertor
+	converter runtime.ObjectConvertor
 	versions  []unversioned.GroupVersion
 }
 
 // NewVersionedPrinter wraps a printer to convert objects to a known API version prior to printing.
-func NewVersionedPrinter(printer ResourcePrinter, convertor runtime.ObjectConvertor, versions ...unversioned.GroupVersion) ResourcePrinter {
+func NewVersionedPrinter(printer ResourcePrinter, converter runtime.ObjectConvertor, versions ...unversioned.GroupVersion) ResourcePrinter {
 	return &VersionedPrinter{
 		printer:   printer,
-		convertor: convertor,
+		converter: converter,
 		versions:  versions,
 	}
 }
@@ -187,7 +187,7 @@ func (p *VersionedPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		if version.IsEmpty() {
 			continue
 		}
-		converted, err := p.convertor.ConvertToVersion(obj, version)
+		converted, err := p.converter.ConvertToVersion(obj, version)
 		if runtime.IsNotRegisteredError(err) {
 			continue
 		}
@@ -287,7 +287,7 @@ func (p *JSONPrinter) HandledResources() []string {
 // to the given version first.
 type YAMLPrinter struct {
 	version   string
-	convertor runtime.ObjectConvertor
+	converter runtime.ObjectConvertor
 }
 
 // PrintObj prints the data as YAML.

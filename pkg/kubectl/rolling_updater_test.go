@@ -680,7 +680,7 @@ Scaling foo-v2 up to 1
 `,
 		},
 		{
-			name:        "1->2 25/25 complex asymetric deployment",
+			name:        "1->2 25/25 complex asymmetric deployment",
 			oldRc:       oldRc(1, 1),
 			newRc:       newRc(0, 2),
 			newRcExists: false,
