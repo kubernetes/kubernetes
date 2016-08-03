@@ -461,20 +461,39 @@ func TestEqualIgnoreHash(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		equal, err := equalIgnoreHash(test.former, test.latter)
-		if err != nil {
-			t.Errorf("In test case %q, returned unexpected error %v", test.test, err)
+		runTest := func(t1, t2 api.PodTemplateSpec, reversed bool) {
+			// Set up
+			t1Copy, err := api.Scheme.DeepCopy(t1)
+			if err != nil {
+				t.Errorf("Failed setting up the test: %v", err)
+			}
+			t2Copy, err := api.Scheme.DeepCopy(t2)
+			if err != nil {
+				t.Errorf("Failed setting up the test: %v", err)
+			}
+			reverseString := ""
+			if reversed {
+				reverseString = " (reverse order)"
+			}
+			// Run
+			equal, err := equalIgnoreHash(t1, t2)
+			// Check
+			if err != nil {
+				t.Errorf("In test case %q%s, expected no error, returned %v", test.test, reverseString, err)
+			}
+			if equal != test.expected {
+				t.Errorf("In test case %q%s, expected %v", test.test, reverseString, test.expected)
+			}
+			if t1.Labels == nil || t2.Labels == nil {
+				t.Errorf("In test case %q%s, unexpected labels becomes nil", test.test, reverseString)
+			}
+			if !reflect.DeepEqual(t1, t1Copy) || !reflect.DeepEqual(t2, t2Copy) {
+				t.Errorf("In test case %q%s, unexpected input template modified", test.test, reverseString)
+			}
 		}
-		if equal != test.expected {
-			t.Errorf("In test case %q, expected %v", test.test, test.expected)
-		}
-		equal, err = equalIgnoreHash(test.latter, test.former)
-		if err != nil {
-			t.Errorf("In test case %q (reverse order), returned unexpected error %v", test.test, err)
-		}
-		if equal != test.expected {
-			t.Errorf("In test case %q (reverse order), expected %v", test.test, test.expected)
-		}
+		runTest(test.former, test.latter, false)
+		// Test the same case in reverse order
+		runTest(test.latter, test.former, true)
 	}
 }
 
