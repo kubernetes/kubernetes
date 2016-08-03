@@ -373,7 +373,7 @@ and a restricted default `PodSecurityPolicy`:
 apiVersion: v1
 kind: PodSecurityPolicy
 metadata:
-  name: 
+  name:
 spec:
   sysctls: # none
 ```
@@ -384,7 +384,7 @@ in contrast to a permissive default `PodSecurityPolicy`:
 apiVersion: v1
 kind: PodSecurityPolicy
 metadata:
-  name: 
+  name:
 spec:
   sysctls:
   - *
