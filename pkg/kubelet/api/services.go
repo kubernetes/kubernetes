@@ -33,9 +33,9 @@ type RuntimeService interface {
 	// StopPodSandbox stops the sandbox. If there are any running containers in the
 	// sandbox, they should be force terminated.
 	StopPodSandbox(podSandboxID string) error
-	// DeletePodSandbox deletes the sandbox. If there are running containers in the
-	// sandbox, they should be forcibly deleted.
-	DeletePodSandbox(podSandboxID string) error
+	// RemovePodSandbox removes the sandbox. If there are running containers in the
+	// sandbox, they should be forcibly removed.
+	RemovePodSandbox(podSandboxID string) error
 	// PodSandboxStatus returns the Status of the PodSandbox.
 	PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error)
 	// ListPodSandbox returns a list of Sandbox.
