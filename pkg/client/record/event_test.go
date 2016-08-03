@@ -350,8 +350,7 @@ func TestEventf(t *testing.T) {
 	recorder := recorderWithFakeClock(api.EventSource{Component: "eventTest"}, eventBroadcaster, clock)
 	for index, item := range table {
 		clock.Step(1 * time.Second)
-		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
-		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
+		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
@@ -369,8 +368,7 @@ func TestEventf(t *testing.T) {
 			actualEvent := <-createEvent
 			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
 		}
-		logWatcher1.Stop()
-		logWatcher2.Stop()
+		logWatcher.Stop()
 	}
 	sinkWatcher.Stop()
 }
@@ -597,8 +595,7 @@ func TestEventfNoNamespace(t *testing.T) {
 
 	for index, item := range table {
 		clock.Step(1 * time.Second)
-		logWatcher1 := eventBroadcaster.StartLogging(t.Logf) // Prove that it is useful
-		logWatcher2 := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
+		logWatcher := eventBroadcaster.StartLogging(func(formatter string, args ...interface{}) {
 			if e, a := item.expectLog, fmt.Sprintf(formatter, args...); e != a {
 				t.Errorf("Expected '%v', got '%v'", e, a)
 			}
@@ -617,8 +614,7 @@ func TestEventfNoNamespace(t *testing.T) {
 			validateEvent(strconv.Itoa(index), actualEvent, item.expect, t)
 		}
 
-		logWatcher1.Stop()
-		logWatcher2.Stop()
+		logWatcher.Stop()
 	}
 	sinkWatcher.Stop()
 }
