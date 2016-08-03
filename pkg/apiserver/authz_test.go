@@ -83,7 +83,7 @@ func TestNewAuthorizerFromAuthorizationConfig(t *testing.T) {
 			msg:     "should have errored when Authorization Policy File is used without ModeABAC",
 		},
 		{
-			// Atleast one authorizationMode is necessary
+			// At least one authorizationMode is necessary
 			modes:   []string{},
 			config:  AuthorizationConfig{PolicyFile: examplePolicyFile},
 			wantErr: true,
