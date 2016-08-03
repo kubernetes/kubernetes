@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -34,6 +35,9 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
 	"github.com/google/cadvisor/utils/sysfs"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	statsApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -201,4 +205,131 @@ func (cc *cadvisorClient) getFsInfo(label string) (cadvisorapiv2.FsInfo, error) 
 
 func (cc *cadvisorClient) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return cc.WatchForEvents(request)
+}
+
+func (cc *cadvisorClient) GetAllContainerStats() ([]*statsApi.ContainerStats, error) {
+	opts := cadvisorapiv2.RequestOptions{
+		IdType:    cadvisorapiv2.TypeName,
+		Count:     2, // 2 samples are needed to compute "instantaneous" CPU
+		Recursive: true,
+	}
+	infos, err := cc.GetContainerInfoV2("/", opts)
+	if err != nil {
+		return nil, err
+	}
+
+	result := []*statsApi.ContainerStats{}
+
+	for key, cinfo := range infos {
+		// on systemd using devicemapper each mount into the container has an associated cgroup.
+		// we ignore them to ensure we do not get duplicate entries in our summary.
+		// for details on .mount units: http://man7.org/linux/man-pages/man5/systemd.mount.5.html
+		if strings.HasSuffix(key, ".mount") {
+			continue
+		}
+		// Build the Pod key if this container is managed by a Pod
+		if isPodManagedContainer(&cinfo) {
+			continue
+		}
+
+		name := types.GetContainerName(cinfo.Spec.Labels)
+		result = append(result, containerInfoV2ToStats(name, &cinfo))
+	}
+	return result, nil
+}
+
+func (cc *cadvisorClient) GetContainerStats(id string) (*statsApi.ContainerStats, error) {
+	req := cadvisorapiv2.RequestOptions{
+		IdType:    cadvisorapiv2.TypeName,
+		Count:     2, // 2 samples are needed to compute "instantaneous" CPU
+		Recursive: false,
+	}
+	infos, err := cc.GetContainerInfoV2(id, req)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, cinfo := range infos {
+		// For non-recursive request, there should only be one info.
+		name := types.GetContainerName(cinfo.Spec.Labels)
+		return containerInfoV2ToStats(name, &cinfo), nil
+	}
+	return nil, fmt.Errorf("no such container found")
+}
+
+// isPodManagedContainer returns true if the cinfo container is managed by a Pod
+func isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
+	podName := types.GetPodName(cinfo.Spec.Labels)
+	podNamespace := types.GetPodNamespace(cinfo.Spec.Labels)
+	managed := podName != "" && podNamespace != ""
+	if !managed && podName != podNamespace {
+		glog.Warningf(
+			"Expect container to have either both podName (%s) and podNamespace (%s) labels, or neither.",
+			podName, podNamespace)
+	}
+	return managed
+}
+
+func containerInfoV2ToStats(name string, info *cadvisorapiv2.ContainerInfo) *statsApi.ContainerStats {
+	cStats := &statsApi.ContainerStats{
+		StartTime: unversioned.NewTime(info.Spec.CreationTime),
+		Name:      name,
+	}
+	cstat, found := latestContainerStats(info)
+	if !found {
+		return cStats
+	}
+	if info.Spec.HasCpu {
+		cpuStats := statsApi.CPUStats{
+			Time: unversioned.NewTime(cstat.Timestamp),
+		}
+		if cstat.CpuInst != nil {
+			cpuStats.UsageNanoCores = &cstat.CpuInst.Usage.Total
+		}
+		if cstat.Cpu != nil {
+			cpuStats.UsageCoreNanoSeconds = &cstat.Cpu.Usage.Total
+		}
+		cStats.CPU = &cpuStats
+	}
+	if info.Spec.HasMemory {
+		pageFaults := cstat.Memory.ContainerData.Pgfault
+		majorPageFaults := cstat.Memory.ContainerData.Pgmajfault
+		cStats.Memory = &statsApi.MemoryStats{
+			Time:            unversioned.NewTime(cstat.Timestamp),
+			UsageBytes:      &cstat.Memory.Usage,
+			WorkingSetBytes: &cstat.Memory.WorkingSet,
+			RSSBytes:        &cstat.Memory.RSS,
+			PageFaults:      &pageFaults,
+			MajorPageFaults: &majorPageFaults,
+		}
+		// availableBytes = memory  limit (if known) - workingset
+		if !isMemoryUnlimited(info.Spec.Memory.Limit) {
+			availableBytes := info.Spec.Memory.Limit - cstat.Memory.WorkingSet
+			cStats.Memory.AvailableBytes = &availableBytes
+		}
+	}
+	// TODO: populate FS stats
+	return cStats
+}
+
+// latestContainerStats returns the latest container stats from cadvisor, or nil if none exist
+func latestContainerStats(info *cadvisorapiv2.ContainerInfo) (*cadvisorapiv2.ContainerStats, bool) {
+	stats := info.Stats
+	if len(stats) < 1 {
+		return nil, false
+	}
+	latest := stats[len(stats)-1]
+	if latest == nil {
+		return nil, false
+	}
+	return latest, true
+}
+
+// Size after which we consider memory to be "unlimited". This is not
+// MaxInt64 due to rounding by the kernel.
+// TODO: cadvisor should export this https://github.com/google/cadvisor/blob/master/metrics/prometheus.go#L596
+const maxMemorySize = uint64(1 << 62)
+
+func isMemoryUnlimited(v uint64) bool {
+	return v > maxMemorySize
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	statsApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
@@ -72,4 +73,12 @@ func (c *Fake) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 
 func (c *Fake) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return new(events.EventChannel), nil
+}
+
+func (c *Fake) GetAllContainerStats() ([]*statsApi.ContainerStats, error) {
+	return []*statsApi.ContainerStats{}, nil
+}
+
+func (c *Fake) GetContainerStats(id string) (*statsApi.ContainerStats, error) {
+	return &statsApi.ContainerStats{}, nil
 }

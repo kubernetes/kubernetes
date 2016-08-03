@@ -20,6 +20,7 @@ import (
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 )
 
 // Interface is an abstract interface for testability.  It abstracts the interface to cAdvisor.
@@ -41,4 +42,7 @@ type Interface interface {
 
 	// Get events streamed through passedChannel that fit the request.
 	WatchEvents(request *events.Request) (*events.EventChannel, error)
+
+	// cadvisor implements the ContainerMetricsService.
+	internalApi.ContainerMetricsService
 }
