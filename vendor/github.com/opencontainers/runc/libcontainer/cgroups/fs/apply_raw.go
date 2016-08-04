@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
 	"sync"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
@@ -33,7 +32,6 @@ var (
 		&FreezerGroup{},
 		&NameGroup{GroupName: "name=systemd", Join: true},
 	}
-	CgroupProcesses  = "cgroup.procs"
 	HugePageSizes, _ = cgroups.GetHugePageSize()
 )
 
@@ -142,7 +140,9 @@ func (m *Manager) Apply(pid int) (err error) {
 		// created then join consists of writing the process pids to cgroup.procs
 		p, err := d.path(sys.Name())
 		if err != nil {
-			if cgroups.IsNotFound(err) {
+			// The non-presence of the devices subsystem is
+			// considered fatal for security reasons.
+			if cgroups.IsNotFound(err) && sys.Name() != "devices" {
 				continue
 			}
 			return err
@@ -190,6 +190,11 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
+	// If Paths are set, then we are just joining cgroups paths
+	// and there is no need to set any values.
+	if m.Cgroups.Paths != nil {
+		return nil
+	}
 	for _, sys := range subsystems {
 		// Generate fake cgroup data.
 		d, err := getCgroupData(container.Cgroups, -1)
@@ -339,7 +344,7 @@ func (raw *cgroupData) join(subsystem string) (string, error) {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return "", err
 	}
-	if err := writeFile(path, CgroupProcesses, strconv.Itoa(raw.pid)); err != nil {
+	if err := cgroups.WriteCgroupProc(path, raw.pid); err != nil {
 		return "", err
 	}
 	return path, nil
@@ -349,7 +354,7 @@ func writeFile(dir, file, data string) error {
 	// Normally dir should not be empty, one case is that cgroup subsystem
 	// is not mounted, we will get empty dir, and we want it fail here.
 	if dir == "" {
-		return fmt.Errorf("no such directory for %s.", file)
+		return fmt.Errorf("no such directory for %s", file)
 	}
 	if err := ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700); err != nil {
 		return fmt.Errorf("failed to write %v to %v: %v", data, file, err)

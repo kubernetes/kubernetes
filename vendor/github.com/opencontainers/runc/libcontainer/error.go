@@ -2,7 +2,7 @@ package libcontainer
 
 import "io"
 
-// API error code type.
+// ErrorCode is the API error code type.
 type ErrorCode int
 
 // API error codes.
@@ -56,7 +56,7 @@ func (c ErrorCode) String() string {
 	}
 }
 
-// API Error type.
+// Error is the API error type.
 type Error interface {
 	error
 
