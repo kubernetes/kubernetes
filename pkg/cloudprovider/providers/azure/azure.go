@@ -24,6 +24,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/Azure/azure-sdk-for-go/arm/network"
+	"github.com/Azure/azure-sdk-for-go/arm/storage"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
 )
@@ -60,6 +61,7 @@ type Cloud struct {
 	PublicIPAddressesClient network.PublicIPAddressesClient
 	SecurityGroupsClient    network.SecurityGroupsClient
 	VirtualMachinesClient   compute.VirtualMachinesClient
+	StorageAccountClient    storage.AccountsClient
 }
 
 func init() {
@@ -134,6 +136,8 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 	az.SecurityGroupsClient.BaseURI = az.Environment.ResourceManagerEndpoint
 	az.SecurityGroupsClient.Authorizer = servicePrincipalToken
 
+	az.StorageAccountClient = storage.NewAccountsClientWithBaseURI(az.Environment.ResourceManagerEndpoint, az.SubscriptionID)
+	az.StorageAccountClient.Authorizer = servicePrincipalToken
 	return &az, nil
 }
 
