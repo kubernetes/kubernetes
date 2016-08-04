@@ -835,6 +835,7 @@ func TestRequestStream(t *testing.T) {
 	for i, testCase := range testCases {
 		testCase.Request.backoffMgr = &NoBackoff{}
 		body, err := testCase.Request.Stream()
+		defer body.Close()
 		hasErr := err != nil
 		if hasErr != testCase.Err {
 			t.Errorf("%d: expected %t, got %t: %v", i, testCase.Err, hasErr, err)
