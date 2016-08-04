@@ -239,6 +239,10 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		}
 	} else {
 		cmdArgs = append(cmdArgs, getKubeletServerBin())
+		cmdArgs = append(cmdArgs,
+			"--runtime-cgroups=/docker-daemon",
+			"--kubelet-cgroups=/kubelet",
+		)
 	}
 	cmdArgs = append(cmdArgs,
 		"--api-servers", "http://127.0.0.1:8080",
