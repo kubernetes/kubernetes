@@ -91,13 +91,15 @@ func (x *PolicyRule) CodecEncodeSelf(e *codec1978.Encoder) {
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
 			yyq2[1] = true
+			yyq2[2] = len(x.APIGroups) != 0
+			yyq2[3] = len(x.Resources) != 0
 			yyq2[4] = len(x.ResourceNames) != 0
 			yyq2[5] = len(x.NonResourceURLs) != 0
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(6)
 			} else {
-				yynn2 = 3
+				yynn2 = 1
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -168,55 +170,67 @@ func (x *PolicyRule) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.APIGroups == nil {
-					r.EncodeNil()
-				} else {
-					yym12 := z.EncBinary()
-					_ = yym12
-					if false {
+				if yyq2[2] {
+					if x.APIGroups == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncSliceStringV(x.APIGroups, false, e)
+						yym12 := z.EncBinary()
+						_ = yym12
+						if false {
+						} else {
+							z.F.EncSliceStringV(x.APIGroups, false, e)
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("apiGroups"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.APIGroups == nil {
-					r.EncodeNil()
-				} else {
-					yym13 := z.EncBinary()
-					_ = yym13
-					if false {
+				if yyq2[2] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("apiGroups"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.APIGroups == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncSliceStringV(x.APIGroups, false, e)
+						yym13 := z.EncBinary()
+						_ = yym13
+						if false {
+						} else {
+							z.F.EncSliceStringV(x.APIGroups, false, e)
+						}
 					}
 				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.Resources == nil {
-					r.EncodeNil()
-				} else {
-					yym15 := z.EncBinary()
-					_ = yym15
-					if false {
+				if yyq2[3] {
+					if x.Resources == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncSliceStringV(x.Resources, false, e)
+						yym15 := z.EncBinary()
+						_ = yym15
+						if false {
+						} else {
+							z.F.EncSliceStringV(x.Resources, false, e)
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("resources"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.Resources == nil {
-					r.EncodeNil()
-				} else {
-					yym16 := z.EncBinary()
-					_ = yym16
-					if false {
+				if yyq2[3] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("resources"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Resources == nil {
+						r.EncodeNil()
 					} else {
-						z.F.EncSliceStringV(x.Resources, false, e)
+						yym16 := z.EncBinary()
+						_ = yym16
+						if false {
+						} else {
+							z.F.EncSliceStringV(x.Resources, false, e)
+						}
 					}
 				}
 			}
