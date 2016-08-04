@@ -17,12 +17,15 @@ limitations under the License.
 package procfs
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 type ProcFS struct{}
@@ -55,4 +58,40 @@ func (pfs *ProcFS) GetFullContainerName(pid int) (string, error) {
 		return "", err
 	}
 	return containerNameFromProcCgroup(string(content))
+}
+
+func PidOf(name string) []int {
+	pids := []int{}
+	filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
+		base := filepath.Base(path)
+		// Traverse only the directories we are interested in
+		if info.IsDir() && path != "/proc" {
+			// If the directory is not a numer (i.e. not a PID), skip it
+			if _, err := strconv.Atoi(base); err != nil {
+				return filepath.SkipDir
+			}
+		}
+		if base == "cmdline" {
+			cmdline, err := ioutil.ReadFile(path)
+			if err == nil {
+				// The bytes we read have '\0' as a separator for the command line
+				parts := bytes.Split(cmdline, []byte{0})
+				// Split the command line itself we are interested in just the first part
+				exe := strings.FieldsFunc(string(parts[0]), func(c rune) bool {
+					return unicode.IsSpace(c) || c == ':'
+				})
+				if len(exe) > 0 {
+					// Check if the name of the executable is what we are looking for
+					if filepath.Base(exe[0]) == name {
+						dirname := filepath.Base(filepath.Dir(path))
+						// Grab the PID from the directory path
+						pid, _ := strconv.Atoi(dirname)
+						pids = append(pids, pid)
+					}
+				}
+			}
+		}
+		return nil
+	})
+	return pids
 }
