@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
@@ -4664,4 +4665,74 @@ func retryCmd(command string, args ...string) (string, string, error) {
 		return true, nil
 	})
 	return stdout, stderr, err
+}
+
+// GetPodsScheduled returns a number of currently scheduled and not scheduled Pods.
+func GetPodsScheduled(masterNodes sets.String, pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
+	for _, pod := range pods.Items {
+		if !masterNodes.Has(pod.Spec.NodeName) {
+			if pod.Spec.NodeName != "" {
+				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
+				Expect(scheduledCondition != nil).To(Equal(true))
+				Expect(scheduledCondition.Status).To(Equal(api.ConditionTrue))
+				scheduledPods = append(scheduledPods, pod)
+			} else {
+				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
+				Expect(scheduledCondition != nil).To(Equal(true))
+				Expect(scheduledCondition.Status).To(Equal(api.ConditionFalse))
+				if scheduledCondition.Reason == "Unschedulable" {
+
+					notScheduledPods = append(notScheduledPods, pod)
+				}
+			}
+		}
+	}
+	return
+}
+
+// WaitForStableCluster waits until all existing pods are scheduled and returns their amount.
+func WaitForStableCluster(c *client.Client, masterNodes sets.String) int {
+	timeout := 10 * time.Minute
+	startTime := time.Now()
+
+	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
+	ExpectNoError(err)
+	// API server returns also Pods that succeeded. We need to filter them out.
+	currentPods := make([]api.Pod, 0, len(allPods.Items))
+	for _, pod := range allPods.Items {
+		if pod.Status.Phase != api.PodSucceeded && pod.Status.Phase != api.PodFailed {
+			currentPods = append(currentPods, pod)
+		}
+
+	}
+	allPods.Items = currentPods
+	scheduledPods, currentlyNotScheduledPods := GetPodsScheduled(masterNodes, allPods)
+	for len(currentlyNotScheduledPods) != 0 {
+		time.Sleep(2 * time.Second)
+
+		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
+		ExpectNoError(err)
+		scheduledPods, currentlyNotScheduledPods = GetPodsScheduled(masterNodes, allPods)
+
+		if startTime.Add(timeout).Before(time.Now()) {
+			Failf("Timed out after %v waiting for stable cluster.", timeout)
+			break
+		}
+	}
+	return len(scheduledPods)
+}
+
+// GetMasterAndWorkerNodesOrDie will return a list masters and schedulable worker nodes
+func GetMasterAndWorkerNodesOrDie(c *client.Client) (sets.String, *api.NodeList) {
+	nodes := &api.NodeList{}
+	masters := sets.NewString()
+	all, _ := c.Nodes().List(api.ListOptions{})
+	for _, n := range all.Items {
+		if system.IsMasterNode(&n) {
+			masters.Insert(n.Name)
+		} else if isNodeSchedulable(&n) {
+			nodes.Items = append(nodes.Items, n)
+		}
+	}
+	return masters, nodes
 }
