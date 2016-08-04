@@ -133,6 +133,12 @@ function pull_installer() {
 }
 
 function ensure_files() {
+	kube::log::status "Ensure provider is supported..."
+	if [[ "${KUBERNETES_PROVIDER:-}" != "gce" ]]; then
+		echo "Supported providers: \"gce\""
+		exit 1
+	fi
+
 	kube::log::status "Ensure credential files exist..."
 	if [[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
 		echo "Please ensure Google credentials file \""${GOOGLE_APPLICATION_CREDENTIALS}"\" exists."
