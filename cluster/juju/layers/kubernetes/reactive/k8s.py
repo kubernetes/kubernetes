@@ -53,6 +53,19 @@ def configure_easrsa():
     # Setting this state before easyrsa is configured ensures the tls layer is
     # configured to generate certificates with client authentication.
     set_state('tls.client.authorization.required')
+    domain = hookenv.config().get('dns_domain')
+    cidr = hookenv.config().get('cidr')
+    sdn_ip = get_sdn_ip(cidr)
+    # Create extra sans that the tls layer will add to the server cert.
+    extra_sans = [
+        sdn_ip,
+        'kubernetes',
+        'kubernetes.{0}'.format(domain),
+        'kubernetes.default',
+        'kubernetes.default.svc',
+        'kubernetes.default.svc.{0}'.format(domain)
+    ]
+    unitdata.kv().set('extra_sans', extra_sans)
 
 
 @hook('config-changed')
@@ -68,6 +81,8 @@ def config_changed():
             # Stop and remove the Kubernetes kubelet container.
             compose.kill('master')
             compose.rm('master')
+            compose.kill('proxy')
+            compose.rm('proxy')
             # Remove the state so the code can react to restarting kubelet.
             remove_state('kubelet.available')
         else:
@@ -182,11 +197,13 @@ def relation_message():
     status_set('waiting', 'Waiting for relation to ETCD')
 
 
-@when('etcd.available', 'kubeconfig.created')
+@when('kubeconfig.created')
+@when('etcd.available')
 @when_not('kubelet.available', 'proxy.available')
 def start_kubelet(etcd):
     '''Run the hyperkube container that starts the kubernetes services.
-    When the leader, run the master services (apiserver, controller, scheduler)
+    When the leader, run the master services (apiserver, controller, scheduler,
+    proxy)
     using the master.json from the rendered manifest directory.
     When a follower, start the node services (kubelet, and proxy). '''
     render_files(etcd)
@@ -195,6 +212,7 @@ def start_kubelet(etcd):
     status_set('maintenance', 'Starting the Kubernetes services.')
     if is_leader():
         compose.up('master')
+        compose.up('proxy')
         set_state('kubelet.available')
         # Open the secure port for api-server.
         hookenv.open_port(6443)
@@ -245,8 +263,12 @@ def master_kubeconfig():
     # Use a context manager to run the tar command in a specific directory.
     with chdir(directory):
         # Create a package with kubectl and the files to use it externally.
-        cmd = 'tar -cvzf /home/ubuntu/kubectl_package.tar.gz ca.crt client.crt client.key kubeconfig kubectl'  # noqa
+        cmd = 'tar -cvzf /home/ubuntu/kubectl_package.tar.gz ca.crt ' \
+              'client.key client.crt kubectl kubeconfig'
         check_call(split(cmd))
+
+    # This sets up the client workspace consistently on the leader and nodes.
+    node_kubeconfig()
     set_state('kubeconfig.created')
 
 
@@ -373,6 +395,14 @@ def get_dns_ip(cidr):
     return '.'.join(ip.split('.')[0:-1]) + '.10'
 
 
+def get_sdn_ip(cidr):
+    '''Get the IP address for the SDN gateway based on the provided cidr.'''
+    # Remove the range from the cidr.
+    ip = cidr.split('/')[0]
+    # Remove the last octet and replace it with 1.
+    return '.'.join(ip.split('.')[0:-1]) + '.1'
+
+
 def render_files(reldata=None):
     '''Use jinja templating to render the docker-compose.yml and master.json
     file to contain the dynamic data for the configuration files.'''
@@ -382,8 +412,22 @@ def render_files(reldata=None):
     # Add the charm configuration data to the context.
     context.update(hookenv.config())
     if reldata:
-        # Add the etcd relation data to the context.
-        context.update({'connection_string': reldata.connection_string()})
+        connection_string = reldata.get_connection_string()
+        # Define where the etcd tls files will be kept.
+        etcd_dir = '/etc/ssl/etcd'
+        # Create paths to the etcd client ca, key, and cert file locations.
+        ca = os.path.join(etcd_dir, 'client-ca.pem')
+        key = os.path.join(etcd_dir, 'client-key.pem')
+        cert = os.path.join(etcd_dir, 'client-cert.pem')
+        # Save the client credentials (in relation data) to the paths provided.
+        reldata.save_client_credentials(key, cert, ca)
+        # Update the context so the template has the etcd information.
+        context.update({'etcd_dir': etcd_dir,
+                        'connection_string': connection_string,
+                        'etcd_ca': ca,
+                        'etcd_key': key,
+                        'etcd_cert': cert})
+
     charm_dir = hookenv.charm_dir()
     rendered_kube_dir = os.path.join(charm_dir, 'files/kubernetes')
     if not os.path.exists(rendered_kube_dir):
