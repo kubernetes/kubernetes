@@ -410,17 +410,26 @@ func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*api.P
 // (e.g. the addition of a new field will cause the hash code to change)
 // Note that we assume input podTemplateSpecs contain non-empty labels
 func equalIgnoreHash(template1, template2 api.PodTemplateSpec) (bool, error) {
+	// First, compare template.Labels (ignoring hash)
+	labels1, labels2 := template1.Labels, template2.Labels
 	// The podTemplateSpec must have a non-empty label so that label selectors can find them.
 	// This is checked by validation (of resources contain a podTemplateSpec).
-	if len(template1.Labels) == 0 || len(template2.Labels) == 0 {
+	if len(labels1) == 0 || len(labels2) == 0 {
 		return false, fmt.Errorf("Unexpected empty labels found in given template")
 	}
-	hash1 := template1.Labels[extensions.DefaultDeploymentUniqueLabelKey]
-	hash2 := template2.Labels[extensions.DefaultDeploymentUniqueLabelKey]
-	// compare equality ignoring pod-template-hash
-	template1.Labels[extensions.DefaultDeploymentUniqueLabelKey] = hash2
+	if len(labels1) > len(labels2) {
+		labels1, labels2 = labels2, labels1
+	}
+	// We make sure len(labels2) >= len(labels1)
+	for k, v := range labels2 {
+		if labels1[k] != v && k != extensions.DefaultDeploymentUniqueLabelKey {
+			return false, nil
+		}
+	}
+
+	// Then, compare the templates without comparing their labels
+	template1.Labels, template2.Labels = nil, nil
 	result := api.Semantic.DeepEqual(template1, template2)
-	template1.Labels[extensions.DefaultDeploymentUniqueLabelKey] = hash1
 	return result, nil
 }
 
