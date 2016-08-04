@@ -30,12 +30,13 @@ import (
 //
 // containerName must be an absolute container name.
 func RunInResourceContainer(containerName string) error {
+	allowAllDevices := true
 	manager := fs.Manager{
 		Cgroups: &configs.Cgroup{
 			Parent: "/",
 			Name:   containerName,
 			Resources: &configs.Resources{
-				AllowAllDevices: true,
+				AllowAllDevices: &allowAllDevices,
 			},
 		},
 	}

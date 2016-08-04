@@ -1643,83 +1643,83 @@
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/apparmor",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/cgroups",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/cgroups/fs",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/cgroups/systemd",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/configs",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/configs/validate",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/criurpc",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/keys",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/label",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/seccomp",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/selinux",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/stacktrace",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/system",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/user",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/opencontainers/runc/libcontainer/utils",
-			"Comment": "v0.1.1",
-			"Rev": "baf6536d6259209c3edfa2b22237af82942d3dfa"
+			"Comment": "v1.0.0-rc1-100-g142df38",
+			"Rev": "142df3836b740af53dc6da59eed8dbc92f62917c"
 		},
 		{
 			"ImportPath": "github.com/pborman/uuid",

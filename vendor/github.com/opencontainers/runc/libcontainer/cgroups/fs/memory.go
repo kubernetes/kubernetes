@@ -5,13 +5,19 @@ package fs
 import (
 	"bufio"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
+)
+
+const (
+	cgroupKernelMemoryLimit = "memory.kmem.limit_in_bytes"
 )
 
 type MemoryGroup struct {
@@ -32,13 +38,10 @@ func (s *MemoryGroup) Apply(d *cgroupData) (err error) {
 				return err
 			}
 		}
-		// We have to set kernel memory here, as we can't change it once
-		// processes have been attached.
-		if err := s.SetKernelMemory(path, d.config); err != nil {
+		if err := EnableKernelMemoryAccounting(path); err != nil {
 			return err
 		}
 	}
-
 	defer func() {
 		if err != nil {
 			os.RemoveAll(path)
@@ -54,13 +57,43 @@ func (s *MemoryGroup) Apply(d *cgroupData) (err error) {
 	return nil
 }
 
-func (s *MemoryGroup) SetKernelMemory(path string, cgroup *configs.Cgroup) error {
-	// This has to be done separately because it has special constraints (it
-	// can't be done after there are processes attached to the cgroup).
-	if cgroup.Resources.KernelMemory > 0 {
-		if err := writeFile(path, "memory.kmem.limit_in_bytes", strconv.FormatInt(cgroup.Resources.KernelMemory, 10)); err != nil {
-			return err
+func EnableKernelMemoryAccounting(path string) error {
+	// Check if kernel memory is enabled
+	// We have to limit the kernel memory here as it won't be accounted at all
+	// until a limit is set on the cgroup and limit cannot be set once the
+	// cgroup has children, or if there are already tasks in the cgroup.
+	kernelMemoryLimit := int64(1)
+	if err := setKernelMemory(path, kernelMemoryLimit); err != nil {
+		return err
+	}
+	kernelMemoryLimit = int64(-1)
+	if err := setKernelMemory(path, kernelMemoryLimit); err != nil {
+		return err
+	}
+	return nil
+}
+
+func setKernelMemory(path string, kernelMemoryLimit int64) error {
+	if path == "" {
+		return fmt.Errorf("no such directory for %s", cgroupKernelMemoryLimit)
+	}
+	if !cgroups.PathExists(filepath.Join(path, cgroupKernelMemoryLimit)) {
+		// kernel memory is not enabled on the system so we should do nothing
+		return nil
+	}
+	if err := ioutil.WriteFile(filepath.Join(path, cgroupKernelMemoryLimit), []byte(strconv.FormatInt(kernelMemoryLimit, 10)), 0700); err != nil {
+		// Check if the error number returned by the syscall is "EBUSY"
+		// The EBUSY signal is returned on attempts to write to the
+		// memory.kmem.limit_in_bytes file if the cgroup has children or
+		// once tasks have been attached to the cgroup
+		if pathErr, ok := err.(*os.PathError); ok {
+			if errNo, ok := pathErr.Err.(syscall.Errno); ok {
+				if errNo == syscall.EBUSY {
+					return fmt.Errorf("failed to set %s, because either tasks have already joined this cgroup or it has children", cgroupKernelMemoryLimit)
+				}
+			}
 		}
+		return fmt.Errorf("failed to write %v to %v: %v", kernelMemoryLimit, cgroupKernelMemoryLimit, err)
 	}
 	return nil
 }
@@ -113,11 +146,18 @@ func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
 		return err
 	}
 
+	if cgroup.Resources.KernelMemory != 0 {
+		if err := setKernelMemory(path, cgroup.Resources.KernelMemory); err != nil {
+			return err
+		}
+	}
+
 	if cgroup.Resources.MemoryReservation != 0 {
 		if err := writeFile(path, "memory.soft_limit_in_bytes", strconv.FormatInt(cgroup.Resources.MemoryReservation, 10)); err != nil {
 			return err
 		}
 	}
+
 	if cgroup.Resources.KernelMemoryTCP != 0 {
 		if err := writeFile(path, "memory.kmem.tcp.limit_in_bytes", strconv.FormatInt(cgroup.Resources.KernelMemoryTCP, 10)); err != nil {
 			return err
