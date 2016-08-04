@@ -56,6 +56,7 @@ var (
 func NewCmdCreateConfigMap(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Aliases: []string{"cm"},
 		Short:   "Create a configmap from a local file, directory or literal value",
 		Long:    configMapLong,
 		Example: configMapExample,
