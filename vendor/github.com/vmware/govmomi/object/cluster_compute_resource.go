@@ -25,8 +25,6 @@ import (
 
 type ClusterComputeResource struct {
 	ComputeResource
-
-	InventoryPath string
 }
 
 func NewClusterComputeResource(c *vim25.Client, ref types.ManagedObjectReference) *ClusterComputeResource {
