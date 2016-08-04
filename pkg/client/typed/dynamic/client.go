@@ -55,9 +55,12 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	confCopy := *conf
 	conf = &confCopy
 
-	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
-	conf.ContentType = runtime.ContentTypeJSON
-	conf.AcceptContentTypes = runtime.ContentTypeJSON
+	contentConfig := ContentConfig()
+	contentConfig.GroupVersion = conf.GroupVersion
+	if conf.NegotiatedSerializer != nil {
+		contentConfig.NegotiatedSerializer = conf.NegotiatedSerializer
+	}
+	conf.ContentConfig = contentConfig
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"
@@ -65,10 +68,6 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 
 	if len(conf.UserAgent) == 0 {
 		conf.UserAgent = restclient.DefaultKubernetesUserAgent()
-	}
-	if conf.NegotiatedSerializer == nil {
-		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
 	}
 
 	cl, err := restclient.RESTClientFor(conf)
@@ -253,6 +252,18 @@ func (dynamicCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj r
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 	return runtime.UnstructuredJSONScheme.Encode(obj, w)
+}
+
+// ContentConfig returns a restclient.ContentConfig for dynamic types.
+func ContentConfig() restclient.ContentConfig {
+	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
+	codec := dynamicCodec{}
+	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+	return restclient.ContentConfig{
+		AcceptContentTypes:   runtime.ContentTypeJSON,
+		ContentType:          runtime.ContentTypeJSON,
+		NegotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo),
+	}
 }
 
 // paramaterCodec is a codec converts an API object to query
