@@ -1,13 +1,13 @@
 services:
   kubernetes:
-    charm: local:trusty/kubernetes
+    charm: __CHARM_DIR__/builds/kubernetes
     annotations:
       "gui-x": "600"
       "gui-y": "0"
     expose: true
     num_units: 2
   etcd:
-    charm: cs:~containers/trusty/etcd
+    charm: cs:~containers/etcd
     annotations:
       "gui-x": "300"
       "gui-y": "0"
@@ -15,4 +15,4 @@ services:
 relations:
   - - "kubernetes:etcd"
     - "etcd:db"
-series: trusty
+series: xenial
