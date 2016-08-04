@@ -295,12 +295,12 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 		cmd.Cmd.Stdout = outfile
 		cmd.Cmd.Stderr = outfile
 
-		// Killing the sudo command should kill the server as well.
+		// Death of this test process should kill the server as well.
 		attrs := &syscall.SysProcAttr{}
 		// Hack to set linux-only field without build tags.
 		deathSigField := reflect.ValueOf(attrs).Elem().FieldByName("Pdeathsig")
 		if deathSigField.IsValid() {
-			deathSigField.Set(reflect.ValueOf(syscall.SIGKILL))
+			deathSigField.Set(reflect.ValueOf(syscall.SIGTERM))
 		} else {
 			cmdErrorChan <- fmt.Errorf("Failed to set Pdeathsig field (non-linux build)")
 			return
