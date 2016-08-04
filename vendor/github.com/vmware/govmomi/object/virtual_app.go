@@ -17,13 +17,10 @@ limitations under the License.
 package object
 
 import (
-	"fmt"
-
 	"golang.org/x/net/context"
 
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/methods"
-	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
@@ -35,24 +32,6 @@ func NewVirtualApp(c *vim25.Client, ref types.ManagedObjectReference) *VirtualAp
 	return &VirtualApp{
 		ResourcePool: NewResourcePool(c, ref),
 	}
-}
-
-func (p VirtualApp) String() string {
-	if p.InventoryPath == "" {
-		return p.Common.String()
-	}
-	return fmt.Sprintf("%v @ %v", p.Common, p.InventoryPath)
-}
-
-func (p VirtualApp) Name(ctx context.Context) (string, error) {
-	var o mo.VirtualApp
-
-	err := p.Properties(ctx, p.Reference(), []string{"name"}, &o)
-	if err != nil {
-		return "", err
-	}
-
-	return o.Name, nil
 }
 
 func (p VirtualApp) CreateChildVM_Task(ctx context.Context, config types.VirtualMachineConfigSpec, host *HostSystem) (*Task, error) {
