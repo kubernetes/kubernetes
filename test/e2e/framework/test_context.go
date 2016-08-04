@@ -69,10 +69,15 @@ type TestContextType struct {
 	DumpLogsOnFailure bool
 	// Name of the node to run tests on (node e2e suite only).
 	NodeName string
+	// TODO(random-liu): Remove following flags.
+	// DisableKubenet disables kubenet when starting kubelet.
+	DisableKubenet bool
 	// Whether to enable the QoS Cgroup Hierarchy or not
 	CgroupsPerQOS bool
 	// The hard eviction thresholds
 	EvictionHard string
+	// ManifestPath is the static pod manifest path.
+	ManifestPath string
 }
 
 type CloudConfig struct {
@@ -151,6 +156,10 @@ func RegisterClusterFlags() {
 // Register flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on (node e2e suite only).")
+	// TODO(random-liu): Remove kubelet related flags when we move the kubelet start logic out of the test.
+	// TODO(random-liu): Add an flag to pass in all kubelet flags set outside, and automatic config and filter test based on the flags.
+	flag.BoolVar(&TestContext.DisableKubenet, "disable-kubenet", false, "If true, start kubelet without kubenet. (default false)")
 	flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
+	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
 }

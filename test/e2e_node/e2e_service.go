@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -33,22 +34,181 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kardianos/osext"
 
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+// TODO(random-liu): Move this file to a separate package.
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 
+// E2EServices starts and stops e2e services. The test use it to start and
+// stop all dependent e2e services.
+type E2EServices struct {
+	cmd *exec.Cmd
+}
+
+func NewE2eServices() *E2EServices {
+	return &E2EServices{}
+}
+
+// StartE2eServices start the e2e services in another process, it returns
+// when all e2e services are ready.
+// We want to statically link e2e services into the test binary, but we don't
+// want their glog to pollute the test result. So we run the binary in start-
+// services-only mode to start e2e services in another process.
+func (e *E2EServices) StartE2EServices() (string, error) {
+	// Create the manifest path for kubelet.
+	// TODO(random-liu): Remove related logic when we move kubelet starting logic out of the test.
+	manifestPath, err := ioutil.TempDir("", "node-e2e-pod")
+	if err != nil {
+		return "", err
+	}
+	testBin, err := osext.Executable()
+	if err != nil {
+		return manifestPath, fmt.Errorf("can't get current binary: %v", err)
+	}
+	cmd := exec.Command(testBin,
+		"--start-services-only",
+		"--server-start-timeout", serverStartTimeout.String(),
+		"--report-dir", framework.TestContext.ReportDir,
+		// TODO(random-liu): Remove the following flags after we move kubelet starting logic
+		// out of the test.
+		"--node-name", framework.TestContext.NodeName,
+		"--disable-kubenet="+strconv.FormatBool(framework.TestContext.DisableKubenet),
+		"--cgroups-per-qos="+strconv.FormatBool(framework.TestContext.CgroupsPerQOS),
+		"--manifest-path", manifestPath,
+		"--eviction-hard", framework.TestContext.EvictionHard,
+	)
+	// TODO(random-liu): Redirect output to log file after switching to static link solution.
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	e.cmd = cmd
+	if err := e.cmd.Start(); err != nil {
+		return manifestPath, err
+	}
+	if err := readinessCheck(); err != nil {
+		return manifestPath, err
+	}
+	return manifestPath, nil
+}
+
+// StopE2EServices stop the e2e services.
+func (e *E2EServices) StopE2EServices() error {
+	defer func() {
+		// Cleanup the manifest path for kubelet.
+		manifestPath := framework.TestContext.ManifestPath
+		if manifestPath != "" {
+			err := os.RemoveAll(manifestPath)
+			if err != nil {
+				glog.Errorf("Failed to delete static pod manifest directory %s.\n%v", manifestPath, err)
+			}
+		}
+	}()
+	cmd := e.cmd
+	if cmd == nil {
+		return fmt.Errorf("can't stop e2e services, because `cmd` is nil")
+	}
+	if cmd.Process == nil {
+		glog.V(2).Info("E2E services are not running")
+		return nil
+	}
+	pid := cmd.Process.Pid
+
+	// Attempt to shut down the process in a friendly manner before forcing it.
+	waitChan := make(chan error)
+	go func() {
+		_, err := cmd.Process.Wait()
+		waitChan <- err
+		close(waitChan)
+	}()
+
+	const timeout = 10 * time.Second
+	for _, signal := range []os.Signal{os.Interrupt, os.Kill} {
+		glog.V(2).Infof("Stopping e2e services (pid=%d) with %s", pid, signal.String())
+		err := cmd.Process.Signal(signal)
+		if err != nil {
+			glog.Errorf("Error signaling e2e services (pid=%d) with %s: %v", pid, signal.String(), err)
+			continue
+		}
+
+		select {
+		case err := <-waitChan:
+			if err != nil {
+				return fmt.Errorf("error stopping e2e services: %v", err)
+			}
+			// Success!
+			return nil
+		case <-time.After(timeout):
+			// Continue.
+		}
+	}
+	return nil
+}
+
+// RunE2EServices actually start the e2e services. This function is used to
+// start e2e services in current process. This is used in start-services-only
+// mode.
+func RunE2EServices() {
+	e := newE2eService()
+	if err := e.run(); err != nil {
+		glog.Fatalf("Failed to run e2e services: %v", err)
+	}
+}
+
+// Ports of different e2e services.
+const (
+	etcdPort            = "4001"
+	apiserverPort       = "8080"
+	kubeletPort         = "10250"
+	kubeletReadOnlyPort = "10255"
+)
+
+// Health check urls of different e2e services.
+var (
+	etcdHealthCheckURL      = getEndpoint(etcdPort) + "/v2/keys/" // Trailing slash is required,
+	apiserverHealthCheckURL = getEndpoint(apiserverPort) + "/healthz"
+	kubeletHealthCheckURL   = getEndpoint(kubeletReadOnlyPort) + "/healthz"
+)
+
+// getEndpoint generates endpoint url from service port.
+func getEndpoint(port string) string {
+	return "http://127.0.0.1:" + port
+}
+
+// readinessCheck checks whether all e2e services are ready.
+func readinessCheck() error {
+	endTime := time.Now().Add(*serverStartTimeout)
+	for endTime.After(time.Now()) {
+		select {
+		case <-time.After(time.Second):
+			ready := true
+			for _, url := range []string{
+				etcdHealthCheckURL,
+				apiserverHealthCheckURL,
+				kubeletHealthCheckURL,
+			} {
+				resp, err := http.Get(url)
+				if err != nil || resp.StatusCode != http.StatusOK {
+					ready = false
+					break
+				}
+			}
+			if ready {
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("e2e service readiness check timeout %v", *serverStartTimeout)
+}
+
+// e2eService is used internally in this file to start e2e services in current process.
 type e2eService struct {
 	killCmds []*killCmd
 	rmDirs   []string
 
-	context       *SharedContext
-	etcdDataDir   string
-	nodeName      string
-	logFiles      map[string]logFileData
-	cgroupsPerQOS bool
-	evictionHard  string
+	etcdDataDir string
+	logFiles    map[string]logFileData
 }
 
 type logFileData struct {
@@ -63,20 +223,36 @@ const (
 	defaultEtcdPath = "/tmp/etcd"
 )
 
-func newE2eService(nodeName string, cgroupsPerQOS bool, evictionHard string, context *SharedContext) *e2eService {
+func newE2eService() *e2eService {
 	// Special log files that need to be collected for additional debugging.
 	var logFiles = map[string]logFileData{
 		"kern.log":   {[]string{"/var/log/kern.log"}, []string{"-k"}},
 		"docker.log": {[]string{"/var/log/docker.log", "/var/log/upstart/docker.log"}, []string{"-u", "docker"}},
 	}
 
-	return &e2eService{
-		context:       context,
-		nodeName:      nodeName,
-		logFiles:      logFiles,
-		cgroupsPerQOS: cgroupsPerQOS,
-		evictionHard:  evictionHard,
+	return &e2eService{logFiles: logFiles}
+}
+
+// run starts all e2e services and wait for the termination signal. Once receives the
+// termination signal, it will stop the e2e services gracefully.
+func (es *e2eService) run() error {
+	defer es.stop()
+	if err := es.start(); err != nil {
+		glog.Fatalf("Unable to start node services.\n%v", err)
 	}
+	return es.wait()
+}
+
+// terminationSignals are signals that cause the program to exit in the
+// supported platforms (linux, darwin, windows).
+var terminationSignals = []os.Signal{syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT}
+
+// wait waits until receiving a termination signal.
+func (es *e2eService) wait() error {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, terminationSignals...)
+	<-sig
+	return nil
 }
 
 func (es *e2eService) start() error {
@@ -105,7 +281,6 @@ func (es *e2eService) start() error {
 		return err
 	}
 	es.killCmds = append(es.killCmds, cmd)
-	es.rmDirs = append(es.rmDirs, es.context.PodConfigPath)
 
 	return nil
 }
@@ -166,6 +341,7 @@ func isJournaldAvailable() bool {
 }
 
 func (es *e2eService) stop() {
+	es.getLogFiles()
 	for _, k := range es.killCmds {
 		if err := k.Kill(); err != nil {
 			glog.Errorf("Failed to stop %v: %v", k.name, err)
@@ -206,7 +382,7 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 	// configuration (e.g. --name in version 0.4.9)
 	cmd.Dir = es.etcdDataDir
 	hcc := newHealthCheckCommand(
-		"http://127.0.0.1:4001/v2/keys/", // Trailing slash is required,
+		etcdHealthCheckURL,
 		cmd,
 		"etcd.log")
 	return &killCmd{name: "etcd", cmd: cmd}, es.startServer(hcc)
@@ -214,26 +390,21 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 
 func (es *e2eService) startApiServer() (*killCmd, error) {
 	cmd := exec.Command("sudo", getApiServerBin(),
-		"--etcd-servers", "http://127.0.0.1:4001",
+		"--etcd-servers", getEndpoint(etcdPort),
 		"--insecure-bind-address", "0.0.0.0",
 		"--service-cluster-ip-range", "10.0.0.1/24",
-		"--kubelet-port", "10250",
+		"--kubelet-port", kubeletPort,
 		"--allow-privileged", "true",
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 	)
 	hcc := newHealthCheckCommand(
-		"http://127.0.0.1:8080/healthz",
+		apiserverHealthCheckURL,
 		cmd,
 		"kube-apiserver.log")
 	return &killCmd{name: "kube-apiserver", cmd: cmd}, es.startServer(hcc)
 }
 
 func (es *e2eService) startKubeletServer() (*killCmd, error) {
-	dataDir, err := ioutil.TempDir("", "node-e2e-pod")
-	if err != nil {
-		return nil, err
-	}
-	es.context.PodConfigPath = dataDir
 	var killOverride *exec.Cmd
 	cmdArgs := []string{}
 	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
@@ -255,27 +426,28 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		)
 	}
 	cmdArgs = append(cmdArgs,
-		"--api-servers", "http://127.0.0.1:8080",
+		"--api-servers", getEndpoint(apiserverPort),
 		"--address", "0.0.0.0",
-		"--port", "10250",
-		"--hostname-override", es.nodeName, // Required because hostname is inconsistent across hosts
+		"--port", kubeletPort,
+		"--read-only-port", kubeletReadOnlyPort,
+		"--hostname-override", framework.TestContext.NodeName, // Required because hostname is inconsistent across hosts
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",
-		"--config", es.context.PodConfigPath,
+		"--config", framework.TestContext.ManifestPath,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
-		"--eviction-hard", es.evictionHard,
+		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--eviction-pressure-transition-period", "30s",
 	)
-	if es.cgroupsPerQOS {
+	if framework.TestContext.CgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
 			"--cgroups-per-qos", "true",
 			"--cgroup-root", "/",
 		)
 	}
-	if !*disableKubenet {
+	if !framework.TestContext.DisableKubenet {
 		cwd, err := os.Getwd()
 		if err != nil {
 			return nil, err
@@ -287,7 +459,7 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 
 	cmd := exec.Command("sudo", cmdArgs...)
 	hcc := newHealthCheckCommand(
-		"http://127.0.0.1:10255/healthz",
+		kubeletHealthCheckURL,
 		cmd,
 		"kubelet.log")
 	return &killCmd{name: "kubelet", cmd: cmd, override: killOverride}, es.startServer(hcc)
