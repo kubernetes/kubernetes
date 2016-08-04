@@ -141,7 +141,7 @@ func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *repl
 	resyncPeriodFunc := func() time.Duration {
 		return resyncPeriod
 	}
-	podInformer := informers.CreateSharedPodIndexInformer(internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod)
+	podInformer := informers.NewPodInformer(internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "pod-informer")), resyncPeriod)
 	rm := replicaset.NewReplicaSetController(
 		podInformer,
 		internalclientset.NewForConfigOrDie(restclient.AddUserAgent(&config, "replicaset-controller")),

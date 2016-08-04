@@ -343,7 +343,7 @@ func NewNodeControllerFromClient(
 	serviceCIDR *net.IPNet,
 	nodeCIDRMaskSize int,
 	allocateNodeCIDRs bool) (*NodeController, error) {
-	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, controller.NoResyncPeriodFunc())
+	podInformer := informers.NewPodInformer(kubeClient, controller.NoResyncPeriodFunc())
 	nc, err := NewNodeController(podInformer, cloud, kubeClient, podEvictionTimeout, evictionLimiterQPS, nodeMonitorGracePeriod,
 		nodeStartupGracePeriod, nodeMonitorPeriod, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs)
 	if err != nil {
