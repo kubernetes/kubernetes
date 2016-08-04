@@ -966,6 +966,66 @@ var _ = framework.KubeDescribe("Services", func() {
 			framework.Failf("expected un-ready endpoint for Service %v within %v, stdout: %v", t.name, kubeProxyLagTimeout, stdout)
 		}
 	})
+
+	It("esipp", func() {
+		// TODO: List existing, schedulable nodes
+		nodes := []string{
+			"e2e-test-beeps-minion-group-0m0g",
+			"e2e-test-beeps-minion-group-axdw",
+			"e2e-test-beeps-minion-group-nlfs",
+		}
+		immediate := int64(0)
+		podName := "echoheaders"
+		image := "gcr.io/google_containers/echoserver:1.3"
+		timeoutClient := &http.Client{Timeout: 5 * time.Second}
+
+		// Create a type=NodePort HTTP service instead of hardcoding static ip
+		url := "http://104.197.214.127"
+
+		for i := 0; i < 20; i++ {
+			// create pod on node n
+			pod := &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: podName,
+					Labels: map[string]string{
+						"app": podName,
+					},
+				},
+				Spec: api.PodSpec{
+					TerminationGracePeriodSeconds: &immediate,
+					Containers: []api.Container{
+						{
+							Name:  podName,
+							Image: image,
+							Ports: []api.ContainerPort{{ContainerPort: 8080}},
+						},
+					},
+					NodeName:      nodes[i%3],
+					RestartPolicy: api.RestartPolicyNever,
+				},
+			}
+			_, err := c.Pods(api.NamespaceDefault).Create(pod)
+			framework.ExpectNoError(err)
+
+			var lastBody string
+			start := time.Now()
+			pollErr := wait.Poll(1*time.Second, 5*time.Minute, func() (bool, error) {
+				var err error
+				lastBody, err = simpleGET(timeoutClient, url, "")
+				if err != nil {
+					framework.Logf("Failed to curl %v: %v", url, err)
+					return false, nil
+				}
+				return true, nil
+			})
+			if pollErr != nil {
+				framework.Failf("Timed out, last body: %v", lastBody)
+			}
+			framework.Logf("Successfully curled %v, last body: %v", url, lastBody)
+			By(fmt.Sprintf("Took ~%v for target pool update to take effect %v", time.Since(start)))
+			framework.ExpectNoError(c.Pods(api.NamespaceDefault).Delete(pod.Name, nil))
+		}
+	})
 })
 
 // updateService fetches a service, calls the update function on it,

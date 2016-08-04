@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"encoding/json"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
@@ -401,7 +402,8 @@ func (e *EndpointController) syncService(key string) {
 
 			epp := api.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 			epa := api.EndpointAddress{
-				IP: pod.Status.PodIP,
+				IP:       pod.Status.PodIP,
+				Hostname: pod.Spec.NodeName,
 				TargetRef: &api.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       pod.ObjectMeta.Namespace,

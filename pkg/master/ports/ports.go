@@ -37,4 +37,6 @@ const (
 	// until heapster can transition to using the SSL endpoint.
 	// TODO(roberthbailey): Remove this once we have a better solution for heapster.
 	KubeletReadOnlyPort = 10255
+	// kube-proxy Health Check responder port
+	KubeProxyHealthCheckPort = 10256
 )
