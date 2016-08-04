@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -129,7 +128,7 @@ type DockerManager struct {
 	dockerPuller DockerPuller
 
 	// wrapped image puller.
-	imagePuller images.ImageManager
+	imagePullFunc func(ipod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
 
 	// Root of the Docker runtime.
 	dockerRoot string
@@ -218,11 +217,10 @@ func NewDockerManager(
 	oomAdjuster *oom.OOMAdjuster,
 	procFs procfs.ProcFSInterface,
 	cpuCFSQuota bool,
-	imageBackOff *flowcontrol.Backoff,
-	serializeImagePulls bool,
 	enableCustomMetrics bool,
 	hairpinMode bool,
 	seccompProfileRoot string,
+	imagePullFunc func(ipod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string),
 	options ...kubecontainer.Option) *DockerManager {
 	// Wrap the docker client with instrumentedDockerInterface
 	client = NewInstrumentedDockerInterface(client)
@@ -262,7 +260,7 @@ func NewDockerManager(
 		seccompProfileRoot:     seccompProfileRoot,
 	}
 	dm.runner = lifecycle.NewHandlerRunner(httpClient, dm, dm)
-	dm.imagePuller = images.NewImageManager(kubecontainer.FilterEventRecorder(recorder), dm, imageBackOff, serializeImagePulls)
+	dm.imagePullFunc = imagePullFunc
 	dm.containerGC = NewContainerGC(client, podGetter, containerLogsDir)
 
 	dm.versionCache = cache.NewObjectCache(
@@ -1736,7 +1734,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 
 	// No pod secrets for the infra container.
 	// The message isn't needed for the Infra container
-	if err, msg := dm.imagePuller.EnsureImageExists(pod, container, nil); err != nil {
+	if err, msg := dm.imagePullFunc(pod, container, nil); err != nil {
 		return "", err, msg
 	}
 
@@ -2148,7 +2146,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 // tryContainerStart attempts to pull and start the container, returning an error and a reason string if the start
 // was not successful.
 func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, namespaceMode, pidMode, podIP string) (err error, reason string) {
-	err, msg := dm.imagePuller.EnsureImageExists(pod, container, pullSecrets)
+	err, msg := dm.imagePullFunc(pod, container, pullSecrets)
 	if err != nil {
 		return err, msg
 	}

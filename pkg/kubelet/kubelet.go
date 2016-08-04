@@ -201,7 +201,7 @@ func NewMainKubelet(
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
-	imageGCPolicy ImageGCPolicy,
+	imageGCPolicy images.ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
 	autoDetectCloudProvider bool,
@@ -431,8 +431,6 @@ func NewMainKubelet(
 			oomAdjuster,
 			procFs,
 			klet.cpuCFSQuota,
-			imageBackOff,
-			serializeImagePulls,
 			enableCustomMetrics,
 			// If using "kubenet", the Kubernetes network plugin that wraps
 			// CNI's bridge plugin, it knows how to set the hairpin veth flag
@@ -442,6 +440,7 @@ func NewMainKubelet(
 			// runtime to set the flag instead.
 			klet.hairpinMode == componentconfig.HairpinVeth && networkPluginName != "kubenet",
 			seccompProfileRoot,
+			klet.imagePullFunc(),
 			containerRuntimeOptions...,
 		)
 	case "rkt":
@@ -464,9 +463,8 @@ func NewMainKubelet(
 			klet.hairpinMode == componentconfig.HairpinVeth,
 			utilexec.New(),
 			kubecontainer.RealOS{},
-			imageBackOff,
-			serializeImagePulls,
 			runtimeRequestTimeout,
+			klet.imagePullFunc(),
 		)
 		if err != nil {
 			return nil, err
@@ -492,7 +490,7 @@ func NewMainKubelet(
 	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
-	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
+	imageManager, err := images.NewImageManager(recorder, klet.containerRuntime, imageBackOff, serializeImagePulls, cadvisorInterface, nodeRef, imageGCPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -662,7 +660,7 @@ type Kubelet struct {
 	containerGC kubecontainer.ContainerGC
 
 	// Manager for images.
-	imageManager imageManager
+	imageManager images.ImageManager
 
 	// Diskspace manager.
 	diskSpaceManager diskSpaceManager
@@ -2928,6 +2926,13 @@ func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID str
 			// If a pod is evicted, we can delete all the dead containers.
 			kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, eviction.PodIsEvicted(status))
 		}
+	}
+}
+
+// imagePullFunc returns a function for pulling images
+func (kl *Kubelet) imagePullFunc() func(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
+	return func(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) {
+		return kl.imageManager.EnsureImageExists(pod, container, pullSecrets)
 	}
 }
 

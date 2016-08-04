@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -153,7 +152,7 @@ type Runtime struct {
 	runtimeHelper       kubecontainer.RuntimeHelper
 	recorder            record.EventRecorder
 	livenessManager     proberesults.Manager
-	imagePuller         images.ImageManager
+	imagePullFunc       func(ipod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
 	runner              kubecontainer.HandlerRunner
 	execer              utilexec.Interface
 	os                  kubecontainer.OSInterface
@@ -206,9 +205,8 @@ func New(
 	hairpinMode bool,
 	execer utilexec.Interface,
 	os kubecontainer.OSInterface,
-	imageBackOff *flowcontrol.Backoff,
-	serializeImagePulls bool,
 	requestTimeout time.Duration,
+	imagePullFunc func(ipod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string),
 ) (*Runtime, error) {
 	// Create dbus connection.
 	systemd, err := newSystemd()
@@ -272,7 +270,7 @@ func New(
 
 	rkt.runner = lifecycle.NewHandlerRunner(httpClient, rkt, rkt)
 
-	rkt.imagePuller = images.NewImageManager(recorder, rkt, imageBackOff, serializeImagePulls)
+	rkt.imagePullFunc = imagePullFunc
 
 	if err := rkt.getVersions(); err != nil {
 		return nil, fmt.Errorf("rkt: error getting version info: %v", err)
@@ -755,7 +753,7 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, podIP string, c api.Container,
 	if requiresPrivileged && !securitycontext.HasPrivilegedRequest(&c) {
 		return fmt.Errorf("cannot make %q: running a custom stage1 requires a privileged security context", format.Pod(pod))
 	}
-	if err, _ := r.imagePuller.EnsureImageExists(pod, &c, pullSecrets); err != nil {
+	if err, _ := r.imagePullFunc(pod, &c, pullSecrets); err != nil {
 		return nil
 	}
 	imgManifest, err := r.getImageManifest(c.Image)

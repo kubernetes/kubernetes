@@ -19,6 +19,7 @@ package e2e_node
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -47,7 +48,8 @@ func dockerRuntime() kubecontainer.Runtime {
 		nil, nil, nil, pm, nil,
 		"", 0, 0, "",
 		nil, nil, nil, nil, nil, nil, nil,
-		false, nil, true, false, false, "",
+		false, false, false, "",
+		func(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string) { return nil, "" },
 	)
 
 	return dm
