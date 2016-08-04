@@ -80,9 +80,9 @@ all: generated_files
 #
 # Example:
 # make ginkgo
+.PHONY: ginkgo
 ginkgo:
 	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
-.PHONY: ginkgo
 
 # Runs all the presubmission verifications.
 #
@@ -174,9 +174,9 @@ test-e2e-node: ginkgo generated_files
 #
 # Example:
 #   make test-cmd
-test-cmd: generated_files
-	@hack/make-rules/test-cmd.sh
 .PHONY: test-cmd
+test-cmd: generated_files
+	hack/make-rules/test-cmd.sh
 
 # Remove all build artifacts.
 #
