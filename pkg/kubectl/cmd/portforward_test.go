@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -68,6 +69,7 @@ func TestPortForward(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		var err error
 		f, tf, codec, ns := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
@@ -89,9 +91,21 @@ func TestPortForward(t *testing.T) {
 		if test.pfErr {
 			ff.pfErr = fmt.Errorf("pf error")
 		}
-		cmd := &cobra.Command{}
-		cmd.Flags().StringP("pod", "p", "", "Pod name")
-		err := RunPortForward(f, cmd, []string{"foo", ":5000", ":1000"}, ff)
+
+		opts := &PortForwardOptions{}
+		cmd := NewCmdPortForward(f, os.Stdout, os.Stderr)
+		cmd.Run = func(cmd *cobra.Command, args []string) {
+			if err = opts.Complete(f, cmd, args, os.Stdout, os.Stderr); err != nil {
+				return
+			}
+			opts.PortForwarder = ff
+			if err = opts.Validate(); err != nil {
+				return
+			}
+			err = opts.RunPortForward()
+		}
+
+		cmd.Run(cmd, []string{"foo", ":5000", ":1000"})
 
 		if test.pfErr && err != ff.pfErr {
 			t.Errorf("%s: Unexpected exec error: %v", test.name, err)
@@ -109,7 +123,6 @@ func TestPortForward(t *testing.T) {
 		if ff.method != "POST" {
 			t.Errorf("%s: Did not get method for attach request: %s", test.name, ff.method)
 		}
-
 	}
 }
 
@@ -138,6 +151,7 @@ func TestPortForwardWithPFlag(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
+		var err error
 		f, tf, codec, ns := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
 			NegotiatedSerializer: ns,
@@ -159,18 +173,38 @@ func TestPortForwardWithPFlag(t *testing.T) {
 		if test.pfErr {
 			ff.pfErr = fmt.Errorf("pf error")
 		}
-		cmd := &cobra.Command{}
-		podPtr := cmd.Flags().StringP("pod", "p", "", "Pod name")
-		*podPtr = "foo"
-		err := RunPortForward(f, cmd, []string{":5000", ":1000"}, ff)
+
+		opts := &PortForwardOptions{}
+		cmd := NewCmdPortForward(f, os.Stdout, os.Stderr)
+		cmd.Run = func(cmd *cobra.Command, args []string) {
+			if err = opts.Complete(f, cmd, args, os.Stdout, os.Stderr); err != nil {
+				return
+			}
+			opts.PortForwarder = ff
+			if err = opts.Validate(); err != nil {
+				return
+			}
+			err = opts.RunPortForward()
+		}
+		cmd.Flags().Set("pod", "foo")
+
+		cmd.Run(cmd, []string{":5000", ":1000"})
+
 		if test.pfErr && err != ff.pfErr {
 			t.Errorf("%s: Unexpected exec error: %v", test.name, err)
 		}
-		if !test.pfErr && ff.url.Path != test.pfPath {
-			t.Errorf("%s: Did not get expected path for portforward request", test.name)
-		}
 		if !test.pfErr && err != nil {
 			t.Errorf("%s: Unexpected error: %v", test.name, err)
+		}
+		if test.pfErr {
+			continue
+		}
+
+		if ff.url.Path != test.pfPath {
+			t.Errorf("%s: Did not get expected path for portforward request", test.name)
+		}
+		if ff.method != "POST" {
+			t.Errorf("%s: Did not get method for attach request: %s", test.name, ff.method)
 		}
 	}
 }
