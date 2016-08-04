@@ -40,20 +40,29 @@ const base64BinaryWebSocketProtocol = "base64.binary.k8s.io"
 // Reader supports returning an arbitrary byte stream over a websocket channel.
 // Supports the "binary.k8s.io" and "base64.binary.k8s.io" subprotocols.
 type Reader struct {
-	err     chan error
-	r       io.Reader
-	ping    bool
-	timeout time.Duration
+	err                chan error
+	r                  io.Reader
+	ping               bool
+	timeout            time.Duration
+	supportedProtocols []string
+	protocolPrefix     string
 }
 
 // NewReader creates a WebSocket pipe that will copy the contents of r to a provided
 // WebSocket connection. If ping is true, a zero length message will be sent to the client
 // before the stream begins reading.
-func NewReader(r io.Reader, ping bool) *Reader {
+//
+// One of the base64 ("base64.channel.k8s.io") and raw ("channel.k8s.io") protocol is negotiated
+// during initial handshake. Given protocolPrefixes (being DNS 1123 subdomains or empty string)
+// are provided all combinations of those and base64+raw are nogatiated, e.g. "", "v1", "v2" leads
+// to the protocols "base64.channel.k8s.io", "channel.k8s.io", "v1.base64.channel.k8s.io",
+// "v1.channel.k8s.io", "v2.base64.channel.k8s.io", "v2.channel.k8s.io".
+func NewReader(r io.Reader, ping bool, protocolPrefixes []string) *Reader {
 	return &Reader{
-		r:    r,
-		err:  make(chan error),
-		ping: ping,
+		r:                  r,
+		err:                make(chan error),
+		ping:               ping,
+		supportedProtocols: generateProtocols(protocolPrefixes, []string{binaryWebSocketProtocol, base64BinaryWebSocketProtocol}),
 	}
 }
 
@@ -64,7 +73,7 @@ func (r *Reader) SetIdleTimeout(duration time.Duration) {
 }
 
 func (r *Reader) handshake(config *websocket.Config, req *http.Request) error {
-	return handshake(config, req, []string{binaryWebSocketProtocol, base64BinaryWebSocketProtocol})
+	return handshake(config, req, r.supportedProtocols)
 }
 
 // Copy the reader to the response. The created WebSocket is closed after this
@@ -77,9 +86,19 @@ func (r *Reader) Copy(w http.ResponseWriter, req *http.Request) error {
 	return <-r.err
 }
 
+// ProtocolPrefix returns the prefix of the negotiated protocol.
+func (r *Reader) ProtocolPrefix() string {
+	return r.protocolPrefix
+}
+
 // handle implements a WebSocket handler.
 func (r *Reader) handle(ws *websocket.Conn) {
-	encode := len(ws.Config().Protocol) > 0 && ws.Config().Protocol[0] == base64BinaryWebSocketProtocol
+	encode := false
+	if len(ws.Config().Protocol) > 0 {
+		prefix, suffix := splitProtocol(ws.Config().Protocol[0], base64BinaryWebSocketProtocol, binaryWebSocketProtocol)
+		r.protocolPrefix = prefix
+		encode = suffix == base64BinaryWebSocketProtocol
+	}
 	defer close(r.err)
 	defer ws.Close()
 	go IgnoreReceives(ws, r.timeout)

@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"sync"
@@ -28,15 +29,15 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-func newServer(handler websocket.Handler) (*httptest.Server, string) {
+func newServer(handler http.Handler) (*httptest.Server, string) {
 	server := httptest.NewServer(handler)
 	serverAddr := server.Listener.Addr().String()
 	return server, serverAddr
 }
 
 func TestRawConn(t *testing.T) {
-	conn := NewConn(ReadWriteChannel, ReadWriteChannel, IgnoreChannel, ReadChannel, WriteChannel)
-	s, addr := newServer(conn.handle)
+	conn := NewConn(nil, ReadWriteChannel, ReadWriteChannel, IgnoreChannel, ReadChannel, WriteChannel)
+	s, addr := newServer(websocket.Handler(conn.handle))
 	defer s.Close()
 
 	client, err := websocket.Dial("ws://"+addr, "", "http://localhost/")
@@ -112,8 +113,8 @@ func TestRawConn(t *testing.T) {
 }
 
 func TestBase64Conn(t *testing.T) {
-	conn := NewConn(ReadWriteChannel, ReadWriteChannel)
-	s, addr := newServer(conn.handle)
+	conn := NewConn(nil, ReadWriteChannel, ReadWriteChannel)
+	s, addr := newServer(websocket.Handler(conn.handle))
 	defer s.Close()
 
 	config, err := websocket.NewConfig("ws://"+addr, "http://localhost/")
@@ -166,4 +167,126 @@ func TestBase64Conn(t *testing.T) {
 
 	client.Close()
 	wg.Wait()
+}
+
+type versionTest struct {
+	supported []string
+	requested []string
+	error     bool
+	expected  string
+}
+
+func versionTests(base64Proto, rawProto string) []versionTest {
+	return []versionTest{
+		{
+			supported: nil,
+			requested: []string{rawProto},
+			expected:  "",
+		},
+		{
+			supported: []string{"v1", "v2"},
+			requested: nil,
+			expected:  "",
+		},
+		{
+			supported: nil,
+			requested: []string{rawProto},
+			expected:  "",
+		},
+		{
+			supported: nil,
+			requested: []string{base64Proto},
+			expected:  "",
+		},
+		{
+			supported: []string{"v1", "v2"},
+			requested: []string{},
+			expected:  "",
+		},
+		{
+			supported: []string{"v1", "v2"},
+			requested: []string{"v1." + rawProto},
+			expected:  "v1",
+		},
+		{
+			supported: []string{"v1", "v2"},
+			requested: []string{"v2." + rawProto},
+			expected:  "v2",
+		},
+		{
+			supported: []string{"v1", "v2"},
+			requested: []string{rawProto},
+			error:     true,
+		},
+		{
+			supported: []string{""},
+			requested: []string{"v1." + rawProto},
+			error:     true,
+		},
+		{
+			supported: []string{"v1", "v2"},
+			requested: []string{"v3." + rawProto},
+			error:     true,
+		},
+	}
+}
+
+func TestVersionedConn(t *testing.T) {
+	for i, test := range versionTests(base64ChannelWebSocketProtocol, channelWebSocketProtocol) {
+		func() {
+			conn := NewConn(test.supported, ReadWriteChannel)
+			s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				conn.Open(w, req)
+			}))
+			defer s.Close()
+
+			config, err := websocket.NewConfig("ws://"+addr, "http://localhost/")
+			if err != nil {
+				t.Fatal(err)
+			}
+			config.Protocol = test.requested
+			client, err := websocket.DialConfig(config)
+			if err != nil {
+				if !test.error {
+					t.Fatalf("test %d: didn't expect error: %v", i, err)
+				} else {
+					return
+				}
+			}
+			defer client.Close()
+			if test.error && err == nil {
+				t.Fatalf("test %d: expected an error", i)
+			}
+
+			<-conn.ready
+			if got, expected := conn.ProtocolPrefix(), test.expected; got != expected {
+				t.Fatalf("test %d: unexpected protocol version: got=%s expected=%s", i, got, expected)
+			}
+		}()
+	}
+}
+
+func TestSplitProtocol(t *testing.T) {
+	for i, test := range []struct {
+		prefix, suffix string
+	}{
+		{"", base64ChannelWebSocketProtocol},
+		{"", channelWebSocketProtocol},
+		{"a", base64ChannelWebSocketProtocol},
+		{"a", channelWebSocketProtocol},
+		{"a.b", base64ChannelWebSocketProtocol},
+		{"a.b", channelWebSocketProtocol},
+	} {
+		proto := test.suffix
+		if test.prefix != "" {
+			proto = test.prefix + "." + proto
+		}
+		prefix, suffix := splitProtocol(proto, base64ChannelWebSocketProtocol, channelWebSocketProtocol)
+		if got, expected := prefix, test.prefix; got != expected {
+			t.Fatalf("test %d: wrong prefix: got=%s, expected=%s", i, got, expected)
+		}
+		if got, expected := suffix, test.suffix; got != expected {
+			t.Fatalf("test %d: wrong suffix: got=%s, expected=%s", i, got, expected)
+		}
+	}
 }

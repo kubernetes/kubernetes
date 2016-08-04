@@ -28,11 +28,12 @@ import (
 	"time"
 
 	"golang.org/x/net/websocket"
+	"net/http"
 )
 
 func TestStream(t *testing.T) {
 	input := "some random text"
-	r := NewReader(bytes.NewBuffer([]byte(input)), true)
+	r := NewReader(bytes.NewBuffer([]byte(input)), true, nil)
 	r.SetIdleTimeout(time.Second)
 	data, err := readWebSocket(r, t, nil)
 	if !reflect.DeepEqual(data, []byte(input)) {
@@ -45,7 +46,7 @@ func TestStream(t *testing.T) {
 
 func TestStreamPing(t *testing.T) {
 	input := "some random text"
-	r := NewReader(bytes.NewBuffer([]byte(input)), true)
+	r := NewReader(bytes.NewBuffer([]byte(input)), true, nil)
 	r.SetIdleTimeout(time.Second)
 	err := expectWebSocketFrames(r, t, nil, [][]byte{
 		{},
@@ -59,13 +60,65 @@ func TestStreamPing(t *testing.T) {
 func TestStreamBase64(t *testing.T) {
 	input := "some random text"
 	encoded := base64.StdEncoding.EncodeToString([]byte(input))
-	r := NewReader(bytes.NewBuffer([]byte(input)), true)
-	data, err := readWebSocket(r, t, nil, base64BinaryWebSocketProtocol)
+	r := NewReader(bytes.NewBuffer([]byte(input)), true, nil)
+	data, err := readWebSocket(r, t, nil, "base64.binary.k8s.io")
 	if !reflect.DeepEqual(data, []byte(encoded)) {
 		t.Errorf("unexpected server read: %v\n%v", data, []byte(encoded))
 	}
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestStreamVersionedBase64(t *testing.T) {
+	input := "some random text"
+	encoded := base64.StdEncoding.EncodeToString([]byte(input))
+	r := NewReader(bytes.NewBuffer([]byte(input)), true, []string{"", "v1", "v2"})
+	data, err := readWebSocket(r, t, nil, "v2.base64.binary.k8s.io")
+	if !reflect.DeepEqual(data, []byte(encoded)) {
+		t.Errorf("unexpected server read: %v\n%v", data, []byte(encoded))
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStreamVersionedCopy(t *testing.T) {
+	for i, test := range versionTests(base64BinaryWebSocketProtocol, binaryWebSocketProtocol) {
+		func() {
+			input := "some random text"
+			r := NewReader(bytes.NewBuffer([]byte(input)), true, test.supported)
+			s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				err := r.Copy(w, req)
+				if err != nil {
+					w.WriteHeader(503)
+				}
+			}))
+			defer s.Close()
+
+			config, err := websocket.NewConfig("ws://"+addr, "http://localhost/")
+			if err != nil {
+				t.Fatal(err)
+			}
+			config.Protocol = test.requested
+			client, err := websocket.DialConfig(config)
+			if err != nil {
+				if !test.error {
+					t.Fatalf("test %d: didn't expect error: %v", i, err)
+				} else {
+					return
+				}
+			}
+			defer client.Close()
+			if test.error && err == nil {
+				t.Fatalf("test %d: expected an error", i)
+			}
+
+			<-r.err
+			if got, expected := r.ProtocolPrefix(), test.expected; got != expected {
+				t.Fatalf("test %d: unexpected protocol version: got=%s expected=%s", i, got, expected)
+			}
+		}()
 	}
 }
 
@@ -78,7 +131,7 @@ func TestStreamError(t *testing.T) {
 		},
 		err: fmt.Errorf("bad read"),
 	}
-	r := NewReader(errs, false)
+	r := NewReader(errs, false, nil)
 
 	data, err := readWebSocket(r, t, nil)
 	if !reflect.DeepEqual(data, []byte(input)) {
@@ -98,7 +151,7 @@ func TestStreamSurvivesPanic(t *testing.T) {
 		},
 		panicMessage: "bad read",
 	}
-	r := NewReader(errs, false)
+	r := NewReader(errs, false, nil)
 
 	data, err := readWebSocket(r, t, nil)
 	if !reflect.DeepEqual(data, []byte(input)) {
@@ -121,7 +174,7 @@ func TestStreamClosedDuringRead(t *testing.T) {
 			err:   fmt.Errorf("stuff"),
 			pause: ch,
 		}
-		r := NewReader(errs, false)
+		r := NewReader(errs, false, nil)
 
 		data, err := readWebSocket(r, t, func(c *websocket.Conn) {
 			c.Close()
@@ -163,7 +216,7 @@ func (r *errorReader) Read(p []byte) (int, error) {
 
 func readWebSocket(r *Reader, t *testing.T, fn func(*websocket.Conn), protocols ...string) ([]byte, error) {
 	errCh := make(chan error, 1)
-	s, addr := newServer(func(ws *websocket.Conn) {
+	s, addr := newServer(websocket.Handler(func(ws *websocket.Conn) {
 		cfg := ws.Config()
 		cfg.Protocol = protocols
 		go IgnoreReceives(ws, 0)
@@ -172,7 +225,7 @@ func readWebSocket(r *Reader, t *testing.T, fn func(*websocket.Conn), protocols 
 			errCh <- err
 		}()
 		r.handle(ws)
-	})
+	}))
 	defer s.Close()
 
 	config, _ := websocket.NewConfig("ws://"+addr, "http://"+addr)
@@ -195,7 +248,7 @@ func readWebSocket(r *Reader, t *testing.T, fn func(*websocket.Conn), protocols 
 
 func expectWebSocketFrames(r *Reader, t *testing.T, fn func(*websocket.Conn), frames [][]byte, protocols ...string) error {
 	errCh := make(chan error, 1)
-	s, addr := newServer(func(ws *websocket.Conn) {
+	s, addr := newServer(websocket.Handler(func(ws *websocket.Conn) {
 		cfg := ws.Config()
 		cfg.Protocol = protocols
 		go IgnoreReceives(ws, 0)
@@ -204,7 +257,7 @@ func expectWebSocketFrames(r *Reader, t *testing.T, fn func(*websocket.Conn), fr
 			errCh <- err
 		}()
 		r.handle(ws)
-	})
+	}))
 	defer s.Close()
 
 	config, _ := websocket.NewConfig("ws://"+addr, "http://"+addr)

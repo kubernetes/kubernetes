@@ -27,7 +27,9 @@ import (
 
 	"github.com/golang/glog"
 	"golang.org/x/net/websocket"
+
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/validation"
 )
 
 // The Websocket subprotocol "channel.k8s.io" prepends each binary message with a byte indicating
@@ -123,21 +125,30 @@ func handshake(config *websocket.Config, req *http.Request, allowed []string) er
 // Conn supports sending multiple binary channels over a websocket connection.
 // Supports only the "channel.k8s.io" subprotocol.
 type Conn struct {
-	channels []*websocketChannel
-	codec    codecType
-	ready    chan struct{}
-	ws       *websocket.Conn
-	timeout  time.Duration
+	channels           []*websocketChannel
+	codec              codecType
+	ready              chan struct{}
+	ws                 *websocket.Conn
+	timeout            time.Duration
+	supportedProtocols []string
+	protocolPrefix     string
 }
 
 // NewConn creates a WebSocket connection that supports a set of channels. Channels begin each
 // web socket message with a single byte indicating the channel number (0-N). 255 is reserved for
 // future use. The channel types for each channel are passed as an array, supporting the different
 // duplex modes. Read and Write refer to whether the channel can be used as a Reader or Writer.
-func NewConn(channels ...ChannelType) *Conn {
+//
+// One of the base64 ("base64.channel.k8s.io") and raw ("channel.k8s.io") protocol is negotiated
+// during initial handshake. Given protocolPrefixes (being DNS 1123 subdomains or empty string)
+// are provided all combinations of those and base64+raw are nogatiated, e.g. "", "v1", "v2" leads
+// to the protocols "base64.channel.k8s.io", "channel.k8s.io", "v1.base64.channel.k8s.io",
+// "v1.channel.k8s.io", "v2.base64.channel.k8s.io", "v2.channel.k8s.io".
+func NewConn(protocolPrefixes []string, channels ...ChannelType) *Conn {
 	conn := &Conn{
-		ready:    make(chan struct{}),
-		channels: make([]*websocketChannel, len(channels)),
+		ready:              make(chan struct{}),
+		channels:           make([]*websocketChannel, len(channels)),
+		supportedProtocols: generateProtocols(protocolPrefixes, []string{channelWebSocketProtocol, base64ChannelWebSocketProtocol}),
 	}
 	for i := range conn.channels {
 		switch channels[i] {
@@ -152,6 +163,29 @@ func NewConn(channels ...ChannelType) *Conn {
 		}
 	}
 	return conn
+}
+
+func generateProtocols(prefixes []string, suffixes []string) []string {
+	if len(prefixes) == 0 {
+		prefixes = []string{""}
+	}
+	protos := make([]string, 0, len(suffixes)*len(prefixes))
+	for _, prefix := range prefixes {
+		if prefix != "" {
+			if errs := validation.IsDNS1123Subdomain(prefix); len(errs) > 0 {
+				glog.Fatalf("websocket protocol prefix %q is no DNS 1123 subdomain: %v", prefix, errs)
+			}
+		}
+
+		for _, suffix := range suffixes {
+			proto := suffix
+			if prefix != "" {
+				proto = prefix + "." + suffix
+			}
+			protos = append(protos, proto)
+		}
+	}
+	return protos
 }
 
 // SetIdleTimeout sets the interval for both reads and writes before timeout. If not specified,
@@ -175,20 +209,44 @@ func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) ([]io.ReadWrite
 	return rwc, nil
 }
 
+func splitProtocol(proto string, b64, raw string) (string, string) {
+	if proto == b64 || proto == raw {
+		return "", proto
+	}
+	if strings.HasSuffix(proto, "."+b64) {
+		prefixLen := len(proto) - len(b64) - 1
+		return proto[0:prefixLen], b64
+	}
+
+	prefixLen := len(proto) - len(raw) - 1
+	return proto[0:prefixLen], raw
+}
+
 func (conn *Conn) initialize(ws *websocket.Conn) {
 	protocols := ws.Config().Protocol
-	switch {
-	case len(protocols) == 0, protocols[0] == channelWebSocketProtocol:
+	if len(protocols) == 0 {
 		conn.codec = rawCodec
-	case protocols[0] == base64ChannelWebSocketProtocol:
-		conn.codec = base64Codec
+	} else {
+		prefix, suffix := splitProtocol(protocols[0], base64ChannelWebSocketProtocol, channelWebSocketProtocol)
+		conn.protocolPrefix = prefix
+		switch suffix {
+		case channelWebSocketProtocol:
+			conn.codec = rawCodec
+		case base64ChannelWebSocketProtocol:
+			conn.codec = base64Codec
+		}
 	}
 	conn.ws = ws
 	close(conn.ready)
 }
 
 func (conn *Conn) handshake(config *websocket.Config, req *http.Request) error {
-	return handshake(config, req, []string{channelWebSocketProtocol, base64ChannelWebSocketProtocol})
+	return handshake(config, req, conn.supportedProtocols)
+}
+
+// ProtocolPrefix returns the prefix of the negotiated protocol.
+func (conn *Conn) ProtocolPrefix() string {
+	return conn.protocolPrefix
 }
 
 func (conn *Conn) resetTimeout() {
