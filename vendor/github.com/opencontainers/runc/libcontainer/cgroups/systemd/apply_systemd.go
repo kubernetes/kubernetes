@@ -74,6 +74,7 @@ var (
 	theConn                         *systemdDbus.Conn
 	hasStartTransientUnit           bool
 	hasTransientDefaultDependencies bool
+	hasDelegate                     bool
 )
 
 func newProp(name string, units interface{}) systemdDbus.Property {
@@ -146,6 +147,20 @@ func UseSystemd() bool {
 
 		// Not critical because of the stop unit logic above.
 		theConn.StopUnit(scope, "replace", nil)
+
+		// Assume StartTransientUnit on a scope allows Delegate
+		hasDelegate = true
+		dl := newProp("Delegate", true)
+		if _, err := theConn.StartTransientUnit(scope, "replace", []systemdDbus.Property{dl}, nil); err != nil {
+			if dbusError, ok := err.(dbus.Error); ok {
+				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") {
+					hasDelegate = false
+				}
+			}
+		}
+
+		// Not critical because of the stop unit logic above.
+		theConn.StopUnit(scope, "replace", nil)
 	}
 	return hasStartTransientUnit
 }
@@ -183,9 +198,12 @@ func (m *Manager) Apply(pid int) error {
 		systemdDbus.PropSlice(slice),
 		systemdDbus.PropDescription("docker container "+c.Name),
 		newProp("PIDs", []uint32{uint32(pid)}),
-		// This is only supported on systemd versions 218 and above.
-		newProp("Delegate", true),
 	)
+
+	if hasDelegate {
+		// This is only supported on systemd versions 218 and above.
+		properties = append(properties, newProp("Delegate", true))
+	}
 
 	// Always enable accounting, this gets us the same behaviour as the fs implementation,
 	// plus the kernel has some problems with joining the memory cgroup at a later time.
@@ -214,11 +232,9 @@ func (m *Manager) Apply(pid int) error {
 			newProp("BlockIOWeight", uint64(c.Resources.BlkioWeight)))
 	}
 
-	// We need to set kernel memory before processes join cgroup because
-	// kmem.limit_in_bytes can only be set when the cgroup is empty.
-	// And swap memory limit needs to be set after memory limit, only
-	// memory limit is handled by systemd, so it's kind of ugly here.
-	if c.Resources.KernelMemory > 0 {
+	// We have to set kernel memory here, as we can't change it once
+	// processes have been attached to the cgroup.
+	if c.Resources.KernelMemory != 0 {
 		if err := setKernelMemory(c); err != nil {
 			return err
 		}
@@ -273,7 +289,7 @@ func writeFile(dir, file, data string) error {
 	// Normally dir should not be empty, one case is that cgroup subsystem
 	// is not mounted, we will get empty dir, and we want it fail here.
 	if dir == "" {
-		return fmt.Errorf("no such directory for %s.", file)
+		return fmt.Errorf("no such directory for %s", file)
 	}
 	return ioutil.WriteFile(filepath.Join(dir, file), []byte(data), 0700)
 }
@@ -372,6 +388,8 @@ func getSubsystemPath(c *configs.Cgroup, subsystem string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// if pid 1 is systemd 226 or later, it will be in init.scope, not the root
+	initPath = strings.TrimSuffix(filepath.Clean(initPath), "init.scope")
 
 	slice := "system.slice"
 	if c.Parent != "" {
@@ -439,6 +457,11 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
+	// If Paths are set, then we are just joining cgroups paths
+	// and there is no need to set any values.
+	if m.Cgroups.Paths != nil {
+		return nil
+	}
 	for _, sys := range subsystems {
 		// Get the subsystem path, but don't error out for not found cgroups.
 		path, err := getSubsystemPath(container.Cgroups, sys.Name())
@@ -472,8 +495,5 @@ func setKernelMemory(c *configs.Cgroup) error {
 	if err := os.MkdirAll(path, 0755); err != nil {
 		return err
 	}
-
-	// This doesn't get called by manager.Set, so we need to do it here.
-	s := &fs.MemoryGroup{}
-	return s.SetKernelMemory(path, c)
+	return fs.EnableKernelMemoryAccounting(path)
 }
