@@ -129,7 +129,7 @@ func (r *replenishmentControllerFactory) NewController(options *ReplenishmentCon
 			break
 		}
 
-		r.podInformer = informers.CreateSharedPodInformer(r.kubeClient, options.ResyncPeriod())
+		r.podInformer = informers.NewPodInformer(r.kubeClient, options.ResyncPeriod())
 		result = r.podInformer
 
 	case api.Kind("Service"):
