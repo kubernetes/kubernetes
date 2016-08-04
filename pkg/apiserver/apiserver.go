@@ -451,7 +451,7 @@ func write(statusCode int, gv unversioned.GroupVersion, s runtime.NegotiatedSeri
 		defer out.Close()
 
 		if wsstream.IsWebSocketRequest(req) {
-			r := wsstream.NewReader(out, true)
+			r := wsstream.NewReader(out, true, wsstream.NewDefaultReaderProtocols())
 			if err := r.Copy(w, req); err != nil {
 				utilruntime.HandleError(fmt.Errorf("error encountered while streaming results via websocket: %v", err))
 			}

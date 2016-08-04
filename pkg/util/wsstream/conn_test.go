@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"sync"
@@ -28,15 +29,19 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-func newServer(handler websocket.Handler) (*httptest.Server, string) {
+func newServer(handler http.Handler) (*httptest.Server, string) {
 	server := httptest.NewServer(handler)
 	serverAddr := server.Listener.Addr().String()
 	return server, serverAddr
 }
 
 func TestRawConn(t *testing.T) {
-	conn := NewConn(ReadWriteChannel, ReadWriteChannel, IgnoreChannel, ReadChannel, WriteChannel)
-	s, addr := newServer(conn.handle)
+	channels := []ChannelType{ReadWriteChannel, ReadWriteChannel, IgnoreChannel, ReadChannel, WriteChannel}
+	conn := NewConn(NewDefaultChannelProtocols(channels))
+
+	s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conn.Open(w, req)
+	}))
 	defer s.Close()
 
 	client, err := websocket.Dial("ws://"+addr, "", "http://localhost/")
@@ -112,8 +117,10 @@ func TestRawConn(t *testing.T) {
 }
 
 func TestBase64Conn(t *testing.T) {
-	conn := NewConn(ReadWriteChannel, ReadWriteChannel)
-	s, addr := newServer(conn.handle)
+	conn := NewConn(NewDefaultChannelProtocols([]ChannelType{ReadWriteChannel, ReadWriteChannel}))
+	s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conn.Open(w, req)
+	}))
 	defer s.Close()
 
 	config, err := websocket.NewConfig("ws://"+addr, "http://localhost/")
@@ -166,4 +173,100 @@ func TestBase64Conn(t *testing.T) {
 
 	client.Close()
 	wg.Wait()
+}
+
+type versionTest struct {
+	supported map[string]bool // protocol -> binary
+	requested []string
+	error     bool
+	expected  string
+}
+
+func versionTests() []versionTest {
+	const (
+		binary = true
+		base64 = false
+	)
+	return []versionTest{
+		{
+			supported: nil,
+			requested: []string{"raw"},
+			error:     true,
+		},
+		{
+			supported: map[string]bool{"": binary, "raw": binary, "base64": base64},
+			requested: nil,
+			expected:  "",
+		},
+		{
+			supported: map[string]bool{"": binary, "raw": binary, "base64": base64},
+			requested: []string{"v1.raw"},
+			error:     true,
+		},
+		{
+			supported: map[string]bool{"": binary, "raw": binary, "base64": base64},
+			requested: []string{"v1.raw", "v1.base64"},
+			error:     true,
+		}, {
+			supported: map[string]bool{"": binary, "raw": binary, "base64": base64},
+			requested: []string{"v1.raw", "raw"},
+			expected:  "raw",
+		},
+		{
+			supported: map[string]bool{"": binary, "v1.raw": binary, "v1.base64": base64, "v2.raw": binary, "v2.base64": base64},
+			requested: []string{"v1.raw"},
+			expected:  "v1.raw",
+		},
+		{
+			supported: map[string]bool{"": binary, "v1.raw": binary, "v1.base64": base64, "v2.raw": binary, "v2.base64": base64},
+			requested: []string{"v2.base64"},
+			expected:  "v2.base64",
+		},
+	}
+}
+
+func TestVersionedConn(t *testing.T) {
+	for i, test := range versionTests() {
+		func() {
+			supportedProtocols := map[string]ChannelProtocolConfig{}
+			for p, binary := range test.supported {
+				supportedProtocols[p] = ChannelProtocolConfig{
+					Binary:   binary,
+					Channels: []ChannelType{ReadWriteChannel},
+				}
+			}
+			conn := NewConn(supportedProtocols)
+			// note that it's not enough to wait for conn.ready to avoid a race here. Hence,
+			// we use a channel.
+			selectedProtocol := make(chan string, 0)
+			s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				p, _, _ := conn.Open(w, req)
+				selectedProtocol <- p
+			}))
+			defer s.Close()
+
+			config, err := websocket.NewConfig("ws://"+addr, "http://localhost/")
+			if err != nil {
+				t.Fatal(err)
+			}
+			config.Protocol = test.requested
+			client, err := websocket.DialConfig(config)
+			if err != nil {
+				if !test.error {
+					t.Fatalf("test %d: didn't expect error: %v", i, err)
+				} else {
+					return
+				}
+			}
+			defer client.Close()
+			if test.error && err == nil {
+				t.Fatalf("test %d: expected an error", i)
+			}
+
+			<-conn.ready
+			if got, expected := <-selectedProtocol, test.expected; got != expected {
+				t.Fatalf("test %d: unexpected protocol version: got=%s expected=%s", i, got, expected)
+			}
+		}()
+	}
 }
