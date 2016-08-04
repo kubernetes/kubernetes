@@ -812,7 +812,7 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *api.Pod, meta interfac
 		return false, fmt.Errorf("node not found")
 	}
 	if !c.satisfiesExistingPodsAntiAffinity(pod, meta, node) {
-		return false, nil
+		return false, ErrPodAffinityNotMatch
 	}
 
 	// Now check if <pod> requirements will be satisfied on this node.
@@ -824,7 +824,7 @@ func (c *PodAffinityChecker) InterPodAffinityMatches(pod *api.Pod, meta interfac
 		return true, nil
 	}
 	if !c.satisfiesPodsAffinityAntiAffinity(pod, node, affinity) {
-		return false, nil
+		return false, ErrPodAffinityNotMatch
 	}
 
 	if glog.V(10) {
