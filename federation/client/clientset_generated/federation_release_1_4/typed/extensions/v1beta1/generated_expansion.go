@@ -17,3 +17,5 @@ limitations under the License.
 package v1beta1
 
 type ReplicaSetExpansion interface{}
+
+type IngressExpansion interface{}

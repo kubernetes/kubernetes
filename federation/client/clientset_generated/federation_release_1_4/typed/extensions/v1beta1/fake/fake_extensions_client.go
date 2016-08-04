@@ -26,6 +26,10 @@ type FakeExtensions struct {
 	*core.Fake
 }
 
+func (c *FakeExtensions) Ingresses(namespace string) v1beta1.IngressInterface {
+	return &FakeIngresses{c, namespace}
+}
+
 func (c *FakeExtensions) ReplicaSets(namespace string) v1beta1.ReplicaSetInterface {
 	return &FakeReplicaSets{c, namespace}
 }
