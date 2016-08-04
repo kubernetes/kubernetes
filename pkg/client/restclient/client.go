@@ -114,6 +114,26 @@ func NewRESTClient(baseURL *url.URL, versionedAPIPath string, config ContentConf
 	}, nil
 }
 
+// WithContentConfig returns an identical RESTClient with different
+// content encoding settings.
+func (c *RESTClient) WithContentConfig(config ContentConfig) (*RESTClient, error) {
+	if config.GroupVersion == nil {
+		config.GroupVersion = &unversioned.GroupVersion{}
+	}
+	if len(config.ContentType) == 0 {
+		config.ContentType = "application/json"
+	}
+	serializers, err := createSerializers(config)
+	if err != nil {
+		return nil, err
+	}
+
+	newRC := *c
+	newRC.contentConfig = config
+	newRC.serializers = *serializers
+	return &newRC, nil
+}
+
 // GetRateLimiter returns rate limier for a given client, or nil if it's called on a nil client
 func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	if c == nil {
