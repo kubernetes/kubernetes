@@ -142,28 +142,28 @@ func runIsolatedToBidirectionalTest(f *framework.Framework, nsA, nsB *api.Namesp
 	}()
 
 	By("Creating a webserver (pending) pod on each node")
-	podAName, podBNames := launchNetMonitorPods(f, nsA, nsB, nodes)
+	podA, podBs := launchNetMonitorPods(f, nsA, nsB, nodes)
 
 	// Deferred clean up of the pods.
 	defer func() {
 		By("Cleaning up the webserver pods")
-		if err = f.Client.Pods(nsA.Name).Delete(podAName, nil); err != nil {
-			framework.Logf("Failed to delete pod %v: %v", podAName, err)
+		if err = f.Client.Pods(nsA.Name).Delete(podA.Name, nil); err != nil {
+			framework.Logf("Failed to delete pod %v: %v", podA.Name, err)
 		}
-		for _, podName := range podBNames {
-			if err = f.Client.Pods(nsB.Name).Delete(podName, nil); err != nil {
-				framework.Logf("Failed to delete pod %v: %v", podName, err)
+		for _, podB := range podBs {
+			if err = f.Client.Pods(nsB.Name).Delete(podB.Name, nil); err != nil {
+				framework.Logf("Failed to delete pod %v: %v", podB.Name, err)
 			}
 		}
 	}()
 
 	// Wait for all pods to be running.
-	By(fmt.Sprintf("Waiting for pod %v to be running", podAName))
-	err = framework.WaitForPodRunningInNamespace(f.Client, podAName, nsA.Name)
+	By(fmt.Sprintf("Waiting for pod %v to be running", podA.Name))
+	err = framework.WaitForPodRunningInNamespace(f.Client, podA)
 	Expect(err).NotTo(HaveOccurred())
-	for _, podName := range podBNames {
-		By(fmt.Sprintf("Waiting for pod %v to be running", podName))
-		err = framework.WaitForPodRunningInNamespace(f.Client, podName, nsB.Name)
+	for _, podB := range podBs {
+		By(fmt.Sprintf("Waiting for pod %v to be running", podB.Name))
+		err = framework.WaitForPodRunningInNamespace(f.Client, podB)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -265,28 +265,28 @@ func createNetworkPolicyService(f *framework.Framework, namespace *api.Namespace
 
 // Launch the required set of network monitor pods for the test.  This creates a single pod
 // in namespaceA/serviceA which peers with a pod on each node in namespaceB/serviceB.
-func launchNetMonitorPods(f *framework.Framework, namespaceA *api.Namespace, namespaceB *api.Namespace, nodes *api.NodeList) (string, []string) {
-	podBNames := []string{}
+func launchNetMonitorPods(f *framework.Framework, namespaceA *api.Namespace, namespaceB *api.Namespace, nodes *api.NodeList) (*api.Pod, []*api.Pod) {
+	podBs := []*api.Pod{}
 
 	// Create the A pod on the first node.  It will find all of the B
 	// pods (one for each node).
-	podAName := createNetMonitorPod(f, namespaceA, namespaceB, serviceAName, serviceBName, &nodes.Items[0])
+	podA := createNetMonitorPod(f, namespaceA, namespaceB, serviceAName, serviceBName, &nodes.Items[0])
 
 	// Now create the B pods, one on each node - each should just search
 	// for the single A pod peer.
 	for _, node := range nodes.Items {
-		podName := createNetMonitorPod(f, namespaceB, namespaceA, serviceBName, serviceAName, &node)
-		podBNames = append(podBNames, podName)
+		pod := createNetMonitorPod(f, namespaceB, namespaceA, serviceBName, serviceAName, &node)
+		podBs = append(podBs, pod)
 	}
 
-	return podAName, podBNames
+	return podA, podBs
 }
 
 // Create a network monitor pod which peers with other network monitor pods.
 func createNetMonitorPod(f *framework.Framework,
 	namespace *api.Namespace, peerNamespace *api.Namespace,
 	serviceName string, peerServiceName string,
-	node *api.Node) string {
+	node *api.Node) *api.Pod {
 	pod, err := f.Client.Pods(namespace.Name).Create(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: serviceName + "-",
@@ -313,7 +313,7 @@ func createNetMonitorPod(f *framework.Framework,
 	Expect(err).NotTo(HaveOccurred())
 	framework.Logf("Created pod %v on node %v", pod.ObjectMeta.Name, node.Name)
 
-	return pod.ObjectMeta.Name
+	return pod
 }
 
 // Monitor the connectivity matrix from the network monitor pods, until the returned
