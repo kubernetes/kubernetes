@@ -501,7 +501,12 @@ func nodeMatchesNodeSelectorTerms(node *api.Node, nodeSelectorTerms []api.NodeSe
 }
 
 // The pod can only schedule onto nodes that satisfy requirements in both NodeAffinity and nodeSelector.
-func podMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
+func PodMatchesNodeLabels(pod *api.Pod, node *api.Node) bool {
+	// If pod has no NodeSelector, match the node directly.
+	if len(pod.Spec.NodeSelector) == 0 {
+		return true
+	}
+
 	// Check if node.Labels match pod.Spec.NodeSelector.
 	if len(pod.Spec.NodeSelector) > 0 {
 		selector := labels.SelectorFromSet(pod.Spec.NodeSelector)
