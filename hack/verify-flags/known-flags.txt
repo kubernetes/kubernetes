@@ -285,6 +285,7 @@ log-flush-frequency
 long-running-request-regexp
 low-diskspace-threshold-mb
 make-symlinks
+manifest-path
 manifest-url
 manifest-url-header
 masquerade-all
@@ -456,6 +457,7 @@ ssh-keyfile
 ssh-options
 ssh-user
 start-services
+start-services-only
 static-pods-config
 stats-port
 stop-services
