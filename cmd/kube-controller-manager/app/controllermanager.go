@@ -240,9 +240,11 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	nodeController.Run(s.NodeSyncPeriod.Duration)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
-	serviceController := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
-	if err := serviceController.Run(s.ServiceSyncPeriod.Duration, s.NodeSyncPeriod.Duration); err != nil {
+	serviceController, err := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
+	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
+	} else {
+		serviceController.Run(int(s.ConcurrentServiceSyncs))
 	}
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 

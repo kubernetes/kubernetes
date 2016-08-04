@@ -479,6 +479,10 @@ type KubeControllerManagerConfiguration struct {
 	// allowed to sync concurrently. Larger number = more responsive replica
 	// management, but more CPU (and network) load.
 	ConcurrentRCSyncs int32 `json:"concurrentRCSyncs"`
+	// concurrentServiceSyncs is the number of services that are
+	// allowed to sync concurrently. Larger number = more responsive service
+	// management, but more CPU (and network) load.
+	ConcurrentServiceSyncs int32 `json:"concurrentServiceSyncs"`
 	// concurrentResourceQuotaSyncs is the number of resource quotas that are
 	// allowed to sync concurrently. Larger number = more responsive quota
 	// management, but more CPU (and network) load.
