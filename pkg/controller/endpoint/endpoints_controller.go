@@ -374,6 +374,8 @@ func (e *EndpointController) syncService(key string) {
 			tolerateUnreadyEndpoints = b
 		} else {
 			glog.Errorf("Failed to parse annotation %v: %v", TolerateUnreadyEndpointsAnnotation, err)
+			e.queue.Add(key) // Retry
+			return
 		}
 	}
 
