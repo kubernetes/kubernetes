@@ -330,12 +330,17 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		clientConfig, err := CreateAPIServerClientConfig(s)
 		if err == nil {
 			kcfg.KubeClient, err = clientset.NewForConfig(clientConfig)
-
+			if err != nil {
+				glog.Warningf("Failed to create kube client: %v", err)
+			}
 			// make a separate client for events
 			eventClientConfig := *clientConfig
 			eventClientConfig.QPS = float32(s.EventRecordQPS)
 			eventClientConfig.Burst = int(s.EventBurst)
 			kcfg.EventClient, err = clientset.NewForConfig(&eventClientConfig)
+			if err != nil {
+				glog.Warningf("Failed to create event client: %v", err)
+			}
 		}
 		if err != nil && len(s.APIServerList) > 0 {
 			glog.Warningf("No API client: %v", err)
