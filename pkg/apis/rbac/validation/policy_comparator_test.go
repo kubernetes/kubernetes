@@ -389,6 +389,7 @@ func rulesMatch(expectedRules, actualRules []rbac.PolicyRule) bool {
 		for _, actualRule := range actualRules {
 			if reflect.DeepEqual(expectedRule, actualRule) {
 				found = true
+				break
 			}
 		}
 
