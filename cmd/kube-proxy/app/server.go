@@ -196,7 +196,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	var proxier proxy.ProxyProvider
 	var endpointsHandler proxyconfig.EndpointsConfigHandler
-
+	var errInf error
 	proxyMode := getProxyMode(string(config.Mode), client.Nodes(), hostname, iptInterface, iptables.LinuxKernelCompatTester{})
 	if proxyMode == proxyModeIptables {
 		glog.V(0).Info("Using iptables Proxier.")
@@ -208,6 +208,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll, int(*config.IPTablesMasqueradeBit), config.ClusterCIDR)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
+			errInf = fmt.Errorf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierIptables
 		endpointsHandler = proxierIptables
@@ -232,11 +233,15 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
+			errInf = fmt.Errorf("Unable to create proxier: %v", err)
 		}
 		proxier = proxierUserspace
 		// Remove artifacts from the pure-iptables Proxier.
 		glog.V(0).Info("Tearing down pure-iptables proxy rules.")
 		iptables.CleanupLeftovers(iptInterface)
+	}
+	if errInf != nil || proxier == nil {
+		return nil, errInf
 	}
 	iptInterface.AddReloadFunc(proxier.Sync)
 
