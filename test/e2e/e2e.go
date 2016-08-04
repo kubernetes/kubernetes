@@ -29,8 +29,6 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 
 	"k8s.io/kubernetes/pkg/api"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
@@ -61,20 +59,13 @@ func setupProviderConfig() error {
 	case "gce", "gke":
 		var err error
 		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
-		var tokenSource oauth2.TokenSource
-		tokenSource = nil
-		if cloudConfig.ServiceAccount != "" {
-			// Use specified service account for auth
-			framework.Logf("Using service account %q as token source.", cloudConfig.ServiceAccount)
-			tokenSource = google.ComputeTokenSource(cloudConfig.ServiceAccount)
-		}
 		zone := framework.TestContext.CloudConfig.Zone
 		region, err := gcecloud.GetGCERegion(zone)
 		if err != nil {
 			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 		}
 		managedZones := []string{zone} // Only single-zone for now
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, tokenSource, false /* useMetadataServer */)
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
