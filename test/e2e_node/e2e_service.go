@@ -181,7 +181,12 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 		return nil, err
 	}
 	es.etcdDataDir = dataDir
-	etcdPath, err := exec.LookPath("etcd")
+	var etcdPath string
+	// CoreOS ships a binary named 'etcd' which is really old, so prefer 'etcd2' if it exists
+	etcdPath, err = exec.LookPath("etcd2")
+	if err != nil {
+		etcdPath, err = exec.LookPath("etcd")
+	}
 	if err != nil {
 		glog.Infof("etcd not found in PATH. Defaulting to %s...", defaultEtcdPath)
 		_, err = os.Stat(defaultEtcdPath)
