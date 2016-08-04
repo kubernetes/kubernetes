@@ -650,22 +650,38 @@ func (r *Runtime) makePodManifest(pod *api.Pod, podIP string, pullSecrets []api.
 	return manifest, nil
 }
 
+func copyfile(src, dst string) error {
+	data, err := ioutil.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(dst, data, 0640)
+}
+
 // TODO(yifan): Can make rkt handle this when '--net=host'. See https://github.com/coreos/rkt/issues/2430.
-func makeHostNetworkMount(opts *kubecontainer.RunContainerOptions) (*kubecontainer.Mount, *kubecontainer.Mount) {
+func makeHostNetworkMount(opts *kubecontainer.RunContainerOptions) (*kubecontainer.Mount, *kubecontainer.Mount, error) {
+	hostsPath := filepath.Join(opts.PodContainerDir, "etc-hosts")
+	resolvPath := filepath.Join(opts.PodContainerDir, "etc-resolv-conf")
+
+	if err := copyfile("/etc/hosts", hostsPath); err != nil {
+		return nil, nil, err
+	}
+	if err := copyfile("/etc/resolv.conf", resolvPath); err != nil {
+		return nil, nil, err
+	}
+
 	hostsMount := kubecontainer.Mount{
 		Name:          "kubernetes-hostnetwork-hosts-conf",
 		ContainerPath: "/etc/hosts",
-		HostPath:      "/etc/hosts",
-		ReadOnly:      true,
+		HostPath:      hostsPath,
 	}
 	resolvMount := kubecontainer.Mount{
 		Name:          "kubernetes-hostnetwork-resolv-conf",
 		ContainerPath: "/etc/resolv.conf",
-		HostPath:      "/etc/resolv.conf",
-		ReadOnly:      true,
+		HostPath:      resolvPath,
 	}
 	opts.Mounts = append(opts.Mounts, hostsMount, resolvMount)
-	return &hostsMount, &resolvMount
+	return &hostsMount, &resolvMount, nil
 }
 
 // podFinishedMarkerPath returns the path to a file which should be used to
@@ -768,11 +784,14 @@ func (r *Runtime) newAppcRuntimeApp(pod *api.Pod, podIP string, c api.Container,
 		return err
 	}
 
-	// If run in 'hostnetwork' mode, then mount the host's /etc/resolv.conf and /etc/hosts,
+	// If run in 'hostnetwork' mode, then copy and mount the host's /etc/resolv.conf and /etc/hosts,
 	// and add volumes.
 	var hostsMnt, resolvMnt *kubecontainer.Mount
 	if kubecontainer.IsHostNetworkPod(pod) {
-		hostsMnt, resolvMnt = makeHostNetworkMount(opts)
+		hostsMnt, resolvMnt, err = makeHostNetworkMount(opts)
+		if err != nil {
+			return err
+		}
 		manifest.Volumes = append(manifest.Volumes, appctypes.Volume{
 			Name:   convertToACName(hostsMnt.Name),
 			Kind:   "host",
