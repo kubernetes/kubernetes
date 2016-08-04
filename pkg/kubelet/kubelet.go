@@ -2188,11 +2188,10 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
 			handler.HandlePodSyncs([]*api.Pod{pod})
 		}
+
 		if e.Type == pleg.ContainerDied {
-			if podStatus, err := kl.podCache.Get(e.ID); err == nil {
-				if containerID, ok := e.Data.(string); ok {
-					kl.containerDeletor.deleteContainersInPod(containerID, podStatus)
-				}
+			if containerID, ok := e.Data.(string); ok {
+				kl.cleanUpContainersInPod(e.ID, containerID)
 			}
 		}
 	case <-syncCh:
@@ -2920,6 +2919,16 @@ func (kl *Kubelet) ListenAndServe(address net.IP, port uint, tlsOptions *server.
 // ListenAndServeReadOnly runs the kubelet HTTP server in read-only mode.
 func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, kl.containerRuntime)
+}
+
+// Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
+func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID string) {
+	if podStatus, err := kl.podCache.Get(podId); err == nil {
+		if status, ok := kl.statusManager.GetPodStatus(podId); ok {
+			// If a pod is evicted, we can delete all the dead containers.
+			kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, eviction.PodIsEvicted(status))
+		}
+	}
 }
 
 // isSyncPodWorthy filters out events that are not worthy of pod syncing

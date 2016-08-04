@@ -22,7 +22,6 @@ import (
 	"time"
 
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
 func testGetContainersToDeleteInPod(t *testing.T) {
@@ -61,9 +60,28 @@ func testGetContainersToDeleteInPod(t *testing.T) {
 		},
 	}
 
-	expectedCandidates := []*kubecontainer.ContainerStatus{pod.ContainerStatuses[2], pod.ContainerStatuses[1]}
-	candidates := newPodContainerDeletor(&containertest.FakeRuntime{}, 1).getContainersToDeleteInPod("2", &pod)
-	if !reflect.DeepEqual(candidates, expectedCandidates) {
-		t.Errorf("expected %v got %v", expectedCandidates, candidates)
+	testCases := []struct {
+		containersToKeep           int
+		expectedContainersToDelete []*kubecontainer.ContainerStatus
+	}{
+		{
+			0,
+			[]*kubecontainer.ContainerStatus{pod.ContainerStatuses[3], pod.ContainerStatuses[2], pod.ContainerStatuses[1]},
+		},
+		{
+			1,
+			[]*kubecontainer.ContainerStatus{pod.ContainerStatuses[2], pod.ContainerStatuses[1]},
+		},
+		{
+			2,
+			[]*kubecontainer.ContainerStatus{pod.ContainerStatuses[1]},
+		},
+	}
+
+	for _, test := range testCases {
+		candidates := getContainersToDeleteInPod("4", &pod, test.containersToKeep)
+		if !reflect.DeepEqual(getContainersToDeleteInPod("4", &pod, test.containersToKeep), test.expectedContainersToDelete) {
+			t.Errorf("expected %v got %v", test.expectedContainersToDelete, candidates)
+		}
 	}
 }

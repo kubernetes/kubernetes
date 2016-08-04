@@ -59,7 +59,7 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 }
 
 // getContainersToDeleteInPod returns the exited containers in a pod whose name matches the name inferred from exitedContainerID, ordered by the creation time from the latest to the earliest.
-func (p *podContainerDeletor) getContainersToDeleteInPod(exitedContainerID string, podStatus *kubecontainer.PodStatus) containerStatusbyCreatedList {
+func getContainersToDeleteInPod(exitedContainerID string, podStatus *kubecontainer.PodStatus, containersToKeep int) containerStatusbyCreatedList {
 	var matchedContainer *kubecontainer.ContainerStatus
 	var exitedContainers []*kubecontainer.ContainerStatus
 	// Find all exited containers in the pod
@@ -84,17 +84,21 @@ func (p *podContainerDeletor) getContainersToDeleteInPod(exitedContainerID strin
 			candidates = append(candidates, containerStatus)
 		}
 	}
-	if len(candidates) <= p.containersToKeep {
+
+	if len(candidates) <= containersToKeep {
 		return containerStatusbyCreatedList{}
 	}
-
 	sort.Sort(candidates)
-	return candidates[p.containersToKeep:]
+	return candidates[containersToKeep:]
 }
 
 // deleteContainersInPod issues container deletion requests for containers selected by getContainersToDeleteInPod.
-func (p *podContainerDeletor) deleteContainersInPod(exitedContainerID string, podStatus *kubecontainer.PodStatus) {
-	for _, candidate := range p.getContainersToDeleteInPod(exitedContainerID, podStatus) {
+func (p *podContainerDeletor) deleteContainersInPod(exitedContainerID string, podStatus *kubecontainer.PodStatus, removeAll bool) {
+	containersToKeep := p.containersToKeep
+	if removeAll {
+		containersToKeep = 0
+	}
+	for _, candidate := range getContainersToDeleteInPod(exitedContainerID, podStatus, containersToKeep) {
 		select {
 		case p.worker <- candidate.ID:
 		default:
