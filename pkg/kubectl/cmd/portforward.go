@@ -17,20 +17,31 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"net/url"
 	"os"
 	"os/signal"
 
-	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/portforward"
 	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
+
+// PortForwardOptions contains all the options for running the port-forward cli command.
+type PortForwardOptions struct {
+	Namespace     string
+	PodName       string
+	Config        *restclient.Config
+	Client        *client.Client
+	Ports         []string
+	PortForwarder portForwarder
+}
 
 var (
 	portforward_example = dedent.Dedent(`
@@ -48,18 +59,27 @@ var (
 )
 
 func NewCmdPortForward(f *cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
+	opts := &PortForwardOptions{
+		PortForwarder: &defaultPortForwarder{
+			cmdOut: cmdOut,
+			cmdErr: cmdErr,
+		},
+	}
 	cmd := &cobra.Command{
 		Use:     "port-forward POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
 		Short:   "Forward one or more local ports to a pod",
 		Long:    "Forward one or more local ports to a pod.",
 		Example: portforward_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			pf := &defaultPortForwarder{
-				cmdOut: cmdOut,
-				cmdErr: cmdErr,
+			if err := opts.Complete(f, cmd, args, cmdOut, cmdErr); err != nil {
+				cmdutil.CheckErr(err)
 			}
-			err := RunPortForward(f, cmd, args, pf)
-			cmdutil.CheckErr(err)
+			if err := opts.Validate(); err != nil {
+				cmdutil.CheckErr(cmdutil.UsageError(cmd, err.Error()))
+			}
+			if err := opts.RunPortForward(); err != nil {
+				cmdutil.CheckErr(err)
+			}
 		},
 	}
 	cmd.Flags().StringP("pod", "p", "", "Pod name")
@@ -87,45 +107,65 @@ func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, config 
 	return fw.ForwardPorts()
 }
 
-func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw portForwarder) error {
-	podName := cmdutil.GetFlagString(cmd, "pod")
-	if len(podName) == 0 && len(args) == 0 {
+// Complete completes all the required options for port-forward cmd.
+func (o *PortForwardOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string, cmdOut io.Writer, cmdErr io.Writer) error {
+	var err error
+	o.PodName = cmdutil.GetFlagString(cmd, "pod")
+	if len(o.PodName) == 0 && len(args) == 0 {
 		return cmdutil.UsageError(cmd, "POD is required for port-forward")
 	}
 
-	if len(podName) != 0 {
+	if len(o.PodName) != 0 {
 		printDeprecationWarning("port-forward POD", "-p POD")
+		o.Ports = args
 	} else {
-		podName = args[0]
-		args = args[1:]
+		o.PodName = args[0]
+		o.Ports = args[1:]
 	}
 
-	if len(args) < 1 {
-		return cmdutil.UsageError(cmd, "at least 1 PORT is required for port-forward")
-	}
-
-	namespace, _, err := f.DefaultNamespace()
+	o.Namespace, _, err = f.DefaultNamespace()
 	if err != nil {
 		return err
 	}
 
-	client, err := f.Client()
+	o.Client, err = f.Client()
 	if err != nil {
 		return err
 	}
 
-	pod, err := client.Pods(namespace).Get(podName)
+	o.Config, err = f.ClientConfig()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Validate validates all the required options for port-forward cmd.
+func (o PortForwardOptions) Validate() error {
+	if len(o.PodName) == 0 {
+		return fmt.Errorf("pod name must be specified")
+	}
+
+	if len(o.Ports) < 1 {
+		return fmt.Errorf("at least 1 PORT is required for port-forward")
+	}
+
+	if o.PortForwarder == nil || o.Client == nil || o.Config == nil {
+		return fmt.Errorf("client, client config, and portforwarder must be provided")
+	}
+	return nil
+}
+
+// RunPortForward implements all the necessary functionality for port-forward cmd.
+func (o PortForwardOptions) RunPortForward() error {
+	pod, err := o.Client.Pods(o.Namespace).Get(o.PodName)
 	if err != nil {
 		return err
 	}
 
 	if pod.Status.Phase != api.PodRunning {
-		glog.Fatalf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
-	}
-
-	config, err := f.ClientConfig()
-	if err != nil {
-		return err
+		return fmt.Errorf("Unable to execute command because pod is not running. Current status=%v", pod.Status.Phase)
 	}
 
 	signals := make(chan os.Signal, 1)
@@ -138,11 +178,11 @@ func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw po
 		close(stopCh)
 	}()
 
-	req := client.RESTClient.Post().
+	req := o.Client.RESTClient.Post().
 		Resource("pods").
-		Namespace(namespace).
+		Namespace(o.Namespace).
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return fw.ForwardPorts("POST", req.URL(), config, args, stopCh)
+	return o.PortForwarder.ForwardPorts("POST", req.URL(), o.Config, o.Ports, stopCh)
 }
