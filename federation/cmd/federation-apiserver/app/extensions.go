@@ -26,15 +26,19 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	ingressetcd "k8s.io/kubernetes/pkg/registry/ingress/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
 )
 
 func installExtensionsAPIs(s *genericoptions.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
 	replicaSetStorage := replicasetetcd.NewStorage(createRESTOptionsOrDie(s, g, f, extensions.Resource("replicasets")))
+	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(createRESTOptionsOrDie(s, g, f, extensions.Resource("ingresses")))
 	extensionsResources := map[string]rest.Storage{
 		"replicasets":        replicaSetStorage.ReplicaSet,
 		"replicasets/status": replicaSetStorage.Status,
 		"replicasets/scale":  replicaSetStorage.Scale,
+		"ingresses":          ingressStorage,
+		"ingresses/status":   ingressStatusStorage,
 	}
 	extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{

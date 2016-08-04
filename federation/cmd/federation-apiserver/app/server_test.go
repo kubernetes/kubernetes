@@ -304,6 +304,7 @@ func testExtensionsResourceList(t *testing.T) {
 	assert.Equal(t, "", apiResourceList.APIVersion)
 	assert.Equal(t, ext_v1b1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
 
+	// Verify replicasets.
 	found := findResource(apiResourceList.APIResources, "replicasets")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
@@ -311,6 +312,14 @@ func testExtensionsResourceList(t *testing.T) {
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 	found = findResource(apiResourceList.APIResources, "replicasets/scale")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+
+	// Verify ingress.
+	found = findResource(apiResourceList.APIResources, "ingresses")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "ingresses/status")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 }
