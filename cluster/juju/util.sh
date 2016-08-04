@@ -18,7 +18,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-set -o xtrace
+#set -o xtrace
 
 UTIL_SCRIPT=$(readlink -m "${BASH_SOURCE}")
 JUJU_PATH=$(dirname ${UTIL_SCRIPT})
@@ -54,7 +54,7 @@ function detect-master() {
 function detect-nodes() {
     # Run the Juju command that gets the minion private IP addresses.
     local ipoutput
-    ipoutput=$(juju run --service kubernetes "unit-get private-address" --format=json)
+    ipoutput=$(juju run --application kubernetes "unit-get private-address" --format=json)
     # [
     # {"MachineId":"2","Stdout":"192.168.122.188\n","UnitId":"kubernetes/0"},
     # {"MachineId":"3","Stdout":"192.168.122.166\n","UnitId":"kubernetes/1"}
@@ -91,7 +91,7 @@ function kube-up() {
       tar xfz ${KUBECTL_DIR}/kubectl_package.tar.gz -C ${KUBECTL_DIR}
     )
     # Export the location of the kubectl configuration file.
-    export KUBECONFIG="${KUBECTL_DIR}/config"
+    export KUBECONFIG="${KUBECTL_DIR}/kubeconfig"
 }
 
 function kube-down() {
