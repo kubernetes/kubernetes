@@ -870,6 +870,11 @@ function start-kube-addons {
     pd_name="${INSTANCE_PREFIX}-influxdb-pd"
     remove-salt-config-comments "${pv_yaml}"
     sed -i -e "s@{{ *pd_name *}}@${pd_name}@g" "${pv_yaml}"
+    # use persistentVolumeClaim instead of emptyDir
+    petset_yaml="${dst_dir}/${file_dir}/influxdb-grafana-petset.yaml"
+    remove-salt-config-comments "${petset_yaml}"
+    sed -i -e "s@{{ *influxdb_vol_line_1 *}}@persistentVolumeClaim:@g" "${petset_yaml}"
+    sed -i -e "s@{{ *influxdb_vol_line_2 *}}@  claimName: influxdb-claim@g" "${petset_yaml}"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"
