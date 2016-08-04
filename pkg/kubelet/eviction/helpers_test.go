@@ -585,29 +585,50 @@ func TestMakeSignalObservations(t *testing.T) {
 
 func TestThresholdsMet(t *testing.T) {
 	hardThreshold := Threshold{
-		Signal:   SignalMemoryAvailable,
-		Operator: OpLessThan,
-		Value:    quantityMustParse("1Gi"),
+		Signal:     SignalMemoryAvailable,
+		Operator:   OpLessThan,
+		Value:      quantityMustParse("1Gi"),
+		MinReclaim: quantityMustParse("500Mi"),
 	}
 	testCases := map[string]struct {
-		thresholds   []Threshold
-		observations signalObservations
-		result       []Threshold
+		enforceMinReclaim bool
+		thresholds        []Threshold
+		observations      signalObservations
+		result            []Threshold
 	}{
 		"empty": {
-			thresholds:   []Threshold{},
-			observations: signalObservations{},
-			result:       []Threshold{},
+			enforceMinReclaim: false,
+			thresholds:        []Threshold{},
+			observations:      signalObservations{},
+			result:            []Threshold{},
 		},
 		"threshold-met": {
-			thresholds: []Threshold{hardThreshold},
+			enforceMinReclaim: false,
+			thresholds:        []Threshold{hardThreshold},
 			observations: signalObservations{
 				SignalMemoryAvailable: quantityMustParse("500Mi"),
 			},
 			result: []Threshold{hardThreshold},
 		},
 		"threshold-not-met": {
-			thresholds: []Threshold{hardThreshold},
+			enforceMinReclaim: false,
+			thresholds:        []Threshold{hardThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: quantityMustParse("2Gi"),
+			},
+			result: []Threshold{},
+		},
+		"threshold-met-with-min-reclaim": {
+			enforceMinReclaim: true,
+			thresholds:        []Threshold{hardThreshold},
+			observations: signalObservations{
+				SignalMemoryAvailable: quantityMustParse("1.05Gi"),
+			},
+			result: []Threshold{hardThreshold},
+		},
+		"threshold-not-met-with-min-reclaim": {
+			enforceMinReclaim: true,
+			thresholds:        []Threshold{hardThreshold},
 			observations: signalObservations{
 				SignalMemoryAvailable: quantityMustParse("2Gi"),
 			},
@@ -615,7 +636,7 @@ func TestThresholdsMet(t *testing.T) {
 		},
 	}
 	for testName, testCase := range testCases {
-		actual := thresholdsMet(testCase.thresholds, testCase.observations)
+		actual := thresholdsMet(testCase.thresholds, testCase.observations, testCase.enforceMinReclaim)
 		if !thresholdList(actual).Equal(thresholdList(testCase.result)) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, testCase.result, actual)
 		}
