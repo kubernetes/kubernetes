@@ -113,7 +113,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 
 // NewEndpointControllerFromClient returns a new *EndpointController that runs its own informer.
 func NewEndpointControllerFromClient(client *clientset.Clientset, resyncPeriod controller.ResyncPeriodFunc) *EndpointController {
-	podInformer := informers.CreateSharedPodIndexInformer(client, resyncPeriod())
+	podInformer := informers.NewPodInformer(client, resyncPeriod())
 	e := NewEndpointController(podInformer, client)
 	e.internalPodInformer = podInformer
 
