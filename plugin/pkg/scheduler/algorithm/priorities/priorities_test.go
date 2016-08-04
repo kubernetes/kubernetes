@@ -145,7 +145,18 @@ func TestZeroRequest(t *testing.T) {
 			// This should match the configuration in defaultPriorities() in
 			// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 			// to test what's actually in production.
-			[]algorithm.PriorityConfig{{Function: LeastRequestedPriority, Weight: 1}, {Function: BalancedResourceAllocation, Weight: 1}, {Function: NewSelectorSpreadPriority(algorithm.FakePodLister(test.pods), algorithm.FakeServiceLister([]api.Service{}), algorithm.FakeControllerLister([]api.ReplicationController{}), algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})), Weight: 1}},
+			[]algorithm.PriorityConfig{
+				{Function: LeastRequestedPriority, Weight: 1},
+				{Function: BalancedResourceAllocation, Weight: 1},
+				{
+					Function: NewSelectorSpreadPriority(
+						algorithm.FakePodLister(test.pods),
+						algorithm.FakeServiceLister([]api.Service{}),
+						algorithm.FakeControllerLister([]api.ReplicationController{}),
+						algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})),
+					Weight: 1,
+				},
+			},
 			algorithm.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
