@@ -130,7 +130,7 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 		t.Fatalf("Failed to get supported resources from server: %v", err)
 	}
 	config := &restclient.Config{Host: s.URL}
-	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()}
+	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
 	config.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)

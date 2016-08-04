@@ -490,7 +490,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 			glog.Fatalf("Failed to get supported resources from server: %v", err)
 		}
 		config := restclient.AddUserAgent(kubeconfig, "generic-garbage-collector")
-		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()}
+		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
 		metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
 		config.ContentConfig.NegotiatedSerializer = nil
 		clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)

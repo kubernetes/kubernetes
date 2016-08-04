@@ -71,7 +71,7 @@ func init() {
 	}
 }
 
-func (x *MetaOnly) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *MetadataOnlyObject) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -180,7 +180,7 @@ func (x *MetaOnly) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *MetaOnly) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *MetadataOnlyObject) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -210,7 +210,7 @@ func (x *MetaOnly) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *MetaOnly) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *MetadataOnlyObject) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -258,7 +258,7 @@ func (x *MetaOnly) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *MetaOnly) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *MetadataOnlyObject) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -330,7 +330,7 @@ func (x *MetaOnly) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x *MetaOnlyList) CodecEncodeSelf(e *codec1978.Encoder) {
+func (x *MetadataOnlyObjectList) CodecEncodeSelf(e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -401,7 +401,7 @@ func (x *MetaOnlyList) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym9
 					if false {
 					} else {
-						h.encSliceMetaOnly(([]MetaOnly)(x.Items), e)
+						h.encSliceMetadataOnlyObject(([]MetadataOnlyObject)(x.Items), e)
 					}
 				}
 			} else {
@@ -415,7 +415,7 @@ func (x *MetaOnlyList) CodecEncodeSelf(e *codec1978.Encoder) {
 					_ = yym10
 					if false {
 					} else {
-						h.encSliceMetaOnly(([]MetaOnly)(x.Items), e)
+						h.encSliceMetadataOnlyObject(([]MetadataOnlyObject)(x.Items), e)
 					}
 				}
 			}
@@ -478,7 +478,7 @@ func (x *MetaOnlyList) CodecEncodeSelf(e *codec1978.Encoder) {
 	}
 }
 
-func (x *MetaOnlyList) CodecDecodeSelf(d *codec1978.Decoder) {
+func (x *MetadataOnlyObjectList) CodecDecodeSelf(d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -508,7 +508,7 @@ func (x *MetaOnlyList) CodecDecodeSelf(d *codec1978.Decoder) {
 	}
 }
 
-func (x *MetaOnlyList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
+func (x *MetadataOnlyObjectList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -552,7 +552,7 @@ func (x *MetaOnlyList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 				_ = yym7
 				if false {
 				} else {
-					h.decSliceMetaOnly((*[]MetaOnly)(yyv6), d)
+					h.decSliceMetadataOnlyObject((*[]MetadataOnlyObject)(yyv6), d)
 				}
 			}
 		case "kind":
@@ -574,7 +574,7 @@ func (x *MetaOnlyList) codecDecodeSelfFromMap(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerMapEnd1234)
 }
 
-func (x *MetaOnlyList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
+func (x *MetadataOnlyObjectList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -623,7 +623,7 @@ func (x *MetaOnlyList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 		_ = yym14
 		if false {
 		} else {
-			h.decSliceMetaOnly((*[]MetaOnly)(yyv13), d)
+			h.decSliceMetadataOnlyObject((*[]MetadataOnlyObject)(yyv13), d)
 		}
 	}
 	yyj10++
@@ -674,7 +674,7 @@ func (x *MetaOnlyList) codecDecodeSelfFromArray(l int, d *codec1978.Decoder) {
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) encSliceMetaOnly(v []MetaOnly, e *codec1978.Encoder) {
+func (x codecSelfer1234) encSliceMetadataOnlyObject(v []MetadataOnlyObject, e *codec1978.Encoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperEncoder(e)
 	_, _, _ = h, z, r
@@ -687,7 +687,7 @@ func (x codecSelfer1234) encSliceMetaOnly(v []MetaOnly, e *codec1978.Encoder) {
 	z.EncSendContainerState(codecSelfer_containerArrayEnd1234)
 }
 
-func (x codecSelfer1234) decSliceMetaOnly(v *[]MetaOnly, d *codec1978.Decoder) {
+func (x codecSelfer1234) decSliceMetadataOnlyObject(v *[]MetadataOnlyObject, d *codec1978.Decoder) {
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
@@ -698,7 +698,7 @@ func (x codecSelfer1234) decSliceMetaOnly(v *[]MetaOnly, d *codec1978.Decoder) {
 	_ = yyc1
 	if yyl1 == 0 {
 		if yyv1 == nil {
-			yyv1 = []MetaOnly{}
+			yyv1 = []MetadataOnlyObject{}
 			yyc1 = true
 		} else if len(yyv1) != 0 {
 			yyv1 = yyv1[:0]
@@ -718,10 +718,10 @@ func (x codecSelfer1234) decSliceMetaOnly(v *[]MetaOnly, d *codec1978.Decoder) {
 				if yyrl1 <= cap(yyv1) {
 					yyv1 = yyv1[:yyrl1]
 				} else {
-					yyv1 = make([]MetaOnly, yyrl1)
+					yyv1 = make([]MetadataOnlyObject, yyrl1)
 				}
 			} else {
-				yyv1 = make([]MetaOnly, yyrl1)
+				yyv1 = make([]MetadataOnlyObject, yyrl1)
 			}
 			yyc1 = true
 			yyrr1 = len(yyv1)
@@ -736,7 +736,7 @@ func (x codecSelfer1234) decSliceMetaOnly(v *[]MetaOnly, d *codec1978.Decoder) {
 		for ; yyj1 < yyrr1; yyj1++ {
 			yyh1.ElemContainerState(yyj1)
 			if r.TryDecodeAsNil() {
-				yyv1[yyj1] = MetaOnly{}
+				yyv1[yyj1] = MetadataOnlyObject{}
 			} else {
 				yyv2 := &yyv1[yyj1]
 				yyv2.CodecDecodeSelf(d)
@@ -745,10 +745,10 @@ func (x codecSelfer1234) decSliceMetaOnly(v *[]MetaOnly, d *codec1978.Decoder) {
 		}
 		if yyrt1 {
 			for ; yyj1 < yyl1; yyj1++ {
-				yyv1 = append(yyv1, MetaOnly{})
+				yyv1 = append(yyv1, MetadataOnlyObject{})
 				yyh1.ElemContainerState(yyj1)
 				if r.TryDecodeAsNil() {
-					yyv1[yyj1] = MetaOnly{}
+					yyv1[yyj1] = MetadataOnlyObject{}
 				} else {
 					yyv3 := &yyv1[yyj1]
 					yyv3.CodecDecodeSelf(d)
@@ -762,13 +762,13 @@ func (x codecSelfer1234) decSliceMetaOnly(v *[]MetaOnly, d *codec1978.Decoder) {
 		for ; !r.CheckBreak(); yyj1++ {
 
 			if yyj1 >= len(yyv1) {
-				yyv1 = append(yyv1, MetaOnly{}) // var yyz1 MetaOnly
+				yyv1 = append(yyv1, MetadataOnlyObject{}) // var yyz1 MetadataOnlyObject
 				yyc1 = true
 			}
 			yyh1.ElemContainerState(yyj1)
 			if yyj1 < len(yyv1) {
 				if r.TryDecodeAsNil() {
-					yyv1[yyj1] = MetaOnly{}
+					yyv1[yyj1] = MetadataOnlyObject{}
 				} else {
 					yyv4 := &yyv1[yyj1]
 					yyv4.CodecDecodeSelf(d)
@@ -783,7 +783,7 @@ func (x codecSelfer1234) decSliceMetaOnly(v *[]MetaOnly, d *codec1978.Decoder) {
 			yyv1 = yyv1[:yyj1]
 			yyc1 = true
 		} else if yyj1 == 0 && yyv1 == nil {
-			yyv1 = []MetaOnly{}
+			yyv1 = []MetadataOnlyObject{}
 			yyc1 = true
 		}
 	}

@@ -642,8 +642,8 @@ func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
 	return ret
 }
 
-func objectReferenceToMetaOnly(ref objectReference) *metaonly.MetaOnly {
-	return &metaonly.MetaOnly{
+func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.MetadataOnlyObject {
+	return &metaonly.MetadataOnlyObject{
 		TypeMeta: unversioned.TypeMeta{
 			APIVersion: ref.APIVersion,
 			Kind:       ref.Kind,
@@ -667,9 +667,9 @@ func (gc *GarbageCollector) processItem(item *node) error {
 			glog.V(6).Infof("item %v not found, generating a virtual delete event", item.identity)
 			event := event{
 				eventType: deleteEvent,
-				obj:       objectReferenceToMetaOnly(item.identity),
+				obj:       objectReferenceToMetadataOnlyObject(item.identity),
 			}
-			glog.V(6).Infof("generating virtual delete event for %s\n\n", metaonly.PrintAsMetaOnly(event.obj))
+			glog.V(6).Infof("generating virtual delete event for %s\n\n", metaonly.PrintAsMetadataOnlyObject(event.obj))
 			gc.propagator.eventQueue.Add(event)
 			return nil
 		}
@@ -679,9 +679,9 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		glog.V(6).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
 		event := event{
 			eventType: deleteEvent,
-			obj:       objectReferenceToMetaOnly(item.identity),
+			obj:       objectReferenceToMetadataOnlyObject(item.identity),
 		}
-		glog.V(6).Infof("generating virtual delete event for %s\n\n", metaonly.PrintAsMetaOnly(event.obj))
+		glog.V(6).Infof("generating virtual delete event for %s\n\n", metaonly.PrintAsMetadataOnlyObject(event.obj))
 		gc.propagator.eventQueue.Add(event)
 		return nil
 	}

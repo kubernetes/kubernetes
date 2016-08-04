@@ -27,49 +27,49 @@ import (
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
-func (obj *MetaOnly) GetObjectKind() unversioned.ObjectKind     { return obj }
-func (obj *MetaOnlyList) GetObjectKind() unversioned.ObjectKind { return obj }
+func (obj *MetadataOnlyObject) GetObjectKind() unversioned.ObjectKind     { return obj }
+func (obj *MetadataOnlyObjectList) GetObjectKind() unversioned.ObjectKind { return obj }
 
 type metaOnlyJSONScheme struct{}
 
-// This function can be extended to mapping different gvk to different MetaOnly,
+// This function can be extended to mapping different gvk to different MetadataOnlyObject,
 // which embedded with different version of ObjectMeta. Currently the system
 // only supports v1.ObjectMeta.
-func gvkToMetaOnly(gvk unversioned.GroupVersionKind) runtime.Object {
+func gvkToMetadataOnlyObject(gvk unversioned.GroupVersionKind) runtime.Object {
 	if strings.HasSuffix(gvk.Kind, "List") {
-		return &MetaOnlyList{}
+		return &MetadataOnlyObjectList{}
 	} else {
-		return &MetaOnly{}
+		return &MetadataOnlyObject{}
 	}
 }
 
-func NewMetaOnlyCodecFactory() serializer.CodecFactory {
+func NewMetadataCodecFactory() serializer.CodecFactory {
 	// populating another scheme from api.Scheme, registering every kind with
-	// MetaOnly (or MetaOnlyList).
+	// MetadataOnlyObject (or MetadataOnlyObjectList).
 	scheme := runtime.NewScheme()
 	allTypes := api.Scheme.AllKnownTypes()
 	for kind := range allTypes {
 		if kind.Version == runtime.APIVersionInternal {
 			continue
 		}
-		metaOnlyObject := gvkToMetaOnly(kind)
+		metaOnlyObject := gvkToMetadataOnlyObject(kind)
 		scheme.AddKnownTypeWithName(kind, metaOnlyObject)
 	}
 	scheme.AddUnversionedTypes(api.Unversioned, &unversioned.Status{})
 	return serializer.NewCodecFactory(scheme)
 }
 
-// String converts a MetaOnly to a human-readable string.
-func (metaOnly MetaOnly) String() string {
+// String converts a MetadataOnlyObject to a human-readable string.
+func (metaOnly MetadataOnlyObject) String() string {
 	return fmt.Sprintf("%s/%s, name: %s, DeletionTimestamp:%v", metaOnly.TypeMeta.APIVersion, metaOnly.TypeMeta.Kind, metaOnly.ObjectMeta.Name, metaOnly.ObjectMeta.DeletionTimestamp)
 }
 
-// PrintAsMetaOnly is a helper function that converts an interface{} to
-// *MetaOnly and then convert it to a human-readable string.
-func PrintAsMetaOnly(obj interface{}) string {
-	metaOnly, ok := obj.(*MetaOnly)
+// PrintAsMetadataOnlyObject is a helper function that converts an interface{} to
+// *MetadataOnlyObject and then convert it to a human-readable string.
+func PrintAsMetadataOnlyObject(obj interface{}) string {
+	metaOnly, ok := obj.(*MetadataOnlyObject)
 	if !ok {
-		return fmt.Sprintf("expected MetaOnly, got %s", reflect.TypeOf(obj))
+		return fmt.Sprintf("expected MetadataOnlyObject, got %s", reflect.TypeOf(obj))
 	}
 	return metaOnly.String()
 }

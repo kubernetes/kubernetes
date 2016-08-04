@@ -21,20 +21,20 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
-// MetaOnly allows decoding only the apiVersion, kind, and metadata fields of
+// MetadataOnlyObject allows decoding only the apiVersion, kind, and metadata fields of
 // JSON data.
 // TODO: enable meta-only decoding for protobuf.
-type MetaOnly struct {
+type MetadataOnlyObject struct {
 	unversioned.TypeMeta `json:",inline"`
 	v1.ObjectMeta        `json:"metadata,omitempty"`
 }
 
-// MetaOnlyList allows decoding from JSON data only the typemeta and metadata of
+// MetadataOnlyObjectList allows decoding from JSON data only the typemeta and metadata of
 // a list, and those of the enclosing objects.
 // TODO: enable meta-only decoding for protobuf.
-type MetaOnlyList struct {
+type MetadataOnlyObjectList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
-	Items []MetaOnly `json:"items"`
+	Items []MetadataOnlyObject `json:"items"`
 }
