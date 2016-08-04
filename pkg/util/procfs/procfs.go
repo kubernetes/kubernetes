@@ -23,11 +23,14 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"unicode"
 
 	"github.com/golang/glog"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
 type ProcFS struct{}
@@ -62,7 +65,42 @@ func (pfs *ProcFS) GetFullContainerName(pid int) (string, error) {
 	return containerNameFromProcCgroup(string(content))
 }
 
-func PidOf(name string) []int {
+func PKill(name string, sig syscall.Signal) error {
+	if len(name) == 0 {
+		return fmt.Errorf("name should not be empty")
+	}
+	re, err := regexp.Compile(name)
+	if err != nil {
+		return err
+	}
+	pids := getPids(re)
+	if len(pids) == 0 {
+		return fmt.Errorf("unable to fetch pids for process name : %q", name)
+	}
+	errList := []error{}
+	for _, pid := range pids {
+		if err = syscall.Kill(pid, sig); err != nil {
+			errList = append(errList, err)
+		}
+	}
+	if len(errList) > 0 {
+		return utilerrors.NewAggregate(errList)
+	}
+	return nil
+}
+
+func PidOf(name string) ([]int, error) {
+	if len(name) == 0 {
+		return []int{}, fmt.Errorf("name should not be empty")
+	}
+	re, err := regexp.Compile("(^|/)" + name + "$")
+	if err != nil {
+		return []int{}, err
+	}
+	return getPids(re), nil
+}
+
+func getPids(re *regexp.Regexp) []int {
 	pids := []int{}
 	filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
 		base := filepath.Base(path)
@@ -94,7 +132,7 @@ func PidOf(name string) []int {
 			return nil
 		}
 		// Check if the name of the executable is what we are looking for
-		if filepath.Base(exe[0]) == name {
+		if re.MatchString(exe[0]) {
 			dirname := filepath.Base(filepath.Dir(path))
 			// Grab the PID from the directory path
 			pid, _ := strconv.Atoi(dirname)
