@@ -733,7 +733,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 	}
 
 	if filterTags[TagNameKubernetesCluster] == "" {
-		glog.Errorf("Tag %q not found; Kuberentes may behave unexpectedly.", TagNameKubernetesCluster)
+		glog.Errorf("Tag %q not found; Kubernetes may behave unexpectedly.", TagNameKubernetesCluster)
 	}
 
 	awsCloud.filterTags = filterTags
