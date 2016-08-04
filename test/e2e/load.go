@@ -47,7 +47,7 @@ const (
 	// We start RCs/Services/pods/... in different namespace in this test.
 	// nodeCountPerNamespace determines how many namespaces we will be using
 	// depending on the number of nodes in the underlying cluster.
-	nodeCountPerNamespace = 250
+	nodeCountPerNamespace = 100
 )
 
 // This test suite can take a long time to run, so by default it is added to
