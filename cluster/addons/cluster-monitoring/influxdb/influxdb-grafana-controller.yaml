@@ -1,5 +1,5 @@
-apiVersion: apps/v1alpha1
-kind: PetSet
+apiVersion: v1
+kind: ReplicationController
 metadata:
   name: monitoring-influxdb-grafana-v3
   namespace: kube-system
@@ -9,6 +9,9 @@ metadata:
     kubernetes.io/cluster-service: "true"
 spec: 
   replicas: 1
+  selector: 
+    k8s-app: influxGrafana
+    version: v3
   template: 
     metadata: 
       labels: 
@@ -65,8 +68,7 @@ spec:
             mountPath: /var
       volumes:
       - name: influxdb-persistent-storage
-        persistentVolumeClaim:
-          claimName: influxdb-claim
+        emptyDir: {}
       - name: grafana-persistent-storage
         emptyDir: {}
-  serviceName: monitoring-influxdb
+
