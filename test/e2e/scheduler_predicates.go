@@ -41,6 +41,79 @@ const minPodCPURequest int64 = 500
 // variable set in BeforeEach, never modified afterwards
 var masterNodes sets.String
 
+var podWithNodeAffinity = api.Pod{
+	ObjectMeta: api.ObjectMeta{
+		Name: "with-labels",
+		Annotations: map[string]string{
+			"scheduler.alpha.kubernetes.io/affinity": `{
+        		"nodeAffinity": {
+          			"requiredDuringSchedulingIgnoredDuringExecution": {
+            			"nodeSelectorTerms": [{
+                			"matchExpressions": [{
+                    			"key": "kubernetes.io/e2e-az-name",
+                    			"operator": "In",
+                    			"values": ["e2e-az1", "e2e-az2"]
+                  			}]
+              			}]
+          			}
+        		}
+      		}`,
+			"another-annotation-key": "another-annotation-value",
+		},
+	},
+	Spec: api.PodSpec{
+		Containers: []api.Container{
+			{
+				Name:  "with-labels",
+				Image: "gcr.io/google_containers/pause:2.0",
+			},
+		},
+	},
+}
+
+var podWithPodAffinity = api.Pod{
+	ObjectMeta: api.ObjectMeta{
+		Name: "with-newlabels",
+		Annotations: map[string]string{
+			"scheduler.alpha.kubernetes.io/affinity": `{
+        		"podAffinity": {
+          			"requiredDuringSchedulingIgnoredDuringExecution": [{
+            			"labelSelector": {
+              				"matchExpressions": [{
+                				"key": "security",
+                				"operator": "In",
+                				"values":["S1"]
+              				}]
+            			},
+            			"topologyKey": "kubernetes.io/hostname"
+          			}]
+        		},
+        		"podAntiAffinity": {
+          			"requiredDuringSchedulingIgnoredDuringExecution": [{
+            			"labelSelector": {
+              				"matchExpressions": [{
+                				"key": "security",
+                				"operator": "In",
+                				"values":["S2"]
+              				}]
+            			},
+            			"topologyKey": "kubernetes.io/hostname"
+          			}]
+        		}
+      		}`,
+			"another-annotation-key": "another-annotation-value",
+		},
+	},
+	Spec: api.PodSpec{
+		Containers: []api.Container{
+			{
+				Name:  "with-newlabels",
+				Image: "gcr.io/google_containers/pause:2.0",
+			},
+		},
+	},
+}
+
 // Returns a number of currently scheduled and not scheduled Pods.
 func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
 	for _, pod := range pods.Items {
@@ -708,9 +781,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
-		labelPodName := "with-labels"
-		testPodPath := "test/e2e/testing-manifests/node-selection/pod-with-node-affinity.yaml"
-		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
+		labelPodName := podWithNodeAffinity.Name
+		pod, err = c.Pods(ns).Create(&podWithNodeAffinity)
+		framework.ExpectNoError(err)
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -1223,10 +1296,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
-		labelPodName := "with-newlabels"
-		testPodPath := "test/e2e/testing-manifests/node-selection/pod-with-pod-affinity.yaml"
-		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
-
+		labelPodName := podWithPodAffinity.Name
+		pod, err = c.Pods(ns).Create(&podWithPodAffinity)
+		framework.ExpectNoError(err)
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
