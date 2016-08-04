@@ -201,7 +201,7 @@ resource.
 
 This proposal is not enough for hosted cluster users, but allows us to improve
 that in the future.
-On a hosted kubernetes cluster, for eg on GKE - where Google manages the kubernetes
+On a hosted kubernetes cluster, for eg on GCE - where Google manages the kubernetes
 API server, users will have to bring up and maintain the proxy and federated servers
 themselves.
 Other system components like the various controllers, will not be aware of the
