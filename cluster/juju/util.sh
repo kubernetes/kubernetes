@@ -18,7 +18,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
-#set -o xtrace
+set -o xtrace
 
 UTIL_SCRIPT=$(readlink -m "${BASH_SOURCE}")
 JUJU_PATH=$(dirname ${UTIL_SCRIPT})
@@ -38,7 +38,7 @@ function build-local() {
     # This used to build the kubernetes project. Now it rebuilds the charm(s)
     # living in `cluster/juju/layers`
 
-    charm build -o $JUJU_REPOSITORY -s trusty ${JUJU_PATH}/layers/kubernetes
+    charm build ${JUJU_PATH}/layers/kubernetes -o $JUJU_REPOSITORY -r --no-local-layers
 }
 
 function detect-master() {
@@ -68,6 +68,9 @@ function detect-nodes() {
 
 function kube-up() {
     build-local
+
+    # Replace the charm directory in the bundle.
+    sed "s|__CHARM_DIR__|${JUJU_REPOSITORY}|" < ${KUBE_BUNDLE_PATH}.base > ${KUBE_BUNDLE_PATH}
 
     # The juju-deployer command will deploy the bundle and can be run
     # multiple times to continue deploying the parts that fail.
@@ -117,7 +120,7 @@ function sleep-status() {
 
     while [[ $i < $maxtime && -z $jujustatus ]]; do
       sleep 15
-      i+=15
+      i=$((i + 15))
       jujustatus=$(${JUJU_PATH}/identify-leaders.py)
       export KUBE_MASTER_NAME=${jujustatus}
     done
