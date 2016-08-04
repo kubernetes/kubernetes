@@ -27,6 +27,8 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/iptables"
+	"k8s.io/kubernetes/pkg/util/procfs"
+	"syscall"
 )
 
 var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
@@ -54,7 +56,7 @@ func createCBR0(wantCIDR *net.IPNet, babysitDaemons bool) error {
 	// For now just log the error. The containerRuntime check will catch docker failures.
 	// TODO (dawnchen) figure out what we should do for rkt here.
 	if babysitDaemons {
-		if err := exec.Command("pkill", "-KILL", "docker").Run(); err != nil {
+		if err := procfs.PKill("docker", syscall.SIGKILL); err != nil {
 			glog.Error(err)
 		}
 	} else if util.UsingSystemdInitSystem() {
