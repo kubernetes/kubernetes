@@ -310,34 +310,63 @@ func assertIsIngress(obj interface{}) (*ext.Ingress, bool) {
 	}
 }
 
+// newIngress generates DNS records for an Ingress resource.
+//
+// If all the Ingress loadbalancer status entries have their IP fields
+// set we generate a series of A records for them, one per IP. If there
+// is only one hostname in the Ingress status entries, we generate a
+// CNAME record for it. If there are multiple hostnames and no IP then
+// we generate a CNAME for the first hostname. If both IPs and hostnames
+// coexist, we favor IPs over the hostnames and we generate only A
+// records for the IPs and no CNAME record at all.
+//
+// We do this because RFC 1034 - https://tools.ietf.org/html/rfc1034,
+// specifies that it is not a valid configuration to mix up CNAME and
+// A records for a given domain name.
+// """
+// If a CNAME RR is present at a node, no other data should be
+// present; this ensures that the data for a canonical name and its
+// aliases cannot be different.
+// """
+// Due to this, we can either only generate A records or a CNAME
+// record but not both. We have to choose between the two. IP addresses
+// are more specific than a CNAME because a CNAME should eventually
+// resolve to an IP address, so favoring IP addresses over CNAME.
+//
+// TODO(madhusudancs): We would like to generate an empty record
+// (NODATA response) if neither of these fields are set to indicate
+// that we know that the Ingress resource exists but we do not know
+// what it points to. It is not entirely clear how to make that work
+// with SkyDNS because setting an empty host field in the service
+// record seems to return all the A records as response. Need to
+// figure this out.
 func (kd *KubeDNS) newIngress(obj interface{}) {
 	if ing, ok := assertIsIngress(obj); ok {
 		glog.V(4).Infof("Add/Update for ingress %v", ing.Name)
-		subCache := NewTreeCache()
-		subCachePath := append(kd.domainPath, ingressSubdomain, ing.Namespace)
 
 		ips := []string{}
-		ingFQDN := strings.Join([]string{ing.Name, ing.Namespace, ingressSubdomain, kd.domain}, ".")
-		reverseRecord, _ := getSkyMsg(ingFQDN, 0)
+		hostnames := []string{}
 		for _, lbi := range ing.Status.LoadBalancer.Ingress {
-			// We generate an A record if the Ingress loadbalancer IP is set and a
-			// CNAME record if the hostname is set. If both IP and hostname fields
-			// are set we favor IP over the hostname.
-			// TODO(madhusudancs): We would like to generate an empty record
-			// (NODATA response) if neither of these fields are set to indicate
-			// that we know that the Ingress resource exists but we do not know
-			// what it points to. It is not entirely clear how to make that work
-			// with SkyDNS because setting an empty host field in the service
-			// record seems to return all the A records as response. Need to
-			// figure this out.
 			if len(lbi.IP) > 0 {
-				kd.newIngressRecord(subCache, ing.Namespace, ing.Name, lbi.IP)
 				ips = append(ips, lbi.IP)
 			} else if len(lbi.Hostname) > 0 {
-				kd.newIngressRecord(subCache, ing.Namespace, ing.Name, lbi.Hostname)
+				hostnames = append(hostnames, lbi.Hostname)
 			} else {
-				glog.V(4).Infof("Ingress resource with neither an IP address nor a hostname: %+v", ing)
+				glog.Warningf("Ingress resource(%s) status neither has an IP nor a hostname: %+v", ing.Name, ing.Status)
 			}
+		}
+
+		subCache := NewTreeCache()
+		subCachePath := append(kd.domainPath, ingressSubdomain, ing.Namespace)
+		ingFQDN := strings.Join([]string{ing.Name, ing.Namespace, ingressSubdomain, kd.domain}, ".")
+		reverseRecord, _ := getSkyMsg(ingFQDN, 0)
+
+		if len(ips) > 0 {
+			for _, ip := range ips {
+				kd.newIngressRecord(subCache, ing.Namespace, ing.Name, ip)
+			}
+		} else if len(hostnames) > 0 {
+			kd.newIngressRecord(subCache, ing.Namespace, ing.Name, hostnames[0])
 		}
 
 		if subCache.numEntries() > 0 {
@@ -374,8 +403,6 @@ func (kd *KubeDNS) removeIngress(obj interface{}) {
 }
 
 func (kd *KubeDNS) updateIngress(oldObj, newObj interface{}) {
-	// TODO(madhusudancs): Ensure we don't leave the records dangling from the
-	// previous update.
 	kd.newIngress(newObj)
 }
 

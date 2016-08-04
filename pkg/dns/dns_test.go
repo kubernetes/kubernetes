@@ -526,39 +526,103 @@ func TestIngress(t *testing.T) {
 }
 
 func TestIngressWithMultipleLBs(t *testing.T) {
-	kd := newKubeDNS()
-	ing := newIngress(testNamespace, testIngress, "1.2.3.4", "")
-	lbis := []kapi.LoadBalancerIngress{
+	testCases := []struct {
+		lbis []kapi.LoadBalancerIngress
+		want sets.String
+	}{
 		{
-			Hostname: "foo.bar.test",
+			lbis: []kapi.LoadBalancerIngress{
+				{
+					IP: "1.2.3.4",
+				},
+				{
+					IP: "2.3.4.5",
+				},
+				{
+					IP:       "",
+					Hostname: "",
+				},
+			},
+			want: sets.NewString("1.2.3.4", "2.3.4.5"),
 		},
 		{
-			IP:       "2.3.4.5",
-			Hostname: "baz.foo.example",
+			lbis: []kapi.LoadBalancerIngress{
+				{
+					Hostname: "foo.bar.test",
+				},
+				{
+					Hostname: "baz.foo.example",
+				},
+				{
+					IP:       "",
+					Hostname: "",
+				},
+			},
+			want: sets.NewString("foo.bar.test"),
 		},
 		{
-			IP:       "",
-			Hostname: "",
+			lbis: []kapi.LoadBalancerIngress{
+				{
+					IP: "1.2.3.4",
+				},
+				{
+					Hostname: "foo.bar.test",
+				},
+				{
+					Hostname: "baz.foo.example",
+				},
+				{
+					IP: "2.3.4.5",
+				},
+				{
+					IP:       "",
+					Hostname: "",
+				},
+			},
+			want: sets.NewString("1.2.3.4", "2.3.4.5"),
+		},
+		{
+			lbis: []kapi.LoadBalancerIngress{
+				{
+					IP: "1.2.3.4",
+				},
+				{
+					Hostname: "foo.bar.test",
+				},
+				{
+					IP:       "2.3.4.5",
+					Hostname: "baz.foo.example",
+				},
+				{
+					IP:       "",
+					Hostname: "",
+				},
+			},
+			want: sets.NewString("1.2.3.4", "2.3.4.5"),
 		},
 	}
-	ing.Status.LoadBalancer.Ingress = append(ing.Status.LoadBalancer.Ingress, lbis...)
-	want := sets.NewString("1.2.3.4", "foo.bar.test", "2.3.4.5")
 
-	kd.newIngress(ing)
-	query := fmt.Sprintf("%s.%s.ing.%s", ing.Name, ing.Namespace, kd.domain)
-	records, err := kd.Records(query, false)
-	require.NoError(t, err)
+	for i, tc := range testCases {
+		kd := newKubeDNS()
+		ing := newIngress(testNamespace, testIngress, "", "")
+		ing.Status.LoadBalancer.Ingress = tc.lbis
 
-	// We should expect records only for those statuses that were not
-	// completely empty, so len(lbi) - 1
-	assert.Equal(t, len(ing.Status.LoadBalancer.Ingress)-1, len(records))
+		kd.newIngress(ing)
+		query := fmt.Sprintf("%s.%s.ing.%s", ing.Name, ing.Namespace, kd.domain)
+		records, err := kd.Records(query, false)
+		require.NoError(t, err)
 
-	// We asserted that the number of loadbalancerIngress entries are equal
-	// to the number of returned records. We ensure each entry exist in
-	// both the sets, the order doesn't matter.
-	for _, record := range records {
-		if !want.Has(record.Host) {
-			t.Errorf("Unexpected target host %s", record.Host)
+		// We should expect records according to the rules specified in
+		// kd.newIngress() method.
+		assert.Equal(t, len(tc.want), len(records))
+
+		// We asserted that the number of loadbalancerIngress entries are equal
+		// to the number of returned records. We ensure each entry exist in
+		// both the sets, the order doesn't matter.
+		for _, record := range records {
+			if !tc.want.Has(record.Host) {
+				t.Errorf("[%d] Unexpected target host %s", i, record.Host)
+			}
 		}
 	}
 }
