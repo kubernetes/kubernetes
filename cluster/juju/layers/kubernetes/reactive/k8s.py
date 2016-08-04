@@ -131,36 +131,47 @@ def ca():
 
 
 @when('kubelet.available', 'leadership.is_leader')
-@when_not('skydns.available')
-def launch_skydns():
-    '''Create the "kube-system" namespace, the skydns resource controller, and
-    the skydns service. '''
-    hookenv.log('Creating kubernetes skydns on the master node.')
+@when_not('kubedns.available', 'skydns.available')
+def launch_dns():
+    '''Create the "kube-system" namespace, the kubedns resource controller,
+    and the kubedns service. '''
+    hookenv.log('Creating kubernetes kubedns on the master node.')
     # Only launch and track this state on the leader.
-    # Launching duplicate SkyDNS rc will raise an error
+    # Launching duplicate kubeDNS rc will raise an error
     # Run a command to check if the apiserver is responding.
     return_code = call(split('kubectl cluster-info'))
     if return_code != 0:
         hookenv.log('kubectl command failed, waiting for apiserver to start.')
-        remove_state('skydns.available')
-        # Return without setting skydns.available so this method will retry.
+        remove_state('kubedns.available')
+        # Return without setting kubedns.available so this method will retry.
         return
     # Check for the "kube-system" namespace.
     return_code = call(split('kubectl get namespace kube-system'))
     if return_code != 0:
-        # Create the kube-system namespace that is used by the skydns files.
+        # Create the kube-system namespace that is used by the kubedns files.
         check_call(split('kubectl create namespace kube-system'))
-    # Check for the skydns replication controller.
-    return_code = call(split('kubectl get -f files/manifests/skydns-rc.yml'))
+    # Check for the kubedns replication controller.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-rc.yaml'))
     if return_code != 0:
-        # Create the skydns replication controller from the rendered file.
-        check_call(split('kubectl create -f files/manifests/skydns-rc.yml'))
-    # Check for the skydns service.
-    return_code = call(split('kubectl get -f files/manifests/skydns-svc.yml'))
+        # Create the kubedns replication controller from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-rc.yaml'))
+    # Check for the kubedns service.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-svc.yaml'))
     if return_code != 0:
-        # Create the skydns service from the rendered file.
-        check_call(split('kubectl create -f files/manifests/skydns-svc.yml'))
-    set_state('skydns.available')
+        # Create the kubedns service from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-svc.yaml'))
+    set_state('kubedns.available')
+
+
+@when('skydns.available', 'leadership.is_leader')
+def convert_to_kubedns():
+    '''Delete the skydns containers to make way for the kubedns containers.'''
+    hookenv.log('Deleteing the old skydns deployment.')
+    # Delete the skydns replication controller.
+    return_code = call(split('kubectl delete rc kube-dns-v11'))
+    # Delete the skydns service.
+    return_code = call(split('kubectl delete svc kube-dns'))
+    remove_state('skydns.available')
 
 
 @when('docker.available')
@@ -297,11 +308,11 @@ def gather_sdn_data():
     else:
         # There is no SDN cider fall back to the kubernetes config cidr option.
         pillar['dns_server'] = get_dns_ip(hookenv.config().get('cidr'))
-    # The pillar['dns_server'] value is used the skydns-svc.yml file.
+    # The pillar['dns_server'] value is used the kubedns-svc.yaml file.
     pillar['dns_replicas'] = 1
-    # The pillar['dns_domain'] value is ued in the skydns-rc.yml
+    # The pillar['dns_domain'] value is used in the kubedns-rc.yaml
     pillar['dns_domain'] = hookenv.config().get('dns_domain')
-    # Use a 'pillar' dictionary so we can reuse the upstream skydns templates.
+    # Use a 'pillar' dictionary so we can reuse the upstream kubedns templates.
     sdn_data['pillar'] = pillar
     return sdn_data
 
@@ -400,14 +411,14 @@ def render_files(reldata=None):
         # Render the files/manifests/master.json that contains parameters for
         # the apiserver, controller, and controller-manager
         render('master.json', target, context)
-        # Source: ...master/cluster/addons/dns/skydns-svc.yaml.in
-        target = os.path.join(rendered_manifest_dir, 'skydns-svc.yml')
-        # Render files/kubernetes/skydns-svc.yaml for SkyDNS service.
-        render('skydns-svc.yml', target, context)
-        # Source: ...master/cluster/addons/dns/skydns-rc.yaml.in
-        target = os.path.join(rendered_manifest_dir, 'skydns-rc.yml')
-        # Render files/kubernetes/skydns-rc.yaml for SkyDNS pod.
-        render('skydns-rc.yml', target, context)
+        # Source: ...cluster/addons/dns/skydns-svc.yaml.in
+        target = os.path.join(rendered_manifest_dir, 'kubedns-svc.yaml')
+        # Render files/kubernetes/kubedns-svc.yaml for the DNS service.
+        render('kubedns-svc.yaml', target, context)
+        # Source: ...cluster/addons/dns/skydns-rc.yaml.in
+        target = os.path.join(rendered_manifest_dir, 'kubedns-rc.yaml')
+        # Render files/kubernetes/kubedns-rc.yaml for the DNS pod.
+        render('kubedns-rc.yaml', target, context)
 
 
 def status_set(level, message):
