@@ -74,7 +74,7 @@ func (w *ThinPoolWatcher) Start() {
 
 			// print latency for refresh
 			duration := time.Since(start)
-			glog.V(3).Infof("thin_ls(%d) took %s", start.Unix(), duration)
+			glog.V(5).Infof("thin_ls(%d) took %s", start.Unix(), duration)
 		}
 	}
 }
@@ -115,7 +115,7 @@ func (w *ThinPoolWatcher) Refresh() error {
 	}
 
 	if currentlyReserved {
-		glog.V(4).Infof("metadata for %v is currently reserved; releasing", w.poolName)
+		glog.V(5).Infof("metadata for %v is currently reserved; releasing", w.poolName)
 		_, err = w.dmsetup.Message(w.poolName, 0, releaseMetadataMessage)
 		if err != nil {
 			err = fmt.Errorf("error releasing metadata snapshot for %v: %v", w.poolName, err)
@@ -123,7 +123,7 @@ func (w *ThinPoolWatcher) Refresh() error {
 		}
 	}
 
-	glog.Infof("reserving metadata snapshot for thin-pool %v", w.poolName)
+	glog.V(5).Infof("reserving metadata snapshot for thin-pool %v", w.poolName)
 	// NOTE: "0" in the call below is for the 'sector' argument to 'dmsetup
 	// message'.  It's not needed for thin pools.
 	if output, err := w.dmsetup.Message(w.poolName, 0, reserveMetadataMessage); err != nil {

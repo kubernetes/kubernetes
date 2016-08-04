@@ -26,6 +26,9 @@ type FsInfo struct {
 
 	// Total number of inodes available on the filesystem.
 	Inodes uint64 `json:"inodes"`
+
+	// HasInodes when true, indicates that Inodes info will be available.
+	HasInodes bool `json:"has_inodes"`
 }
 
 type Node struct {

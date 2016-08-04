@@ -125,14 +125,14 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 			AvailableBytes: &sb.rootFsInfo.Available,
 			CapacityBytes:  &sb.rootFsInfo.Capacity,
 			UsedBytes:      &sb.rootFsInfo.Usage,
-			InodesFree:     &sb.rootFsInfo.InodesFree},
+			InodesFree:     sb.rootFsInfo.InodesFree},
 		StartTime: rootStats.StartTime,
 		Runtime: &stats.RuntimeStats{
 			ImageFs: &stats.FsStats{
 				AvailableBytes: &sb.imageFsInfo.Available,
 				CapacityBytes:  &sb.imageFsInfo.Capacity,
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
-				InodesFree:     &sb.imageFsInfo.InodesFree,
+				InodesFree:     sb.imageFsInfo.InodesFree,
 			},
 		},
 	}
@@ -164,14 +164,14 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 	cs.Logs = &stats.FsStats{
 		AvailableBytes: &sb.rootFsInfo.Available,
 		CapacityBytes:  &sb.rootFsInfo.Capacity,
-		InodesFree:     &sb.rootFsInfo.InodesFree,
+		InodesFree:     sb.rootFsInfo.InodesFree,
 	}
 
 	// The container rootFs lives on the imageFs devices (which may not be the node root fs)
 	cs.Rootfs = &stats.FsStats{
 		AvailableBytes: &sb.imageFsInfo.Available,
 		CapacityBytes:  &sb.imageFsInfo.Capacity,
-		InodesFree:     &sb.imageFsInfo.InodesFree,
+		InodesFree:     sb.imageFsInfo.InodesFree,
 	}
 	lcs, found := sb.latestContainerStats(info)
 	if !found {
