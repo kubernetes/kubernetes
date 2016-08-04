@@ -729,13 +729,12 @@ func PodFitsHostPorts(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 
 	// TODO: Aggregate it at the NodeInfo level.
 	existingPorts := getUsedPorts(nodeInfo.Pods()...)
-	var predicateFails []algorithm.PredicateFailureReason
 	for wport := range wantPorts {
 		if wport != 0 && existingPorts[wport] {
-			predicateFails = append(predicateFails, ErrPodNotFitsHostPorts)
+			return false, []algorithm.PredicateFailureReason{ErrPodNotFitsHostPorts}, nil
 		}
 	}
-	return len(predicateFails) == 0, predicateFails, nil
+	return true, nil, nil
 }
 
 func getUsedPorts(pods ...*api.Pod) map[int]bool {
@@ -771,34 +770,37 @@ func haveSame(a1, a2 []string) bool {
 func GeneralPredicates(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	var predicateFails []algorithm.PredicateFailureReason
 	fit, reasons, err := PodFitsResources(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
-		if err != nil {
-			return false, predicateFails, err
-		}
 	}
 
 	fit, reasons, err = PodFitsHost(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
-		if err != nil {
-			return false, predicateFails, err
-		}
 	}
+
 	fit, reasons, err = PodFitsHostPorts(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
-		if err != nil {
-			return false, predicateFails, err
-		}
 	}
+
 	fit, reasons, err = PodSelectorMatches(pod, meta, nodeInfo)
+	if err != nil {
+		return false, predicateFails, err
+	}
 	if !fit {
 		predicateFails = append(predicateFails, reasons...)
-		if err != nil {
-			return false, predicateFails, err
-		}
 	}
+
 	return len(predicateFails) == 0, predicateFails, nil
 }
 

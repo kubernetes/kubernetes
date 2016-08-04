@@ -2053,31 +2053,32 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
 	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
+	if err != nil {
+		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
+		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		return fit, "UnexpectedError", message
+	}
 	if !fit {
-		if err != nil {
-			reason := "UnexpectedError"
-			message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
-			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
-			return fit, reason, message
-		}
-		for _, r := range reasons {
+		// If there are failed predicates, we only return the first one as a reason.
+		var reason string
+		var message string
+		if len(reasons) > 0 {
+			r := reasons[0]
 			if re, ok := r.(*predicates.PredicateFailureError); ok {
-				reason := re.PredicateName
-				message := re.Error()
+				reason = re.PredicateName
+				message = re.Error()
 				glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
-				return fit, reason, message
 			} else if re, ok := r.(*predicates.InsufficientResourceError); ok {
-				reason := fmt.Sprintf("OutOf%s", re.ResourceName)
+				reason = fmt.Sprintf("OutOf%s", re.ResourceName)
 				message := re.Error()
 				glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
-				return fit, reason, message
 			} else {
-				reason := "UnexpectedPredicateFailureType"
-				message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
+				reason = "UnexpectedPredicateFailureType"
+				message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
 				glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
-				return fit, reason, message
 			}
 		}
+		return fit, reason, message
 	}
 	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
 	// add the disk space predicate to predicates.GeneralPredicates.

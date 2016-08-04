@@ -705,20 +705,10 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *api.Node, ds *exte
 	nodeInfo.SetNode(node)
 	fit, reasons, err := predicates.GeneralPredicates(newPod, nil, nodeInfo)
 	if err != nil {
-		message := fmt.Sprintf("GeneralPredicates failed due to %v.", err)
-		glog.Warningf("Predicate failed on Pod %s - %s", newPod.Name, message)
+		glog.Warningf("GeneralPredicates failed on pod %s due to unexpected error: %v", newPod.Name, err)
 	}
 	for _, r := range reasons {
-		if re, ok := r.(*predicates.PredicateFailureError); ok {
-			message := re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %s, for reason: %v", newPod.Name, message)
-		} else if re, ok := r.(*predicates.InsufficientResourceError); ok {
-			message := re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %s, for reason: %v", newPod.Name, message)
-		} else {
-			message := fmt.Sprintf("GeneralPredicates failed due to %v.", err)
-			glog.Warningf("Predicate failed on Pod %s - %s", newPod.Name, message)
-		}
+		glog.V(2).Infof("GeneralPredicates failed on pod %s for reason: %v", newPod.Name, r.GetReason())
 	}
 	return fit
 }

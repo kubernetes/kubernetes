@@ -203,7 +203,7 @@ func findNodesThatFit(
 
 // Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
 func podFitsOnNode(pod *api.Pod, meta interface{}, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, []algorithm.PredicateFailureReason, error) {
-	failedPredicates := make([]algorithm.PredicateFailureReason, 0)
+	var failedPredicates []algorithm.PredicateFailureReason
 	for _, predicate := range predicateFuncs {
 		fit, reasons, err := predicate(pod, meta, info)
 		if err != nil {

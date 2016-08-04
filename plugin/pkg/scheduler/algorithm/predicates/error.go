@@ -74,7 +74,7 @@ type PredicateFailureError struct {
 }
 
 func newPredicateFailureError(predicateName string) *PredicateFailureError {
-	return &PredicateFailureError{predicateName}
+	return &PredicateFailureError{PredicateName: predicateName}
 }
 
 func (e *PredicateFailureError) Error() string {
