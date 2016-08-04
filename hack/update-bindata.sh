@@ -19,7 +19,7 @@ set -o pipefail
 set -o nounset
 
 if [[ -z "${KUBE_ROOT:-}" ]]; then
-	echo "KUBE_ROOT not detected, setting default."
+	# Relative to test/e2e/generated/
 	KUBE_ROOT="../../../"
 fi
 
@@ -28,25 +28,14 @@ if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
 	exit 1
 fi
 
-# Setup bindata if not already in the system.
-# For separation of concerns, download first, then install later.
-if ! git config -l | grep -q "user.name" && ! git config -l | grep -q "user.email" ; then
-    git config --global user.name bindata-mockuser
-    git config --global user.email bindata-mockuser@example.com
-fi
-
-go get -u github.com/jteeuwen/go-bindata/... || echo "go-bindata get failed, possibly already exists, proceeding"
-go install github.com/jteeuwen/go-bindata/... || echo "go-bindata install may have failed, proceeding anyway..."
-
-if [[ ! -f ${GOPATH}/bin/go-bindata ]]; then
-	echo "missing bin/go-bindata"
-	echo "for debugging, printing search for bindata files out..."
-	find ${GOPATH} -name go-bindata
+if ! which go-bindata &>/dev/null ; then
+	echo "Cannot find go-bindata. Install with"
+	echo "  go get -u github.com/jteeuwen/go-bindata/go-bindata"
 	exit 5
 fi
 
 BINDATA_OUTPUT="${KUBE_ROOT}/test/e2e/generated/bindata.go"
-${GOPATH}/bin/go-bindata -nometadata -prefix "${KUBE_ROOT}" -o ${BINDATA_OUTPUT} -pkg generated \
+go-bindata -nometadata -prefix "${KUBE_ROOT}" -o ${BINDATA_OUTPUT} -pkg generated \
 	-ignore .jpg -ignore .png -ignore .md \
 	"${KUBE_ROOT}/examples/..." \
 	"${KUBE_ROOT}/docs/user-guide/..." \

@@ -32,6 +32,7 @@ retry() {
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
 retry go get github.com/tools/godep && godep version
+retry go get github.com/jteeuwen/go-bindata/go-bindata
 
 export LOG_LEVEL=4
 
