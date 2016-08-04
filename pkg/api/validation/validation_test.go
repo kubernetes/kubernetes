@@ -1968,6 +1968,15 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
+		{ // Populate AppArmorProfile.
+			SecurityContext: &api.PodSecurityContext{
+				AppArmorProfile: "docker/default",
+			},
+			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
+			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
 		{ // Populate Affinity.
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
@@ -2084,6 +2093,14 @@ func TestValidatePodSpec(t *testing.T) {
 			SecurityContext: &api.PodSecurityContext{
 				HostNetwork: false,
 				FSGroup:     &minID,
+			},
+			RestartPolicy: api.RestartPolicyAlways,
+			DNSPolicy:     api.DNSClusterFirst,
+		},
+		"bad AppArmorProfile": {
+			Containers: []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+			SecurityContext: &api.PodSecurityContext{
+				AppArmorProfile: "invalid",
 			},
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -6465,7 +6482,8 @@ func TestValidateSecurityContext(t *testing.T) {
 				Type:  "type",
 				Level: "level",
 			},
-			RunAsUser: &runAsUser,
+			RunAsUser:       &runAsUser,
+			AppArmorProfile: "docker/default",
 		}
 	}
 
@@ -6483,14 +6501,22 @@ func TestValidateSecurityContext(t *testing.T) {
 	noRunAsUser := fullValidSC()
 	noRunAsUser.RunAsUser = nil
 
+	noAppArmorProfile := fullValidSC()
+	noAppArmorProfile.AppArmorProfile = ""
+
+	localhostAppArmorProfile := fullValidSC()
+	localhostAppArmorProfile.AppArmorProfile = "localhost/foo/bar"
+
 	successCases := map[string]struct {
 		sc *api.SecurityContext
 	}{
-		"all settings":    {allSettings},
-		"no capabilities": {noCaps},
-		"no selinux":      {noSELinux},
-		"no priv request": {noPrivRequest},
-		"no run as user":  {noRunAsUser},
+		"all settings":               {allSettings},
+		"no capabilities":            {noCaps},
+		"no selinux":                 {noSELinux},
+		"no priv request":            {noPrivRequest},
+		"no run as user":             {noRunAsUser},
+		"no AppArmor profile":        {noAppArmorProfile},
+		"localhost AppArmor profile": {localhostAppArmorProfile},
 	}
 	for k, v := range successCases {
 		if errs := ValidateSecurityContext(v.sc, field.NewPath("field")); len(errs) != 0 {
@@ -6506,6 +6532,12 @@ func TestValidateSecurityContext(t *testing.T) {
 	var negativeUser int64 = -1
 	negativeRunAsUser.RunAsUser = &negativeUser
 
+	invalidAppArmorProfile := fullValidSC()
+	invalidAppArmorProfile.AppArmorProfile = "invalid"
+
+	invalidAppArmorProfilePath := fullValidSC()
+	invalidAppArmorProfilePath.AppArmorProfile = "localhost/../invalid"
+
 	errorCases := map[string]struct {
 		sc          *api.SecurityContext
 		errorType   field.ErrorType
@@ -6520,6 +6552,16 @@ func TestValidateSecurityContext(t *testing.T) {
 			sc:          negativeRunAsUser,
 			errorType:   "FieldValueInvalid",
 			errorDetail: isNegativeErrorMsg,
+		},
+		"invalid AppArmorProfile": {
+			sc:          invalidAppArmorProfile,
+			errorType:   "FieldValueInvalid",
+			errorDetail: isInvalidAppArmorProfile,
+		},
+		"invalid AppArmorProfile path": {
+			sc:          invalidAppArmorProfilePath,
+			errorType:   "FieldValueInvalid",
+			errorDetail: "must not start with '../'",
 		},
 	}
 	for k, v := range errorCases {

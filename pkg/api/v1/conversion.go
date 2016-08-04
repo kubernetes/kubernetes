@@ -417,6 +417,9 @@ func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, 
 	} else {
 		delete(out.Annotations, PodInitContainersAnnotationKey)
 	}
+
+	internalConvertApiAppArmorToV1AppArmor(&in.Spec, &out.ObjectMeta)
+
 	return nil
 }
 
@@ -439,6 +442,9 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 	if err := autoConvert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in, out, s); err != nil {
 		return err
 	}
+
+	internalConvertV1AppArmorToApiAppArmor(in.Annotations, &out.Spec, out.Annotations)
+
 	if len(out.Annotations) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old))
@@ -524,6 +530,8 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 		out.Annotations[PodInitContainerStatusesAnnotationKey] = string(value)
 	}
 
+	internalConvertApiAppArmorToV1AppArmor(&in.Spec, &out.ObjectMeta)
+
 	// We need to reset certain fields for mirror pods from pre-v1.1 kubelet
 	// (#15960).
 	// TODO: Remove this code after we drop support for v1.0 kubelets.
@@ -536,6 +544,37 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 		}
 	}
 	return nil
+}
+
+// TODO(timstclair): When AppArmor is out of alpha this can be removed.
+func internalConvertApiAppArmorToV1AppArmor(inPodSpec *api.PodSpec, outObjectMeta *ObjectMeta) {
+	if inPodSpec.SecurityContext != nil && inPodSpec.SecurityContext.AppArmorProfile != "" {
+		if outObjectMeta.Annotations == nil {
+			outObjectMeta.Annotations = map[string]string{}
+		}
+		outObjectMeta.Annotations[api.AppArmorPodAnnotationKey] =
+			inPodSpec.SecurityContext.AppArmorProfile
+	}
+
+	for _, c := range inPodSpec.Containers {
+		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != "" {
+			if outObjectMeta.Annotations == nil {
+				outObjectMeta.Annotations = map[string]string{}
+			}
+			outObjectMeta.Annotations[api.AppArmorContainerAnnotationKeyPrefix+c.Name] =
+				c.SecurityContext.AppArmorProfile
+		}
+	}
+
+	for _, c := range inPodSpec.InitContainers {
+		if c.SecurityContext != nil && c.SecurityContext.AppArmorProfile != "" {
+			if outObjectMeta.Annotations == nil {
+				outObjectMeta.Annotations = map[string]string{}
+			}
+			outObjectMeta.Annotations[api.AppArmorContainerAnnotationKeyPrefix+c.Name] =
+				c.SecurityContext.AppArmorProfile
+		}
+	}
 }
 
 func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
@@ -570,6 +609,9 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 	if err := autoConvert_v1_Pod_To_api_Pod(in, out, s); err != nil {
 		return err
 	}
+
+	internalConvertV1AppArmorToApiAppArmor(in.Annotations, &out.Spec, out.Annotations)
+
 	if len(out.Annotations) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old))
@@ -580,6 +622,45 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
 	}
 	return nil
+}
+
+func internalConvertV1AppArmorToApiAppArmor(inAnnotations map[string]string, outPodSpec *api.PodSpec, outAnnotations map[string]string) {
+	if podProfile, hasPodProfile := inAnnotations[api.AppArmorPodAnnotationKey]; hasPodProfile {
+		if outPodSpec.SecurityContext == nil {
+			outPodSpec.SecurityContext = &api.PodSecurityContext{}
+		}
+		outPodSpec.SecurityContext.AppArmorProfile = podProfile
+		if len(outAnnotations) > 0 {
+			delete(outAnnotations, api.AppArmorPodAnnotationKey)
+		}
+	}
+
+	for i, c := range outPodSpec.Containers {
+		key := api.AppArmorContainerAnnotationKeyPrefix + c.Name
+		if containerProfile, hasContainerProfile := inAnnotations[key]; hasContainerProfile {
+			if outPodSpec.Containers[i].SecurityContext == nil {
+				outPodSpec.Containers[i].SecurityContext = &api.SecurityContext{}
+			}
+			outPodSpec.Containers[i].SecurityContext.AppArmorProfile = containerProfile
+			if len(outAnnotations) > 0 {
+				delete(outAnnotations, key)
+			}
+		}
+	}
+
+	for i, c := range outPodSpec.InitContainers {
+		key := api.AppArmorContainerAnnotationKeyPrefix + c.Name
+		if containerProfile, hasContainerProfile :=
+			inAnnotations[api.AppArmorContainerAnnotationKeyPrefix+c.Name]; hasContainerProfile {
+			if outPodSpec.InitContainers[i].SecurityContext == nil {
+				outPodSpec.InitContainers[i].SecurityContext = &api.SecurityContext{}
+			}
+			outPodSpec.InitContainers[i].SecurityContext.AppArmorProfile = containerProfile
+			if len(outAnnotations) > 0 {
+				delete(outAnnotations, key)
+			}
+		}
+	}
 }
 
 func Convert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *ServiceSpec, s conversion.Scope) error {

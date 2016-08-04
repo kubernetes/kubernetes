@@ -1522,6 +1522,10 @@ type PodSecurityContext struct {
 	//
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	FSGroup *int64 `json:"fsGroup,omitempty"`
+	// The AppArmor profile that containers in the pod will run with by default if they do not define
+	// their own profile.
+	// +k8s:conversion-gen=false
+	AppArmorProfile string `json:"appArmorProfile,omitempty"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
@@ -2878,6 +2882,10 @@ type SecurityContext struct {
 	// The read-only root filesystem allows you to restrict the locations that an application can write
 	// files to, ensuring the persistent data can only be written to mounts.
 	ReadOnlyRootFilesystem *bool `json:"readOnlyRootFilesystem,omitempty"`
+	// The AppArmor profile that the container will run with. If not set the pod level AppArmor
+	// profile will be used.
+	// +k8s:conversion-gen=false
+	AppArmorProfile string `json:"appArmorProfile,omitempty"`
 }
 
 // SELinuxOptions are the labels to be applied to the container.

@@ -50,6 +50,7 @@ const isNegativeErrorMsg string = `must be greater than or equal to 0`
 const isInvalidQuotaResource string = `must be a standard resource for quota`
 const fieldImmutableErrorMsg string = `field is immutable`
 const isNotIntegerErrorMsg string = `must be an integer`
+const isInvalidAppArmorProfile string = `must be a valid AppArmor profile`
 
 var pdPartitionErrorMsg string = validation.InclusiveRangeError(1, 255)
 
@@ -1937,6 +1938,16 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 	return allErrs
 }
 
+func validateAppArmorProfile(p string, fldPath *field.Path) field.ErrorList {
+	if p == "docker/default" {
+		return nil
+	}
+	if strings.HasPrefix(p, "localhost/") {
+		return validateSubPath(strings.TrimPrefix(p, "localhost/"), fldPath)
+	}
+	return field.ErrorList{field.Invalid(fldPath, p, isInvalidAppArmorProfile)}
+}
+
 // ValidatePodSecurityContext test that the specified PodSecurityContext has valid data.
 func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *api.PodSpec, specPath, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -1957,6 +1968,9 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 			for _, msg := range validation.IsValidGroupId(gid) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
 			}
+		}
+		if securityContext.AppArmorProfile != "" {
+			allErrs = append(allErrs, validateAppArmorProfile(securityContext.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
 		}
 	}
 
@@ -3192,6 +3206,11 @@ func ValidateSecurityContext(sc *api.SecurityContext, fldPath *field.Path) field
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("runAsUser"), *sc.RunAsUser, isNegativeErrorMsg))
 		}
 	}
+
+	if sc.AppArmorProfile != "" {
+		allErrs = append(allErrs, validateAppArmorProfile(sc.AppArmorProfile, fldPath.Child("appArmorProfile"))...)
+	}
+
 	return allErrs
 }
 
