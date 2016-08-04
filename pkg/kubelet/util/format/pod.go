@@ -18,9 +18,11 @@ package format
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
+	//"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 )
 
@@ -62,4 +64,30 @@ func aggregatePods(pods []*api.Pod, handler podHandler) string {
 		podStrings = append(podStrings, handler(pod))
 	}
 	return fmt.Sprintf(strings.Join(podStrings, ", "))
+}
+
+func ExpandConfigMap(configMap *api.ConfigMap, pod *api.Pod) {
+	r := regexp.MustCompile("\\$\\([a-zA-Z0-9.]+\\)")
+	mapping_funcs := map[string]func(*api.Pod) string{
+		"$(status.podIP)":   func(pod *api.Pod) string { return pod.Status.PodIP },
+		"$(status.message)": func(pod *api.Pod) string { return pod.Status.Message },
+		"$(status.phase)":   func(pod *api.Pod) string { return string(pod.Status.Phase) },
+		"$(pod.name)":       func(pod *api.Pod) string { return pod.Name },
+		"$(pod.labels)": func(pod *api.Pod) string {
+			labels := make([]string, 0, len(pod.Labels))
+			for label, value := range pod.Labels {
+				labels = append(labels, label+"="+value)
+			}
+
+			return strings.Join(labels, ",")
+		},
+	}
+	for k := range configMap.Data {
+		vars := r.FindAllString(configMap.Data[k], -1)
+		for _, v := range vars {
+			value := mapping_funcs[v](pod)
+			configMap.Data[k] = strings.Replace(configMap.Data[k], v, value, -1)
+		}
+	}
+	return
 }

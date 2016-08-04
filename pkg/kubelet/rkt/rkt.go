@@ -1305,6 +1305,7 @@ func (r *Runtime) RunPod(pod *api.Pod, pullSecrets []api.Secret) error {
 		r.cleanupPodNetwork(pod)
 		return err
 	}
+	pod.Status.PodIP = podIP
 
 	name, runtimePod, prepareErr := r.preparePod(pod, podIP, pullSecrets, netnsName)
 
