@@ -41,8 +41,8 @@ ${clientgen} "$@"
 ${clientgen} -t "$@"
 ${clientgen} --clientset-name="release_1_4" --input="api/v1,extensions/v1beta1,autoscaling/v1,batch/v1"
 # Clientgen for federation clientset.
-${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret"   "$@"
-${clientgen} --clientset-name=federation_release_1_4 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret"   "$@"
+${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress"   "$@"
+${clientgen} --clientset-name=federation_release_1_4 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress"   "$@"
 ${setgen} "$@"
 
 # You may add additional calls of code generators like set-gen above.
