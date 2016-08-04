@@ -124,13 +124,12 @@ func (rc *ResourceClient) List(opts runtime.Object) (runtime.Object, error) {
 	if parameterEncoder == nil {
 		parameterEncoder = defaultParameterEncoder
 	}
-	ret, _, err := rc.cl.Get().
+	return rc.cl.Get().
 		NamespaceIfScoped(rc.ns, rc.resource.Namespaced).
 		Resource(rc.resource.Name).
 		VersionedParams(opts, parameterEncoder).
 		Do().
-		Decode()
-	return ret, err
+		Get()
 }
 
 // Get gets the resource with the specified name.
