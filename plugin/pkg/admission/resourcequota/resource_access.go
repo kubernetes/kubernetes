@@ -24,11 +24,11 @@ import (
 	lru "github.com/hashicorp/golang-lru"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage/etcd"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -113,8 +113,6 @@ func (e *quotaAccessor) UpdateQuotaStatus(newQuota *api.ResourceQuota) error {
 	return nil
 }
 
-var etcdVersioner = etcd.APIObjectVersioner{}
-
 // checkCache compares the passed quota against the value in the look-aside cache and returns the newer
 // if the cache is out of date, it deletes the stale entry.  This only works because of etcd resourceVersions
 // being monotonically increasing integers
@@ -126,7 +124,7 @@ func (e *quotaAccessor) checkCache(quota *api.ResourceQuota) *api.ResourceQuota 
 	}
 	cachedQuota := uncastCachedQuota.(*api.ResourceQuota)
 
-	if etcdVersioner.CompareResourceVersion(quota, cachedQuota) >= 0 {
+	if versioner.CompareResourceVersion(quota, cachedQuota) >= 0 {
 		e.updatedQuotas.Remove(key)
 		return quota
 	}

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
@@ -46,9 +47,6 @@ type CacherConfig struct {
 
 	// An underlying storage.Interface.
 	Storage Interface
-
-	// An underlying storage.Versioner.
-	Versioner Versioner
 
 	// The Cache will be caching objects of a given Type and assumes that they
 	// are all stored under ResourcePrefix directory in the underlying database.
@@ -142,9 +140,6 @@ type Cacher struct {
 	watchCache *watchCache
 	reflector  *cache.Reflector
 
-	// Versioner is used to handle resource versions.
-	versioner Versioner
-
 	// keyFunc is used to get a key in the underyling storage for a given object.
 	keyFunc func(runtime.Object) (string, error)
 
@@ -183,7 +178,6 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 		storage:     config.Storage,
 		watchCache:  watchCache,
 		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
-		versioner:   config.Versioner,
 		keyFunc:     config.KeyFunc,
 		triggerFunc: config.TriggerPublisherFunc,
 		watcherIdx:  0,
@@ -246,11 +240,6 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 // Implements storage.Interface.
 func (c *Cacher) Backends(ctx context.Context) []string {
 	return c.storage.Backends(ctx)
-}
-
-// Implements storage.Interface.
-func (c *Cacher) Versioner() Versioner {
-	return c.storage.Versioner()
 }
 
 // Implements storage.Interface.
@@ -363,10 +352,8 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, f
 			listVal.Set(reflect.Append(listVal, reflect.ValueOf(object).Elem()))
 		}
 	}
-	if c.versioner != nil {
-		if err := c.versioner.UpdateList(listObj, readResourceVersion); err != nil {
-			return err
-		}
+	if err := versioner.UpdateList(listObj, readResourceVersion); err != nil {
+		return err
 	}
 	return nil
 }

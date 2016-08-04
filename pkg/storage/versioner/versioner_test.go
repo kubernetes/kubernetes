@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcd
+package versioner_test
 
 import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 )
 
 func TestObjectVersioner(t *testing.T) {
-	v := APIObjectVersioner{}
-	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "5"}}); err != nil || ver != 5 {
+	if ver, err := versioner.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "5"}}); err != nil || ver != 5 {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
-	if ver, err := v.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}); err == nil || ver != 0 {
+	if ver, err := versioner.ObjectResourceVersion(&storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}); err == nil || ver != 0 {
 		t.Errorf("unexpected version: %d %v", ver, err)
 	}
 	obj := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "a"}}
-	if err := v.UpdateObject(obj, 5); err != nil {
+	if err := versioner.UpdateObject(obj, 5); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
@@ -43,8 +43,6 @@ func TestObjectVersioner(t *testing.T) {
 func TestCompareResourceVersion(t *testing.T) {
 	five := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "5"}}
 	six := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "6"}}
-
-	versioner := APIObjectVersioner{}
 
 	if e, a := -1, versioner.CompareResourceVersion(five, six); e != a {
 		t.Errorf("expected %v got %v", e, a)

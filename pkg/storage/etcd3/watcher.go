@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/coreos/etcd/clientv3"
@@ -42,9 +43,8 @@ const (
 )
 
 type watcher struct {
-	client    *clientv3.Client
-	codec     runtime.Codec
-	versioner storage.Versioner
+	client *clientv3.Client
+	codec  runtime.Codec
 }
 
 // watchChan implements watch.Interface.
@@ -61,11 +61,10 @@ type watchChan struct {
 	errChan           chan error
 }
 
-func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner) *watcher {
+func newWatcher(client *clientv3.Client, codec runtime.Codec) *watcher {
 	return &watcher{
-		client:    client,
-		codec:     codec,
-		versioner: versioner,
+		client: client,
+		codec:  codec,
 	}
 }
 
@@ -213,7 +212,7 @@ func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 //   - For PUT, we can save current and previous objects into the value.
 //   - For DELETE, See https://github.com/coreos/etcd/issues/4620
 func (wc *watchChan) transform(e *event) (res *watch.Event) {
-	curObj, oldObj, err := prepareObjs(wc.ctx, e, wc.watcher.client, wc.watcher.codec, wc.watcher.versioner)
+	curObj, oldObj, err := prepareObjs(wc.ctx, e, wc.watcher.client, wc.watcher.codec)
 	if err != nil {
 		wc.sendError(err)
 		return nil
@@ -310,9 +309,9 @@ func (wc *watchChan) sendEvent(e *event) {
 	}
 }
 
-func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner) (curObj runtime.Object, oldObj runtime.Object, err error) {
+func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec runtime.Codec) (curObj runtime.Object, oldObj runtime.Object, err error) {
 	if !e.isDeleted {
-		curObj, err = decodeObj(codec, versioner, e.value, e.rev)
+		curObj, err = decodeObj(codec, e.value, e.rev)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -326,7 +325,7 @@ func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec r
 		// which it gets deleted.
 		// We assume old object is returned only in Deleted event. Users (e.g. cacher) need
 		// to have larger than previous rev to tell the ordering.
-		oldObj, err = decodeObj(codec, versioner, getResp.Kvs[0].Value, e.rev)
+		oldObj, err = decodeObj(codec, getResp.Kvs[0].Value, e.rev)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -334,7 +333,7 @@ func prepareObjs(ctx context.Context, e *event, client *clientv3.Client, codec r
 	return curObj, oldObj, nil
 }
 
-func decodeObj(codec runtime.Codec, versioner storage.Versioner, data []byte, rev int64) (runtime.Object, error) {
+func decodeObj(codec runtime.Codec, data []byte, rev int64) (runtime.Object, error) {
 	obj, err := runtime.Decode(codec, []byte(data))
 	if err != nil {
 		return nil, err

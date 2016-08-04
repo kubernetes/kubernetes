@@ -54,7 +54,6 @@ func newTestCacher(s storage.Interface) *storage.Cacher {
 	config := storage.CacherConfig{
 		CacheCapacity:  10,
 		Storage:        s,
-		Versioner:      etcdstorage.APIObjectVersioner{},
 		Type:           &api.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },

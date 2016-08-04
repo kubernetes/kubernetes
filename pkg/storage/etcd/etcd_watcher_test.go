@@ -34,8 +34,6 @@ import (
 	"golang.org/x/net/context"
 )
 
-var versioner = APIObjectVersioner{}
-
 // Implements etcdCache interface as empty methods (i.e. does not cache any objects)
 type fakeEtcdCache struct{}
 
@@ -140,7 +138,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 	for name, item := range table {
 		for _, action := range item.actions {
-			w := newEtcdWatcher(true, false, nil, &firstLetterIsB{}, codec, versioner, nil, &fakeEtcdCache{})
+			w := newEtcdWatcher(true, false, nil, &firstLetterIsB{}, codec, nil, &fakeEtcdCache{})
 			emitCalled := false
 			w.emit = func(event watch.Event) {
 				emitCalled = true
@@ -179,7 +177,7 @@ func TestWatchInterpretations(t *testing.T) {
 
 func TestWatchInterpretation_ResponseNotSet(t *testing.T) {
 	_, codec := testScheme(t)
-	w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+	w := newEtcdWatcher(false, false, nil, storage.Everything, codec, nil, &fakeEtcdCache{})
 	w.emit = func(e watch.Event) {
 		t.Errorf("Unexpected emit: %v", e)
 	}
@@ -194,7 +192,7 @@ func TestWatchInterpretation_ResponseNoNode(t *testing.T) {
 	_, codec := testScheme(t)
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -209,7 +207,7 @@ func TestWatchInterpretation_ResponseBadData(t *testing.T) {
 	_, codec := testScheme(t)
 	actions := []string{"create", "set", "compareAndSwap", "delete"}
 	for _, action := range actions {
-		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, versioner, nil, &fakeEtcdCache{})
+		w := newEtcdWatcher(false, false, nil, storage.Everything, codec, nil, &fakeEtcdCache{})
 		w.emit = func(e watch.Event) {
 			t.Errorf("Unexpected emit: %v", e)
 		}
@@ -235,7 +233,7 @@ func TestSendResultDeleteEventHaveLatestIndex(t *testing.T) {
 		return obj.(*api.Pod).Name != "bar"
 	}
 	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
-	w := newEtcdWatcher(false, false, nil, filter, codec, versioner, nil, &fakeEtcdCache{})
+	w := newEtcdWatcher(false, false, nil, filter, codec, nil, &fakeEtcdCache{})
 
 	eventChan := make(chan watch.Event, 1)
 	w.emit = func(e watch.Event) {

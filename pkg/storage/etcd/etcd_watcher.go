@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	"k8s.io/kubernetes/pkg/storage/versioner"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
@@ -78,11 +79,7 @@ func exceptKey(except string) includeFunc {
 
 // etcdWatcher converts a native etcd watch to a watch.Interface.
 type etcdWatcher struct {
-	encoding runtime.Codec
-	// Note that versioner is required for etcdWatcher to work correctly.
-	// There is no public constructor of it, so be careful when manipulating
-	// with it manually.
-	versioner storage.Versioner
+	encoding  runtime.Codec
 	transform TransformFunc
 
 	list    bool // If we're doing a recursive watch, should be true.
@@ -114,14 +111,12 @@ type etcdWatcher struct {
 const watchWaitDuration = 100 * time.Millisecond
 
 // newEtcdWatcher returns a new etcdWatcher; if list is true, watch sub-nodes.
-// The versioner must be able to handle the objects that transform creates.
 func newEtcdWatcher(
 	list bool, quorum bool, include includeFunc, filter storage.Filter,
-	encoding runtime.Codec, versioner storage.Versioner, transform TransformFunc,
+	encoding runtime.Codec, transform TransformFunc,
 	cache etcdCache) *etcdWatcher {
 	w := &etcdWatcher{
 		encoding:  encoding,
-		versioner: versioner,
 		transform: transform,
 		list:      list,
 		quorum:    quorum,
@@ -329,7 +324,7 @@ func (w *etcdWatcher) decodeObject(node *etcd.Node) (runtime.Object, error) {
 	}
 
 	// ensure resource version is set on the object we load from etcd
-	if err := w.versioner.UpdateObject(obj, node.ModifiedIndex); err != nil {
+	if err := versioner.UpdateObject(obj, node.ModifiedIndex); err != nil {
 		utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", node.ModifiedIndex, obj, err))
 	}
 
@@ -399,7 +394,7 @@ func (w *etcdWatcher) sendModify(res *etcd.Response) {
 	if res.PrevNode != nil && res.PrevNode.Value != "" {
 		// Ignore problems reading the old object.
 		if oldObj, err = w.decodeObject(res.PrevNode); err == nil {
-			if err := w.versioner.UpdateObject(oldObj, res.Node.ModifiedIndex); err != nil {
+			if err := versioner.UpdateObject(oldObj, res.Node.ModifiedIndex); err != nil {
 				utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", res.Node.ModifiedIndex, oldObj, err))
 			}
 			oldObjPasses = w.filter.Filter(oldObj)
