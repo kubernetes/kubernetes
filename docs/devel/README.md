@@ -48,7 +48,7 @@ Guide](../admin/README.md).
 
 * **Pull Request Process** ([pull-requests.md](pull-requests.md)): When and why pull requests are closed.
 
-* **Kubernetes On-Call Rotations** ([on-call-rotations.md](on-call-rotations.md)): Descriptions of on-call rotations for build and end-user support
+* **Kubernetes On-Call Rotations** ([on-call-rotations.md](on-call-rotations.md)): Descriptions of on-call rotations for build and end-user support.
 
 * **Faster PR reviews** ([faster_reviews.md](faster_reviews.md)): How to get faster PR reviews.
 
@@ -110,7 +110,7 @@ Guide](../admin/README.md).
 
 ## Building releases
 
-* **Making release notes** ([making-release-notes.md](making-release-notes.md)): Generating release nodes for a new release.
+* **Making release notes** ([making-release-notes.md](making-release-notes.md)): Generating release notes for a new release.
 
 * **Releasing Kubernetes** ([releasing.md](releasing.md)): How to create a Kubernetes release (as in version)
   and how the version information gets embedded into the built binaries.
