@@ -5,6 +5,7 @@ package fs
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/configs"
+	"github.com/opencontainers/runc/libcontainer/system"
 )
 
 type MemoryGroup struct {
@@ -33,12 +35,11 @@ func (s *MemoryGroup) Apply(d *cgroupData) (err error) {
 			}
 		}
 		// We have to set kernel memory here, as we can't change it once
-		// processes have been attached.
+		// processes have been attached to the cgroup.
 		if err := s.SetKernelMemory(path, d.config); err != nil {
 			return err
 		}
 	}
-
 	defer func() {
 		if err != nil {
 			os.RemoveAll(path)
@@ -55,9 +56,34 @@ func (s *MemoryGroup) Apply(d *cgroupData) (err error) {
 }
 
 func (s *MemoryGroup) SetKernelMemory(path string, cgroup *configs.Cgroup) error {
-	// This has to be done separately because it has special constraints (it
-	// can't be done after there are processes attached to the cgroup).
-	if cgroup.Resources.KernelMemory > 0 {
+	// This has to be done separately because it has special
+	// constraints (it can only be initialized before setting up a
+	// hierarchy or adding a task to the cgroups. However, if
+	// sucessfully initialized, it can be updated anytime afterwards)
+	if cgroup.Resources.KernelMemory != 0 {
+		kmemInitialized := false
+		// Is kmem.limit_in_bytes already set?
+		kmemValue, err := getCgroupParamUint(path, "memory.kmem.limit_in_bytes")
+		if err != nil {
+			return err
+		}
+		switch system.GetLongBit() {
+		case 32:
+			kmemInitialized = uint32(kmemValue) != uint32(math.MaxUint32)
+		case 64:
+			kmemInitialized = kmemValue != uint64(math.MaxUint64)
+		}
+		if !kmemInitialized {
+			// If there's already tasks in the cgroup, we can't change the limit either
+			tasks, err := getCgroupParamString(path, "tasks")
+			if err != nil {
+				return err
+			}
+			if tasks != "" {
+				return fmt.Errorf("cannot set kmem.limit_in_bytes after task have joined this cgroup")
+			}
+		}
+
 		if err := writeFile(path, "memory.kmem.limit_in_bytes", strconv.FormatInt(cgroup.Resources.KernelMemory, 10)); err != nil {
 			return err
 		}
@@ -110,6 +136,10 @@ func setMemoryAndSwap(path string, cgroup *configs.Cgroup) error {
 
 func (s *MemoryGroup) Set(path string, cgroup *configs.Cgroup) error {
 	if err := setMemoryAndSwap(path, cgroup); err != nil {
+		return err
+	}
+
+	if err := s.SetKernelMemory(path, cgroup); err != nil {
 		return err
 	}
 
