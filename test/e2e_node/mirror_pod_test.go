@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
 			By("create the static pod")
-			err := createStaticPod(context.PodConfigPath, staticPodName, ns, ImageRegistry[nginxImage], api.RestartPolicyAlways)
+			err := createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns, ImageRegistry[nginxImage], api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be running")
@@ -60,7 +60,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 
 			By("update the static pod container image")
 			image := ImageRegistry[pauseImage]
-			err = createStaticPod(context.PodConfigPath, staticPodName, ns, image, api.RestartPolicyAlways)
+			err = createStaticPod(framework.TestContext.ManifestPath, staticPodName, ns, image, api.RestartPolicyAlways)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to be updated")
@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("MirrorPod", func() {
 		})
 		AfterEach(func() {
 			By("delete the static pod")
-			err := deleteStaticPod(context.PodConfigPath, staticPodName, ns)
+			err := deleteStaticPod(framework.TestContext.ManifestPath, staticPodName, ns)
 			Expect(err).ShouldNot(HaveOccurred())
 
 			By("wait for the mirror pod to disappear")
