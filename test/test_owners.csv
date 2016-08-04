@@ -11,7 +11,7 @@ Cadvisor should be healthy on every node.,vishh,0
 Cassandra should create and scale cassandra,fabioy,1
 Celery-RabbitMQ should create and stop celery+rabbitmq servers,luxas,1
 Clean up pods on node kubelet should be able to delete 10 pods per node in 1m0s.,lavalamp,1
-Cluster level logging using Elasticsearch should check that logs from pods on all nodes are ingested into Elasticsearch,david-mcmahon,1
+Cluster level logging using Elasticsearch should check that logs from pods on all nodes are ingested into Elasticsearch,dchen1107,1
 Cluster size autoscaling Should scale cluster size based on cpu reservation,dchen1107,1
 Cluster size autoscaling Should scale cluster size based on cpu utilization,ixdy,1
 Cluster size autoscaling Should scale cluster size based on memory reservation,ghodss,1
@@ -83,7 +83,7 @@ Downward API should provide pod IP as an env var,nhlfr,0
 Downward API should provide pod name and namespace as env vars,nhlfr,0
 Downward API volume should provide container's cpu limit,smarterclayton,1
 Downward API volume should provide container's cpu request,krousey,1
-Downward API volume should provide container's memory limit,david-mcmahon,1
+Downward API volume should provide container's memory limit,krousey,1
 Downward API volume should provide container's memory request,mikedanese,1
 Downward API volume should provide labels and annotations files,nhlfr,0
 Downward API volume should provide podname as non-root with fsgroup,karlkfi,1
@@ -296,7 +296,7 @@ Pods should have their auto-restart back-off timer reset on image update,mikedan
 Pods should invoke init containers on a RestartAlways pod,cjcullen,1
 Pods should invoke init containers on a RestartNever pod,justinsb,1
 Pods should not start app containers and fail the pod if init containers fail on a RestartNever pod,maisem,0
-Pods should not start app containers if init containers fail on a RestartAlways pod,david-mcmahon,1
+Pods should not start app containers if init containers fail on a RestartAlways pod,dchen1107,1
 Pods should support remote command execution over websockets,madhusudancs,1
 Pods should support retrieving logs from the container over websockets,vishh,0
 "Port forwarding With a server that expects a client request should support a client that connects, sends data, and disconnects",sttts,0
@@ -325,7 +325,7 @@ ReplicaSet should serve a basic image on each replica with a public image,krouse
 ReplicationController should serve a basic image on each replica with a private image,jbeda,1
 ReplicationController should serve a basic image on each replica with a public image,krousey,1
 Resource usage of system containers should not exceed expected amount.,ncdc,1
-ResourceQuota should create a ResourceQuota and capture the life of a configMap.,david-mcmahon,1
+ResourceQuota should create a ResourceQuota and capture the life of a configMap.,timstclair,1
 ResourceQuota should create a ResourceQuota and capture the life of a persistent volume claim.,bgrant0607,1
 ResourceQuota should create a ResourceQuota and capture the life of a pod.,pmorie,1
 ResourceQuota should create a ResourceQuota and capture the life of a replication controller.,jdef,1
@@ -403,7 +403,7 @@ ThirdParty resources Simple Third Party creating/deleting thirdparty objects wor
 Ubernetes Lite should spread the pods of a replication controller across zones,quinton-hoole,0
 Ubernetes Lite should spread the pods of a service across zones,quinton-hoole,0
 Upgrade cluster upgrade should maintain a functioning cluster,girishkalele,1
-Upgrade cluster upgrade should maintain responsive services,david-mcmahon,1
+Upgrade cluster upgrade should maintain responsive services,mikedanese,1
 Upgrade master upgrade should maintain responsive services,mikedanese,1
 Upgrade node upgrade should maintain a functioning cluster,zmerlynn,1
 Upgrade node upgrade should maintain responsive services,childsb,1
@@ -424,7 +424,7 @@ Volumes Cinder should be mountable,cjcullen,1
 Volumes GlusterFS should be mountable,eparis,1
 Volumes NFS should be mountable,andyzheng0831,1
 Volumes PD should be mountable,caesarxuchao,1
-Volumes iSCSI should be mountable,david-mcmahon,1
+Volumes iSCSI should be mountable,jsafrane,1
 download_gcloud,kargakis,1
 gcp_resource_leak_check,derekwaynecarr,1
 hostDir should give a volume the correct mode,bgrant0607,1
@@ -456,7 +456,7 @@ k8s.io/kubernetes/contrib/mesos/pkg/election,vulpecula,1
 k8s.io/kubernetes/contrib/mesos/pkg/executor,brendandburns,1
 k8s.io/kubernetes/contrib/mesos/pkg/minion/tasks,hurf,1
 k8s.io/kubernetes/contrib/mesos/pkg/node,jdef,1
-k8s.io/kubernetes/contrib/mesos/pkg/offers,david-mcmahon,1
+k8s.io/kubernetes/contrib/mesos/pkg/offers,Q-Lee,1
 k8s.io/kubernetes/contrib/mesos/pkg/podutil,Q-Lee,1
 k8s.io/kubernetes/contrib/mesos/pkg/proc,apelisse,1
 k8s.io/kubernetes/contrib/mesos/pkg/queue,caesarxuchao,1
@@ -559,7 +559,7 @@ k8s.io/kubernetes/pkg/controller/job,soltysh,0
 k8s.io/kubernetes/pkg/controller/namespace,karlkfi,1
 k8s.io/kubernetes/pkg/controller/node,gmarek,0
 k8s.io/kubernetes/pkg/controller/persistentvolume,jsafrane,0
-k8s.io/kubernetes/pkg/controller/petset,david-mcmahon,1
+k8s.io/kubernetes/pkg/controller/petset,fgrzadkowski,1
 k8s.io/kubernetes/pkg/controller/podautoscaler,piosz,0
 k8s.io/kubernetes/pkg/controller/podautoscaler/metrics,piosz,0
 k8s.io/kubernetes/pkg/controller/podgc,jdef,1
@@ -601,7 +601,7 @@ k8s.io/kubernetes/pkg/kubelet/dockertools,deads2k,1
 k8s.io/kubernetes/pkg/kubelet/envvars,karlkfi,1
 k8s.io/kubernetes/pkg/kubelet/eviction,childsb,1
 k8s.io/kubernetes/pkg/kubelet/images,caesarxuchao,1
-k8s.io/kubernetes/pkg/kubelet/lifecycle,david-mcmahon,1
+k8s.io/kubernetes/pkg/kubelet/lifecycle,yujuhong,1
 k8s.io/kubernetes/pkg/kubelet/network,freehan,0
 k8s.io/kubernetes/pkg/kubelet/network/cni,freehan,0
 k8s.io/kubernetes/pkg/kubelet/network/exec,freehan,0
@@ -628,7 +628,7 @@ k8s.io/kubernetes/pkg/kubelet/volumemanager/reconciler,timstclair,1
 k8s.io/kubernetes/pkg/labels,ixdy,1
 k8s.io/kubernetes/pkg/master,fabioy,1
 k8s.io/kubernetes/pkg/probe/exec,bgrant0607,1
-k8s.io/kubernetes/pkg/probe/http,david-mcmahon,1
+k8s.io/kubernetes/pkg/probe/http,mtaufen,1
 k8s.io/kubernetes/pkg/probe/tcp,mtaufen,1
 k8s.io/kubernetes/pkg/proxy/config,ixdy,1
 k8s.io/kubernetes/pkg/proxy/iptables,freehan,0
@@ -663,7 +663,7 @@ k8s.io/kubernetes/pkg/registry/limitrange,apelisse,1
 k8s.io/kubernetes/pkg/registry/limitrange/etcd,zmerlynn,1
 k8s.io/kubernetes/pkg/registry/namespace,roberthbailey,1
 k8s.io/kubernetes/pkg/registry/namespace/etcd,justinsb,1
-k8s.io/kubernetes/pkg/registry/networkpolicy,david-mcmahon,1
+k8s.io/kubernetes/pkg/registry/networkpolicy,xiang90,1
 k8s.io/kubernetes/pkg/registry/networkpolicy/etcd,xiang90,1
 k8s.io/kubernetes/pkg/registry/node,krousey,1
 k8s.io/kubernetes/pkg/registry/node/etcd,kevin-wangzefeng,1
@@ -718,7 +718,7 @@ k8s.io/kubernetes/pkg/security/podsecuritypolicy/group,erictune,0
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux,erictune,0
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/user,erictune,0
 k8s.io/kubernetes/pkg/security/podsecuritypolicy/util,erictune,0
-k8s.io/kubernetes/pkg/securitycontext,david-mcmahon,1
+k8s.io/kubernetes/pkg/securitycontext,erictune,1
 k8s.io/kubernetes/pkg/serviceaccount,liggitt,0
 k8s.io/kubernetes/pkg/ssh,jbeda,1
 k8s.io/kubernetes/pkg/storage,xiang90,0
