@@ -47,7 +47,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
 	ad := operationexecutor.NewOperationExecutor(
 		fakeKubeClient, volumePluginMgr)
-	nodeInformer := informers.CreateSharedNodeIndexInformer(
+	nodeInformer := informers.NewNodeInformer(
 		fakeKubeClient, resyncPeriod)
 	nsu := statusupdater.NewNodeStatusUpdater(
 		fakeKubeClient, nodeInformer, asw)

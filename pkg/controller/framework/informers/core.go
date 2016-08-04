@@ -22,8 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 )
 
 // PodInformer is type of SharedIndexInformer which watches and lists all pods.
@@ -43,26 +41,12 @@ func (f *podInformer) Informer() framework.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerObj := &api.Pod{}
-	informerType := reflect.TypeOf(informerObj)
+	informerType := reflect.TypeOf(&api.Pod{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
 	}
-
-	informer = framework.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.client.Core().Pods(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.client.Core().Pods(api.NamespaceAll).Watch(options)
-			},
-		},
-		informerObj,
-		f.defaultResync,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	)
+	informer = NewPodInformer(f.client, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -92,25 +76,13 @@ type namespaceInformer struct {
 func (f *namespaceInformer) Informer() framework.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	informerObj := &api.Namespace{}
-	informerType := reflect.TypeOf(informerObj)
+
+	informerType := reflect.TypeOf(&api.Namespace{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
 	}
-	informer = framework.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.client.Core().Namespaces().List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.client.Core().Namespaces().Watch(options)
-			},
-		},
-		informerObj,
-		f.defaultResync,
-		cache.Indexers{},
-	)
+	informer = NewNamespaceInformer(f.client, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -141,26 +113,12 @@ func (f *nodeInformer) Informer() framework.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerObj := &api.Node{}
-	informerType := reflect.TypeOf(informerObj)
+	informerType := reflect.TypeOf(&api.Node{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
 	}
-
-	informer = framework.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.client.Core().Nodes().List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.client.Core().Nodes().Watch(options)
-			},
-		},
-		informerObj,
-		f.defaultResync,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	)
+	informer = NewNodeInformer(f.client, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -191,26 +149,12 @@ func (f *pvcInformer) Informer() framework.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerObj := &api.PersistentVolumeClaim{}
-	informerType := reflect.TypeOf(informerObj)
+	informerType := reflect.TypeOf(&api.PersistentVolumeClaim{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
 	}
-
-	informer = framework.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.client.Core().PersistentVolumeClaims(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.client.Core().PersistentVolumeClaims(api.NamespaceAll).Watch(options)
-			},
-		},
-		informerObj,
-		f.defaultResync,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	)
+	informer = NewPVCInformer(f.client, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
@@ -241,26 +185,12 @@ func (f *pvInformer) Informer() framework.SharedIndexInformer {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	informerObj := &api.PersistentVolume{}
-	informerType := reflect.TypeOf(informerObj)
+	informerType := reflect.TypeOf(&api.PersistentVolume{})
 	informer, exists := f.informers[informerType]
 	if exists {
 		return informer
 	}
-
-	informer = framework.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return f.client.Core().PersistentVolumes().List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return f.client.Core().PersistentVolumes().Watch(options)
-			},
-		},
-		informerObj,
-		f.defaultResync,
-		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-	)
+	informer = NewPVInformer(f.client, f.defaultResync)
 	f.informers[informerType] = informer
 
 	return informer
