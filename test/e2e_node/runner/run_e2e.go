@@ -119,6 +119,12 @@ func main() {
 	if *hosts == "" && *imageConfigFile == "" && *images == "" {
 		glog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
 	}
+	var err error
+	computeService, err = getComputeClient()
+	if err != nil {
+		glog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
+	}
+
 	gceImages := &internalImageConfig{
 		images: make(map[string]internalGCEImage),
 	}
@@ -133,7 +139,7 @@ func main() {
 		if err != nil {
 			glog.Fatalf("Could not parse image config file: %v", err)
 		}
-		for key, imageConfig := range externalImageConfig.Images {
+		for _, imageConfig := range externalImageConfig.Images {
 			var images []string
 			if imageConfig.ImageRegex != "" && imageConfig.Image == "" {
 				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.Project, imageConfig.PreviousImages)
@@ -200,12 +206,6 @@ func main() {
 
 	go arc.getArchive()
 	defer arc.deleteArchive()
-
-	var err error
-	computeService, err = getComputeClient()
-	if err != nil {
-		glog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
-	}
 
 	results := make(chan *TestResult)
 	running := 0
@@ -329,7 +329,7 @@ type imageObj struct {
 }
 
 func (io imageObj) string() string {
-	return fmt.Sprintf("%q created % %q", io.name, io.creationTime.String())
+	return fmt.Sprintf("%q created %q", io.name, io.creationTime.String())
 }
 
 type byCreationTime []imageObj

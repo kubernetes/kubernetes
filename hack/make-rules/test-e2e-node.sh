@@ -31,17 +31,20 @@ artifacts=${ARTIFACTS:-"/tmp/_artifacts"}
 remote=${REMOTE:-"false"}
 images=${IMAGES:-""}
 hosts=${HOSTS:-""}
+metadata=${INSTANCE_METADATA:-""}
+gci_image=$(gcloud compute images list --project google-containers \
+    --no-standard-images --regexp="gci-dev.*" --format="table[no-heading](name)")
 if [[ $hosts == "" && $images == "" ]]; then
-  images="e2e-node-containervm-v20160321-image"
+  images=$gci_image
+  metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml"
 fi
-image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
+image_project=${IMAGE_PROJECT:-"google-containers"}
 instance_prefix=${INSTANCE_PREFIX:-"test"}
 cleanup=${CLEANUP:-"true"}
 delete_instances=${DELETE_INSTANCES:-"false"}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
 list_images=${LIST_IMAGES:-"false"}
 test_args=${TEST_ARGS:-""}
-metadata=${INSTANCE_METADATA:-""}
 
 if  [[ $list_images == "true" ]]; then
   gcloud compute images list --project="${image_project}" | grep "e2e-node"
@@ -126,7 +129,7 @@ if [ $remote = true ] ; then
   echo "Ginkgo Flags: $ginkgoflags"
   echo "Instance Metadata: $metadata"
   # Invoke the runner
-  go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
+  go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
     --zone="$zone" --project="$project"  \
     --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \

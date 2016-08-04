@@ -2,9 +2,8 @@
 
 runcmd:
   - mount /tmp /tmp -o remount,exec,suid
-  - ETCD_VERSION=v3.0.3
-  - curl -L https://github.com/coreos/etcd/releases/download/${ETCD_VERSION}/etcd-${ETCD_VERSION}-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+  - etcd_version=v2.2.5
+  - curl -L https://github.com/coreos/etcd/releases/download/${etcd_version}/etcd-${etcd_version}-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
   - tar xzvf /tmp/etcd.tar.gz -C /tmp
-  - cp /tmp/etcd-${ETCD_VERSION}-linux-amd64/etcd* /tmp/
-  - rm -rf /tmp/etcd-${ETCD_VERSION}-linux-amd64/
-  - usermod -a -G docker jenkins
+  - cp  /tmp/etcd-${etcd_version}-linux-amd64/etcd* /tmp/
+  - rm -rf /tmp/etcd-${etcd_version}-linux-amd64/

@@ -18,6 +18,7 @@ package e2e_node
 
 import (
 	"os/exec"
+	"os/user"
 	"time"
 
 	"github.com/golang/glog"
@@ -66,6 +67,10 @@ var NoPullImageRegistry = map[int]string{
 
 // Pre-fetch all images tests depend on so that we don't fail in an actual test
 func PrePullAllImages() error {
+	usr, err := user.Current()
+	if err != nil {
+		return err
+	}
 	for _, image := range ImageRegistry {
 		var (
 			err    error
@@ -78,8 +83,8 @@ func PrePullAllImages() error {
 			if output, err = exec.Command("docker", "pull", image).CombinedOutput(); err == nil {
 				break
 			}
-			glog.Warningf("Failed to pull %s, retrying in %s (%d of %d): %v",
-				image, imagePullRetryDelay.String(), i+1, maxImagePullRetries, err)
+			glog.Warningf("Failed to pull %s as user %q, retrying in %s (%d of %d): %v",
+				image, usr.Username, imagePullRetryDelay.String(), i+1, maxImagePullRetries, err)
 		}
 		if err != nil {
 			glog.Warningf("Could not pre-pull image %s %v output:  %s", image, err, output)
