@@ -192,6 +192,12 @@ func init() {
 		Convert_api_NodeStatus_To_v1_NodeStatus,
 		Convert_v1_NodeSystemInfo_To_api_NodeSystemInfo,
 		Convert_api_NodeSystemInfo_To_v1_NodeSystemInfo,
+		Convert_v1_Notification_To_api_Notification,
+		Convert_api_Notification_To_v1_Notification,
+		Convert_v1_Notify_To_api_Notify,
+		Convert_api_Notify_To_v1_Notify,
+		Convert_v1_NotifySpec_To_api_NotifySpec,
+		Convert_api_NotifySpec_To_v1_NotifySpec,
 		Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector,
 		Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector,
 		Convert_v1_ObjectMeta_To_api_ObjectMeta,
@@ -1023,6 +1029,17 @@ func autoConvert_v1_Container_To_api_Container(in *Container, out *api.Container
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
+	if in.Notifications != nil {
+		in, out := &in.Notifications, &out.Notifications
+		*out = make([]api.Notification, len(*in))
+		for i := range *in {
+			if err := Convert_v1_Notification_To_api_Notification(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Notifications = nil
+	}
 	return nil
 }
 
@@ -1113,6 +1130,17 @@ func autoConvert_api_Container_To_v1_Container(in *api.Container, out *Container
 	out.Stdin = in.Stdin
 	out.StdinOnce = in.StdinOnce
 	out.TTY = in.TTY
+	if in.Notifications != nil {
+		in, out := &in.Notifications, &out.Notifications
+		*out = make([]Notification, len(*in))
+		for i := range *in {
+			if err := Convert_api_Notification_To_v1_Notification(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Notifications = nil
+	}
 	return nil
 }
 
@@ -3610,6 +3638,82 @@ func autoConvert_api_NodeSystemInfo_To_v1_NodeSystemInfo(in *api.NodeSystemInfo,
 
 func Convert_api_NodeSystemInfo_To_v1_NodeSystemInfo(in *api.NodeSystemInfo, out *NodeSystemInfo, s conversion.Scope) error {
 	return autoConvert_api_NodeSystemInfo_To_v1_NodeSystemInfo(in, out, s)
+}
+
+func autoConvert_v1_Notification_To_api_Notification(in *Notification, out *api.Notification, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Type = in.Type
+	out.Signal = in.Signal
+	return nil
+}
+
+func Convert_v1_Notification_To_api_Notification(in *Notification, out *api.Notification, s conversion.Scope) error {
+	return autoConvert_v1_Notification_To_api_Notification(in, out, s)
+}
+
+func autoConvert_api_Notification_To_v1_Notification(in *api.Notification, out *Notification, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Type = in.Type
+	out.Signal = in.Signal
+	return nil
+}
+
+func Convert_api_Notification_To_v1_Notification(in *api.Notification, out *Notification, s conversion.Scope) error {
+	return autoConvert_api_Notification_To_v1_Notification(in, out, s)
+}
+
+func autoConvert_v1_Notify_To_api_Notify(in *Notify, out *api.Notify, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_ObjectMeta_To_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_v1_NotifySpec_To_api_NotifySpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1_Notify_To_api_Notify(in *Notify, out *api.Notify, s conversion.Scope) error {
+	return autoConvert_v1_Notify_To_api_Notify(in, out, s)
+}
+
+func autoConvert_api_Notify_To_v1_Notify(in *api.Notify, out *Notify, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_ObjectMeta_To_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
+	if err := Convert_api_NotifySpec_To_v1_NotifySpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_api_Notify_To_v1_Notify(in *api.Notify, out *Notify, s conversion.Scope) error {
+	return autoConvert_api_Notify_To_v1_Notify(in, out, s)
+}
+
+func autoConvert_v1_NotifySpec_To_api_NotifySpec(in *NotifySpec, out *api.NotifySpec, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Container = in.Container
+	return nil
+}
+
+func Convert_v1_NotifySpec_To_api_NotifySpec(in *NotifySpec, out *api.NotifySpec, s conversion.Scope) error {
+	return autoConvert_v1_NotifySpec_To_api_NotifySpec(in, out, s)
+}
+
+func autoConvert_api_NotifySpec_To_v1_NotifySpec(in *api.NotifySpec, out *NotifySpec, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Container = in.Container
+	return nil
+}
+
+func Convert_api_NotifySpec_To_v1_NotifySpec(in *api.NotifySpec, out *NotifySpec, s conversion.Scope) error {
+	return autoConvert_api_NotifySpec_To_v1_NotifySpec(in, out, s)
 }
 
 func autoConvert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(in *ObjectFieldSelector, out *api.ObjectFieldSelector, s conversion.Scope) error {

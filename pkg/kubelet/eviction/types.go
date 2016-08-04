@@ -98,14 +98,14 @@ type DiskInfoProvider interface {
 	HasDedicatedImageFs() (bool, error)
 }
 
-// KillPodFunc kills a pod.
+// StopPodFunc kills a pod.
 // The pod status is updated, and then it is killed with the specified grace period.
 // This function must block until either the pod is killed or an error is encountered.
 // Arguments:
 // pod - the pod to kill
 // status - the desired status to associate with the pod (i.e. why its killed)
 // gracePeriodOverride - the grace period override to use instead of what is on the pod spec
-type KillPodFunc func(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error
+type StopPodFunc func(pod *api.Pod, status api.PodStatus, gracePeriodOverride *int64) error
 
 // ActivePodsFunc returns pods bound to the kubelet that are active (i.e. non-terminal state)
 type ActivePodsFunc func() []*api.Pod

@@ -47,6 +47,7 @@ type PodStorage struct {
 	Exec        *podrest.ExecREST
 	Attach      *podrest.AttachREST
 	PortForward *podrest.PortForwardREST
+	Notify      *podrest.NotifyREST
 }
 
 // REST implements a RESTStorage for pods against etcd
@@ -106,6 +107,7 @@ func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTr
 		Exec:        &podrest.ExecREST{Store: store, KubeletConn: k},
 		Attach:      &podrest.AttachREST{Store: store, KubeletConn: k},
 		PortForward: &podrest.PortForwardREST{Store: store, KubeletConn: k},
+		Notify:      &podrest.NotifyREST{Store: store},
 	}
 }
 

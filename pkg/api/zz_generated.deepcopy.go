@@ -115,6 +115,9 @@ func init() {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeSpec, InType: reflect.TypeOf(func() *NodeSpec { var x *NodeSpec; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeStatus, InType: reflect.TypeOf(func() *NodeStatus { var x *NodeStatus; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NodeSystemInfo, InType: reflect.TypeOf(func() *NodeSystemInfo { var x *NodeSystemInfo; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Notification, InType: reflect.TypeOf(func() *Notification { var x *Notification; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Notify, InType: reflect.TypeOf(func() *Notify { var x *Notify; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_NotifySpec, InType: reflect.TypeOf(func() *NotifySpec { var x *NotifySpec; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectFieldSelector, InType: reflect.TypeOf(func() *ObjectFieldSelector { var x *ObjectFieldSelector; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectMeta, InType: reflect.TypeOf(func() *ObjectMeta { var x *ObjectMeta; return x }())},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ObjectReference, InType: reflect.TypeOf(func() *ObjectReference { var x *ObjectReference; return x }())},
@@ -573,6 +576,15 @@ func DeepCopy_api_Container(in interface{}, out interface{}, c *conversion.Clone
 		out.Stdin = in.Stdin
 		out.StdinOnce = in.StdinOnce
 		out.TTY = in.TTY
+		if in.Notifications != nil {
+			in, out := &in.Notifications, &out.Notifications
+			*out = make([]Notification, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
+		} else {
+			out.Notifications = nil
+		}
 		return nil
 	}
 }
@@ -1830,6 +1842,40 @@ func DeepCopy_api_NodeSystemInfo(in interface{}, out interface{}, c *conversion.
 		out.KubeProxyVersion = in.KubeProxyVersion
 		out.OperatingSystem = in.OperatingSystem
 		out.Architecture = in.Architecture
+		return nil
+	}
+}
+
+func DeepCopy_api_Notification(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Notification)
+		out := out.(*Notification)
+		out.Name = in.Name
+		out.Type = in.Type
+		out.Signal = in.Signal
+		return nil
+	}
+}
+
+func DeepCopy_api_Notify(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Notify)
+		out := out.(*Notify)
+		out.TypeMeta = in.TypeMeta
+		if err := DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+			return err
+		}
+		out.Spec = in.Spec
+		return nil
+	}
+}
+
+func DeepCopy_api_NotifySpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*NotifySpec)
+		out := out.(*NotifySpec)
+		out.Name = in.Name
+		out.Container = in.Container
 		return nil
 	}
 }

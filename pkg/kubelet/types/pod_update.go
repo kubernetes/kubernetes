@@ -112,9 +112,9 @@ const (
 	SyncPodUpdate
 	// SyncPodCreate is when the pod is created from source
 	SyncPodCreate
-	// SyncPodKill is when the pod is killed based on a trigger internal to the kubelet for eviction.
-	// If a SyncPodKill request is made to pod workers, the request is never dropped, and will always be processed.
-	SyncPodKill
+	// SyncPodStop is when the pod is stopped based on a trigger internal to the kubelet for eviction.
+	// If a SyncPodStop request is made to pod workers, the request is never dropped, and will always be processed.
+	SyncPodStop
 )
 
 func (sp SyncPodType) String() string {
@@ -125,8 +125,8 @@ func (sp SyncPodType) String() string {
 		return "update"
 	case SyncPodSync:
 		return "sync"
-	case SyncPodKill:
-		return "kill"
+	case SyncPodStop:
+		return "stop"
 	default:
 		return "unknown"
 	}

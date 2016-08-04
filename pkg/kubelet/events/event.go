@@ -22,7 +22,7 @@ const (
 	StartedContainer        = "Started"
 	FailedToCreateContainer = "Failed"
 	FailedToStartContainer  = "Failed"
-	KillingContainer        = "Killing"
+	StoppingContainer       = "Stopping"
 	BackOffStartContainer   = "BackOff"
 
 	// Image event reason list

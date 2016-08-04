@@ -50,7 +50,7 @@ func (f *fakePodWorkers) UpdatePod(options *UpdatePodOptions) {
 		pod:            options.Pod,
 		podStatus:      status,
 		updateType:     options.UpdateType,
-		killPodOptions: options.KillPodOptions,
+		stopPodOptions: options.StopPodOptions,
 	}); err != nil {
 		f.t.Errorf("Unexpected error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestUpdatePod(t *testing.T) {
 	}
 }
 
-func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
+func TestUpdatePodDoesNotForgetSyncPodStop(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
 	numPods := 20
 	for i := 0; i < numPods; i++ {
@@ -173,7 +173,7 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 		})
 		podWorkers.UpdatePod(&UpdatePodOptions{
 			Pod:        pod,
-			UpdateType: kubetypes.SyncPodKill,
+			UpdateType: kubetypes.SyncPodStop,
 		})
 		podWorkers.UpdatePod(&UpdatePodOptions{
 			Pod:        pod,
@@ -187,7 +187,7 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 	}
 	for i := 0; i < numPods; i++ {
 		uid := types.UID(i)
-		// each pod should be processed two times (create, kill, but not update)
+		// each pod should be processed two times (create, stop, but not update)
 		syncPodRecords := processed[uid]
 		if len(syncPodRecords) < 2 {
 			t.Errorf("Pod %v processed %v times, but expected at least 2", i, len(syncPodRecords))
@@ -196,8 +196,8 @@ func TestUpdatePodDoesNotForgetSyncPodKill(t *testing.T) {
 		if syncPodRecords[0].updateType != kubetypes.SyncPodCreate {
 			t.Errorf("Pod %v event was %v, but expected %v", i, syncPodRecords[0].updateType, kubetypes.SyncPodCreate)
 		}
-		if syncPodRecords[1].updateType != kubetypes.SyncPodKill {
-			t.Errorf("Pod %v event was %v, but expected %v", i, syncPodRecords[1].updateType, kubetypes.SyncPodKill)
+		if syncPodRecords[1].updateType != kubetypes.SyncPodStop {
+			t.Errorf("Pod %v event was %v, but expected %v", i, syncPodRecords[1].updateType, kubetypes.SyncPodStop)
 		}
 	}
 }
@@ -329,13 +329,13 @@ func TestFakePodWorkers(t *testing.T) {
 	}
 }
 
-// TestKillPodNowFunc tests the blocking kill pod function works with pod workers as expected.
-func TestKillPodNowFunc(t *testing.T) {
+// TestStopPodNowFunc tests the blocking stop pod function works with pod workers as expected.
+func TestStopPodNowFunc(t *testing.T) {
 	podWorkers, processed := createPodWorkers()
-	killPodFunc := killPodNow(podWorkers)
+	stopPodFunc := stopPodNow(podWorkers)
 	pod := newPod("test", "test")
 	gracePeriodOverride := int64(0)
-	err := killPodFunc(pod, api.PodStatus{Phase: api.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)
+	err := stopPodFunc(pod, api.PodStatus{Phase: api.PodFailed, Reason: "reason", Message: "message"}, &gracePeriodOverride)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -347,7 +347,7 @@ func TestKillPodNowFunc(t *testing.T) {
 	if len(syncPodRecords) != 1 {
 		t.Errorf("Pod processed %v times, but expected %v", len(syncPodRecords), 1)
 	}
-	if syncPodRecords[0].updateType != kubetypes.SyncPodKill {
-		t.Errorf("Pod update type was %v, but expected %v", syncPodRecords[0].updateType, kubetypes.SyncPodKill)
+	if syncPodRecords[0].updateType != kubetypes.SyncPodStop {
+		t.Errorf("Pod update type was %v, but expected %v", syncPodRecords[0].updateType, kubetypes.SyncPodStop)
 	}
 }

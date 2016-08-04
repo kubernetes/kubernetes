@@ -1103,6 +1103,22 @@ const (
 	TerminationMessagePathDefault string = "/dev/termination-log"
 )
 
+type Notification struct {
+	// User-friendly name of notification.
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// Type of notification
+	Type NotificationType `json:"type" protobuf:"bytes,2,opt,name=type,casttype=NotificationType"`
+	// POSIX signal name; used only when type is "signal"
+	Signal string `json:"signal,omitempty" protobuf:"bytes,3,opt,name=signal"`
+}
+
+// A notification type is the set of types that can be used in a notification.
+type NotificationType string
+
+const (
+	NotificationSignal NotificationType = "signal"
+)
+
 // A single application container that you want to run within a pod.
 type Container struct {
 	// Name of the container specified as a DNS_LABEL.
@@ -1200,6 +1216,8 @@ type Container struct {
 	// Whether this container should allocate a TTY for itself, also requires 'stdin' to be true.
 	// Default is false.
 	TTY bool `json:"tty,omitempty" protobuf:"varint,18,opt,name=tty"`
+	// List of notifications defined in the container.
+	Notifications []Notification `json:"notifications,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,19,rep,name=notifications"`
 }
 
 // Handler defines a specific action that should be taken
@@ -3353,6 +3371,19 @@ type RangeAllocation struct {
 	Range string `json:"range" protobuf:"bytes,2,opt,name=range"`
 	// Data is a bit array containing all allocated addresses in the previous segment.
 	Data []byte `json:"data" protobuf:"bytes,3,opt,name=data"`
+}
+
+// NotifySpec describes the attributes of a notify subresource.
+type NotifySpec struct {
+	Name      string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	Container string `json:"container" protobuf:"bytes,2,opt,name=container"`
+}
+
+// Notify represents a notification request for a pod.
+type Notify struct {
+	unversioned.TypeMeta `json:",inline"`
+	ObjectMeta           `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+	Spec                 NotifySpec `json:"spec,omitempty" protobuf:"bytes,2,opt,name=spec"`
 }
 
 const (

@@ -36,7 +36,7 @@ var (
 
 var (
 	ErrRunContainer     = errors.New("RunContainerError")
-	ErrKillContainer    = errors.New("KillContainerError")
+	ErrStopContainer    = errors.New("StopContainerError")
 	ErrVerifyNonRoot    = errors.New("VerifyNonRootError")
 	ErrRunInitContainer = errors.New("RunInitContainerError")
 )
@@ -46,13 +46,13 @@ var (
 	ErrTeardownNetwork = errors.New("TeardownNetworkError")
 )
 
-// SyncAction indicates different kind of actions in SyncPod() and KillPod(). Now there are only actions
+// SyncAction indicates different kind of actions in SyncPod() and StopPod(). Now there are only actions
 // about start/kill container and setup/teardown network.
 type SyncAction string
 
 const (
 	StartContainer  SyncAction = "StartContainer"
-	KillContainer   SyncAction = "KillContainer"
+	StopContainer   SyncAction = "StopContainer"
 	SetupNetwork    SyncAction = "SetupNetwork"
 	TeardownNetwork SyncAction = "TeardownNetwork"
 	InitContainer   SyncAction = "InitContainer"
@@ -82,11 +82,11 @@ func (r *SyncResult) Fail(err error, msg string) {
 	r.Error, r.Message = err, msg
 }
 
-// PodSyncResult is the summary result of SyncPod() and KillPod()
+// PodSyncResult is the summary result of SyncPod() and StopPod()
 type PodSyncResult struct {
 	// Result of different sync actions
 	SyncResults []*SyncResult
-	// Error encountered in SyncPod() and KillPod() that is not already included in SyncResults
+	// Error encountered in SyncPod() and StopPod() that is not already included in SyncResults
 	SyncError error
 }
 
@@ -101,7 +101,7 @@ func (p *PodSyncResult) AddPodSyncResult(result PodSyncResult) {
 	p.SyncError = result.SyncError
 }
 
-// Fail fails the PodSyncResult with an error occurred in SyncPod() and KillPod() itself
+// Fail fails the PodSyncResult with an error occurred in SyncPod() and StopPod() itself
 func (p *PodSyncResult) Fail(err error) {
 	p.SyncError = err
 }

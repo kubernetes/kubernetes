@@ -427,6 +427,15 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return fmt.Errorf("container not stopped")
 }
 
+// KillContainer is a test-spy implementation of DockerInterface.KillContainer.
+// It adds an entry "kill" to the internal method call record.
+func (f *FakeDockerClient) KillContainer(id, signal string) error {
+	f.Lock()
+	defer f.Unlock()
+	f.called = append(f.called, calledDetail{name: "kill"})
+	return f.popError("kill")
+}
+
 // Logs is a test-spy implementation of DockerInterface.Logs.
 // It adds an entry "logs" to the internal method call record.
 func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions, sopts StreamOptions) error {

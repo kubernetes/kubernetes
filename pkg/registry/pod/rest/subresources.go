@@ -183,6 +183,24 @@ func (r *PortForwardREST) Connect(ctx api.Context, name string, opts runtime.Obj
 	return newThrottledUpgradeAwareProxyHandler(location, transport, false, true, responder), nil
 }
 
+type NotifyREST struct {
+	Store *registry.Store
+}
+
+var _ = rest.NamedCreater(&NotifyREST{})
+
+func (r *NotifyREST) New() runtime.Object {
+	return &api.Notify{}
+}
+
+func (r *NotifyREST) Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error) {
+	err := pod.NotifyPod(r.Store, ctx, name, obj)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
 func newThrottledUpgradeAwareProxyHandler(location *url.URL, transport http.RoundTripper, wrapTransport, upgradeRequired bool, responder rest.Responder) *genericrest.UpgradeAwareProxyHandler {
 	handler := genericrest.NewUpgradeAwareProxyHandler(location, transport, wrapTransport, upgradeRequired, responder)
 	handler.MaxBytesPerSec = capabilities.Get().PerConnectionBandwidthLimitBytesPerSec

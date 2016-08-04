@@ -28,6 +28,9 @@ const (
 	// The annotation value is a string specifying the hostname to be used for the pod e.g 'my-webserver-1'
 	PodHostnameAnnotation = "pod.beta.kubernetes.io/hostname"
 
+	PodNotificationsAnnotation        = "pod.alpha.kubernetes.io/notifications"
+	PodPendingNotificationsAnnotation = "pod.alpha.kubernetes.io/pending-notifications"
+
 	// TODO: to be de!eted after v1.3 is released. PodSpec has a dedicated Subdomain field.
 	// The annotation value is a string specifying the subdomain e.g. "my-web-service"
 	// If specified, on the the pod itself, "<hostname>.my-web-service.<namespace>.svc.<cluster domain>" would resolve to
@@ -36,6 +39,19 @@ const (
 	// <hostname>.my-web-service.<namespace>.svc.<cluster domain>" would be resolved by the cluster DNS Server.
 	PodSubdomainAnnotation = "pod.beta.kubernetes.io/subdomain"
 )
+
+type PodNotification struct {
+	Name   string
+	Type   api.NotificationType
+	Signal string
+}
+
+type PodPendingNotification struct {
+	Name      string
+	Type      api.NotificationType
+	Signal    string
+	Container string
+}
 
 // FindPort locates the container port for the given pod and portName.  If the
 // targetPort is a number, use that.  If the targetPort is a string, look that
@@ -58,4 +74,14 @@ func FindPort(pod *api.Pod, svcPort *api.ServicePort) (int, error) {
 	}
 
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
+}
+
+// FindContainer returns the container for the given pod and containerContainerName.
+func FindContainer(pod *api.Pod, containerName string) (*api.Container, error) {
+	for _, c := range pod.Spec.Containers {
+		if c.Name == containerName {
+			return &c, nil
+		}
+	}
+	return nil, fmt.Errorf("no suitable container for manifest: %s", pod.UID)
 }
