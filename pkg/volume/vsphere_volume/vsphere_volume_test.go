@@ -58,44 +58,10 @@ func TestCanSupport(t *testing.T) {
 }
 
 type fakePDManager struct {
-	attachCalled bool
-	detachCalled bool
 }
 
 func getFakeDeviceName(host volume.VolumeHost, volPath string) string {
 	return path.Join(host.GetPluginDir(vsphereVolumePluginName), "device", volPath)
-}
-
-func (fake *fakePDManager) AttachDisk(b *vsphereVolumeMounter, globalPDPath string) error {
-	fakeDeviceName := getFakeDeviceName(b.plugin.host, b.volPath)
-	err := os.MkdirAll(fakeDeviceName, 0750)
-	if err != nil {
-		return err
-	}
-	fake.attachCalled = true
-	// Simulate the global mount so that the fakeMounter returns the
-	// expected number of mounts for the attached disk.
-	err = b.mounter.Mount(fakeDeviceName, globalPDPath, "", []string{"bind"})
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (fake *fakePDManager) DetachDisk(v *vsphereVolumeUnmounter) error {
-	globalPath := makeGlobalPDPath(v.plugin.host, v.volPath)
-	fakeDeviceName := getFakeDeviceName(v.plugin.host, v.volPath)
-	err := v.mounter.Unmount(globalPath)
-	if err != nil {
-		return err
-	}
-	// "Detach" the fake "device"
-	err = os.RemoveAll(fakeDeviceName)
-	if err != nil {
-		return err
-	}
-	fake.detachCalled = true
-	return nil
 }
 
 func (fake *fakePDManager) CreateVolume(v *vsphereVolumeProvisioner) (vmDiskPath string, volumeSizeKB int, err error) {
@@ -156,10 +122,6 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Expected success, got: %v", err)
 	}
 
-	if !fakeManager.attachCalled {
-		t.Errorf("Attach watch not called")
-	}
-
 	// Test Unmounter
 	fakeManager = &fakePDManager{}
 	unmounter, err := plug.(*vsphereVolumePlugin).newUnmounterInternal("vol1", types.UID("poduid"), fakeManager, fakeMounter)
@@ -177,9 +139,6 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("TearDown() failed, volume path still exists: %s", path)
 	} else if !os.IsNotExist(err) {
 		t.Errorf("SetUp() failed: %v", err)
-	}
-	if !fakeManager.detachCalled {
-		t.Errorf("Detach watch not called")
 	}
 
 	// Test Provisioner
