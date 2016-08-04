@@ -796,6 +796,82 @@ func TestValidateIngress(t *testing.T) {
 	errorCases[badPathErr] = badRegexPath
 	errorCases[badHostIPErr] = badHostIP
 
+	wildcardHost := "foo.*.bar.com"
+	badWildcard := newValid()
+	badWildcard.Spec.Rules[0].Host = wildcardHost
+	badWildcardErr := fmt.Sprintf("spec.rules[0].host: Invalid value: '%v'", wildcardHost)
+	errorCases[badWildcardErr] = badWildcard
+
+	for k, v := range errorCases {
+		errs := ValidateIngress(&v)
+		if len(errs) == 0 {
+			t.Errorf("expected failure for %q", k)
+		} else {
+			s := strings.Split(k, ":")
+			err := errs[0]
+			if err.Field != s[0] || !strings.Contains(err.Error(), s[1]) {
+				t.Errorf("unexpected error: %q, expected: %q", err, k)
+			}
+		}
+	}
+}
+
+func TestValidateIngressTLS(t *testing.T) {
+	defaultBackend := extensions.IngressBackend{
+		ServiceName: "default-backend",
+		ServicePort: intstr.FromInt(80),
+	}
+
+	newValid := func() extensions.Ingress {
+		return extensions.Ingress{
+			ObjectMeta: api.ObjectMeta{
+				Name:      "foo",
+				Namespace: api.NamespaceDefault,
+			},
+			Spec: extensions.IngressSpec{
+				Backend: &extensions.IngressBackend{
+					ServiceName: "default-backend",
+					ServicePort: intstr.FromInt(80),
+				},
+				Rules: []extensions.IngressRule{
+					{
+						Host: "foo.bar.com",
+						IngressRuleValue: extensions.IngressRuleValue{
+							HTTP: &extensions.HTTPIngressRuleValue{
+								Paths: []extensions.HTTPIngressPath{
+									{
+										Path:    "/foo",
+										Backend: defaultBackend,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Status: extensions.IngressStatus{
+				LoadBalancer: api.LoadBalancerStatus{
+					Ingress: []api.LoadBalancerIngress{
+						{IP: "127.0.0.1"},
+					},
+				},
+			},
+		}
+	}
+
+	errorCases := map[string]extensions.Ingress{}
+
+	wildcardHost := "foo.*.bar.com"
+	badWildcardTLS := newValid()
+	badWildcardTLS.Spec.Rules[0].Host = "*.foo.bar.com"
+	badWildcardTLS.Spec.TLS = []extensions.IngressTLS{
+		{
+			Hosts: []string{wildcardHost},
+		},
+	}
+	badWildcardTLSErr := fmt.Sprintf("spec.tls[0].hosts: Invalid value: '%v'", wildcardHost)
+	errorCases[badWildcardTLSErr] = badWildcardTLS
+
 	for k, v := range errorCases {
 		errs := ValidateIngress(&v)
 		if len(errs) == 0 {

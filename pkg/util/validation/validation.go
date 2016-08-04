@@ -139,6 +139,27 @@ func IsDNS1035Label(value string) []string {
 	return errs
 }
 
+// wildcard definition - RFC 1034 section 4.3.3.
+// examples:
+// - valid: *.bar.com, *.foo.bar.com
+// - invalid: *.*.bar.com, *.foo.*.com, *bar.com, f*.bar.com, *
+const wildcardDNF1123SubdomainFmt = "\\*\\." + dns1123SubdomainFmt
+
+// IsWildcardDNS1123Subdomain tests for a string that conforms to the definition of a
+// wildcard subdomain in DNS (RFC 1034 section 4.3.3).
+func IsWildcardDNS1123Subdomain(value string) []string {
+	wildcardDNS1123SubdomainRegexp := regexp.MustCompile("^\\*\\." + dns1123SubdomainFmt + "$")
+
+	var errs []string
+	if len(value) > DNS1123SubdomainMaxLength {
+		errs = append(errs, MaxLenError(DNS1123SubdomainMaxLength))
+	}
+	if !wildcardDNS1123SubdomainRegexp.MatchString(value) {
+		errs = append(errs, RegexError(wildcardDNF1123SubdomainFmt, "*.example.com"))
+	}
+	return errs
+}
+
 const cIdentifierFmt string = "[A-Za-z_][A-Za-z0-9_]*"
 
 var cIdentifierRegexp = regexp.MustCompile("^" + cIdentifierFmt + "$")
