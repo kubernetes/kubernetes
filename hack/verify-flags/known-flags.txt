@@ -289,6 +289,7 @@ log-flush-frequency
 long-running-request-regexp
 low-diskspace-threshold-mb
 make-symlinks
+manifest-path
 manifest-url
 manifest-url-header
 masquerade-all
@@ -421,6 +422,7 @@ rkt-stage1-image
 root-ca-file
 root-dir
 run-proxy
+run-services-mode
 runtime-cgroups
 runtime-config
 runtime-request-timeout
