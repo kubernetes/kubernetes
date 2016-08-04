@@ -644,7 +644,6 @@ ENABLE_MANIFEST_URL: $(yaml-quote ${ENABLE_MANIFEST_URL:-false})
 MANIFEST_URL: $(yaml-quote ${MANIFEST_URL:-})
 MANIFEST_URL_HEADER: $(yaml-quote ${MANIFEST_URL_HEADER:-})
 NUM_NODES: $(yaml-quote ${NUM_NODES})
-INITIAL_ETCD_CLUSTER: $(yaml-quote ${MASTER_NAME})
 ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-false})
 EOF
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
@@ -675,6 +674,11 @@ EOF
     if [ -n "${SCHEDULER_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
 SCHEDULER_TEST_LOG_LEVEL: $(yaml-quote ${SCHEDULER_TEST_LOG_LEVEL})
+EOF
+    fi
+    if [ -n "${INITIAL_ETCD_CLUSTER:-}" ]; then
+      cat >>$file <<EOF
+INITIAL_ETCD_CLUSTER: $(yaml-quote ${INITIAL_ETCD_CLUSTER})
 EOF
     fi
   else
