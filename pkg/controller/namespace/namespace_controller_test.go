@@ -155,7 +155,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *unversioned.APIV
 		defer srv.Close()
 
 		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
-		clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc, nil)
+		clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
 
 		err := syncNamespace(mockClient, clientPool, operationNotSupportedCache{}, groupVersionResources, testInput.testNamespace, api.FinalizerKubernetes)
 		if err != nil {

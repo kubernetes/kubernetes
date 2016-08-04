@@ -45,21 +45,19 @@ func LegacyAPIPathResolverFunc(groupVersion unversioned.GroupVersion) string {
 
 // clientPoolImpl implements Factory
 type clientPoolImpl struct {
-	lock                 sync.RWMutex
-	config               *restclient.Config
-	clients              map[unversioned.GroupVersion]*Client
-	apiPathResolverFunc  APIPathResolverFunc
-	negotiatedSerializer runtime.NegotiatedSerializer
+	lock                sync.RWMutex
+	config              *restclient.Config
+	clients             map[unversioned.GroupVersion]*Client
+	apiPathResolverFunc APIPathResolverFunc
 }
 
 // NewClientPool returns a ClientPool from the specified config
-func NewClientPool(config *restclient.Config, apiPathResolverFunc APIPathResolverFunc, negotiatedSerializer runtime.NegotiatedSerializer) ClientPool {
+func NewClientPool(config *restclient.Config, apiPathResolverFunc APIPathResolverFunc) ClientPool {
 	confCopy := *config
 	return &clientPoolImpl{
-		config:               &confCopy,
-		clients:              map[unversioned.GroupVersion]*Client{},
-		apiPathResolverFunc:  apiPathResolverFunc,
-		negotiatedSerializer: negotiatedSerializer,
+		config:              &confCopy,
+		clients:             map[unversioned.GroupVersion]*Client{},
+		apiPathResolverFunc: apiPathResolverFunc,
 	}
 }
 
@@ -83,9 +81,7 @@ func (c *clientPoolImpl) ClientForGroupVersion(groupVersion unversioned.GroupVer
 	// we need to make a client
 	conf.GroupVersion = &groupVersion
 
-	if c.negotiatedSerializer != nil {
-		conf.NegotiatedSerializer = c.negotiatedSerializer
-	} else {
+	if conf.NegotiatedSerializer == nil {
 		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
 		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
 	}

@@ -315,7 +315,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 	// Find the list of namespaced resources via discovery that the namespace controller must manage
 	namespaceKubeClient := clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "namespace-controller"))
-	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), dynamic.LegacyAPIPathResolverFunc, nil)
+	namespaceClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "namespace-controller"), dynamic.LegacyAPIPathResolverFunc)
 	groupVersionResources, err := namespaceKubeClient.Discovery().ServerPreferredNamespacedResources()
 	if err != nil {
 		glog.Fatalf("Failed to get supported resources from server: %v", err)
@@ -489,8 +489,11 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		if err != nil {
 			glog.Fatalf("Failed to get supported resources from server: %v", err)
 		}
-		metaOnlyClientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc, serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()})
-		clientPool := dynamic.NewClientPool(restclient.AddUserAgent(kubeconfig, "generic-garbage-collector"), dynamic.LegacyAPIPathResolverFunc, nil)
+		config := restclient.AddUserAgent(kubeconfig, "generic-garbage-collector")
+		config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()}
+		metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+		config.ContentConfig.NegotiatedSerializer = nil
+		clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
 		garbageCollector, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, groupVersionResources)
 		if err != nil {
 			glog.Errorf("Failed to start the generic garbage collector: %v", err)

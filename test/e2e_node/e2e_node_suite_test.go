@@ -192,7 +192,7 @@ func startNamespaceController() {
 	config := restclient.AddUserAgent(&restclient.Config{Host: framework.TestContext.Host}, "node-e2e-namespace-controller")
 	client, err := clientset.NewForConfig(config)
 	Expect(err).NotTo(HaveOccurred())
-	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc, nil)
+	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
 	resources, err := client.Discovery().ServerPreferredNamespacedResources()
 	Expect(err).NotTo(HaveOccurred())
 	nc := namespacecontroller.NewNamespaceController(client, clientPool, resources, ncResyncPeriod, api.FinalizerKubernetes)

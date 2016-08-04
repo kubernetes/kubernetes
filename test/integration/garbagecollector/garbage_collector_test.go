@@ -129,8 +129,11 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 	if err != nil {
 		t.Fatalf("Failed to get supported resources from server: %v", err)
 	}
-	metaOnlyClientPool := dynamic.NewClientPool(&restclient.Config{Host: s.URL}, dynamic.LegacyAPIPathResolverFunc, serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()})
-	clientPool := dynamic.NewClientPool(&restclient.Config{Host: s.URL}, dynamic.LegacyAPIPathResolverFunc, nil)
+	config := &restclient.Config{Host: s.URL}
+	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetaOnlyCodecFactory()}
+	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	config.ContentConfig.NegotiatedSerializer = nil
+	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
 	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, groupVersionResources)
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
