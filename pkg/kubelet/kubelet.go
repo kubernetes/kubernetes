@@ -1934,11 +1934,13 @@ func (kl *Kubelet) podKiller() {
 	for {
 		select {
 		case podPair, ok := <-kl.podKillingCh:
-			runningPod := podPair.RunningPod
-			apiPod := podPair.APIPod
 			if !ok {
 				return
 			}
+
+			runningPod := podPair.RunningPod
+			apiPod := podPair.APIPod
+
 			if killing.Has(string(runningPod.ID)) {
 				// The pod is already being killed.
 				break
