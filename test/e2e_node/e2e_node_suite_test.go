@@ -42,6 +42,7 @@ import (
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/config"
 	more_reporters "github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
 )
@@ -70,7 +71,6 @@ var e2es *e2eService
 var context SharedContext
 
 var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
-var junitFileNumber = flag.Int("junit-file-number", 1, "Used to create junit filename - e.g. junit_01.xml.")
 
 func init() {
 	framework.RegisterCommonFlags()
@@ -89,7 +89,7 @@ func TestE2eNode(t *testing.T) {
 			glog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
-			junitFile := fmt.Sprintf("junit_%02d.xml", *junitFileNumber)
+			junitFile := fmt.Sprintf("junit_%s%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
 			junitPath := path.Join(*reportDir, junitFile)
 			reporters = append(reporters, more_reporters.NewJUnitReporter(junitPath))
 		}
