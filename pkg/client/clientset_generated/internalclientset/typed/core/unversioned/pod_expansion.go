@@ -32,7 +32,7 @@ func (c *pods) Bind(binding *api.Binding) error {
 	return c.client.Post().Namespace(c.ns).Resource("pods").Name(binding.Name).SubResource("binding").Body(binding).Do().Error()
 }
 
-// Get constructs a request for getting the logs for a pod
+// GetLogs constructs a request for getting the logs for a pod
 func (c *pods) GetLogs(name string, opts *api.PodLogOptions) *restclient.Request {
 	return c.client.Get().Namespace(c.ns).Name(name).Resource("pods").SubResource("log").VersionedParams(opts, api.ParameterCodec)
 }
