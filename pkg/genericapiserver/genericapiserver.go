@@ -466,8 +466,8 @@ func (s *GenericAPIServer) init(c *Config) {
 	handler := http.Handler(s.mux.(*http.ServeMux))
 
 	// TODO: handle CORS and auth using go-restful
-	// See github.com/emicklei/go-restful/blob/GenericAPIServer/examples/restful-CORS-filter.go, and
-	// github.com/emicklei/go-restful/blob/GenericAPIServer/examples/restful-basic-authentication.go
+	// See github.com/emicklei/go-restful/blob/master/examples/restful-CORS-filter.go, and
+	// github.com/emicklei/go-restful/blob/master/examples/restful-basic-authentication.go
 
 	if len(c.CorsAllowedOriginList) > 0 {
 		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
@@ -507,17 +507,18 @@ func (s *GenericAPIServer) init(c *Config) {
 	s.Handler = handler
 
 	// After all wrapping is done, put a context filter around both handlers
-	if handler, err := api.NewRequestContextFilter(s.RequestContextMapper, s.Handler); err != nil {
+	var err error
+	handler, err = api.NewRequestContextFilter(s.RequestContextMapper, s.Handler)
+	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.Handler: %v", err)
-	} else {
-		s.Handler = handler
 	}
+	s.Handler = handler
 
-	if handler, err := api.NewRequestContextFilter(s.RequestContextMapper, s.InsecureHandler); err != nil {
+	handler, err = api.NewRequestContextFilter(s.RequestContextMapper, s.InsecureHandler)
+	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.InsecureHandler: %v", err)
-	} else {
-		s.InsecureHandler = handler
 	}
+	s.InsecureHandler = handler
 
 	s.installGroupsDiscoveryHandler()
 }
