@@ -92,6 +92,9 @@ func resolvePort(portReference intstr.IntOrString, container *api.Container) (in
 		return portReference.IntValue(), nil
 	}
 	portName := portReference.StrVal
+	if len(portName) == 0 {
+		return -1, fmt.Errorf("Couldn't find port: %v in %v", portReference, container)
+	}
 	port, err := strconv.Atoi(portName)
 	if err == nil {
 		return port, nil
@@ -101,7 +104,7 @@ func resolvePort(portReference intstr.IntOrString, container *api.Container) (in
 			return int(portSpec.ContainerPort), nil
 		}
 	}
-	return -1, fmt.Errorf("couldn't find port: %v in %v", portReference, container)
+	return -1, fmt.Errorf("Couldn't find port: %v in %v", portReference, container)
 }
 
 func (hr *HandlerRunner) runHTTPHandler(pod *api.Pod, container *api.Container, handler *api.Handler) (string, error) {
