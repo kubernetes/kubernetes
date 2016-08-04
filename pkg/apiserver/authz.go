@@ -90,7 +90,7 @@ var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABA
 type AuthorizationConfig struct {
 	// Options for ModeABAC
 
-	// Path to a ABAC policy file.
+	// Path to an ABAC policy file.
 	PolicyFile string
 
 	// Options for ModeWebhook
@@ -119,7 +119,7 @@ type AuthorizationConfig struct {
 func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config AuthorizationConfig) (authorizer.Authorizer, error) {
 
 	if len(authorizationModes) == 0 {
-		return nil, errors.New("Atleast one authorization mode should be passed")
+		return nil, errors.New("At least one authorization mode should be passed")
 	}
 
 	var authorizers []authorizer.Authorizer

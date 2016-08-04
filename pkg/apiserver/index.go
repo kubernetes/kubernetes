@@ -30,7 +30,7 @@ func IndexHandler(container *restful.Container, muxHelper *MuxHelper) func(http.
 		status := http.StatusOK
 		if r.URL.Path != "/" && r.URL.Path != "/index.html" {
 			// Since "/" matches all paths, handleIndex is called for all paths for which there is no handler registered.
-			// We want to to return a 404 status with a list of all valid paths, incase of an invalid URL request.
+			// We want to return a 404 status with a list of all valid paths, incase of an invalid URL request.
 			status = http.StatusNotFound
 		}
 		var handledPaths []string
