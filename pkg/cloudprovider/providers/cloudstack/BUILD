@@ -12,15 +12,22 @@ go_library(
     name = "go_default_library",
     srcs = [
         "cloudstack.go",
+        "cloudstack_instances.go",
         "cloudstack_loadbalancer.go",
+        "metadata.go",
+        "metadata_linux.go",
     ],
     tags = ["automanaged"],
     deps = [
         "//pkg/api/v1:go_default_library",
         "//pkg/cloudprovider:go_default_library",
+        "//vendor:github.com/d2g/dhcp4",
+        "//vendor:github.com/d2g/dhcp4client",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/kardianos/osext",
         "//vendor:github.com/xanzy/go-cloudstack/cloudstack",
         "//vendor:gopkg.in/gcfg.v1",
+        "//vendor:k8s.io/apimachinery/pkg/types",
     ],
 )
 

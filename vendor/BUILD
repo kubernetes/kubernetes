@@ -14006,3 +14006,29 @@ go_library(
         "//vendor:k8s.io/client-go/pkg/apis/authorization/v1beta1",
     ],
 )
+
+go_library(
+    name = "github.com/d2g/dhcp4",
+    srcs = [
+        "github.com/d2g/dhcp4/constants.go",
+        "github.com/d2g/dhcp4/helpers.go",
+        "github.com/d2g/dhcp4/option.go",
+        "github.com/d2g/dhcp4/packet.go",
+    ],
+    tags = ["automanaged"],
+)
+
+go_library(
+    name = "github.com/d2g/dhcp4client",
+    srcs = [
+        "github.com/d2g/dhcp4client/client.go",
+        "github.com/d2g/dhcp4client/inetsock.go",
+        "github.com/d2g/dhcp4client/init.go",
+        "github.com/d2g/dhcp4client/pktsock_linux.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/d2g/dhcp4",
+        "//vendor:golang.org/x/sys/unix",
+    ],
+)
