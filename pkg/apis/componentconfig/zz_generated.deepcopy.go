@@ -71,6 +71,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.ConcurrentEndpointSyncs = in.ConcurrentEndpointSyncs
 		out.ConcurrentRSSyncs = in.ConcurrentRSSyncs
 		out.ConcurrentRCSyncs = in.ConcurrentRCSyncs
+		out.ConcurrentServiceSyncs = in.ConcurrentServiceSyncs
 		out.ConcurrentResourceQuotaSyncs = in.ConcurrentResourceQuotaSyncs
 		out.ConcurrentDeploymentSyncs = in.ConcurrentDeploymentSyncs
 		out.ConcurrentDaemonSetSyncs = in.ConcurrentDaemonSetSyncs

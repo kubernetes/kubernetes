@@ -171,9 +171,11 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Failed to start node status update controller: %v", err)
 	}
 
-	serviceController := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
-	if err := serviceController.Run(s.ServiceSyncPeriod.Duration, s.NodeSyncPeriod.Duration); err != nil {
+	serviceController, err := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
+	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
+	} else {
+		serviceController.Run(int(s.ConcurrentServiceSyncs))
 	}
 
 	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {
