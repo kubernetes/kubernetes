@@ -695,3 +695,7 @@ func buildResourceToRankFunc(withImageFs bool) map[api.ResourceName]rankFunc {
 	}
 	return resourceToRankFunc
 }
+
+func PodIsEvicted(podStatus api.PodStatus) bool {
+	return podStatus.Phase == api.PodFailed && podStatus.Reason == reason
+}
