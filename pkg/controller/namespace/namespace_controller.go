@@ -88,7 +88,7 @@ func NewNamespaceController(
 			},
 		},
 		&api.Namespace{},
-		resyncPeriod,
+		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*api.Namespace)

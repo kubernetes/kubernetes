@@ -49,11 +49,6 @@ import (
 )
 
 const (
-	// We'll attempt to recompute the required replicas of all ReplicaSets
-	// that have fulfilled their expectations at least this often. This recomputation
-	// happens based on contents in local pod storage.
-	FullControllerResyncPeriod = 30 * time.Second
-
 	// Realistic value of the burstReplica field for the replica set manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
@@ -153,8 +148,7 @@ func newReplicaSetController(eventRecorder record.EventRecorder, podInformer fra
 			},
 		},
 		&extensions.ReplicaSet{},
-		// TODO: Can we have much longer period here?
-		FullControllerResyncPeriod,
+		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc:    rsc.enqueueReplicaSet,
 			UpdateFunc: rsc.updateRS,

@@ -44,8 +44,6 @@ const (
 	PodStoreSyncedPollPeriod = 100 * time.Millisecond
 	// number of retries for a status update.
 	statusUpdateRetries = 2
-	// period to relist petsets and verify pets
-	petSetResyncPeriod = 30 * time.Second
 )
 
 // PetSetController controls petsets.
@@ -118,7 +116,7 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 			},
 		},
 		&apps.PetSet{},
-		petSetResyncPeriod,
+		controller.NoResyncPeriodFunc(),
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: psc.enqueuePetSet,
 			UpdateFunc: func(old, cur interface{}) {

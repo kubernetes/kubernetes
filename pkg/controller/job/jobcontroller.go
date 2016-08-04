@@ -77,6 +77,11 @@ type JobController struct {
 	recorder record.EventRecorder
 }
 
+const (
+	// How often to resync job data from local cache
+	JobResyncPeriod = 10 * time.Minute
+)
+
 func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clientset.Interface) *JobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -108,8 +113,7 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 			},
 		},
 		&batch.Job{},
-		// TODO: Can we have much longer period here?
-		replicationcontroller.FullControllerResyncPeriod,
+		JobResyncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: jm.enqueueController,
 			UpdateFunc: func(old, cur interface{}) {
