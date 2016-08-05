@@ -858,8 +858,13 @@ func TestParseEnv(t *testing.T) {
 			envArray: []string{
 				"WITH_OUT_VALUES=",
 			},
-			expected:  []api.EnvVar{},
-			expectErr: true,
+			expected: []api.EnvVar{
+				{
+					Name:  "WITH_OUT_VALUES",
+					Value: "",
+				},
+			},
+			expectErr: false,
 			test:      "test case 3",
 		},
 		{
