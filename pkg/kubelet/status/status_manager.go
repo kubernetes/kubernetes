@@ -220,27 +220,20 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 
 func findContainerStatus(status *api.PodStatus, containerID string) (containerStatus *api.ContainerStatus, init bool, ok bool) {
 	// Find the container to update.
-	containerIndex := -1
 	for i, c := range status.ContainerStatuses {
 		if c.ContainerID == containerID {
-			containerIndex = i
-			break
+			return &status.ContainerStatuses[i], false, true
 		}
-	}
-	if containerIndex != -1 {
-		return &status.ContainerStatuses[containerIndex], false, true
 	}
 
 	for i, c := range status.InitContainerStatuses {
 		if c.ContainerID == containerID {
-			containerIndex = i
-			break
+			return &status.InitContainerStatuses[i], true, true
 		}
 	}
-	if containerIndex != -1 {
-		return &status.InitContainerStatuses[containerIndex], true, true
-	}
+
 	return nil, false, false
+
 }
 
 func (m *manager) TerminatePod(pod *api.Pod) {
