@@ -71,6 +71,7 @@ pkg/api/install
 pkg/api/meta
 pkg/api/resource
 pkg/api/service
+pkg/api/util/resources
 pkg/api/v1
 pkg/api/v1/service
 pkg/apimachinery

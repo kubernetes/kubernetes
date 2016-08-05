@@ -26,6 +26,7 @@ go_library(
         "//pkg/admission:go_default_library",
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
+        "//pkg/api/util/resources:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/api/validation:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
@@ -53,9 +54,9 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
+        "//pkg/api/util/resources:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/apis/storage/util:go_default_library",
         "//pkg/client/clientset_generated/release_1_5/fake:go_default_library",
-        "//pkg/quota:go_default_library",
     ],
 )

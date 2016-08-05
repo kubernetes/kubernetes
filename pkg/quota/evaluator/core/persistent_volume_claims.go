@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/storage/util"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
@@ -112,8 +113,8 @@ func (p *pvcEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 	// in effect, this will remove things from the required set that are not tied to this pvcs storage class
 	// for example, if a quota has bronze and gold storage class items defined, we should not error a bronze pvc for not being gold.
 	// but we should error a bronze pvc if it doesn't make a storage request size...
-	requiredResources := quota.Intersection(required, pvcRequiredSet)
-	requiredSet := quota.ToSet(requiredResources)
+	requiredResources := resources.Intersection(required, pvcRequiredSet)
+	requiredSet := resources.ToSet(requiredResources)
 
 	// usage for this pvc will only include global pvc items + this storage class specific items
 	pvcUsage, err := p.Usage(item)
@@ -123,7 +124,7 @@ func (p *pvcEvaluator) Constraints(required []api.ResourceName, item runtime.Obj
 
 	// determine what required resources were not tracked by usage.
 	missingSet := sets.NewString()
-	pvcSet := quota.ToSet(quota.ResourceNames(pvcUsage))
+	pvcSet := resources.ToSet(resources.ResourceNames(pvcUsage))
 	if diff := requiredSet.Difference(pvcSet); len(diff) > 0 {
 		missingSet.Insert(diff.List()...)
 	}
@@ -152,7 +153,7 @@ func (p *pvcEvaluator) Matches(resourceQuota *api.ResourceQuota, item runtime.Ob
 func (p *pvcEvaluator) MatchingResources(items []api.ResourceName) []api.ResourceName {
 	result := []api.ResourceName{}
 	for _, item := range items {
-		if quota.Contains(pvcResources, item) {
+		if resources.Contains(pvcResources, item) {
 			result = append(result, item)
 			continue
 		}

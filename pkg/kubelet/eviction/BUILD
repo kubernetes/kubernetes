@@ -50,12 +50,12 @@ go_test(
     deps = [
         "//pkg/api:go_default_library",
         "//pkg/api/resource:go_default_library",
+        "//pkg/api/util/resources:go_default_library",
         "//pkg/api/v1:go_default_library",
         "//pkg/apis/meta/v1:go_default_library",
         "//pkg/client/record:go_default_library",
         "//pkg/kubelet/api/v1alpha1/stats:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
-        "//pkg/quota:go_default_library",
         "//pkg/types:go_default_library",
         "//pkg/util/clock:go_default_library",
     ],

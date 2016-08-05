@@ -24,10 +24,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/api/v1"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -1358,8 +1358,8 @@ func TestGetStarvedResources(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		actual := getStarvedResources(testCase.inputs)
-		actualSet := quota.ToSet(internalResourceNames(actual))
-		expectedSet := quota.ToSet(internalResourceNames(testCase.result))
+		actualSet := resources.ToSet(internalResourceNames(actual))
+		expectedSet := resources.ToSet(internalResourceNames(testCase.result))
 		if !actualSet.Equal(expectedSet) {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", testName, expectedSet, actualSet)
 		}

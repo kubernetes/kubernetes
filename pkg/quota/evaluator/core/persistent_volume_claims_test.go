@@ -21,10 +21,10 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	metav1 "k8s.io/kubernetes/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/storage/util"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5/fake"
-	"k8s.io/kubernetes/pkg/quota"
 )
 
 func testVolumeClaim(name string, namespace string, spec api.PersistentVolumeClaimSpec) *api.PersistentVolumeClaim {
@@ -271,7 +271,7 @@ func TestPersistentVolumeClaimEvaluatorUsage(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s unexpected error: %v", testName, err)
 		}
-		if !quota.Equals(testCase.usage, actual) {
+		if !resources.Equals(testCase.usage, actual) {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
 		}
 	}
