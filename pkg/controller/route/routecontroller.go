@@ -19,6 +19,7 @@ package route
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -89,6 +90,12 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	return rc.reconcile(nodeList.Items, routeList)
 }
 
+const alreadyExistError = "googleapi: Error 409"
+
+func isRouteAlreadyExistError(err error) bool {
+	return err != nil && strings.Contains(err.Error(), alreadyExistError)
+}
+
 func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.Route) error {
 	// nodeCIDRs maps nodeName->nodeCIDR
 	nodeCIDRs := make(map[string]string)
@@ -127,13 +134,21 @@ func (rc *RouteController) reconcile(nodes []api.Node, routes []*cloudprovider.R
 					err := rc.routes.CreateRoute(rc.clusterName, nameHint, route)
 					<-rateLimiter
 
-					rc.updateNetworkingCondition(nodeName, err == nil)
-					if err != nil {
-						glog.Errorf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
-					} else {
+					rc.updateNetworkingCondition(nodeName, err == nil || isRouteAlreadyExistError(err))
+					if err == nil {
+						// The route is sucessfully created, just return
 						glog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime))
 						return
 					}
+					if isRouteAlreadyExistError(err) {
+						// The route already exists, just return
+						// This is only a workaround, in fact there seems to be a race here (see issue https://github.com/kubernetes/kubernetes/issues/28362)
+						// TODO: Figure out and fix the race.
+						glog.Warningf("The route %s %s for node %s exists already after %v: %v", nodeName, route.DestinationCIDR, nameHint, time.Now().Sub(startTime), err)
+						return
+					}
+					// Failed to create route, keep trying
+					glog.Errorf("Could not create route %s %s for node %s after %v: %v", nameHint, route.DestinationCIDR, nodeName, time.Now().Sub(startTime), err)
 				}
 			}(node.Name, nameHint, route)
 		} else {
