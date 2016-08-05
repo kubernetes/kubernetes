@@ -214,7 +214,7 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 			}
 			found := false
 			for _, allowed := range r.AllowedPrefixes {
-				glog.V(0).Infof("Checking %v against %v\n", v, allowed)
+				glog.V(4).Infof("Checking %v against %v\n", v, allowed)
 				if strings.HasPrefix(v, allowed) {
 					found = true
 					break
@@ -226,7 +226,7 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 		}
 	}
 	if len(rules.Rules) > 0 {
-		glog.V(0).Infof("%v passes rules found in %v\n", path, actualPath)
+		glog.V(2).Infof("%v passes rules found in %v\n", path, actualPath)
 	}
 
 	return nil
