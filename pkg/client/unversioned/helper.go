@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -61,6 +62,15 @@ func New(c *restclient.Config) (*Client, error) {
 	discoveryClient, err := discovery.NewDiscoveryClientForConfig(&discoveryConfig)
 	if err != nil {
 		return nil, err
+	}
+
+	var authorizationClient *AuthorizationClient
+	if registered.IsRegistered(authorization.GroupName) {
+		authorizationConfig := *c
+		authorizationClient, err = NewAuthorization(&authorizationConfig)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	var autoscalingClient *AutoscalingClient
@@ -137,6 +147,7 @@ func New(c *restclient.Config) (*Client, error) {
 		RESTClient:           client,
 		AppsClient:           appsClient,
 		AuthenticationClient: authenticationClient,
+		AuthorizationClient:  authorizationClient,
 		AutoscalingClient:    autoscalingClient,
 		BatchClient:          batchClient,
 		CertificatesClient:   certsClient,
