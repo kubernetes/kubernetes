@@ -102,6 +102,13 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	if *buildServices {
 		buildGo()
 	}
+	if framework.TestContext.NodeName == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			glog.Fatalf("Could not get node name: %v", err)
+		}
+		framework.TestContext.NodeName = hostname
+	}
 
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
@@ -133,6 +140,8 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
 
+	// Share the node name with the other test nodes.
+	shared.NodeName = framework.TestContext.NodeName
 	data, err := json.Marshal(shared)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -143,13 +152,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	Expect(json.Unmarshal(data, shared)).To(Succeed())
 	context = *shared
 
-	if framework.TestContext.NodeName == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			glog.Fatalf("Could not get node name: %v", err)
-		}
-		framework.TestContext.NodeName = hostname
-	}
+	framework.TestContext.NodeName = shared.NodeName
 })
 
 // Tear down the kubelet on the node
