@@ -105,7 +105,11 @@ added. This strongly implies that node-local services are of `ClusterIP` type
 and point to DaemonSets, both reasonable assumptions to make.
 
 Last, but not least: the current assumption is that service and DaemonSet reside
-in the same namespace.
+in the same namespace. There is currently no easy way to provide a global
+service spanning multiple or all namespaces. Clients would need to be aware not
+just of the service name, but also of the standard namespace it lives in. This
+might be revisited once external services are implemented: administrators could
+create "aliases" to the real service in all other namespaces that need it.
 
 The new API, with changes highlighted in bold, would look like
 <pre>
@@ -176,7 +180,9 @@ even taking into account network latency.
 
 For use cases like `kube2iam`, which requires intercepting traffic meant for the
 special `169.254.169.254` metadata IP address, perhaps `ClusterIP` should be
-allowed to live outside of the service IP range.
+allowed to live outside of the service IP range. For security reasons, this
+behaviour would require explicit activation from the administrator (an API
+server or proxy flag).
 
 #### ipvs kernel mode
 
@@ -226,9 +232,12 @@ find out which VIP a connection was meant for. Possible options:
 
 ### kube-proxy
 
+1. Figure host address
 1. Implement iptables change
 1. Implement userland change
 1. Add tests
+1. Implement special case code to handle, optionally, cloud provider metadata IP
+interception (169.254.169.254)
 
 ### Documentation
 
