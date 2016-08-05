@@ -72,7 +72,7 @@ func (c *FakeReplicationControllers) UpdateStatus(controller *api.ReplicationCon
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) Delete(name string) error {
+func (c *FakeReplicationControllers) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.Invokes(NewDeleteAction("replicationcontrollers", c.Namespace, name), &api.ReplicationController{})
 	return err
 }
