@@ -95,14 +95,14 @@ pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_sc
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
 test/e2e/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
-test/e2e/downwardapi_volume.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+test/e2e/common/downwardapi_volume.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 test/e2e/es_cluster_logging.go:		framework.Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
 test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
 test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
-test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
-test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
-test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
-test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
+test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
+test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
+test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
+test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e_node/configmap_test.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")

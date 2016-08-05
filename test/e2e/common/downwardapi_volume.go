@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package common
 
 import (
 	"fmt"
@@ -32,8 +32,12 @@ import (
 var _ = framework.KubeDescribe("Downward API volume", func() {
 	// How long to wait for a log pod to be displayed
 	const podLogTimeout = 45 * time.Second
-
 	f := framework.NewDefaultFramework("downward-api")
+	var podClient *framework.PodClient
+	BeforeEach(func() {
+		podClient = f.PodClient()
+	})
+
 	It("should provide podname only [Conformance]", func() {
 		podName := "downwardapi-volume-" + string(uuid.NewUUID())
 		pod := downwardAPIVolumePodForSimpleTest(podName, "/etc/podname")
@@ -67,13 +71,10 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		containerName := "client-container"
 		defer func() {
 			By("Deleting the pod")
-			f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
 		By("Creating the pod")
-		pod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
-
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
+		podClient.CreateSync(pod)
 
 		Eventually(func() (string, error) {
 			return framework.GetPodLogs(f.Client, f.Namespace.Name, podName, containerName)
@@ -81,7 +82,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("key1=\"value1\"\n"))
 
 		//modify labels
-		f.PodClient().Update(podName, func(pod *api.Pod) {
+		podClient.Update(podName, func(pod *api.Pod) {
 			pod.Labels["key3"] = "value3"
 		})
 
@@ -100,14 +101,12 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		containerName := "client-container"
 		defer func() {
 			By("Deleting the pod")
-			f.Client.Pods(f.Namespace.Name).Delete(pod.Name, api.NewDeleteOptions(0))
+			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 		}()
 		By("Creating the pod")
-		pod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
-		Expect(err).NotTo(HaveOccurred())
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
+		podClient.CreateSync(pod)
 
-		pod, err = f.Client.Pods(f.Namespace.Name).Get(pod.Name)
+		pod, err := podClient.Get(pod.Name)
 		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() (string, error) {
@@ -116,7 +115,7 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 			podLogTimeout, framework.Poll).Should(ContainSubstring("builder=\"bar\"\n"))
 
 		//modify annotations
-		f.PodClient().Update(podName, func(pod *api.Pod) {
+		podClient.Update(podName, func(pod *api.Pod) {
 			pod.Annotations["builder"] = "foo"
 		})
 
