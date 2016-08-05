@@ -31,9 +31,10 @@ import (
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 
+	"reflect"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"reflect"
 )
 
 type clusterCache struct {
