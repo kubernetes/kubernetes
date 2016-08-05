@@ -23,6 +23,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/docker/distribution/reference"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -132,6 +135,13 @@ func Run(f *cmdutil.Factory, opts *RunOptions, cmdIn io.Reader, cmdOut, cmdErr i
 	// Let kubectl run follow rules for `--`, see #13004 issue
 	if len(args) == 0 || argsLenAtDash == 0 {
 		return cmdutil.UsageError(cmd, "NAME is required for run")
+	}
+
+	// validate image name
+	imageName := cmdutil.GetFlagString(cmd, "image")
+	validImageRef := reference.ReferenceRegexp.MatchString(imageName)
+	if !validImageRef {
+		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
 	}
 
 	interactive := cmdutil.GetFlagBool(cmd, "stdin")
