@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -167,4 +168,37 @@ func generatePodSandboxLinuxConfig(pod *api.Pod, cgroupParent string) *runtimeAp
 	}
 
 	return linuxPodSandboxConfig
+}
+
+// getKubeletSandboxes lists all (or just the running) sandboxes managed by kubelet.
+func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeApi.PodSandbox, error) {
+	var filter *runtimeApi.PodSandboxFilter
+	if !all {
+		readyState := runtimeApi.PodSandBoxState_READY
+		filter = &runtimeApi.PodSandboxFilter{
+			State: &readyState,
+		}
+	}
+
+	resp, err := m.runtimeService.ListPodSandbox(filter)
+	if err != nil {
+		glog.Errorf("ListPodSandbox failed: %v", err)
+		return nil, err
+	}
+
+	result := []*runtimeApi.PodSandbox{}
+	for _, s := range resp {
+		if len(s.GetName()) == 0 {
+			continue
+		}
+
+		if !isSandBoxManagedByKubelet(s.GetName()) {
+			glog.V(3).Infof("Sandbox %s is not managed by kubelet", s.GetName())
+			continue
+		}
+
+		result = append(result, s)
+	}
+
+	return result, nil
 }

@@ -185,6 +185,41 @@ func makeMounts(cid string, opts *kubecontainer.RunContainerOptions, container *
 	return volumeMounts
 }
 
+// getKubeletContainers lists all (or just the running) containers managed by kubelet.
+func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]*runtimeApi.Container, error) {
+	var resp []*runtimeApi.Container
+	var err error
+
+	if allContainers {
+		resp, err = m.runtimeService.ListContainers(nil)
+	} else {
+		runningState := runtimeApi.ContainerState_RUNNING
+		resp, err = m.runtimeService.ListContainers(&runtimeApi.ContainerFilter{
+			State: &runningState,
+		})
+	}
+	if err != nil {
+		glog.Errorf("ListContainers failed: %v", err)
+		return nil, err
+	}
+
+	result := []*runtimeApi.Container{}
+	for _, c := range resp {
+		if len(c.GetName()) == 0 {
+			continue
+		}
+
+		if !isContainerManagedByKubelet(c.GetName()) {
+			glog.V(3).Infof("Container %s is not managed by kubelet", c.GetName())
+			continue
+		}
+
+		result = append(result, c)
+	}
+
+	return result, nil
+}
+
 // AttachContainer attaches to the container's console
 func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
 	return fmt.Errorf("not implemented")
