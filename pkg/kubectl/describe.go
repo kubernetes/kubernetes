@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/federation/apis/federation"
 	fed_clientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	"k8s.io/kubernetes/pkg/api"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -48,8 +48,11 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
+	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/golang/glog"
 )
 
 // Describer generates output for the named resource or an error
@@ -101,17 +104,18 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		api.Kind("Endpoints"):             &EndpointsDescriber{c},
 		api.Kind("ConfigMap"):             &ConfigMapDescriber{c},
 
-		extensions.Kind("ReplicaSet"):               &ReplicaSetDescriber{c},
-		extensions.Kind("HorizontalPodAutoscaler"):  &HorizontalPodAutoscalerDescriber{c},
-		extensions.Kind("NetworkPolicy"):            &NetworkPolicyDescriber{c},
-		autoscaling.Kind("HorizontalPodAutoscaler"): &HorizontalPodAutoscalerDescriber{c},
-		extensions.Kind("DaemonSet"):                &DaemonSetDescriber{c},
-		extensions.Kind("Deployment"):               &DeploymentDescriber{adapter.FromUnversionedClient(c)},
-		extensions.Kind("Job"):                      &JobDescriber{c},
-		batch.Kind("Job"):                           &JobDescriber{c},
-		batch.Kind("ScheduledJob"):                  &ScheduledJobDescriber{adapter.FromUnversionedClient(c)},
-		apps.Kind("PetSet"):                         &PetSetDescriber{c},
-		extensions.Kind("Ingress"):                  &IngressDescriber{c},
+		extensions.Kind("ReplicaSet"):                  &ReplicaSetDescriber{c},
+		extensions.Kind("HorizontalPodAutoscaler"):     &HorizontalPodAutoscalerDescriber{c},
+		extensions.Kind("NetworkPolicy"):               &NetworkPolicyDescriber{c},
+		autoscaling.Kind("HorizontalPodAutoscaler"):    &HorizontalPodAutoscalerDescriber{c},
+		extensions.Kind("DaemonSet"):                   &DaemonSetDescriber{c},
+		extensions.Kind("Deployment"):                  &DeploymentDescriber{adapter.FromUnversionedClient(c)},
+		extensions.Kind("Job"):                         &JobDescriber{c},
+		extensions.Kind("Ingress"):                     &IngressDescriber{c},
+		batch.Kind("Job"):                              &JobDescriber{c},
+		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{adapter.FromUnversionedClient(c)},
+		apps.Kind("PetSet"):                            &PetSetDescriber{c},
+		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
 	}
 
 	return m
@@ -1874,6 +1878,70 @@ func (p *PetSetDescriber) Describe(namespace, name string, describerSettings Des
 		describeVolumes(ps.Spec.Template.Spec.Volumes, out, "")
 		if describerSettings.ShowEvents {
 			events, _ := p.client.Events(namespace).Search(ps)
+			if events != nil {
+				DescribeEvents(events, out)
+			}
+		}
+		return nil
+	})
+}
+
+type CertificateSigningRequestDescriber struct {
+	client *client.Client
+}
+
+func (p *CertificateSigningRequestDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	csr, err := p.client.Certificates().CertificateSigningRequests().Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	cr, err := utilcertificates.ParseCertificateRequestObject(csr)
+	if err != nil {
+		return "", fmt.Errorf("Error parsing CSR: %v", err)
+	}
+
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", csr.Name)
+		fmt.Fprintf(out, "Labels:\t%s\n", labels.FormatLabels(csr.Labels))
+		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(csr.Annotations))
+		fmt.Fprintf(out, "CreationTimestamp:\t%s\n", csr.CreationTimestamp.Time.Format(time.RFC1123Z))
+		fmt.Fprintf(out, "RequestingUser:\t%s\n", csr.Spec.Username)
+
+		fmt.Fprintf(out, "Subject:\n")
+		fmt.Fprintf(out, "\tCommonName:\t%s\n", cr.Subject.CommonName)
+		fmt.Fprintf(out, "\tSerialNumber:\t%s\n", cr.Subject.SerialNumber)
+		fmt.Fprintf(out, "\tOrganization:\t%s\n", strings.Join(cr.Subject.Organization, ","))
+		fmt.Fprintf(out, "\tOrganizationalUnit:\t%s\n", strings.Join(cr.Subject.OrganizationalUnit, ","))
+		fmt.Fprintf(out, "\tCountry:\t%s\n", strings.Join(cr.Subject.Country, ","))
+		fmt.Fprintf(out, "\tLocality:\t%s\n", strings.Join(cr.Subject.Locality, ","))
+		fmt.Fprintf(out, "\tProvince:\t%s\n", strings.Join(cr.Subject.Province, ","))
+		fmt.Fprintf(out, "\tStreetAddress:\t%s\n", strings.Join(cr.Subject.StreetAddress, ","))
+		fmt.Fprintf(out, "\tPostalCode:\t%s\n", strings.Join(cr.Subject.PostalCode, ","))
+
+		if len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses) > 0 {
+			fmt.Fprintf(out, "Subject Alternative Names:\n")
+			if len(cr.DNSNames) > 0 {
+				fmt.Fprintf(out, "\tDNSNames:\n")
+				for _, h := range cr.DNSNames {
+					fmt.Fprintf(out, "\t\t%s\n", h)
+				}
+			}
+			if len(cr.EmailAddresses) > 0 {
+				fmt.Fprintf(out, "\tEmailAddresses:\n")
+				for _, h := range cr.EmailAddresses {
+					fmt.Fprintf(out, "\t\t%s\n", h)
+				}
+			}
+			if len(cr.IPAddresses) > 0 {
+				fmt.Fprintf(out, "\tIPAddresses:\n")
+				for _, h := range cr.IPAddresses {
+					fmt.Fprintf(out, "\t\t%s\n", h.String())
+				}
+			}
+		}
+		if describerSettings.ShowEvents {
+			events, _ := p.client.Events(namespace).Search(csr)
 			if events != nil {
 				DescribeEvents(events, out)
 			}

@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/labels"
@@ -445,6 +446,7 @@ var configMapColumns = []string{"NAME", "DATA", "AGE"}
 var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS", "SELINUX", "RUNASUSER"}
 var clusterColumns = []string{"NAME", "STATUS", "VERSION", "AGE"}
 var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
+var certificateSigningRequestColumns = []string{"NAME", "AGE", "CONDITION"}
 
 // addDefaultHandlers adds print handlers for default Kubernetes types.
 func (h *HumanReadablePrinter) addDefaultHandlers() {
@@ -514,6 +516,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(clusterRoleColumns, printClusterRoleList)
 	h.Handler(clusterRoleBindingColumns, printClusterRoleBinding)
 	h.Handler(clusterRoleBindingColumns, printClusterRoleBindingList)
+	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequest)
+	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequestList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -1742,6 +1746,63 @@ func printClusterRoleBinding(clusterRoleBinding *rbac.ClusterRoleBinding, w io.W
 func printClusterRoleBindingList(list *rbac.ClusterRoleBindingList, w io.Writer, options PrintOptions) error {
 	for i := range list.Items {
 		if err := printClusterRoleBinding(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printCertificateSigningRequest(csr *certificates.CertificateSigningRequest, w io.Writer, options PrintOptions) error {
+	meta := csr.ObjectMeta
+	name := meta.Name
+	kind := options.KindName
+
+	if options.WithKind {
+		name = kind + "/" + name
+	}
+
+	if _, err := fmt.Fprintf(
+		w, "%s\t%s",
+		name,
+		translateTimestamp(meta.CreationTimestamp),
+	); err != nil {
+		return err
+	}
+	var approved, denied bool
+	for _, c := range csr.Status.Conditions {
+		switch c.Type {
+		case certificates.CertificateApproved:
+			approved = true
+		case certificates.CertificateDenied:
+			denied = true
+		default:
+			return fmt.Errorf("unkown csr conditon %q", c)
+		}
+	}
+	// must be in order of presidence
+	if denied {
+		if _, err := fmt.Fprintf(w, "\tDenied"); err != nil {
+			return err
+		}
+	} else if approved {
+		if _, err := fmt.Fprintf(w, "\tApproved"); err != nil {
+			return err
+		}
+	} else {
+		if _, err := fmt.Fprintf(w, "\tPending"); err != nil {
+			return err
+		}
+	}
+	if _, err := fmt.Fprint(w, AppendLabels(meta.Labels, options.ColumnLabels)); err != nil {
+		return err
+	}
+	_, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, meta.Labels))
+	return err
+}
+
+func printCertificateSigningRequestList(list *certificates.CertificateSigningRequestList, w io.Writer, options PrintOptions) error {
+	for i := range list.Items {
+		if err := printCertificateSigningRequest(&list.Items[i], w, options); err != nil {
 			return err
 		}
 	}
