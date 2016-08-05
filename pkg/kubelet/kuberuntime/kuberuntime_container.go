@@ -97,7 +97,6 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		if securityContext.Privileged != nil {
 			config.Privileged = securityContext.Privileged
 		}
-
 		if securityContext.ReadOnlyRootFilesystem != nil {
 			config.ReadonlyRootfs = securityContext.ReadOnlyRootFilesystem
 		}

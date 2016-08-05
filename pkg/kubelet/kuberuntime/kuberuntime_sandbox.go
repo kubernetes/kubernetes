@@ -24,9 +24,9 @@ import (
 
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP string) (*runtimeApi.PodSandboxConfig, error) {
-	_, podName, _ := buildPodName(pod.Name, pod.Namespace, string(pod.UID))
+	sandboxName := buildSandboxName(pod)
 	podSandboxConfig := &runtimeApi.PodSandboxConfig{
-		Name:        &podName,
+		Name:        &sandboxName,
 		Labels:      newPodLabels(pod),
 		Annotations: newPodAnnotations(pod),
 	}
@@ -40,7 +40,6 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP
 			Servers:  dnsServers,
 			Searches: dnsSearches,
 		}
-
 		// TODO: Add domain support in new runtime interface
 		hostname, _, err := m.runtimeHelper.GeneratePodHostNameAndDomain(pod)
 		if err != nil {
@@ -50,25 +49,8 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP
 	}
 
 	cgroupParent := ""
-	podResourceLimits := make(map[api.ResourceName]int64)
-	podResourceRequests := make(map[api.ResourceName]int64)
 	portMappings := []*runtimeApi.PortMapping{}
 	for _, c := range pod.Spec.Containers {
-		for name, limit := range c.Resources.Limits {
-			if l, ok := podResourceLimits[name]; ok {
-				podResourceLimits[name] = l + limit.MilliValue()
-			} else {
-				podResourceLimits[name] = limit.MilliValue()
-			}
-		}
-		for name, req := range c.Resources.Requests {
-			if l, ok := podResourceRequests[name]; ok {
-				podResourceRequests[name] = l + req.MilliValue()
-			} else {
-				podResourceRequests[name] = req.MilliValue()
-			}
-		}
-
 		opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, podIP)
 		if err != nil {
 			return nil, err
@@ -90,51 +72,73 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP
 		cgroupParent = opts.CgroupParent
 	}
 
-	podSandboxConfig.Linux = generatePodSandboxLinuxConfig(pod, cgroupParent)
-
 	if len(portMappings) > 0 {
 		podSandboxConfig.PortMappings = portMappings
 	}
 
-	if len(podResourceLimits) > 0 || len(podResourceRequests) > 0 {
-		podSandboxConfig.Resources = &runtimeApi.PodSandboxResources{}
-		var podCPULimit, podMemoryLimit, podCPURequest, podMemoryRequest int64
-		for k, v := range podResourceLimits {
-			switch k {
-			case api.ResourceCPU:
-				podCPULimit = v
-			case api.ResourceMemory:
-				podMemoryLimit = v
-			}
-		}
-		for k, v := range podResourceRequests {
-			switch k {
-			case api.ResourceCPU:
-				podCPURequest = v
-			case api.ResourceMemory:
-				podMemoryRequest = v
-			}
-		}
-
-		cpuResource := &runtimeApi.ResourceRequirements{}
-		cpulimit := float64(podCPULimit) / 1000
-		cpuResource.Limits = &cpulimit
-
-		cpuRequest := float64(podCPURequest) / 1000
-		cpuResource.Requests = &cpuRequest
-		podSandboxConfig.Resources.Cpu = cpuResource
-
-		memoryResource := &runtimeApi.ResourceRequirements{}
-		memLimit := float64(podMemoryLimit) / 1000
-		memoryResource.Limits = &memLimit
-
-		memRequest := float64(podMemoryRequest) / 1000
-		memoryResource.Requests = &memRequest
-		podSandboxConfig.Resources.Memory = memoryResource
-
-	}
+	podSandboxConfig.Resources = generateSandboxResources(pod)
+	podSandboxConfig.Linux = generatePodSandboxLinuxConfig(pod, cgroupParent)
 
 	return podSandboxConfig, nil
+}
+
+// generateSandboxResources generates runtimeApi.PodSandboxResources from api.Pod
+func generateSandboxResources(pod *api.Pod) *runtimeApi.PodSandboxResources {
+	podResourceLimits := make(map[api.ResourceName]int64)
+	podResourceRequests := make(map[api.ResourceName]int64)
+	for _, c := range pod.Spec.Containers {
+		for name, limit := range c.Resources.Limits {
+			if l, ok := podResourceLimits[name]; ok {
+				podResourceLimits[name] = l + limit.MilliValue()
+			} else {
+				podResourceLimits[name] = limit.MilliValue()
+			}
+		}
+		for name, req := range c.Resources.Requests {
+			if l, ok := podResourceRequests[name]; ok {
+				podResourceRequests[name] = l + req.MilliValue()
+			} else {
+				podResourceRequests[name] = req.MilliValue()
+			}
+		}
+	}
+
+	var podCPULimit, podMemoryLimit, podCPURequest, podMemoryRequest int64
+	for k, v := range podResourceLimits {
+		switch k {
+		case api.ResourceCPU:
+			podCPULimit = v
+		case api.ResourceMemory:
+			podMemoryLimit = v
+		}
+	}
+	for k, v := range podResourceRequests {
+		switch k {
+		case api.ResourceCPU:
+			podCPURequest = v
+		case api.ResourceMemory:
+			podMemoryRequest = v
+		}
+	}
+
+	cpuResource := &runtimeApi.ResourceRequirements{}
+	cpulimit := float64(podCPULimit) / 1000
+	cpuResource.Limits = &cpulimit
+
+	cpuRequest := float64(podCPURequest) / 1000
+	cpuResource.Requests = &cpuRequest
+
+	memoryResource := &runtimeApi.ResourceRequirements{}
+	memLimit := float64(podMemoryLimit) / 1000
+	memoryResource.Limits = &memLimit
+
+	memRequest := float64(podMemoryRequest) / 1000
+	memoryResource.Requests = &memRequest
+
+	return &runtimeApi.PodSandboxResources{
+		Cpu:    cpuResource,
+		Memory: memoryResource,
+	}
 }
 
 // generatePodSandboxLinuxConfig generates LinuxPodSandboxConfig from api.Pod.

@@ -29,8 +29,10 @@ import (
 )
 
 const (
-	// containerNamePrefix is used to identify the containers/sandboxes on the node managed by kubelet
-	containerNamePrefix = "k8s"
+	// kubePrefix is used to identify the containers/sandboxes on the node managed by kubelet
+	kubePrefix = "k8s"
+	// kubeSandboxNamePrefix is used to keep sandbox name consistent with old podInfraContainer name
+	kubeSandboxNamePrefix = "POD"
 
 	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
 	minShares     = 2
@@ -42,29 +44,41 @@ const (
 	minQuotaPeriod = 1000
 )
 
-// buildPodName creates a name which can be reversed to identify pod full name
-// This function returns stable name, unique name and an unique id.
-func buildPodName(podName, podNamespace, podUID string) (string, string, string) {
-	return buildContainerName(podName, podNamespace, podUID, nil)
+// buildSandboxName creates a name which can be reversed to identify sandbox full name
+func buildSandboxName(pod *api.Pod) string {
+	stableName := fmt.Sprintf("%s_%s_%s_%s_%s",
+		kubePrefix,
+		kubeSandboxNamePrefix,
+		pod.Name,
+		pod.Namespace,
+		string(pod.UID),
+	)
+	UID := fmt.Sprintf("%08x", rand.Uint32())
+	return fmt.Sprintf("%s_%s", stableName, UID)
 }
 
-// parsePodName unpacks a pod full name, returning the pod name, namespace and uid
-func parsePodName(name string) (string, string, string, error) {
-	podName, podNamespace, podUID, _, _, err := parseContainerName(name)
-	return podName, podNamespace, podUID, err
-}
-
-// buildContainerName creates a name which can be reversed to identify both full pod name and container name.
-// This function returns stable name, unique name and an unique id.
-func buildContainerName(podName, podNamespace, podUID string, container *api.Container) (string, string, string) {
-	// Build name for pod sandbox if container is nil
-	containerName := "POD"
-	if container != nil {
-		containerName = container.Name + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+// parseSandboxName unpacks a sandbox full name, returning the pod name, namespace and uid
+func parseSandboxName(name string) (string, string, string, error) {
+	parts := strings.Split(name, "_")
+	if len(parts) == 0 || parts[0] != kubePrefix {
+		err := fmt.Errorf("failed to parse sandbox name %q into parts", name)
+		return "", "", "", err
+	}
+	if len(parts) < 6 {
+		glog.Warningf("Found a sandbox with the %q prefix, but too few fields (%d): %q", kubePrefix, len(parts), name)
+		err := fmt.Errorf("sandbox name %q has fewer parts than expected %v", name, parts)
+		return "", "", "", err
 	}
 
+	return parts[2], parts[3], parts[4], nil
+}
+
+// buildContainerName creates a name which can be reversed to identify container name.
+// This function returns stable name, unique name and an unique id.
+func buildContainerName(podName, podNamespace, podUID string, container *api.Container) (string, string, string) {
+	containerName := container.Name + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
 	stableName := fmt.Sprintf("%s_%s_%s_%s_%s",
-		containerNamePrefix,
+		kubePrefix,
 		containerName,
 		podName,
 		podNamespace,
@@ -74,18 +88,16 @@ func buildContainerName(podName, podNamespace, podUID string, container *api.Con
 	return stableName, fmt.Sprintf("%s_%s", stableName, UID), UID
 }
 
-// parseContainerName unpacks a container name, returning the pod full name and container name
+// parseContainerName unpacks a container name, returning the pod name, namespace, UID and container name
 func parseContainerName(name string) (podName, podNamespace, podUID, containerName string, hash uint64, err error) {
-	// Some container runtimes appear to be appending '/' to names.
-	name = strings.TrimPrefix(name, "/")
 	parts := strings.Split(name, "_")
-	if len(parts) == 0 || parts[0] != containerNamePrefix {
+	if len(parts) == 0 || parts[0] != kubePrefix {
 		err = fmt.Errorf("failed to parse container name %q into parts", name)
 		return "", "", "", "", 0, err
 	}
 	if len(parts) < 6 {
-		glog.Warningf("found a container with the %q prefix, but too few fields (%d): %q", containerNamePrefix, len(parts), name)
-		err = fmt.Errorf("Container name %q has less parts than expected %v", name, parts)
+		glog.Warningf("Found a container with the %q prefix, but too few fields (%d): %q", kubePrefix, len(parts), name)
+		err = fmt.Errorf("container name %q has fewer parts than expected %v", name, parts)
 		return "", "", "", "", 0, err
 	}
 
@@ -137,7 +149,6 @@ func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 	//  - cfs_quota=20ms (the amount of cpu time allowed to be used across a period)
 	// so in the above example, you are limited to 20% of a single CPU
 	// for multi-cpu environments, you just scale equivalent amounts
-
 	if milliCPU == 0 {
 		// take the default behavior from docker
 		return
