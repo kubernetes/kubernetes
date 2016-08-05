@@ -54,7 +54,13 @@ func PodMatchesTermsNamespaceAndSelector(pod *api.Pod, affinityPod *api.Pod, ter
 
 // nodesHaveSameTopologyKeyInternal checks if nodeA and nodeB have same label value with given topologyKey as label key.
 func nodesHaveSameTopologyKeyInternal(nodeA, nodeB *api.Node, topologyKey string) bool {
-	return nodeA.Labels != nil && nodeB.Labels != nil && len(nodeA.Labels[topologyKey]) > 0 && nodeA.Labels[topologyKey] == nodeB.Labels[topologyKey]
+	if nodeA.Labels == nil {
+		return nodeB.Labels == nil || nodeB.Labels[topologyKey] == ""
+	}
+	if nodeB.Labels == nil {
+		return nodeA.Labels == nil || nodeA.Labels[topologyKey] == ""
+	}
+	return nodeA.Labels[topologyKey] == nodeB.Labels[topologyKey]
 }
 
 type Topologies struct {
