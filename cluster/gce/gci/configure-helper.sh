@@ -48,16 +48,32 @@ function create-dirs {
   fi
 }
 
+# Formats the given device ($1) if needed and mounts it at given mount point
+# ($2).
+function safe-format-and-mount() {
+  device=$1
+  mountpoint=$2
+
+  # Format only if the disk is not already formatted.
+  if ! tune2fs -l "${device}" ; then
+    echo "Formatting '${device}'"
+    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0,discard "${device}"
+  fi
+
+  mkdir -p "${mountpoint}"
+  echo "Mounting '${device}' at '${mountpoint}'"
+  mount -o discard,defaults "${device}" "${mountpoint}"
+}
+
 # Local ssds, if present, are mounted at /mnt/disks/ssdN.
 function ensure-local-ssds() {
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
       ssdnum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
       ssdmount="/mnt/disks/ssd${ssdnum}/"
-      echo "Formatting and mounting local SSD $ssd to ${ssdmount}"
       mkdir -p ${ssdmount}
-      /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${ssd}" ${ssdmount} || \
-      { echo "Local SSD $ssdnum mount failed"; return 1; }
+      safe-format-and-mount "${ssd}" ${ssdmount}
+      echo "Mounted local SSD $ssd at ${ssdmount}"
       chmod a+w ${ssdmount}
     else
       echo "No local SSD disks found."
@@ -124,7 +140,7 @@ function find-master-pd {
 
 # Mounts a persistent disk (formatting if needed) to store the persistent data
 # on the master -- etcd's data, a few settings, and security certs/keys/tokens.
-# safe_format_and_mount only formats an unformatted disk, and mkdir -p will
+# safe-format-and-mount only formats an unformatted disk, and mkdir -p will
 # leave a directory be if it already exists.
 function mount-master-pd {
   find-master-pd
@@ -138,8 +154,8 @@ function mount-master-pd {
   # Format and mount the disk, create directories on it for all of the master's
   # persistent data, and link them to where they're used.
   mkdir -p "${mount_point}"
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${pd_path}" "${mount_point}" &>/var/log/master-pd-mount.log || \
-    { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
+  safe-format-and-mount "${pd_path}" "${mount_point}"
+  echo "Mounted master-pd '${pd_path}' at '${mount_point}'"
 
   # NOTE: These locations on the PD store persistent data, so to maintain
   # upgradeability, these locations should not change.  If they do, take care
