@@ -33,10 +33,11 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
-var reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 
 type e2eService struct {
 	killCmds []*killCmd
@@ -111,12 +112,12 @@ func (es *e2eService) start() error {
 // Since we scp files from the remote directory, symlinks will be treated as normal files and file contents will be copied over.
 func (es *e2eService) getLogFiles() {
 	// Nothing to do if report dir is not specified.
-	if *reportDir == "" {
+	if framework.TestContext.ReportDir == "" {
 		return
 	}
 	journaldFound := isJournaldAvailable()
 	for targetFileName, logFileData := range es.logFiles {
-		targetLink := path.Join(*reportDir, targetFileName)
+		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
 		if journaldFound {
 			// Skip log files that do not have an equivalent in journald based machines.
 			if len(logFileData.journalctlCommand) == 0 {
@@ -287,7 +288,7 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 		defer close(cmdErrorChan)
 
 		// Create the output filename
-		outPath := path.Join(*reportDir, cmd.outputFilename)
+		outPath := path.Join(framework.TestContext.ReportDir, cmd.outputFilename)
 		outfile, err := os.Create(outPath)
 		if err != nil {
 			cmdErrorChan <- fmt.Errorf("Failed to create file %s for `%s` %v.", outPath, cmd, err)
