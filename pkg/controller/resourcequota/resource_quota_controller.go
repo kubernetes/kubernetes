@@ -289,6 +289,10 @@ func (rq *ResourceQuotaController) syncResourceQuota(resourceQuota api.ResourceQ
 		used[key] = value
 	}
 
+	// ensure set of used values match those that have hard constraints
+	hardResources := quota.ResourceNames(hardLimits)
+	used = quota.Mask(used, hardResources)
+
 	// Create a usage object that is based on the quota resource version that will handle updates
 	// by default, we preserve the past usage observation, and set hard to the current spec
 	usage := api.ResourceQuota{
