@@ -32,7 +32,7 @@ type REST struct {
 
 // NewREST returns a RESTStorage object that will work against persistent volumes.
 func NewREST(opts generic.RESTOptions) *REST {
-	prefix := "/storageclasses"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &extensions.StorageClassList{} }
 	storageInterface := opts.Decorator(
