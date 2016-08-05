@@ -232,6 +232,34 @@ func NewNodeController(
 					glog.Errorf("Error allocating CIDR: %v", err)
 				}
 			},
+			UpdateFunc: func(_, obj interface{}) {
+				node := obj.(*api.Node)
+				// If the PodCIDR is not empty we either:
+				// - already processed a Node that already had a CIDR after NC restarted
+				//   (cidr is marked as used),
+				// - already processed a Node successfully and allocated a CIDR for it
+				//   (cidr is marked as used),
+				// - already processed a Node but we did saw a "timeout" response and
+				//   request eventually got through in this case we haven't released
+				//   the allocated CIDR (cidr is still marked as used).
+				// There's a possible error here:
+				// - NC sees a new Node and assigns a CIDR X to it,
+				// - Update Node call fails with a timeout,
+				// - Node is updated by some other component, NC sees an update and
+				//   assigns CIDR Y to the Node,
+				// - Both CIDR X and CIDR Y are marked as used in the local cache,
+				//   even though Node sees only CIDR Y
+				// The problem here is that in in-memory cache we see CIDR X as marked,
+				// which prevents it from being assigned to any new node. The cluster
+				// state is correct.
+				// Restart of NC fixes the issue.
+				if node.Spec.PodCIDR == "" {
+					err := nc.cidrAllocator.AllocateOrOccupyCIDR(node)
+					if err != nil {
+						glog.Errorf("Error allocating CIDR: %v", err)
+					}
+				}
+			},
 			DeleteFunc: func(obj interface{}) {
 				node := obj.(*api.Node)
 				err := nc.cidrAllocator.ReleaseCIDR(node)

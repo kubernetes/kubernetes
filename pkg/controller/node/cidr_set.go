@@ -78,26 +78,13 @@ func (s *cidrSet) allocateNext() (*net.IPNet, error) {
 	}, nil
 }
 
-func (s *cidrSet) release(cidr *net.IPNet) error {
-	used, err := s.getIndexForCIDR(cidr)
-	if err != nil {
-		return err
-	}
-
-	s.Lock()
-	defer s.Unlock()
-	s.used.SetBit(&s.used, used, 0)
-
-	return nil
-}
-
-func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
-	begin, end := 0, s.maxCIDRs
+func (s *cidrSet) getBeginingAndEndIndices(cidr *net.IPNet) (begin, end int, err error) {
+	begin, end = 0, s.maxCIDRs
 	cidrMask := cidr.Mask
 	maskSize, _ := cidrMask.Size()
 
 	if !s.clusterCIDR.Contains(cidr.IP.Mask(s.clusterCIDR.Mask)) && !cidr.Contains(s.clusterCIDR.IP.Mask(cidr.Mask)) {
-		return fmt.Errorf("cidr %v is out the range of cluster cidr %v", cidr, s.clusterCIDR)
+		return -1, -1, fmt.Errorf("cidr %v is out the range of cluster cidr %v", cidr, s.clusterCIDR)
 	}
 
 	if s.clusterMaskSize < maskSize {
@@ -107,7 +94,7 @@ func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
 			Mask: subNetMask,
 		})
 		if err != nil {
-			return err
+			return -1, -1, err
 		}
 
 		ip := make([]byte, 4)
@@ -118,8 +105,29 @@ func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
 			Mask: subNetMask,
 		})
 		if err != nil {
-			return err
+			return -1, -1, err
 		}
+	}
+	return begin, end, nil
+}
+
+func (s *cidrSet) release(cidr *net.IPNet) error {
+	begin, end, err := s.getBeginingAndEndIndices(cidr)
+	if err != nil {
+		return err
+	}
+	s.Lock()
+	defer s.Unlock()
+	for i := begin; i <= end; i++ {
+		s.used.SetBit(&s.used, i, 0)
+	}
+	return nil
+}
+
+func (s *cidrSet) occupy(cidr *net.IPNet) (err error) {
+	begin, end, err := s.getBeginingAndEndIndices(cidr)
+	if err != nil {
+		return err
 	}
 
 	s.Lock()
