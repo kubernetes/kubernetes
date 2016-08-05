@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os/exec"
+	"os"
 	"strings"
 	"time"
 
@@ -31,13 +31,13 @@ import (
 )
 
 func GetHostname(hostnameOverride string) string {
-	hostname := hostnameOverride
-	if string(hostname) == "" {
-		nodename, err := exec.Command("uname", "-n").Output()
+	var hostname string = hostnameOverride
+	if hostname == "" {
+		nodename, err := os.Hostname()
 		if err != nil {
 			glog.Fatalf("Couldn't determine hostname: %v", err)
 		}
-		hostname = string(nodename)
+		hostname = nodename
 	}
 	return strings.ToLower(strings.TrimSpace(hostname))
 }
