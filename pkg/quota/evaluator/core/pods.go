@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/api/validation"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -92,7 +93,7 @@ func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) erro
 	// TODO: fix this when we have pod level cgroups
 	// since we do not yet pod level requests/limits, we need to ensure each
 	// container makes an explict request or limit for a quota tracked resource
-	requiredSet := quota.ToSet(required)
+	requiredSet := resources.ToSet(required)
 	missingSet := sets.NewString()
 	for i := range pod.Spec.Containers {
 		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSet)
@@ -112,7 +113,7 @@ func enforcePodContainerConstraints(container *api.Container, requiredSet, missi
 	requests := container.Resources.Requests
 	limits := container.Resources.Limits
 	containerUsage := podUsageHelper(requests, limits)
-	containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
+	containerSet := resources.ToSet(resources.ResourceNames(containerUsage))
 	if !containerSet.Equal(requiredSet) {
 		difference := requiredSet.Difference(containerSet)
 		missingSet.Insert(difference.List()...)
@@ -158,15 +159,15 @@ func PodUsageFunc(object runtime.Object) api.ResourceList {
 	limits := api.ResourceList{}
 
 	for i := range pod.Spec.Containers {
-		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
-		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
+		requests = resources.Add(requests, pod.Spec.Containers[i].Resources.Requests)
+		limits = resources.Add(limits, pod.Spec.Containers[i].Resources.Limits)
 	}
 	// InitContainers are run sequentially before other containers start, so the highest
 	// init container resource is compared against the sum of app containers to determine
 	// the effective usage for both requests and limits.
 	for i := range pod.Spec.InitContainers {
-		requests = quota.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
-		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
+		requests = resources.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
+		limits = resources.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
 	return podUsageHelper(requests, limits)

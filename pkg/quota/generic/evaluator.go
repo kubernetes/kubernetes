@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -52,7 +53,7 @@ func MatchesNoScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) boo
 // specified resource name is in the required set of resource names
 func ObjectCountConstraintsFunc(resourceName api.ResourceName) ConstraintsFunc {
 	return func(required []api.ResourceName, item runtime.Object) error {
-		if !quota.Contains(required, resourceName) {
+		if !resources.Contains(required, resourceName) {
 			return fmt.Errorf("missing %s", resourceName)
 		}
 		return nil
@@ -193,7 +194,7 @@ func (g *GenericEvaluator) UsageStats(options quota.UsageStatsOptions) (quota.Us
 		}
 		// only count usage if there was a match
 		if matchesScopes {
-			result.Used = quota.Add(result.Used, g.Usage(item))
+			result.Used = resources.Add(result.Used, g.Usage(item))
 		}
 	}
 	return result, nil

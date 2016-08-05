@@ -21,19 +21,19 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/resources"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/quota"
 )
 
 func TestServiceEvaluatorMatchesResources(t *testing.T) {
 	kubeClient := fake.NewSimpleClientset()
 	evaluator := NewServiceEvaluator(kubeClient)
-	expected := quota.ToSet([]api.ResourceName{
+	expected := resources.ToSet([]api.ResourceName{
 		api.ResourceServices,
 		api.ResourceServicesNodePorts,
 		api.ResourceServicesLoadBalancers,
 	})
-	actual := quota.ToSet(evaluator.MatchesResources())
+	actual := resources.ToSet(evaluator.MatchesResources())
 	if !expected.Equal(actual) {
 		t.Errorf("expected: %v, actual: %v", expected, actual)
 	}
@@ -105,7 +105,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		actual := evaluator.Usage(testCase.service)
-		if !quota.Equals(testCase.usage, actual) {
+		if !resources.Equals(testCase.usage, actual) {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
 		}
 	}
