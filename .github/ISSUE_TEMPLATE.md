@@ -1,18 +1,15 @@
-<!-- PLEASE REMOVE THIS COMMENT BLOCK BEFORE SUBMITTING
+<!-- Thanks for filing an issue! Before hitting the button, please answer these questions.-->
 
-Thanks for filing an issue!  Before hitting the button, please read this.
+**Is this a request for help?** (If yes, you should use our troubleshooting guide and community support channels, see http://kubernetes.io/docs/troubleshooting/.):
 
-If this is a REQUEST FOR HELP, it is probably be better served by:
-  - Stack Overflow: http://stackoverflow.com/questions/tagged/kubernetes
-  - Mailing list: https://groups.google.com/forum/#!forum/google-containers
-  - Slack: http://slack.kubernetes.io/
 
-Please check for duplicates.  We know searching for dups can be tricky, but we
-appreciate that you try.
-  - If you find an issue that sounds like your bug/feature, reply there.
-  - If you just want to say "me too", PLEASE DO NOT REPLY. Instead, use the
-    smiley-face icon in the upper-right of the issue message.
+**What keywords did you search in Kubernetes issues before filing this one?** (If you found any duplicates, you should instead reply there or use the :+1: icon in the upper-right of the issue message):
 
+---
+
+**Is this a BUG REPORT or FEATURE REQUEST?** (choose one):
+
+<!--
 If this is a BUG REPORT, please:
   - Fill in as much of the template below as you can.  If you leave out
     information, we can't help you as well.
@@ -26,27 +23,25 @@ might close your issue.  If we're wrong, PLEASE feel free to reopen it and
 explain why.
 -->
 
-----------
-BUG REPORT
-----------
-
-*Kubernetes version*: (try `kubctl version`)
+**Kubernetes version** (use `kubectl version`):
 
 
-*Environment (e.g. cloud provider, OS, kernel, install tools)*:
+**Environment**:
+- **Cloud provider or hardware configuration**:
+- **OS** (e.g. from /etc/os-release):
+- **Kernel** (e.g. `uname -a`):
+- **Install tools**:
+- **Others**:
 
 
-*What happened*:
+**What happened**:
 
 
-*What you expected to happen*:
+**What you expected to happen**:
 
 
-*How to reproduce it, as minimally and precisely as possible*:
+**How to reproduce it** (as minimally and precisely as possible):
 
 
-*Anything else do we need to know*:
+**Anything else do we need to know**:
 
-
-
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/.github/ISSUE_TEMPLATE.md?pixel)]()
