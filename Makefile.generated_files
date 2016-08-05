@@ -209,6 +209,7 @@ DEEPCOPY_FILES := $(addsuffix /$(DEEPCOPY_FILENAME), $(DEEPCOPY_DIRS))
 gen_deepcopy: $(DEEPCOPY_FILES)
 	if [[ -f $(META_DIR)/$(DEEPCOPY_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(DEEPCOPY_GEN)                         \
+	        --v $(KUBE_VERBOSE)                                         \
 	        -i $$(cat $(META_DIR)/$(DEEPCOPY_GEN).todo | paste -sd, -)  \
 	        --bounding-dirs $(PRJ_SRC_PATH)                             \
 	        -O $(DEEPCOPY_BASENAME);                                    \
@@ -323,6 +324,7 @@ CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
 gen_conversion: $(CONVERSION_FILES)
 	if [[ -f $(META_DIR)/$(CONVERSION_GEN).todo ]]; then                  \
 	    ./hack/run-in-gopath.sh $(CONVERSION_GEN)                         \
+	        --v $(KUBE_VERBOSE)                                           \
 	        -i $$(cat $(META_DIR)/$(CONVERSION_GEN).todo | paste -sd, -)  \
 	        -O $(CONVERSION_BASENAME);                                    \
 	fi
