@@ -2248,50 +2248,103 @@ func TestPruneInitContainers(t *testing.T) {
 }
 
 func TestGetPodStatusFromNetworkPlugin(t *testing.T) {
-	const (
-		containerID      = "123"
-		infraContainerID = "9876"
-		fakePodIP        = "10.10.10.10"
-	)
-	dm, fakeDocker := newTestDockerManager()
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-	fnp := mock_network.NewMockNetworkPlugin(ctrl)
-	dm.networkPlugin = fnp
-
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
+	cases := []struct {
+		pod                *api.Pod
+		fakePodIP          string
+		containerID        string
+		infraContainerID   string
+		networkStatusError error
+		expectRunning      bool
+		expectUnknown      bool
+	}{
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "container"}},
+				},
+			},
+			fakePodIP:          "10.10.10.10",
+			containerID:        "123",
+			infraContainerID:   "9876",
+			networkStatusError: nil,
+			expectRunning:      true,
+			expectUnknown:      false,
 		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{{Name: "container"}},
+		{
+			pod: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					UID:       "12345678",
+					Name:      "foo",
+					Namespace: "new",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "container"}},
+				},
+			},
+			fakePodIP:          "",
+			containerID:        "123",
+			infraContainerID:   "9876",
+			networkStatusError: fmt.Errorf("CNI plugin error"),
+			expectRunning:      false,
+			expectUnknown:      true,
 		},
 	}
+	for _, test := range cases {
+		dm, fakeDocker := newTestDockerManager()
+		ctrl := gomock.NewController(t)
+		fnp := mock_network.NewMockNetworkPlugin(ctrl)
+		dm.networkPlugin = fnp
 
-	fakeDocker.SetFakeRunningContainers([]*FakeContainer{
-		{
-			ID:      containerID,
-			Name:    "/k8s_container_foo_new_12345678_42",
-			Running: true,
-		},
-		{
-			ID:      infraContainerID,
-			Name:    "/k8s_POD." + strconv.FormatUint(generatePodInfraContainerHash(pod), 16) + "_foo_new_12345678_42",
-			Running: true,
-		},
-	})
+		fakeDocker.SetFakeRunningContainers([]*FakeContainer{
+			{
+				ID:      test.containerID,
+				Name:    fmt.Sprintf("/k8s_container_%s_%s_%s_42", test.pod.Name, test.pod.Namespace, test.pod.UID),
+				Running: true,
+			},
+			{
+				ID:      test.infraContainerID,
+				Name:    fmt.Sprintf("/k8s_POD.%s_%s_%s_%s_42", strconv.FormatUint(generatePodInfraContainerHash(test.pod), 16), test.pod.Name, test.pod.Namespace, test.pod.UID),
+				Running: true,
+			},
+		})
 
-	fnp.EXPECT().Name().Return("someNetworkPlugin")
-	fnp.EXPECT().GetPodNetworkStatus("new", "foo", kubecontainer.DockerID(infraContainerID).ContainerID()).Return(&network.PodNetworkStatus{IP: net.ParseIP(fakePodIP)}, nil)
+		fnp.EXPECT().Name().Return("someNetworkPlugin").AnyTimes()
+		var podNetworkStatus *network.PodNetworkStatus
+		if test.fakePodIP != "" {
+			podNetworkStatus = &network.PodNetworkStatus{IP: net.ParseIP(test.fakePodIP)}
+		}
+		fnp.EXPECT().GetPodNetworkStatus(test.pod.Namespace, test.pod.Name, kubecontainer.DockerID(test.infraContainerID).ContainerID()).Return(podNetworkStatus, test.networkStatusError)
 
-	podStatus, err := dm.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if podStatus.IP != fakePodIP {
-		t.Errorf("Got wrong ip, expected %v, got %v", fakePodIP, podStatus.IP)
+		podStatus, err := dm.GetPodStatus(test.pod.UID, test.pod.Name, test.pod.Namespace)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if podStatus.IP != test.fakePodIP {
+			t.Errorf("Got wrong ip, expected %v, got %v", test.fakePodIP, podStatus.IP)
+		}
+
+		expectedStatesCount := 0
+		var expectedState kubecontainer.ContainerState
+		if test.expectRunning {
+			expectedState = kubecontainer.ContainerStateRunning
+		} else if test.expectUnknown {
+			expectedState = kubecontainer.ContainerStateUnknown
+		} else {
+			t.Errorf("Some state has to be expected")
+		}
+		for _, containerStatus := range podStatus.ContainerStatuses {
+			if containerStatus.State == expectedState {
+				expectedStatesCount++
+			}
+		}
+		if expectedStatesCount < 1 {
+			t.Errorf("Invalid count of containers with expected state")
+		}
 	}
 }
 
