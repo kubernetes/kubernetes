@@ -71,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -551,6 +552,8 @@ func NewMainKubelet(
 	}
 	klet.AddPodSyncLoopHandler(activeDeadlineHandler)
 	klet.AddPodSyncHandler(activeDeadlineHandler)
+
+	klet.AddPodAdmitHandler(apparmor.NewValidator(containerRuntime))
 
 	// apply functional Option's
 	for _, opt := range kubeOptions {
