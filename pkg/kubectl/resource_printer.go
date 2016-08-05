@@ -414,6 +414,7 @@ var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLA
 var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
+var scheduledJobColumns = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
 var ingressColumns = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 var petSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
@@ -459,6 +460,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(daemonSetColumns, printDaemonSetList)
 	h.Handler(jobColumns, printJob)
 	h.Handler(jobColumns, printJobList)
+	h.Handler(scheduledJobColumns, printScheduledJob)
+	h.Handler(scheduledJobColumns, printScheduledJobList)
 	h.Handler(serviceColumns, printService)
 	h.Handler(serviceColumns, printServiceList)
 	h.Handler(ingressColumns, printIngress)
@@ -964,6 +967,42 @@ func printJob(job *batch.Job, w io.Writer, options PrintOptions) error {
 func printJobList(list *batch.JobList, w io.Writer, options PrintOptions) error {
 	for _, job := range list.Items {
 		if err := printJob(&job, w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printScheduledJob(scheduledJob *batch.ScheduledJob, w io.Writer, options PrintOptions) error {
+	name := scheduledJob.Name
+	namespace := scheduledJob.Namespace
+
+	if options.WithNamespace {
+		if _, err := fmt.Fprintf(w, "%s\t", namespace); err != nil {
+			return err
+		}
+	}
+
+	lastScheduleTime := "<none>"
+	if scheduledJob.Status.LastScheduleTime != nil {
+		lastScheduleTime = scheduledJob.Status.LastScheduleTime.Time.Format(time.RFC1123Z)
+	}
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n",
+		name,
+		scheduledJob.Spec.Schedule,
+		printBoolPtr(scheduledJob.Spec.Suspend),
+		len(scheduledJob.Status.Active),
+		lastScheduleTime,
+	); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func printScheduledJobList(list *batch.ScheduledJobList, w io.Writer, options PrintOptions) error {
+	for _, scheduledJob := range list.Items {
+		if err := printScheduledJob(&scheduledJob, w, options); err != nil {
 			return err
 		}
 	}

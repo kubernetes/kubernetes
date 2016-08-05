@@ -3494,11 +3494,12 @@ func (x *ScheduledJobSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			const yyr2 bool = false
 			yyq2[1] = x.StartingDeadlineSeconds != nil
 			yyq2[2] = x.ConcurrencyPolicy != ""
+			yyq2[3] = x.Suspend != nil
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(5)
 			} else {
-				yynn2 = 3
+				yynn2 = 2
 				for _, b := range yyq2 {
 					if b {
 						yynn2++
@@ -3578,30 +3579,36 @@ func (x *ScheduledJobSpec) CodecEncodeSelf(e *codec1978.Encoder) {
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
-				if x.Suspend == nil {
-					r.EncodeNil()
-				} else {
-					yy15 := *x.Suspend
-					yym16 := z.EncBinary()
-					_ = yym16
-					if false {
+				if yyq2[3] {
+					if x.Suspend == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeBool(bool(yy15))
+						yy15 := *x.Suspend
+						yym16 := z.EncBinary()
+						_ = yym16
+						if false {
+						} else {
+							r.EncodeBool(bool(yy15))
+						}
 					}
+				} else {
+					r.EncodeNil()
 				}
 			} else {
-				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("suspend"))
-				z.EncSendContainerState(codecSelfer_containerMapValue1234)
-				if x.Suspend == nil {
-					r.EncodeNil()
-				} else {
-					yy17 := *x.Suspend
-					yym18 := z.EncBinary()
-					_ = yym18
-					if false {
+				if yyq2[3] {
+					z.EncSendContainerState(codecSelfer_containerMapKey1234)
+					r.EncodeString(codecSelferC_UTF81234, string("suspend"))
+					z.EncSendContainerState(codecSelfer_containerMapValue1234)
+					if x.Suspend == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeBool(bool(yy17))
+						yy17 := *x.Suspend
+						yym18 := z.EncBinary()
+						_ = yym18
+						if false {
+						} else {
+							r.EncodeBool(bool(yy17))
+						}
 					}
 				}
 			}
