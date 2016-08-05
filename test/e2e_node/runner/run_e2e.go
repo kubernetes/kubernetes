@@ -194,19 +194,19 @@ func main() {
 	running := 0
 	for shortName := range gceImages.images {
 		imageConfig := gceImages.images[shortName]
-		running++
 		fmt.Printf("Initializing e2e tests using image %s.\n", shortName)
-		go func(image *internalGCEImage, junitFileNum int) {
-			results <- testImage(image, junitFileNum)
-		}(&imageConfig, running)
+		running++
+		go func(image *internalGCEImage, junitFilePrefix string) {
+			results <- testImage(image, junitFilePrefix)
+		}(&imageConfig, shortName)
 	}
 	if *hosts != "" {
 		for _, host := range strings.Split(*hosts, ",") {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
-			go func(host string, junitFileNum int) {
-				results <- testHost(host, *cleanup, junitFileNum, *setupNode)
-			}(host, running)
+			go func(host string, junitFilePrefix string) {
+				results <- testHost(host, *cleanup, junitFilePrefix, *setupNode)
+			}(host, host)
 		}
 	}
 
@@ -267,7 +267,7 @@ func getImageMetadata(input string) *compute.Metadata {
 }
 
 // Run tests in archive against host
-func testHost(host string, deleteFiles bool, junitFileNum int, setupNode bool) *TestResult {
+func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode bool) *TestResult {
 	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
 	if err != nil {
 		return &TestResult{
@@ -297,7 +297,7 @@ func testHost(host string, deleteFiles bool, junitFileNum int, setupNode bool) *
 		}
 	}
 
-	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFileNum, setupNode, *testArgs)
+	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -308,7 +308,7 @@ func testHost(host string, deleteFiles bool, junitFileNum int, setupNode bool) *
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(image *internalGCEImage, junitFileNum int) *TestResult {
+func testImage(image *internalGCEImage, junitFilePrefix string) *TestResult {
 	host, err := createInstance(image)
 	if *deleteInstances {
 		defer deleteInstance(image.image)
@@ -322,7 +322,7 @@ func testImage(image *internalGCEImage, junitFileNum int) *TestResult {
 	// Only delete the files if we are keeping the instance and want it cleaned up.
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
-	return testHost(host, deleteFiles, junitFileNum, *setupNode)
+	return testHost(host, deleteFiles, junitFilePrefix, *setupNode)
 }
 
 // Provision a gce instance using image

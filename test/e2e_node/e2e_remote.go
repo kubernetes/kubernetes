@@ -146,7 +146,7 @@ func CreateTestArchive() (string, error) {
 }
 
 // Returns the command output, whether the exit was ok, and any errors
-func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, setupNode bool, testArgs string) (string, bool, error) {
+func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string, setupNode bool, testArgs string) (string, bool, error) {
 	if setupNode {
 		uname, err := user.Current()
 		if err != nil {
@@ -214,7 +214,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 	// Run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
-		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d %s", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFileNumber, testArgs),
+		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --report-prefix=%s %s", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFilePrefix, testArgs),
 	)
 	aggErrs := []error{}
 
