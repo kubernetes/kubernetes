@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package images
 
 import (
 	"fmt"
@@ -33,10 +33,10 @@ import (
 
 var zero time.Time
 
-func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *containertest.FakeRuntime, *cadvisortest.Mock) {
+func newRealImageGCManager(policy ImageGCPolicy) (*realImageGCManager, *containertest.FakeRuntime, *cadvisortest.Mock) {
 	fakeRuntime := &containertest.FakeRuntime{}
 	mockCadvisor := new(cadvisortest.Mock)
-	return &realImageManager{
+	return &realImageGCManager{
 		runtime:      fakeRuntime,
 		policy:       policy,
 		imageRecords: make(map[string]*imageRecord),
@@ -46,12 +46,12 @@ func newRealImageManager(policy ImageGCPolicy) (*realImageManager, *containertes
 }
 
 // Accessors used for thread-safe testing.
-func (im *realImageManager) imageRecordsLen() int {
+func (im *realImageGCManager) imageRecordsLen() int {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
 	return len(im.imageRecords)
 }
-func (im *realImageManager) getImageRecord(name string) (*imageRecord, bool) {
+func (im *realImageGCManager) getImageRecord(name string) (*imageRecord, bool) {
 	im.imageRecordsLock.Lock()
 	defer im.imageRecordsLock.Unlock()
 	v, ok := im.imageRecords[name]
@@ -87,7 +87,7 @@ func makeContainer(id int) *container.Container {
 }
 
 func TestDetectImagesInitialDetect(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -131,7 +131,7 @@ func TestDetectImagesInitialDetect(t *testing.T) {
 
 func TestDetectImagesWithNewImage(t *testing.T) {
 	// Just one image initially.
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -176,7 +176,7 @@ func TestDetectImagesWithNewImage(t *testing.T) {
 }
 
 func TestDetectImagesContainerStopped(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -212,7 +212,7 @@ func TestDetectImagesContainerStopped(t *testing.T) {
 }
 
 func TestDetectImagesWithRemovedImages(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -238,7 +238,7 @@ func TestDetectImagesWithRemovedImages(t *testing.T) {
 }
 
 func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -259,7 +259,7 @@ func TestFreeSpaceImagesInUseContainersAreIgnored(t *testing.T) {
 }
 
 func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -281,7 +281,7 @@ func TestDeleteUnusedImagesRemoveAllUnusedImages(t *testing.T) {
 }
 
 func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 		makeImage(1, 2048),
@@ -321,7 +321,7 @@ func TestFreeSpaceRemoveByLeastRecentlyUsed(t *testing.T) {
 }
 
 func TestFreeSpaceTiesBrokenByDetectedTime(t *testing.T) {
-	manager, fakeRuntime, _ := newRealImageManager(ImageGCPolicy{})
+	manager, fakeRuntime, _ := newRealImageGCManager(ImageGCPolicy{})
 	fakeRuntime.ImageList = []container.Image{
 		makeImage(0, 1024),
 	}
@@ -356,7 +356,7 @@ func TestGarbageCollectBelowLowThreshold(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, _, mockCadvisor := newRealImageManager(policy)
+	manager, _, mockCadvisor := newRealImageGCManager(policy)
 
 	// Expect 40% usage.
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
@@ -372,7 +372,7 @@ func TestGarbageCollectCadvisorFailure(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, _, mockCadvisor := newRealImageManager(policy)
+	manager, _, mockCadvisor := newRealImageGCManager(policy)
 
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, fmt.Errorf("error"))
 	assert.NotNil(t, manager.GarbageCollect())
@@ -383,7 +383,7 @@ func TestGarbageCollectBelowSuccess(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, fakeRuntime, mockCadvisor := newRealImageManager(policy)
+	manager, fakeRuntime, mockCadvisor := newRealImageGCManager(policy)
 
 	// Expect 95% usage and most of it gets freed.
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
@@ -402,7 +402,7 @@ func TestGarbageCollectNotEnoughFreed(t *testing.T) {
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	manager, fakeRuntime, mockCadvisor := newRealImageManager(policy)
+	manager, fakeRuntime, mockCadvisor := newRealImageGCManager(policy)
 
 	// Expect 95% usage and little of it gets freed.
 	mockCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{
@@ -424,7 +424,7 @@ func TestGarbageCollectImageNotOldEnough(t *testing.T) {
 	}
 	fakeRuntime := &containertest.FakeRuntime{}
 	mockCadvisor := new(cadvisortest.Mock)
-	manager := &realImageManager{
+	manager := &realImageGCManager{
 		runtime:      fakeRuntime,
 		policy:       policy,
 		imageRecords: make(map[string]*imageRecord),

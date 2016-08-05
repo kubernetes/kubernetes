@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubelet
+package images
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ import (
 // Manages lifecycle of all images.
 //
 // Implementation is thread-safe.
-type imageManager interface {
+type ImageGCManager interface {
 	// Applies the garbage collection policy. Errors include being unable to free
 	// enough space as per the garbage collection policy.
 	GarbageCollect() error
@@ -50,8 +50,6 @@ type imageManager interface {
 
 	// Delete all unused images and returns the number of bytes freed. The number of bytes freed is always returned.
 	DeleteUnusedImages() (int64, error)
-
-	// TODO(vmarmol): Have this subsume pulls as well.
 }
 
 // A policy for garbage collecting images. Policy defines an allowed band in
@@ -69,7 +67,7 @@ type ImageGCPolicy struct {
 	MinAge time.Duration
 }
 
-type realImageManager struct {
+type realImageGCManager struct {
 	// Container runtime
 	runtime container.Runtime
 
@@ -105,7 +103,7 @@ type imageRecord struct {
 	size int64
 }
 
-func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (imageManager, error) {
+func NewImageGCManager(runtime container.Runtime, cadvisorInterface cadvisor.Interface, recorder record.EventRecorder, nodeRef *api.ObjectReference, policy ImageGCPolicy) (ImageGCManager, error) {
 	// Validate policy.
 	if policy.HighThresholdPercent < 0 || policy.HighThresholdPercent > 100 {
 		return nil, fmt.Errorf("invalid HighThresholdPercent %d, must be in range [0-100]", policy.HighThresholdPercent)
@@ -116,7 +114,7 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 	if policy.LowThresholdPercent > policy.HighThresholdPercent {
 		return nil, fmt.Errorf("LowThresholdPercent %d can not be higher than HighThresholdPercent %d", policy.LowThresholdPercent, policy.HighThresholdPercent)
 	}
-	im := &realImageManager{
+	im := &realImageGCManager{
 		runtime:      runtime,
 		policy:       policy,
 		imageRecords: make(map[string]*imageRecord),
@@ -129,7 +127,7 @@ func newImageManager(runtime container.Runtime, cadvisorInterface cadvisor.Inter
 	return im, nil
 }
 
-func (im *realImageManager) Start() error {
+func (im *realImageGCManager) Start() error {
 	go wait.Until(func() {
 		// Initial detection make detected time "unknown" in the past.
 		var ts time.Time
@@ -138,7 +136,7 @@ func (im *realImageManager) Start() error {
 		}
 		err := im.detectImages(ts)
 		if err != nil {
-			glog.Warningf("[ImageManager] Failed to monitor images: %v", err)
+			glog.Warningf("[imageGCManager] Failed to monitor images: %v", err)
 		} else {
 			im.initialized = true
 		}
@@ -148,7 +146,7 @@ func (im *realImageManager) Start() error {
 }
 
 // Get a list of images on this node
-func (im *realImageManager) GetImageList() ([]kubecontainer.Image, error) {
+func (im *realImageGCManager) GetImageList() ([]kubecontainer.Image, error) {
 	images, err := im.runtime.ListImages()
 	if err != nil {
 		return nil, err
@@ -156,7 +154,7 @@ func (im *realImageManager) GetImageList() ([]kubecontainer.Image, error) {
 	return images, nil
 }
 
-func (im *realImageManager) detectImages(detectTime time.Time) error {
+func (im *realImageGCManager) detectImages(detectTime time.Time) error {
 	images, err := im.runtime.ListImages()
 	if err != nil {
 		return err
@@ -213,7 +211,7 @@ func (im *realImageManager) detectImages(detectTime time.Time) error {
 	return nil
 }
 
-func (im *realImageManager) GarbageCollect() error {
+func (im *realImageGCManager) GarbageCollect() error {
 	// Get disk usage on disk holding images.
 	fsInfo, err := im.cadvisor.ImagesFsInfo()
 	if err != nil {
@@ -237,7 +235,7 @@ func (im *realImageManager) GarbageCollect() error {
 	usagePercent := 100 - int(available*100/capacity)
 	if usagePercent >= im.policy.HighThresholdPercent {
 		amountToFree := capacity*int64(100-im.policy.LowThresholdPercent)/100 - available
-		glog.Infof("[ImageManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, im.policy.HighThresholdPercent, amountToFree)
+		glog.Infof("[imageGCManager]: Disk usage on %q (%s) is at %d%% which is over the high threshold (%d%%). Trying to free %d bytes", fsInfo.Device, fsInfo.Mountpoint, usagePercent, im.policy.HighThresholdPercent, amountToFree)
 		freed, err := im.freeSpace(amountToFree, time.Now())
 		if err != nil {
 			return err
@@ -253,7 +251,7 @@ func (im *realImageManager) GarbageCollect() error {
 	return nil
 }
 
-func (im *realImageManager) DeleteUnusedImages() (int64, error) {
+func (im *realImageGCManager) DeleteUnusedImages() (int64, error) {
 	return im.freeSpace(math.MaxInt64, time.Now())
 }
 
@@ -263,7 +261,7 @@ func (im *realImageManager) DeleteUnusedImages() (int64, error) {
 // bytes freed is always returned.
 // Note that error may be nil and the number of bytes free may be less
 // than bytesToFree.
-func (im *realImageManager) freeSpace(bytesToFree int64, freeTime time.Time) (int64, error) {
+func (im *realImageGCManager) freeSpace(bytesToFree int64, freeTime time.Time) (int64, error) {
 	err := im.detectImages(freeTime)
 	if err != nil {
 		return 0, err
@@ -302,7 +300,7 @@ func (im *realImageManager) freeSpace(bytesToFree int64, freeTime time.Time) (in
 		}
 
 		// Remove image. Continue despite errors.
-		glog.Infof("[ImageManager]: Removing image %q to free %d bytes", image.id, image.size)
+		glog.Infof("[imageGCManager]: Removing image %q to free %d bytes", image.id, image.size)
 		err := im.runtime.RemoveImage(container.ImageSpec{Image: image.id})
 		if err != nil {
 			deletionErrors = append(deletionErrors, err)
