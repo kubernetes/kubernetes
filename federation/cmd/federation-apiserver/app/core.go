@@ -28,13 +28,16 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
+	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 )
 
 func installCoreAPIs(s *genericoptions.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
 	serviceStore, serviceStatusStore := serviceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("service")))
 	namespaceStore, namespaceStatusStore, _ := namespaceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("namespaces")))
+	secretStore := secretetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("secrets")))
 	coreResources := map[string]rest.Storage{
+		"secrets":           secretStore,
 		"services":          serviceStore,
 		"services/status":   serviceStatusStore,
 		"namespaces":        namespaceStore,
