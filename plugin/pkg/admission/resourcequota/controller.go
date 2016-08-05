@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/util/matrix"
 	"k8s.io/kubernetes/pkg/quota"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -210,7 +211,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 		// that means that no quota docs applied, so it can get a pass
 		atLeastOneChangeForThisWaiter := false
 		for j := range newQuotas {
-			if !quota.Equals(originalQuotas[j].Status.Used, newQuotas[j].Status.Used) {
+			if !matrix.Equals(originalQuotas[j].Status.Used, newQuotas[j].Status.Used) {
 				atLeastOneChanged = true
 				atLeastOneChangeForThisWaiter = true
 				break
@@ -237,7 +238,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 	for i := range quotas {
 		newQuota := quotas[i]
 		// if this quota didn't have its status changed, skip it
-		if quota.Equals(originalQuotas[i].Status.Used, newQuota.Status.Used) {
+		if matrix.Equals(originalQuotas[i].Status.Used, newQuota.Status.Used) {
 			continue
 		}
 
@@ -326,9 +327,9 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 			continue
 		}
 
-		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
+		hardResources := matrix.ResourceNames(resourceQuota.Status.Hard)
 		evaluatorResources := evaluator.MatchesResources()
-		requiredResources := quota.Intersection(hardResources, evaluatorResources)
+		requiredResources := matrix.Intersection(hardResources, evaluatorResources)
 		err := evaluator.Constraints(requiredResources, inputObject)
 		if err != nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("Failed quota: %s: %v", resourceQuota.Name, err))
@@ -364,22 +365,22 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 			return nil, admission.NewForbidden(a, fmt.Errorf("Unable to get previous usage since prior version of object was not found"))
 		}
 		prevUsage := evaluator.Usage(prevItem)
-		deltaUsage = quota.Subtract(deltaUsage, prevUsage)
+		deltaUsage = matrix.Subtract(deltaUsage, prevUsage)
 	}
-	if quota.IsZero(deltaUsage) {
+	if matrix.IsZero(deltaUsage) {
 		return quotas, nil
 	}
 
 	for _, index := range interestingQuotaIndexes {
 		resourceQuota := quotas[index]
 
-		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
-		requestedUsage := quota.Mask(deltaUsage, hardResources)
-		newUsage := quota.Add(resourceQuota.Status.Used, requestedUsage)
-		if allowed, exceeded := quota.LessThanOrEqual(newUsage, resourceQuota.Status.Hard); !allowed {
-			failedRequestedUsage := quota.Mask(requestedUsage, exceeded)
-			failedUsed := quota.Mask(resourceQuota.Status.Used, exceeded)
-			failedHard := quota.Mask(resourceQuota.Status.Hard, exceeded)
+		hardResources := matrix.ResourceNames(resourceQuota.Status.Hard)
+		requestedUsage := matrix.Mask(deltaUsage, hardResources)
+		newUsage := matrix.Add(resourceQuota.Status.Used, requestedUsage)
+		if allowed, exceeded := matrix.LessThanOrEqual(newUsage, resourceQuota.Status.Hard); !allowed {
+			failedRequestedUsage := matrix.Mask(requestedUsage, exceeded)
+			failedUsed := matrix.Mask(resourceQuota.Status.Used, exceeded)
+			failedHard := matrix.Mask(resourceQuota.Status.Hard, exceeded)
 			return nil, admission.NewForbidden(a,
 				fmt.Errorf("Exceeded quota: %s, requested: %s, used: %s, limited: %s",
 					resourceQuota.Name,

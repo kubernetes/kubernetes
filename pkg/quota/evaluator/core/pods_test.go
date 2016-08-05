@@ -21,8 +21,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/util/matrix"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
-	"k8s.io/kubernetes/pkg/quota"
 )
 
 func TestPodConstraintsFunc(t *testing.T) {
@@ -246,7 +246,7 @@ func TestPodEvaluatorUsage(t *testing.T) {
 	}
 	for testName, testCase := range testCases {
 		actual := evaluator.Usage(testCase.pod)
-		if !quota.Equals(testCase.usage, actual) {
+		if !matrix.Equals(testCase.usage, actual) {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
 		}
 	}
