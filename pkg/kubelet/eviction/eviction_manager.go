@@ -40,6 +40,8 @@ type managerImpl struct {
 	config Config
 	// the function to invoke to kill a pod
 	killPodFunc KillPodFunc
+	// the interface that knows how to do image gc
+	imageGC ImageGC
 	// protects access to internal state
 	sync.RWMutex
 	// node conditions are the set of conditions present
@@ -54,8 +56,12 @@ type managerImpl struct {
 	summaryProvider stats.SummaryProvider
 	// records when a threshold was first observed
 	thresholdsFirstObservedAt thresholdsObservedAt
+	// records the set of thresholds that have been met (including graceperiod) but not yet resolved
+	thresholdsMet []Threshold
 	// resourceToRankFunc maps a resource to ranking function for that resource.
 	resourceToRankFunc map[api.ResourceName]rankFunc
+	// resourceToNodeReclaimFuncs maps a resource to an ordered list of functions that know how to reclaim that resource.
+	resourceToNodeReclaimFuncs map[api.ResourceName]nodeReclaimFuncs
 }
 
 // ensure it implements the required interface
@@ -66,12 +72,14 @@ func NewManager(
 	summaryProvider stats.SummaryProvider,
 	config Config,
 	killPodFunc KillPodFunc,
+	imageGC ImageGC,
 	recorder record.EventRecorder,
 	nodeRef *api.ObjectReference,
 	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
 	manager := &managerImpl{
 		clock:           clock,
 		killPodFunc:     killPodFunc,
+		imageGC:         imageGC,
 		config:          config,
 		recorder:        recorder,
 		summaryProvider: summaryProvider,
@@ -138,13 +146,14 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// build the ranking functions (if not yet known)
 	// TODO: have a function in cadvisor that lets us know if global housekeeping has completed
-	if len(m.resourceToRankFunc) == 0 {
+	if len(m.resourceToRankFunc) == 0 || len(m.resourceToNodeReclaimFuncs) == 0 {
 		// this may error if cadvisor has yet to complete housekeeping, so we will just try again in next pass.
 		hasDedicatedImageFs, err := diskInfoProvider.HasDedicatedImageFs()
 		if err != nil {
 			return
 		}
 		m.resourceToRankFunc = buildResourceToRankFunc(hasDedicatedImageFs)
+		m.resourceToNodeReclaimFuncs = buildResourceToNodeReclaimFuncs(m.imageGC, hasDedicatedImageFs)
 	}
 
 	// make observations and get a function to derive pod usage stats relative to those observations.
@@ -158,7 +167,13 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	now := m.clock.Now()
 
 	// determine the set of thresholds met independent of grace period
-	thresholds = thresholdsMet(thresholds, observations)
+	thresholds = thresholdsMet(thresholds, observations, false)
+
+	// determine the set of thresholds previously met that have not yet satisfied the associated min-reclaim
+	if len(m.thresholdsMet) > 0 {
+		thresholdsNotYetResolved := thresholdsMet(m.thresholdsMet, observations, true)
+		thresholds = mergeThresholds(thresholds, thresholdsNotYetResolved)
+	}
 
 	// track when a threshold was first observed
 	thresholdsFirstObservedAt := thresholdsFirstObservedAt(thresholds, m.thresholdsFirstObservedAt, now)
@@ -180,10 +195,11 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	m.nodeConditions = nodeConditions
 	m.thresholdsFirstObservedAt = thresholdsFirstObservedAt
 	m.nodeConditionsLastObservedAt = nodeConditionsLastObservedAt
+	m.thresholdsMet = thresholds
 	m.Unlock()
 
 	// determine the set of resources under starvation
-	starvedResources := reclaimResources(thresholds)
+	starvedResources := getStarvedResources(thresholds)
 	if len(starvedResources) == 0 {
 		glog.V(3).Infof("eviction manager: no resources are starved")
 		return
@@ -199,6 +215,14 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// record an event about the resources we are now attempting to reclaim via eviction
 	m.recorder.Eventf(m.nodeRef, api.EventTypeWarning, "EvictionThresholdMet", "Attempting to reclaim %s", resourceToReclaim)
+
+	// check if there are node-level resources we can reclaim to reduce pressure before evicting end-user pods.
+	if m.reclaimNodeLevelResources(resourceToReclaim, observations) {
+		glog.Infof("eviction manager: able to reduce %v pressure without evicting pods.", resourceToReclaim)
+		return
+	}
+
+	glog.Infof("eviction manager: must evict pod(s) to reclaim %v", resourceToReclaim)
 
 	// rank the pods for eviction
 	rank, ok := m.resourceToRankFunc[resourceToReclaim]
@@ -244,4 +268,32 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return
 	}
 	glog.Infof("eviction manager: unable to evict any pods from the node")
+}
+
+// reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
+func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim api.ResourceName, observations signalObservations) bool {
+	nodeReclaimFuncs := m.resourceToNodeReclaimFuncs[resourceToReclaim]
+	for _, nodeReclaimFunc := range nodeReclaimFuncs {
+		// attempt to reclaim the pressured resource.
+		reclaimed, err := nodeReclaimFunc()
+		if err == nil {
+			// update our local observations based on the amount reported to have been reclaimed.
+			// note: this is optimistic, other things could have been still consuming the pressured resource in the interim.
+			signal := resourceToSignal[resourceToReclaim]
+			value, ok := observations[signal]
+			if !ok {
+				glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
+				continue
+			}
+			value.Add(*reclaimed)
+
+			// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
+			if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
+				return true
+			}
+		} else {
+			glog.Errorf("eviction manager: unexpected error when attempting to reduce %v pressure: %v", resourceToReclaim, err)
+		}
+	}
+	return false
 }

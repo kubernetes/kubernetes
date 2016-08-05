@@ -47,18 +47,31 @@ const (
 	resourceNodeFs api.ResourceName = "nodefs"
 )
 
-// signalToNodeCondition maps a signal to the node condition to report if threshold is met.
-var signalToNodeCondition = map[Signal]api.NodeConditionType{
-	SignalMemoryAvailable:  api.NodeMemoryPressure,
-	SignalImageFsAvailable: api.NodeDiskPressure,
-	SignalNodeFsAvailable:  api.NodeDiskPressure,
-}
+var (
+	// signalToNodeCondition maps a signal to the node condition to report if threshold is met.
+	signalToNodeCondition map[Signal]api.NodeConditionType
+	// signalToResource maps a Signal to its associated Resource.
+	signalToResource map[Signal]api.ResourceName
+	// resourceToSignal maps a Resource to its associated Signal
+	resourceToSignal map[api.ResourceName]Signal
+)
 
-// signalToResource maps a Signal to its associated Resource.
-var signalToResource = map[Signal]api.ResourceName{
-	SignalMemoryAvailable:  api.ResourceMemory,
-	SignalImageFsAvailable: resourceImageFs,
-	SignalNodeFsAvailable:  resourceNodeFs,
+func init() {
+	// map eviction signals to node conditions
+	signalToNodeCondition = map[Signal]api.NodeConditionType{}
+	signalToNodeCondition[SignalMemoryAvailable] = api.NodeMemoryPressure
+	signalToNodeCondition[SignalImageFsAvailable] = api.NodeDiskPressure
+	signalToNodeCondition[SignalNodeFsAvailable] = api.NodeDiskPressure
+
+	// map signals to resources (and vice-versa)
+	signalToResource = map[Signal]api.ResourceName{}
+	signalToResource[SignalMemoryAvailable] = api.ResourceMemory
+	signalToResource[SignalImageFsAvailable] = resourceImageFs
+	signalToResource[SignalNodeFsAvailable] = resourceNodeFs
+	resourceToSignal = map[api.ResourceName]Signal{}
+	for key, value := range signalToResource {
+		resourceToSignal[value] = key
+	}
 }
 
 // validSignal returns true if the signal is supported.
@@ -534,7 +547,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 }
 
 // thresholdsMet returns the set of thresholds that were met independent of grace period
-func thresholdsMet(thresholds []Threshold, observations signalObservations) []Threshold {
+func thresholdsMet(thresholds []Threshold, observations signalObservations, enforceMinReclaim bool) []Threshold {
 	results := []Threshold{}
 	for i := range thresholds {
 		threshold := thresholds[i]
@@ -545,7 +558,12 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations) []Th
 		}
 		// determine if we have met the specified threshold
 		thresholdMet := false
-		thresholdResult := threshold.Value.Cmp(*observed)
+		quantity := threshold.Value.Copy()
+		// if enforceMinReclaim is specified, we compare relative to value - minreclaim
+		if enforceMinReclaim && threshold.MinReclaim != nil {
+			quantity.Add(*threshold.MinReclaim)
+		}
+		thresholdResult := quantity.Cmp(*observed)
 		switch threshold.Operator {
 		case OpLessThan:
 			thresholdMet = thresholdResult > 0
@@ -589,7 +607,9 @@ func nodeConditions(thresholds []Threshold) []api.NodeConditionType {
 	results := []api.NodeConditionType{}
 	for _, threshold := range thresholds {
 		if nodeCondition, found := signalToNodeCondition[threshold.Signal]; found {
-			results = append(results, nodeCondition)
+			if !hasNodeCondition(results, nodeCondition) {
+				results = append(results, nodeCondition)
+			}
 		}
 	}
 	return results
@@ -644,7 +664,18 @@ func hasNodeCondition(inputs []api.NodeConditionType, item api.NodeConditionType
 	return false
 }
 
-// hasThreshold returns true if the node condition is in the input list
+// mergeThresholds will merge both threshold lists eliminating duplicates.
+func mergeThresholds(inputsA []Threshold, inputsB []Threshold) []Threshold {
+	results := inputsA
+	for _, threshold := range inputsB {
+		if !hasThreshold(results, threshold) {
+			results = append(results, threshold)
+		}
+	}
+	return results
+}
+
+// hasThreshold returns true if the threshold is in the input list
 func hasThreshold(inputs []Threshold, item Threshold) bool {
 	for _, input := range inputs {
 		if input.GracePeriod == item.GracePeriod && input.Operator == item.Operator && input.Signal == item.Signal && input.Value.Cmp(*item.Value) == 0 {
@@ -654,8 +685,8 @@ func hasThreshold(inputs []Threshold, item Threshold) bool {
 	return false
 }
 
-// reclaimResources returns the set of resources that are starved based on thresholds met.
-func reclaimResources(thresholds []Threshold) []api.ResourceName {
+// getStarvedResources returns the set of resources that are starved based on thresholds met.
+func getStarvedResources(thresholds []Threshold) []api.ResourceName {
 	results := []api.ResourceName{}
 	for _, threshold := range thresholds {
 		if starvedResource, found := signalToResource[threshold.Signal]; found {
@@ -698,4 +729,40 @@ func buildResourceToRankFunc(withImageFs bool) map[api.ResourceName]rankFunc {
 
 func PodIsEvicted(podStatus api.PodStatus) bool {
 	return podStatus.Phase == api.PodFailed && podStatus.Reason == reason
+}
+
+// buildResourceToNodeReclaimFuncs returns reclaim functions associated with resources.
+func buildResourceToNodeReclaimFuncs(imageGC ImageGC, withImageFs bool) map[api.ResourceName]nodeReclaimFuncs {
+	resourceToReclaimFunc := map[api.ResourceName]nodeReclaimFuncs{}
+	// usage of an imagefs is optional
+	if withImageFs {
+		// with an imagefs, nodefs pressure should just delete logs
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs()}
+		// with an imagefs, imagefs pressure should delete unused images
+		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteImages(imageGC)}
+	} else {
+		// without an imagefs, nodefs pressure should delete logs, and unused images
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC)}
+	}
+	return resourceToReclaimFunc
+}
+
+// deleteLogs will delete logs to free up disk pressure.
+func deleteLogs() nodeReclaimFunc {
+	return func() (*resource.Quantity, error) {
+		// TODO: not yet supported.
+		return resource.NewQuantity(int64(0), resource.BinarySI), nil
+	}
+}
+
+// deleteImages will delete unused images to free up disk pressure.
+func deleteImages(imageGC ImageGC) nodeReclaimFunc {
+	return func() (*resource.Quantity, error) {
+		glog.Infof("eviction manager: attempting to delete unused images")
+		reclaimed, err := imageGC.DeleteUnusedImages()
+		if err != nil {
+			return nil, err
+		}
+		return resource.NewQuantity(reclaimed, resource.BinarySI), nil
+	}
 }

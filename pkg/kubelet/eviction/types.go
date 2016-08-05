@@ -98,6 +98,12 @@ type DiskInfoProvider interface {
 	HasDedicatedImageFs() (bool, error)
 }
 
+// ImageGC is responsible for performing garbage collection of unused images.
+type ImageGC interface {
+	// DeleteUnusedImages deletes unused images and returns the number of bytes freed, or an error.
+	DeleteUnusedImages() (int64, error)
+}
+
 // KillPodFunc kills a pod.
 // The pod status is updated, and then it is killed with the specified grace period.
 // This function must block until either the pod is killed or an error is encountered.
@@ -124,3 +130,9 @@ type thresholdsObservedAt map[Threshold]time.Time
 
 // nodeConditionsObservedAt maps a node condition to a time that it was observed
 type nodeConditionsObservedAt map[api.NodeConditionType]time.Time
+
+// nodeReclaimFunc is a function that knows how to reclaim a resource from the node without impacting pods.
+type nodeReclaimFunc func() (*resource.Quantity, error)
+
+// nodeReclaimFuncs is an ordered list of nodeReclaimFunc
+type nodeReclaimFuncs []nodeReclaimFunc
