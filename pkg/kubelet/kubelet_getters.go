@@ -218,3 +218,19 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	}
 	return nodeutil.GetNodeHostIP(node)
 }
+
+// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or the initialNodeStatus
+func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
+	node, err := kl.getNodeAnyWay()
+	if err != nil {
+		return nil, err
+	}
+	return nodeutil.GetNodeHostIP(node)
+}
+
+// GetExtraSupplementalGroupsForPod returns a list of the extra
+// supplemental groups for the Pod. These extra supplemental groups come
+// from annotations on persistent volumes that the pod depends on.
+func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
+	return kl.volumeManager.GetExtraSupplementalGroupsForPod(pod)
+}

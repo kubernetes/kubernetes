@@ -44,6 +44,10 @@ type RuntimeHelper interface {
 	GetClusterDNS(pod *api.Pod) (dnsServers []string, dnsSearches []string, err error)
 	GetPodDir(podUID types.UID) string
 	GeneratePodHostNameAndDomain(pod *api.Pod) (hostname string, hostDomain string, err error)
+	// GetExtraSupplementalGroupsForPod returns a list of the extra
+	// supplemental groups for the Pod. These extra supplemental groups come
+	// from annotations on persistent volumes that the pod depends on.
+	GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64
 }
 
 // ShouldContainerBeRestarted checks whether a container needs to be restarted.
