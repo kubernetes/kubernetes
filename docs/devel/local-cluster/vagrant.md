@@ -27,19 +27,7 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
----
-assignees:
-- brendandburns
-- derekwaynecarr
-- jbeda
----
-
-did no
-
 Running Kubernetes with Vagrant (and VirtualBox) is an easy way to run/test/develop on your local machine (Linux, Mac OS X).
-
-* TOC
-{:toc}
 
 ### Prerequisites
 
