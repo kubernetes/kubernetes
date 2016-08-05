@@ -544,7 +544,7 @@ type KubeControllerManagerConfiguration struct {
 	DeploymentControllerSyncPeriod unversioned.Duration `json:"deploymentControllerSyncPeriod"`
 	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
 	PodEvictionTimeout unversioned.Duration `json:"podEvictionTimeout"`
-	// deletingPodsQps is the number of nodes per second on which pods are deleted in
+	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
 	// case of node failure.
 	DeletingPodsQps float32 `json:"deletingPodsQps"`
 	// DEPRECATED: deletingPodsBurst is the number of nodes on which pods are bursty deleted in
@@ -610,6 +610,15 @@ type KubeControllerManagerConfiguration struct {
 	// concurrentGCSyncs is the number of garbage collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentGCSyncs int32 `json:"concurrentGCSyncs"`
+	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
+	NodeEvictionRate float32 `json:"nodeEvictionRate"`
+	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealty
+	SecondaryNodeEvictionRate float32 `json:"secondaryNodeEvictionRate"`
+	// secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than largeClusterSizeThreshold
+	LargeClusterSizeThreshold int32 `json:"largeClusterSizeThreshold"`
+	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
+	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
+	UnhealthyZoneThreshold float32 `json:"unhealthyZoneThreshold"`
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume

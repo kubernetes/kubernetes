@@ -120,7 +120,6 @@ type NodeController struct {
 	// workers that evicts pods from unresponsive nodes.
 	zonePodEvictor         map[string]*RateLimitedTimedQueue
 	zoneTerminationEvictor map[string]*RateLimitedTimedQueue
-	evictionLimiterQPS     float32
 	podEvictionTimeout     time.Duration
 	// The maximum duration before a pod evicted from a node can be forcefully terminated.
 	maximumGracePeriod time.Duration
@@ -140,10 +139,14 @@ type NodeController struct {
 	forcefullyDeletePod        func(*api.Pod) error
 	nodeExistsInCloudProvider  func(string) (bool, error)
 	computeZoneStateFunc       func(nodeConditions []*api.NodeCondition) zoneState
-	enterPartialDisruptionFunc func(nodeNum int, defaultQPS float32) float32
-	enterFullDisruptionFunc    func(nodeNum int, defaultQPS float32) float32
+	enterPartialDisruptionFunc func(nodeNum int) float32
+	enterFullDisruptionFunc    func(nodeNum int) float32
 
-	zoneStates map[string]zoneState
+	zoneStates                  map[string]zoneState
+	evictionLimiterQPS          float32
+	secondaryEvictionLimiterQPS float32
+	largeClusterThreshold       int32
+	unhealthyZoneThreshold      float32
 
 	// internalPodInformer is used to hold a personal informer.  If we're using
 	// a normal shared informer, then the informer will be started for us.  If
@@ -163,6 +166,9 @@ func NewNodeController(
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
 	evictionLimiterQPS float32,
+	secondaryEvictionLimiterQPS float32,
+	largeClusterThreshold int32,
+	unhealthyZoneThreshold float32,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -195,31 +201,34 @@ func NewNodeController(
 	}
 
 	nc := &NodeController{
-		cloud:                      cloud,
-		knownNodeSet:               make(map[string]*api.Node),
-		kubeClient:                 kubeClient,
-		recorder:                   recorder,
-		podEvictionTimeout:         podEvictionTimeout,
-		maximumGracePeriod:         5 * time.Minute,
-		zonePodEvictor:             make(map[string]*RateLimitedTimedQueue),
-		zoneTerminationEvictor:     make(map[string]*RateLimitedTimedQueue),
-		nodeStatusMap:              make(map[string]nodeStatusData),
-		nodeMonitorGracePeriod:     nodeMonitorGracePeriod,
-		nodeMonitorPeriod:          nodeMonitorPeriod,
-		nodeStartupGracePeriod:     nodeStartupGracePeriod,
-		lookupIP:                   net.LookupIP,
-		now:                        unversioned.Now,
-		clusterCIDR:                clusterCIDR,
-		serviceCIDR:                serviceCIDR,
-		allocateNodeCIDRs:          allocateNodeCIDRs,
-		forcefullyDeletePod:        func(p *api.Pod) error { return forcefullyDeletePod(kubeClient, p) },
-		nodeExistsInCloudProvider:  func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
-		enterPartialDisruptionFunc: ReducedQPSFunc,
-		enterFullDisruptionFunc:    HealthyQPSFunc,
-		computeZoneStateFunc:       ComputeZoneState,
-		evictionLimiterQPS:         evictionLimiterQPS,
-		zoneStates:                 make(map[string]zoneState),
+		cloud:                       cloud,
+		knownNodeSet:                make(map[string]*api.Node),
+		kubeClient:                  kubeClient,
+		recorder:                    recorder,
+		podEvictionTimeout:          podEvictionTimeout,
+		maximumGracePeriod:          5 * time.Minute,
+		zonePodEvictor:              make(map[string]*RateLimitedTimedQueue),
+		zoneTerminationEvictor:      make(map[string]*RateLimitedTimedQueue),
+		nodeStatusMap:               make(map[string]nodeStatusData),
+		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
+		nodeMonitorPeriod:           nodeMonitorPeriod,
+		nodeStartupGracePeriod:      nodeStartupGracePeriod,
+		lookupIP:                    net.LookupIP,
+		now:                         unversioned.Now,
+		clusterCIDR:                 clusterCIDR,
+		serviceCIDR:                 serviceCIDR,
+		allocateNodeCIDRs:           allocateNodeCIDRs,
+		forcefullyDeletePod:         func(p *api.Pod) error { return forcefullyDeletePod(kubeClient, p) },
+		nodeExistsInCloudProvider:   func(nodeName string) (bool, error) { return nodeExistsInCloudProvider(cloud, nodeName) },
+		evictionLimiterQPS:          evictionLimiterQPS,
+		secondaryEvictionLimiterQPS: secondaryEvictionLimiterQPS,
+		largeClusterThreshold:       largeClusterThreshold,
+		unhealthyZoneThreshold:      unhealthyZoneThreshold,
+		zoneStates:                  make(map[string]zoneState),
 	}
+	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
+	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
+	nc.computeZoneStateFunc = nc.ComputeZoneState
 
 	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
 		AddFunc:    nc.maybeDeleteTerminatingPod,
@@ -336,6 +345,9 @@ func NewNodeControllerFromClient(
 	kubeClient clientset.Interface,
 	podEvictionTimeout time.Duration,
 	evictionLimiterQPS float32,
+	secondaryEvictionLimiterQPS float32,
+	largeClusterThreshold int32,
+	unhealthyZoneThreshold float32,
 	nodeMonitorGracePeriod time.Duration,
 	nodeStartupGracePeriod time.Duration,
 	nodeMonitorPeriod time.Duration,
@@ -344,8 +356,9 @@ func NewNodeControllerFromClient(
 	nodeCIDRMaskSize int,
 	allocateNodeCIDRs bool) (*NodeController, error) {
 	podInformer := informers.NewPodInformer(kubeClient, controller.NoResyncPeriodFunc())
-	nc, err := NewNodeController(podInformer, cloud, kubeClient, podEvictionTimeout, evictionLimiterQPS, nodeMonitorGracePeriod,
-		nodeStartupGracePeriod, nodeMonitorPeriod, clusterCIDR, serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs)
+	nc, err := NewNodeController(podInformer, cloud, kubeClient, podEvictionTimeout, evictionLimiterQPS, secondaryEvictionLimiterQPS,
+		largeClusterThreshold, unhealthyZoneThreshold, nodeMonitorGracePeriod, nodeStartupGracePeriod, nodeMonitorPeriod, clusterCIDR,
+		serviceCIDR, nodeCIDRMaskSize, allocateNodeCIDRs)
 	if err != nil {
 		return nil, err
 	}
@@ -648,14 +661,14 @@ func (nc *NodeController) setLimiterInZone(zone string, zoneSize int, state zone
 		nc.zoneTerminationEvictor[zone].SwapLimiter(nc.evictionLimiterQPS)
 	case statePartialDisruption:
 		nc.zonePodEvictor[zone].SwapLimiter(
-			nc.enterPartialDisruptionFunc(zoneSize, nc.evictionLimiterQPS))
+			nc.enterPartialDisruptionFunc(zoneSize))
 		nc.zoneTerminationEvictor[zone].SwapLimiter(
-			nc.enterPartialDisruptionFunc(zoneSize, nc.evictionLimiterQPS))
+			nc.enterPartialDisruptionFunc(zoneSize))
 	case stateFullDisruption:
 		nc.zonePodEvictor[zone].SwapLimiter(
-			nc.enterFullDisruptionFunc(zoneSize, nc.evictionLimiterQPS))
+			nc.enterFullDisruptionFunc(zoneSize))
 		nc.zoneTerminationEvictor[zone].SwapLimiter(
-			nc.enterFullDisruptionFunc(zoneSize, nc.evictionLimiterQPS))
+			nc.enterFullDisruptionFunc(zoneSize))
 	}
 }
 
@@ -868,4 +881,42 @@ func (nc *NodeController) evictPods(node *api.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name)
+}
+
+// Default value for cluster eviction rate - we take nodeNum for consistency with ReducedQPSFunc.
+func (nc *NodeController) HealthyQPSFunc(nodeNum int) float32 {
+	return nc.evictionLimiterQPS
+}
+
+// If the cluster is large make evictions slower, if they're small stop evictions altogether.
+func (nc *NodeController) ReducedQPSFunc(nodeNum int) float32 {
+	if int32(nodeNum) > nc.largeClusterThreshold {
+		return nc.secondaryEvictionLimiterQPS
+	}
+	return 0
+}
+
+// This function is expected to get a slice of NodeReadyConditions for all Nodes in a given zone.
+// The zone is considered:
+// - fullyDisrupted if there're no Ready Nodes,
+// - partiallyDisrupted if more than nc.unhealthyZoneThreshold percent of Nodes are not Ready,
+// - normal otherwise
+func (nc *NodeController) ComputeZoneState(nodeReadyConditions []*api.NodeCondition) zoneState {
+	readyNodes := 0
+	notReadyNodes := 0
+	for i := range nodeReadyConditions {
+		if nodeReadyConditions[i] != nil && nodeReadyConditions[i].Status == api.ConditionTrue {
+			readyNodes++
+		} else {
+			notReadyNodes++
+		}
+	}
+	switch {
+	case readyNodes == 0 && notReadyNodes > 0:
+		return stateFullDisruption
+	case notReadyNodes > 2 && float32(notReadyNodes)/float32(notReadyNodes+readyNodes) >= nc.unhealthyZoneThreshold:
+		return statePartialDisruption
+	default:
+		return stateNormal
+	}
 }

@@ -116,6 +116,10 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.ControllerStartInterval = in.ControllerStartInterval
 		out.EnableGarbageCollector = in.EnableGarbageCollector
 		out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
+		out.NodeEvictionRate = in.NodeEvictionRate
+		out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
+		out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
+		out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
 		return nil
 	}
 }
