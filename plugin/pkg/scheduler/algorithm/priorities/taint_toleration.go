@@ -57,7 +57,7 @@ func ComputeTaintTolerationPriority(pod *api.Pod, nodeNameToInfo map[string]*sch
 	// counts hold the count of intolerable taints of a pod for a given node
 	counts := make(map[string]float64, len(nodes))
 
-	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.Annotations)
+	tolerations, err := api.GetTolerationsFromAnnotations(pod.Annotations)
 	if err != nil {
 		return nil, err
 	}
