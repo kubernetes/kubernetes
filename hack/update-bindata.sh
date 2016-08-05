@@ -23,6 +23,8 @@ if [[ -z "${KUBE_ROOT:-}" ]]; then
 	KUBE_ROOT="../../../"
 fi
 
+source "${KUBE_ROOT}/cluster/lib/logging.sh"
+
 if [[ ! -d "${KUBE_ROOT}/examples" ]]; then
 	echo "${KUBE_ROOT}/examples not detected.  This script should be run from a location where the source dirs are available."
 	exit 1
@@ -44,4 +46,4 @@ go-bindata -nometadata -prefix "${KUBE_ROOT}" -o ${BINDATA_OUTPUT} -pkg generate
 
 gofmt -s -w ${BINDATA_OUTPUT}
 
-echo "Generated bindata file : $(wc -l ${BINDATA_OUTPUT}) lines of lovely automated artifacts"
+V=2 kube::log::info "Generated bindata file : $(wc -l ${BINDATA_OUTPUT}) lines of lovely automated artifacts"

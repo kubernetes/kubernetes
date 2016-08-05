@@ -75,5 +75,5 @@ func main() {
 	); err != nil {
 		glog.Fatalf("Error: %v", err)
 	}
-	glog.Info("Completed successfully.")
+	glog.V(2).Info("Completed successfully.")
 }
