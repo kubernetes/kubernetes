@@ -17,3 +17,5 @@ limitations under the License.
 package v1
 
 type ServiceExpansion interface{}
+
+type SecretExpansion interface{}
