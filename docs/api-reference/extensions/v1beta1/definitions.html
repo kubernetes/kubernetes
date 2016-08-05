@@ -3700,7 +3700,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">dnsPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for containers within the pod. One of <em>ClusterFirst</em> or <em>Default</em>. Defaults to "ClusterFirst".</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for containers within the pod. One of <em>ClusterFirstAlways</em>, <em>ClusterFirst</em> or <em>Default</em>. Defaults to "ClusterFirst". To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to <em>ClusterFirstAlways</em>.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -6919,7 +6919,7 @@ Both these may change in the future. Incoming requests are matched against the h
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-12-16 21:59:42 UTC
+Last updated 2016-12-21 12:22:36 UTC
 </div>
 </div>
 </body>

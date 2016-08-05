@@ -1281,7 +1281,7 @@ func (kl *Kubelet) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
 			return nil, nil, err
 		}
 	}
-	useClusterFirstPolicy := pod.Spec.DNSPolicy == v1.DNSClusterFirst
+	useClusterFirstPolicy := ((pod.Spec.DNSPolicy == v1.DNSClusterFirst && !kubecontainer.IsHostNetworkPod(pod)) || pod.Spec.DNSPolicy == v1.DNSClusterFirstAlways)
 	if useClusterFirstPolicy && kl.clusterDNS == nil {
 		// clusterDNS is not known.
 		// pod with ClusterDNSFirst Policy cannot be created
