@@ -84,5 +84,5 @@ func main() {
 		glog.Errorf("Error: %v", err)
 		os.Exit(1)
 	}
-	glog.Info("Completed successfully.")
+	glog.V(2).Info("Completed successfully.")
 }
