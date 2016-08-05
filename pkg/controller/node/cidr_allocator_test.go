@@ -17,334 +17,380 @@ limitations under the License.
 package node
 
 import (
-	"github.com/golang/glog"
-	"math/big"
 	"net"
-	"reflect"
 	"testing"
+	"time"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-func TestRangeAllocatorFullyAllocated(t *testing.T) {
-	_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/30")
-	a := NewCIDRRangeAllocator(clusterCIDR, 30)
-	p, err := a.AllocateNext()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.String() != "127.123.234.0/30" {
-		t.Fatalf("unexpected allocated cidr: %s", p.String())
-	}
+const (
+	nodePollInterval = 100 * time.Millisecond
+)
 
-	_, err = a.AllocateNext()
-	if err == nil {
-		t.Fatalf("expected error because of fully-allocated range")
-	}
-
-	a.Release(p)
-	p, err = a.AllocateNext()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if p.String() != "127.123.234.0/30" {
-		t.Fatalf("unexpected allocated cidr: %s", p.String())
-	}
-	_, err = a.AllocateNext()
-	if err == nil {
-		t.Fatalf("expected error because of fully-allocated range")
-	}
+func waitForUpdatedNodeWithTimeout(nodeHandler *FakeNodeHandler, number int, timeout time.Duration) error {
+	return wait.Poll(nodePollInterval, timeout, func() (bool, error) {
+		if len(nodeHandler.getUpdatedNodesCopy()) >= number {
+			return true, nil
+		}
+		return false, nil
+	})
 }
 
-func TestRangeAllocator_RandomishAllocation(t *testing.T) {
-	_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/16")
-	a := NewCIDRRangeAllocator(clusterCIDR, 24)
-
-	// allocate all the CIDRs
-	var err error
-	cidrs := make([]*net.IPNet, 256)
-
-	for i := 0; i < 256; i++ {
-		cidrs[i], err = a.AllocateNext()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	}
-
-	_, err = a.AllocateNext()
-	if err == nil {
-		t.Fatalf("expected error because of fully-allocated range")
-	}
-	// release them all
-	for i := 0; i < 256; i++ {
-		a.Release(cidrs[i])
-	}
-
-	// allocate the CIDRs again
-	rcidrs := make([]*net.IPNet, 256)
-	for i := 0; i < 256; i++ {
-		rcidrs[i], err = a.AllocateNext()
-		if err != nil {
-			t.Fatalf("unexpected error: %d, %v", i, err)
-		}
-	}
-	_, err = a.AllocateNext()
-	if err == nil {
-		t.Fatalf("expected error because of fully-allocated range")
-	}
-
-	if !reflect.DeepEqual(cidrs, rcidrs) {
-		t.Fatalf("expected re-allocated cidrs are the same collection")
-	}
-}
-
-func TestRangeAllocator_AllocationOccupied(t *testing.T) {
-	_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/16")
-	a := NewCIDRRangeAllocator(clusterCIDR, 24)
-
-	// allocate all the CIDRs
-	var err error
-	cidrs := make([]*net.IPNet, 256)
-
-	for i := 0; i < 256; i++ {
-		cidrs[i], err = a.AllocateNext()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	}
-
-	_, err = a.AllocateNext()
-	if err == nil {
-		t.Fatalf("expected error because of fully-allocated range")
-	}
-	// release them all
-	for i := 0; i < 256; i++ {
-		a.Release(cidrs[i])
-	}
-	// occupy the last 128 CIDRs
-	for i := 128; i < 256; i++ {
-		a.Occupy(cidrs[i])
-	}
-
-	// allocate the first 128 CIDRs again
-	rcidrs := make([]*net.IPNet, 128)
-	for i := 0; i < 128; i++ {
-		rcidrs[i], err = a.AllocateNext()
-		if err != nil {
-			t.Fatalf("unexpected error: %d, %v", i, err)
-		}
-	}
-	_, err = a.AllocateNext()
-	if err == nil {
-		t.Fatalf("expected error because of fully-allocated range")
-	}
-
-	// check Occupy() work properly
-	for i := 128; i < 256; i++ {
-		rcidrs = append(rcidrs, cidrs[i])
-	}
-	if !reflect.DeepEqual(cidrs, rcidrs) {
-		t.Fatalf("expected re-allocated cidrs are the same collection")
-	}
-}
-
-func TestGetBitforCIDR(t *testing.T) {
-	cases := []struct {
-		clusterCIDRStr string
-		subNetMaskSize int
-		subNetCIDRStr  string
-		expectedBit    int
-		expectErr      bool
+func TestAllocateOrOccupyCIDRSuccess(t *testing.T) {
+	testCases := []struct {
+		description           string
+		fakeNodeHandler       *FakeNodeHandler
+		clusterCIDR           *net.IPNet
+		serviceCIDR           *net.IPNet
+		subNetMaskSize        int
+		expectedAllocatedCIDR string
+		allocatedCIDRs        []string
 	}{
 		{
-			clusterCIDRStr: "127.0.0.0/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "127.0.0.0/16",
-			expectedBit:    0,
-			expectErr:      false,
+			description: "When there's no ServiceCIDR return first CIDR in range",
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
+				return clusterCIDR
+			}(),
+			serviceCIDR:           nil,
+			subNetMaskSize:        30,
+			expectedAllocatedCIDR: "127.123.234.0/30",
 		},
 		{
-			clusterCIDRStr: "127.0.0.0/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "127.123.0.0/16",
-			expectedBit:    123,
-			expectErr:      false,
+			description: "Correctly filter out ServiceCIDR",
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
+				return clusterCIDR
+			}(),
+			serviceCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/26")
+				return clusterCIDR
+			}(),
+			subNetMaskSize: 30,
+			// it should return first /30 CIDR after service range
+			expectedAllocatedCIDR: "127.123.234.64/30",
 		},
 		{
-			clusterCIDRStr: "127.0.0.0/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "127.168.0.0/16",
-			expectedBit:    168,
-			expectErr:      false,
-		},
-		{
-			clusterCIDRStr: "127.0.0.0/8",
-			subNetMaskSize: 16,
-			subNetCIDRStr:  "127.224.0.0/16",
-			expectedBit:    224,
-			expectErr:      false,
-		},
-		{
-			clusterCIDRStr: "192.168.0.0/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "192.168.12.0/24",
-			expectedBit:    12,
-			expectErr:      false,
-		},
-		{
-			clusterCIDRStr: "192.168.0.0/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "192.168.151.0/24",
-			expectedBit:    151,
-			expectErr:      false,
-		},
-		{
-			clusterCIDRStr: "192.168.0.0/16",
-			subNetMaskSize: 24,
-			subNetCIDRStr:  "127.168.224.0/24",
-			expectErr:      true,
+			description: "Correctly ignore already allocated CIDRs",
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/24")
+				return clusterCIDR
+			}(),
+			serviceCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/26")
+				return clusterCIDR
+			}(),
+			subNetMaskSize:        30,
+			allocatedCIDRs:        []string{"127.123.234.64/30", "127.123.234.68/30", "127.123.234.72/30", "127.123.234.80/30"},
+			expectedAllocatedCIDR: "127.123.234.76/30",
 		},
 	}
 
-	for _, tc := range cases {
-		_, clusterCIDR, err := net.ParseCIDR(tc.clusterCIDRStr)
-		clusterMask := clusterCIDR.Mask
-		clusterMaskSize, _ := clusterMask.Size()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	testFunc := func(tc struct {
+		description           string
+		fakeNodeHandler       *FakeNodeHandler
+		clusterCIDR           *net.IPNet
+		serviceCIDR           *net.IPNet
+		subNetMaskSize        int
+		expectedAllocatedCIDR string
+		allocatedCIDRs        []string
+	}) {
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		// this is a bit of white box testing
+		for _, allocated := range tc.allocatedCIDRs {
+			_, cidr, err := net.ParseCIDR(allocated)
+			if err != nil {
+				t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, allocated, err)
+			}
+			rangeAllocator, ok := allocator.(*rangeAllocator)
+			if !ok {
+				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+				return
+			}
+			if err = rangeAllocator.cidrs.occupy(cidr); err != nil {
+				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
+			}
 		}
+		if err := allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0]); err != nil {
+			t.Errorf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
+		}
+		if err := waitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {
+			t.Fatalf("%v: timeout while waiting for Node update: %v", tc.description, err)
+		}
+		found := false
+		seenCIDRs := []string{}
+		for _, updatedNode := range tc.fakeNodeHandler.getUpdatedNodesCopy() {
+			seenCIDRs = append(seenCIDRs, updatedNode.Spec.PodCIDR)
+			if updatedNode.Spec.PodCIDR == tc.expectedAllocatedCIDR {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("%v: Unable to find allocated CIDR %v, found updated Nodes with CIDRs: %v",
+				tc.description, tc.expectedAllocatedCIDR, seenCIDRs)
+		}
+	}
 
-		ra := &rangeAllocator{
-			clusterIP:       clusterCIDR.IP.To4(),
-			clusterMaskSize: clusterMaskSize,
-			subNetMaskSize:  tc.subNetMaskSize,
-			maxCIDRs:        1 << uint32(tc.subNetMaskSize-clusterMaskSize),
-		}
-
-		_, subnetCIDR, err := net.ParseCIDR(tc.subNetCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		got, err := ra.getIndexForCIDR(subnetCIDR)
-		if err == nil && tc.expectErr {
-			glog.Errorf("expected error but got null")
-			continue
-		}
-
-		if err != nil && !tc.expectErr {
-			glog.Errorf("unexpected error: %v", err)
-			continue
-		}
-
-		if got != tc.expectedBit {
-			glog.Errorf("expected %v, but got %v", tc.expectedBit, got)
-		}
+	for _, tc := range testCases {
+		testFunc(tc)
 	}
 }
 
-func TestOccupy(t *testing.T) {
-	cases := []struct {
-		clusterCIDRStr    string
-		subNetMaskSize    int
-		subNetCIDRStr     string
-		expectedUsedBegin int
-		expectedUsedEnd   int
-		expectErr         bool
+func TestAllocateOrOccupyCIDRFailure(t *testing.T) {
+	testCases := []struct {
+		description     string
+		fakeNodeHandler *FakeNodeHandler
+		clusterCIDR     *net.IPNet
+		serviceCIDR     *net.IPNet
+		subNetMaskSize  int
+		allocatedCIDRs  []string
 	}{
 		{
-			clusterCIDRStr:    "127.0.0.0/8",
-			subNetMaskSize:    16,
-			subNetCIDRStr:     "127.0.0.0/8",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   256,
-			expectErr:         false,
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/8",
-			subNetMaskSize:    16,
-			subNetCIDRStr:     "127.0.0.0/2",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   256,
-			expectErr:         false,
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/8",
-			subNetMaskSize:    16,
-			subNetCIDRStr:     "127.0.0.0/16",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   0,
-			expectErr:         false,
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/8",
-			subNetMaskSize:    32,
-			subNetCIDRStr:     "127.0.0.0/16",
-			expectedUsedBegin: 0,
-			expectedUsedEnd:   65535,
-			expectErr:         false,
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/7",
-			subNetMaskSize:    16,
-			subNetCIDRStr:     "127.0.0.0/15",
-			expectedUsedBegin: 256,
-			expectedUsedEnd:   257,
-			expectErr:         false,
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/7",
-			subNetMaskSize:    15,
-			subNetCIDRStr:     "127.0.0.0/15",
-			expectedUsedBegin: 128,
-			expectedUsedEnd:   128,
-			expectErr:         false,
-		},
-		{
-			clusterCIDRStr:    "127.0.0.0/7",
-			subNetMaskSize:    18,
-			subNetCIDRStr:     "127.0.0.0/15",
-			expectedUsedBegin: 1024,
-			expectedUsedEnd:   1031,
-			expectErr:         false,
+			description: "When there's no ServiceCIDR return first CIDR in range",
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
+				return clusterCIDR
+			}(),
+			serviceCIDR:    nil,
+			subNetMaskSize: 30,
+			allocatedCIDRs: []string{"127.123.234.0/30", "127.123.234.4/30", "127.123.234.8/30", "127.123.234.12/30"},
 		},
 	}
 
-	for _, tc := range cases {
-		_, clusterCIDR, err := net.ParseCIDR(tc.clusterCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+	testFunc := func(tc struct {
+		description     string
+		fakeNodeHandler *FakeNodeHandler
+		clusterCIDR     *net.IPNet
+		serviceCIDR     *net.IPNet
+		subNetMaskSize  int
+		allocatedCIDRs  []string
+	}) {
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		// this is a bit of white box testing
+		for _, allocated := range tc.allocatedCIDRs {
+			_, cidr, err := net.ParseCIDR(allocated)
+			if err != nil {
+				t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, allocated, err)
+			}
+			rangeAllocator, ok := allocator.(*rangeAllocator)
+			if !ok {
+				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+				return
+			}
+			err = rangeAllocator.cidrs.occupy(cidr)
+			if err != nil {
+				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
+			}
 		}
-		clusterMask := clusterCIDR.Mask
-		clusterMaskSize, _ := clusterMask.Size()
+		if err := allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0]); err == nil {
+			t.Errorf("%v: unexpected success in AllocateOrOccupyCIDR: %v", tc.description, err)
+		}
+		// We don't expect any updates, so just sleep for some time
+		time.Sleep(time.Second)
+		if len(tc.fakeNodeHandler.getUpdatedNodesCopy()) != 0 {
+			t.Fatalf("%v: unexpected update of nodes: %v", tc.description, tc.fakeNodeHandler.getUpdatedNodesCopy())
+		}
+		seenCIDRs := []string{}
+		for _, updatedNode := range tc.fakeNodeHandler.getUpdatedNodesCopy() {
+			if updatedNode.Spec.PodCIDR != "" {
+				seenCIDRs = append(seenCIDRs, updatedNode.Spec.PodCIDR)
+			}
+		}
+		if len(seenCIDRs) != 0 {
+			t.Errorf("%v: Seen assigned CIDRs when not expected: %v",
+				tc.description, seenCIDRs)
+		}
+	}
+	for _, tc := range testCases {
+		testFunc(tc)
+	}
+}
 
-		ra := &rangeAllocator{
-			clusterCIDR:     clusterCIDR,
-			clusterIP:       clusterCIDR.IP.To4(),
-			clusterMaskSize: clusterMaskSize,
-			subNetMaskSize:  tc.subNetMaskSize,
-			maxCIDRs:        1 << uint32(tc.subNetMaskSize-clusterMaskSize),
+func TestReleaseCIDRSuccess(t *testing.T) {
+	testCases := []struct {
+		description                      string
+		fakeNodeHandler                  *FakeNodeHandler
+		clusterCIDR                      *net.IPNet
+		serviceCIDR                      *net.IPNet
+		subNetMaskSize                   int
+		expectedAllocatedCIDRFirstRound  string
+		expectedAllocatedCIDRSecondRound string
+		allocatedCIDRs                   []string
+		cidrsToRelease                   []string
+	}{
+		{
+			description: "Correctly release preallocated CIDR",
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
+				return clusterCIDR
+			}(),
+			serviceCIDR:                      nil,
+			subNetMaskSize:                   30,
+			allocatedCIDRs:                   []string{"127.123.234.0/30", "127.123.234.4/30", "127.123.234.8/30", "127.123.234.12/30"},
+			expectedAllocatedCIDRFirstRound:  "",
+			cidrsToRelease:                   []string{"127.123.234.4/30"},
+			expectedAllocatedCIDRSecondRound: "127.123.234.4/30",
+		},
+		{
+			description: "Correctly recycle CIDR",
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(),
+			},
+			clusterCIDR: func() *net.IPNet {
+				_, clusterCIDR, _ := net.ParseCIDR("127.123.234.0/28")
+				return clusterCIDR
+			}(),
+			serviceCIDR:                      nil,
+			subNetMaskSize:                   30,
+			expectedAllocatedCIDRFirstRound:  "127.123.234.0/30",
+			cidrsToRelease:                   []string{"127.123.234.0/30"},
+			expectedAllocatedCIDRSecondRound: "127.123.234.0/30",
+		},
+	}
+
+	testFunc := func(tc struct {
+		description                      string
+		fakeNodeHandler                  *FakeNodeHandler
+		clusterCIDR                      *net.IPNet
+		serviceCIDR                      *net.IPNet
+		subNetMaskSize                   int
+		expectedAllocatedCIDRFirstRound  string
+		expectedAllocatedCIDRSecondRound string
+		allocatedCIDRs                   []string
+		cidrsToRelease                   []string
+	}) {
+		allocator, _ := NewCIDRRangeAllocator(tc.fakeNodeHandler, tc.clusterCIDR, tc.serviceCIDR, tc.subNetMaskSize, nil)
+		// this is a bit of white box testing
+		for _, allocated := range tc.allocatedCIDRs {
+			_, cidr, err := net.ParseCIDR(allocated)
+			if err != nil {
+				t.Fatalf("%v: unexpected error when parsing CIDR %v: %v", tc.description, allocated, err)
+			}
+			rangeAllocator, ok := allocator.(*rangeAllocator)
+			if !ok {
+				t.Logf("%v: found non-default implementation of CIDRAllocator, skipping white-box test...", tc.description)
+				return
+			}
+			err = rangeAllocator.cidrs.occupy(cidr)
+			if err != nil {
+				t.Fatalf("%v: unexpected error when occupying CIDR %v: %v", tc.description, allocated, err)
+			}
+		}
+		err := allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0])
+		if tc.expectedAllocatedCIDRFirstRound != "" {
+			if err != nil {
+				t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
+			}
+			if err := waitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {
+				t.Fatalf("%v: timeout while waiting for Node update: %v", tc.description, err)
+			}
+		} else {
+			if err == nil {
+				t.Fatalf("%v: unexpected success in AllocateOrOccupyCIDR: %v", tc.description, err)
+			}
+			// We don't expect any updates here
+			time.Sleep(time.Second)
+			if len(tc.fakeNodeHandler.getUpdatedNodesCopy()) != 0 {
+				t.Fatalf("%v: unexpected update of nodes: %v", tc.description, tc.fakeNodeHandler.getUpdatedNodesCopy())
+			}
 		}
 
-		_, subnetCIDR, err := net.ParseCIDR(tc.subNetCIDRStr)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
+		for _, cidrToRelease := range tc.cidrsToRelease {
+			nodeToRelease := api.Node{
+				ObjectMeta: api.ObjectMeta{
+					Name: "node0",
+				},
+			}
+			nodeToRelease.Spec.PodCIDR = cidrToRelease
+			err = allocator.ReleaseCIDR(&nodeToRelease)
+			if err != nil {
+				t.Fatalf("%v: unexpected error in ReleaseCIDR: %v", tc.description, err)
+			}
 		}
 
-		err = ra.Occupy(subnetCIDR)
-		if err == nil && tc.expectErr {
-			t.Errorf("expected error but got none")
-			continue
+		if err = allocator.AllocateOrOccupyCIDR(tc.fakeNodeHandler.Existing[0]); err != nil {
+			t.Fatalf("%v: unexpected error in AllocateOrOccupyCIDR: %v", tc.description, err)
 		}
-		if err != nil && !tc.expectErr {
-			t.Errorf("unexpected error: %v", err)
-			continue
+		if err := waitForUpdatedNodeWithTimeout(tc.fakeNodeHandler, 1, wait.ForeverTestTimeout); err != nil {
+			t.Fatalf("%v: timeout while waiting for Node update: %v", tc.description, err)
 		}
 
-		expectedUsed := big.Int{}
-		for i := tc.expectedUsedBegin; i <= tc.expectedUsedEnd; i++ {
-			expectedUsed.SetBit(&expectedUsed, i, 1)
+		found := false
+		seenCIDRs := []string{}
+		for _, updatedNode := range tc.fakeNodeHandler.getUpdatedNodesCopy() {
+			seenCIDRs = append(seenCIDRs, updatedNode.Spec.PodCIDR)
+			if updatedNode.Spec.PodCIDR == tc.expectedAllocatedCIDRSecondRound {
+				found = true
+				break
+			}
 		}
-		if expectedUsed.Cmp(&ra.used) != 0 {
-			t.Errorf("error")
+		if !found {
+			t.Errorf("%v: Unable to find allocated CIDR %v, found updated Nodes with CIDRs: %v",
+				tc.description, tc.expectedAllocatedCIDRSecondRound, seenCIDRs)
 		}
+	}
+	for _, tc := range testCases {
+		testFunc(tc)
 	}
 }
