@@ -52,6 +52,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/proxy/ipvs"
 )
 
 type ProxyServer struct {
@@ -68,6 +69,7 @@ type ProxyServer struct {
 const (
 	proxyModeUserspace              = "userspace"
 	proxyModeIptables               = "iptables"
+	proxyModeIPVS                   = "ipvs"
 	experimentalProxyModeAnnotation = options.ExperimentalProxyModeAnnotation
 	betaProxyModeAnnotation         = "net.beta.kubernetes.io/proxy-mode"
 )
@@ -214,6 +216,18 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		// No turning back. Remove artifacts that might still exist from the userspace Proxier.
 		glog.V(0).Info("Tearing down userspace rules.")
 		userspace.CleanupLeftovers(iptInterface)
+	} else if proxyMode == proxyModeIPVS {
+		glog.V(0).Info("Using ipvs Proxier.")
+		proxierIpvs, err := ipvs.NewProxier(iptInterface, config.IPTablesSyncPeriod.Duration)
+		if err != nil {
+			glog.Fatalf("Unable to create proxier: %v", err)
+		}
+		proxier = proxierIpvs
+		endpointsHandler = proxierIpvs
+
+		// clean up all applied iptables and ipvs rules
+		ipvs.CleanupIptablesLeftovers(iptInterface)
+		ipvs.CleanupIpvsLeftover()
 	} else {
 		glog.V(0).Info("Using userspace Proxier.")
 		// This is a proxy.LoadBalancer which NewProxier needs but has methods we don't need for
@@ -353,6 +367,8 @@ type nodeGetter interface {
 func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver iptables.IptablesVersioner, kcompat iptables.KernelCompatTester) string {
 	if proxyMode == proxyModeUserspace {
 		return proxyModeUserspace
+	} else if proxyMode == proxyModeIPVS {
+		return proxyModeIPVS
 	} else if proxyMode == proxyModeIptables {
 		return tryIptablesProxy(iptver, kcompat)
 	} else if proxyMode != "" {
