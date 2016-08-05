@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -78,7 +79,7 @@ func TestValidateProfile(t *testing.T) {
 	}
 }
 
-func TestValidateBadHost(t *testing.T) {
+func TestAdmitBadHost(t *testing.T) {
 	hostErr := errors.New("expected host error")
 	v := &validator{
 		validateHostErr: hostErr,
@@ -94,16 +95,20 @@ func TestValidateBadHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := v.Validate(getPodWithProfile(test.profile))
+		result := v.Admit(&lifecycle.PodAdmitAttributes{
+			Pod: getPodWithProfile(test.profile),
+		})
 		if test.expectValid {
-			assert.NoError(t, err, "Pod with profile %q should be valid", test.profile)
+			assert.True(t, result.Admit, "Pod with profile %q should be admitted", test.profile)
 		} else {
-			assert.Equal(t, hostErr, err, "Pod with profile %q should trigger a host validation error", test.profile)
+			assert.False(t, result.Admit, "Pod with profile %q should be rejected", test.profile)
+			assert.Equal(t, rejectReason, result.Reason, "Pod with profile %q", test.profile)
+			assert.Contains(t, result.Message, hostErr.Error(), "Pod with profile %q", test.profile)
 		}
 	}
 }
 
-func TestValidateValidHost(t *testing.T) {
+func TestAdmitValidHost(t *testing.T) {
 	v := &validator{
 		appArmorFS: "./testdata/",
 	}
@@ -123,11 +128,15 @@ func TestValidateValidHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := v.Validate(getPodWithProfile(test.profile))
+		result := v.Admit(&lifecycle.PodAdmitAttributes{
+			Pod: getPodWithProfile(test.profile),
+		})
 		if test.expectValid {
-			assert.NoError(t, err, "Pod with profile %q should be valid", test.profile)
+			assert.True(t, result.Admit, "Pod with profile %q should be admitted", test.profile)
 		} else {
-			assert.Error(t, err, "Pod with profile %q should trigger a validation error", test.profile)
+			assert.False(t, result.Admit, "Pod with profile %q should be rejected", test.profile)
+			assert.Equal(t, rejectReason, result.Reason, "Pod with profile %q", test.profile)
+			assert.NotEmpty(t, result.Message, "Pod with profile %q", test.profile)
 		}
 	}
 

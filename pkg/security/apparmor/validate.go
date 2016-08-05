@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -33,12 +34,11 @@ import (
 // Set to true if the wrong build tags are set (see validate_disabled.go).
 var isDisabledBuild bool
 
-// Interface for validating that a pod with with an AppArmor profile can be run by a Node.
-type Validator interface {
-	Validate(pod *api.Pod) error
-}
+const (
+	rejectReason = "AppArmor"
+)
 
-func NewValidator(runtime string) Validator {
+func NewValidator(runtime string) lifecycle.PodAdmitHandler {
 	if err := validateHost(runtime); err != nil {
 		return &validator{validateHostErr: err}
 	}
@@ -58,7 +58,19 @@ type validator struct {
 	appArmorFS      string
 }
 
-func (v *validator) Validate(pod *api.Pod) error {
+func (v *validator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	err := v.validate(attrs.Pod)
+	if err == nil {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
+	return lifecycle.PodAdmitResult{
+		Admit:   false,
+		Reason:  rejectReason,
+		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+	}
+}
+
+func (v *validator) validate(pod *api.Pod) error {
 	if !isRequired(pod) {
 		return nil
 	}

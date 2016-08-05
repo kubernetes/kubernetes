@@ -51,6 +51,7 @@ import (
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/clock"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
@@ -1778,6 +1779,70 @@ func TestSecurityOptsOperator(t *testing.T) {
 	}
 	if expected := []string{"seccomp=unconfined"}; len(opts) != 1 || opts[0] != expected[0] {
 		t.Fatalf("security opts for Docker 1.11: expected %v, got: %v", expected, opts)
+	}
+}
+
+func TestGetSecurityOpts(t *testing.T) {
+	const containerName = "bar"
+	makePod := func(annotations map[string]string) *api.Pod {
+		return &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				UID:         "12345678",
+				Name:        "foo",
+				Namespace:   "new",
+				Annotations: annotations,
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{Name: containerName},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		msg          string
+		pod          *api.Pod
+		expectedOpts []string
+	}{{
+		msg:          "No security annotations",
+		pod:          makePod(nil),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "Seccomp default",
+		pod: makePod(map[string]string{
+			api.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
+		}),
+		expectedOpts: nil,
+	}, {
+		msg: "AppArmor runtime/default",
+		pod: makePod(map[string]string{
+			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileRuntimeDefault,
+		}),
+		expectedOpts: []string{"seccomp=unconfined"},
+	}, {
+		msg: "AppArmor local profile",
+		pod: makePod(map[string]string{
+			apparmor.ContainerAnnotationKeyPrefix + containerName: apparmor.ProfileNamePrefix + "foo",
+		}),
+		expectedOpts: []string{"seccomp=unconfined", "apparmor=foo"},
+	}, {
+		msg: "AppArmor and seccomp profile",
+		pod: makePod(map[string]string{
+			api.SeccompContainerAnnotationKeyPrefix + containerName: "docker/default",
+			apparmor.ContainerAnnotationKeyPrefix + containerName:   apparmor.ProfileNamePrefix + "foo",
+		}),
+		expectedOpts: []string{"apparmor=foo"},
+	}}
+
+	dm, _ := newTestDockerManagerWithVersion("1.11.1", "1.23")
+	for i, test := range tests {
+		opts, err := dm.getSecurityOpts(test.pod, containerName)
+		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
+		for _, opt := range test.expectedOpts {
+			assert.Contains(t, opts, opt, "TestCase[%d]: %s", i, test.msg)
+		}
 	}
 }
 
