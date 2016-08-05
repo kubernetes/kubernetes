@@ -225,7 +225,7 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers), fakeRecorder, nodeRef, kubelet.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers), kubelet.imageManager, fakeRecorder, nodeRef, kubelet.clock)
 	if err != nil {
 		t.Fatalf("failed to initialize eviction manager: %v", err)
 	}

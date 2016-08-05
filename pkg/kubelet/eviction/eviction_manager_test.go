@@ -54,6 +54,19 @@ func (m *mockDiskInfoProvider) HasDedicatedImageFs() (bool, error) {
 	return m.dedicatedImageFs, nil
 }
 
+// mockImageGC is used to simulate invoking image garbage collection.
+type mockImageGC struct {
+	err     error
+	freed   int64
+	invoked bool
+}
+
+// DeleteUnusedImages returns the mocked values.
+func (m *mockImageGC) DeleteUnusedImages() (int64, error) {
+	m.invoked = true
+	return m.freed, m.err
+}
+
 // TestMemoryPressure
 func TestMemoryPressure(t *testing.T) {
 	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
@@ -106,6 +119,7 @@ func TestMemoryPressure(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	imageGC := &mockImageGC{freed: int64(0), err: nil}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -129,6 +143,7 @@ func TestMemoryPressure(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
+		imageGC:         imageGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -351,6 +366,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
 	podKiller := &mockPodKiller{}
 	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	imageGC := &mockImageGC{freed: int64(0), err: nil}
 	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
 
 	config := Config{
@@ -374,6 +390,7 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	manager := &managerImpl{
 		clock:           fakeClock,
 		killPodFunc:     podKiller.killPodNow,
+		imageGC:         imageGC,
 		config:          config,
 		recorder:        &record.FakeRecorder{},
 		summaryProvider: summaryProvider,
@@ -512,5 +529,364 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	// try to admit our pod (should succeed)
 	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
 		t.Errorf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
+	}
+}
+
+// TestMinReclaim verifies that min-reclaim works as desired.
+func TestMinReclaim(t *testing.T) {
+	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, memoryWorkingSet string) (*api.Pod, statsapi.PodStats) {
+		pod := newPod(name, []api.Container{
+			newContainer(name, requests, limits),
+		}, nil)
+		podStats := newPodMemoryStats(pod, resource.MustParse(memoryWorkingSet))
+		return pod, podStats
+	}
+	summaryStatsMaker := func(nodeAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
+		val := resource.MustParse(nodeAvailableBytes)
+		availableBytes := uint64(val.Value())
+		result := &statsapi.Summary{
+			Node: statsapi.NodeStats{
+				Memory: &statsapi.MemoryStats{
+					AvailableBytes: &availableBytes,
+				},
+			},
+			Pods: []statsapi.PodStats{},
+		}
+		for _, podStat := range podStats {
+			result.Pods = append(result.Pods, podStat)
+		}
+		return result
+	}
+	podsToMake := []struct {
+		name             string
+		requests         api.ResourceList
+		limits           api.ResourceList
+		memoryWorkingSet string
+	}{
+		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "500Mi"},
+		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), memoryWorkingSet: "300Mi"},
+		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "800Mi"},
+		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), memoryWorkingSet: "300Mi"},
+		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "800Mi"},
+		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), memoryWorkingSet: "200Mi"},
+	}
+	pods := []*api.Pod{}
+	podStats := map[*api.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.memoryWorkingSet)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	activePodsFunc := func() []*api.Pod {
+		return pods
+	}
+
+	fakeClock := clock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []Threshold{
+			{
+				Signal:     SignalMemoryAvailable,
+				Operator:   OpLessThan,
+				Value:      quantityMustParse("1Gi"),
+				MinReclaim: quantityMustParse("500Mi"),
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("2Gi", podStats)}
+	manager := &managerImpl{
+		clock:           fakeClock,
+		killPodFunc:     podKiller.killPodNow,
+		imageGC:         imageGC,
+		config:          config,
+		recorder:        &record.FakeRecorder{},
+		summaryProvider: summaryProvider,
+		nodeRef:         nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	// synchronize
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have memory pressure
+	if manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should not report memory pressure")
+	}
+
+	// induce memory pressure!
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("500Mi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have memory pressure
+	if !manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should report memory pressure")
+	}
+
+	// check the right pod was killed
+	if podKiller.pod != pods[0] {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	}
+	observedGracePeriod := *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(0) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	}
+
+	// reduce memory pressure, but not below the min-reclaim amount
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1.2Gi", podStats)
+	podKiller.pod = nil // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have memory pressure (because transition period not yet met)
+	if !manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should report memory pressure")
+	}
+
+	// check the right pod was killed
+	if podKiller.pod != pods[0] {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	}
+	observedGracePeriod = *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(0) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	}
+
+	// reduce memory pressure and ensure the min-reclaim amount
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
+	podKiller.pod = nil // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have memory pressure (because transition period not yet met)
+	if !manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should report memory pressure")
+	}
+
+	// no pod should have been killed
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	}
+
+	// move the clock past transition period to ensure that we stop reporting pressure
+	fakeClock.Step(5 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("2Gi", podStats)
+	podKiller.pod = nil // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have memory pressure (because transition period met)
+	if manager.IsUnderMemoryPressure() {
+		t.Errorf("Manager should not report memory pressure")
+	}
+
+	// no pod should have been killed
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	}
+}
+
+func TestNodeReclaimFuncs(t *testing.T) {
+	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList, rootFsUsed, logsUsed, perLocalVolumeUsed string) (*api.Pod, statsapi.PodStats) {
+		pod := newPod(name, []api.Container{
+			newContainer(name, requests, limits),
+		}, nil)
+		podStats := newPodDiskStats(pod, parseQuantity(rootFsUsed), parseQuantity(logsUsed), parseQuantity(perLocalVolumeUsed))
+		return pod, podStats
+	}
+	summaryStatsMaker := func(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
+		rootFsVal := resource.MustParse(rootFsAvailableBytes)
+		rootFsBytes := uint64(rootFsVal.Value())
+		imageFsVal := resource.MustParse(imageFsAvailableBytes)
+		imageFsBytes := uint64(imageFsVal.Value())
+		result := &statsapi.Summary{
+			Node: statsapi.NodeStats{
+				Fs: &statsapi.FsStats{
+					AvailableBytes: &rootFsBytes,
+				},
+				Runtime: &statsapi.RuntimeStats{
+					ImageFs: &statsapi.FsStats{
+						AvailableBytes: &imageFsBytes,
+					},
+				},
+			},
+			Pods: []statsapi.PodStats{},
+		}
+		for _, podStat := range podStats {
+			result.Pods = append(result.Pods, podStat)
+		}
+		return result
+	}
+	podsToMake := []struct {
+		name               string
+		requests           api.ResourceList
+		limits             api.ResourceList
+		rootFsUsed         string
+		logsFsUsed         string
+		perLocalVolumeUsed string
+	}{
+		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", ""), rootFsUsed: "500Mi"},
+		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", ""), perLocalVolumeUsed: "300Mi"},
+		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), rootFsUsed: "800Mi"},
+		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi"), logsFsUsed: "300Mi"},
+		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "800Mi"},
+		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi"), rootFsUsed: "200Mi"},
+	}
+	pods := []*api.Pod{}
+	podStats := map[*api.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits, podToMake.rootFsUsed, podToMake.logsFsUsed, podToMake.perLocalVolumeUsed)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	activePodsFunc := func() []*api.Pod {
+		return pods
+	}
+
+	fakeClock := clock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	imageGcFree := resource.MustParse("700Mi")
+	imageGC := &mockImageGC{freed: imageGcFree.Value(), err: nil}
+	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []Threshold{
+			{
+				Signal:     SignalNodeFsAvailable,
+				Operator:   OpLessThan,
+				Value:      quantityMustParse("1Gi"),
+				MinReclaim: quantityMustParse("500Mi"),
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("16Gi", "200Gi", podStats)}
+	manager := &managerImpl{
+		clock:           fakeClock,
+		killPodFunc:     podKiller.killPodNow,
+		imageGC:         imageGC,
+		config:          config,
+		recorder:        &record.FakeRecorder{},
+		summaryProvider: summaryProvider,
+		nodeRef:         nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	// synchronize
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have disk pressure
+	if manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should not report disk pressure")
+	}
+
+	// induce hard threshold
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker(".9Gi", "200Gi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure since soft threshold was met")
+	}
+
+	// verify image gc was invoked
+	if !imageGC.invoked {
+		t.Errorf("Manager should have invoked image gc")
+	}
+
+	// verify no pod was killed because image gc was sufficient
+	if podKiller.pod != nil {
+		t.Errorf("Manager should not have killed a pod, but killed: %v", podKiller.pod)
+	}
+
+	// reset state
+	imageGC.invoked = false
+
+	// remove disk pressure
+	fakeClock.Step(20 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have disk pressure
+	if manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should not report disk pressure")
+	}
+
+	// induce disk pressure!
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("400Mi", "200Gi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure")
+	}
+
+	// ensure image gc was invoked
+	if !imageGC.invoked {
+		t.Errorf("Manager should have invoked image gc")
+	}
+
+	// check the right pod was killed
+	if podKiller.pod != pods[0] {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	}
+	observedGracePeriod := *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(0) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	}
+
+	// reduce disk pressure
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
+	imageGC.invoked = false // reset state
+	podKiller.pod = nil     // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have disk pressure (because transition period not yet met)
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure")
+	}
+
+	// no image gc should have occurred
+	if imageGC.invoked {
+		t.Errorf("Manager chose to perform image gc when it was not neeed")
+	}
+
+	// no pod should have been killed
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	}
+
+	// move the clock past transition period to ensure that we stop reporting pressure
+	fakeClock.Step(5 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("16Gi", "200Gi", podStats)
+	imageGC.invoked = false // reset state
+	podKiller.pod = nil     // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have disk pressure (because transition period met)
+	if manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should not report disk pressure")
+	}
+
+	// no image gc should have occurred
+	if imageGC.invoked {
+		t.Errorf("Manager chose to perform image gc when it was not neeed")
+	}
+
+	// no pod should have been killed
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
 	}
 }
