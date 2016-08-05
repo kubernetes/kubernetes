@@ -54,6 +54,10 @@ func autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectA
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
 	if err := Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -69,6 +73,10 @@ func Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAcces
 
 func autoConvert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview(in *authorization.LocalSubjectAccessReview, out *LocalSubjectAccessReview, s conversion.Scope) error {
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
 	if err := Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
@@ -138,6 +146,10 @@ func autoConvert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAcc
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
 	if err := Convert_v1beta1_SelfSubjectAccessReviewSpec_To_authorization_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -153,6 +165,10 @@ func Convert_v1beta1_SelfSubjectAccessReview_To_authorization_SelfSubjectAccessR
 
 func autoConvert_authorization_SelfSubjectAccessReview_To_v1beta1_SelfSubjectAccessReview(in *authorization.SelfSubjectAccessReview, out *SelfSubjectAccessReview, s conversion.Scope) error {
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
 	if err := Convert_authorization_SelfSubjectAccessReviewSpec_To_v1beta1_SelfSubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
@@ -224,6 +240,10 @@ func autoConvert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessRevie
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
 		return err
 	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
 	if err := Convert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
 		return err
 	}
@@ -239,6 +259,10 @@ func Convert_v1beta1_SubjectAccessReview_To_authorization_SubjectAccessReview(in
 
 func autoConvert_authorization_SubjectAccessReview_To_v1beta1_SubjectAccessReview(in *authorization.SubjectAccessReview, out *SubjectAccessReview, s conversion.Scope) error {
 	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
 		return err
 	}
 	if err := Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec(&in.Spec, &out.Spec, s); err != nil {
@@ -275,7 +299,20 @@ func autoConvert_v1beta1_SubjectAccessReviewSpec_To_authorization_SubjectAccessR
 	}
 	out.User = in.User
 	out.Groups = in.Groups
-	out.Extra = in.Extra
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string]authorization.ExtraValue, len(*in))
+		for key, val := range *in {
+			newVal := new(authorization.ExtraValue)
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&val, newVal, 0); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Extra = nil
+	}
 	return nil
 }
 
@@ -304,7 +341,20 @@ func autoConvert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessR
 	}
 	out.User = in.User
 	out.Groups = in.Groups
-	out.Extra = in.Extra
+	if in.Extra != nil {
+		in, out := &in.Extra, &out.Extra
+		*out = make(map[string]ExtraValue, len(*in))
+		for key, val := range *in {
+			newVal := new(ExtraValue)
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&val, newVal, 0); err != nil {
+				return err
+			}
+			(*out)[key] = *newVal
+		}
+	} else {
+		out.Extra = nil
+	}
 	return nil
 }
 
@@ -315,6 +365,7 @@ func Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessRevie
 func autoConvert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus(in *SubjectAccessReviewStatus, out *authorization.SubjectAccessReviewStatus, s conversion.Scope) error {
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
+	out.EvaluationError = in.EvaluationError
 	return nil
 }
 
@@ -325,6 +376,7 @@ func Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessRev
 func autoConvert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus(in *authorization.SubjectAccessReviewStatus, out *SubjectAccessReviewStatus, s conversion.Scope) error {
 	out.Allowed = in.Allowed
 	out.Reason = in.Reason
+	out.EvaluationError = in.EvaluationError
 	return nil
 }
 
