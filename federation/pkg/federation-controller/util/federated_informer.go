@@ -45,6 +45,9 @@ type FederatedReadOnlyStore interface {
 	// Returns all items in the store.
 	List() ([]interface{}, error)
 
+	// Returns all items from a cluster.
+	ListFromCluster(clusterName string) ([]interface{}, error)
+
 	// GetByKey returns the item stored under the given key in the specified cluster (if exist).
 	GetByKey(clusterName string, key string) (interface{}, bool, error)
 
@@ -97,8 +100,24 @@ type FederatedInformer interface {
 // framework.DeletionHandlingMetaNamespaceKeyFunc as a keying function.
 type TargetInformerFactory func(*federation_api.Cluster, federation_release_1_4.Interface) (cache.Store, framework.ControllerInterface)
 
+// A structure with cluster lifecycle handler functions. Cluster is available (and ClusterAvailable is fired)
+// when it is created in federated etcd and ready. Cluster becomes unavailable (and ClusterUnavailable is fired)
+// when it is either deleted or becomes not ready. When cluster spec (IP)is modified both ClusterAvailable
+// and ClusterUnavailable are fired.
+type ClusterLifecycleHandlerFuncs struct {
+	// Fired when the cluster becomes available.
+	ClusterAvailable func(*federation_api.Cluster)
+	// Fired when the cluster becomes unavailable. The second arg contains data that was present
+	// in the cluster before deletion.
+	ClusterUnavailable func(*federation_api.Cluster, []interface{})
+}
+
 // Builds a FederatedInformer for the given federation client and factory.
-func NewFederatedInformer(federationClient federation_release_1_4.Interface, targetInformerFactory TargetInformerFactory) FederatedInformer {
+func NewFederatedInformer(
+	federationClient federation_release_1_4.Interface,
+	targetInformerFactory TargetInformerFactory,
+	clusterLifecycle ClusterLifecycleHandlerFuncs) FederatedInformer {
+
 	federatedInformer := &federatedInformerImpl{
 		targetInformerFactory: targetInformerFactory,
 		clientFactory: func(cluster *federation_api.Cluster) (federation_release_1_4.Interface, error) {
@@ -110,6 +129,15 @@ func NewFederatedInformer(federationClient federation_release_1_4.Interface, tar
 			return nil, err
 		},
 		targetInformers: make(map[string]informer),
+	}
+
+	getClusterData := func(name string) []interface{} {
+		data, err := federatedInformer.GetTargetStore().ListFromCluster(name)
+		if err != nil {
+			glog.Errorf("Failed to list %s content: %v", name, err)
+			return make([]interface{}, 0)
+		}
+		return data
 	}
 
 	federatedInformer.clusterInformer.store, federatedInformer.clusterInformer.controller = framework.NewInformer(
@@ -127,13 +155,23 @@ func NewFederatedInformer(federationClient federation_release_1_4.Interface, tar
 			DeleteFunc: func(old interface{}) {
 				oldCluster, ok := old.(*federation_api.Cluster)
 				if ok {
+					var data []interface{}
+					if clusterLifecycle.ClusterUnavailable != nil {
+						data = getClusterData(oldCluster.Name)
+					}
 					federatedInformer.deleteCluster(oldCluster)
+					if clusterLifecycle.ClusterUnavailable != nil {
+						clusterLifecycle.ClusterUnavailable(oldCluster, data)
+					}
 				}
 			},
 			AddFunc: func(cur interface{}) {
 				curCluster, ok := cur.(*federation_api.Cluster)
 				if ok && isClusterReady(curCluster) {
 					federatedInformer.addCluster(curCluster)
+					if clusterLifecycle.ClusterAvailable != nil {
+						clusterLifecycle.ClusterAvailable(curCluster)
+					}
 				}
 			},
 			UpdateFunc: func(old, cur interface{}) {
@@ -146,9 +184,20 @@ func NewFederatedInformer(federationClient federation_release_1_4.Interface, tar
 					return
 				}
 				if isClusterReady(oldCluster) != isClusterReady(curCluster) || !reflect.DeepEqual(oldCluster.Spec, curCluster.Spec) {
+					var data []interface{}
+					if clusterLifecycle.ClusterUnavailable != nil {
+						data = getClusterData(oldCluster.Name)
+					}
 					federatedInformer.deleteCluster(oldCluster)
+					if clusterLifecycle.ClusterUnavailable != nil {
+						clusterLifecycle.ClusterUnavailable(oldCluster, data)
+					}
+
 					if isClusterReady(curCluster) {
 						federatedInformer.addCluster(curCluster)
+						if clusterLifecycle.ClusterAvailable != nil {
+							clusterLifecycle.ClusterAvailable(curCluster)
+						}
 					}
 				}
 			},
@@ -325,6 +374,19 @@ func (fs *federatedStoreImpl) List() ([]interface{}, error) {
 
 	result := make([]interface{}, 0)
 	for _, targetInformer := range fs.federatedInformer.targetInformers {
+		values := targetInformer.store.List()
+		result = append(result, values...)
+	}
+	return result, nil
+}
+
+// Returns all items in the given cluster.
+func (fs *federatedStoreImpl) ListFromCluster(clusterName string) ([]interface{}, error) {
+	fs.federatedInformer.Lock()
+	defer fs.federatedInformer.Unlock()
+
+	result := make([]interface{}, 0)
+	if targetInformer, found := fs.federatedInformer.targetInformers[clusterName]; found {
 		values := targetInformer.store.List()
 		result = append(result, values...)
 	}

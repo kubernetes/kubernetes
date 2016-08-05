@@ -92,7 +92,20 @@ func TestFederatedInformer(t *testing.T) {
 			framework.ResourceEventHandlerFuncs{})
 	}
 
-	informer := NewFederatedInformer(fakeClient, targetInformerFactory).(*federatedInformerImpl)
+	addedClusters := make(chan string, 1)
+	deletedClusters := make(chan string, 1)
+	lifecycle := ClusterLifecycleHandlerFuncs{
+		ClusterAvailable: func(cluster *federation_api.Cluster) {
+			addedClusters <- cluster.Name
+			close(addedClusters)
+		},
+		ClusterUnavailable: func(cluster *federation_api.Cluster, _ []interface{}) {
+			deletedClusters <- cluster.Name
+			close(deletedClusters)
+		},
+	}
+
+	informer := NewFederatedInformer(fakeClient, targetInformerFactory, lifecycle).(*federatedInformerImpl)
 	informer.clientFactory = func(cluster *federation_api.Cluster) (federation_release_1_4.Interface, error) {
 		return fakeClient, nil
 	}
@@ -113,6 +126,7 @@ func TestFederatedInformer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.True(t, found)
 	assert.EqualValues(t, &service, service1)
+	assert.Equal(t, "mycluster", <-addedClusters)
 
 	// All checked, lets delete the cluster.
 	deleteChan <- struct{}{}
@@ -126,6 +140,8 @@ func TestFederatedInformer(t *testing.T) {
 	serviceList, err = informer.GetTargetStore().List()
 	assert.NoError(t, err)
 	assert.Empty(t, serviceList)
+
+	assert.Equal(t, "mycluster", <-deletedClusters)
 
 	// Test complete.
 	informer.Stop()
