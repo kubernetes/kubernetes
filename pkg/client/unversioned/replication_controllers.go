@@ -33,7 +33,7 @@ type ReplicationControllerInterface interface {
 	Create(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	Update(ctrl *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateStatus(ctrl *api.ReplicationController) (*api.ReplicationController, error)
-	Delete(name string) error
+	Delete(name string, options *api.DeleteOptions) error
 	Watch(opts api.ListOptions) (watch.Interface, error)
 }
 
@@ -84,8 +84,8 @@ func (c *replicationControllers) UpdateStatus(controller *api.ReplicationControl
 }
 
 // Delete deletes an existing replication controller.
-func (c *replicationControllers) Delete(name string) error {
-	return c.r.Delete().Namespace(c.ns).Resource("replicationControllers").Name(name).Do().Error()
+func (c *replicationControllers) Delete(name string, options *api.DeleteOptions) error {
+	return c.r.Delete().Namespace(c.ns).Resource("replicationControllers").Name(name).Body(options).Do().Error()
 }
 
 // Watch returns a watch.Interface that watches the requested controllers.
