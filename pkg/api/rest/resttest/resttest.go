@@ -892,7 +892,7 @@ func (t *Tester) testDeleteGracefulImmediate(obj runtime.Object, createFn Create
 		t.Errorf("unexpected error: %v", err)
 	}
 	_, err = t.storage.(rest.Getter).Get(ctx, objectMeta.Name)
-	if !errors.IsNotFound(err) {
+	if err != nil && !errors.IsNotFound(err) {
 		t.Errorf("unexpected error, object should be deleted immediately: %v", err)
 	}
 	objectMeta = t.getObjectMetaOrFail(out)
@@ -918,7 +918,7 @@ func (t *Tester) testDeleteGracefulUsesZeroOnNil(obj runtime.Object, createFn Cr
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
-	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name); !errors.IsNotFound(err) {
+	if _, err := t.storage.(rest.Getter).Get(ctx, objectMeta.Name); err != nil && !errors.IsNotFound(err) {
 		t.Errorf("unexpected error, object should not exist: %v", err)
 	}
 }
@@ -1052,7 +1052,7 @@ func (t *Tester) testGetMimatchedNamespace(obj runtime.Object) {
 			t.Errorf("unexpected error: %v", err)
 		}
 	} else {
-		if !errors.IsNotFound(err) {
+		if err != nil && !errors.IsNotFound(err) {
 			t.Errorf("unexpected error returned: %#v", err)
 		}
 	}
@@ -1066,7 +1066,7 @@ func (t *Tester) testGetNotFound(obj runtime.Object) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	_, err = t.storage.(rest.Getter).Get(ctx, t.namer(3))
-	if !errors.IsNotFound(err) {
+	if err != nil && !errors.IsNotFound(err) {
 		t.Errorf("unexpected error returned: %#v", err)
 	}
 }
