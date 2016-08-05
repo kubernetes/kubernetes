@@ -56,7 +56,7 @@ func (c *PodClient) CreateSync(pod *api.Pod) *api.Pod {
 	p := c.Create(pod)
 	ExpectNoError(c.f.WaitForPodRunning(p.Name))
 	// Get the newest pod after it becomes running, some status may change after pod created, such as pod ip.
-	p, err := c.Get(pod.Name)
+	p, err := c.Get(p.Name)
 	ExpectNoError(err)
 	return p
 }
