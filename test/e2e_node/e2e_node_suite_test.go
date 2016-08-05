@@ -83,14 +83,15 @@ func TestE2eNode(t *testing.T) {
 	rand.Seed(time.Now().UTC().UnixNano())
 	RegisterFailHandler(Fail)
 	reporters := []Reporter{}
-	if *reportDir != "" {
+	reportDir := framework.TestContext.ReportDir
+	if reportDir != "" {
 		// Create the directory if it doesn't already exists
-		if err := os.MkdirAll(*reportDir, 0755); err != nil {
+		if err := os.MkdirAll(reportDir, 0755); err != nil {
 			glog.Errorf("Failed creating report directory: %v", err)
 		} else {
 			// Configure a junit reporter to write to the directory
 			junitFile := fmt.Sprintf("junit_%s%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode)
-			junitPath := path.Join(*reportDir, junitFile)
+			junitPath := path.Join(reportDir, junitFile)
 			reporters = append(reporters, more_reporters.NewJUnitReporter(junitPath))
 		}
 	}
