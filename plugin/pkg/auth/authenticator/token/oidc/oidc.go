@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/jose"
@@ -112,7 +111,7 @@ func New(opts OIDCOptions) (*OIDCAuthenticator, error) {
 			return nil, fmt.Errorf("failed to fetch provider config after %v retries", maxRetries)
 		}
 
-		cfg, err = oidc.FetchProviderConfig(hc, strings.TrimSuffix(opts.IssuerURL, "/"))
+		cfg, err = oidc.FetchProviderConfig(hc, opts.IssuerURL)
 		if err == nil {
 			break
 		}
