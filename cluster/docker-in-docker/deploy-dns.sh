@@ -30,7 +30,7 @@ workspace=$(pwd)
 # Process salt pillar templates manually
 for f in skydns-rc.yaml skydns-svc.yaml; do
 	eval "cat <<EOF
-$(<"${KUBE_ROOT}/cluster/saltbase/salt/kube-dns/${f}.sed")
+$(<"${KUBE_ROOT}/cluster/addons/dns/${f}.sed")
 EOF
 " 2>/dev/null >"${workspace}/$f"
 done

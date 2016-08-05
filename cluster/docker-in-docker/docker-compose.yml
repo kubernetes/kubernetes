@@ -16,7 +16,7 @@ node:
   - bash
   - -xc
   - >
-    NAME=$$(cut -f2 -d/ <<<$${APISERVER_NAME}) &&
+    NAME=$$(cut -f2 -d/ <<<$${APISERVER_1_NAME}) &&
     N=$${NAME##*_} &&
     hostname $$(echo $${NAME} | tr _ -) &&
     HOSTNAME_OVERRIDE=$$(getent hosts node | cut -d' ' -f1 | sort -u | tail -1) &&
