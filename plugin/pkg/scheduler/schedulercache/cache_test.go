@@ -95,6 +95,15 @@ func TestAssumePodScheduled(t *testing.T) {
 		if !reflect.DeepEqual(n, tt.wNodeInfo) {
 			t.Errorf("#%d: node info get=%s, want=%s", i, n, tt.wNodeInfo)
 		}
+
+		for _, pod := range tt.pods {
+			if err := cache.ForgetPod(pod); err != nil {
+				t.Fatalf("ForgetPod failed: %v", err)
+			}
+		}
+		if cache.nodes[nodeName] != nil {
+			t.Errorf("NodeInfo should be cleaned for %s", nodeName)
+		}
 	}
 }
 

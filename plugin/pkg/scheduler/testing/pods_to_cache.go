@@ -25,9 +25,9 @@ import (
 // PodsToCache is used for testing
 type PodsToCache []*api.Pod
 
-func (p PodsToCache) AssumePod(pod *api.Pod) error {
-	return nil
-}
+func (p PodsToCache) AssumePod(pod *api.Pod) error { return nil }
+
+func (p PodsToCache) ForgetPod(pod *api.Pod) error { return nil }
 
 func (p PodsToCache) AddPod(pod *api.Pod) error { return nil }
 

@@ -32,6 +32,8 @@ func (f *FakeCache) AssumePod(pod *api.Pod) error {
 	return nil
 }
 
+func (f *FakeCache) ForgetPod(pod *api.Pod) error { return nil }
+
 func (f *FakeCache) AddPod(pod *api.Pod) error { return nil }
 
 func (f *FakeCache) UpdatePod(oldPod, newPod *api.Pod) error { return nil }
