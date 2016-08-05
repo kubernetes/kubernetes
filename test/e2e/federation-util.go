@@ -35,9 +35,9 @@ import (
 )
 
 var (
-	KubeAPIQPS   = 20.0
-	KubeAPIBurst = 30
-	DefaultFederationName = "federation"
+	KubeAPIQPS            float32 = 20.0
+	KubeAPIBurst                  = 30
+	DefaultFederationName         = "federation"
 )
 
 /*
@@ -50,7 +50,6 @@ type cluster struct {
 	namespaceCreated bool    // Did we need to create a new namespace in this cluster?  If so, we should delete it.
 	backendPod       *v1.Pod // The backend pod, if one's been created.
 }
-
 
 func createClusterObjectOrFail(f *framework.Framework, context *framework.E2EContext) {
 	framework.Logf("Creating cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)

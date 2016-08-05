@@ -52,7 +52,6 @@ var FederatedServiceLabels = map[string]string{
 	"foo": "bar",
 }
 
-
 var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-service")
 	var clusters map[string]*cluster // All clusters, keyed by cluster name

@@ -4164,10 +4164,15 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 }
 
 // getIngressAddress returns the ips/hostnames associated with the Ingress.
-func getIngressAddress(client *client.Client, ns, name string) ([]string, error) {
-	ing, err := client.Extensions().Ingress(ns).Get(name)
+func getIngressAddress(client *restclient.RESTClient, ns, name string) ([]string, error) {
+	var ing *extensions.Ingress
+	var ok bool
+	o, err := client.Get().Namespace(ns).Resource("ingress").Name(name).Do().Get()
 	if err != nil {
 		return nil, err
+	}
+	if ing, ok = o.(*extensions.Ingress); !ok {
+		return nil, fmt.Errorf("Failed to get ingress info.")
 	}
 	addresses := []string{}
 	for _, a := range ing.Status.LoadBalancer.Ingress {
@@ -4182,7 +4187,7 @@ func getIngressAddress(client *client.Client, ns, name string) ([]string, error)
 }
 
 // WaitForIngressAddress waits for the Ingress to acquire an address.
-func WaitForIngressAddress(c *client.Client, ns, ingName string, timeout time.Duration) (string, error) {
+func WaitForIngressAddress(c *restclient.RESTClient, ns, ingName string, timeout time.Duration) (string, error) {
 	var address string
 	err := wait.PollImmediate(10*time.Second, timeout, func() (bool, error) {
 		ipOrNameList, err := getIngressAddress(c, ns, ingName)
@@ -4235,10 +4240,15 @@ func LookForString(expectedString string, timeout time.Duration, fn func() strin
 }
 
 // getSvcNodePort returns the node port for the given service:port.
-func getSvcNodePort(client *client.Client, ns, name string, svcPort int) (int, error) {
-	svc, err := client.Services(ns).Get(name)
+func getSvcNodePort(client *restclient.RESTClient, ns, name string, svcPort int) (int, error) {
+	var svc *api.Service
+	var ok bool
+	o, err := client.Get().Namespace(ns).Resource("service").Name(name).Do().Get()
 	if err != nil {
 		return 0, err
+	}
+	if svc, ok = o.(*api.Service); !ok {
+		return 0, fmt.Errorf("Failed to get service.")
 	}
 	for _, p := range svc.Spec.Ports {
 		if p.Port == int32(svcPort) {
@@ -4252,7 +4262,7 @@ func getSvcNodePort(client *client.Client, ns, name string, svcPort int) (int, e
 }
 
 // GetNodePortURL returns the url to a nodeport Service.
-func GetNodePortURL(client *client.Client, ns, name string, svcPort int) (string, error) {
+func GetNodePortURL(client *restclient.RESTClient, ns, name string, svcPort int) (string, error) {
 	nodePort, err := getSvcNodePort(client, ns, name, svcPort)
 	if err != nil {
 		return "", err
@@ -4261,14 +4271,21 @@ func GetNodePortURL(client *client.Client, ns, name string, svcPort int) (string
 	// unschedulable, since the master doesn't run kube-proxy. Without
 	// kube-proxy NodePorts won't work.
 	var nodes *api.NodeList
+	var ok bool
 	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		nodes, err = client.Nodes().List(api.ListOptions{FieldSelector: fields.Set{
-			"spec.unschedulable": "false",
-		}.AsSelector()})
+		o, err := client.Get().Resource("nodes").
+			FieldsSelectorParam(fields.Set{"spec.unschedulable": "false"}.AsSelector()).Do().Get()
+		if err != nil {
+			return false, err
+		}
+		if nodes, ok = o.(*api.NodeList); !ok {
+			return false, fmt.Errorf("Unable to list nodes in cluster")
+		}
 		return err == nil, nil
 	}) != nil {
 		return "", err
 	}
+
 	if len(nodes.Items) == 0 {
 		return "", fmt.Errorf("Unable to list nodes in cluster.")
 	}

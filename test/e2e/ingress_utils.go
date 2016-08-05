@@ -33,6 +33,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -48,11 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"path/filepath"
 
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 const (
@@ -84,7 +83,7 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 	updateURLMapHost := "bar.baz.com"
 	updateURLMapPath := "/testurl"
 	// Platform agnostic list of tests that must be satisfied by all controllers
-	return conformanceTests{
+	return []conformanceTests{
 		{
 			fmt.Sprintf("should create a basic HTTP ingress"),
 			func() { jig.createIngress(manifestPath, ns, map[string]string{}) },
@@ -262,6 +261,9 @@ func buildInsecureClient(timeout time.Duration) *http.Client {
 // Ingress, it's updated.
 func createSecret(client *restclient.RESTClient, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
 	var k, c bytes.Buffer
+	var ok bool
+	var s *api.Secret
+
 	tls := ing.Spec.TLS[0]
 	host = strings.Join(tls.Hosts, ",")
 	framework.Logf("Generating RSA cert for host %v", host)
@@ -280,13 +282,15 @@ func createSecret(client *restclient.RESTClient, ing *extensions.Ingress) (host 
 			api.TLSPrivateKeyKey: key,
 		},
 	}
-	var s *api.Secret
 
-	if err = client.Get().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Do().Into(s).Error(); err == nil {
+	if o, err := client.Get().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Do().Get(); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
 		framework.Logf("Updating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
-		s.Data = secret.Data
-		err = client.Put().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Body(s).Do().Error()
+		s, ok = o.(*api.Secret)
+		if ok {
+			s.Data = secret.Data
+			err = client.Put().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Body(s).Do().Error()
+		}
 	} else {
 		framework.Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
 		err = client.Post().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Body(secret).Do().Error()
@@ -539,15 +543,18 @@ func (j *testJig) createIngress(manifestPath, ns string, ingAnnotations map[stri
 }
 
 func (j *testJig) update(update func(ing *extensions.Ingress)) {
-	var err error
+	var ok bool
 	ns, name := j.ing.Namespace, j.ing.Name
 	for i := 0; i < 3; i++ {
-		err = j.client.Get().Namespace(ns).Resource(ingressResourceName).Name(name).Do().Into(j.ing)
+		o, err := j.client.Get().Namespace(ns).Resource(ingressResourceName).Name(name).Do().Get()
 		if err != nil {
 			framework.Failf("failed to get ingress %q: %v", name, err)
 		}
+		if j.ing, ok = o.(*extensions.Ingress); !ok {
+			framework.Failf("failed to get ingress %q: %v", name, err)
+		}
 		update(j.ing)
-		err = j.client.Put().Namespace(ns).Resource(ingressResourceName).Name(name).Body(j.ing).Do().Into(j.ing).Error()
+		err = j.client.Put().Namespace(ns).Resource(ingressResourceName).Name(name).Body(j.ing).Do().Error()
 		if err == nil {
 			describeIng(j.ing.Namespace)
 			return
@@ -654,14 +661,16 @@ func ingFromManifest(fileName string) *extensions.Ingress {
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
 	framework.Logf("Retrieving UID from config map: %v/%v", api.NamespaceSystem, uidConfigMap)
-	cm := v1.ConfigMap{}
-	err := cont.c.Get().
-		Namespace(api.NamespaceSystem).
-		Resource("configmaps").Name(uidConfigMap).Do().Into(cm)
+	var cm *api.ConfigMap
+	var ok bool
+	o, err := cont.c.Get().Namespace(api.NamespaceSystem).
+		Resource("configmaps").Name(uidConfigMap).Do().Get()
 	if err != nil {
 		return "", err
 	}
-
+	if cm, ok = o.(*api.ConfigMap); !ok {
+		return "", fmt.Errorf("Failed to get UID.")
+	}
 	if uid, ok := cm.Data[uidKey]; ok {
 		return uid, nil
 	}
