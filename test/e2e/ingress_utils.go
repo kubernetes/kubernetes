@@ -33,6 +33,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -41,6 +42,7 @@ import (
 	compute "google.golang.org/api/compute/v1"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -48,11 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"path/filepath"
 
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api/v1"
-	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
 const (
@@ -84,7 +83,7 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 	updateURLMapHost := "bar.baz.com"
 	updateURLMapPath := "/testurl"
 	// Platform agnostic list of tests that must be satisfied by all controllers
-	return conformanceTests{
+	return []conformanceTests{
 		{
 			fmt.Sprintf("should create a basic HTTP ingress"),
 			func() { jig.createIngress(manifestPath, ns, map[string]string{}) },
@@ -262,6 +261,9 @@ func buildInsecureClient(timeout time.Duration) *http.Client {
 // Ingress, it's updated.
 func createSecret(client *restclient.RESTClient, ing *extensions.Ingress) (host string, rootCA, privKey []byte, err error) {
 	var k, c bytes.Buffer
+	var ok bool
+	var s *api.Secret
+
 	tls := ing.Spec.TLS[0]
 	host = strings.Join(tls.Hosts, ",")
 	framework.Logf("Generating RSA cert for host %v", host)
@@ -280,13 +282,15 @@ func createSecret(client *restclient.RESTClient, ing *extensions.Ingress) (host 
 			api.TLSPrivateKeyKey: key,
 		},
 	}
-	var s *api.Secret
 
-	if err = client.Get().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Do().Into(s).Error(); err == nil {
+	if o, err := client.Get().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Do().Get(); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
 		framework.Logf("Updating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
-		s.Data = secret.Data
-		err = client.Put().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Body(s).Do().Error()
+		s, ok = o.(*api.Secret)
+		if ok {
+			s.Data = secret.Data
+			err = client.Put().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Body(s).Do().Error()
+		}
 	} else {
 		framework.Logf("Creating secret %v in ns %v with hosts %v for ingress %v", secret.Name, secret.Namespace, host, ing.Name)
 		err = client.Post().Namespace(ing.Namespace).Resource(secretResourceName).Name(tls.SecretName).Body(secret).Do().Error()
@@ -316,29 +320,26 @@ func cleanupGCE(gceController *GCEIngressController) {
 	}
 }
 
-// Cleanup cleans up cloud resources.
-// If del is false, it simply reports existing resources without deleting them.
-// It always deletes resources created through it's methods, like staticIP, even
-// if del is false.
-func (cont *GCEIngressController) Cleanup(del bool) error {
-	errMsg := ""
-	// Ordering is important here because we cannot delete resources that other
-	// resources hold references to.
+func (cont *GCEIngressController) deleteForwardingRule(del bool) string {
+	msg := ""
 	fwList := []compute.ForwardingRule{}
 	for _, regex := range []string{fmt.Sprintf("k8s-fw-.*--%v", cont.UID), fmt.Sprintf("k8s-fws-.*--%v", cont.UID)} {
 		gcloudList("forwarding-rules", regex, cont.Project, &fwList)
 		if len(fwList) != 0 {
-			msg := ""
 			for _, f := range fwList {
 				msg += fmt.Sprintf("%v\n", f.Name)
 				if del {
 					gcloudDelete("forwarding-rules", f.Name, cont.Project, "--global")
 				}
 			}
-			errMsg += fmt.Sprintf("\nFound forwarding rules:\n%v", msg)
+			msg += fmt.Sprintf("\nFound forwarding rules:\n%v", msg)
 		}
 	}
-	// Static IPs are named after forwarding rules.
+	return msg
+}
+
+func (cont *GCEIngressController) deleteAddresses(del bool) string {
+	msg := ""
 	ipList := []compute.Address{}
 	gcloudList("addresses", fmt.Sprintf("k8s-fw-.*--%v", cont.UID), cont.Project, &ipList)
 	if len(ipList) != 0 {
@@ -349,16 +350,19 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 				gcloudDelete("addresses", ip.Name, cont.Project)
 			}
 		}
-		errMsg += fmt.Sprintf("Found addresses:\n%v", msg)
+		msg += fmt.Sprintf("Found addresses:\n%v", msg)
 	}
-
 	// If the test allocated a static ip, delete that regardless
 	if cont.staticIPName != "" {
 		if err := gcloudDelete("addresses", cont.staticIPName, cont.Project, "--global"); err == nil {
 			cont.staticIPName = ""
 		}
 	}
+	return msg
+}
 
+func (cont *GCEIngressController) deleteTargetProxy(del bool) string {
+	msg := ""
 	tpList := []compute.TargetHttpProxy{}
 	gcloudList("target-http-proxies", fmt.Sprintf("k8s-tp-.*--%v", cont.UID), cont.Project, &tpList)
 	if len(tpList) != 0 {
@@ -369,7 +373,7 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 				gcloudDelete("target-http-proxies", t.Name, cont.Project)
 			}
 		}
-		errMsg += fmt.Sprintf("Found target proxies:\n%v", msg)
+		msg += fmt.Sprintf("Found target proxies:\n%v", msg)
 	}
 	tpsList := []compute.TargetHttpsProxy{}
 	gcloudList("target-https-proxies", fmt.Sprintf("k8s-tps-.*--%v", cont.UID), cont.Project, &tpsList)
@@ -381,10 +385,13 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 				gcloudDelete("target-https-proxies", t.Name, cont.Project)
 			}
 		}
-		errMsg += fmt.Sprintf("Found target HTTPS proxies:\n%v", msg)
+		msg += fmt.Sprintf("Found target HTTPS proxies:\n%v", msg)
 	}
-	// TODO: Check for leaked ssl certs.
+	return msg
+}
 
+func (cont *GCEIngressController) deleteUrlMap(del bool) string {
+	msg := ""
 	umList := []compute.UrlMap{}
 	gcloudList("url-maps", fmt.Sprintf("k8s-um-.*--%v", cont.UID), cont.Project, &umList)
 	if len(umList) != 0 {
@@ -395,9 +402,13 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 				gcloudDelete("url-maps", u.Name, cont.Project)
 			}
 		}
-		errMsg += fmt.Sprintf("Found url maps:\n%v", msg)
+		msg += fmt.Sprintf("Found url maps:\n%v", msg)
 	}
+	return msg
+}
 
+func (cont *GCEIngressController) deleteBackendService(del bool) string {
+	msg := ""
 	beList := []compute.BackendService{}
 	gcloudList("backend-services", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), cont.Project, &beList)
 	if len(beList) != 0 {
@@ -408,9 +419,13 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 				gcloudDelete("backend-services", b.Name, cont.Project)
 			}
 		}
-		errMsg += fmt.Sprintf("Found backend services:\n%v", msg)
+		msg += fmt.Sprintf("Found backend services:\n%v", msg)
 	}
+	return msg
+}
 
+func (cont *GCEIngressController) deleteHttpHealthCheck(del bool) string {
+	msg := ""
 	hcList := []compute.HttpHealthCheck{}
 	gcloudList("http-health-checks", fmt.Sprintf("k8s-be-[0-9]+--%v", cont.UID), cont.Project, &hcList)
 	if len(hcList) != 0 {
@@ -421,8 +436,28 @@ func (cont *GCEIngressController) Cleanup(del bool) error {
 				gcloudDelete("http-health-checks", h.Name, cont.Project)
 			}
 		}
-		errMsg += fmt.Sprintf("Found health check:\n%v", msg)
+		msg += fmt.Sprintf("Found health check:\n%v", msg)
 	}
+	return msg
+}
+
+// Cleanup cleans up cloud resources.
+// If del is false, it simply reports existing resources without deleting them.
+// It always deletes resources created through it's methods, like staticIP, even
+// if del is false.
+func (cont *GCEIngressController) Cleanup(del bool) error {
+	// Ordering is important here because we cannot delete resources that other
+	// resources hold references to.
+	errMsg := cont.deleteForwardingRule(del)
+	// Static IPs are named after forwarding rules.
+	errMsg += cont.deleteAddresses(del)
+	// TODO: Check for leaked ssl certs.
+
+	errMsg += cont.deleteTargetProxy(del)
+	errMsg += cont.deleteUrlMap(del)
+	errMsg += cont.deleteBackendService(del)
+	errMsg += cont.deleteHttpHealthCheck(del)
+
 	// TODO: Verify instance-groups, issue #16636. Gcloud mysteriously barfs when told
 	// to unmarshal instance groups into the current vendored gce-client's understanding
 	// of the struct.
@@ -518,6 +553,7 @@ func (j *testJig) createIngress(manifestPath, ns string, ingAnnotations map[stri
 	}
 
 	framework.Logf("creating replication controller")
+	// TODO: to change to rs.yaml when add federation ingress e2e
 	framework.RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", ns))
 
 	framework.Logf("creating service")
@@ -539,15 +575,18 @@ func (j *testJig) createIngress(manifestPath, ns string, ingAnnotations map[stri
 }
 
 func (j *testJig) update(update func(ing *extensions.Ingress)) {
-	var err error
+	var ok bool
 	ns, name := j.ing.Namespace, j.ing.Name
 	for i := 0; i < 3; i++ {
-		err = j.client.Get().Namespace(ns).Resource(ingressResourceName).Name(name).Do().Into(j.ing)
+		o, err := j.client.Get().Namespace(ns).Resource(ingressResourceName).Name(name).Do().Get()
 		if err != nil {
 			framework.Failf("failed to get ingress %q: %v", name, err)
 		}
+		if j.ing, ok = o.(*extensions.Ingress); !ok {
+			framework.Failf("failed to get ingress %q: %v", name, err)
+		}
 		update(j.ing)
-		err = j.client.Put().Namespace(ns).Resource(ingressResourceName).Name(name).Body(j.ing).Do().Into(j.ing).Error()
+		err = j.client.Put().Namespace(ns).Resource(ingressResourceName).Name(name).Body(j.ing).Do().Error()
 		if err == nil {
 			describeIng(j.ing.Namespace)
 			return
@@ -654,14 +693,16 @@ func ingFromManifest(fileName string) *extensions.Ingress {
 
 func (cont *GCEIngressController) getL7AddonUID() (string, error) {
 	framework.Logf("Retrieving UID from config map: %v/%v", api.NamespaceSystem, uidConfigMap)
-	cm := v1.ConfigMap{}
-	err := cont.c.Get().
-		Namespace(api.NamespaceSystem).
-		Resource("configmaps").Name(uidConfigMap).Do().Into(cm)
+	var cm *api.ConfigMap
+	var ok bool
+	o, err := cont.c.Get().Namespace(api.NamespaceSystem).
+		Resource("configmaps").Name(uidConfigMap).Do().Get()
 	if err != nil {
 		return "", err
 	}
-
+	if cm, ok = o.(*api.ConfigMap); !ok {
+		return "", fmt.Errorf("Failed to get UID.")
+	}
 	if uid, ok := cm.Data[uidKey]; ok {
 		return uid, nil
 	}
