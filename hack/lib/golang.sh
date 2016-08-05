@@ -367,7 +367,7 @@ kube::golang::place_bins() {
   local host_platform
   host_platform=$(kube::golang::host_platform)
 
-  kube::log::status "Placing binaries"
+  V=2 kube::log::status "Placing binaries"
 
   local platform
   for platform in "${KUBE_CLIENT_PLATFORMS[@]}"; do
@@ -598,7 +598,7 @@ kube::golang::build_binaries() {
   (
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
-    echo "Go version: $(go version)"
+    V=2 kube::log::info "Go version: $(go version)"
 
     local host_platform
     host_platform=$(kube::golang::host_platform)
