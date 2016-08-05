@@ -21,6 +21,8 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -28,6 +30,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -160,6 +163,19 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *api.Pod {
 
 func isAppArmorEnabled() bool {
 	// TODO(timstclair): Pass this through the image setup rather than hardcoding.
+	if strings.Contains(framework.TestContext.NodeName, "-gci-dev-") {
+		gciVersionRe := regexp.MustCompile("-gci-dev-([0-9]+)-")
+		matches := gciVersionRe.FindStringSubmatch(framework.TestContext.NodeName)
+		if len(matches) == 2 {
+			version, err := strconv.Atoi(matches[1])
+			if err != nil {
+				glog.Errorf("Error parsing GCI version from NodeName %q: %v", framework.TestContext.NodeName, err)
+				return false
+			}
+			return version >= 54
+		}
+		return false
+	}
 	if strings.Contains(framework.TestContext.NodeName, "-ubuntu-") {
 		return true
 	}
