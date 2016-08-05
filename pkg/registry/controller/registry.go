@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// If you make changes to this file, you should also make the corresponding change in ReplicaSet.
+
 package controller
 
 import (
@@ -21,15 +23,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store ReplicationControllers.
 type Registry interface {
-	ListControllers(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error)
-	WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error)
+	WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error)
 	CreateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
 	UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error)
@@ -47,20 +47,19 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-// List obtains a list of ReplicationControllers that match selector.
-func (s *storage) ListControllers(ctx api.Context, label labels.Selector, field fields.Selector) (*api.ReplicationControllerList, error) {
-	if !field.Empty() {
+func (s *storage) ListControllers(ctx api.Context, options *api.ListOptions) (*api.ReplicationControllerList, error) {
+	if options != nil && options.FieldSelector != nil && !options.FieldSelector.Empty() {
 		return nil, fmt.Errorf("field selector not supported yet")
 	}
-	obj, err := s.List(ctx, label, field)
+	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*api.ReplicationControllerList), err
 }
 
-func (s *storage) WatchControllers(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return s.Watch(ctx, label, field, resourceVersion)
+func (s *storage) WatchControllers(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return s.Watch(ctx, options)
 }
 
 func (s *storage) GetController(ctx api.Context, controllerID string) (*api.ReplicationController, error) {
@@ -80,7 +79,7 @@ func (s *storage) CreateController(ctx api.Context, controller *api.ReplicationC
 }
 
 func (s *storage) UpdateController(ctx api.Context, controller *api.ReplicationController) (*api.ReplicationController, error) {
-	obj, _, err := s.Update(ctx, controller)
+	obj, _, err := s.Update(ctx, controller.Name, rest.DefaultUpdatedObjectInfo(controller, api.Scheme))
 	if err != nil {
 		return nil, err
 	}

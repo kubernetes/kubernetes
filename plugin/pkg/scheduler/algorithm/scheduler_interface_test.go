@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,16 +25,16 @@ import (
 // Some functions used by multiple scheduler tests.
 
 type schedulerTester struct {
-	t            *testing.T
-	scheduler    ScheduleAlgorithm
-	minionLister MinionLister
+	t          *testing.T
+	scheduler  ScheduleAlgorithm
+	nodeLister NodeLister
 }
 
 // Call if you know exactly where pod should get scheduled.
 func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
-	actual, err := st.scheduler.Schedule(pod, st.minionLister)
+	actual, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
-		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
+		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
 		return
 	}
 	if actual != expected {
@@ -44,16 +44,16 @@ func (st *schedulerTester) expectSchedule(pod *api.Pod, expected string) {
 
 // Call if you can't predict where pod will be scheduled.
 func (st *schedulerTester) expectSuccess(pod *api.Pod) {
-	_, err := st.scheduler.Schedule(pod, st.minionLister)
+	_, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err != nil {
-		st.t.Errorf("Unexpected error %v\nTried to scheduler: %#v", err, pod)
+		st.t.Errorf("Unexpected error %v\nTried to schedule: %#v", err, pod)
 		return
 	}
 }
 
 // Call if pod should *not* schedule.
 func (st *schedulerTester) expectFailure(pod *api.Pod) {
-	_, err := st.scheduler.Schedule(pod, st.minionLister)
+	_, err := st.scheduler.Schedule(pod, st.nodeLister)
 	if err == nil {
 		st.t.Error("Unexpected non-error")
 	}

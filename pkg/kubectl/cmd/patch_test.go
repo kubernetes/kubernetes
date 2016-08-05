@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,20 +21,20 @@ import (
 	"net/http"
 	"testing"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 func TestPatchObject(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &client.FakeRESTClient{
-		Codec: codec,
-		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services/frontend" && (m == "PATCH" || m == "GET"):
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -59,14 +59,14 @@ func TestPatchObject(t *testing.T) {
 func TestPatchObjectFromFile(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
-	tf.Client = &client.FakeRESTClient{
-		Codec: codec,
-		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services/frontend" && (m == "PATCH" || m == "GET"):
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &svc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

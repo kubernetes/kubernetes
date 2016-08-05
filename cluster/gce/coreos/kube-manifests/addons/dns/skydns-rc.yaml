@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: kube-dns-v15
+  namespace: kube-system
+  labels:
+    k8s-app: kube-dns
+    version: v15
+    kubernetes.io/cluster-service: "true"
+spec:
+  replicas: ${DNS_REPLICAS}
+  selector:
+    k8s-app: kube-dns
+    version: v15
+  template:
+    metadata:
+      labels:
+        k8s-app: kube-dns
+        version: v15
+        kubernetes.io/cluster-service: "true"
+    spec:
+      containers:
+      - name: kubedns
+        image: gcr.io/google_containers/kubedns-amd64:1.5
+        resources:
+          # TODO: Set memory limits when we've profiled the container for large
+          # clusters, then set request = limit to keep this container in
+          # guaranteed class. Currently, this container falls into the
+          # "burstable" category so the kubelet doesn't backoff from restarting it.
+          limits:
+            cpu: 100m
+            memory: 200Mi
+          requests:
+            cpu: 100m
+            memory: 100Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 60
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 8081
+            scheme: HTTP
+          # we poll on pod startup for the Kubernetes master service and
+          # only setup the /readiness HTTP server once that's available.
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        args:
+        # command = "/kube-dns"
+        - --domain=${DNS_DOMAIN}.
+        - --dns-port=10053
+        ports:
+        - containerPort: 10053
+          name: dns-local
+          protocol: UDP
+        - containerPort: 10053
+          name: dns-tcp-local
+          protocol: TCP
+      - name: dnsmasq
+        image: gcr.io/google_containers/dnsmasq:1.1
+        args:
+        - --cache-size=1000
+        - --no-resolv
+        - --server=127.0.0.1#10053
+        ports:
+        - containerPort: 53
+          name: dns
+          protocol: UDP
+        - containerPort: 53
+          name: dns-tcp
+          protocol: TCP
+      - name: healthz
+        image: gcr.io/google_containers/exechealthz-amd64:1.0
+        resources:
+          # keep request = limit to keep this container in guaranteed class
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        args:
+        - -cmd=nslookup kubernetes.default.svc.${DNS_DOMAIN} 127.0.0.1 >/dev/null
+        - -port=8080
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+      dnsPolicy: Default  # Don't use cluster DNS.

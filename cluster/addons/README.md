@@ -58,6 +58,8 @@ of:
      pods.
   1. Note that this cannot happen for Services as their version is always empty.
 
+Note that in order to run the updator script, python is required on the machine.
+For OS distros that don't have python installed, a python container will be used.
 
 
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,22 +23,25 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 // LocationStreamer is a resource that streams the contents of a particular
 // location URL
 type LocationStreamer struct {
-	Location    *url.URL
-	Transport   http.RoundTripper
-	ContentType string
-	Flush       bool
+	Location        *url.URL
+	Transport       http.RoundTripper
+	ContentType     string
+	Flush           bool
+	ResponseChecker HttpResponseChecker
 }
 
 // a LocationStreamer must implement a rest.ResourceStreamer
 var _ rest.ResourceStreamer = &LocationStreamer{}
 
-// IsAnAPIObject marks this object as a runtime.Object
-func (*LocationStreamer) IsAnAPIObject() {}
+func (obj *LocationStreamer) GetObjectKind() unversioned.ObjectKind {
+	return unversioned.EmptyObjectKind
+}
 
 // InputStream returns a stream with the contents of the URL location. If no location is provided,
 // a null stream is returned.
@@ -54,8 +57,15 @@ func (s *LocationStreamer) InputStream(apiVersion, acceptHeader string) (stream 
 	client := &http.Client{Transport: transport}
 	resp, err := client.Get(s.Location.String())
 	if err != nil {
-		return
+		return nil, false, "", err
 	}
+
+	if s.ResponseChecker != nil {
+		if err = s.ResponseChecker.Check(resp); err != nil {
+			return nil, false, "", err
+		}
+	}
+
 	contentType = s.ContentType
 	if len(contentType) == 0 {
 		contentType = resp.Header.Get("Content-Type")

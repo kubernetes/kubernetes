@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,19 +28,20 @@ import (
 func NewCmdVersion(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",
-		Short: "Print the client and server version information.",
+		Short: "Print the client and server version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			err := RunVersion(f, out, cmd)
 			cmdutil.CheckErr(err)
 		},
 	}
 	cmd.Flags().BoolP("client", "c", false, "Client version only (no server required).")
+	cmd.Flags().MarkShorthandDeprecated("client", "please use --client instead.")
 	return cmd
 }
 
 func RunVersion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
+	kubectl.GetClientVersion(out)
 	if cmdutil.GetFlagBool(cmd, "client") {
-		kubectl.GetClientVersion(out)
 		return nil
 	}
 
@@ -49,6 +50,6 @@ func RunVersion(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error {
 		return err
 	}
 
-	kubectl.GetVersion(out, client)
+	kubectl.GetServerVersion(out, client)
 	return nil
 }

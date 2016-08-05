@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,119 +14,72 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package resourcequotacontroller
+package resourcequota
 
 import (
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/quota/generic"
+	"k8s.io/kubernetes/pkg/quota/install"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func getResourceRequirements(cpu, memory string) api.ResourceRequirements {
-	res := api.ResourceRequirements{}
-	res.Limits = api.ResourceList{}
+func getResourceList(cpu, memory string) api.ResourceList {
+	res := api.ResourceList{}
 	if cpu != "" {
-		res.Limits[api.ResourceCPU] = resource.MustParse(cpu)
+		res[api.ResourceCPU] = resource.MustParse(cpu)
 	}
 	if memory != "" {
-		res.Limits[api.ResourceMemory] = resource.MustParse(memory)
+		res[api.ResourceMemory] = resource.MustParse(memory)
 	}
-
 	return res
 }
 
-func TestFilterQuotaPods(t *testing.T) {
-	pods := []api.Pod{
-		{
-			ObjectMeta: api.ObjectMeta{Name: "pod-running"},
-			Status:     api.PodStatus{Phase: api.PodRunning},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "pod-pending"},
-			Status:     api.PodStatus{Phase: api.PodPending},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "pod-succeeded"},
-			Status:     api.PodStatus{Phase: api.PodSucceeded},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "pod-unknown"},
-			Status:     api.PodStatus{Phase: api.PodUnknown},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "pod-failed"},
-			Status:     api.PodStatus{Phase: api.PodFailed},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "pod-failed-with-restart-always"},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyAlways,
-			},
-			Status: api.PodStatus{Phase: api.PodFailed},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "pod-failed-with-restart-on-failure"},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyOnFailure,
-			},
-			Status: api.PodStatus{Phase: api.PodFailed},
-		},
-		{
-			ObjectMeta: api.ObjectMeta{Name: "pod-failed-with-restart-never"},
-			Spec: api.PodSpec{
-				RestartPolicy: api.RestartPolicyNever,
-			},
-			Status: api.PodStatus{Phase: api.PodFailed},
-		},
-	}
-	expectedResults := util.NewStringSet("pod-running",
-		"pod-pending", "pod-unknown", "pod-failed-with-restart-always",
-		"pod-failed-with-restart-on-failure")
-
-	actualResults := util.StringSet{}
-	result := FilterQuotaPods(pods)
-	for i := range result {
-		actualResults.Insert(result[i].Name)
-	}
-
-	if len(expectedResults) != len(actualResults) || !actualResults.HasAll(expectedResults.List()...) {
-		t.Errorf("Expected results %v, Actual results %v", expectedResults, actualResults)
-	}
+func getResourceRequirements(requests, limits api.ResourceList) api.ResourceRequirements {
+	res := api.ResourceRequirements{}
+	res.Requests = requests
+	res.Limits = limits
+	return res
 }
 
 func TestSyncResourceQuota(t *testing.T) {
 	podList := api.PodList{
 		Items: []api.Pod{
 			{
-				ObjectMeta: api.ObjectMeta{Name: "pod-running"},
+				ObjectMeta: api.ObjectMeta{Name: "pod-running", Namespace: "testing"},
 				Status:     api.PodStatus{Phase: api.PodRunning},
 				Spec: api.PodSpec{
 					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "pod-running-2"},
+				ObjectMeta: api.ObjectMeta{Name: "pod-running-2", Namespace: "testing"},
 				Status:     api.PodStatus{Phase: api.PodRunning},
 				Spec: api.PodSpec{
 					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
 				},
 			},
 			{
-				ObjectMeta: api.ObjectMeta{Name: "pod-failed"},
+				ObjectMeta: api.ObjectMeta{Name: "pod-failed", Namespace: "testing"},
 				Status:     api.PodStatus{Phase: api.PodFailed},
 				Spec: api.PodSpec{
 					Volumes:    []api.Volume{{Name: "vol"}},
-					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "1Gi")}},
+					Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements(getResourceList("100m", "1Gi"), getResourceList("", ""))}},
 				},
 			},
 		},
 	}
-	quota := api.ResourceQuota{
+	resourceQuota := api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "testing"},
 		Spec: api.ResourceQuotaSpec{
 			Hard: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("3"),
@@ -144,21 +97,45 @@ func TestSyncResourceQuota(t *testing.T) {
 			},
 			Used: api.ResourceList{
 				api.ResourceCPU:    resource.MustParse("200m"),
-				api.ResourceMemory: resource.MustParse("2147483648"),
+				api.ResourceMemory: resource.MustParse("2Gi"),
 				api.ResourcePods:   resource.MustParse("2"),
 			},
 		},
 	}
 
-	kubeClient := testclient.NewSimpleFake(&podList, &quota)
-
-	ResourceQuotaController := NewResourceQuotaController(kubeClient)
-	err := ResourceQuotaController.syncResourceQuota(quota)
+	kubeClient := fake.NewSimpleClientset(&podList, &resourceQuota)
+	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+		KubeClient:   kubeClient,
+		ResyncPeriod: controller.NoResyncPeriodFunc,
+		Registry:     install.NewRegistry(kubeClient),
+		GroupKindsToReplenish: []unversioned.GroupKind{
+			api.Kind("Pod"),
+			api.Kind("Service"),
+			api.Kind("ReplicationController"),
+			api.Kind("PersistentVolumeClaim"),
+		},
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+	}
+	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
+	err := quotaController.syncResourceQuota(resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"list", "pods", ""}, "-"),
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
 
-	usage := kubeClient.Actions()[1].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+	lastActionIndex := len(kubeClient.Actions()) - 1
+	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*api.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -177,11 +154,14 @@ func TestSyncResourceQuota(t *testing.T) {
 			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
 		}
 	}
-
 }
 
 func TestSyncResourceQuotaSpecChange(t *testing.T) {
-	quota := api.ResourceQuota{
+	resourceQuota := api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "default",
+			Name:      "rq",
+		},
 		Spec: api.ResourceQuotaSpec{
 			Hard: api.ResourceList{
 				api.ResourceCPU: resource.MustParse("4"),
@@ -208,15 +188,40 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 		},
 	}
 
-	kubeClient := testclient.NewSimpleFake(&quota)
-
-	ResourceQuotaController := NewResourceQuotaController(kubeClient)
-	err := ResourceQuotaController.syncResourceQuota(quota)
+	kubeClient := fake.NewSimpleClientset(&resourceQuota)
+	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+		KubeClient:   kubeClient,
+		ResyncPeriod: controller.NoResyncPeriodFunc,
+		Registry:     install.NewRegistry(kubeClient),
+		GroupKindsToReplenish: []unversioned.GroupKind{
+			api.Kind("Pod"),
+			api.Kind("Service"),
+			api.Kind("ReplicationController"),
+			api.Kind("PersistentVolumeClaim"),
+		},
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+	}
+	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
+	err := quotaController.syncResourceQuota(resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
 
-	usage := kubeClient.Actions()[1].(testclient.UpdateAction).GetObject().(*api.ResourceQuota)
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"list", "pods", ""}, "-"),
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	lastActionIndex := len(kubeClient.Actions()) - 1
+	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*api.ResourceQuota)
 
 	// ensure hard and used limits are what we expected
 	for k, v := range expectedUsage.Status.Hard {
@@ -239,7 +244,11 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 }
 
 func TestSyncResourceQuotaNoChange(t *testing.T) {
-	quota := api.ResourceQuota{
+	resourceQuota := api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "default",
+			Name:      "rq",
+		},
 		Spec: api.ResourceQuotaSpec{
 			Hard: api.ResourceList{
 				api.ResourceCPU: resource.MustParse("4"),
@@ -255,76 +264,189 @@ func TestSyncResourceQuotaNoChange(t *testing.T) {
 		},
 	}
 
-	kubeClient := testclient.NewSimpleFake(&api.PodList{}, &quota)
-
-	ResourceQuotaController := NewResourceQuotaController(kubeClient)
-	err := ResourceQuotaController.syncResourceQuota(quota)
+	kubeClient := fake.NewSimpleClientset(&api.PodList{}, &resourceQuota)
+	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+		KubeClient:   kubeClient,
+		ResyncPeriod: controller.NoResyncPeriodFunc,
+		Registry:     install.NewRegistry(kubeClient),
+		GroupKindsToReplenish: []unversioned.GroupKind{
+			api.Kind("Pod"),
+			api.Kind("Service"),
+			api.Kind("ReplicationController"),
+			api.Kind("PersistentVolumeClaim"),
+		},
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+	}
+	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
+	err := quotaController.syncResourceQuota(resourceQuota)
 	if err != nil {
 		t.Fatalf("Unexpected error %v", err)
 	}
-
-	actions := kubeClient.Actions()
-	if len(actions) != 1 && !actions[0].Matches("list", "pods") {
-		t.Errorf("SyncResourceQuota made an unexpected client action when state was not dirty: %v", kubeClient.Actions)
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"list", "pods", ""}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
 	}
 }
 
-func TestIsPodCPUUnbounded(t *testing.T) {
-	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "pod-running"},
-		Status:     api.PodStatus{Phase: api.PodRunning},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("100m", "0")}},
+func TestAddQuota(t *testing.T) {
+	kubeClient := fake.NewSimpleClientset()
+	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+		KubeClient:   kubeClient,
+		ResyncPeriod: controller.NoResyncPeriodFunc,
+		Registry:     install.NewRegistry(kubeClient),
+		GroupKindsToReplenish: []unversioned.GroupKind{
+			api.Kind("Pod"),
+			api.Kind("ReplicationController"),
+			api.Kind("PersistentVolumeClaim"),
 		},
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
 	}
-	if IsPodCPUUnbounded(&pod) {
-		t.Errorf("Expected false")
-	}
-	pod = api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "pod-running"},
-		Status:     api.PodStatus{Phase: api.PodRunning},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("0", "0")}},
+	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
+
+	delete(quotaController.registry.(*generic.GenericRegistry).InternalEvaluators, api.Kind("Service"))
+
+	testCases := []struct {
+		name string
+
+		quota            *api.ResourceQuota
+		expectedPriority bool
+	}{
+		{
+			name:             "no status",
+			expectedPriority: true,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+			},
 		},
-	}
-	if !IsPodCPUUnbounded(&pod) {
-		t.Errorf("Expected true")
+		{
+			name:             "status, no usage",
+			expectedPriority: true,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+			},
+		},
+		{
+			name:             "status, mismatch",
+			expectedPriority: true,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("6"),
+					},
+					Used: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("0"),
+					},
+				},
+			},
+		},
+		{
+			name:             "status, missing usage, but don't care",
+			expectedPriority: false,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceServices: resource.MustParse("4"),
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceServices: resource.MustParse("4"),
+					},
+				},
+			},
+		},
+		{
+			name:             "ready",
+			expectedPriority: false,
+			quota: &api.ResourceQuota{
+				ObjectMeta: api.ObjectMeta{
+					Namespace: "default",
+					Name:      "rq",
+				},
+				Spec: api.ResourceQuotaSpec{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+				},
+				Status: api.ResourceQuotaStatus{
+					Hard: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("4"),
+					},
+					Used: api.ResourceList{
+						api.ResourceCPU: resource.MustParse("0"),
+					},
+				},
+			},
+		},
 	}
 
-	pod.Spec.Containers[0].Resources = api.ResourceRequirements{}
-	if !IsPodCPUUnbounded(&pod) {
-		t.Errorf("Expected true")
-	}
-}
+	for _, tc := range testCases {
+		quotaController.addQuota(tc.quota)
+		if tc.expectedPriority {
+			if e, a := 1, quotaController.missingUsageQueue.Len(); e != a {
+				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			}
+			if e, a := 0, quotaController.queue.Len(); e != a {
+				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			}
+		} else {
+			if e, a := 0, quotaController.missingUsageQueue.Len(); e != a {
+				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			}
+			if e, a := 1, quotaController.queue.Len(); e != a {
+				t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+			}
+		}
 
-func TestIsPodMemoryUnbounded(t *testing.T) {
-	pod := api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "pod-running"},
-		Status:     api.PodStatus{Phase: api.PodRunning},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("0", "1Gi")}},
-		},
-	}
-	if IsPodMemoryUnbounded(&pod) {
-		t.Errorf("Expected false")
-	}
-	pod = api.Pod{
-		ObjectMeta: api.ObjectMeta{Name: "pod-running"},
-		Status:     api.PodStatus{Phase: api.PodRunning},
-		Spec: api.PodSpec{
-			Volumes:    []api.Volume{{Name: "vol"}},
-			Containers: []api.Container{{Name: "ctr", Image: "image", Resources: getResourceRequirements("0", "0")}},
-		},
-	}
-	if !IsPodMemoryUnbounded(&pod) {
-		t.Errorf("Expected true")
-	}
-
-	pod.Spec.Containers[0].Resources = api.ResourceRequirements{}
-	if !IsPodMemoryUnbounded(&pod) {
-		t.Errorf("Expected true")
+		for quotaController.missingUsageQueue.Len() > 0 {
+			key, _ := quotaController.missingUsageQueue.Get()
+			quotaController.missingUsageQueue.Done(key)
+		}
+		for quotaController.queue.Len() > 0 {
+			key, _ := quotaController.queue.Get()
+			quotaController.queue.Done(key)
+		}
 	}
 }

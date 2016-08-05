@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -49,6 +52,31 @@ func testJSONPath(tests []jsonpathTest, t *testing.T) {
 	}
 }
 
+// testJSONPathSortOutput test cases related to map, the results may print in random order
+func testJSONPathSortOutput(tests []jsonpathTest, t *testing.T) {
+	for _, test := range tests {
+		j := New(test.name)
+		err := j.Parse(test.template)
+		if err != nil {
+			t.Errorf("in %s, parse %s error %v", test.name, test.template, err)
+		}
+		buf := new(bytes.Buffer)
+		err = j.Execute(buf, test.input)
+		if err != nil {
+			t.Errorf("in %s, execute error %v", test.name, err)
+		}
+		out := buf.String()
+		//since map is visited in random order, we need to sort the results.
+		sortedOut := strings.Fields(out)
+		sort.Strings(sortedOut)
+		sortedExpect := strings.Fields(test.expect)
+		sort.Strings(sortedExpect)
+		if !reflect.DeepEqual(sortedOut, sortedExpect) {
+			t.Errorf(`in %s, expect to get "%s", got "%s"`, test.name, test.expect, out)
+		}
+	}
+}
+
 func testFailJSONPath(tests []jsonpathTest, t *testing.T) {
 	for _, test := range tests {
 		j := New(test.name)
@@ -65,7 +93,7 @@ func testFailJSONPath(tests []jsonpathTest, t *testing.T) {
 			out = err.Error()
 		}
 		if out != test.expect {
-			t.Errorf("in %s, expect to get error %s, got %s", test.name, test.expect, out)
+			t.Errorf("in %s, expect to get error %q, got %q", test.name, test.expect, out)
 		}
 	}
 }
@@ -86,11 +114,14 @@ type bicycle struct {
 	Price float32
 }
 
+type empName string
+type job string
 type store struct {
-	Book    []book
-	Bicycle bicycle
-	Name    string
-	Labels  map[string]int
+	Book      []book
+	Bicycle   bicycle
+	Name      string
+	Labels    map[string]int
+	Employees map[empName]job
 }
 
 func TestStructInput(t *testing.T) {
@@ -108,6 +139,10 @@ func TestStructInput(t *testing.T) {
 			"web/html": 15,
 			"k8s-app":  20,
 		},
+		Employees: map[empName]job{
+			"jason": "manager",
+			"dan":   "clerk",
+		},
 	}
 
 	storeTests := []jsonpathTest{
@@ -119,6 +154,8 @@ func TestStructInput(t *testing.T) {
 		{"array", "{[0:2]}", []string{"Monday", "Tudesday"}, "Monday Tudesday"},
 		{"variable", "hello {.Name}", storeData, "hello jsonpath"},
 		{"dict/", "{$.Labels.web/html}", storeData, "15"},
+		{"dict/", "{$.Employees.jason}", storeData, "manager"},
+		{"dict/", "{$.Employees.dan}", storeData, "clerk"},
 		{"dict-", "{.Labels.k8s-app}", storeData, "20"},
 		{"nest", "{.Bicycle.Color}", storeData, "red"},
 		{"allarray", "{.Book[*].Author}", storeData, "Nigel Rees Evelyn Waugh Herman Melville"},
@@ -132,9 +169,9 @@ func TestStructInput(t *testing.T) {
 	testJSONPath(storeTests, t)
 
 	failStoreTests := []jsonpathTest{
-		{"invalid identfier", "{hello}", storeData, "unrecongnized identifier hello"},
+		{"invalid identfier", "{hello}", storeData, "unrecognized identifier hello"},
 		{"nonexistent field", "{.hello}", storeData, "hello is not found"},
-		{"invalid array", "{.Labels[0]}", storeData, "<map[string]int Value> is not array or slice"},
+		{"invalid array", "{.Labels[0]}", storeData, "map[string]int is not array or slice"},
 		{"invalid filter operator", "{.Book[?(@.Price<>10)]}", storeData, "unrecognized filter operator <>"},
 		{"redundent end", "{range .Labels.*}{@}{end}{end}", storeData, "not in range, nothing to end"},
 	}
@@ -162,8 +199,8 @@ func TestJSONInput(t *testing.T) {
 	testJSONPath(pointsTests, t)
 }
 
-// TestKubenates tests some use cases from kubenates
-func TestKubenates(t *testing.T) {
+// TestKubernetes tests some use cases from kubernetes
+func TestKubernetes(t *testing.T) {
 	var input = []byte(`{
 	  "kind": "List",
 	  "items":[
@@ -205,19 +242,23 @@ func TestKubenates(t *testing.T) {
 	}
 
 	nodesTests := []jsonpathTest{
-		{"range item", "{range .items[*]}{.metadata.name}, {end}{.kind}", nodesData, `127.0.0.1, 127.0.0.2, List`},
-		{"range addresss", "{.items[*].status.addresses[*].address}", nodesData,
-			`127.0.0.1 127.0.0.2 127.0.0.3`},
-		{"double range", "{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}", nodesData,
-			`127.0.0.1, 127.0.0.2, 127.0.0.3, `},
-		// TODO: fix & uncomment the case bellow (#13024)
-		// {"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},
-		{"item name", "{.items[*].metadata.name}", nodesData, `127.0.0.1 127.0.0.2`},
-		{"union nodes capacity", "{.items[*]['metadata.name', 'status.capacity']}", nodesData,
-			`127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]`},
-		{"range nodes capacity", "{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}", nodesData,
-			`[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] `},
+		{"range item", `{range .items[*]}{.metadata.name}, {end}{.kind}`, nodesData, "127.0.0.1, 127.0.0.2, List"},
+		{"range item with quote", `{range .items[*]}{.metadata.name}{"\t"}{end}`, nodesData, "127.0.0.1\t127.0.0.2\t"},
+		{"range addresss", `{.items[*].status.addresses[*].address}`, nodesData,
+			"127.0.0.1 127.0.0.2 127.0.0.3"},
+		{"double range", `{range .items[*]}{range .status.addresses[*]}{.address}, {end}{end}`, nodesData,
+			"127.0.0.1, 127.0.0.2, 127.0.0.3, "},
+		{"item name", `{.items[*].metadata.name}`, nodesData, "127.0.0.1 127.0.0.2"},
+		{"union nodes capacity", `{.items[*]['metadata.name', 'status.capacity']}`, nodesData,
+			"127.0.0.1 127.0.0.2 map[cpu:4] map[cpu:8]"},
+		{"range nodes capacity", `{range .items[*]}[{.metadata.name}, {.status.capacity}] {end}`, nodesData,
+			"[127.0.0.1, map[cpu:4]] [127.0.0.2, map[cpu:8]] "},
 		{"user password", `{.users[?(@.name=="e2e")].user.password}`, &nodesData, "secret"},
 	}
 	testJSONPath(nodesTests, t)
+
+	randomPrintOrderTests := []jsonpathTest{
+		{"recursive name", "{..name}", nodesData, `127.0.0.1 127.0.0.2 myself e2e`},
+	}
+	testJSONPathSortOutput(randomPrintOrderTests, t)
 }

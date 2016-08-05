@@ -79,3 +79,7 @@ kubelet:
 {% endif %}
       - file: {{ environment_file }}
       - file: /var/lib/kubelet/kubeconfig
+{% if pillar.get('is_systemd') %}
+    - provider:
+      - service: systemd
+{%- endif %}

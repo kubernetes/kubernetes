@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,9 +20,10 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // Config contains all the settings for a Controller.
@@ -67,6 +68,12 @@ type Controller struct {
 	reflectorMutex sync.RWMutex
 }
 
+// TODO make the "Controller" private, and convert all references to use ControllerInterface instead
+type ControllerInterface interface {
+	Run(stopCh <-chan struct{})
+	HasSynced() bool
+}
+
 // New makes a new Controller from the given Config.
 func New(c *Config) *Controller {
 	ctlr := &Controller{
@@ -79,7 +86,7 @@ func New(c *Config) *Controller {
 // It's an error to call Run more than once.
 // Run blocks; call via go.
 func (c *Controller) Run(stopCh <-chan struct{}) {
-	defer util.HandleCrash()
+	defer utilruntime.HandleCrash()
 	r := cache.NewReflector(
 		c.config.ListerWatcher,
 		c.config.ObjectType,
@@ -93,17 +100,12 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 
 	r.RunUntil(stopCh)
 
-	util.Until(c.processLoop, time.Second, stopCh)
+	wait.Until(c.processLoop, time.Second, stopCh)
 }
 
 // Returns true once this controller has completed an initial resource listing
 func (c *Controller) HasSynced() bool {
-	c.reflectorMutex.RLock()
-	defer c.reflectorMutex.RUnlock()
-	if c.reflector == nil {
-		return false
-	}
-	return c.reflector.LastSyncResourceVersion() != ""
+	return c.config.Queue.HasSynced()
 }
 
 // Requeue adds the provided object back into the queue if it does not already exist.
@@ -122,8 +124,7 @@ func (c *Controller) Requeue(obj interface{}) error {
 // concurrently.
 func (c *Controller) processLoop() {
 	for {
-		obj := c.config.Queue.Pop()
-		err := c.config.Process(obj)
+		obj, err := c.config.Queue.Pop(cache.PopProcessFunc(c.config.Process))
 		if err != nil {
 			if c.config.RetryOnError {
 				// This is the safe way to re-enqueue.

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,8 @@ limitations under the License.
 package apiserver
 
 import (
-	"crypto/tls"
-	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -32,27 +29,25 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/httpstream"
+	"k8s.io/kubernetes/pkg/util/net"
 	proxyutil "k8s.io/kubernetes/pkg/util/proxy"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/third_party/golang/netutil"
 )
 
 // ProxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type ProxyHandler struct {
-	prefix                 string
-	storage                map[string]rest.Storage
-	codec                  runtime.Codec
-	context                api.RequestContextMapper
-	apiRequestInfoResolver *APIRequestInfoResolver
-
-	dial func(network, addr string) (net.Conn, error)
+	prefix              string
+	storage             map[string]rest.Storage
+	serializer          runtime.NegotiatedSerializer
+	context             api.RequestContextMapper
+	requestInfoResolver *RequestInfoResolver
 }
 
 func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -62,10 +57,10 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var apiResource string
 	var httpCode int
 	reqStart := time.Now()
-	defer metrics.Monitor(&verb, &apiResource, util.GetClient(req), &httpCode, reqStart)
+	defer metrics.Monitor(&verb, &apiResource, net.GetHTTPClient(req), w.Header().Get("Content-Type"), httpCode, reqStart)
 
-	requestInfo, err := r.apiRequestInfoResolver.GetAPIRequestInfo(req)
-	if err != nil {
+	requestInfo, err := r.requestInfoResolver.GetRequestInfo(req)
+	if err != nil || !requestInfo.IsResourceRequest {
 		notFound(w, req)
 		httpCode = http.StatusNotFound
 		return
@@ -104,19 +99,19 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	apiResource = resource
 
+	gv := unversioned.GroupVersion{Group: requestInfo.APIGroup, Version: requestInfo.APIVersion}
+
 	redirector, ok := storage.(rest.Redirector)
 	if !ok {
 		httplog.LogOf(req, w).Addf("'%v' is not a redirector", resource)
-		httpCode = errorJSON(errors.NewMethodNotSupported(resource, "proxy"), r.codec, w)
+		httpCode = errorNegotiated(errors.NewMethodNotSupported(api.Resource(resource), "proxy"), r.serializer, gv, w, req)
 		return
 	}
 
 	location, roundTripper, err := redirector.ResourceLocation(ctx, id)
 	if err != nil {
 		httplog.LogOf(req, w).Addf("Error getting ResourceLocation: %v", err)
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
-		httpCode = status.Code
+		httpCode = errorNegotiated(err, r.serializer, gv, w, req)
 		return
 	}
 	if location == nil {
@@ -125,11 +120,8 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		httpCode = http.StatusNotFound
 		return
 	}
-	// If we have a custom dialer, and no pre-existing transport, initialize it to use the dialer.
-	if roundTripper == nil && r.dial != nil {
-		glog.V(5).Infof("[%x: %v] making a dial-only transport...", proxyHandlerTraceID, req.URL)
-		roundTripper = &http.Transport{Dial: r.dial}
-	} else if roundTripper != nil {
+
+	if roundTripper != nil {
 		glog.V(5).Infof("[%x: %v] using transport %T...", proxyHandlerTraceID, req.URL, roundTripper)
 	}
 
@@ -152,19 +144,20 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	newReq, err := http.NewRequest(req.Method, location.String(), req.Body)
 	if err != nil {
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
-		notFound(w, req)
-		httpCode = status.Code
+		httpCode = errorNegotiated(err, r.serializer, gv, w, req)
 		return
 	}
 	httpCode = http.StatusOK
 	newReq.Header = req.Header
+	newReq.ContentLength = req.ContentLength
+	// Copy the TransferEncoding is for future-proofing. Currently Go only supports "chunked" and
+	// it can determine the TransferEncoding based on ContentLength and the Body.
+	newReq.TransferEncoding = req.TransferEncoding
 
 	// TODO convert this entire proxy to an UpgradeAwareProxy similar to
 	// https://github.com/openshift/origin/blob/master/pkg/util/httpproxy/upgradeawareproxy.go.
 	// That proxy needs to be modified to support multiple backends, not just 1.
-	if r.tryUpgrade(w, req, newReq, location, roundTripper) {
+	if r.tryUpgrade(w, req, newReq, location, roundTripper, gv) {
 		return
 	}
 
@@ -213,14 +206,13 @@ func (r *ProxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // tryUpgrade returns true if the request was handled.
-func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper) bool {
+func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Request, location *url.URL, transport http.RoundTripper, gv unversioned.GroupVersion) bool {
 	if !httpstream.IsUpgradeRequest(req) {
 		return false
 	}
-	backendConn, err := dialURL(location, transport)
+	backendConn, err := proxyutil.DialURL(location, transport)
 	if err != nil {
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		errorNegotiated(err, r.serializer, gv, w, req)
 		return true
 	}
 	defer backendConn.Close()
@@ -230,15 +222,13 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 	// hijack, just for reference...
 	requestHijackedConn, _, err := w.(http.Hijacker).Hijack()
 	if err != nil {
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		errorNegotiated(err, r.serializer, gv, w, req)
 		return true
 	}
 	defer requestHijackedConn.Close()
 
 	if err = newReq.Write(backendConn); err != nil {
-		status := errToAPIStatus(err)
-		writeJSON(status.Code, r.codec, status, w, true)
+		errorNegotiated(err, r.serializer, gv, w, req)
 		return true
 	}
 
@@ -262,41 +252,6 @@ func (r *ProxyHandler) tryUpgrade(w http.ResponseWriter, req, newReq *http.Reque
 
 	<-done
 	return true
-}
-
-func dialURL(url *url.URL, transport http.RoundTripper) (net.Conn, error) {
-	dialAddr := netutil.CanonicalAddr(url)
-
-	switch url.Scheme {
-	case "http":
-		return net.Dial("tcp", dialAddr)
-	case "https":
-		// Get the tls config from the transport if we recognize it
-		var tlsConfig *tls.Config
-		if transport != nil {
-			httpTransport, ok := transport.(*http.Transport)
-			if ok {
-				tlsConfig = httpTransport.TLSClientConfig
-			}
-		}
-
-		// Dial
-		tlsConn, err := tls.Dial("tcp", dialAddr, tlsConfig)
-		if err != nil {
-			return nil, err
-		}
-
-		// Verify
-		host, _, _ := net.SplitHostPort(dialAddr)
-		if err := tlsConn.VerifyHostname(host); err != nil {
-			tlsConn.Close()
-			return nil, err
-		}
-
-		return tlsConn, nil
-	default:
-		return nil, fmt.Errorf("Unknown scheme: %s", url.Scheme)
-	}
 }
 
 // borrowed from net/http/httputil/reverseproxy.go

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,9 +26,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"runtime"
 
 	"k8s.io/kubernetes/pkg/util"
+	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -40,10 +40,11 @@ type HyperKube struct {
 	Name string // The executable name, used for help and soft-link invocation
 	Long string // A long description of the binary.  It will be world wrapped before output.
 
-	servers     []Server
-	baseFlags   *pflag.FlagSet
-	out         io.Writer
-	helpFlagVal bool
+	servers             []Server
+	baseFlags           *pflag.FlagSet
+	out                 io.Writer
+	helpFlagVal         bool
+	makeSymlinksFlagVal bool
 }
 
 // AddServer adds a server to the HyperKube object.
@@ -62,7 +63,7 @@ func (hk *HyperKube) FindServer(name string) (*Server, error) {
 	return nil, fmt.Errorf("Server not found: %s", name)
 }
 
-// Servers returns a list of all of the registred servers
+// Servers returns a list of all of the registered servers
 func (hk *HyperKube) Servers() []Server {
 	return hk.servers
 }
@@ -72,8 +73,10 @@ func (hk *HyperKube) Flags() *pflag.FlagSet {
 	if hk.baseFlags == nil {
 		hk.baseFlags = pflag.NewFlagSet(hk.Name, pflag.ContinueOnError)
 		hk.baseFlags.SetOutput(ioutil.Discard)
-		hk.baseFlags.SetNormalizeFunc(util.WordSepNormalizeFunc)
+		hk.baseFlags.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
 		hk.baseFlags.BoolVarP(&hk.helpFlagVal, "help", "h", false, "help for "+hk.Name)
+		hk.baseFlags.BoolVar(&hk.makeSymlinksFlagVal, "make-symlinks", false, "create a symlink for each server in current directory")
+		hk.baseFlags.MarkHidden("make-symlinks") // hide this flag from appearing in servers' usage output
 
 		// These will add all of the "global" flags (defined with both the
 		// flag and pflag packages) to the new flag set we have.
@@ -116,10 +119,11 @@ func (hk *HyperKube) Printf(format string, i ...interface{}) {
 func (hk *HyperKube) Run(args []string) error {
 	// If we are called directly, parse all flags up to the first real
 	// argument.  That should be the server to run.
-	baseCommand := path.Base(args[0])
+	command := args[0]
+	baseCommand := path.Base(command)
 	serverName := baseCommand
+	args = args[1:]
 	if serverName == hk.Name {
-		args = args[1:]
 
 		baseFlags := hk.Flags()
 		baseFlags.SetInterspersed(false) // Only parse flags up to the next real command
@@ -130,6 +134,10 @@ func (hk *HyperKube) Run(args []string) error {
 			}
 			hk.Usage()
 			return err
+		}
+
+		if hk.makeSymlinksFlagVal {
+			return hk.MakeSymlinks(command)
 		}
 
 		verflag.PrintAndExitIfRequested()
@@ -179,7 +187,6 @@ func (hk *HyperKube) Run(args []string) error {
 
 // RunToExit will run the hyperkube and then call os.Exit with an appropriate exit code.
 func (hk *HyperKube) RunToExit(args []string) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	err := hk.Run(args)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())
@@ -199,7 +206,32 @@ Servers
 {{range .Servers}}
   {{.Name}}
 {{.Long | trim | wrap "    "}}{{end}}
+Call '{{.Name}} --make-symlinks' to create symlinks for each server in the local directory.
 Call '{{.Name}} <server> --help' for help on a specific server.
 `
 	util.ExecuteTemplate(hk.Out(), tt, hk)
+}
+
+// MakeSymlinks will create a symlink for each registered hyperkube server in the local directory.
+func (hk *HyperKube) MakeSymlinks(command string) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	var errs bool
+	for _, s := range hk.servers {
+		link := path.Join(wd, s.Name())
+
+		err := os.Symlink(command, link)
+		if err != nil {
+			errs = true
+			hk.Println(err)
+		}
+	}
+
+	if errs {
+		return errors.New("Error creating one or more symlinks.")
+	}
+	return nil
 }

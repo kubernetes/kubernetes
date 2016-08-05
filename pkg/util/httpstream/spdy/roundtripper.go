@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,16 +19,20 @@ package spdy
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/third_party/golang/netutil"
+	"k8s.io/kubernetes/third_party/forked/golang/netutil"
 )
 
 // SpdyRoundTripper knows how to upgrade an HTTP request to one that supports
@@ -50,23 +54,109 @@ type SpdyRoundTripper struct {
 
 	// Dialer is the dialer used to connect.  Used if non-nil.
 	Dialer *net.Dialer
+
+	// proxier knows which proxy to use given a request, defaults to http.ProxyFromEnvironment
+	// Used primarily for mocking the proxy discovery in tests.
+	proxier func(req *http.Request) (*url.URL, error)
 }
 
-// NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
+// NewRoundTripper creates a new SpdyRoundTripper that will use
 // the specified tlsConfig.
 func NewRoundTripper(tlsConfig *tls.Config) httpstream.UpgradeRoundTripper {
 	return NewSpdyRoundTripper(tlsConfig)
 }
 
+// NewSpdyRoundTripper creates a new SpdyRoundTripper that will use
+// the specified tlsConfig. This function is mostly meant for unit tests.
 func NewSpdyRoundTripper(tlsConfig *tls.Config) *SpdyRoundTripper {
 	return &SpdyRoundTripper{tlsConfig: tlsConfig}
 }
 
-// dial dials the host specified by req, using TLS if appropriate.
+// dial dials the host specified by req, using TLS if appropriate, optionally
+// using a proxy server if one is configured via environment variables.
 func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
-	dialAddr := netutil.CanonicalAddr(req.URL)
+	proxier := s.proxier
+	if proxier == nil {
+		proxier = http.ProxyFromEnvironment
+	}
+	proxyURL, err := proxier(req)
+	if err != nil {
+		return nil, err
+	}
 
-	if req.URL.Scheme == "http" {
+	if proxyURL == nil {
+		return s.dialWithoutProxy(req.URL)
+	}
+
+	// ensure we use a canonical host with proxyReq
+	targetHost := netutil.CanonicalAddr(req.URL)
+
+	// proxying logic adapted from http://blog.h6t.eu/post/74098062923/golang-websocket-with-http-proxy-support
+	proxyReq := http.Request{
+		Method: "CONNECT",
+		URL:    &url.URL{},
+		Host:   targetHost,
+	}
+
+	if pa := s.proxyAuth(proxyURL); pa != "" {
+		proxyReq.Header = http.Header{}
+		proxyReq.Header.Set("Proxy-Authorization", pa)
+	}
+
+	proxyDialConn, err := s.dialWithoutProxy(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+
+	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
+	_, err = proxyClientConn.Do(&proxyReq)
+	if err != nil && err != httputil.ErrPersistEOF {
+		return nil, err
+	}
+
+	rwc, _ := proxyClientConn.Hijack()
+
+	if req.URL.Scheme != "https" {
+		return rwc, nil
+	}
+
+	host, _, err := net.SplitHostPort(targetHost)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.tlsConfig == nil {
+		s.tlsConfig = &tls.Config{}
+	}
+
+	if len(s.tlsConfig.ServerName) == 0 {
+		s.tlsConfig.ServerName = host
+	}
+
+	tlsConn := tls.Client(rwc, s.tlsConfig)
+
+	// need to manually call Handshake() so we can call VerifyHostname() below
+	if err := tlsConn.Handshake(); err != nil {
+		return nil, err
+	}
+
+	// Return if we were configured to skip validation
+	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
+		return tlsConn, nil
+	}
+
+	if err := tlsConn.VerifyHostname(host); err != nil {
+		return nil, err
+	}
+
+	return tlsConn, nil
+}
+
+// dialWithoutProxy dials the host specified by url, using TLS if appropriate.
+func (s *SpdyRoundTripper) dialWithoutProxy(url *url.URL) (net.Conn, error) {
+	dialAddr := netutil.CanonicalAddr(url)
+
+	if url.Scheme == "http" {
 		if s.Dialer == nil {
 			return net.Dial("tcp", dialAddr)
 		} else {
@@ -86,6 +176,11 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 		return nil, err
 	}
 
+	// Return if we were configured to skip validation
+	if s.tlsConfig != nil && s.tlsConfig.InsecureSkipVerify {
+		return conn, nil
+	}
+
 	host, _, err := net.SplitHostPort(dialAddr)
 	if err != nil {
 		return nil, err
@@ -96,6 +191,16 @@ func (s *SpdyRoundTripper) dial(req *http.Request) (net.Conn, error) {
 	}
 
 	return conn, nil
+}
+
+// proxyAuth returns, for a given proxy URL, the value to be used for the Proxy-Authorization header
+func (s *SpdyRoundTripper) proxyAuth(proxyURL *url.URL) string {
+	if proxyURL == nil || proxyURL.User == nil {
+		return ""
+	}
+	credentials := proxyURL.User.String()
+	encodedAuth := base64.StdEncoding.EncodeToString([]byte(credentials))
+	return fmt.Sprintf("Basic %s", encodedAuth)
 }
 
 // RoundTrip executes the Request and upgrades it. After a successful upgrade,
@@ -133,15 +238,16 @@ func (s *SpdyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 func (s *SpdyRoundTripper) NewConnection(resp *http.Response) (httpstream.Connection, error) {
 	connectionHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderConnection))
 	upgradeHeader := strings.ToLower(resp.Header.Get(httpstream.HeaderUpgrade))
-	if !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
+	if (resp.StatusCode != http.StatusSwitchingProtocols) || !strings.Contains(connectionHeader, strings.ToLower(httpstream.HeaderUpgrade)) || !strings.Contains(upgradeHeader, strings.ToLower(HeaderSpdy31)) {
 		defer resp.Body.Close()
 		responseError := ""
 		responseErrorBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			responseError = "unable to read error from server response"
 		} else {
-			if obj, err := api.Scheme.Decode(responseErrorBytes); err == nil {
-				if status, ok := obj.(*api.Status); ok {
+			// TODO: I don't belong here, I should be abstracted from this class
+			if obj, _, err := api.Codecs.UniversalDecoder().Decode(responseErrorBytes, nil, &unversioned.Status{}); err == nil {
+				if status, ok := obj.(*unversioned.Status); ok {
 					return nil, &apierrors.StatusError{ErrStatus: *status}
 				}
 			}

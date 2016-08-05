@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,13 @@ limitations under the License.
 package exec
 
 import (
+	"io"
 	osexec "os/exec"
 	"syscall"
 )
+
+// ErrExecutableNotFound is returned if the executable is not found.
+var ErrExecutableNotFound = osexec.ErrNotFound
 
 // Interface is an interface that presents a subset of the os/exec API.  Use this
 // when you want to inject fakeable/mockable exec behavior.
@@ -27,6 +31,9 @@ type Interface interface {
 	// Command returns a Cmd instance which can be used to run a single command.
 	// This follows the pattern of package os/exec.
 	Command(cmd string, args ...string) Cmd
+
+	// LookPath wraps os/exec.LookPath
+	LookPath(file string) (string, error)
 }
 
 // Cmd is an interface that presents an API that is very similar to Cmd from os/exec.
@@ -36,7 +43,11 @@ type Cmd interface {
 	// CombinedOutput runs the command and returns its combined standard output
 	// and standard error.  This follows the pattern of package os/exec.
 	CombinedOutput() ([]byte, error)
+	// Output runs the command and returns standard output, but not standard err
+	Output() ([]byte, error)
 	SetDir(dir string)
+	SetStdin(in io.Reader)
+	SetStdout(out io.Writer)
 }
 
 // ExitError is an interface that presents an API similar to os.ProcessState, which is
@@ -62,6 +73,11 @@ func (executor *executor) Command(cmd string, args ...string) Cmd {
 	return (*cmdWrapper)(osexec.Command(cmd, args...))
 }
 
+// LookPath is part of the Interface interface
+func (executor *executor) LookPath(file string) (string, error) {
+	return osexec.LookPath(file)
+}
+
 // Wraps exec.Cmd so we can capture errors.
 type cmdWrapper osexec.Cmd
 
@@ -69,19 +85,43 @@ func (cmd *cmdWrapper) SetDir(dir string) {
 	cmd.Dir = dir
 }
 
+func (cmd *cmdWrapper) SetStdin(in io.Reader) {
+	cmd.Stdin = in
+}
+
+func (cmd *cmdWrapper) SetStdout(out io.Writer) {
+	cmd.Stdout = out
+}
+
 // CombinedOutput is part of the Cmd interface.
 func (cmd *cmdWrapper) CombinedOutput() ([]byte, error) {
 	out, err := (*osexec.Cmd)(cmd).CombinedOutput()
 	if err != nil {
-		ee, ok := err.(*osexec.ExitError)
-		if !ok {
-			return out, err
-		}
-		// Force a compile fail if exitErrorWrapper can't convert to ExitError.
-		var x ExitError = &exitErrorWrapper{ee}
-		return out, x
+		return out, handleError(err)
 	}
 	return out, nil
+}
+
+func (cmd *cmdWrapper) Output() ([]byte, error) {
+	out, err := (*osexec.Cmd)(cmd).Output()
+	if err != nil {
+		return out, handleError(err)
+	}
+	return out, nil
+}
+
+func handleError(err error) error {
+	if ee, ok := err.(*osexec.ExitError); ok {
+		// Force a compile fail if exitErrorWrapper can't convert to ExitError.
+		var x ExitError = &exitErrorWrapper{ee}
+		return x
+	}
+	if ee, ok := err.(*osexec.Error); ok {
+		if ee.Err == osexec.ErrNotFound {
+			return ErrExecutableNotFound
+		}
+	}
+	return err
 }
 
 // exitErrorWrapper is an implementation of ExitError in terms of os/exec ExitError.

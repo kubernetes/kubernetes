@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -62,7 +63,7 @@ func TestSplitYAMLDocument(t *testing.T) {
 }
 
 func TestGuessJSON(t *testing.T) {
-	if r, isJSON := guessJSONStream(bytes.NewReader([]byte(" \n{}")), 100); !isJSON {
+	if r, isJSON := GuessJSONStream(bytes.NewReader([]byte(" \n{}")), 100); !isJSON {
 		t.Fatalf("expected stream to be JSON")
 	} else {
 		b := make([]byte, 30)
@@ -122,6 +123,41 @@ stuff: 1
 	obj = generic{}
 	if err := s.Decode(&obj); err != io.EOF {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestDecodeBrokenYAML(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`---
+stuff: 1
+		test-foo: 1
+
+---       
+  `)), 100)
+	obj := generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with yaml: prefix, got no error")
+	}
+	if !strings.HasPrefix(err.Error(), "yaml: line 2:") {
+		t.Fatalf("expected %q to have 'yaml: line 2:' prefix", err.Error())
+	}
+}
+
+func TestDecodeBrokenJSON(t *testing.T) {
+	s := NewYAMLOrJSONDecoder(bytes.NewReader([]byte(`{
+	"foo": {
+		"stuff": 1
+		"otherStuff": 2
+	}
+}
+  `)), 100)
+	obj := generic{}
+	err := s.Decode(&obj)
+	if err == nil {
+		t.Fatal("expected error with json: prefix, got no error")
+	}
+	if !strings.HasPrefix(err.Error(), "json: line 3:") {
+		t.Fatalf("expected %q to have 'json: line 3:' prefix", err.Error())
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package user contains utilities for dealing with simple user exchange in the auth
 // packages. The user.Info interface defines an interface for exchanging that info.
-package user
+package user // import "k8s.io/kubernetes/pkg/auth/user"

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,17 +18,11 @@ kube::util::sortable_date() {
   date "+%Y%m%d-%H%M%S"
 }
 
-# this mimics the behavior of linux realpath which is not shipped by default with
-# mac OS X 
-kube::util::realpath() {
-  [[ $1 = /* ]] && echo "$1" | sed 's/\/$//' || echo "$PWD/${1#./}"  | sed 's/\/$//'
-}
-
 kube::util::wait_for_url() {
   local url=$1
   local prefix=${2:-}
-  local wait=${3:-0.5}
-  local times=${4:-25}
+  local wait=${3:-1}
+  local times=${4:-30}
 
   which curl >/dev/null || {
     kube::log::usage "curl must be installed"
@@ -38,7 +32,7 @@ kube::util::wait_for_url() {
   local i
   for i in $(seq 1 $times); do
     local out
-    if out=$(curl -fs $url 2>/dev/null); then
+    if out=$(curl -gfs $url 2>/dev/null); then
       kube::log::status "On try ${i}, ${prefix}: ${out}"
       return 0
     fi
@@ -48,6 +42,62 @@ kube::util::wait_for_url() {
   return 1
 }
 
+# returns a random port
+kube::util::get_random_port() {
+  awk -v min=1024 -v max=65535 'BEGIN{srand(); print int(min+rand()*(max-min+1))}'
+}
+
+# use netcat to check if the host($1):port($2) is free (return 0 means free, 1 means used)
+kube::util::test_host_port_free() {
+  local host=$1
+  local port=$2
+  local success=0
+  local fail=1
+
+  which nc >/dev/null || {
+    kube::log::usage "netcat isn't installed, can't verify if ${host}:${port} is free, skipping the check..."
+    return ${success}
+  }
+
+  if [ ! $(nc -vz "${host}" "${port}") ]; then
+    kube::log::status "${host}:${port} is free, proceeding..."
+    return ${success}
+  else
+    kube::log::status "${host}:${port} is already used"
+    return ${fail}
+  fi
+}
+
+# Example:  kube::util::trap_add 'echo "in trap DEBUG"' DEBUG
+# See: http://stackoverflow.com/questions/3338030/multiple-bash-traps-for-the-same-signal
+kube::util::trap_add() {
+  local trap_add_cmd
+  trap_add_cmd=$1
+  shift
+
+  for trap_add_name in "$@"; do
+    local existing_cmd
+    local new_cmd
+
+    # Grab the currently defined trap commands for this trap
+    existing_cmd=`trap -p "${trap_add_name}" |  awk -F"'" '{print $2}'`
+
+    if [[ -z "${existing_cmd}" ]]; then
+      new_cmd="${trap_add_cmd}"
+    else
+      new_cmd="${existing_cmd};${trap_add_cmd}"
+    fi
+
+    # Assign the test
+    trap "${new_cmd}" "${trap_add_name}"
+  done
+}
+
+# Opposite of kube::util::ensure-temp-dir()
+kube::util::cleanup-temp-dir() {
+  rm -rf "${KUBE_TEMP}"
+}
+
 # Create a temp dir that'll be deleted at the end of this bash session.
 #
 # Vars set:
@@ -55,6 +105,7 @@ kube::util::wait_for_url() {
 kube::util::ensure-temp-dir() {
   if [[ -z ${KUBE_TEMP-} ]]; then
     KUBE_TEMP=$(mktemp -d 2>/dev/null || mktemp -d -t kubernetes.XXXXXX)
+    kube::util::trap_add kube::util::cleanup-temp-dir EXIT
   fi
 }
 
@@ -87,14 +138,26 @@ kube::util::host_platform() {
     amd64*)
       host_arch=amd64
       ;;
+    aarch64*)
+      host_arch=arm64
+      ;;
+    arm64*)
+      host_arch=arm64
+      ;;
     arm*)
       host_arch=arm
       ;;
     i?86*)
       host_arch=x86
       ;;
+    s390x*)
+      host_arch=s390x
+      ;;
+    ppc64le*)
+      host_arch=ppc64le
+      ;;
     *)
-      kube::log::error "Unsupported host arch. Must be x86_64, 386 or arm."
+      kube::log::error "Unsupported host arch. Must be x86_64, 386, arm, arm64, s390x or ppc64le."
       exit 1
       ;;
   esac
@@ -105,6 +168,7 @@ kube::util::find-binary() {
   local lookfor="${1}"
   local host_platform="$(kube::util::host_platform)"
   local locations=(
+    "${KUBE_ROOT}/_output/bin/${lookfor}"
     "${KUBE_ROOT}/_output/dockerized/bin/${host_platform}/${lookfor}"
     "${KUBE_ROOT}/_output/local/bin/${host_platform}/${lookfor}"
     "${KUBE_ROOT}/platforms/${host_platform}/${lookfor}"
@@ -113,71 +177,66 @@ kube::util::find-binary() {
   echo -n "${bin}"
 }
 
-# Wait for background jobs to finish. Return with
-# an error status if any of the jobs failed.
-kube::util::wait-for-jobs() {
-  local fail=0
-  local job
-  for job in $(jobs -p); do
-    wait "${job}" || fail=$((fail + 1))
-  done
-  return ${fail}
+# Run all known doc generators (today gendocs and genman for kubectl)
+# $1 is the directory to put those generated documents
+kube::util::gen-docs() {
+  local dest="$1"
+
+  # Find binary
+  gendocs=$(kube::util::find-binary "gendocs")
+  genkubedocs=$(kube::util::find-binary "genkubedocs")
+  genman=$(kube::util::find-binary "genman")
+  genyaml=$(kube::util::find-binary "genyaml")
+  genfeddocs=$(kube::util::find-binary "genfeddocs")
+
+  mkdir -p "${dest}/docs/user-guide/kubectl/"
+  "${gendocs}" "${dest}/docs/user-guide/kubectl/"
+  mkdir -p "${dest}/docs/admin/"
+  "${genkubedocs}" "${dest}/docs/admin/" "kube-apiserver"
+  "${genkubedocs}" "${dest}/docs/admin/" "kube-controller-manager"
+  "${genkubedocs}" "${dest}/docs/admin/" "kube-proxy"
+  "${genkubedocs}" "${dest}/docs/admin/" "kube-scheduler"
+  "${genkubedocs}" "${dest}/docs/admin/" "kubelet"
+  "${genfeddocs}" "${dest}/docs/admin/" "federation-apiserver"
+  "${genfeddocs}" "${dest}/docs/admin/" "federation-controller-manager"
+  mkdir -p "${dest}/docs/man/man1/"
+  "${genman}" "${dest}/docs/man/man1/"
+  mkdir -p "${dest}/docs/yaml/kubectl/"
+  "${genyaml}" "${dest}/docs/yaml/kubectl/"
+
+  # create the list of generated files
+  pushd "${dest}" > /dev/null
+  touch .generated_docs
+  find . -type f | cut -sd / -f 2- | LC_ALL=C sort > .generated_docs
+  popd > /dev/null
 }
 
-# Takes a binary to run $1 and then copies the results to $2.
-# If the generated and original files are the same after filtering lines
-# that match $3, copy is skipped.
-kube::util::gen-doc() {
-  local cmd="$1"
-  local base_dest="$(kube::util::realpath $2)"
-  local relative_doc_dest="$(echo $3 | sed 's/\/$//')"
-  local dest="${base_dest}/${relative_doc_dest}"
-  local skipprefix="${4:-}"
-
-  # We do this in a tmpdir in case the dest has other non-autogenned files
-  # We don't want to include them in the list of gen'd files
-  local tmpdir="${KUBE_ROOT}/doc_tmp"
-  mkdir -p "${tmpdir}"
-  # generate the new files
-  ${cmd} "${tmpdir}"
-  # create the list of generated files
-  ls "${tmpdir}" | LC_ALL=C sort > "${tmpdir}/.files_generated"
-
-  while read file; do
-    # Don't add analytics link to generated .md files -- that is done (and
-    # checked) by mungedocs.
-
-    # Remove all old generated files from the destination
-    if [[ -e "${tmpdir}/${file}" ]]; then
-      local original generated
-      # Filter all munges from original content.
-      original=$(cat "${dest}/${file}" | sed '/^<!-- BEGIN MUNGE:.*/,/^<!-- END MUNGE:.*/d')
-      generated=$(cat "${tmpdir}/${file}")
-      # If this function was asked to filter lines with a prefix, do so.
-      if [[ -n "${skipprefix}" ]]; then
-        original=$(echo "${original}" | grep -v "^${skipprefix}" || :)
-        generated=$(echo "${generated}" | grep -v "^${skipprefix}" || :)
+# Puts a placeholder for every generated doc. This makes the link checker work.
+kube::util::set-placeholder-gen-docs() {
+  local list_file="${KUBE_ROOT}/.generated_docs"
+  if [ -e ${list_file} ]; then
+    # remove all of the old docs; we don't want to check them in.
+    while read file; do
+      if [[ "${list_file}" != "${KUBE_ROOT}/${file}" ]]; then
+        cp "${KUBE_ROOT}/hack/autogenerated_placeholder.txt" "${KUBE_ROOT}/${file}"
       fi
-      # By now, the contents should be normalized and stripped of any
-      # auto-managed content.  We also ignore whitespace here because of
-      # markdown strictness fixups later in the pipeline.
-      if diff -Bw <(echo "${original}") <(echo "${generated}") > /dev/null; then
-        # actual contents same, overwrite generated with original.
-        mv "${dest}/${file}" "${tmpdir}/${file}"
-      fi
-    else
-      rm "${dest}/${file}" || true
-    fi
-  done <"${dest}/.files_generated"
+    done <"${list_file}"
+    # The .generated_docs file lists itself, so we don't need to explicitly
+    # delete it.
+  fi
+}
 
-  # put the new generated file into the destination
-  # the shopt is so that we get .files_generated from the glob.
-  shopt -s dotglob
-  cp -af "${tmpdir}"/* "${dest}"
-  shopt -u dotglob
-
-  #cleanup
-  rm -rf "${tmpdir}"
+# Removes previously generated docs-- we don't want to check them in. $KUBE_ROOT
+# must be set.
+kube::util::remove-gen-docs() {
+  if [ -e "${KUBE_ROOT}/.generated_docs" ]; then
+    # remove all of the old docs; we don't want to check them in.
+    while read file; do
+      rm "${KUBE_ROOT}/${file}" 2>/dev/null || true
+    done <"${KUBE_ROOT}/.generated_docs"
+    # The .generated_docs file lists itself, so we don't need to explicitly
+    # delete it.
+  fi
 }
 
 # Takes a path $1 to traverse for md files to append the ga-beacon tracking
@@ -195,11 +254,14 @@ kube::util::gen-analytics() {
   else
     dir="${path}"
   fi
-  # We don't touch files in Godeps|third_party, and the kubectl
-  # docs are autogenerated by gendocs.
+  # We don't touch files in special dirs, and the kubectl docs are
+  # autogenerated by gendocs.
+  # Don't descend into .directories
   mdfiles=($( find "${dir}" -name "*.md" -type f \
-              -not -path "${path}/Godeps/*" \
+              -not -path '*/\.*' \
+              -not -path "${path}/vendor/*" \
               -not -path "${path}/third_party/*" \
+              -not -path "${path}/_gopath/*" \
               -not -path "${path}/_output/*" \
               -not -path "${path}/docs/user-guide/kubectl/kubectl*" ))
   for f in "${mdfiles[@]}"; do
@@ -218,6 +280,86 @@ kube::util::gen-analytics() {
 kube::util::analytics-link() {
   local path="$1"
   echo "[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/${path}?pixel)]()"
+}
+
+# Takes a group/version and returns the path to its location on disk, sans
+# "pkg". E.g.:
+# * default behavior: extensions/v1beta1 -> apis/extensions/v1beta1
+# * default behavior for only a group: experimental -> apis/experimental
+# * Special handling for empty group: v1 -> api/v1, unversioned -> api/unversioned
+# * Very special handling for when both group and version are "": / -> api
+kube::util::group-version-to-pkg-path() {
+  local group_version="$1"
+  # Special cases first.
+  # TODO(lavalamp): Simplify this by moving pkg/api/v1 and splitting pkg/api,
+  # moving the results to pkg/apis/api.
+  case "${group_version}" in
+    # both group and version are "", this occurs when we generate deep copies for internal objects of the legacy v1 API.
+    __internal)
+      echo "api"
+      ;;
+    v1)
+      echo "api/v1"
+      ;;
+    unversioned)
+      echo "api/unversioned"
+      ;;
+    *)
+      echo "apis/${group_version%__internal}"
+      ;;
+  esac
+}
+
+# Takes a group/version and returns the swagger-spec file name.
+# default behavior: extensions/v1beta1 -> extensions_v1beta1
+# special case for v1: v1 -> v1
+kube::util::gv-to-swagger-name() {
+  local group_version="$1"
+  case "${group_version}" in
+    v1)
+      echo "v1"
+      ;;
+    *)
+      echo "${group_version%/*}_${group_version#*/}"
+      ;;
+  esac
+}
+
+# Returns the name of the upstream remote repository name for the local git
+# repo, e.g. "upstream" or "origin".
+kube::util::git_upstream_remote_name() {
+  git remote -v | grep fetch |\
+    grep -E 'github.com[/:]kubernetes/kubernetes|k8s.io/kubernetes' |\
+    head -n 1 | awk '{print $1}'
+}
+
+# Checks whether there are any files matching pattern $2 changed between the
+# current branch and upstream branch named by $1.
+# Returns 1 (false) if there are no changes, 0 (true) if there are changes
+# detected.
+kube::util::has_changes_against_upstream_branch() {
+  local -r git_branch=$1
+  local -r pattern=$2
+  local full_branch
+
+  full_branch="$(kube::util::git_upstream_remote_name)/${git_branch}"
+  echo "Checking for '${pattern}' changes against '${full_branch}'"
+  # make sure the branch is valid, otherwise the check will pass erroneously.
+  if ! git describe "${full_branch}" >/dev/null; then
+    # abort!
+    exit 1
+  fi
+  # notice this uses ... to find the first shared ancestor
+  if git diff --name-only "${full_branch}...HEAD" | grep "${pattern}" > /dev/null; then
+    return 0
+  fi
+  # also check for pending changes
+  if git status --porcelain | grep "${pattern}" > /dev/null; then
+    echo "Detected '${pattern}' uncommitted changes."
+    return 0
+  fi
+  echo "No '${pattern}' changes detected."
+  return 1
 }
 
 # ex: ts=2 sw=2 et filetype=sh

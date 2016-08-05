@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,17 +15,15 @@ limitations under the License.
 */
 
 /*
-Package client contains the implementation of the client side communication with the
+Package unversioned contains the implementation of the client side communication with the
 Kubernetes master. The Client class provides methods for reading, creating, updating,
-and deleting pods, replication controllers, daemons, services, and minions.
+and deleting pods, replication controllers, daemons, services, and nodes.
 
 Most consumers should use the Config object to create a Client:
 
     import (
-      "k8s.io/kubernetes/pkg/client"
+      client "k8s.io/kubernetes/pkg/client/unversioned"
       "k8s.io/kubernetes/pkg/api"
-      "k8s.io/kubernetes/pkg/fields"
-      "k8s.io/kubernetes/pkg/labels"
     )
 
     [...]
@@ -39,7 +37,7 @@ Most consumers should use the Config object to create a Client:
     if err != nil {
       // handle error
     }
-    pods, err := client.Pods(api.NamespaceDefault).List(labels.Everything(), fields.Everything())
+    pods, err := client.Pods(api.NamespaceDefault).List(api.ListOptions{})
     if err != nil {
       // handle error
     }
@@ -52,8 +50,8 @@ More advanced consumers may wish to provide their own transport via a http.Round
     }
     client, err := client.New(config)
 
-The RESTClient type implements the Kubernetes API conventions (see `docs/api-conventions.md`)
+The RESTClient type implements the Kubernetes API conventions (see `docs/devel/api-conventions.md`)
 for a given API path and is intended for use by consumers implementing their own Kubernetes
 compatible APIs.
 */
-package unversioned
+package unversioned // import "k8s.io/kubernetes/pkg/client/unversioned"

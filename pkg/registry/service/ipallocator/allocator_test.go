@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 func TestAllocate(t *testing.T) {
@@ -34,7 +34,7 @@ func TestAllocate(t *testing.T) {
 	if f := r.Free(); f != 254 {
 		t.Errorf("unexpected free %d", f)
 	}
-	found := util.NewStringSet()
+	found := sets.NewString()
 	count := 0
 	for r.Free() > 0 {
 		ip, err := r.AllocateNext()
@@ -118,7 +118,7 @@ func TestAllocateSmall(t *testing.T) {
 	if f := r.Free(); f != 2 {
 		t.Errorf("free: %d", f)
 	}
-	found := util.NewStringSet()
+	found := sets.NewString()
 	for i := 0; i < 2; i++ {
 		ip, err := r.AllocateNext()
 		if err != nil {

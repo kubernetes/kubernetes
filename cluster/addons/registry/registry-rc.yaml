@@ -23,7 +23,11 @@ spec:
       - name: registry
         image: registry:2
         resources:
+          # keep request = limit to keep this container in guaranteed class
           limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
             cpu: 100m
             memory: 100Mi
         env:
@@ -38,7 +42,6 @@ spec:
         - containerPort: 5000
           name: registry
           protocol: TCP
-      # TODO: use a persistent volume claim
       volumes:
       - name: image-store
         persistentVolumeClaim:

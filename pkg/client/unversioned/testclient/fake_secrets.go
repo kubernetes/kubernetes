@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,8 +37,8 @@ func (c *FakeSecrets) Get(name string) (*api.Secret, error) {
 	return obj.(*api.Secret), err
 }
 
-func (c *FakeSecrets) List(label labels.Selector, field fields.Selector) (*api.SecretList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("secrets", c.Namespace, label, field), &api.SecretList{})
+func (c *FakeSecrets) List(opts api.ListOptions) (*api.SecretList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("secrets", c.Namespace, opts), &api.SecretList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,7 +69,6 @@ func (c *FakeSecrets) Delete(name string) error {
 	return err
 }
 
-func (c *FakeSecrets) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("secrets", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+func (c *FakeSecrets) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("secrets", c.Namespace, opts))
 }

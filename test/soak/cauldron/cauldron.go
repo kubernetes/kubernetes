@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,9 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
 var (
@@ -68,7 +66,7 @@ func main() {
 
 	var nodes *api.NodeList
 	for start := time.Now(); time.Since(start) < nodeListTimeout; time.Sleep(2 * time.Second) {
-		nodes, err = c.Nodes().List(labels.Everything(), fields.Everything())
+		nodes, err = c.Nodes().List(api.ListOptions{})
 		if err == nil {
 			break
 		}
@@ -129,7 +127,7 @@ func main() {
 				Ports: []api.ServicePort{{
 					Protocol:   "TCP",
 					Port:       9376,
-					TargetPort: util.NewIntOrStringFromInt(9376),
+					TargetPort: intstr.FromInt(9376),
 				}},
 				Selector: map[string]string{
 					"name": "serve-hostname",
@@ -179,7 +177,7 @@ func main() {
 						Containers: []api.Container{
 							{
 								Name:  "serve-hostname",
-								Image: "gcr.io/google_containers/serve_hostname:1.1",
+								Image: "gcr.io/google_containers/serve_hostname:v1.4",
 								Ports: []api.ContainerPort{{ContainerPort: 9376}},
 							},
 						},

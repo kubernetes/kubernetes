@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -127,5 +127,35 @@ func TestUnlogged(t *testing.T) {
 		}
 		w := httptest.NewRecorder()
 		handler(w, req)
+	}
+}
+
+type testResponseWriter struct{}
+
+func (*testResponseWriter) Header() http.Header       { return nil }
+func (*testResponseWriter) Write([]byte) (int, error) { return 0, nil }
+func (*testResponseWriter) WriteHeader(int)           {}
+
+func TestLoggedStatus(t *testing.T) {
+	req, err := http.NewRequest("GET", "http://example.com", nil)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	var tw http.ResponseWriter = new(testResponseWriter)
+	logger := NewLogged(req, &tw)
+	logger.Write(nil)
+
+	if logger.status != http.StatusOK {
+		t.Errorf("expected status after write to be %v, got %v", http.StatusOK, logger.status)
+	}
+
+	tw = new(testResponseWriter)
+	logger = NewLogged(req, &tw)
+	logger.WriteHeader(http.StatusForbidden)
+	logger.Write(nil)
+
+	if logger.status != http.StatusForbidden {
+		t.Errorf("expected status after write to remain %v, got %v", http.StatusForbidden, logger.status)
 	}
 }

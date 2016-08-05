@@ -1,7 +1,7 @@
 // +build cgo,linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,10 @@ limitations under the License.
 package oom
 
 import (
+	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // Converts a sequence of PID lists into a PID lister.
@@ -38,73 +41,64 @@ func sequenceToPidLister(pidListSequence [][]int) func(string) ([]int, error) {
 	}
 }
 
-// Tests that applyOomScoreAdjContainer correctly applies OOM scores to relevant processes, or
+// Tests that applyOOMScoreAdjContainer correctly applies OOM scores to relevant processes, or
 // returns the right error.
-func applyOomScoreAdjContainerTester(pidListSequence [][]int, maxTries int, appliedPids []int, expectedError bool, t *testing.T) {
-	pidOoms := make(map[int]bool)
+func applyOOMScoreAdjContainerTester(pidListSequence [][]int, maxTries int, appliedPids []int, expectedError bool, t *testing.T) {
+	pidOOMs := make(map[int]bool)
 
-	// Mock ApplyOomScoreAdj and pidLister.
-	oomAdjuster := NewOomAdjuster()
-	oomAdjuster.ApplyOomScoreAdj = func(pid int, oomScoreAdj int) error {
-		pidOoms[pid] = true
+	// Mock ApplyOOMScoreAdj and pidLister.
+	oomAdjuster := NewOOMAdjuster()
+	oomAdjuster.ApplyOOMScoreAdj = func(pid int, oomScoreAdj int) error {
+		pidOOMs[pid] = true
 		return nil
 	}
 	oomAdjuster.pidLister = sequenceToPidLister(pidListSequence)
-	err := oomAdjuster.ApplyOomScoreAdjContainer("", 100, maxTries)
+	err := oomAdjuster.ApplyOOMScoreAdjContainer("", 100, maxTries)
 
 	// Check error value.
 	if expectedError && err == nil {
-		t.Errorf("Expected error %+v when running ApplyOomScoreAdjContainer but got no error", expectedError)
+		t.Errorf("Expected error %+v when running ApplyOOMScoreAdjContainer but got no error", expectedError)
 		return
 	} else if !expectedError && err != nil {
-		t.Errorf("Expected no error but got error %+v when running ApplyOomScoreAdjContainer", err)
+		t.Errorf("Expected no error but got error %+v when running ApplyOOMScoreAdjContainer", err)
 		return
 	} else if err != nil {
 		return
 	}
-
 	// Check that OOM scores were applied to the right processes.
-	if len(appliedPids) != len(pidOoms) {
-		t.Errorf("Applied OOM scores to incorrect number of processes")
+	if len(appliedPids) != len(pidOOMs) {
+		t.Errorf("Applied OOM scores to incorrect number of processes - %+v vs %v", appliedPids, pidOOMs)
 		return
 	}
 	for _, pid := range appliedPids {
-		if !pidOoms[pid] {
+		if !pidOOMs[pid] {
 			t.Errorf("Failed to apply OOM scores to process %d", pid)
 		}
 	}
 }
 
-func TestOomScoreAdjContainer(t *testing.T) {
+func TestOOMScoreAdjContainer(t *testing.T) {
 	pidListSequenceEmpty := [][]int{}
-	applyOomScoreAdjContainerTester(pidListSequenceEmpty, 3, nil, true, t)
+	applyOOMScoreAdjContainerTester(pidListSequenceEmpty, 3, nil, true, t)
 
 	pidListSequence1 := [][]int{
 		{1, 2},
 	}
-	applyOomScoreAdjContainerTester(pidListSequence1, 1, nil, true, t)
-	applyOomScoreAdjContainerTester(pidListSequence1, 2, []int{1, 2}, false, t)
-	applyOomScoreAdjContainerTester(pidListSequence1, 3, []int{1, 2}, false, t)
-
-	pidListSequence3 := [][]int{
-		{1, 2},
-		{1, 2, 4, 5},
-		{2, 1, 4, 5, 3},
-	}
-	applyOomScoreAdjContainerTester(pidListSequence3, 1, nil, true, t)
-	applyOomScoreAdjContainerTester(pidListSequence3, 2, nil, true, t)
-	applyOomScoreAdjContainerTester(pidListSequence3, 3, nil, true, t)
-	applyOomScoreAdjContainerTester(pidListSequence3, 4, []int{1, 2, 3, 4, 5}, false, t)
+	applyOOMScoreAdjContainerTester(pidListSequence1, 1, []int{1, 2}, false, t)
 
 	pidListSequenceLag := [][]int{
 		{},
 		{},
 		{},
 		{1, 2, 4},
-		{1, 2, 4, 5},
 	}
-	for i := 1; i < 5; i++ {
-		applyOomScoreAdjContainerTester(pidListSequenceLag, i, nil, true, t)
+	for i := 1; i < 4; i++ {
+		applyOOMScoreAdjContainerTester(pidListSequenceLag, i, nil, true, t)
 	}
-	applyOomScoreAdjContainerTester(pidListSequenceLag, 6, []int{1, 2, 4, 5}, false, t)
+	applyOOMScoreAdjContainerTester(pidListSequenceLag, 4, []int{1, 2, 4}, false, t)
+}
+
+func TestPidListerFailure(t *testing.T) {
+	_, err := getPids("/does/not/exist")
+	assert.True(t, os.IsNotExist(err), "expected getPids to return not exists error. Got %v", err)
 }

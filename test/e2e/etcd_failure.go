@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,18 +20,17 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Etcd failure", func() {
+var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 
-	var skipped bool
-	framework := Framework{BaseName: "etcd-failure"}
+	f := framework.NewDefaultFramework("etcd-failure")
 
 	BeforeEach(func() {
 		// This test requires:
@@ -39,32 +38,20 @@ var _ = Describe("Etcd failure", func() {
 		// - master access
 		// ... so the provider check should be identical to the intersection of
 		// providers that provide those capabilities.
-		skipped = true
-		SkipUnlessProviderIs("gce")
-		skipped = false
+		framework.SkipUnlessProviderIs("gce")
 
-		framework.beforeEach()
-
-		Expect(RunRC(RCConfig{
-			Client:    framework.Client,
+		Expect(framework.RunRC(framework.RCConfig{
+			Client:    f.Client,
 			Name:      "baz",
-			Namespace: framework.Namespace.Name,
-			Image:     "gcr.io/google_containers/nginx",
+			Namespace: f.Namespace.Name,
+			Image:     framework.GetPauseImageName(f.Client),
 			Replicas:  1,
 		})).NotTo(HaveOccurred())
 	})
 
-	AfterEach(func() {
-		if skipped {
-			return
-		}
-
-		framework.afterEach()
-	})
-
 	It("should recover from network partition with master", func() {
 		etcdFailTest(
-			framework,
+			f,
 			"sudo iptables -A INPUT -p tcp --destination-port 4001 -j DROP",
 			"sudo iptables -D INPUT -p tcp --destination-port 4001 -j DROP",
 		)
@@ -72,19 +59,19 @@ var _ = Describe("Etcd failure", func() {
 
 	It("should recover from SIGKILL", func() {
 		etcdFailTest(
-			framework,
+			f,
 			"pgrep etcd | xargs -I {} sudo kill -9 {}",
 			"echo 'do nothing. monit should restart etcd.'",
 		)
 	})
 })
 
-func etcdFailTest(framework Framework, failCommand, fixCommand string) {
+func etcdFailTest(f *framework.Framework, failCommand, fixCommand string) {
 	doEtcdFailure(failCommand, fixCommand)
 
-	checkExistingRCRecovers(framework)
+	checkExistingRCRecovers(f)
 
-	ServeImageOrFail(&framework, "basic", "gcr.io/google_containers/serve_hostname:1.1")
+	ServeImageOrFail(f, "basic", "gcr.io/google_containers/serve_hostname:v1.4")
 }
 
 // For this duration, etcd will be failed by executing a failCommand on the master.
@@ -103,23 +90,25 @@ func doEtcdFailure(failCommand, fixCommand string) {
 }
 
 func masterExec(cmd string) {
-	stdout, stderr, code, err := SSH(cmd, getMasterHost()+":22", testContext.Provider)
+	result, err := framework.SSH(cmd, framework.GetMasterHost()+":22", framework.TestContext.Provider)
 	Expect(err).NotTo(HaveOccurred())
-	if code != 0 {
-		Failf("master exec command, '%v' failed with exitcode %v: \n\tstdout: %v\n\tstderr: %v", cmd, code, stdout, stderr)
+	if result.Code != 0 {
+		framework.LogSSHResult(result)
+		framework.Failf("master exec command returned non-zero")
 	}
 }
 
-func checkExistingRCRecovers(f Framework) {
+func checkExistingRCRecovers(f *framework.Framework) {
 	By("assert that the pre-existing replication controller recovers")
 	podClient := f.Client.Pods(f.Namespace.Name)
 	rcSelector := labels.Set{"name": "baz"}.AsSelector()
 
 	By("deleting pods from existing replication controller")
-	expectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
-		pods, err := podClient.List(rcSelector, fields.Everything())
+	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
+		options := api.ListOptions{LabelSelector: rcSelector}
+		pods, err := podClient.List(options)
 		if err != nil {
-			Logf("apiserver returned error, as expected before recovery: %v", err)
+			framework.Logf("apiserver returned error, as expected before recovery: %v", err)
 			return false, nil
 		}
 		if len(pods.Items) == 0 {
@@ -129,13 +118,14 @@ func checkExistingRCRecovers(f Framework) {
 			err = podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 			Expect(err).NotTo(HaveOccurred())
 		}
-		Logf("apiserver has recovered")
+		framework.Logf("apiserver has recovered")
 		return true, nil
 	}))
 
 	By("waiting for replication controller to recover")
-	expectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
-		pods, err := podClient.List(rcSelector, fields.Everything())
+	framework.ExpectNoError(wait.Poll(time.Millisecond*500, time.Second*60, func() (bool, error) {
+		options := api.ListOptions{LabelSelector: rcSelector}
+		pods, err := podClient.List(options)
 		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range pods.Items {
 			if pod.DeletionTimestamp == nil && api.IsPodReady(&pod) {

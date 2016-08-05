@@ -1,0 +1,16 @@
+{
+        "servers": [
+                {
+                        "serverAddress": "http://127.0.0.1:8083",
+                        "groupVersionDiscoveryPaths": [
+                                {
+                                        "path": "/apis"
+                                },
+                                {
+                                        "path": "/api",
+                                        "isLegacy": true
+                                }
+                        ]
+                }
+        ]
+}

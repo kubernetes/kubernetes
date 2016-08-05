@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: l7-lb-controller-v0.6.0
+  namespace: kube-system
+  labels:
+    k8s-app: glbc
+    version: v0.6.0
+    kubernetes.io/cluster-service: "true"
+    kubernetes.io/name: "GLBC"
+spec:
+  # There should never be more than 1 controller alive simultaneously.
+  replicas: 1
+  selector:
+    k8s-app: glbc
+    version: v0.6.0
+  template:
+    metadata:
+      labels:
+        k8s-app: glbc
+        version: v0.6.0
+        name: glbc
+        kubernetes.io/cluster-service: "true"
+    spec:
+      terminationGracePeriodSeconds: 600
+      containers:
+      - name: default-http-backend
+        # Any image is permissible as long as:
+        # 1. It serves a 404 page at /
+        # 2. It serves 200 on a /healthz endpoint
+        image: gcr.io/google_containers/defaultbackend:1.0
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            cpu: 10m
+            memory: 20Mi
+          requests:
+            cpu: 10m
+            memory: 20Mi
+      - image: gcr.io/google_containers/glbc:0.6.0
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+            scheme: HTTP
+          initialDelaySeconds: 30
+          # healthz reaches out to GCE
+          periodSeconds: 30
+          timeoutSeconds: 5
+        name: l7-lb-controller
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 50Mi
+        args:
+        - --default-backend-service=kube-system/default-http-backend
+        - --sync-period=60s
+        - --cluster-uid=${KUBE_UID}

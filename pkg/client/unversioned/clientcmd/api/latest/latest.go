@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,18 @@ limitations under the License.
 package latest
 
 import (
-	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	_ "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer/json"
+	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 )
 
 // Version is the string that represents the current external default version.
 const Version = "v1"
+
+var ExternalVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 
 // OldestVersion is the string that represents the oldest server version supported,
 // for client code that wants to hardcode the lowest common denominator.
@@ -34,8 +40,15 @@ const OldestVersion = "v1"
 // with a set of versions to choose.
 var Versions = []string{"v1"}
 
-// Codec is the default codec for serializing output that should use
-// the latest supported version.  Use this Codec when writing to
-// disk, a data store that is not dynamically versioned, or in tests.
-// This codec can decode any object that Kubernetes is aware of.
-var Codec = runtime.YAMLDecoder(v1.Codec)
+var Codec runtime.Codec
+
+func init() {
+	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, api.Scheme, api.Scheme)
+	Codec = versioning.NewCodecForScheme(
+		api.Scheme,
+		yamlSerializer,
+		yamlSerializer,
+		[]unversioned.GroupVersion{{Version: Version}},
+		[]unversioned.GroupVersion{{Version: runtime.APIVersionInternal}},
+	)
+}

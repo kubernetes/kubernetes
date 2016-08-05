@@ -1,0 +1,10 @@
+language: go
+go:
+  - 1.5
+install:
+  - go get golang.org/x/tools/cmd/vet
+script:
+  - go get -t -v ./...
+  - diff -u <(echo -n) <(gofmt -d -s .)
+  - go tool vet .
+  - go test -v -race ./...

@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,498 +19,270 @@
 # Use the config file specified in $KUBE_CONFIG_FILE, or default to
 # config-default.sh.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
-source "${KUBE_ROOT}/cluster/azure/${KUBE_CONFIG_FILE-"config-default.sh"}"
+set -e
+
+SOURCE="${BASH_SOURCE[0]}"
+while [ -h "$SOURCE" ]; do
+  DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+DIR="$( cd -P "$( dirname "$SOURCE" )" && pwd )"
+
+KUBE_ROOT="${DIR}/../.."
+KUBE_CONFIG_FILE="${KUBE_CONFIG_FILE:-"${DIR}/config-default.sh"}"
+source "${KUBE_CONFIG_FILE}"
 source "${KUBE_ROOT}/cluster/common.sh"
 
-function azure_call {
-    local -a params=()
-    local param
-    # the '... in "$@"' is implicit on a for, so doesn't need to be stated.
-    for param; do
-        params+=("${param}")
+AZKUBE_VERSION="v0.0.5"
+REGISTER_MASTER_KUBELET="true"
+
+function verify-prereqs() {
+    required_binaries=("docker" "jq")
+
+    for rb in "${required_binaries[@]}"; do
+    if ! which "$rb" > /dev/null 2>&1; then
+        echo "Couldn't find ${rb} in PATH"
+        exit 1
+    fi
     done
-    local rc=0
-    local stderr
-    local count=0
-    while [[ count -lt 10 ]]; do
-        stderr=$(azure "${params[@]}" 2>&1 >&3) && break
-        rc=$?
-        if [[ "${stderr}" != *"getaddrinfo ENOTFOUND"* ]]; then
-            break
+
+    if ! "${KUBE_ROOT}/cluster/kubectl.sh" >/dev/null 2>&1 ; then
+        echo "kubectl is unavailable. Ensure ${KUBE_ROOT}/cluster/kubectl.sh runs with a successful exit."
+        exit 1
+    fi
+}
+
+function azure-ensure-config() {
+    if [[ -z "${AZURE_SUBSCRIPTION_ID:-}" ]]; then
+        echo "AZURE_SUBSCRIPTION_ID must be set"
+        exit 1
+    fi
+
+    export AZURE_OUTPUT_RELDIR="_deployments/${AZURE_DEPLOY_ID}"
+    export AZURE_OUTPUT_DIR="${DIR}/${AZURE_OUTPUT_RELDIR}"
+    mkdir -p "${AZURE_OUTPUT_DIR}"
+
+    case "${AZURE_AUTH_METHOD:-}" in
+        "client_secret")
+            if [[ -z "${AZURE_CLIENT_ID}" ]]; then
+                echo "AZURE_CLIENT_ID must be set"
+                exit 1
+            fi
+            if [[ -z "${AZURE_CLIENT_SECRET}" ]]; then
+                echo "AZURE_CLIENT_SECRET must be set"
+                exit 1
+            fi
+            ;;
+        "")
+            echo "AZURE_AUTH_METHOD not set, assuming \"device\"."
+            ;;
+        "device" | "")
+            echo "This will be interactive. (export AZURE_AUTH_METHOD=client_secret to avoid the prompt)"
+            export AZURE_AUTH_METHOD="device"
+            ;;
+        *)
+            echo "AZURE_AUTH_METHOD is an unsupported value: \"${AZURE_AUTH_METHOD}\""
+            exit 1
+            ;;
+    esac
+}
+
+function repo-contains-image() {
+    registry="$1"
+    repo="$2"
+    image="$3"
+    version="$4"
+
+    prefix="${registry}"
+    if [[ "${prefix}" == "docker.io" ]]; then
+        prefix="registry.hub.docker.com/v2/repositories"
+        tags_json=$(curl "https://registry.hub.docker.com/v2/repositories/${repo}/${image}/tags/${version}/" 2>/dev/null)
+        tags_found="$(echo "${tags_json}" | jq ".v2?")"
+    elif [[ "${prefix}" == "gcr.io" ]]; then
+        tags_json=$(curl "https://gcr.io/v2/${repo}/${image}/tags/list" 2>/dev/null)
+        tags_found="$(echo "${tags_json}" | jq ".tags | indices([\"${version}\"]) | any")"
+    fi
+
+
+    if [[ "${tags_found}" == "true" ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
+function ensure-hyperkube() {
+    hyperkube="hyperkube-amd64"
+    official_image_tag="gcr.io/google_containers/${hyperkube}:${KUBE_GIT_VERSION}"
+
+    if repo-contains-image "gcr.io" "google_containers" "${hyperkube}" "${KUBE_GIT_VERSION}" ; then
+        echo "${hyperkube}:${KUBE_GIT_VERSION} was found in the gcr.io/google_containers repository"
+        export AZURE_HYPERKUBE_SPEC="${official_image_tag}"
+        return 0
+    fi
+
+    echo "${hyperkube}:${KUBE_GIT_VERSION} was not found in the gcr.io/google_containers repository"
+    if [[ -z "${AZURE_DOCKER_REGISTRY:-}" || -z "${AZURE_DOCKER_REPO:-}" ]]; then
+        echo "AZURE_DOCKER_REGISTRY and AZURE_DOCKER_REPO must be set in order to push ${hyperkube}:${KUBE_GIT_VERSION}"
+        return 1
+    fi
+
+    # check if it is already in the user owned docker hub
+    local user_image_tag="${AZURE_DOCKER_REGISTRY}/${AZURE_DOCKER_REPO}/${hyperkube}:${KUBE_GIT_VERSION}"
+    if repo-contains-image "${AZURE_DOCKER_REGISTRY}" "${AZURE_DOCKER_REPO}" "${hyperkube}" "${KUBE_GIT_VERSION}" ; then
+        echo "${image}:${version} was found in ${repo} (success)"
+        export AZURE_HYPERKUBE_SPEC="${user_image_tag}"
+        return 0
+    fi
+
+    # should these steps tell them to just immediately tag it with the final user-specified repo?
+    # for now just stick with the assumption that `make release` will eventually tag a hyperkube image on gcr.io
+    # and then the existing code can re-tag that for the user's repo and then push
+    if ! docker inspect "${user_image_tag}" ; then
+        if ! docker inspect "${official_image_tag}" ; then
+            REGISTRY="gcr.io/google_containers" \
+            VERSION="${KUBE_GIT_VERSION}" \
+            make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
         fi
-        count=$(($count + 1))
-    done 3>&1
-    if [[ "${rc}" -ne 0 ]]; then
-        echo "${stderr}" >&2
-        return "${rc}"
+
+        docker tag "${official_image_tag}" "${user_image_tag}"
+    fi
+
+    docker push "${user_image_tag}"
+
+    echo "${image}:${version} was pushed to ${repo}"
+    export AZURE_HYPERKUBE_SPEC="${user_image_tag}"
+}
+
+function deploy-kube-system() {
+    kubectl create -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+    name: kube-system
+EOF
+}
+
+function get-common-params() {
+    declare -ag AZKUBE_AUTH_PARAMS
+    declare -ag AZKUBE_DOCKER_PARAMS
+    declare -ag AZKUBE_RESOURCE_GROUP_PARAM
+
+    case "${AZURE_AUTH_METHOD}" in
+        "client_secret")
+            AZKUBE_AUTH_PARAMS+=("--client-id=${AZURE_CLIENT_ID}" "--client-secret=${AZURE_CLIENT_SECRET}")
+            ;;
+        "device")
+            AZKUBE_AUTH_PARAMS=()
+            ;;
+    esac
+
+
+    if [[ ! -z "${AZURE_HTTPS_PROXY:-}" ]]; then
+        AZKUBE_DOCKER_PARAMS+=("--net=host" "--env=https_proxy=${AZURE_HTTPS_PROXY}")
+    fi
+
+    if [[ ! -z "${AZURE_RESOURCE_GROUP:-}" ]]; then
+        echo "Forcing use of resource group ${AZURE_RESOURCE_GROUP}"
+        AZKUBE_RESOURCE_GROUP_PARAM+=("--resource-group=${AZURE_RESOURCE_GROUP}")
     fi
 }
 
-function json_val () {
-    python -c 'import json,sys;obj=json.load(sys.stdin);print obj'$1'';
+function azure-deploy(){
+    get-common-params
+
+    docker run -it \
+        --user "$(id -u)" \
+        "${AZKUBE_DOCKER_PARAMS[@]:+${AZKUBE_DOCKER_PARAMS[@]}}" \
+        -v "$HOME/.azkube:/.azkube" -v "/tmp:/tmp" \
+        -v "${AZURE_OUTPUT_DIR}:/opt/azkube/${AZURE_OUTPUT_RELDIR}" \
+        "colemickens/azkube:${AZKUBE_VERSION}" /opt/azkube/azkube deploy \
+            --kubernetes-hyperkube-spec="${AZURE_HYPERKUBE_SPEC}" \
+            --deployment-name="${AZURE_DEPLOY_ID}" \
+            --location="${AZURE_LOCATION}" \
+            "${AZKUBE_RESOURCE_GROUP_PARAM[@]:+${AZKUBE_RESOURCE_GROUP_PARAM[@]}}" \
+            --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
+            --auth-method="${AZURE_AUTH_METHOD}" "${AZKUBE_AUTH_PARAMS[@]:+${AZKUBE_AUTH_PARAMS[@]}}" \
+            --master-size="${AZURE_MASTER_SIZE}" \
+            --node-size="${AZURE_NODE_SIZE}" \
+            --node-count="${NUM_NODES}" \
+            --username="${AZURE_USERNAME}" \
+            --output-directory="/opt/azkube/${AZURE_OUTPUT_RELDIR}" \
+            --no-cloud-provider \
+            "${AZURE_AZKUBE_ARGS[@]:+${AZURE_AZKUBE_ARGS[@]}}"
 }
 
-# Verify prereqs
-function verify-prereqs {
-    if [[ -z "$(which azure)" ]]; then
-        echo "Couldn't find azure in PATH"
-        echo "  please install with 'npm install azure-cli'"
-        exit 1
-    fi
-
-    if [[ -z "$(azure_call account list | grep true)" ]]; then
-        echo "Default azure account not set"
-        echo "  please set with 'azure account set'"
-        exit 1
-    fi
-
-    account=$(azure_call account list | grep true)
-    if which md5 > /dev/null 2>&1; then
-        AZ_HSH=$(md5 -q -s "$account")
-    else
-        AZ_HSH=$(echo -n "$account" | md5sum)
-    fi
-
-    AZ_HSH=${AZ_HSH:0:7}
-    AZ_STG=kube$AZ_HSH
-    echo "==> AZ_STG: $AZ_STG"
-
-    AZ_CS="$AZ_CS_PREFIX-$AZ_HSH"
-    echo "==> AZ_CS: $AZ_CS"
-
-    CONTAINER=kube-$TAG
-    echo "==> CONTAINER: $CONTAINER"
-}
-
-# Create a temp dir that'll be deleted at the end of this bash session.
-#
-# Vars set:
-#   KUBE_TEMP
-function ensure-temp-dir {
-    if [[ -z ${KUBE_TEMP-} ]]; then
-        KUBE_TEMP=$(mktemp -d -t kubernetes.XXXXXX)
-        trap 'rm -rf "${KUBE_TEMP}"' EXIT
-    fi
-}
-
-# Verify and find the various tar files that we are going to use on the server.
-#
-# Vars set:
-#   SERVER_BINARY_TAR
-#   SALT_TAR
-function find-release-tars {
-    SERVER_BINARY_TAR="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
-    if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-        SERVER_BINARY_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
-    fi
-    if [[ ! -f "$SERVER_BINARY_TAR" ]]; then
-        echo "!!! Cannot find kubernetes-server-linux-amd64.tar.gz"
-        exit 1
-    fi
-
-    SALT_TAR="${KUBE_ROOT}/server/kubernetes-salt.tar.gz"
-    if [[ ! -f "$SALT_TAR" ]]; then
-        SALT_TAR="${KUBE_ROOT}/_output/release-tars/kubernetes-salt.tar.gz"
-    fi
-    if [[ ! -f "$SALT_TAR" ]]; then
-        echo "!!! Cannot find kubernetes-salt.tar.gz"
-        exit 1
-    fi
-}
-
-
-# Take the local tar files and upload them to Azure Storage.  They will then be
-# downloaded by the master as part of the start up script for the master.
-#
-# Assumed vars:
-#   SERVER_BINARY_TAR
-#   SALT_TAR
-# Vars set:
-#   SERVER_BINARY_TAR_URL
-#   SALT_TAR_URL
-function upload-server-tars() {
-    SERVER_BINARY_TAR_URL=
-    SALT_TAR_URL=
-
-    echo "==> SERVER_BINARY_TAR: $SERVER_BINARY_TAR"
-    echo "==> SALT_TAR: $SALT_TAR"
-
-    echo "+++ Staging server tars to Azure Storage: $AZ_STG"
-    local server_binary_url="${SERVER_BINARY_TAR##*/}"
-    local salt_url="${SALT_TAR##*/}"
-
-    SERVER_BINARY_TAR_URL="https://${AZ_STG}.blob.core.windows.net/$CONTAINER/$server_binary_url"
-    SALT_TAR_URL="https://${AZ_STG}.blob.core.windows.net/$CONTAINER/$salt_url"
-
-    echo "==> SERVER_BINARY_TAR_URL: $SERVER_BINARY_TAR_URL"
-    echo "==> SALT_TAR_URL: $SALT_TAR_URL"
-
-    echo "--> Checking storage exists..."
-    if [[ -z "$(azure_call storage account show $AZ_STG 2>/dev/null | \
-    grep data)" ]]; then
-        echo "--> Creating storage..."
-        azure_call storage account create -l "$AZ_LOCATION" $AZ_STG --type LRS
-    fi
-
-    echo "--> Getting storage key..."
-    stg_key=$(azure_call storage account keys list $AZ_STG --json | \
-        json_val '["primaryKey"]')
-
-    echo "--> Checking storage container exists..."
-    if [[ -z "$(azure_call storage container show -a $AZ_STG -k "$stg_key" \
-      $CONTAINER 2>/dev/null | grep data)" ]]; then
-        echo "--> Creating storage container..."
-        azure_call storage container create \
-            -a $AZ_STG \
-            -k "$stg_key" \
-            -p Blob \
-            $CONTAINER
-    fi
-
-    echo "--> Checking server binary exists in the container..."
-    if [[ -n "$(azure_call storage blob show -a $AZ_STG -k "$stg_key" \
-      $CONTAINER $server_binary_url 2>/dev/null | grep data)" ]]; then
-        echo "--> Deleting server binary in the container..."
-        azure_call storage blob delete \
-            -a $AZ_STG \
-            -k "$stg_key" \
-            $CONTAINER \
-            $server_binary_url
-    fi
-
-    echo "--> Uploading server binary to the container..."
-    azure_call storage blob upload \
-        -a $AZ_STG \
-        -k "$stg_key" \
-        $SERVER_BINARY_TAR \
-        $CONTAINER \
-        $server_binary_url
-
-    echo "--> Checking salt data exists in the container..."
-    if [[ -n "$(azure_call storage blob show -a $AZ_STG -k "$stg_key" \
-      $CONTAINER $salt_url 2>/dev/null | grep data)" ]]; then
-        echo "--> Deleting salt data in the container..."
-        azure_call storage blob delete \
-            -a $AZ_STG \
-            -k "$stg_key" \
-            $CONTAINER \
-            $salt_url
-    fi
-
-    echo "--> Uploading salt data to the container..."
-    azure_call storage blob upload \
-        -a $AZ_STG \
-        -k "$stg_key" \
-        $SALT_TAR \
-        $CONTAINER \
-        $salt_url
-}
-
-# Detect the information about the minions
-#
-# Assumed vars:
-#   MINION_NAMES
-#   ZONE
-# Vars set:
-#
-function detect-minions () {
-    if [[ -z "$AZ_CS" ]]; then
-        verify-prereqs
-    fi
-    ssh_ports=($(eval echo "2200{1..$NUM_MINIONS}"))
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        MINION_NAMES[$i]=$(ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} $AZ_CS.cloudapp.net hostname -f)
-    done
-}
-
-# Detect the IP for the master
-#
-# Assumed vars:
-#   MASTER_NAME
-#   ZONE
-# Vars set:
-#   KUBE_MASTER
-#   KUBE_MASTER_IP
-function detect-master () {
-    if [[ -z "$AZ_CS" ]]; then
-        verify-prereqs
-    fi
-
-    KUBE_MASTER=${MASTER_NAME}
-    KUBE_MASTER_IP="${AZ_CS}.cloudapp.net"
-    echo "Using master: $KUBE_MASTER (external IP: $KUBE_MASTER_IP)"
-}
-
-# Instantiate a kubernetes cluster
-#
-# Assumed vars
-#   KUBE_ROOT
-#   <Various vars set in config file>
 function kube-up {
-    # Make sure we have the tar files staged on Azure Storage
-    find-release-tars
-    upload-server-tars
+    date_start="$(date)"
+    startdate="$(date +%s)"
+    echo "++> AZURE KUBE-UP STARTED: $(date)"
 
-    ensure-temp-dir
+    verify-prereqs
+    azure-ensure-config
 
-    gen-kube-basicauth
-    python "${KUBE_ROOT}/third_party/htpasswd/htpasswd.py" \
-        -b -c "${KUBE_TEMP}/htpasswd" "$KUBE_USER" "$KUBE_PASSWORD"
-    local htpasswd
-    htpasswd=$(cat "${KUBE_TEMP}/htpasswd")
+    if [[ -z "${AZURE_HYPERKUBE_SPEC:-}" ]]; then
+        find-release-version
+        export KUBE_GIT_VERSION="${KUBE_GIT_VERSION//+/-}"
 
-    # Generate openvpn certs
-    echo "--> Generating openvpn certs"
-    echo 01 > ${KUBE_TEMP}/ca.srl
-    openssl genrsa -out ${KUBE_TEMP}/ca.key
-    openssl req -new -x509 -days 1095 \
-        -key ${KUBE_TEMP}/ca.key \
-        -out ${KUBE_TEMP}/ca.crt \
-        -subj "/CN=openvpn-ca"
-    openssl genrsa -out ${KUBE_TEMP}/server.key
-    openssl req -new \
-        -key ${KUBE_TEMP}/server.key \
-        -out ${KUBE_TEMP}/server.csr \
-        -subj "/CN=server"
-    openssl x509 -req -days 1095 \
-        -in ${KUBE_TEMP}/server.csr \
-        -CA ${KUBE_TEMP}/ca.crt \
-        -CAkey ${KUBE_TEMP}/ca.key \
-        -CAserial ${KUBE_TEMP}/ca.srl \
-        -out ${KUBE_TEMP}/server.crt
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        openssl genrsa -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.key
-        openssl req -new \
-            -key ${KUBE_TEMP}/${MINION_NAMES[$i]}.key \
-            -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.csr \
-            -subj "/CN=${MINION_NAMES[$i]}"
-        openssl x509 -req -days 1095 \
-            -in ${KUBE_TEMP}/${MINION_NAMES[$i]}.csr \
-            -CA ${KUBE_TEMP}/ca.crt \
-            -CAkey ${KUBE_TEMP}/ca.key \
-            -CAserial ${KUBE_TEMP}/ca.srl \
-            -out ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt
-    done
-
-    # Build up start up script for master
-    echo "--> Building up start up script for master"
-    (
-        echo "#!/bin/bash"
-        echo "CA_CRT=\"$(cat ${KUBE_TEMP}/ca.crt)\""
-        echo "SERVER_CRT=\"$(cat ${KUBE_TEMP}/server.crt)\""
-        echo "SERVER_KEY=\"$(cat ${KUBE_TEMP}/server.key)\""
-        echo "mkdir -p /var/cache/kubernetes-install"
-        echo "cd /var/cache/kubernetes-install"
-        echo "readonly MASTER_NAME='${MASTER_NAME}'"
-        echo "readonly INSTANCE_PREFIX='${INSTANCE_PREFIX}'"
-        echo "readonly NODE_INSTANCE_PREFIX='${INSTANCE_PREFIX}-minion'"
-        echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
-        echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
-        echo "readonly MASTER_HTPASSWD='${htpasswd}'"
-        echo "readonly SERVICE_CLUSTER_IP_RANGE='${SERVICE_CLUSTER_IP_RANGE}'"
-        echo "readonly ADMISSION_CONTROL='${ADMISSION_CONTROL:-}'"        
-        grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
-        grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/create-dynamic-salt-files.sh"
-        grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/download-release.sh"
-        grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/salt-master.sh"
-    ) > "${KUBE_TEMP}/master-start.sh"
-
-    if [[ ! -f $AZ_SSH_KEY ]]; then
-        ssh-keygen -f $AZ_SSH_KEY -N ''
+        # this will export AZURE_HYPERKUBE_SPEC based on whether an official image was found
+        # or if it was uploaded to the user specified docker repository.
+        if ! ensure-hyperkube; then
+            echo "Failed to ensure hyperkube was available. Exitting."
+            return 1
+        fi
+    else
+        echo "Using user specified AZURE_HYPERKUBE_SPEC: ${AZURE_HYPERKUBE_SPEC}"
+        echo "Note: The existence of this is not verified! (It might only be pullable from your DC)"
     fi
 
-    if [[ ! -f $AZ_SSH_CERT ]]; then
-        openssl req -new -x509 -days 1095 -key $AZ_SSH_KEY -out $AZ_SSH_CERT \
-            -subj "/CN=azure-ssh-key"
-    fi
+    azure-deploy
 
-    if [[ -z "$(azure_call network vnet show "$AZ_VNET" 2>/dev/null | grep data)" ]]; then
-        echo error create vnet $AZ_VNET with subnet $AZ_SUBNET
+    kubectl config set-cluster "${AZURE_DEPLOY_ID}" --server="https://${AZURE_DEPLOY_ID}.${AZURE_LOCATION}.cloudapp.azure.com:6443" --certificate-authority="${AZURE_OUTPUT_DIR}/ca.crt" --api-version="v1"
+    kubectl config set-credentials "${AZURE_DEPLOY_ID}_user" --client-certificate="${AZURE_OUTPUT_DIR}/client.crt" --client-key="${AZURE_OUTPUT_DIR}/client.key"
+    kubectl config set-context "${AZURE_DEPLOY_ID}" --cluster="${AZURE_DEPLOY_ID}" --user="${AZURE_DEPLOY_ID}_user"
+    kubectl config use-context "${AZURE_DEPLOY_ID}"
+
+    deploy-kube-system
+
+    enddate="$(date +%s)"
+    duration="$(( (startdate - enddate) ))"
+
+    echo "++> AZURE KUBE-UP FINISHED: $(date) (duration: ${duration} seconds)"
+}
+
+function kube-down {
+    verify-prereqs
+
+    # required
+    if [[ -z "${AZURE_SUBSCRIPTION_ID:-}" ]]; then
+        echo "AZURE_SUBSCRIPTION_ID must be set"
         exit 1
     fi
+    if [[ -z "${AZURE_DEPLOY_ID:-}" ]]; then
+        echo "AZURE_DEPLOY_ID must be set. This selects the deployment (and resource group) to delete."
+        return -1
+    fi
 
-    echo "--> Starting VM"
-    azure_call vm create \
-        -w "$AZ_VNET" \
-        -n $MASTER_NAME \
-        -l "$AZ_LOCATION" \
-        -t $AZ_SSH_CERT \
-        -e 22000 -P \
-        -d ${KUBE_TEMP}/master-start.sh \
-        -b $AZ_SUBNET \
-        $AZ_CS $AZ_IMAGE $USER
+    #optional
+    declare -a destroy_params
+    declare -a docker_params
+    if [[ ${AZURE_DOWN_SKIP_CONFIRM:-} == "true" ]]; then
+        destroy_params+=("--skip-confirm")
+    fi
+    if [[ ! -z "${AZURE_HTTPS_PROXY:-}" ]]; then
+        docker_params+=("--net=host" "--env=https_proxy=${AZURE_HTTPS_PROXY}")
+    fi
 
-    ssh_ports=($(eval echo "2200{1..$NUM_MINIONS}"))
-
-    #Build up start up script for minions
-    echo "--> Building up start up script for minions"
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        (
-            echo "#!/bin/bash"
-            echo "MASTER_NAME='${MASTER_NAME}'"
-            echo "CA_CRT=\"$(cat ${KUBE_TEMP}/ca.crt)\""
-            echo "CLIENT_CRT=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.crt)\""
-            echo "CLIENT_KEY=\"$(cat ${KUBE_TEMP}/${MINION_NAMES[$i]}.key)\""
-            echo "MINION_IP_RANGE='${MINION_IP_RANGES[$i]}'"
-            grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
-            grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/salt-minion.sh"
-        ) > "${KUBE_TEMP}/minion-start-${i}.sh"
-
-        echo "--> Starting VM"
-        azure_call vm create \
-            -c -w "$AZ_VNET" \
-            -n ${MINION_NAMES[$i]} \
-            -l "$AZ_LOCATION" \
-            -t $AZ_SSH_CERT \
-            -e ${ssh_ports[$i]} -P \
-            -d ${KUBE_TEMP}/minion-start-${i}.sh \
-            -b $AZ_SUBNET \
-            $AZ_CS $AZ_IMAGE $USER
-    done
-
-    echo "--> Creating endpoint"
-    azure_call vm endpoint create $MASTER_NAME 443
-
-    detect-master > /dev/null
-
-    echo "==> KUBE_MASTER_IP: ${KUBE_MASTER_IP}"
-
-    echo "Waiting for cluster initialization."
-    echo
-    echo "  This will continually check to see if the API for kubernetes is reachable."
-    echo "  This might loop forever if there was some uncaught error during start"
-    echo "  up."
-    echo
-
-    until curl --insecure --user "${KUBE_USER}:${KUBE_PASSWORD}" --max-time 5 \
-        --fail --output /dev/null --silent "https://${KUBE_MASTER_IP}/healthz"; do
-        printf "."
-        sleep 2
-    done
-
-    printf "\n"
-    echo "Kubernetes cluster created."
-
-    export KUBE_CERT="/tmp/$RANDOM-kubecfg.crt"
-    export KUBE_KEY="/tmp/$RANDOM-kubecfg.key"
-    export CA_CERT="/tmp/$RANDOM-kubernetes.ca.crt"
-    export CONTEXT="azure_${INSTANCE_PREFIX}"
-
-    # TODO: generate ADMIN (and KUBELET) tokens and put those in the master's
-    # config file.  Distribute the same way the htpasswd is done.
-(umask 077
-    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.crt >"${KUBE_CERT}" 2>/dev/null
-    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/kubecfg.key >"${KUBE_KEY}" 2>/dev/null
-    ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p 22000 $AZ_CS.cloudapp.net \
-        sudo cat /srv/kubernetes/ca.crt >"${CA_CERT}" 2>/dev/null
-
-    create-kubeconfig
-)
-
-    echo "Sanity checking cluster..."
-    echo
-    echo "  This will continually check the minions to ensure docker is"
-    echo "  installed. This is usually a good indicator that salt has"
-    echo "  successfully  provisioned. This might loop forever if there was"
-    echo "  some uncaught error during start up."
-    echo
-    # Basic sanity checking
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        # Make sure docker is installed
-        echo "--> Making sure docker is installed on ${MINION_NAMES[$i]}."
-        until ssh -oStrictHostKeyChecking=no -i $AZ_SSH_KEY -p ${ssh_ports[$i]} \
-            $AZ_CS.cloudapp.net which docker > /dev/null 2>&1; do
-            printf "."
-            sleep 2
-        done
-    done
-
-    # ensures KUBECONFIG is set
-    get-kubeconfig-basicauth
-    echo
-    echo "Kubernetes cluster is running.  The master is running at:"
-    echo
-    echo "  https://${KUBE_MASTER_IP}"
-    echo
-    echo "The user name and password to use is located in ${KUBECONFIG}."
-    echo
+    docker run -it \
+        --user "$(id -u)" \
+        -v "$HOME/.azkube:/.azkube" -v "/tmp:/tmp" \
+        "${AZKUBE_DOCKER_PARAMS[@]:+${AZKUBE_DOCKER_PARAMS[@]}}" \
+        "colemickens/azkube:${AZKUBE_VERSION}" /opt/azkube/azkube destroy \
+            --deployment-name="${AZURE_DEPLOY_ID}" \
+            --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
+            --auth-method="${AZURE_AUTH_METHOD}" "${AZKUBE_AUTH_PARAMS[@]:+${AZKUBE_AUTH_PARAMS[@]}}" \
+            "${destroy_params[@]:+${destroy_params[@]}}" \
+            "${AZURE_AZKUBE_ARGS[@]:+${AZURE_AZKUBE_ARGS[@]}}"
 }
 
-# Delete a kubernetes cluster
-function kube-down {
-    echo "Bringing down cluster"
-
-    set +e
-    azure_call vm delete $MASTER_NAME -b -q
-    for (( i=0; i<${#MINION_NAMES[@]}; i++)); do
-        azure_call vm delete ${MINION_NAMES[$i]} -b -q
-    done
-
-    wait
-}
-
-# Update a kubernetes cluster with latest source
-#function kube-push {
-#  detect-project
-#  detect-master
-
-# Make sure we have the tar files staged on Azure Storage
-#  find-release-tars
-#  upload-server-tars
-
-#  (
-#    echo "#! /bin/bash"
-#    echo "mkdir -p /var/cache/kubernetes-install"
-#    echo "cd /var/cache/kubernetes-install"
-#    echo "readonly SERVER_BINARY_TAR_URL='${SERVER_BINARY_TAR_URL}'"
-#    echo "readonly SALT_TAR_URL='${SALT_TAR_URL}'"
-#    grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/common.sh"
-#    grep -v "^#" "${KUBE_ROOT}/cluster/azure/templates/download-release.sh"
-#    echo "echo Executing configuration"
-#    echo "sudo salt '*' mine.update"
-#    echo "sudo salt --force-color '*' state.highstate"
-#   ) | gcutil ssh --project "$PROJECT" --zone "$ZONE" "$KUBE_MASTER" sudo bash
-
-#  get-kubeconfig-basicauth
-
-#  echo
-#  echo "Kubernetes cluster is running.  The master is running at:"
-#  echo
-#  echo "  https://${KUBE_MASTER_IP}"
-# echo
-#  echo "The user name and password to use is located in ${KUBECONFIG:-$DEFAULT_KUBECONFIG}."
-#  echo
-
-#}
-
-# -----------------------------------------------------------------------------
-# Cluster specific test helpers used from hack/e2e-test.sh
-
-# Execute prior to running tests to build a release if required for env.
-#
-# Assumed Vars:
-#   KUBE_ROOT
-function test-build-release {
-    # Make a release
-    "${KUBE_ROOT}/build/release.sh"
-}
-
-# SSH to a node by name ($1) and run a command ($2).
-function ssh-to-node {
-    local node="$1"
-    local cmd="$2"
-    ssh --ssh_arg "-o LogLevel=quiet" "${node}" "${cmd}"
-}
-
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-    ssh-to-node "$1" "sudo /etc/init.d/kube-proxy restart"
-}
-
-# Restart the kube-proxy on the master ($1)
-function restart-apiserver {
-    ssh-to-node "$1" "sudo /etc/init.d/kube-apiserver restart"
-}

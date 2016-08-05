@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-addon-manager
+  namespace: kube-system
+  version: v1
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-addon-manager
+    image: gcr.io/google-containers/kube-addon-manager:v1
+    resources:
+      requests:
+        cpu: 5m
+        # TODO(yifan): Figure out what's the memory usage should be here.
+        # See https://github.com/kubernetes/kubernetes/issues/23641.
+        memory: 100Mi
+    volumeMounts:
+    - mountPath: /etc/kubernetes/
+      name: addons
+      readOnly: true
+  volumes:
+  - hostPath:
+      path: /etc/kubernetes/
+    name: addons

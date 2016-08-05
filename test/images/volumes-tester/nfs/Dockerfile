@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:14.04
+FROM centos
 MAINTAINER Jan Safranek, jsafrane@redhat.com
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update -qq && apt-get install -y nfs-kernel-server -qq
+RUN yum -y install /usr/bin/ps nfs-utils && yum clean all
 RUN mkdir -p /exports
 ADD run_nfs.sh /usr/local/bin/
-ADD index.html /exports/index.html
-RUN chmod 644 /exports/index.html
+ADD index.html /tmp/index.html
+RUN chmod 644 /tmp/index.html
 
-EXPOSE 2049/tcp
+# expose mountd 20048/tcp and nfsd 2049/tcp
+EXPOSE 2049/tcp 20048/tcp
 
-ENTRYPOINT ["/usr/local/bin/run_nfs.sh", "/exports"]
+ENTRYPOINT ["/usr/local/bin/run_nfs.sh", "/exports", "/"]

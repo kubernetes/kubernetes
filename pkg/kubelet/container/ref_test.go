@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestFieldPath(t *testing.T) {
@@ -64,16 +65,16 @@ func TestFieldPath(t *testing.T) {
 func TestGenerateContainerRef(t *testing.T) {
 	var (
 		okPod = api.Pod{
-			TypeMeta: api.TypeMeta{
+			TypeMeta: unversioned.TypeMeta{
 				Kind:       "Pod",
-				APIVersion: testapi.Version(),
+				APIVersion: testapi.Default.GroupVersion().String(),
 			},
 			ObjectMeta: api.ObjectMeta{
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
 				ResourceVersion: "42",
-				SelfLink:        "/api/" + testapi.Version() + "/pods/foo",
+				SelfLink:        "/api/" + testapi.Default.GroupVersion().String() + "/pods/foo",
 			},
 			Spec: api.PodSpec{
 				Containers: []api.Container{
@@ -90,7 +91,7 @@ func TestGenerateContainerRef(t *testing.T) {
 	noSelfLinkPod.Kind = ""
 	noSelfLinkPod.APIVersion = ""
 	noSelfLinkPod.ObjectMeta.SelfLink = ""
-	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/" + testapi.Version() + "/pods/ok"
+	defaultedSelfLinkPod.ObjectMeta.SelfLink = "/api/" + testapi.Default.GroupVersion().String() + "/pods/ok"
 
 	cases := []struct {
 		name      string
@@ -107,7 +108,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Version(),
+				APIVersion:      testapi.Default.GroupVersion().String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -122,7 +123,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			container: &api.Container{},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Version(),
+				APIVersion:      testapi.Default.GroupVersion().String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -146,7 +147,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Version(),
+				APIVersion:      testapi.Default.GroupVersion().String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",
@@ -163,7 +164,7 @@ func TestGenerateContainerRef(t *testing.T) {
 			},
 			expected: &api.ObjectReference{
 				Kind:            "Pod",
-				APIVersion:      testapi.Version(),
+				APIVersion:      testapi.Default.GroupVersion().String(),
 				Name:            "ok",
 				Namespace:       "test-ns",
 				UID:             "bar",

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,9 +21,17 @@ import (
 	"net/url"
 	"reflect"
 	"strings"
-
-	"k8s.io/kubernetes/pkg/runtime"
 )
+
+// Marshaler converts an object to a query parameter string representation
+type Marshaler interface {
+	MarshalQueryParameter() (string, error)
+}
+
+// Unmarshaler converts a string representation to an object
+type Unmarshaler interface {
+	UnmarshalQueryParameter(string) error
+}
 
 func jsonTag(field reflect.StructField) (string, bool) {
 	structTag := field.Tag.Get("json")
@@ -50,6 +58,14 @@ func formatValue(value interface{}) string {
 	return fmt.Sprintf("%v", value)
 }
 
+func isPointerKind(kind reflect.Kind) bool {
+	return kind == reflect.Ptr
+}
+
+func isStructKind(kind reflect.Kind) bool {
+	return kind == reflect.Struct
+}
+
 func isValueKind(kind reflect.Kind) bool {
 	switch kind {
 	case reflect.String, reflect.Bool, reflect.Int, reflect.Int8, reflect.Int16,
@@ -66,11 +82,42 @@ func zeroValue(value reflect.Value) bool {
 	return reflect.DeepEqual(reflect.Zero(value.Type()).Interface(), value.Interface())
 }
 
+func customMarshalValue(value reflect.Value) (reflect.Value, bool) {
+	// Return unless we implement a custom query marshaler
+	if !value.CanInterface() {
+		return reflect.Value{}, false
+	}
+
+	marshaler, ok := value.Interface().(Marshaler)
+	if !ok {
+		return reflect.Value{}, false
+	}
+
+	// Don't invoke functions on nil pointers
+	// If the type implements MarshalQueryParameter, AND the tag is not omitempty, AND the value is a nil pointer, "" seems like a reasonable response
+	if isPointerKind(value.Kind()) && zeroValue(value) {
+		return reflect.ValueOf(""), true
+	}
+
+	// Get the custom marshalled value
+	v, err := marshaler.MarshalQueryParameter()
+	if err != nil {
+		return reflect.Value{}, false
+	}
+	return reflect.ValueOf(v), true
+}
+
 func addParam(values url.Values, tag string, omitempty bool, value reflect.Value) {
 	if omitempty && zeroValue(value) {
 		return
 	}
-	values.Add(tag, fmt.Sprintf("%v", value.Interface()))
+	val := ""
+	iValue := fmt.Sprintf("%v", value.Interface())
+
+	if iValue != "<nil>" {
+		val = iValue
+	}
+	values.Add(tag, val)
 }
 
 func addListOfParams(values url.Values, tag string, omitempty bool, list reflect.Value) {
@@ -79,10 +126,10 @@ func addListOfParams(values url.Values, tag string, omitempty bool, list reflect
 	}
 }
 
-// Convert takes a versioned runtime.Object and serializes it to a url.Values object
-// using JSON tags as parameter names. Only top-level simple values, arrays, and slices
-// are serialized. Embedded structs, maps, etc. will not be serialized.
-func Convert(obj runtime.Object) (url.Values, error) {
+// Convert takes an object and converts it to a url.Values object using JSON tags as
+// parameter names. Only top-level simple values, arrays, and slices are serialized.
+// Embedded structs, maps, etc. will not be serialized.
+func Convert(obj interface{}) (url.Values, error) {
 	result := url.Values{}
 	if obj == nil {
 		return result, nil
@@ -92,12 +139,20 @@ func Convert(obj runtime.Object) (url.Values, error) {
 	case reflect.Ptr, reflect.Interface:
 		sv = reflect.ValueOf(obj).Elem()
 	default:
-		return nil, fmt.Errorf("Expecting a pointer or interface")
+		return nil, fmt.Errorf("expecting a pointer or interface")
 	}
 	st := sv.Type()
-	if st.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("Expecting a pointer to a struct")
+	if !isStructKind(st.Kind()) {
+		return nil, fmt.Errorf("expecting a pointer to a struct")
 	}
+
+	// Check all object fields
+	convertStruct(result, st, sv)
+
+	return result, nil
+}
+
+func convertStruct(result url.Values, st reflect.Type, sv reflect.Value) {
 	for i := 0; i < st.NumField(); i++ {
 		field := sv.Field(i)
 		tag, omitempty := jsonTag(st.Field(i))
@@ -105,14 +160,29 @@ func Convert(obj runtime.Object) (url.Values, error) {
 			continue
 		}
 		ft := field.Type()
+
+		kind := ft.Kind()
+		if isPointerKind(kind) {
+			ft = ft.Elem()
+			kind = ft.Kind()
+			if !field.IsNil() {
+				field = reflect.Indirect(field)
+			}
+		}
+
 		switch {
-		case isValueKind(ft.Kind()):
+		case isValueKind(kind):
 			addParam(result, tag, omitempty, field)
-		case ft.Kind() == reflect.Array || ft.Kind() == reflect.Slice:
+		case kind == reflect.Array || kind == reflect.Slice:
 			if isValueKind(ft.Elem().Kind()) {
 				addListOfParams(result, tag, omitempty, field)
 			}
+		case isStructKind(kind) && !(zeroValue(field) && omitempty):
+			if marshalValue, ok := customMarshalValue(field); ok {
+				addParam(result, tag, omitempty, marshalValue)
+			} else {
+				convertStruct(result, ft, field)
+			}
 		}
 	}
-	return result, nil
 }

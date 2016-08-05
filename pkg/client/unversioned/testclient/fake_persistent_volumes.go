@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -36,8 +34,8 @@ func (c *FakePersistentVolumes) Get(name string) (*api.PersistentVolume, error) 
 	return obj.(*api.PersistentVolume), err
 }
 
-func (c *FakePersistentVolumes) List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("persistentvolumes", label, field), &api.PersistentVolumeList{})
+func (c *FakePersistentVolumes) List(opts api.ListOptions) (*api.PersistentVolumeList, error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("persistentvolumes", opts), &api.PersistentVolumeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -68,9 +66,8 @@ func (c *FakePersistentVolumes) Delete(name string) error {
 	return err
 }
 
-func (c *FakePersistentVolumes) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewRootWatchAction("persistentvolumes", label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+func (c *FakePersistentVolumes) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewRootWatchAction("persistentvolumes", opts))
 }
 
 func (c *FakePersistentVolumes) UpdateStatus(pv *api.PersistentVolume) (*api.PersistentVolume, error) {

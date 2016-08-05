@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,15 +23,16 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
 type useContextOptions struct {
-	configAccess ConfigAccess
+	configAccess clientcmd.ConfigAccess
 	contextName  string
 }
 
-func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Command {
+func NewCmdConfigUseContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {
 	options := &useContextOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
@@ -46,6 +47,8 @@ func NewCmdConfigUseContext(out io.Writer, configAccess ConfigAccess) *cobra.Com
 			err := options.run()
 			if err != nil {
 				fmt.Fprintf(out, "%v\n", err)
+			} else {
+				fmt.Fprintf(out, "switched to context %q.\n", options.contextName)
 			}
 		},
 	}
@@ -66,7 +69,7 @@ func (o useContextOptions) run() error {
 
 	config.CurrentContext = o.contextName
 
-	if err := ModifyConfig(o.configAccess, *config, true); err != nil {
+	if err := clientcmd.ModifyConfig(o.configAccess, *config, true); err != nil {
 		return err
 	}
 
@@ -86,7 +89,7 @@ func (o *useContextOptions) complete(cmd *cobra.Command) bool {
 
 func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 	if len(o.contextName) == 0 {
-		return errors.New("You must specify a current-context")
+		return errors.New("you must specify a current-context")
 	}
 
 	for name := range config.Contexts {
@@ -95,5 +98,5 @@ func (o useContextOptions) validate(config *clientcmdapi.Config) error {
 		}
 	}
 
-	return fmt.Errorf("No context exists with the name: %q.", o.contextName)
+	return fmt.Errorf("no context exists with the name: %q.", o.contextName)
 }

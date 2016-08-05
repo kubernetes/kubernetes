@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,8 @@ import (
 const (
 	DefaultLogMaxBackups   = 5 // how many backup to keep
 	DefaultLogMaxAgeInDays = 7 // after how many days to rotate at most
+
+	DefaultCgroupPrefix = "mesos"
 )
 
 // DefaultLogMaxSize returns the maximal log file size before rotation

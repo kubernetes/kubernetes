@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,8 @@ import (
 type LoadBalancer interface {
 	// NextEndpoint returns the endpoint to handle a request for the given
 	// service-port and source address.
-	NextEndpoint(service proxy.ServicePortName, srcAddr net.Addr) (string, error)
+	NextEndpoint(service proxy.ServicePortName, srcAddr net.Addr, sessionAffinityReset bool) (string, error)
 	NewService(service proxy.ServicePortName, sessionAffinityType api.ServiceAffinity, stickyMaxAgeMinutes int) error
+	DeleteService(service proxy.ServicePortName)
 	CleanupStaleStickySessions(service proxy.ServicePortName)
 }

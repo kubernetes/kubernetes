@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,24 +18,48 @@ package api
 
 import (
 	stderrs "errors"
+	"time"
 
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/auth/user"
+	"k8s.io/kubernetes/pkg/types"
 )
 
 // Context carries values across API boundaries.
+// This context matches the context.Context interface
+// (https://blog.golang.org/context), for the purposes
+// of passing the api.Context through to the storage tier.
+// TODO: Determine the extent that this abstraction+interface
+// is used by the api, and whether we can remove.
 type Context interface {
+	// Value returns the value associated with key or nil if none.
 	Value(key interface{}) interface{}
+
+	// Deadline returns the time when this Context will be canceled, if any.
+	Deadline() (deadline time.Time, ok bool)
+
+	// Done returns a channel that is closed when this Context is canceled
+	// or times out.
+	Done() <-chan struct{}
+
+	// Err indicates why this context was canceled, after the Done channel
+	// is closed.
+	Err() error
 }
 
 // The key type is unexported to prevent collisions
 type key int
 
-// namespaceKey is the context key for the request namespace.
-const namespaceKey key = 0
+const (
+	// namespaceKey is the context key for the request namespace.
+	namespaceKey key = iota
 
-// userKey is the context key for the request user.
-const userKey key = 1
+	// userKey is the context key for the request user.
+	userKey
+
+	// uidKey is the context key for the uid to assign to an object on create.
+	uidKey
+)
 
 // NewContext instantiates a base context object for request flows.
 func NewContext() Context {
@@ -100,4 +124,15 @@ func WithUser(parent Context, user user.Info) Context {
 func UserFrom(ctx Context) (user.Info, bool) {
 	user, ok := ctx.Value(userKey).(user.Info)
 	return user, ok
+}
+
+// WithUID returns a copy of parent in which the uid value is set
+func WithUID(parent Context, uid types.UID) Context {
+	return WithValue(parent, uidKey, uid)
+}
+
+// UIDFrom returns the value of the uid key on the ctx
+func UIDFrom(ctx Context) (types.UID, bool) {
+	uid, ok := ctx.Value(uidKey).(types.UID)
+	return uid, ok
 }

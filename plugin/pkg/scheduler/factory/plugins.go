@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
@@ -33,11 +33,16 @@ import (
 
 // PluginFactoryArgs are passed to all plugin factory functions.
 type PluginFactoryArgs struct {
-	algorithm.PodLister
-	algorithm.ServiceLister
-	algorithm.ControllerLister
-	NodeLister algorithm.MinionLister
-	NodeInfo   predicates.NodeInfo
+	PodLister                      algorithm.PodLister
+	ServiceLister                  algorithm.ServiceLister
+	ControllerLister               algorithm.ControllerLister
+	ReplicaSetLister               algorithm.ReplicaSetLister
+	NodeLister                     algorithm.NodeLister
+	NodeInfo                       predicates.NodeInfo
+	PVInfo                         predicates.PersistentVolumeInfo
+	PVCInfo                        predicates.PersistentVolumeClaimInfo
+	HardPodAffinitySymmetricWeight int
+	FailureDomains                 []string
 }
 
 // A FitPredicateFactory produces a FitPredicate from the given args.
@@ -66,8 +71,8 @@ const (
 )
 
 type AlgorithmProviderConfig struct {
-	FitPredicateKeys     util.StringSet
-	PriorityFunctionKeys util.StringSet
+	FitPredicateKeys     sets.String
+	PriorityFunctionKeys sets.String
 }
 
 // RegisterFitPredicate registers a fit predicate with the algorithm
@@ -108,7 +113,6 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 		} else if policy.Argument.LabelsPresence != nil {
 			predicateFactory = func(args PluginFactoryArgs) algorithm.FitPredicate {
 				return predicates.NewNodeLabelPredicate(
-					args.NodeInfo,
 					policy.Argument.LabelsPresence.Labels,
 					policy.Argument.LabelsPresence.Presence,
 				)
@@ -117,6 +121,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {
 		// checking to see if a pre-defined predicate is requested
 		glog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
+		return policy.Name
 	}
 
 	if predicateFactory == nil {
@@ -166,6 +171,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 			pcf = &PriorityConfigFactory{
 				Function: func(args PluginFactoryArgs) algorithm.PriorityFunction {
 					return priorities.NewServiceAntiAffinityPriority(
+						args.PodLister,
 						args.ServiceLister,
 						policy.Argument.ServiceAntiAffinity.Label,
 					)
@@ -209,7 +215,7 @@ func IsPriorityFunctionRegistered(name string) bool {
 
 // Registers a new algorithm provider with the algorithm registry. This should
 // be called from the init function in a provider plugin.
-func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys util.StringSet) string {
+func RegisterAlgorithmProvider(name string, predicateKeys, priorityKeys sets.String) string {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	validateAlgorithmNameOrDie(name)
@@ -234,7 +240,7 @@ func GetAlgorithmProvider(name string) (*AlgorithmProviderConfig, error) {
 	return &provider, nil
 }
 
-func getFitPredicateFunctions(names util.StringSet, args PluginFactoryArgs) (map[string]algorithm.FitPredicate, error) {
+func getFitPredicateFunctions(names sets.String, args PluginFactoryArgs) (map[string]algorithm.FitPredicate, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
@@ -249,7 +255,7 @@ func getFitPredicateFunctions(names util.StringSet, args PluginFactoryArgs) (map
 	return predicates, nil
 }
 
-func getPriorityFunctionConfigs(names util.StringSet, args PluginFactoryArgs) ([]algorithm.PriorityConfig, error) {
+func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]algorithm.PriorityConfig, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
@@ -271,7 +277,7 @@ var validName = regexp.MustCompile("^[a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])$")
 
 func validateAlgorithmNameOrDie(name string) {
 	if !validName.MatchString(name) {
-		glog.Fatalf("algorithm name %v does not match the name validation regexp \"%v\".", name, validName)
+		glog.Fatalf("Algorithm name %v does not match the name validation regexp \"%v\".", name, validName)
 	}
 }
 
@@ -285,7 +291,7 @@ func validatePredicateOrDie(predicate schedulerapi.PredicatePolicy) {
 			numArgs++
 		}
 		if numArgs != 1 {
-			glog.Fatalf("Exactly 1 predicate argument is required")
+			glog.Fatalf("Exactly 1 predicate argument is required, numArgs: %v, Predicate: %s", numArgs, predicate.Name)
 		}
 	}
 }
@@ -300,12 +306,12 @@ func validatePriorityOrDie(priority schedulerapi.PriorityPolicy) {
 			numArgs++
 		}
 		if numArgs != 1 {
-			glog.Fatalf("Exactly 1 priority argument is required")
+			glog.Fatalf("Exactly 1 priority argument is required, numArgs: %v, Priority: %s", numArgs, priority.Name)
 		}
 	}
 }
 
-// ListAlgorithmProviders is called when listing all available algortihm providers in `kube-scheduler --help`
+// ListAlgorithmProviders is called when listing all available algorithm providers in `kube-scheduler --help`
 func ListAlgorithmProviders() string {
 	var availableAlgorithmProviders []string
 	for name := range algorithmProviderMap {

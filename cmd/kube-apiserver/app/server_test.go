@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,10 +19,12 @@ package app
 import (
 	"regexp"
 	"testing"
+
+	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(defaultLongRunningRequestRE)
+	regexp := regexp.MustCompile(options.NewAPIServer().LongRunningRequestRE)
 	dontMatch := []string{
 		"/api/v1/watch-namespace/",
 		"/api/v1/namespace-proxy/",
@@ -38,12 +40,16 @@ func TestLongRunningRequestRegexp(t *testing.T) {
 		"/api/v1/watch/stuff",
 		"/api/v1/default/service/proxy",
 		"/api/v1/pods/proxy/path/to/thing",
+		"/api/v1/namespaces/myns/pods/mypod/log",
 		"/api/v1/namespaces/myns/pods/mypod/logs",
 		"/api/v1/namespaces/myns/pods/mypod/portforward",
 		"/api/v1/namespaces/myns/pods/mypod/exec",
+		"/api/v1/namespaces/myns/pods/mypod/attach",
+		"/api/v1/namespaces/myns/pods/mypod/log/",
 		"/api/v1/namespaces/myns/pods/mypod/logs/",
 		"/api/v1/namespaces/myns/pods/mypod/portforward/",
 		"/api/v1/namespaces/myns/pods/mypod/exec/",
+		"/api/v1/namespaces/myns/pods/mypod/attach/",
 		"/api/v1/watch/namespaces/myns/pods",
 	}
 	for _, path := range dontMatch {

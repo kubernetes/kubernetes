@@ -5,7 +5,7 @@ directory. The bulk of the pillars are hard to perceive from browsing
 this directory, though, because they are written into
 [cluster-params.sls](cluster-params.sls) at cluster inception.
 
-* [cluster-params.sls](cluster-params.sls) is generated entirely at cluster inception. See e.g. [configure-vm.sh](../../gce/configure-vm.sh#L226)
+* [cluster-params.sls](cluster-params.sls) is generated entirely at cluster inception. See e.g. [configure-vm.sh](../../gce/configure-vm.sh#L262)
 * [docker-images.sls](docker-images.sls) stores the Docker tags of the current Docker-wrapped server binaries, twiddling by the Salt install script
 * [logging.sls](logging.sls) defines the cluster log level
 * [mine.sls](mine.sls): defines the variables shared across machines in the Salt

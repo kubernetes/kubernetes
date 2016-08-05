@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,11 +17,8 @@ limitations under the License.
 package ports
 
 const (
-	// KubeletStatusPort is the default port for the kubelet healthz server.
-	// May be overridden by a flag at startup.
-	KubeletStatusPort = 10248
 	// ProxyPort is the default port for the proxy healthz server.
-	// May be overriden by a flag at startup.
+	// May be overridden by a flag at startup.
 	ProxyStatusPort = 10249
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
@@ -32,6 +29,8 @@ const (
 	// ControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
 	ControllerManagerPort = 10252
+	// Port for flannel daemon.
+	FlannelDaemonPort = 10253
 	// KubeletReadOnlyPort exposes basic read-only services from the kubelet.
 	// May be overridden by a flag at startup.
 	// This is necessary for heapster to collect monitoring stats from the kubelet

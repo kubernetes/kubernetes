@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -112,10 +112,10 @@ type SchedulerProcess struct {
 	fin      chan struct{}
 }
 
-func New(sched bindings.Scheduler) *SchedulerProcess {
+func New(framework bindings.Scheduler) *SchedulerProcess {
 	p := &SchedulerProcess{
 		Process:   proc.New(),
-		Scheduler: sched,
+		Scheduler: framework,
 		stage:     initStage,
 		elected:   make(chan struct{}),
 		failover:  make(chan struct{}),

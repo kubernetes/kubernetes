@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,11 +18,10 @@ package queue
 
 import (
 	"fmt"
-	"reflect"
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type entry struct {
@@ -177,13 +176,13 @@ func (f *HistoricalFIFO) ListKeys() []string {
 	return list
 }
 
-// ContainedIDs returns a util.StringSet containing all IDs of the stored items.
+// ContainedIDs returns a stringset.StringSet containing all IDs of the stored items.
 // This is a snapshot of a moment in time, and one should keep in mind that
 // other go routines can add or remove items after you call this.
-func (c *HistoricalFIFO) ContainedIDs() util.StringSet {
+func (c *HistoricalFIFO) ContainedIDs() sets.String {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
-	set := util.StringSet{}
+	set := sets.String{}
 	for id, entry := range c.items {
 		if entry.Is(DELETE_EVENT | POP_EVENT) {
 			continue
@@ -220,22 +219,28 @@ func (f *HistoricalFIFO) Poll(id string, t EventType) bool {
 
 // Variant of DelayQueue.Pop() for UniqueDelayed items
 func (q *HistoricalFIFO) Await(timeout time.Duration) interface{} {
-	cancel := make(chan struct{})
-	ch := make(chan interface{}, 1)
-	go func() { ch <- q.pop(cancel) }()
+	var (
+		cancel = make(chan struct{})
+		ch     = make(chan interface{}, 1)
+		t      = time.NewTimer(timeout)
+	)
+	defer t.Stop()
+
+	go func() { ch <- q.Pop(cancel) }()
+
 	select {
-	case <-time.After(timeout):
+	case <-t.C:
 		close(cancel)
 		return <-ch
 	case x := <-ch:
 		return x
 	}
 }
-func (f *HistoricalFIFO) Pop() interface{} {
-	return f.pop(nil)
-}
 
-func (f *HistoricalFIFO) pop(cancel chan struct{}) interface{} {
+// Pop blocks until either there is an item available to dequeue or else the specified
+// cancel chan is closed. Callers that have no interest in providing a cancel chan
+// should specify nil, or else WithoutCancel() (for readability).
+func (f *HistoricalFIFO) Pop(cancel <-chan struct{}) interface{} {
 	popEvent := (Entry)(nil)
 	defer func() {
 		f.carrier(popEvent)
@@ -277,7 +282,7 @@ func (f *HistoricalFIFO) pop(cancel chan struct{}) interface{} {
 	}
 }
 
-func (f *HistoricalFIFO) Replace(objs []interface{}) error {
+func (f *HistoricalFIFO) Replace(objs []interface{}, resourceVersion string) error {
 	notifications := make([]Entry, 0, len(objs))
 	defer func() {
 		for _, e := range notifications {
@@ -346,30 +351,22 @@ func (f *HistoricalFIFO) gc() {
 // Assumes that the caller has acquired the state lock.
 func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []Entry) {
 	item, exists := f.items[id]
-	now := time.Now()
-	if !exists {
+	if !exists || item.Is(POP_EVENT|DELETE_EVENT) {
+		// no prior history for this UID, or else it was popped/removed by the client.
 		e := &entry{obj.Copy().(UniqueCopyable), ADD_EVENT}
 		f.items[id] = e
 		notifications = append(notifications, e)
+	} else if item.Value().GetUID() != obj.GetUID() {
+		// sanity check, please
+		panic(fmt.Sprintf("historical UID %q != current UID %v", item.Value().GetUID(), obj.GetUID()))
 	} else {
-		if !item.Is(DELETE_EVENT) && item.Value().GetUID() != obj.GetUID() {
-			// hidden DELETE!
-			// (1) append a DELETE
-			// (2) append an ADD
-			// .. and notify listeners in that order
-			ent := item.(*entry)
-			ent.event = DELETE_EVENT
-			e1 := &deletedEntry{ent, now.Add(f.lingerTTL)}
-			e2 := &entry{obj.Copy().(UniqueCopyable), ADD_EVENT}
-			f.items[id] = e2
-			notifications = append(notifications, e1, e2)
-		} else if !reflect.DeepEqual(obj, item.Value()) {
-			//TODO(jdef): it would be nice if we could rely on resource versions
-			//instead of doing a DeepEqual. Maybe someday we'll be able to.
-			e := &entry{obj.Copy().(UniqueCopyable), UPDATE_EVENT}
-			f.items[id] = e
-			notifications = append(notifications, e)
-		}
+		// exists && !(popped | deleted). so either the prior event was an add or an
+		// update. reflect.DeepEqual is expensive. it won't help us determine if
+		// we missed a hidden delete along the way.
+		e := &entry{obj.Copy().(UniqueCopyable), UPDATE_EVENT}
+		f.items[id] = e
+		notifications = append(notifications, e)
+		// else objects are the same, no work to do.
 	}
 	// check for garbage collection
 	f.gcc++
@@ -380,10 +377,16 @@ func (f *HistoricalFIFO) merge(id string, obj UniqueCopyable) (notifications []E
 	return
 }
 
+// Resync will touch all objects to put them into the processing queue
+func (f *HistoricalFIFO) Resync() error {
+	// Nothing to do
+	return nil
+}
+
 // NewHistorical returns a Store which can be used to queue up items to
 // process. If a non-nil Mux is provided, then modifications to the
 // the FIFO are delivered on a channel specific to this fifo.
-func NewHistorical(ch chan<- Entry) FIFO {
+func NewHistorical(ch chan<- Entry) *HistoricalFIFO {
 	carrier := dead
 	if ch != nil {
 		carrier = func(msg Entry) {

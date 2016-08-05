@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Handlers for pod lifecycle events.
-package lifecycle
+// Handlers for pod lifecycle events and interfaces to integrate
+// with kubelet admission, synchronization, and eviction of pods.
+package lifecycle // import "k8s.io/kubernetes/pkg/kubelet/lifecycle"

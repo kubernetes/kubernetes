@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/proposals/apiserver-watch.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/docs/proposals/apiserver-watch.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -33,9 +34,9 @@ Documentation for other releases can be found at
 
 ## Abstract
 
-In the current system, all watch requests send to apiserver are in general
-redirected to etcd. This means that for every watch request to apiserver,
-apiserver opens a watch on etcd.
+In the current system, most watch requests sent to apiserver are redirected to
+etcd. This means that for every watch request the apiserver opens a watch on
+etcd.
 
 The purpose of the proposal is to improve the overall performance of the system
 by solving the following problems:
@@ -60,7 +61,7 @@ the objects (of a given type) without any filtering. The changes delivered from
 etcd will then be stored in a cache in apiserver. This cache is in fact a
 "rolling history window" that will support clients having some amount of latency
 between their list and watch calls. Thus it will have a limited capacity and
-whenever a new change comes from etcd when a cache is full, othe oldest change
+whenever a new change comes from etcd when a cache is full, the oldest change
 will be remove to make place for the new one.
 
 When a client sends a watch request to apiserver, instead of redirecting it to
@@ -98,13 +99,13 @@ to implement the proposal.
 1. Since we want the watch in apiserver to be optional for different resource
 types, this needs to be self-contained and hidden behind a well defined API.
 This should be a layer very close to etcd - in particular all registries:
-"pkg/registry/generic/etcd" should be build on top of it.
+"pkg/registry/generic/etcd" should be built on top of it.
 We will solve it by turning tools.EtcdHelper by extracting its interface
 and treating this interface as this API - the whole watch mechanisms in
 apiserver will be hidden behind that interface.
 Thanks to it we will get an initial implementation for free and we will just
 need to reimplement few relevant functions (probably just Watch and List).
-Mover, this will not require any changes in other parts of the code.
+Moreover, this will not require any changes in other parts of the code.
 This step is about extracting the interface of tools.EtcdHelper.
 
 2. Create a FIFO cache with a given capacity. In its "rolling history window"
@@ -116,7 +117,7 @@ we will store two things:
   This should be as simple as having an array an treating it as a cyclic buffer.
   Obviously resourceVersion of objects watched from etcd will be increasing, but
   they are necessary for registering a new watcher that is interested in all the
-  changes since a given etcdIndec.
+  changes since a given etcdIndex.
 
   Additionally, we should support LIST operation, otherwise clients can never
   start watching at now. We may consider passing lists through etcd, however
@@ -159,17 +160,17 @@ necessary. In such case, to avoid LIST requests coming from all watchers at
 the same time, we can introduce an additional etcd event type:
 [EtcdResync](../../pkg/storage/etcd/etcd_watcher.go#L36)
 
-  Whenever reslisting will be done to refresh the internal watch to etcd,
+  Whenever relisting will be done to refresh the internal watch to etcd,
   EtcdResync event will be send to all the watchers. It will contain the
   full list of all the objects the watcher is interested in (appropriately
   filtered) as the parameter of this watch event.
   Thus, we need to create the EtcdResync event, extend watch.Interface and
   its implementations to support it and handle those events appropriately
   in places like
-  [Reflector](../../pkg/client/unversioned/cache/reflector.go)
+  [Reflector](../../pkg/client/cache/reflector.go)
 
-	However, this might turn out to be unnecessary optimization if apiserver
-	will always keep up (which is possible in the new design). We will work
+  However, this might turn out to be unnecessary optimization if apiserver
+  will always keep up (which is possible in the new design). We will work
   out all necessary details at that point.
 
 

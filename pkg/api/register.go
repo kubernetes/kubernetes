@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,14 +17,45 @@ limitations under the License.
 package api
 
 import (
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
 var Scheme = runtime.NewScheme()
 
-func init() {
-	Scheme.AddKnownTypes("",
+// Codecs provides access to encoding and decoding for the scheme
+var Codecs = serializer.NewCodecFactory(Scheme)
+
+// GroupName is the group name use in this package
+const GroupName = ""
+
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
+
+// Unversioned is group version for unversioned API objects
+// TODO: this should be v1 probably
+var Unversioned = unversioned.GroupVersion{Group: "", Version: "v1"}
+
+// ParameterCodec handles versioning of objects that are converted to query parameters.
+var ParameterCodec = runtime.NewParameterCodec(Scheme)
+
+// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+func Kind(kind string) unversioned.GroupKind {
+	return SchemeGroupVersion.WithKind(kind).GroupKind()
+}
+
+// Resource takes an unqualified resource and returns back a Group qualified GroupResource
+func Resource(resource string) unversioned.GroupResource {
+	return SchemeGroupVersion.WithResource(resource).GroupResource()
+}
+
+func AddToScheme(scheme *runtime.Scheme) {
+	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+		panic(err)
+	}
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
@@ -32,13 +63,12 @@ func init() {
 		&PodTemplateList{},
 		&ReplicationControllerList{},
 		&ReplicationController{},
-		&DaemonList{},
-		&Daemon{},
 		&ServiceList{},
 		&Service{},
+		&ServiceProxyOptions{},
 		&NodeList{},
 		&Node{},
-		&Status{},
+		&NodeProxyOptions{},
 		&Endpoints{},
 		&EndpointsList{},
 		&Binding{},
@@ -69,59 +99,17 @@ func init() {
 		&ComponentStatusList{},
 		&SerializedReference{},
 		&RangeAllocation{},
-		&ThirdPartyResource{},
-		&ThirdPartyResourceList{},
-		&ThirdPartyResourceData{},
+		&ConfigMap{},
+		&ConfigMapList{},
 	)
-	// Legacy names are supported
-	Scheme.AddKnownTypeWithName("", "Minion", &Node{})
-	Scheme.AddKnownTypeWithName("", "MinionList", &NodeList{})
-}
 
-func (*Pod) IsAnAPIObject()                       {}
-func (*PodList) IsAnAPIObject()                   {}
-func (*PodStatusResult) IsAnAPIObject()           {}
-func (*PodTemplate) IsAnAPIObject()               {}
-func (*PodTemplateList) IsAnAPIObject()           {}
-func (*ReplicationController) IsAnAPIObject()     {}
-func (*ReplicationControllerList) IsAnAPIObject() {}
-func (*Daemon) IsAnAPIObject()                    {}
-func (*DaemonList) IsAnAPIObject()                {}
-func (*Service) IsAnAPIObject()                   {}
-func (*ServiceList) IsAnAPIObject()               {}
-func (*Endpoints) IsAnAPIObject()                 {}
-func (*EndpointsList) IsAnAPIObject()             {}
-func (*Node) IsAnAPIObject()                      {}
-func (*NodeList) IsAnAPIObject()                  {}
-func (*Binding) IsAnAPIObject()                   {}
-func (*Status) IsAnAPIObject()                    {}
-func (*Event) IsAnAPIObject()                     {}
-func (*EventList) IsAnAPIObject()                 {}
-func (*List) IsAnAPIObject()                      {}
-func (*LimitRange) IsAnAPIObject()                {}
-func (*LimitRangeList) IsAnAPIObject()            {}
-func (*ResourceQuota) IsAnAPIObject()             {}
-func (*ResourceQuotaList) IsAnAPIObject()         {}
-func (*Namespace) IsAnAPIObject()                 {}
-func (*NamespaceList) IsAnAPIObject()             {}
-func (*ServiceAccount) IsAnAPIObject()            {}
-func (*ServiceAccountList) IsAnAPIObject()        {}
-func (*Secret) IsAnAPIObject()                    {}
-func (*SecretList) IsAnAPIObject()                {}
-func (*PersistentVolume) IsAnAPIObject()          {}
-func (*PersistentVolumeList) IsAnAPIObject()      {}
-func (*PersistentVolumeClaim) IsAnAPIObject()     {}
-func (*PersistentVolumeClaimList) IsAnAPIObject() {}
-func (*DeleteOptions) IsAnAPIObject()             {}
-func (*ListOptions) IsAnAPIObject()               {}
-func (*PodAttachOptions) IsAnAPIObject()          {}
-func (*PodLogOptions) IsAnAPIObject()             {}
-func (*PodExecOptions) IsAnAPIObject()            {}
-func (*PodProxyOptions) IsAnAPIObject()           {}
-func (*ComponentStatus) IsAnAPIObject()           {}
-func (*ComponentStatusList) IsAnAPIObject()       {}
-func (*SerializedReference) IsAnAPIObject()       {}
-func (*RangeAllocation) IsAnAPIObject()           {}
-func (*ThirdPartyResource) IsAnAPIObject()        {}
-func (*ThirdPartyResourceList) IsAnAPIObject()    {}
-func (*ThirdPartyResourceData) IsAnAPIObject()    {}
+	// Register Unversioned types under their own special group
+	Scheme.AddUnversionedTypes(Unversioned,
+		&unversioned.ExportOptions{},
+		&unversioned.Status{},
+		&unversioned.APIVersions{},
+		&unversioned.APIGroupList{},
+		&unversioned.APIGroup{},
+		&unversioned.APIResourceList{},
+	)
+}

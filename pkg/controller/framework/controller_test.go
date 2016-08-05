@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,13 +24,27 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/google/gofuzz"
 )
+
+type testLW struct {
+	ListFunc  func(options api.ListOptions) (runtime.Object, error)
+	WatchFunc func(options api.ListOptions) (watch.Interface, error)
+}
+
+func (t *testLW) List(options api.ListOptions) (runtime.Object, error) {
+	return t.ListFunc(options)
+}
+func (t *testLW) Watch(options api.ListOptions) (watch.Interface, error) {
+	return t.WatchFunc(options)
+}
 
 func Example() {
 	// source simulates an apiserver object endpoint.
@@ -104,7 +118,7 @@ func Example() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := util.StringSet{}
+	outputSet := sets.String{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
@@ -161,7 +175,7 @@ func ExampleInformer() {
 	}
 
 	// Let's wait for the controller to process the things we just added.
-	outputSet := util.StringSet{}
+	outputSet := sets.String{}
 	for i := 0; i < len(testIDs); i++ {
 		outputSet.Insert(<-deletionCounter)
 	}
@@ -223,7 +237,9 @@ func TestHammerController(t *testing.T) {
 	go controller.Run(stop)
 
 	// Let's wait for the controller to do its initial sync
-	time.Sleep(100 * time.Millisecond)
+	wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		return controller.HasSynced(), nil
+	})
 	if !controller.HasSynced() {
 		t.Errorf("Expected HasSynced() to return true after the initial sync")
 	}
@@ -235,7 +251,7 @@ func TestHammerController(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			// Let's add a few objects to the source.
-			currentNames := util.StringSet{}
+			currentNames := sets.String{}
 			rs := rand.NewSource(rand.Int63())
 			f := fuzz.New().NilChance(.5).NumElements(0, 2).RandSource(rs)
 			r := rand.New(rs) // Mustn't use r and f concurrently!
@@ -276,6 +292,7 @@ func TestHammerController(t *testing.T) {
 	wg.Wait()
 
 	// Let's wait for the controller to finish processing the things we just added.
+	// TODO: look in the queue to see how many items need to be processed.
 	time.Sleep(100 * time.Millisecond)
 	close(stop)
 
@@ -291,18 +308,15 @@ func TestUpdate(t *testing.T) {
 	source := framework.NewFakeControllerSource()
 
 	const (
-		FROM       = "from"
-		ADD_MISSED = "missed the add event"
-		TO         = "to"
+		FROM = "from"
+		TO   = "to"
 	)
 
 	// These are the transitions we expect to see; because this is
 	// asynchronous, there are a lot of valid possibilities.
 	type pair struct{ from, to string }
 	allowedTransitions := map[pair]bool{
-		pair{FROM, TO}:         true,
-		pair{FROM, ADD_MISSED}: true,
-		pair{ADD_MISSED, TO}:   true,
+		pair{FROM, TO}: true,
 
 		// Because a resync can happen when we've already observed one
 		// of the above but before the item is deleted.
@@ -311,15 +325,52 @@ func TestUpdate(t *testing.T) {
 		pair{FROM, FROM}: true,
 	}
 
+	pod := func(name, check string, final bool) *api.Pod {
+		p := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   name,
+				Labels: map[string]string{"check": check},
+			},
+		}
+		if final {
+			p.Labels["final"] = "true"
+		}
+		return p
+	}
+	deletePod := func(p *api.Pod) bool {
+		return p.Labels["final"] == "true"
+	}
+
+	tests := []func(string){
+		func(name string) {
+			name = "a-" + name
+			source.Add(pod(name, FROM, false))
+			source.Modify(pod(name, TO, true))
+		},
+	}
+
+	const threads = 3
+
 	var testDoneWG sync.WaitGroup
+	testDoneWG.Add(threads * len(tests))
 
 	// Make a controller that deletes things once it observes an update.
 	// It calls Done() on the wait group on deletions so we can tell when
 	// everything we've added has been deleted.
+	watchCh := make(chan struct{})
 	_, controller := framework.NewInformer(
-		source,
+		&testLW{
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				watch, err := source.Watch(options)
+				close(watchCh)
+				return watch, err
+			},
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return source.List(options)
+			},
+		},
 		&api.Pod{},
-		time.Millisecond*1,
+		0,
 		framework.ResourceEventHandlerFuncs{
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				o, n := oldObj.(*api.Pod), newObj.(*api.Pod)
@@ -327,7 +378,9 @@ func TestUpdate(t *testing.T) {
 				if !allowedTransitions[pair{from, to}] {
 					t.Errorf("observed transition %q -> %q for %v", from, to, n.Name)
 				}
-				source.Delete(n)
+				if deletePod(n) {
+					source.Delete(n)
+				}
 			},
 			DeleteFunc: func(obj interface{}) {
 				testDoneWG.Done()
@@ -336,46 +389,15 @@ func TestUpdate(t *testing.T) {
 	)
 
 	// Run the controller and run it until we close stop.
+	// Once Run() is called, calls to testDoneWG.Done() might start, so
+	// all testDoneWG.Add() calls must happen before this point
 	stop := make(chan struct{})
 	go controller.Run(stop)
-
-	pod := func(name, check string) *api.Pod {
-		return &api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name:   name,
-				Labels: map[string]string{"check": check},
-			},
-		}
-	}
-
-	tests := []func(string){
-		func(name string) {
-			name = "a-" + name
-			source.Add(pod(name, FROM))
-			source.Modify(pod(name, TO))
-		},
-		func(name string) {
-			name = "b-" + name
-			source.Add(pod(name, FROM))
-			source.ModifyDropWatch(pod(name, TO))
-		},
-		func(name string) {
-			name = "c-" + name
-			source.AddDropWatch(pod(name, FROM))
-			source.Modify(pod(name, ADD_MISSED))
-			source.Modify(pod(name, TO))
-		},
-		func(name string) {
-			name = "d-" + name
-			source.Add(pod(name, FROM))
-		},
-	}
+	<-watchCh
 
 	// run every test a few times, in parallel
-	const threads = 3
 	var wg sync.WaitGroup
 	wg.Add(threads * len(tests))
-	testDoneWG.Add(threads * len(tests))
 	for i := 0; i < threads; i++ {
 		for j, f := range tests {
 			go func(name string, f func(string)) {

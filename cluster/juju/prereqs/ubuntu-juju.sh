@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,6 +43,6 @@ function gather_installation_reqs() {
         sudo apt-get update
     fi
 
-    package_status 'juju-quickstart'
-    package_status 'juju-deployer'
+    package_status 'juju'
+    package_status 'charm-tools'
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,31 +25,63 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-// stat a path, if not exists, retry maxRetries times
-func waitForPathToExist(devicePath string, maxRetries int) bool {
-	for i := 0; i < maxRetries; i++ {
-		_, err := os.Stat(devicePath)
-		if err == nil {
-			return true
+// search /sys/bus for rbd device that matches given pool and image
+func getDevFromImageAndPool(pool, image string) (string, bool) {
+	// /sys/bus/rbd/devices/X/name and /sys/bus/rbd/devices/X/pool
+	sys_path := "/sys/bus/rbd/devices"
+	if dirs, err := ioutil.ReadDir(sys_path); err == nil {
+		for _, f := range dirs {
+			// pool and name format:
+			// see rbd_pool_show() and rbd_name_show() at
+			// https://github.com/torvalds/linux/blob/master/drivers/block/rbd.c
+			name := f.Name()
+			// first match pool, then match name
+			po := path.Join(sys_path, name, "pool")
+			img := path.Join(sys_path, name, "name")
+			exe := exec.New()
+			out, err := exe.Command("cat", po, img).CombinedOutput()
+			if err != nil {
+				continue
+			}
+			matched, err := regexp.MatchString("^"+pool+"\n"+image+"\n$", string(out))
+			if err != nil || !matched {
+				continue
+			}
+			// found a match, check if device exists
+			devicePath := "/dev/rbd" + name
+			if _, err := os.Lstat(devicePath); err == nil {
+				return devicePath, true
+			}
 		}
-		if err != nil && !os.IsNotExist(err) {
-			return false
+	}
+	return "", false
+}
+
+// stat a path, if not exists, retry maxRetries times
+func waitForPath(pool, image string, maxRetries int) (string, bool) {
+	for i := 0; i < maxRetries; i++ {
+		devicePath, found := getDevFromImageAndPool(pool, image)
+		if found {
+			return devicePath, true
 		}
 		time.Sleep(time.Second)
 	}
-	return false
+	return "", false
 }
 
 // make a directory like /var/lib/kubelet/plugins/kubernetes.io/pod/rbd/pool-image-image
@@ -63,7 +95,7 @@ func (util *RBDUtil) MakeGlobalPDName(rbd rbd) string {
 	return makePDNameInternal(rbd.plugin.host, rbd.Pool, rbd.Image)
 }
 
-func (util *RBDUtil) rbdLock(b rbdBuilder, lock bool) error {
+func (util *RBDUtil) rbdLock(b rbdMounter, lock bool) error {
 	var err error
 	var output, locker string
 	var cmd []byte
@@ -127,7 +159,7 @@ func (util *RBDUtil) rbdLock(b rbdBuilder, lock bool) error {
 	return err
 }
 
-func (util *RBDUtil) persistRBD(rbd rbdBuilder, mnt string) error {
+func (util *RBDUtil) persistRBD(rbd rbdMounter, mnt string) error {
 	file := path.Join(mnt, "rbd.json")
 	fp, err := os.Create(file)
 	if err != nil {
@@ -143,7 +175,7 @@ func (util *RBDUtil) persistRBD(rbd rbdBuilder, mnt string) error {
 	return nil
 }
 
-func (util *RBDUtil) loadRBD(builder *rbdBuilder, mnt string) error {
+func (util *RBDUtil) loadRBD(mounter *rbdMounter, mnt string) error {
 	file := path.Join(mnt, "rbd.json")
 	fp, err := os.Open(file)
 	if err != nil {
@@ -152,35 +184,36 @@ func (util *RBDUtil) loadRBD(builder *rbdBuilder, mnt string) error {
 	defer fp.Close()
 
 	decoder := json.NewDecoder(fp)
-	if err = decoder.Decode(builder); err != nil {
+	if err = decoder.Decode(mounter); err != nil {
 		return fmt.Errorf("rbd: decode err: %v.", err)
 	}
 
 	return nil
 }
 
-func (util *RBDUtil) fencing(b rbdBuilder) error {
+func (util *RBDUtil) fencing(b rbdMounter) error {
 	// no need to fence readOnly
-	if b.IsReadOnly() {
+	if (&b).GetAttributes().ReadOnly {
 		return nil
 	}
 	return util.rbdLock(b, true)
 }
 
-func (util *RBDUtil) defencing(c rbdCleaner) error {
+func (util *RBDUtil) defencing(c rbdUnmounter) error {
 	// no need to fence readOnly
 	if c.ReadOnly {
 		return nil
 	}
 
-	return util.rbdLock(*c.rbdBuilder, false)
+	return util.rbdLock(*c.rbdMounter, false)
 }
 
-func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
+func (util *RBDUtil) AttachDisk(b rbdMounter) error {
 	var err error
-	devicePath := strings.Join([]string{"/dev/rbd", b.Pool, b.Image}, "/")
-	exist := waitForPathToExist(devicePath, 1)
-	if !exist {
+	var output []byte
+
+	devicePath, found := waitForPath(b.Pool, b.Image, 1)
+	if !found {
 		// modprobe
 		_, err = b.plugin.execCommand("modprobe", []string{"rbd"})
 		if err != nil {
@@ -195,23 +228,24 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 			mon := b.Mon[i%l]
 			glog.V(1).Infof("rbd: map mon %s", mon)
 			if b.Secret != "" {
-				_, err = b.plugin.execCommand("rbd",
+				output, err = b.plugin.execCommand("rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "--key=" + b.Secret})
 			} else {
-				_, err = b.plugin.execCommand("rbd",
+				output, err = b.plugin.execCommand("rbd",
 					[]string{"map", b.Image, "--pool", b.Pool, "--id", b.Id, "-m", mon, "-k", b.Keyring})
 			}
 			if err == nil {
 				break
 			}
+			glog.V(1).Infof("rbd: map error %v %s", err, string(output))
 		}
-	}
-	if err != nil {
-		return err
-	}
-	exist = waitForPathToExist(devicePath, 10)
-	if !exist {
-		return errors.New("Could not map image: Timeout after 10s")
+		if err != nil {
+			return fmt.Errorf("rbd: map failed %v %s", err, string(output))
+		}
+		devicePath, found = waitForPath(b.Pool, b.Image, 10)
+		if !found {
+			return errors.New("Could not map image: Timeout after 10s")
+		}
 	}
 	// mount it
 	globalPDPath := b.manager.MakeGlobalPDName(*b.rbd)
@@ -230,6 +264,8 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 
 	// fence off other mappers
 	if err := util.fencing(b); err != nil {
+		// rbd unmap before exit
+		b.plugin.execCommand("rbd", []string{"unmap", devicePath})
 		return fmt.Errorf("rbd: image %s is locked by other nodes", b.Image)
 	}
 	// rbd lock remove needs ceph and image config
@@ -239,13 +275,13 @@ func (util *RBDUtil) AttachDisk(b rbdBuilder) error {
 	// the json file remains invisible during rbd mount and thus won't be removed accidentally.
 	util.persistRBD(b, globalPDPath)
 
-	if err = b.mounter.Mount(devicePath, globalPDPath, b.fsType, nil); err != nil {
+	if err = b.mounter.FormatAndMount(devicePath, globalPDPath, b.fsType, nil); err != nil {
 		err = fmt.Errorf("rbd: failed to mount rbd volume %s [%s] to %s, error %v", devicePath, b.fsType, globalPDPath, err)
 	}
 	return err
 }
 
-func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
+func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 	device, cnt, err := mount.GetDeviceNameFromMount(c.mounter, mntPath)
 	if err != nil {
 		return fmt.Errorf("rbd detach disk: failed to get device from mnt: %s\nError: %v", mntPath, err)
@@ -262,7 +298,7 @@ func (util *RBDUtil) DetachDisk(c rbdCleaner, mntPath string) error {
 		}
 
 		// load ceph and image/pool info to remove fencing
-		if err := util.loadRBD(c.rbdBuilder, mntPath); err == nil {
+		if err := util.loadRBD(c.rbdMounter, mntPath); err == nil {
 			// remove rbd lock
 			util.defencing(c)
 		}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package testclient
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -46,10 +45,10 @@ func (c *FakeEvents) Get(name string) (*api.Event, error) {
 }
 
 // List returns a list of events matching the selectors.
-func (c *FakeEvents) List(label labels.Selector, field fields.Selector) (*api.EventList, error) {
-	action := NewRootListAction("events", label, field)
+func (c *FakeEvents) List(opts api.ListOptions) (*api.EventList, error) {
+	action := NewRootListAction("events", opts)
 	if c.Namespace != "" {
-		action = NewListAction("events", c.Namespace, label, field)
+		action = NewListAction("events", c.Namespace, opts)
 	}
 	obj, err := c.Fake.Invokes(action, &api.EventList{})
 	if obj == nil {
@@ -87,6 +86,20 @@ func (c *FakeEvents) Update(event *api.Event) (*api.Event, error) {
 	return obj.(*api.Event), err
 }
 
+// Patch patches an existing event. Returns the copy of the event the server returns, or an error.
+func (c *FakeEvents) Patch(event *api.Event, data []byte) (*api.Event, error) {
+	action := NewRootPatchAction("events", event)
+	if c.Namespace != "" {
+		action = NewPatchAction("events", c.Namespace, event)
+	}
+	obj, err := c.Fake.Invokes(action, event)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*api.Event), err
+}
+
 func (c *FakeEvents) Delete(name string) error {
 	action := NewRootDeleteAction("events", name)
 	if c.Namespace != "" {
@@ -96,21 +109,29 @@ func (c *FakeEvents) Delete(name string) error {
 	return err
 }
 
-// Watch starts watching for events matching the given selectors.
-func (c *FakeEvents) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	action := NewRootWatchAction("events", label, field, resourceVersion)
+func (c *FakeEvents) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	action := NewRootDeleteCollectionAction("events", listOptions)
 	if c.Namespace != "" {
-		action = NewWatchAction("events", c.Namespace, label, field, resourceVersion)
+		action = NewDeleteCollectionAction("events", c.Namespace, listOptions)
 	}
-	c.Fake.Invokes(action, nil)
-	return c.Fake.Watch, c.Fake.Err()
+	_, err := c.Fake.Invokes(action, &api.EventList{})
+	return err
+}
+
+// Watch starts watching for events matching the given selectors.
+func (c *FakeEvents) Watch(opts api.ListOptions) (watch.Interface, error) {
+	action := NewRootWatchAction("events", opts)
+	if c.Namespace != "" {
+		action = NewWatchAction("events", c.Namespace, opts)
+	}
+	return c.Fake.InvokesWatch(action)
 }
 
 // Search returns a list of events matching the specified object.
 func (c *FakeEvents) Search(objOrRef runtime.Object) (*api.EventList, error) {
-	action := NewRootListAction("events", nil, nil)
+	action := NewRootListAction("events", api.ListOptions{})
 	if c.Namespace != "" {
-		action = NewListAction("events", c.Namespace, nil, nil)
+		action = NewListAction("events", c.Namespace, api.ListOptions{})
 	}
 	obj, err := c.Fake.Invokes(action, &api.EventList{})
 	if obj == nil {

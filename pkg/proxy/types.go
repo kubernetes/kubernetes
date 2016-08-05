@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ type ProxyProvider interface {
 	// Active service proxies are reinitialized if found in the update set or
 	// removed if missing from the update set.
 	OnServiceUpdate(services []api.Service)
+	// Sync immediately synchronizes the ProxyProvider's current state to iptables.
+	Sync()
 	// SyncLoop runs periodic work.
 	// This is expected to run as a goroutine or as the main loop of the app.
 	// It does not return.

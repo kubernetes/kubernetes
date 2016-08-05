@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,16 +19,14 @@ package endpoint
 import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Registry is an interface for things that know how to store endpoints.
 type Registry interface {
-	ListEndpoints(ctx api.Context) (*api.EndpointsList, error)
+	ListEndpoints(ctx api.Context, options *api.ListOptions) (*api.EndpointsList, error)
 	GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error)
-	WatchEndpoints(ctx api.Context, labels labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	WatchEndpoints(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 	UpdateEndpoints(ctx api.Context, e *api.Endpoints) error
 	DeleteEndpoints(ctx api.Context, name string) error
 }
@@ -44,16 +42,16 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListEndpoints(ctx api.Context) (*api.EndpointsList, error) {
-	obj, err := s.List(ctx, labels.Everything(), fields.Everything())
+func (s *storage) ListEndpoints(ctx api.Context, options *api.ListOptions) (*api.EndpointsList, error) {
+	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
 	}
 	return obj.(*api.EndpointsList), nil
 }
 
-func (s *storage) WatchEndpoints(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	return s.Watch(ctx, label, field, resourceVersion)
+func (s *storage) WatchEndpoints(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
+	return s.Watch(ctx, options)
 }
 
 func (s *storage) GetEndpoints(ctx api.Context, name string) (*api.Endpoints, error) {
@@ -65,7 +63,7 @@ func (s *storage) GetEndpoints(ctx api.Context, name string) (*api.Endpoints, er
 }
 
 func (s *storage) UpdateEndpoints(ctx api.Context, endpoints *api.Endpoints) error {
-	_, _, err := s.Update(ctx, endpoints)
+	_, _, err := s.Update(ctx, endpoints.Name, rest.DefaultUpdatedObjectInfo(endpoints, api.Scheme))
 	return err
 }
 

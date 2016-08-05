@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,24 +20,34 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-LATEST=$(git describe)
-KUBE_GCS_NO_CACHING=n
-KUBE_GCS_MAKE_PUBLIC=y
-KUBE_GCS_UPLOAD_RELEASE=y
-KUBE_GCS_DELETE_EXISTING=y
-KUBE_GCS_RELEASE_BUCKET=kubernetes-release
-KUBE_GCS_RELEASE_PREFIX="ci/${LATEST}"
-KUBE_GCS_LATEST_FILE="ci/latest.txt"
-KUBE_GCS_LATEST_CONTENTS=${LATEST}
-
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "$KUBE_ROOT/build/common.sh"
+
+source "${KUBE_ROOT}/build/util.sh"
+
+LATEST=$(kube::release::semantic_version)
+
+KUBE_GCS_NO_CACHING='n'
+KUBE_GCS_MAKE_PUBLIC='y'
+KUBE_GCS_UPLOAD_RELEASE='y'
+KUBE_GCS_DELETE_EXISTING='n'
+: ${KUBE_GCS_RELEASE_BUCKET:='kubernetes-release-dev'}
+KUBE_GCS_RELEASE_PREFIX="ci/${LATEST}"
+KUBE_GCS_PUBLISH_VERSION="${LATEST}"
+
+source "${KUBE_ROOT}/build/common.sh"
 
 MAX_ATTEMPTS=3
 attempt=0
 while [[ ${attempt} -lt ${MAX_ATTEMPTS} ]]; do
-  kube::release::gcs::release && kube::release::gcs::publish_latest && break || true
+  kube::release::gcs::release && kube::release::gcs::publish_ci && break || true
   attempt=$((attempt + 1))
   sleep 5
 done
-[[ ${attempt} -lt ${MAX_ATTEMPTS} ]] || exit 1
+if [[ ! ${attempt} -lt ${MAX_ATTEMPTS} ]];then
+    kube::log::error "Max attempts reached. Will exit."
+    exit 1
+fi
+
+if [[ "${FEDERATION:-}" == "true" ]];then
+    "${KUBE_ROOT}/build/push-federation-images.sh"
+fi

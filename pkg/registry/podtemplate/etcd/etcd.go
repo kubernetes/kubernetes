@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,44 +18,57 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/podtemplate"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
-	etcdgeneric.Etcd
+	*registry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against pod templates.
-func NewREST(s storage.Interface) *REST {
-	prefix := "/podtemplates"
-	store := etcdgeneric.Etcd{
+func NewREST(opts generic.RESTOptions) *REST {
+	prefix := "/" + opts.ResourcePrefix
+
+	newListFunc := func() runtime.Object { return &api.PodTemplateList{} }
+	storageInterface := opts.Decorator(
+		opts.Storage,
+		cachesize.GetWatchCacheSizeByResource(cachesize.PodTemplates),
+		&api.PodTemplate{},
+		prefix,
+		podtemplate.Strategy,
+		newListFunc,
+		storage.NoTriggerPublisher,
+	)
+
+	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.PodTemplate{} },
-		NewListFunc: func() runtime.Object { return &api.PodTemplateList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
-			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+			return registry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+			return registry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.PodTemplate).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return podtemplate.MatchPodTemplate(label, field)
-		},
-		EndpointName: "podtemplates",
+		PredicateFunc:           podtemplate.MatchPodTemplate,
+		QualifiedResource:       api.Resource("podtemplates"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
-		CreateStrategy:      podtemplate.Strategy,
-		UpdateStrategy:      podtemplate.Strategy,
+		CreateStrategy: podtemplate.Strategy,
+		UpdateStrategy: podtemplate.Strategy,
+		DeleteStrategy: podtemplate.Strategy,
+		ExportStrategy: podtemplate.Strategy,
+
 		ReturnDeletedObject: true,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
 	return &REST{store}
 }

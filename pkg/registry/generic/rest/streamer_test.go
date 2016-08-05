@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 )
 
 func TestInputStreamReader(t *testing.T) {
@@ -114,5 +118,31 @@ func TestInputStreamTransport(t *testing.T) {
 	result, err := ioutil.ReadAll(readCloser)
 	if string(result) != message {
 		t.Errorf("Stream content does not match. Got: %s. Expected: %s.", string(result), message)
+	}
+}
+
+func fakeInternalServerErrorTransport(mime, message string) http.RoundTripper {
+	content := fmt.Sprintf("HTTP/1.1 500 \"Internal Server Error\"\nContent-Type: %s\n\n%s", mime, message)
+	return &testTransport{body: content}
+}
+
+func TestInputStreamInternalServerErrorTransport(t *testing.T) {
+	message := "Pod is in PodPending"
+	location, _ := url.Parse("http://www.example.com")
+	streamer := &LocationStreamer{
+		Location:        location,
+		Transport:       fakeInternalServerErrorTransport("text/plain", message),
+		ResponseChecker: NewGenericHttpResponseChecker(api.Resource(""), ""),
+	}
+	expectedError := errors.NewInternalError(fmt.Errorf("%s", message))
+
+	_, _, _, err := streamer.InputStream("", "")
+	if err == nil {
+		t.Errorf("unexpected non-error")
+		return
+	}
+
+	if !reflect.DeepEqual(err, expectedError) {
+		t.Errorf("StreamInternalServerError does not match. Got: %s. Expected: %s.", err, expectedError)
 	}
 }

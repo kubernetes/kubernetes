@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,66 +18,49 @@ package e2e
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
+	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
 )
 
-var _ = Describe("Docker Containers", func() {
-	var c *client.Client
-	var ns string
+var _ = framework.KubeDescribe("Docker Containers", func() {
+	f := framework.NewDefaultFramework("containers")
 
-	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		ns_, err := createTestingNS("containers", c)
-		ns = ns_.Name
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		if err := deleteNS(c, ns); err != nil {
-			Failf("Couldn't delete ns %s", err)
-		}
-	})
-
-	It("should use the image defaults if command and args are blank", func() {
-		testContainerOutputInNamespace("use defaults", c, entrypointTestPod(), 0, []string{
+	It("should use the image defaults if command and args are blank [Conformance]", func() {
+		f.TestContainerOutput("use defaults", entrypointTestPod(), 0, []string{
 			"[/ep default arguments]",
-		}, ns)
+		})
 	})
 
-	It("should be able to override the image's default arguments (docker cmd)", func() {
+	It("should be able to override the image's default arguments (docker cmd) [Conformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutputInNamespace("override arguments", c, pod, 0, []string{
+		f.TestContainerOutput("override arguments", pod, 0, []string{
 			"[/ep override arguments]",
-		}, ns)
+		})
 	})
 
 	// Note: when you override the entrypoint, the image's arguments (docker cmd)
 	// are ignored.
-	It("should be able to override the image's default commmand (docker entrypoint)", func() {
+	It("should be able to override the image's default commmand (docker entrypoint) [Conformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 
-		testContainerOutputInNamespace("override command", c, pod, 0, []string{
+		f.TestContainerOutput("override command", pod, 0, []string{
 			"[/ep-2]",
-		}, ns)
+		})
 	})
 
-	It("should be able to override the image's default command and arguments", func() {
+	It("should be able to override the image's default command and arguments [Conformance]", func() {
 		pod := entrypointTestPod()
 		pod.Spec.Containers[0].Command = []string{"/ep-2"}
 		pod.Spec.Containers[0].Args = []string{"override", "arguments"}
 
-		testContainerOutputInNamespace("override all", c, pod, 0, []string{
+		f.TestContainerOutput("override all", pod, 0, []string{
 			"[/ep-2 override arguments]",
-		}, ns)
+		})
 	})
 })
 
@@ -85,7 +68,7 @@ const testContainerName = "test-container"
 
 // Return a prototypical entrypoint test pod
 func entrypointTestPod() *api.Pod {
-	podName := "client-containers-" + string(util.NewUUID())
+	podName := "client-containers-" + string(uuid.NewUUID())
 
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{

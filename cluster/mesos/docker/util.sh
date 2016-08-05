@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ provider_root="${KUBE_ROOT}/cluster/${KUBERNETES_PROVIDER}"
 
 source "${provider_root}/${KUBE_CONFIG_FILE-"config-default.sh"}"
 source "${KUBE_ROOT}/cluster/common.sh"
-source "${provider_root}/common/bin/util-ssl.sh"
 
 # Execute a docker-compose command with the default environment and compose file.
 function cluster::mesos::docker::docker_compose {
@@ -90,36 +89,20 @@ function cluster::mesos::docker::run_in_docker_test {
     kube_config_mount="-v \"$(dirname ${KUBECONFIG}):/root/.kube\""
   fi
 
-  container_id=$(
-    docker run \
-      -d \
-      -e "KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}" \
-      -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
-      ${kube_config_mount} \
-      -v "/var/run/docker.sock:/var/run/docker.sock" \
-      --link docker_mesosmaster1_1:mesosmaster1 \
-      --link docker_mesosslave1_1:mesosslave1 \
-      --link docker_mesosslave2_1:mesosslave2 \
-      --link docker_apiserver_1:apiserver \
-      --entrypoint="${entrypoint}" \
-      mesosphere/kubernetes-mesos-test \
-      ${args}
-  )
+  docker run \
+    --rm \
+    -t $(tty &>/dev/null && echo "-i") \
+    -e "KUBERNETES_PROVIDER=${KUBERNETES_PROVIDER}" \
+    -v "${KUBE_ROOT}:/go/src/github.com/GoogleCloudPlatform/kubernetes" \
+    ${kube_config_mount} \
+    -v "/var/run/docker.sock:/var/run/docker.sock" \
+    --link docker_mesosmaster1_1:mesosmaster1 \
+    --link docker_apiserver_1:apiserver \
+    --entrypoint="${entrypoint}" \
+    mesosphere/kubernetes-mesos-test \
+    ${args}
 
-  docker logs -f "${container_id}" &
-
-  # trap and kill for better signal handing
-  trap 'echo "Killing container ${container_id}" 1>&2 && docker kill ${container_id}' INT TERM
-  exit_status=$(docker wait "${container_id}")
-  trap - INT TERM
-
-  if [ "$exit_status" != 0 ]; then
-    echo "Exited ${exit_status}" 1>&2
-  fi
-
-  docker rm -f "${container_id}" > /dev/null
-
-  return "${exit_status}"
+  return "$?"
 }
 
 # Run kube-cagen.sh inside docker.
@@ -127,29 +110,32 @@ function cluster::mesos::docker::run_in_docker_test {
 function cluster::mesos::docker::run_in_docker_cagen {
   local out_dir="$1"
 
-  container_id=$(
-    docker run \
-      -d \
-      -v "${out_dir}:/var/run/kubernetes/auth" \
-      --entrypoint="kube-cagen.sh" \
-      mesosphere/kubernetes-mesos-keygen \
-      "/var/run/kubernetes/auth"
-  )
+  docker run \
+    --rm \
+    -t $(tty &>/dev/null && echo "-i") \
+    -v "${out_dir}:/var/run/kubernetes/auth" \
+    mesosphere/kubernetes-keygen:v1.0.0 \
+    "cagen" \
+    "/var/run/kubernetes/auth"
 
-  docker logs -f "${container_id}" &
+  return "$?"
+}
 
-  # trap and kill for better signal handing
-  trap 'echo "Killing container ${container_id}" 1>&2 && docker kill ${container_id}' INT TERM
-  exit_status=$(docker wait "${container_id}")
-  trap - INT TERM
+# Run kube-keygen.sh inside docker.
+function cluster::mesos::docker::run_in_docker_keygen {
+  local out_file_path="$1"
+  local out_dir="$(dirname "${out_file_path}")"
+  local out_file="$(basename "${out_file_path}")"
 
-  if [ "$exit_status" != 0 ]; then
-    echo "Exited ${exit_status}" 1>&2
-  fi
+  docker run \
+    --rm \
+    -t $(tty &>/dev/null && echo "-i") \
+    -v "${out_dir}:/var/run/kubernetes/auth" \
+    mesosphere/kubernetes-keygen:v1.0.0 \
+    "keygen" \
+    "/var/run/kubernetes/auth/${out_file}"
 
-  docker rm -f "${container_id}" > /dev/null
-
-  return "${exit_status}"
+  return "$?"
 }
 
 # Generate kubeconfig data for the created cluster.
@@ -206,10 +192,10 @@ function detect-master {
   echo "KUBE_MASTER_IP: $KUBE_MASTER_IP" 1>&2
 }
 
-# Get minion IP addresses and store in KUBE_MINION_IP_ADDRESSES[]
+# Get minion IP addresses and store in KUBE_NODE_IP_ADDRESSES[]
 # These Mesos slaves MAY host Kublets,
 # but might not have a Kublet running unless a kubernetes task has been scheduled on them.
-function detect-minions {
+function detect-nodes {
   local docker_ids=$(docker ps --filter="name=docker_mesosslave" --quiet)
   if [ -z "${docker_ids}" ]; then
     echo "ERROR: Mesos slave(s) not running" 1>&2
@@ -217,9 +203,9 @@ function detect-minions {
   fi
   while read -r docker_id; do
     local minion_ip=$(docker inspect --format="{{.NetworkSettings.IPAddress}}" "${docker_id}")
-    KUBE_MINION_IP_ADDRESSES+=("${minion_ip}")
+    KUBE_NODE_IP_ADDRESSES+=("${minion_ip}")
   done <<< "$docker_ids"
-  echo "KUBE_MINION_IP_ADDRESSES: [${KUBE_MINION_IP_ADDRESSES[*]}]" 1>&2
+  echo "KUBE_NODE_IP_ADDRESSES: [${KUBE_NODE_IP_ADDRESSES[*]}]" 1>&2
 }
 
 # Verify prereqs on host machine
@@ -240,10 +226,13 @@ function cluster::mesos::docker::init_auth {
   rm -rf "${auth_dir}"/*
 
   echo "Creating Certificate Authority" 1>&2
-  cluster::mesos::docker::run_in_docker_cagen "${auth_dir}"
+  cluster::mesos::docker::buffer_output cluster::mesos::docker::run_in_docker_cagen "${auth_dir}"
+  echo "Certificate Authority Key: ${auth_dir}/root-ca.key" 1>&2
+  echo "Certificate Authority Cert: ${auth_dir}/root-ca.crt" 1>&2
 
-  echo "Creating Service-Account RSA Key" 1>&2
-  cluster::mesos::docker::create_rsa_key "${auth_dir}/service-accounts.key"
+  echo "Creating Service Account RSA Key" 1>&2
+  cluster::mesos::docker::buffer_output cluster::mesos::docker::run_in_docker_keygen "${auth_dir}/service-accounts.key"
+  echo "Service Account Key: ${auth_dir}/service-accounts.key" 1>&2
 
   echo "Creating User Accounts" 1>&2
   cluster::mesos::docker::create_token_user "cluster-admin" > "${auth_dir}/token-users"
@@ -255,16 +244,13 @@ function cluster::mesos::docker::init_auth {
 # Instantiate a kubernetes cluster.
 function kube-up {
   # Nuke old mesos-slave workspaces
-  for ((i=1; i <= NUM_MINIONS; i++)) do
-    local work_dir="${MESOS_DOCKER_WORK_DIR}/mesosslave${i}/mesos"
-    echo "Creating Mesos Work Dir: ${work_dir}" 1>&2
-    mkdir -p "${work_dir}"
-    rm -rf "${work_dir}"/*
-  done
-
-  local -r log_dir="${MESOS_DOCKER_WORK_DIR}/log"
+  local work_dir="${MESOS_DOCKER_WORK_DIR}/mesosslave"
+  echo "Creating Mesos Work Dir: ${work_dir}" 1>&2
+  mkdir -p "${work_dir}"
+  rm -rf "${work_dir}"/*
 
   # Nuke old logs
+  local -r log_dir="${MESOS_DOCKER_WORK_DIR}/log"
   mkdir -p "${log_dir}"
   rm -rf "${log_dir}"/*
 
@@ -272,12 +258,11 @@ function kube-up {
   echo "Pulling Docker images" 1>&2
   cluster::mesos::docker::docker_compose_lazy_pull
 
-  if [ "${MESOS_DOCKER_SKIP_BUILD:-false}" != "true" ]; then
+  if [ "${MESOS_DOCKER_SKIP_BUILD}" != "true" ]; then
     echo "Building Docker images" 1>&2
     # TODO: version images (k8s version, git sha, and dirty state) to avoid re-building them every time.
     "${provider_root}/km/build.sh"
     "${provider_root}/test/build.sh"
-    "${provider_root}/keygen/build.sh"
   fi
 
   cluster::mesos::docker::init_auth
@@ -288,13 +273,15 @@ function kube-up {
 
   echo "Starting ${KUBERNETES_PROVIDER} cluster" 1>&2
   cluster::mesos::docker::docker_compose up -d
+  echo "Scaling ${KUBERNETES_PROVIDER} cluster to ${NUM_NODES} slaves"
+  cluster::mesos::docker::docker_compose scale mesosslave=${NUM_NODES}
 
   # await-health-check requires GNU timeout
   # apiserver hostname resolved by docker
   cluster::mesos::docker::run_in_docker_test await-health-check "-t=${MESOS_DOCKER_API_TIMEOUT}" http://apiserver:8888/healthz
 
   detect-master
-  detect-minions
+  detect-nodes
   create-kubeconfig
 
   echo "Deploying Addons" 1>&2
@@ -302,7 +289,7 @@ function kube-up {
 
   # Wait for addons to deploy
   cluster::mesos::docker::await_ready "kube-dns" "${MESOS_DOCKER_ADDON_TIMEOUT}"
-  cluster::mesos::docker::await_ready "kube-ui" "${MESOS_DOCKER_ADDON_TIMEOUT}"
+  cluster::mesos::docker::await_ready "kubernetes-dashboard" "${MESOS_DOCKER_ADDON_TIMEOUT}"
 
   trap - EXIT
 }
@@ -315,11 +302,14 @@ function validate-cluster {
 
   # Validate immediate cluster reachability and responsiveness
   echo "KubeDNS: $(cluster::mesos::docker::addon_status 'kube-dns')"
-  echo "KubeUI: $(cluster::mesos::docker::addon_status 'kube-ui')"
+  echo "Kubernetes Dashboard: $(cluster::mesos::docker::addon_status 'kubernetes-dashboard')"
 }
 
 # Delete a kubernetes cluster
 function kube-down {
+  if [ "${MESOS_DOCKER_DUMP_LOGS}" == "true" ]; then
+    cluster::mesos::docker::dump_logs "${MESOS_DOCKER_WORK_DIR}/log"
+  fi
   echo "Stopping ${KUBERNETES_PROVIDER} cluster" 1>&2
   # Since restoring a stopped cluster is not yet supported, use the nuclear option
   cluster::mesos::docker::docker_compose kill
@@ -327,7 +317,8 @@ function kube-down {
 }
 
 function test-setup {
-  echo "TODO: test-setup" 1>&2
+  echo "test-setup" 1>&2
+  "${KUBE_ROOT}/cluster/kube-up.sh"
 }
 
 # Execute after running tests to perform any required clean-up
@@ -341,16 +332,6 @@ function test-teardown {
 # SSH to a node by name or IP ($1) and run a command ($2).
 function ssh-to-node {
   echo "TODO: ssh-to-node" 1>&2
-}
-
-# Restart the kube-proxy on a node ($1)
-function restart-kube-proxy {
-  echo "TODO: restart-kube-proxy" 1>&2
-}
-
-# Restart the apiserver
-function restart-apiserver {
-  echo "TODO: restart-apiserver" 1>&2
 }
 
 # Waits for a kube-system pod (of the provided name) to have the phase/status "Running".
@@ -389,4 +370,39 @@ function cluster::mesos::docker::dump_logs {
   while read name; do
     docker logs "${name}" &> "${out_dir}/${name}.log"
   done < <(cluster::mesos::docker::docker_compose ps -q | xargs docker inspect --format '{{.Name}}')
+}
+
+# Creates a k8s token auth user file.
+# See /docs/admin/authentication.md
+function cluster::mesos::docker::create_token_user {
+  local user_name="$1"
+  echo "$(openssl rand -hex 32),${user_name},${user_name}"
+}
+
+# Creates a k8s basic auth user file.
+# See /docs/admin/authentication.md
+function cluster::mesos::docker::create_basic_user {
+  local user_name="$1"
+  local password="$2"
+  echo "${password},${user_name},${user_name}"
+}
+
+# Buffers command output to file, prints output on failure.
+function cluster::mesos::docker::buffer_output {
+  local cmd="$@"
+  local tempfile="$(mktemp "${TMPDIR:-/tmp}/buffer.XXXXXX")"
+  trap "kill -TERM \${PID}; rm '${tempfile}'" TERM INT
+  set +e
+  ${cmd} &> "${tempfile}" &
+  PID=$!
+  wait ${PID}
+  trap - TERM INT
+  wait ${PID}
+  local exit_status="$?"
+  set -e
+  if [ "${exit_status}" != 0 ]; then
+    cat "${tempfile}" 1>&2
+  fi
+  rm "${tempfile}"
+  return "${exit_status}"
 }

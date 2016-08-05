@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,9 +22,8 @@ import (
 
 // default values to use when constructing mesos ExecutorInfo messages
 const (
-	DefaultInfoID         = "k8sm-executor"
-	DefaultInfoSource     = "kubernetes"
-	DefaultInfoName       = "Kubelet-Executor"
-	DefaultSuicideTimeout = 20 * time.Minute
-	DefaultCgroupPrefix   = "mesos"
+	DefaultInfoID            = "k8sm-executor"
+	DefaultInfoSource        = "kubernetes"
+	DefaultSuicideTimeout    = 20 * time.Minute
+	DefaultLaunchGracePeriod = 5 * time.Minute
 )

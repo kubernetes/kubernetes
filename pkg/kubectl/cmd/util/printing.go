@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,10 @@ package util
 import (
 	"fmt"
 	"io"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 
 	"github.com/spf13/cobra"
@@ -28,20 +30,29 @@ import (
 
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
 func AddPrinterFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|template|templatefile|wide|jsonpath.")
-	cmd.Flags().String("output-version", "", "Output the formatted object with the given version (default api-version).")
-	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
-	// template shorthand -t is deprecated to support -t for --tty
-	// TODO: remove template flag shorthand -t
-	cmd.Flags().StringP("template", "t", "", "Template string or path to template file to use when -o=template, -o=templatefile or -o=jsonpath.  The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview]. The jsonpath template is composed of jsonpath expressions enclosed by {} [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md]")
-	cmd.Flags().MarkShorthandDeprecated("template", "please use --template instead")
-	cmd.Flags().String("sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. 'ObjectMeta.Name'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
+	AddOutputFlags(cmd)
+	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
+	AddNoHeadersFlags(cmd)
+	cmd.Flags().Bool("show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
+	cmd.Flags().String("template", "", "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].")
+	cmd.MarkFlagFilename("template")
+	cmd.Flags().String("sort-by", "", "If non-empty, sort list types using this field specification.  The field specification is expressed as a JSONPath expression (e.g. '{.metadata.name}'). The field in the API resource specified by this JSONPath expression must be an integer or a string.")
 	cmd.Flags().BoolP("show-all", "a", false, "When printing, show all resources (default hide terminated pods.)")
 }
 
 // AddOutputFlagsForMutation adds output related flags to a command. Used by mutations only.
 func AddOutputFlagsForMutation(cmd *cobra.Command) {
 	cmd.Flags().StringP("output", "o", "", "Output mode. Use \"-o name\" for shorter output (resource/name).")
+}
+
+// AddOutputFlags adds output related flags to a command.
+func AddOutputFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
+}
+
+// AddNoHeadersFlags adds no-headers flags to a command.
+func AddNoHeadersFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers.")
 }
 
 // PrintSuccess prints message after finishing mutating operations
@@ -74,12 +85,18 @@ func ValidateOutputArgs(cmd *cobra.Command) error {
 }
 
 // OutputVersion returns the preferred output version for generic content (JSON, YAML, or templates)
-func OutputVersion(cmd *cobra.Command, defaultVersion string) string {
-	outputVersion := GetFlagString(cmd, "output-version")
-	if len(outputVersion) == 0 {
-		outputVersion = defaultVersion
+// defaultVersion is never mutated.  Nil simply allows clean passing in common usage from client.Config
+func OutputVersion(cmd *cobra.Command, defaultVersion *unversioned.GroupVersion) (unversioned.GroupVersion, error) {
+	outputVersionString := GetFlagString(cmd, "output-version")
+	if len(outputVersionString) == 0 {
+		if defaultVersion == nil {
+			return unversioned.GroupVersion{}, nil
+		}
+
+		return *defaultVersion, nil
 	}
-	return outputVersion
+
+	return unversioned.ParseGroupVersion(outputVersionString)
 }
 
 // PrinterForCommand returns the default printer for this command.
@@ -94,7 +111,17 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 		outputFormat = "template"
 	}
 
-	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile)
+	templateFormat := []string{
+		"go-template=", "go-template-file=", "jsonpath=", "jsonpath-file=", "custom-columns=", "custom-columns-file=",
+	}
+	for _, format := range templateFormat {
+		if strings.HasPrefix(outputFormat, format) {
+			templateFile = outputFormat[len(format):]
+			outputFormat = format[:len(format)-1]
+		}
+	}
+
+	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile, GetFlagBool(cmd, "no-headers"))
 	if err != nil {
 		return nil, generic, err
 	}
@@ -103,7 +130,12 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 }
 
 func maybeWrapSortingPrinter(cmd *cobra.Command, printer kubectl.ResourcePrinter) kubectl.ResourcePrinter {
-	sorting := GetFlagString(cmd, "sort-by")
+	sorting, err := cmd.Flags().GetString("sort-by")
+	if err != nil {
+		// error can happen on missing flag or bad flag type.  In either case, this command didn't intent to sort
+		return printer
+	}
+
 	if len(sorting) != 0 {
 		return &kubectl.SortingPrinter{
 			Delegate:  printer,

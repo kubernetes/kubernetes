@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,8 @@ package rkt
 import (
 	"fmt"
 	"strings"
+
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 // containerID defines the ID of rkt containers, it will
@@ -32,16 +34,19 @@ type containerID struct {
 // buildContainerID constructs the containers's ID using containerID,
 // which consists of the pod uuid and the container name.
 // The result can be used to uniquely identify a container.
-func buildContainerID(c *containerID) string {
-	return fmt.Sprintf("%s:%s", c.uuid, c.appName)
+func buildContainerID(c *containerID) kubecontainer.ContainerID {
+	return kubecontainer.ContainerID{
+		Type: RktType,
+		ID:   fmt.Sprintf("%s:%s", c.uuid, c.appName),
+	}
 }
 
 // parseContainerID parses the containerID into pod uuid and the container name. The
 // results can be used to get more information of the container.
-func parseContainerID(id string) (*containerID, error) {
-	tuples := strings.Split(id, ":")
+func parseContainerID(id kubecontainer.ContainerID) (*containerID, error) {
+	tuples := strings.Split(id.ID, ":")
 	if len(tuples) != 2 {
-		return nil, fmt.Errorf("rkt: cannot parse container ID for: %v", id)
+		return nil, fmt.Errorf("rkt: cannot parse container ID for: %q, required format is [UUID:APPNAME]", id)
 	}
 	return &containerID{
 		uuid:    tuples[0],

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,32 +17,102 @@ limitations under the License.
 package v1_test
 
 import (
+	"net/url"
+	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	versioned "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
-func TestNodeConversion(t *testing.T) {
-	obj, err := versioned.Codec.Decode([]byte(`{"kind":"Minion","apiVersion":"v1"}`))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestPodLogOptions(t *testing.T) {
+	sinceSeconds := int64(1)
+	sinceTime := unversioned.NewTime(time.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC).Local())
+	tailLines := int64(2)
+	limitBytes := int64(3)
+
+	versionedLogOptions := &versioned.PodLogOptions{
+		Container:    "mycontainer",
+		Follow:       true,
+		Previous:     true,
+		SinceSeconds: &sinceSeconds,
+		SinceTime:    &sinceTime,
+		Timestamps:   true,
+		TailLines:    &tailLines,
+		LimitBytes:   &limitBytes,
 	}
-	if _, ok := obj.(*api.Node); !ok {
-		t.Errorf("unexpected type: %#v", obj)
+	unversionedLogOptions := &api.PodLogOptions{
+		Container:    "mycontainer",
+		Follow:       true,
+		Previous:     true,
+		SinceSeconds: &sinceSeconds,
+		SinceTime:    &sinceTime,
+		Timestamps:   true,
+		TailLines:    &tailLines,
+		LimitBytes:   &limitBytes,
+	}
+	expectedParameters := url.Values{
+		"container":    {"mycontainer"},
+		"follow":       {"true"},
+		"previous":     {"true"},
+		"sinceSeconds": {"1"},
+		"sinceTime":    {"2000-01-01T12:34:56Z"},
+		"timestamps":   {"true"},
+		"tailLines":    {"2"},
+		"limitBytes":   {"3"},
 	}
 
-	obj, err = versioned.Codec.Decode([]byte(`{"kind":"MinionList","apiVersion":"v1"}`))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if _, ok := obj.(*api.NodeList); !ok {
-		t.Errorf("unexpected type: %#v", obj)
+	codec := runtime.NewParameterCodec(api.Scheme)
+
+	// unversioned -> query params
+	{
+		actualParameters, err := codec.EncodeParameters(unversionedLogOptions, versioned.SchemeGroupVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(actualParameters, expectedParameters) {
+			t.Fatalf("Expected\n%#v\ngot\n%#v", expectedParameters, actualParameters)
+		}
 	}
 
-	obj = &api.Node{}
-	if err := versioned.Codec.DecodeInto([]byte(`{"kind":"Minion","apiVersion":"v1"}`), obj); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// versioned -> query params
+	{
+		actualParameters, err := codec.EncodeParameters(versionedLogOptions, versioned.SchemeGroupVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(actualParameters, expectedParameters) {
+			t.Fatalf("Expected\n%#v\ngot\n%#v", expectedParameters, actualParameters)
+		}
+	}
+
+	// query params -> versioned
+	{
+		convertedLogOptions := &versioned.PodLogOptions{}
+		err := codec.DecodeParameters(expectedParameters, versioned.SchemeGroupVersion, convertedLogOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(convertedLogOptions, versionedLogOptions) {
+			t.Fatalf("Unexpected deserialization:\n%s", diff.ObjectGoPrintSideBySide(versionedLogOptions, convertedLogOptions))
+		}
+	}
+
+	// query params -> unversioned
+	{
+		convertedLogOptions := &api.PodLogOptions{}
+		err := codec.DecodeParameters(expectedParameters, versioned.SchemeGroupVersion, convertedLogOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(convertedLogOptions, unversionedLogOptions) {
+			t.Fatalf("Unexpected deserialization:\n%s", diff.ObjectGoPrintSideBySide(unversionedLogOptions, convertedLogOptions))
+		}
 	}
 }
 
@@ -88,6 +158,60 @@ func TestPodSpecConversion(t *testing.T) {
 		}
 		if got.ServiceAccountName != name {
 			t.Fatalf("want api.ServiceAccountName %q, got %q", name, got.ServiceAccountName)
+		}
+	}
+}
+
+func TestResourceListConversion(t *testing.T) {
+	bigMilliQuantity := resource.NewQuantity(resource.MaxMilliValue, resource.DecimalSI)
+	bigMilliQuantity.Add(resource.MustParse("12345m"))
+
+	tests := []struct {
+		input    versioned.ResourceList
+		expected api.ResourceList
+	}{
+		{ // No changes necessary.
+			input: versioned.ResourceList{
+				versioned.ResourceMemory:  resource.MustParse("30M"),
+				versioned.ResourceCPU:     resource.MustParse("100m"),
+				versioned.ResourceStorage: resource.MustParse("1G"),
+			},
+			expected: api.ResourceList{
+				api.ResourceMemory:  resource.MustParse("30M"),
+				api.ResourceCPU:     resource.MustParse("100m"),
+				api.ResourceStorage: resource.MustParse("1G"),
+			},
+		},
+		{ // Nano-scale values should be rounded up to milli-scale.
+			input: versioned.ResourceList{
+				versioned.ResourceCPU:    resource.MustParse("3.000023m"),
+				versioned.ResourceMemory: resource.MustParse("500.000050m"),
+			},
+			expected: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("4m"),
+				api.ResourceMemory: resource.MustParse("501m"),
+			},
+		},
+		{ // Large values should still be accurate.
+			input: versioned.ResourceList{
+				versioned.ResourceCPU:     *bigMilliQuantity.Copy(),
+				versioned.ResourceStorage: *bigMilliQuantity.Copy(),
+			},
+			expected: api.ResourceList{
+				api.ResourceCPU:     *bigMilliQuantity.Copy(),
+				api.ResourceStorage: *bigMilliQuantity.Copy(),
+			},
+		},
+	}
+
+	for i, test := range tests {
+		output := api.ResourceList{}
+		err := api.Scheme.Convert(&test.input, &output)
+		if err != nil {
+			t.Fatalf("unexpected error for case %d: %v", i, err)
+		}
+		if !api.Semantic.DeepEqual(test.expected, output) {
+			t.Errorf("unexpected conversion for case %d: Expected %+v; Got %+v", i, test.expected, output)
 		}
 	}
 }

@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,5 +14,7 @@
 
 FROM scratch
 MAINTAINER Daniel Smith <dbsmith@google.com>
+ADD localhost.crt localhost.crt
+ADD localhost.key localhost.key
 ADD porter porter
 ENTRYPOINT ["/porter"]

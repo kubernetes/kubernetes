@@ -33,7 +33,7 @@ juju-quickstart`) or Ubuntu (`apt-get install juju-quickstart`).
 Use the 'juju quickstart' command to deploy a Kubernetes cluster to any cloud
 supported by Juju.  
 
-The charm store version of the Kubernetes bundle can be deployed as folllows:
+The charm store version of the Kubernetes bundle can be deployed as follows:
 
     juju quickstart u/kubernetes/kubernetes-cluster
 
@@ -81,7 +81,7 @@ via juju ssh:
 
     juju ssh kubernetes-master/0 -t "sudo kubectl get nodes"
 
-You may also SSH to the kuberentes-master unit (`juju ssh kubernetes-master/0`)
+You may also SSH to the kubernetes-master unit (`juju ssh kubernetes-master/0`)
 and call kubectl from the command prompt.
 
 See the

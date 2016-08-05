@@ -10,4 +10,4 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: "/tmp/data01"
+    path: "/somepath/data01"

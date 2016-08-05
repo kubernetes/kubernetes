@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,45 +14,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-INSTANCE_PREFIX=kubernetes
-AZ_LOCATION='West US'
-TAG=testing
-AZ_CS_PREFIX=kube
-AZ_VNET=MyVnet
-AZ_SUBNET=Subnet-1
-AZ_IMAGE=b39f27a8b8c64d52b05eac6a62ebad85__Ubuntu-14_04_1-LTS-amd64-server-20140927-en-us-30GB
-AZ_CS="" # is set in azure/util.sh verify-prereqs
+# Azure location to deploy to. (Storage account, resource group, resources)
+# Must be be specified in the compact form. ("westus" is ok, "West US" is not)
+AZURE_LOCATION="${AZURE_LOCATION:-"westus"}"
 
-AZ_SSH_KEY=$HOME/.ssh/azure_rsa
-AZ_SSH_CERT=$HOME/.ssh/azure.pem
+# An identifier for the deployment. It can be left blank and an identifier
+# will be generated from the date/time.
+AZURE_DEPLOY_ID="${AZURE_DEPLOY_ID:-"kube-$(date +"%Y%m%d-%H%M%S")"}"
 
-NUM_MINIONS=4
+AZURE_MASTER_SIZE="${AZURE_MASTER_SIZE:-"Standard_A1"}"
+AZURE_NODE_SIZE="${AZURE_NODE_SIZE:-"Standard_A1"}"
 
-MASTER_NAME="${INSTANCE_PREFIX}-master"
-MASTER_TAG="${INSTANCE_PREFIX}-master"
-MINION_TAG="${INSTANCE_PREFIX}-minion"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
-MINION_IP_RANGES=($(eval echo "10.244.{1..${NUM_MINIONS}}.0/24"))
-MINION_SCOPES=""
+# Username of the admin account created on the VMs
+AZURE_USERNAME="${AZURE_USERNAME:-"kube"}"
 
-SERVICE_CLUSTER_IP_RANGE="10.250.0.0/16"  # formerly PORTAL_NET
+# Initial number of worker nodes to provision
+NUM_NODES=${NUM_NODES:-3}
 
-# Optional: Install node logging
-ENABLE_NODE_LOGGING=false
-LOGGING_DESTINATION=elasticsearch # options: elasticsearch, gcp
+# The target Azure subscription ID
+# This should be a GUID.
+AZURE_SUBSCRIPTION_ID="${AZURE_SUBSCRIPTION_ID:-}"
 
-# Optional: When set to true, Elasticsearch and Kibana will be setup as part of the cluster bring up.
-ENABLE_CLUSTER_LOGGING=false
-ELASTICSEARCH_LOGGING_REPLICAS=1
-
-# Optional: Cluster monitoring to setup as part of the cluster bring up:
-#   none     - No cluster monitoring setup 
-#   influxdb - Heapster, InfluxDB, and Grafana 
-#   google   - Heapster, Google Cloud Monitoring, and Google Cloud Logging
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
-
-# Optional: Install Kubernetes UI
-ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
-
-# Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+# The authentication mechanism to use. The default "device" is recommended as
+# it requires the least ahead-of-time setup.
+# This should be one of: { "device", "client_secret" }
+AZURE_AUTH_METHOD="${AZURE_AUTH_METHOD:-"device"}"

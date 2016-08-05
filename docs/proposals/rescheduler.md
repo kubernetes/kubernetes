@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/proposals/rescheduler.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/docs/proposals/rescheduler.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -96,7 +97,7 @@ case, the nodes we move the Pods onto might have been in the system for a long t
 have been added by the cluster auto-scaler specifically to allow the rescheduler to
 rebalance utilization.
 
-A second spreading use case is to separate antagnosits.
+A second spreading use case is to separate antagonists.
 Sometimes the processes running in two different Pods on the same node
 may have unexpected antagonistic
 behavior towards one another. A system component might monitor for such
@@ -107,7 +108,7 @@ antagonism and ask the rescheduler to move one of the antagonists to a new node.
 The vast majority of users probably only care about rescheduling for three scenarios:
 
 1. Move Pods around to get a PENDING Pod to schedule
-1. Redistribute Pods onto new nodes added by a cluster auto-scaler when ther are no PENDING Pods
+1. Redistribute Pods onto new nodes added by a cluster auto-scaler when there are no PENDING Pods
 1. Move Pods around when CPU starvation is detected on a node
 
 ## Design considerations and design space
@@ -144,6 +145,7 @@ A key design question for a Rescheduler is how much knowledge it needs about the
 ## Appendix: Integrating rescheduler with cluster auto-scaler (scale up)
 
 For scaling up the cluster, a reasonable workflow might be:
+
 1. pod horizontal auto-scaler decides to add one or more Pods to a service, based on the metrics it is observing
 1. the Pod goes PENDING due to lack of a suitable node with sufficient resources
 1. rescheduler notices the PENDING Pod and determines that the Pod cannot schedule just by rearranging existing Pods (while respecting SLOs)

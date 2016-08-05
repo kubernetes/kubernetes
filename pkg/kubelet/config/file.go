@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet"
-	"k8s.io/kubernetes/pkg/util"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 )
@@ -45,7 +45,7 @@ func NewSourceFile(path string, nodeName string, period time.Duration, updates c
 		updates:  updates,
 	}
 	glog.V(1).Infof("Watching path %q", path)
-	go util.Forever(config.run, period)
+	go wait.Until(config.run, period, wait.NeverStop)
 }
 
 func (s *sourceFile) run() {
@@ -66,7 +66,7 @@ func (s *sourceFile) extractFromPath() error {
 			return err
 		}
 		// Emit an update with an empty PodList to allow FileSource to be marked as seen
-		s.updates <- kubelet.PodUpdate{Pods: []*api.Pod{}, Op: kubelet.SET, Source: kubelet.FileSource}
+		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{}, Op: kubetypes.SET, Source: kubetypes.FileSource}
 		return fmt.Errorf("path does not exist, ignoring")
 	}
 
@@ -76,14 +76,14 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{Pods: pods, Op: kubelet.SET, Source: kubelet.FileSource}
+		s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
 
 	case statInfo.Mode().IsRegular():
 		pod, err := s.extractFromFile(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubelet.PodUpdate{Pods: []*api.Pod{pod}, Op: kubelet.SET, Source: kubelet.FileSource}
+		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{pod}, Op: kubetypes.SET, Source: kubetypes.FileSource}
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
@@ -92,8 +92,8 @@ func (s *sourceFile) extractFromPath() error {
 	return nil
 }
 
-// Get as many pod configs as we can from a directory.  Return an error iff something
-// prevented us from reading anything at all.  Do not return an error if only some files
+// Get as many pod configs as we can from a directory. Return an error if and only if something
+// prevented us from reading anything at all. Do not return an error if only some files
 // were problematic.
 func (s *sourceFile) extractFromDir(name string) ([]*api.Pod, error) {
 	dirents, err := filepath.Glob(filepath.Join(name, "[^.]*"))

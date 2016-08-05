@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,10 @@
 
 ## Contains configuration values for interacting with the mesos/docker cluster
 
-NUM_MINIONS=${NUM_MINIONS:-2}
+NUM_NODES=${NUM_NODES:-2}
 INSTANCE_PREFIX="${INSTANCE_PREFIX:-kubernetes}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
-MINION_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_MINIONS}}))
+NODE_NAMES=($(eval echo ${INSTANCE_PREFIX}-minion-{1..${NUM_NODES}}))
 
 SERVICE_CLUSTER_IP_RANGE=10.10.10.0/24
 
@@ -62,3 +62,10 @@ MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR:-${HOME}/tmp/kubernetes}"
 
 # Arguments to pass to docker-engine running on the mesos-slave-dind containers.
 DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:---log-level=error}"
+
+# Force a dump of the logs into ${MESOS_DOCKER_WORK_DIR}/log on kube-down.sh. By
+# default this only happens when kube-up.sh fails.
+MESOS_DOCKER_DUMP_LOGS="${MESOS_DOCKER_DUMP_LOGS:-false}"
+
+# Skip rebuilding the involved docker containers on kube-up.sh.
+MESOS_DOCKER_SKIP_BUILD="${MESOS_DOCKER_SKIP_BUILD:-false}"

@@ -3,13 +3,15 @@ kind: Service
 metadata:
   name: frontend
   labels:
-    name: frontend
+    app: guestbook
+    tier: frontend
 spec:
   # if your cluster supports it, uncomment the following to automatically create
   # an external load-balanced IP for the frontend service.
   # type: LoadBalancer
   ports:
     # the port that this service should serve on
-    - port: 80
+  - port: 80
   selector:
-    name: frontend
+    app: guestbook
+    tier: frontend

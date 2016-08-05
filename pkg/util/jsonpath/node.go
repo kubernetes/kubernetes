@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,18 +84,18 @@ func (l *ListNode) String() string {
 // TextNode holds plain text.
 type TextNode struct {
 	NodeType
-	Text []byte // The text; may span newlines.
+	Text string // The text; may span newlines.
 }
 
 func newText(text string) *TextNode {
-	return &TextNode{NodeType: NodeText, Text: []byte(text)}
+	return &TextNode{NodeType: NodeText, Text: text}
 }
 
 func (t *TextNode) String() string {
 	return fmt.Sprintf("%s: %s", t.Type(), t.Text)
 }
 
-// FieldNode holds filed of struct
+// FieldNode holds field of struct
 type FieldNode struct {
 	NodeType
 	Value string

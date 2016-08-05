@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
 
 import (
 	"net/url"
@@ -23,8 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
 func getPersistentVolumesResoureName() string {
@@ -46,17 +45,18 @@ func TestPersistentVolumeCreate(t *testing.T) {
 		},
 	}
 
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.ResourcePath(getPersistentVolumesResoureName(), "", ""),
-			Query:  buildQueryValues(nil),
+			Path:   testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", ""),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   pv,
 		},
-		Response: Response{StatusCode: 200, Body: pv},
+		Response: simple.Response{StatusCode: 200, Body: pv},
 	}
 
-	response, err := c.Setup().PersistentVolumes().Create(pv)
+	response, err := c.Setup(t).PersistentVolumes().Create(pv)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -75,17 +75,18 @@ func TestPersistentVolumeGet(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getPersistentVolumesResoureName(), "", "abc"),
-			Query:  buildQueryValues(nil),
+			Path:   testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", "abc"),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: persistentVolume},
+		Response: simple.Response{StatusCode: 200, Body: persistentVolume},
 	}
 
-	response, err := c.Setup().PersistentVolumes().Get("abc")
+	response, err := c.Setup(t).PersistentVolumes().Get("abc")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -97,16 +98,17 @@ func TestPersistentVolumeList(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getPersistentVolumesResoureName(), "", ""),
-			Query:  buildQueryValues(nil),
+			Path:   testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", ""),
+			Query:  simple.BuildQueryValues(nil),
 			Body:   nil,
 		},
-		Response: Response{StatusCode: 200, Body: persistentVolumeList},
+		Response: simple.Response{StatusCode: 200, Body: persistentVolumeList},
 	}
-	response, err := c.Setup().PersistentVolumes().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).PersistentVolumes().List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -125,11 +127,12 @@ func TestPersistentVolumeUpdate(t *testing.T) {
 			},
 		},
 	}
-	c := &testClient{
-		Request:  testRequest{Method: "PUT", Path: testapi.ResourcePath(getPersistentVolumesResoureName(), "", "abc"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: persistentVolume},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "PUT", Path: testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", "abc"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200, Body: persistentVolume},
 	}
-	response, err := c.Setup().PersistentVolumes().Update(persistentVolume)
+	response, err := c.Setup(t).PersistentVolumes().Update(persistentVolume)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
@@ -152,34 +155,37 @@ func TestPersistentVolumeStatusUpdate(t *testing.T) {
 			Message: "foo",
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.ResourcePath(getPersistentVolumesResoureName(), "", "abc") + "/status",
-			Query:  buildQueryValues(nil)},
-		Response: Response{StatusCode: 200, Body: persistentVolume},
+			Path:   testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", "abc") + "/status",
+			Query:  simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200, Body: persistentVolume},
 	}
-	response, err := c.Setup().PersistentVolumes().UpdateStatus(persistentVolume)
+	response, err := c.Setup(t).PersistentVolumes().UpdateStatus(persistentVolume)
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
 func TestPersistentVolumeDelete(t *testing.T) {
-	c := &testClient{
-		Request:  testRequest{Method: "DELETE", Path: testapi.ResourcePath(getPersistentVolumesResoureName(), "", "foo"), Query: buildQueryValues(nil)},
-		Response: Response{StatusCode: 200},
+	c := &simple.Client{
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getPersistentVolumesResoureName(), "", "foo"), Query: simple.BuildQueryValues(nil)},
+		Response: simple.Response{StatusCode: 200},
 	}
-	err := c.Setup().PersistentVolumes().Delete("foo")
+	err := c.Setup(t).PersistentVolumes().Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
 func TestPersistentVolumeWatch(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.ResourcePathWithPrefix("watch", getPersistentVolumesResoureName(), "", ""),
+			Path:   testapi.Default.ResourcePathWithPrefix("watch", getPersistentVolumesResoureName(), "", ""),
 			Query:  url.Values{"resourceVersion": []string{}}},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
-	_, err := c.Setup().PersistentVolumes().Watch(labels.Everything(), fields.Everything(), "")
+	_, err := c.Setup(t).PersistentVolumes().Watch(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, nil, err)
 }

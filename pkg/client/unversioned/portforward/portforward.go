@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,36 +25,28 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/util/httpstream"
-	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
-
-type upgrader interface {
-	upgrade(*client.Request, *client.Config) (httpstream.Connection, error)
-}
-
-type defaultUpgrader struct{}
-
-func (u *defaultUpgrader) upgrade(req *client.Request, config *client.Config) (httpstream.Connection, error) {
-	return req.Upgrade(config, spdy.NewRoundTripper)
-}
 
 // PortForwarder knows how to listen for local connections and forward them to
 // a remote pod via an upgraded HTTP request.
 type PortForwarder struct {
-	req      *client.Request
-	config   *client.Config
 	ports    []ForwardedPort
 	stopChan <-chan struct{}
 
-	streamConn httpstream.Connection
-	listeners  []io.Closer
-	upgrader   upgrader
-	Ready      chan struct{}
+	dialer        httpstream.Dialer
+	streamConn    httpstream.Connection
+	listeners     []io.Closer
+	Ready         chan struct{}
+	requestIDLock sync.Mutex
+	requestID     int
+	out           io.Writer
+	errOut        io.Writer
 }
 
 // ForwardedPort contains a Local:Remote port pairing.
@@ -116,7 +108,7 @@ func parsePorts(ports []string) ([]ForwardedPort, error) {
 }
 
 // New creates a new PortForwarder.
-func New(req *client.Request, config *client.Config, ports []string, stopChan <-chan struct{}) (*PortForwarder, error) {
+func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
 	if len(ports) == 0 {
 		return nil, errors.New("You must specify at least 1 port")
 	}
@@ -124,13 +116,13 @@ func New(req *client.Request, config *client.Config, ports []string, stopChan <-
 	if err != nil {
 		return nil, err
 	}
-
 	return &PortForwarder{
-		req:      req,
-		config:   config,
+		dialer:   dialer,
 		ports:    parsedPorts,
 		stopChan: stopChan,
 		Ready:    make(chan struct{}),
+		out:      out,
+		errOut:   errOut,
 	}, nil
 }
 
@@ -139,13 +131,10 @@ func New(req *client.Request, config *client.Config, ports []string, stopChan <-
 func (pf *PortForwarder) ForwardPorts() error {
 	defer pf.Close()
 
-	if pf.upgrader == nil {
-		pf.upgrader = &defaultUpgrader{}
-	}
 	var err error
-	pf.streamConn, err = pf.upgrader.upgrade(pf.req, pf.config)
+	pf.streamConn, _, err = pf.dialer.Dial(portforward.PortForwardProtocolV1Name)
 	if err != nil {
-		return fmt.Errorf("Error upgrading connection: %s", err)
+		return fmt.Errorf("error upgrading connection: %s", err)
 	}
 	defer pf.streamConn.Close()
 
@@ -165,7 +154,9 @@ func (pf *PortForwarder) forward() error {
 		case err == nil:
 			listenSuccess = true
 		default:
-			glog.Warningf("Unable to listen on port %d: %v", port.Local, err)
+			if pf.errOut != nil {
+				fmt.Fprintf(pf.errOut, "Unable to listen on port %d: %v\n", port.Local, err)
+			}
 		}
 	}
 
@@ -179,7 +170,7 @@ func (pf *PortForwarder) forward() error {
 	select {
 	case <-pf.stopChan:
 	case <-pf.streamConn.CloseChan():
-		glog.Errorf("Lost connection to pod")
+		runtime.HandleError(errors.New("lost connection to pod"))
 	}
 
 	return nil
@@ -213,7 +204,7 @@ func (pf *PortForwarder) listenOnPortAndAddress(port *ForwardedPort, protocol st
 func (pf *PortForwarder) getListener(protocol string, hostname string, port *ForwardedPort) (net.Listener, error) {
 	listener, err := net.Listen(protocol, fmt.Sprintf("%s:%d", hostname, port.Local))
 	if err != nil {
-		glog.Errorf("Unable to create listener: Error %s", err)
+		runtime.HandleError(fmt.Errorf("Unable to create listener: Error %s", err))
 		return nil, err
 	}
 	listenerAddress := listener.Addr().String()
@@ -224,7 +215,9 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 		return nil, fmt.Errorf("Error parsing local port: %s from %s (%s)", err, listenerAddress, host)
 	}
 	port.Local = uint16(localPortUInt)
-	glog.Infof("Forwarding from %s:%d -> %d", hostname, localPortUInt, port.Remote)
+	if pf.out != nil {
+		fmt.Fprintf(pf.out, "Forwarding from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)
+	}
 
 	return listener, nil
 }
@@ -237,7 +230,7 @@ func (pf *PortForwarder) waitForConnection(listener net.Listener, port Forwarded
 		if err != nil {
 			// TODO consider using something like https://github.com/hydrogen18/stoppableListener?
 			if !strings.Contains(strings.ToLower(err.Error()), "use of closed network connection") {
-				glog.Errorf("Error accepting connection on port %d: %v", port.Local, err)
+				runtime.HandleError(fmt.Errorf("Error accepting connection on port %d: %v", port.Local, err))
 			}
 			return
 		}
@@ -245,72 +238,93 @@ func (pf *PortForwarder) waitForConnection(listener net.Listener, port Forwarded
 	}
 }
 
+func (pf *PortForwarder) nextRequestID() int {
+	pf.requestIDLock.Lock()
+	defer pf.requestIDLock.Unlock()
+	id := pf.requestID
+	pf.requestID++
+	return id
+}
+
 // handleConnection copies data between the local connection and the stream to
 // the remote server.
 func (pf *PortForwarder) handleConnection(conn net.Conn, port ForwardedPort) {
 	defer conn.Close()
 
-	glog.Infof("Handling connection for %d", port.Local)
+	if pf.out != nil {
+		fmt.Fprintf(pf.out, "Handling connection for %d\n", port.Local)
+	}
 
-	errorChan := make(chan error)
-	doneChan := make(chan struct{}, 2)
+	requestID := pf.nextRequestID()
 
 	// create error stream
 	headers := http.Header{}
 	headers.Set(api.StreamType, api.StreamTypeError)
 	headers.Set(api.PortHeader, fmt.Sprintf("%d", port.Remote))
+	headers.Set(api.PortForwardRequestIDHeader, strconv.Itoa(requestID))
 	errorStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
-		glog.Errorf("Error creating error stream for port %d -> %d: %v", port.Local, port.Remote, err)
+		runtime.HandleError(fmt.Errorf("error creating error stream for port %d -> %d: %v", port.Local, port.Remote, err))
 		return
 	}
-	defer errorStream.Reset()
+	// we're not writing to this stream
+	errorStream.Close()
+
+	errorChan := make(chan error)
 	go func() {
 		message, err := ioutil.ReadAll(errorStream)
-		if err != nil && err != io.EOF {
-			errorChan <- fmt.Errorf("Error reading from error stream for port %d -> %d: %v", port.Local, port.Remote, err)
+		switch {
+		case err != nil:
+			errorChan <- fmt.Errorf("error reading from error stream for port %d -> %d: %v", port.Local, port.Remote, err)
+		case len(message) > 0:
+			errorChan <- fmt.Errorf("an error occurred forwarding %d -> %d: %v", port.Local, port.Remote, string(message))
 		}
-		if len(message) > 0 {
-			errorChan <- fmt.Errorf("An error occurred forwarding %d -> %d: %v", port.Local, port.Remote, string(message))
-		}
+		close(errorChan)
 	}()
 
 	// create data stream
 	headers.Set(api.StreamType, api.StreamTypeData)
 	dataStream, err := pf.streamConn.CreateStream(headers)
 	if err != nil {
-		glog.Errorf("Error creating forwarding stream for port %d -> %d: %v", port.Local, port.Remote, err)
+		runtime.HandleError(fmt.Errorf("error creating forwarding stream for port %d -> %d: %v", port.Local, port.Remote, err))
 		return
 	}
-	// Send a Reset when this function exits to completely tear down the stream here
-	// and in the remote server.
-	defer dataStream.Reset()
+
+	localError := make(chan struct{})
+	remoteDone := make(chan struct{})
 
 	go func() {
-		// Copy from the remote side to the local port. We won't get an EOF from
-		// the server as it has no way of knowing when to close the stream.  We'll
-		// take care of closing both ends of the stream with the call to
-		// stream.Reset() when this function exits.
-		if _, err := io.Copy(conn, dataStream); err != nil && err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
-			glog.Errorf("Error copying from remote stream to local connection: %v", err)
+		// Copy from the remote side to the local port.
+		if _, err := io.Copy(conn, dataStream); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			runtime.HandleError(fmt.Errorf("error copying from remote stream to local connection: %v", err))
 		}
-		doneChan <- struct{}{}
+
+		// inform the select below that the remote copy is done
+		close(remoteDone)
 	}()
 
 	go func() {
-		// Copy from the local port to the remote side. Here we will be able to know
-		// when the Copy gets an EOF from conn, as that will happen as soon as conn is
-		// closed (i.e. client disconnected).
-		if _, err := io.Copy(dataStream, conn); err != nil && err != io.EOF && !strings.Contains(err.Error(), "use of closed network connection") {
-			glog.Errorf("Error copying from local connection to remote stream: %v", err)
+		// inform server we're not sending any more data after copy unblocks
+		defer dataStream.Close()
+
+		// Copy from the local port to the remote side.
+		if _, err := io.Copy(dataStream, conn); err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+			runtime.HandleError(fmt.Errorf("error copying from local connection to remote stream: %v", err))
+			// break out of the select below without waiting for the other copy to finish
+			close(localError)
 		}
-		doneChan <- struct{}{}
 	}()
 
+	// wait for either a local->remote error or for copying from remote->local to finish
 	select {
-	case err := <-errorChan:
-		glog.Error(err)
-	case <-doneChan:
+	case <-remoteDone:
+	case <-localError:
+	}
+
+	// always expect something on errorChan (it may be nil)
+	err = <-errorChan
+	if err != nil {
+		runtime.HandleError(err)
 	}
 }
 
@@ -318,7 +332,7 @@ func (pf *PortForwarder) Close() {
 	// stop all listeners
 	for _, l := range pf.listeners {
 		if err := l.Close(); err != nil {
-			glog.Errorf("Error closing listener: %v", err)
+			runtime.HandleError(fmt.Errorf("error closing listener: %v", err))
 		}
 	}
 }

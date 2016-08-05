@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,22 +20,22 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
 )
 
 func TestRangeAllocatorEmpty(t *testing.T) {
-	r := &util.PortRange{}
+	r := &net.PortRange{}
 	r.Set("0-0")
 	defer func() {
 		if rv := recover(); rv == nil {
-			t.Fatalf("expected panic because of empty port range: %+v", r)
+			t.Fatalf("expected panic because of empty port range: %#v", r)
 		}
 	}()
 	_ = newPortRangeAllocator(*r)
 }
 
 func TestRangeAllocatorFullyAllocated(t *testing.T) {
-	r := &util.PortRange{}
+	r := &net.PortRange{}
 	r.Set("1-1")
 	a := newPortRangeAllocator(*r)
 	p, err := a.AllocateNext()
@@ -67,7 +67,7 @@ func TestRangeAllocatorFullyAllocated(t *testing.T) {
 }
 
 func TestRangeAllocator_RandomishAllocation(t *testing.T) {
-	r := &util.PortRange{}
+	r := &net.PortRange{}
 	r.Set("1-100")
 	a := newPortRangeAllocator(*r)
 

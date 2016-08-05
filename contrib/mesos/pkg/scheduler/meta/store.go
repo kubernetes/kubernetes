@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,9 +16,8 @@ limitations under the License.
 
 package meta
 
-// keys for things that we store
-const (
-	//TODO(jdef) this should also be a format instead of a fixed path
-	FrameworkIDKey        = "/mesos/k8sm/frameworkid"
-	DefaultElectionFormat = "/mesos/k8sm/framework/%s/leader"
-)
+const StoreChroot = "/k8sm"
+
+func ElectionPath(frameworkName string) string {
+	return StoreChroot + "/" + frameworkName + "/leader"
+}

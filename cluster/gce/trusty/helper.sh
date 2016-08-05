@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,26 +16,24 @@
 
 # A library of helper functions and constant for ubuntu os distro
 
-# The code and configuration is for running node instances on Ubuntu images.
-# The master is still on Debian. In addition, the configuration is based on
-# upstart, which is in Ubuntu upto 14.04 LTS (Trusty). Ubuntu 15.04 and above
-# replaced upstart with systemd as the init system. Consequently, the
-# configuration cannot work on these images.
+# The configuration is based on upstart, which is in Ubuntu up to 14.04 LTS (Trusty).
+# Ubuntu 15.04 and above replaced upstart with systemd as the init system.
+# Consequently, the configuration cannot work on these images. In release-1.2 branch,
+# GCI and Trusty share the configuration code. We have to keep the GCI specific code
+# here as long as the release-1.2 branch has not been deprecated.
 
-# By sourcing debian's helper.sh, we use the same build-kube-env and
-# create-master-instance functions as debian. But we overwrite the
-# create-node-instance-template function to use Ubuntu.
-source "${KUBE_ROOT}/cluster/gce/debian/helper.sh"
-
-# TODO(andyzheng0831): Make $1 required.
-# TODO(andyzheng0831): Document required vars (for this and call chain).
-# $1 version
-function create-node-instance-template {
-  local suffix=""
-  if [[ -n ${1:-} ]]; then
-    suffix="-${1}"
+# Creates the GCI specific metadata files if they do not exit.
+# Assumed var
+#   KUBE_TEMP
+function ensure-gci-metadata-files {
+  if [[ ! -f "${KUBE_TEMP}/gci-update.txt" ]]; then
+    cat >"${KUBE_TEMP}/gci-update.txt" << EOF
+update_disabled
+EOF
   fi
-  create-node-template "${NODE_INSTANCE_PREFIX}-template${suffix}" "${scope_flags[*]}" \
-		"kube-env=${KUBE_TEMP}/node-kube-env.yaml" \
-    "user-data=${KUBE_ROOT}/cluster/gce/trusty/node.yaml"
+  if [[ ! -f "${KUBE_TEMP}/gci-docker.txt" ]]; then
+    cat >"${KUBE_TEMP}/gci-docker.txt" << EOF
+true
+EOF
+  fi
 }

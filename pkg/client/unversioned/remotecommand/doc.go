@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,4 +17,4 @@ limitations under the License.
 // Package remotecommand adds support for executing commands in containers,
 // with support for separate stdin, stdout, and stderr streams, as well as
 // TTY.
-package remotecommand
+package remotecommand // import "k8s.io/kubernetes/pkg/client/unversioned/remotecommand"

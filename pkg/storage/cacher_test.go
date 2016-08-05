@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,69 +19,83 @@ package storage_test
 import (
 	"fmt"
 	"reflect"
+	goruntime "runtime"
+	"strconv"
 	"testing"
 	"time"
 
-	"github.com/coreos/go-etcd/etcd"
-
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
+
+	"golang.org/x/net/context"
 )
 
-func newTestCacher(client tools.EtcdClient) *storage.Cacher {
+func newEtcdTestStorage(t *testing.T, codec runtime.Codec, prefix string) (*etcdtesting.EtcdTestServer, storage.Interface) {
+	server := etcdtesting.NewEtcdTestClientServer(t)
+	storage := etcdstorage.NewEtcdStorage(server.Client, codec, prefix, false, etcdtest.DeserializationCacheSize)
+	return server, storage
+}
+
+func newTestCacher(s storage.Interface) *storage.Cacher {
 	prefix := "pods"
 	config := storage.CacherConfig{
 		CacheCapacity:  10,
+		Storage:        s,
 		Versioner:      etcdstorage.APIObjectVersioner{},
-		Storage:        etcdstorage.NewEtcdStorage(client, testapi.Codec(), etcdtest.PathPrefix()),
 		Type:           &api.Pod{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		NewListFunc:    func() runtime.Object { return &api.PodList{} },
-		StopChannel:    util.NeverStop,
 	}
-	return storage.NewCacher(config)
+	return storage.NewCacherFromConfig(config)
 }
 
 func makeTestPod(name string) *api.Pod {
-	gracePeriod := int64(30)
 	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{Namespace: "ns", Name: name},
-		Spec: api.PodSpec{
-			TerminationGracePeriodSeconds: &gracePeriod,
-			DNSPolicy:                     api.DNSClusterFirst,
-			RestartPolicy:                 api.RestartPolicyAlways,
-		},
+		Spec:       apitesting.DeepEqualSafePodSpec(),
 	}
 }
 
-func waitForUpToDateCache(cacher *storage.Cacher, resourceVersion uint64) error {
-	ready := func() (bool, error) {
-		result, err := cacher.LastSyncResourceVersion()
+func updatePod(t *testing.T, s storage.Interface, obj, old *api.Pod) *api.Pod {
+	updateFn := func(input runtime.Object, res storage.ResponseMeta) (runtime.Object, *uint64, error) {
+		newObj, err := api.Scheme.DeepCopy(obj)
 		if err != nil {
-			return false, err
+			t.Errorf("unexpected error: %v", err)
+			return nil, nil, err
 		}
-		return result == resourceVersion, nil
+		return newObj.(*api.Pod), nil, nil
 	}
-	return wait.Poll(10*time.Millisecond, 100*time.Millisecond, ready)
+	key := etcdtest.AddPrefix("pods/" + obj.Namespace + "/" + obj.Name)
+	if err := s.GuaranteedUpdate(context.TODO(), key, &api.Pod{}, old == nil, nil, updateFn); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	obj.ResourceVersion = ""
+	result := &api.Pod{}
+	if err := s.Get(context.TODO(), key, result, false); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	return result
 }
 
-func TestListFromMemory(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	prefixedKey := etcdtest.AddPrefix("pods")
-	fakeClient.ExpectNotFoundGet(prefixedKey)
-	cacher := newTestCacher(fakeClient)
-	fakeClient.WaitForWatchCompletion()
+func TestList(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
 	podBar := makeTestPod("bar")
@@ -90,392 +104,322 @@ func TestListFromMemory(t *testing.T) {
 	podFooPrime := makeTestPod("foo")
 	podFooPrime.Spec.NodeName = "fakeNode"
 
-	testCases := []*etcd.Response{
-		{
-			Action: "create",
-			Node: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-				CreatedIndex:  1,
-				ModifiedIndex: 1,
-			},
-		},
-		{
-			Action: "create",
-			Node: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podBar)),
-				CreatedIndex:  2,
-				ModifiedIndex: 2,
-			},
-		},
-		{
-			Action: "create",
-			Node: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podBaz)),
-				CreatedIndex:  3,
-				ModifiedIndex: 3,
-			},
-		},
-		{
-			Action: "set",
-			Node: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFooPrime)),
-				CreatedIndex:  1,
-				ModifiedIndex: 4,
-			},
-			PrevNode: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-				CreatedIndex:  1,
-				ModifiedIndex: 1,
-			},
-		},
-		{
-			Action: "delete",
-			Node: &etcd.Node{
-				CreatedIndex:  1,
-				ModifiedIndex: 5,
-			},
-			PrevNode: &etcd.Node{
-				Value:         string(runtime.EncodeOrDie(testapi.Codec(), podBar)),
-				CreatedIndex:  1,
-				ModifiedIndex: 1,
-			},
-		},
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+	_ = updatePod(t, etcdStorage, podBar, nil)
+	_ = updatePod(t, etcdStorage, podBaz, nil)
+
+	_ = updatePod(t, etcdStorage, podFooPrime, fooCreated)
+
+	// Create a pod in a namespace that contains "ns" as a prefix
+	// Make sure it is not returned in a watch of "ns"
+	podFooNS2 := makeTestPod("foo")
+	podFooNS2.Namespace += "2"
+	updatePod(t, etcdStorage, podFooNS2, nil)
+
+	deleted := api.Pod{}
+	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/bar"), &deleted, nil); err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 
-	// Propagate some data to etcd.
-	for _, test := range testCases {
-		fakeClient.WatchResponse <- test
+	// We first List directly from etcd by passing empty resourceVersion,
+	// to get the current etcd resourceVersion.
+	rvResult := &api.PodList{}
+	if err := cacher.List(context.TODO(), "pods/ns", "", storage.Everything, rvResult); err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
-	if err := waitForUpToDateCache(cacher, 5); err != nil {
-		t.Errorf("watch cache didn't propagated correctly: %v", err)
-	}
+	deletedPodRV := rvResult.ListMeta.ResourceVersion
 
 	result := &api.PodList{}
-	if err := cacher.ListFromMemory("pods/ns", result); err != nil {
-		t.Errorf("unexpected error: %v", err)
+	// We pass the current etcd ResourceVersion received from the above List() operation,
+	// since there is not easy way to get ResourceVersion of barPod deletion operation.
+	if err := cacher.List(context.TODO(), "pods/ns", deletedPodRV, storage.Everything, result); err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
-	if result.ListMeta.ResourceVersion != "5" {
-		t.Errorf("incorrect resource version: %v", result.ListMeta.ResourceVersion)
+	if result.ListMeta.ResourceVersion != deletedPodRV {
+		t.Errorf("Incorrect resource version: %v", result.ListMeta.ResourceVersion)
 	}
 	if len(result.Items) != 2 {
-		t.Errorf("unexpected list result: %d", len(result.Items))
+		t.Errorf("Unexpected list result: %d", len(result.Items))
 	}
-	keys := util.StringSet{}
+	keys := sets.String{}
 	for _, item := range result.Items {
-		keys.Insert(item.ObjectMeta.Name)
+		keys.Insert(item.Name)
 	}
 	if !keys.HasAll("foo", "baz") {
-		t.Errorf("unexpected list result: %#v", result)
+		t.Errorf("Unexpected list result: %#v", result)
 	}
 	for _, item := range result.Items {
 		// unset fields that are set by the infrastructure
-		item.ObjectMeta.ResourceVersion = ""
-		item.ObjectMeta.CreationTimestamp = util.Time{}
+		item.ResourceVersion = ""
+		item.CreationTimestamp = unversioned.Time{}
+
+		if item.Namespace != "ns" {
+			t.Errorf("Unexpected namespace: %s", item.Namespace)
+		}
 
 		var expected *api.Pod
-		switch item.ObjectMeta.Name {
+		switch item.Name {
 		case "foo":
 			expected = podFooPrime
 		case "baz":
 			expected = podBaz
 		default:
-			t.Errorf("unexpected item: %v", item)
+			t.Errorf("Unexpected item: %v", item)
 		}
 		if e, a := *expected, item; !reflect.DeepEqual(e, a) {
-			t.Errorf("expected: %#v, got: %#v", e, a)
+			t.Errorf("Expected: %#v, got: %#v", e, a)
 		}
 	}
+}
 
-	close(fakeClient.WatchResponse)
+func verifyWatchEvent(t *testing.T, w watch.Interface, eventType watch.EventType, eventObject runtime.Object) {
+	_, _, line, _ := goruntime.Caller(1)
+	select {
+	case event := <-w.ResultChan():
+		if e, a := eventType, event.Type; e != a {
+			t.Logf("(called from line %d)", line)
+			t.Errorf("Expected: %s, got: %s", eventType, event.Type)
+		}
+		if e, a := eventObject, event.Object; !api.Semantic.DeepDerivative(e, a) {
+			t.Logf("(called from line %d)", line)
+			t.Errorf("Expected (%s): %#v, got: %#v", eventType, e, a)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Logf("(called from line %d)", line)
+		t.Errorf("Timed out waiting for an event")
+	}
+}
+
+type injectListError struct {
+	errors int
+	storage.Interface
+}
+
+func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, filter storage.Filter, listObj runtime.Object) error {
+	if self.errors > 0 {
+		self.errors--
+		return fmt.Errorf("injected error")
+	}
+	return self.Interface.List(ctx, key, resourceVersion, filter, listObj)
 }
 
 func TestWatch(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	prefixedKey := etcdtest.AddPrefix("pods")
-	fakeClient.ExpectNotFoundGet(prefixedKey)
-	cacher := newTestCacher(fakeClient)
-	fakeClient.WaitForWatchCompletion()
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	// Inject one list error to make sure we test the relist case.
+	etcdStorage = &injectListError{errors: 1, Interface: etcdStorage}
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
 
 	podFoo := makeTestPod("foo")
 	podBar := makeTestPod("bar")
 
-	testCases := []struct {
-		object       *api.Pod
-		etcdResponse *etcd.Response
-		event        watch.EventType
-		filtered     bool
-	}{
-		{
-			object: podFoo,
-			etcdResponse: &etcd.Response{
-				Action: "create",
-				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 1,
-				},
-			},
-			event:    watch.Added,
-			filtered: true,
-		},
-		{
-			object: podBar,
-			etcdResponse: &etcd.Response{
-				Action: "create",
-				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podBar)),
-					CreatedIndex:  2,
-					ModifiedIndex: 2,
-				},
-			},
-			event:    watch.Added,
-			filtered: false,
-		},
-		{
-			object: podFoo,
-			etcdResponse: &etcd.Response{
-				Action: "set",
-				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 3,
-				},
-				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 1,
-				},
-			},
-			event:    watch.Modified,
-			filtered: true,
-		},
+	podFooPrime := makeTestPod("foo")
+	podFooPrime.Spec.NodeName = "fakeNode"
+
+	podFooBis := makeTestPod("foo")
+	podFooBis.Spec.NodeName = "anotherFakeNode"
+
+	podFooNS2 := makeTestPod("foo")
+	podFooNS2.Namespace += "2"
+
+	// initialVersion is used to initate the watcher at the beginning of the world,
+	// which is not defined precisely in etcd.
+	initialVersion, err := cacher.LastSyncResourceVersion()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
 	}
+	startVersion := strconv.Itoa(int(initialVersion))
 
 	// Set up Watch for object "podFoo".
-	watcher, err := cacher.Watch("pods/ns/foo", 1, storage.Everything)
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", startVersion, storage.Everything)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watcher.Stop()
 
-	for _, test := range testCases {
-		fakeClient.WatchResponse <- test.etcdResponse
-		if test.filtered {
-			event := <-watcher.ResultChan()
-			if e, a := test.event, event.Type; e != a {
-				t.Errorf("%v %v", e, a)
-			}
-			// unset fields that are set by the infrastructure
-			obj := event.Object.(*api.Pod)
-			obj.ObjectMeta.ResourceVersion = ""
-			obj.ObjectMeta.CreationTimestamp = util.Time{}
-			if e, a := test.object, obj; !reflect.DeepEqual(e, a) {
-				t.Errorf("expected: %#v, got: %#v", e, a)
-			}
-		}
-	}
+	// Create in another namespace first to make sure events from other namespaces don't get delivered
+	updatePod(t, etcdStorage, podFooNS2, nil)
 
-	// Check whether we get too-old error.
-	_, err = cacher.Watch("pods/ns/foo", 0, storage.Everything)
-	if err == nil {
-		t.Errorf("expected 'error too old' error")
-	}
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+	_ = updatePod(t, etcdStorage, podBar, nil)
+	fooUpdated := updatePod(t, etcdStorage, podFooPrime, fooCreated)
 
-	// Now test watch with initial state.
-	initialWatcher, err := cacher.Watch("pods/ns/foo", 1, storage.Everything)
+	verifyWatchEvent(t, watcher, watch.Added, podFoo)
+	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
+
+	// Check whether we get too-old error via the watch channel
+	tooOldWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "1", storage.Everything)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Expected no direct error, got %v", err)
 	}
-	for _, test := range testCases {
-		if test.filtered {
-			event := <-initialWatcher.ResultChan()
-			if e, a := test.event, event.Type; e != a {
-				t.Errorf("%v %v", e, a)
-			}
-			// unset fields that are set by the infrastructure
-			obj := event.Object.(*api.Pod)
-			obj.ObjectMeta.ResourceVersion = ""
-			obj.ObjectMeta.CreationTimestamp = util.Time{}
-			if e, a := test.object, obj; !reflect.DeepEqual(e, a) {
-				t.Errorf("expected: %#v, got: %#v", e, a)
-			}
-		}
-	}
+	defer tooOldWatcher.Stop()
+	// Ensure we get a "Gone" error
+	expectedGoneError := errors.NewGone("").ErrStatus
+	verifyWatchEvent(t, tooOldWatcher, watch.Error, &expectedGoneError)
 
-	close(fakeClient.WatchResponse)
+	initialWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer initialWatcher.Stop()
+
+	verifyWatchEvent(t, initialWatcher, watch.Modified, podFooPrime)
+
+	// Now test watch from "now".
+	nowWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer nowWatcher.Stop()
+
+	verifyWatchEvent(t, nowWatcher, watch.Added, podFooPrime)
+
+	_ = updatePod(t, etcdStorage, podFooBis, fooUpdated)
+
+	verifyWatchEvent(t, nowWatcher, watch.Modified, podFooBis)
+}
+
+func TestWatcherTimeout(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
+
+	// initialVersion is used to initate the watcher at the beginning of the world,
+	// which is not defined precisely in etcd.
+	initialVersion, err := cacher.LastSyncResourceVersion()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	startVersion := strconv.Itoa(int(initialVersion))
+
+	// Create a watcher that will not be reading any result.
+	watcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watcher.Stop()
+
+	// Create a second watcher that will be reading result.
+	readingWatcher, err := cacher.WatchList(context.TODO(), "pods/ns", startVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer readingWatcher.Stop()
+
+	for i := 1; i <= 22; i++ {
+		pod := makeTestPod(strconv.Itoa(i))
+		_ = updatePod(t, etcdStorage, pod, nil)
+		verifyWatchEvent(t, readingWatcher, watch.Added, pod)
+	}
 }
 
 func TestFiltering(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	prefixedKey := etcdtest.AddPrefix("pods")
-	fakeClient.ExpectNotFoundGet(prefixedKey)
-	cacher := newTestCacher(fakeClient)
-	fakeClient.WaitForWatchCompletion()
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
+
+	// Ensure that the cacher is initialized, before creating any pods,
+	// so that we are sure that all events will be present in cacher.
+	syncWatcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", "0", storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	syncWatcher.Stop()
 
 	podFoo := makeTestPod("foo")
-	podFoo.ObjectMeta.Labels = map[string]string{"filter": "foo"}
+	podFoo.Labels = map[string]string{"filter": "foo"}
 	podFooFiltered := makeTestPod("foo")
+	podFooPrime := makeTestPod("foo")
+	podFooPrime.Labels = map[string]string{"filter": "foo"}
+	podFooPrime.Spec.NodeName = "fakeNode"
 
-	testCases := []struct {
-		object       *api.Pod
-		etcdResponse *etcd.Response
-		filtered     bool
-		event        watch.EventType
-	}{
-		{
-			object: podFoo,
-			etcdResponse: &etcd.Response{
-				Action: "create",
-				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 1,
-				},
-			},
-			filtered: true,
-			event:    watch.Added,
-		},
-		{
-			object: podFooFiltered,
-			etcdResponse: &etcd.Response{
-				Action: "set",
-				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFooFiltered)),
-					CreatedIndex:  1,
-					ModifiedIndex: 2,
-				},
-				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 1,
-				},
-			},
-			filtered: true,
-			// Deleted, because the new object doesn't match filter.
-			event: watch.Deleted,
-		},
-		{
-			object: podFoo,
-			etcdResponse: &etcd.Response{
-				Action: "set",
-				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 3,
-				},
-				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFooFiltered)),
-					CreatedIndex:  1,
-					ModifiedIndex: 2,
-				},
-			},
-			filtered: true,
-			// Added, because the previous object didn't match filter.
-			event: watch.Added,
-		},
-		{
-			object: podFoo,
-			etcdResponse: &etcd.Response{
-				Action: "set",
-				Node: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 4,
-				},
-				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 3,
-				},
-			},
-			filtered: true,
-			event:    watch.Modified,
-		},
-		{
-			object: podFoo,
-			etcdResponse: &etcd.Response{
-				Action: "delete",
-				Node: &etcd.Node{
-					CreatedIndex:  1,
-					ModifiedIndex: 5,
-				},
-				PrevNode: &etcd.Node{
-					Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-					CreatedIndex:  1,
-					ModifiedIndex: 4,
-				},
-			},
-			filtered: true,
-			event:    watch.Deleted,
-		},
+	podFooNS2 := makeTestPod("foo")
+	podFooNS2.Namespace += "2"
+	podFooNS2.Labels = map[string]string{"filter": "foo"}
+
+	// Create in another namespace first to make sure events from other namespaces don't get delivered
+	updatePod(t, etcdStorage, podFooNS2, nil)
+
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
+	fooFiltered := updatePod(t, etcdStorage, podFooFiltered, fooCreated)
+	fooUnfiltered := updatePod(t, etcdStorage, podFoo, fooFiltered)
+	_ = updatePod(t, etcdStorage, podFooPrime, fooUnfiltered)
+
+	deleted := api.Pod{}
+	if err := etcdStorage.Delete(context.TODO(), etcdtest.AddPrefix("pods/ns/foo"), &deleted, nil); err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 
 	// Set up Watch for object "podFoo" with label filter set.
 	selector := labels.SelectorFromSet(labels.Set{"filter": "foo"})
-	filter := func(obj runtime.Object) bool {
+	filterFunc := func(obj runtime.Object) bool {
 		metadata, err := meta.Accessor(obj)
 		if err != nil {
-			t.Errorf("unexpected error: %v", err)
+			t.Errorf("Unexpected error: %v", err)
 			return false
 		}
-		return selector.Matches(labels.Set(metadata.Labels()))
+		return selector.Matches(labels.Set(metadata.GetLabels()))
 	}
-	watcher, err := cacher.Watch("pods/ns/foo", 1, filter)
+	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, filter)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
+	defer watcher.Stop()
 
-	for _, test := range testCases {
-		fakeClient.WatchResponse <- test.etcdResponse
-		if test.filtered {
-			event := <-watcher.ResultChan()
-			if e, a := test.event, event.Type; e != a {
-				t.Errorf("%v %v", e, a)
-			}
-			// unset fields that are set by the infrastructure
-			obj := event.Object.(*api.Pod)
-			obj.ObjectMeta.ResourceVersion = ""
-			obj.ObjectMeta.CreationTimestamp = util.Time{}
-			if e, a := test.object, obj; !reflect.DeepEqual(e, a) {
-				t.Errorf("expected: %#v, got: %#v", e, a)
-			}
-		}
-	}
-
-	close(fakeClient.WatchResponse)
+	verifyWatchEvent(t, watcher, watch.Deleted, podFooFiltered)
+	verifyWatchEvent(t, watcher, watch.Added, podFoo)
+	verifyWatchEvent(t, watcher, watch.Modified, podFooPrime)
+	verifyWatchEvent(t, watcher, watch.Deleted, podFooPrime)
 }
 
-func TestStorageError(t *testing.T) {
-	fakeClient := tools.NewFakeEtcdClient(t)
-	prefixedKey := etcdtest.AddPrefix("pods")
-	fakeClient.ExpectNotFoundGet(prefixedKey)
-	cacher := newTestCacher(fakeClient)
-	fakeClient.WaitForWatchCompletion()
+func TestStartingResourceVersion(t *testing.T) {
+	server, etcdStorage := newEtcdTestStorage(t, testapi.Default.Codec(), etcdtest.PathPrefix())
+	defer server.Terminate(t)
+	cacher := newTestCacher(etcdStorage)
+	defer cacher.Stop()
 
+	// add 1 object
 	podFoo := makeTestPod("foo")
+	fooCreated := updatePod(t, etcdStorage, podFoo, nil)
 
-	// Set up Watch for object "podFoo".
-	watcher, err := cacher.Watch("pods/ns/foo", 1, storage.Everything)
+	// Set up Watch starting at fooCreated.ResourceVersion + 10
+	rv, err := storage.ParseWatchResourceVersion(fooCreated.ResourceVersion)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	rv += 10
+	startVersion := strconv.Itoa(int(rv))
+
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", startVersion, storage.Everything)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	defer watcher.Stop()
+
+	lastFoo := fooCreated
+	for i := 0; i < 11; i++ {
+		podFooForUpdate := makeTestPod("foo")
+		podFooForUpdate.Labels = map[string]string{"foo": strconv.Itoa(i)}
+		lastFoo = updatePod(t, etcdStorage, podFooForUpdate, lastFoo)
 	}
 
-	fakeClient.WatchResponse <- &etcd.Response{
-		Action: "create",
-		Node: &etcd.Node{
-			Value:         string(runtime.EncodeOrDie(testapi.Codec(), podFoo)),
-			CreatedIndex:  1,
-			ModifiedIndex: 1,
-		},
-	}
-	_ = <-watcher.ResultChan()
+	select {
+	case e := <-watcher.ResultChan():
+		pod := e.Object.(*api.Pod)
+		podRV, err := storage.ParseWatchResourceVersion(pod.ResourceVersion)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
-	// Injecting error is simulating error from etcd.
-	// This is almost the same what would happen e.g. in case of
-	// "error too old" when reconnecting to etcd watch.
-	fakeClient.WatchInjectError <- fmt.Errorf("fake error")
-
-	_, ok := <-watcher.ResultChan()
-	if ok {
-		t.Errorf("unexpected event")
+		// event should have at least rv + 1, since we're starting the watch at rv
+		if podRV <= rv {
+			t.Errorf("expected event with resourceVersion of at least %d, got %d", rv+1, podRV)
+		}
+	case <-time.After(wait.ForeverTestTimeout):
+		t.Errorf("timed out waiting for event")
 	}
 }

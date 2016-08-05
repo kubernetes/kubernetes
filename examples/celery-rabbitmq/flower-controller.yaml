@@ -2,12 +2,10 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: flower
+    component: flower
   name: flower-controller
 spec:
   replicas: 1
-  selector:
-    component: flower
   template:
     metadata:
       labels:
@@ -20,3 +18,10 @@ spec:
         resources:
           limits:
             cpu: 100m
+        livenessProbe:
+          httpGet:
+            # Path to probe; should be cheap, but representative of typical behavior
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          timeoutSeconds: 1

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,15 +19,15 @@ package config
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/kubelet"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // NewSourceApiserver creates a config source that watches and pulls from the apiserver.
-func NewSourceApiserver(c *client.Client, nodeName string, updates chan<- interface{}) {
-	lw := cache.NewListWatchFromClient(c, "pods", api.NamespaceAll, fields.OneTermEqualSelector(client.PodHost, nodeName))
+func NewSourceApiserver(c *clientset.Clientset, nodeName string, updates chan<- interface{}) {
+	lw := cache.NewListWatchFromClient(c.CoreClient, "pods", api.NamespaceAll, fields.OneTermEqualSelector(api.PodHostField, nodeName))
 	newSourceApiserverFromLW(lw, updates)
 }
 
@@ -38,7 +38,7 @@ func newSourceApiserverFromLW(lw cache.ListerWatcher, updates chan<- interface{}
 		for _, o := range objs {
 			pods = append(pods, o.(*api.Pod))
 		}
-		updates <- kubelet.PodUpdate{Pods: pods, Op: kubelet.SET, Source: kubelet.ApiserverSource}
+		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.ApiserverSource}
 	}
 	cache.NewReflector(lw, &api.Pod{}, cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc), 0).Run()
 }

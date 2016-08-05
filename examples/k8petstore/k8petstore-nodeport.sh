@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,14 +20,15 @@ echo "WRITING KUBE FILES , will overwrite the jsons, then testing pods. is kube 
 #Args below can be overriden when calling from cmd line.
 #Just send all the args in order.
 #for dev/test you can use:
-#kubectl=$GOPATH/src/github.com/kubernetes/kubernetes/cluster/kubectl.sh"
+#kubectl="$GOPATH/src/k8s.io/kubernetes/cluster/kubectl.sh"
+
 kubectl="kubectl"
 VERSION="r.2.8.19"
 _SECONDS=1000          # number of seconds to measure throughput.
 FE="1"                # amount of Web server
 LG="1"                # amount of load generators
 SLAVE="1"             # amount of redis slaves
-TEST="1"              # 0 = Dont run tests, 1 = Do run tests.
+TEST="1"              # 0 = Don't run tests, 1 = Do run tests.
 NS="default"          # namespace
 NODE_PORT=30291     #nodePort, see fe-s.json
 
@@ -37,10 +38,10 @@ _SECONDS="${3:-$_SECONDS}"   # number of seconds to measure throughput.
 FE="${4:-$FE}"       # amount of Web server
 LG="${5:-$LG}"        # amount of load generators
 SLAVE="${6:-$SLAVE}"     # amount of redis slaves
-TEST="${7:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
+TEST="${7:-$TEST}"      # 0 = Don't run tests, 1 = Do run tests.
 NS="${8:-$NS}"          # namespace
 NODE_PORT="${9:-$NODE_PORT}" #nodePort, see fe-s.json
-echo "Running w/ args: kubectl $kubectl version $VERSION sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS NODE_PORT $NODE_PORT"
+echo "Running w/ args: kubectl $kubectl version $VERSION sec $_SECONDS fe $FE lg $LG slave $SLAVE test = $TEST, NAMESPACE = $NS, NODE_PORT = $NODE_PORT"
 function create {
 
 cat << EOF > fe-rc.json
@@ -232,10 +233,10 @@ $kubectl create -f bps-load-gen-rc.json --namespace=$NS
 #Get the IP addresses of all Kubernetes nodes.
 function getIP {
   #currently this script is only tested on GCE. The following line may need to be updated if k8s is not running on a cloud platform
-  NODES_IP=$($kubectl get nodes -t='{{range .items}}{{range .status.addresses}}{{if or (eq .type "ExternalIP") (eq .type "LegacyHostIP")}}{{.address}}{{print "\n"}}{{end}}{{end}}{{end}}')
-  TEST_IP=$($kubectl get nodes -t='{{range (index .items 0).status.addresses}}{{if eq .type "ExternalIP"}}{{.address}}{{end}}{{end}}')
+  NODES_IP=$($kubectl get nodes -o go-template='{{range .items}}{{range .status.addresses}}{{if or (eq .type "ExternalIP") (eq .type "LegacyHostIP")}}{{.address}}{{print "\n"}}{{end}}{{end}}{{end}}')
+  TEST_IP=$($kubectl get nodes -o go-template='{{range (index .items 0).status.addresses}}{{if eq .type "ExternalIP"}}{{.address}}{{end}}{{end}}')
   if [ -z "$TEST_IP" ]; then
-    TEST_IP=$($kubectl get nodes -t='{{range (index .items 0).status.addresses}}{{if eq .type "LegacyHostIP"}}{{.address}}{{end}}{{end}}')
+    TEST_IP=$($kubectl get nodes -o go-template='{{range (index .items 0).status.addresses}}{{if eq .type "LegacyHostIP"}}{{.address}}{{end}}{{end}}')
   fi
   if [ -z "$NODES_IP" ]; then
     echo "Error: Can't get node's IP!!!"
@@ -249,16 +250,17 @@ function getIP {
 }
 
 function getNodePort {
-NODE_PORT=$($kubectl get services/frontend -t='{{(index .spec.ports 0).nodePort}}')
- if [ -z "$NODE_PORT" ]; then
+NODE_PORT=$($kubectl get services/frontend --namespace=$NS -o go-template='{{(index .spec.ports 0).nodePort}}')
+
+if [ -z "$NODE_PORT" ]; then
         echo "Error: Can't get NodePort of services/frontend!!!"
         exit 1
-    else
+else
         printf '\n\n\n%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' =
         echo -e "NodePort of services/frontend:\n$NODE_PORT"
         echo -e "WARNING: On cloud platforms like GCE, you may need to add a firewall rule to allow TCP traffic on port $NODE_PORT"
         printf '%*s\n\n\n\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' =
-    fi
+fi
 }
 
 function pollfor {
@@ -268,8 +270,8 @@ function pollfor {
   for i in `seq 1 150`;
   do
       ### Just testing that the front end comes up.  Not sure how to test total entries etc... (yet)
-      echo "Trying curl ... $PUBLIC_IP:3000 , attempt $i . expect a few failures while pulling images... "
-      curl "$TEST_IP:$NODE_PORT" > result
+      echo "Trying curl frontend:3000 via $TEST_IP:$NODE_PORT, attempt ${i}. Expect a few failures while pulling images... "
+      curl --max-time 1 --connect-timeout 3 "$TEST_IP:$NODE_PORT" > result
       cat result
       cat result | grep -q "k8-bps"
       if [ $? -eq 0 ]; then
@@ -294,7 +296,7 @@ function tests {
     for i in `seq 1 $_SECONDS`;
      do
         echo "curl : $TEST_IP:$NODE_PORT , $i of $_SECONDS"
-        curr_cnt="`curl "$TEST_IP:$NODE_PORT/llen"`"
+        curr_cnt="`curl --max-time 1  --connect-timeout 3 "$TEST_IP:$NODE_PORT/llen"`"
         ### Write CSV File of # of trials / total transcations.
         echo "$i $curr_cnt" >> result
         echo "total transactions so far : $curr_cnt"

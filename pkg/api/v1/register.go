@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,29 +17,27 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/registered"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
+	versionedwatch "k8s.io/kubernetes/pkg/watch/versioned"
 )
 
-// Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, "v1")
+// GroupName is the group name use in this package
+const GroupName = ""
 
-func init() {
-	// Check if v1 is in the list of supported API versions.
-	if !registered.IsRegisteredAPIVersion("v1") {
-		return
-	}
+// SchemeGroupVersion is group version used to register these objects
+var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1"}
 
-	// Register the API.
-	addKnownTypes()
-	addConversionFuncs()
-	addDefaultingFuncs()
+func AddToScheme(scheme *runtime.Scheme) {
+	// Add the API to Scheme.
+	addKnownTypes(scheme)
+	addConversionFuncs(scheme)
+	addDefaultingFuncs(scheme)
 }
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes() {
-	api.Scheme.AddKnownTypes("v1",
+func addKnownTypes(scheme *runtime.Scheme) {
+	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
 		&PodList{},
 		&PodStatusResult{},
@@ -47,16 +45,15 @@ func addKnownTypes() {
 		&PodTemplateList{},
 		&ReplicationController{},
 		&ReplicationControllerList{},
-		&DaemonList{},
-		&Daemon{},
 		&Service{},
+		&ServiceProxyOptions{},
 		&ServiceList{},
 		&Endpoints{},
 		&EndpointsList{},
 		&Node{},
 		&NodeList{},
+		&NodeProxyOptions{},
 		&Binding{},
-		&Status{},
 		&Event{},
 		&EventList{},
 		&List{},
@@ -75,6 +72,7 @@ func addKnownTypes() {
 		&PersistentVolumeClaim{},
 		&PersistentVolumeClaimList{},
 		&DeleteOptions{},
+		&ExportOptions{},
 		&ListOptions{},
 		&PodAttachOptions{},
 		&PodLogOptions{},
@@ -84,59 +82,13 @@ func addKnownTypes() {
 		&ComponentStatusList{},
 		&SerializedReference{},
 		&RangeAllocation{},
-		&ThirdPartyResource{},
-		&ThirdPartyResourceList{},
-		&ThirdPartyResourceData{},
+		&ConfigMap{},
+		&ConfigMapList{},
 	)
-	// Legacy names are supported
-	api.Scheme.AddKnownTypeWithName("v1", "Minion", &Node{})
-	api.Scheme.AddKnownTypeWithName("v1", "MinionList", &NodeList{})
-}
 
-func (*Pod) IsAnAPIObject()                       {}
-func (*PodList) IsAnAPIObject()                   {}
-func (*PodStatusResult) IsAnAPIObject()           {}
-func (*PodTemplate) IsAnAPIObject()               {}
-func (*PodTemplateList) IsAnAPIObject()           {}
-func (*ReplicationController) IsAnAPIObject()     {}
-func (*ReplicationControllerList) IsAnAPIObject() {}
-func (*Daemon) IsAnAPIObject()                    {}
-func (*DaemonList) IsAnAPIObject()                {}
-func (*Service) IsAnAPIObject()                   {}
-func (*ServiceList) IsAnAPIObject()               {}
-func (*Endpoints) IsAnAPIObject()                 {}
-func (*EndpointsList) IsAnAPIObject()             {}
-func (*Node) IsAnAPIObject()                      {}
-func (*NodeList) IsAnAPIObject()                  {}
-func (*Binding) IsAnAPIObject()                   {}
-func (*Status) IsAnAPIObject()                    {}
-func (*Event) IsAnAPIObject()                     {}
-func (*EventList) IsAnAPIObject()                 {}
-func (*List) IsAnAPIObject()                      {}
-func (*LimitRange) IsAnAPIObject()                {}
-func (*LimitRangeList) IsAnAPIObject()            {}
-func (*ResourceQuota) IsAnAPIObject()             {}
-func (*ResourceQuotaList) IsAnAPIObject()         {}
-func (*Namespace) IsAnAPIObject()                 {}
-func (*NamespaceList) IsAnAPIObject()             {}
-func (*Secret) IsAnAPIObject()                    {}
-func (*SecretList) IsAnAPIObject()                {}
-func (*ServiceAccount) IsAnAPIObject()            {}
-func (*ServiceAccountList) IsAnAPIObject()        {}
-func (*PersistentVolume) IsAnAPIObject()          {}
-func (*PersistentVolumeList) IsAnAPIObject()      {}
-func (*PersistentVolumeClaim) IsAnAPIObject()     {}
-func (*PersistentVolumeClaimList) IsAnAPIObject() {}
-func (*DeleteOptions) IsAnAPIObject()             {}
-func (*ListOptions) IsAnAPIObject()               {}
-func (*PodAttachOptions) IsAnAPIObject()          {}
-func (*PodLogOptions) IsAnAPIObject()             {}
-func (*PodExecOptions) IsAnAPIObject()            {}
-func (*PodProxyOptions) IsAnAPIObject()           {}
-func (*ComponentStatus) IsAnAPIObject()           {}
-func (*ComponentStatusList) IsAnAPIObject()       {}
-func (*SerializedReference) IsAnAPIObject()       {}
-func (*RangeAllocation) IsAnAPIObject()           {}
-func (*ThirdPartyResource) IsAnAPIObject()        {}
-func (*ThirdPartyResourceList) IsAnAPIObject()    {}
-func (*ThirdPartyResourceData) IsAnAPIObject()    {}
+	// Add common types
+	scheme.AddKnownTypes(SchemeGroupVersion, &unversioned.Status{})
+
+	// Add the watch version that applies
+	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
+}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,30 +20,20 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/storage"
-	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/pkg/util"
-
-	"k8s.io/kubernetes/pkg/expapi"
-
-	"github.com/coreos/go-etcd/etcd"
+	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
-func newEtcdStorage(t *testing.T) (*tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient := tools.NewFakeEtcdClient(t)
-	fakeEtcdClient.TestIndex = true
-	etcdStorage := etcdstorage.NewEtcdStorage(fakeEtcdClient, testapi.Codec(), etcdtest.PathPrefix())
-	return fakeEtcdClient, etcdStorage
-}
-
-func newStorage(t *testing.T) (*RcREST, *ScaleREST, *tools.FakeEtcdClient, storage.Interface) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage := NewStorage(etcdStorage)
-	return storage.ReplicationController, storage.Scale, fakeEtcdClient, etcdStorage
+func newStorage(t *testing.T) (*ScaleREST, *etcdtesting.EtcdTestServer, storage.Interface) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "controllers"}
+	return NewStorage(restOptions).Scale, server, etcdStorage
 }
 
 var validPodTemplate = api.PodTemplate{
@@ -65,7 +55,7 @@ var validPodTemplate = api.PodTemplate{
 	},
 }
 
-var validReplicas = 8
+var validReplicas = int32(8)
 
 var validControllerSpec = api.ReplicationControllerSpec{
 	Replicas: validReplicas,
@@ -74,80 +64,69 @@ var validControllerSpec = api.ReplicationControllerSpec{
 }
 
 var validController = api.ReplicationController{
-	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test", ResourceVersion: "1"},
+	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 	Spec:       validControllerSpec,
 }
 
-var validScale = expapi.Scale{
+var validScale = extensions.Scale{
 	ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
-	Spec: expapi.ScaleSpec{
+	Spec: extensions.ScaleSpec{
 		Replicas: validReplicas,
 	},
-	Status: expapi.ScaleStatus{
+	Status: extensions.ScaleStatus{
 		Replicas: 0,
-		Selector: validPodTemplate.Template.Labels,
+		Selector: &unversioned.LabelSelector{
+			MatchLabels: validPodTemplate.Template.Labels,
+		},
 	},
 }
 
 func TestGet(t *testing.T) {
-	expect := &validScale
+	storage, server, si := newStorage(t)
+	defer server.Terminate(t)
 
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-
+	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), &validController),
-				ModifiedIndex: 1,
-			},
-		},
+	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	storage := NewStorage(etcdStorage).Scale
-
-	obj, err := storage.Get(api.WithNamespace(api.NewContext(), "test"), "foo")
-	scale := obj.(*expapi.Scale)
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if e, a := expect, scale; !api.Semantic.DeepEqual(e, a) {
-		t.Errorf("Unexpected scale: %s", util.ObjectDiff(e, a))
+	scale := obj.(*extensions.Scale)
+	if scale.Spec.Replicas != validReplicas {
+		t.Errorf("wrong replicas count expected: %d got: %d", validReplicas, scale.Spec.Replicas)
 	}
 }
 
 func TestUpdate(t *testing.T) {
-	fakeEtcdClient, etcdStorage := newEtcdStorage(t)
-	storage := NewStorage(etcdStorage).Scale
+	storage, server, si := newStorage(t)
+	defer server.Terminate(t)
 
+	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
-	fakeEtcdClient.Data[key] = tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), &validController),
-				ModifiedIndex: 1,
-			},
-		},
+	if err := si.Create(ctx, key, &validController, nil, 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	replicas := 12
-	update := expapi.Scale{
+	replicas := int32(12)
+	update := extensions.Scale{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
-		Spec: expapi.ScaleSpec{
+		Spec: extensions.ScaleSpec{
 			Replicas: replicas,
 		},
 	}
 
-	_, _, err := storage.Update(api.WithNamespace(api.NewContext(), "test"), &update)
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+	if _, _, err := storage.Update(ctx, update.Name, rest.DefaultUpdatedObjectInfo(&update, api.Scheme)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	response, err := fakeEtcdClient.Get(key, false, false)
+	obj, err := storage.Get(ctx, "foo")
 	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var controller api.ReplicationController
-	testapi.Codec().DecodeInto([]byte(response.Node.Value), &controller)
-	if controller.Spec.Replicas != replicas {
-		t.Errorf("wrong replicas count expected: %d got: %d", replicas, controller.Spec.Replicas)
+	updated := obj.(*extensions.Scale)
+	if updated.Spec.Replicas != replicas {
+		t.Errorf("wrong replicas count expected: %d got: %d", replicas, updated.Spec.Replicas)
 	}
 }

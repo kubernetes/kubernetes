@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	assetfs "github.com/elazarl/go-bindata-assetfs"
 )
 
-const dashboardPath = "/api/v1/proxy/namespaces/kube-system/services/kube-ui/#/dashboard/"
+const dashboardPath = "/api/v1/proxy/namespaces/kube-system/services/kubernetes-dashboard"
 
 type MuxInterface interface {
 	Handle(pattern string, handler http.Handler)

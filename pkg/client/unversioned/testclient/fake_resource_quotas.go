@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,8 +37,8 @@ func (c *FakeResourceQuotas) Get(name string) (*api.ResourceQuota, error) {
 	return obj.(*api.ResourceQuota), err
 }
 
-func (c *FakeResourceQuotas) List(label labels.Selector) (*api.ResourceQuotaList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, label, nil), &api.ResourceQuotaList{})
+func (c *FakeResourceQuotas) List(opts api.ListOptions) (*api.ResourceQuotaList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("resourcequotas", c.Namespace, opts), &api.ResourceQuotaList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,19 +69,12 @@ func (c *FakeResourceQuotas) Delete(name string) error {
 	return err
 }
 
-func (c *FakeResourceQuotas) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("resourcequotas", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, nil
+func (c *FakeResourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("resourcequotas", c.Namespace, opts))
 }
 
 func (c *FakeResourceQuotas) UpdateStatus(resourceQuota *api.ResourceQuota) (*api.ResourceQuota, error) {
-	action := UpdateActionImpl{}
-	action.Verb = "update"
-	action.Resource = "resourcequotas"
-	action.Subresource = "status"
-	action.Object = resourceQuota
-
-	obj, err := c.Fake.Invokes(action, resourceQuota)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("resourcequotas", "status", c.Namespace, resourceQuota), resourceQuota)
 	if obj == nil {
 		return nil, err
 	}

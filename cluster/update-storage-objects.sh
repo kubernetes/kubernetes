@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,20 +46,36 @@ declare -a resources=(
     "resourcequotas"
     "secrets"
     "services"
+    "jobs"
+    "horizontalpodautoscalers"
 )
 
 # Find all the namespaces.
-namespaces=( $("${KUBECTL}" get namespaces -o template -t "{{range.items}}{{.metadata.name}} {{end}}"))
+namespaces=( $("${KUBECTL}" get namespaces -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
 if [ -z "${namespaces:-}" ]
 then
   echo "Unexpected: No namespace found. Nothing to do."
   exit 1
 fi
+
+all_failed=1
+
 for resource in "${resources[@]}"
 do
   for namespace in "${namespaces[@]}"
   do
-    instances=( $("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o template -t "{{range.items}}{{.metadata.name}} {{end}}"))
+    # If get fails, assume it's because the resource hasn't been installed in the apiserver.
+    # TODO hopefully we can remove this once we use dynamic discovery of gettable/updateable
+    # resources.
+    set +e
+    instances=( $("${KUBECTL}" get "${resource}" --namespace="${namespace}" -o go-template="{{range.items}}{{.metadata.name}} {{end}}"))
+    result=$?
+    set -e
+
+    if [[ "${all_failed}" -eq 1 && "${result}" -eq 0 ]]; then
+      all_failed=0
+    fi
+
     # Nothing to do if there is no instance of that resource.
     if [[ -z "${instances:-}" ]]
     then
@@ -84,7 +100,7 @@ do
           echo "Looks like ${instance} got deleted. Ignoring it"
           continue
         fi
-        output=$("${KUBECTL}" update -f "${filename}" --namespace="${namespace}") || true
+        output=$("${KUBECTL}" replace -f "${filename}" --namespace="${namespace}") || true
         rm "${filename}"
         if [ -n "${output:-}" ]
         then
@@ -106,6 +122,11 @@ do
     fi
   done
 done
+
+if [[ "${all_failed}" -eq 1 ]]; then
+  echo "kubectl get failed for all resources"
+  exit 1
+fi
 
 echo "All objects updated successfully!!"
 

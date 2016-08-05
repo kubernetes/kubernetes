@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,10 +53,12 @@ type logger interface {
 // the http.ResponseWriter. We can recover panics from go-restful, and
 // the logging value is questionable.
 type respLogger struct {
-	status      int
-	statusStack string
-	addedInfo   string
-	startTime   time.Time
+	hijacked       bool
+	statusRecorded bool
+	status         int
+	statusStack    string
+	addedInfo      string
+	startTime      time.Time
 
 	req *http.Request
 	w   http.ResponseWriter
@@ -69,7 +71,7 @@ type passthroughLogger struct{}
 
 // Addf logs info immediately.
 func (passthroughLogger) Addf(format string, data ...interface{}) {
-	glog.InfoDepth(1, fmt.Sprintf(format, data...))
+	glog.V(2).Info(fmt.Sprintf(format, data...))
 }
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
@@ -155,7 +157,11 @@ func (rl *respLogger) Addf(format string, data ...interface{}) {
 func (rl *respLogger) Log() {
 	latency := time.Since(rl.startTime)
 	if glog.V(2) {
-		glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+		if !rl.hijacked {
+			glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) %v%v%v [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.status, rl.statusStack, rl.addedInfo, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+		} else {
+			glog.InfoDepth(1, fmt.Sprintf("%s %s: (%v) hijacked [%s %s]", rl.req.Method, rl.req.RequestURI, latency, rl.req.Header["User-Agent"], rl.req.RemoteAddr))
+		}
 	}
 }
 
@@ -166,6 +172,9 @@ func (rl *respLogger) Header() http.Header {
 
 // Write implements http.ResponseWriter.
 func (rl *respLogger) Write(b []byte) (int, error) {
+	if !rl.statusRecorded {
+		rl.recordStatus(http.StatusOK) // Default if WriteHeader hasn't been called
+	}
 	return rl.w.Write(b)
 }
 
@@ -181,19 +190,30 @@ func (rl *respLogger) Flush() {
 
 // WriteHeader implements http.ResponseWriter.
 func (rl *respLogger) WriteHeader(status int) {
-	rl.status = status
-	if rl.logStacktracePred(status) {
-		// Only log stacks for errors
-		stack := make([]byte, 2048)
-		stack = stack[:runtime.Stack(stack, false)]
-		rl.statusStack = "\n" + string(stack)
-	} else {
-		rl.statusStack = ""
-	}
+	rl.recordStatus(status)
 	rl.w.WriteHeader(status)
 }
 
 // Hijack implements http.Hijacker.
 func (rl *respLogger) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	rl.hijacked = true
 	return rl.w.(http.Hijacker).Hijack()
+}
+
+// CloseNotify implements http.CloseNotifier
+func (rl *respLogger) CloseNotify() <-chan bool {
+	return rl.w.(http.CloseNotifier).CloseNotify()
+}
+
+func (rl *respLogger) recordStatus(status int) {
+	rl.status = status
+	rl.statusRecorded = true
+	if rl.logStacktracePred(status) {
+		// Only log stacks for errors
+		stack := make([]byte, 50*1024)
+		stack = stack[:runtime.Stack(stack, false)]
+		rl.statusStack = "\n" + string(stack)
+	} else {
+		rl.statusStack = ""
+	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,4 +54,44 @@ func TestPreformatted(t *testing.T) {
 			t.Errorf("case[%d]: expected %q got %q", i, c.expected, actual.String())
 		}
 	}
+}
+
+func TestPreformattedImbalance(t *testing.T) {
+	var cases = []struct {
+		in string
+		ok bool
+	}{
+		{"", true},
+		{"```\nin\n```", true},
+		{"```\nin\n```\nout", true},
+		{"```", false},
+		{"```\nin\n```\nout\n```", false},
+	}
+	for i, c := range cases {
+		in := getMungeLines(c.in)
+		out, err := checkPreformatBalance("filename.md", in)
+		if err != nil && c.ok {
+			t.Errorf("case[%d]: expected success", i)
+		}
+		if err == nil && !c.ok {
+			t.Errorf("case[%d]: expected failure", i)
+		}
+		// Even in case of misformat, return all the text,
+		// so that the user's work is not lost.
+		if !equalMungeLines(out, in) {
+			t.Errorf("case[%d]: expected munged text to be identical to input text", i)
+		}
+	}
+}
+
+func equalMungeLines(a, b mungeLines) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

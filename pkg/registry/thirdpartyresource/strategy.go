@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,38 +21,45 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/expapi"
-	"k8s.io/kubernetes/pkg/expapi/validation"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // strategy implements behavior for ThirdPartyResource objects
 type strategy struct {
 	runtime.ObjectTyper
-	api.NameGenerator
 }
 
 // Strategy is the default logic that applies when creating and updating ThirdPartyResource
 // objects via the REST API.
-var Strategy = strategy{api.Scheme, api.SimpleNameGenerator}
+var Strategy = strategy{api.Scheme}
 
 var _ = rest.RESTCreateStrategy(Strategy)
 
 var _ = rest.RESTUpdateStrategy(Strategy)
 
 func (strategy) NamespaceScoped() bool {
-	return true
+	return false
+}
+
+func (strategy) GenerateName(base string) string {
+	return ""
 }
 
 func (strategy) PrepareForCreate(obj runtime.Object) {
 }
 
-func (strategy) Validate(ctx api.Context, obj runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateThirdPartyResource(obj.(*expapi.ThirdPartyResource))
+func (strategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
+	return validation.ValidateThirdPartyResource(obj.(*extensions.ThirdPartyResource))
+}
+
+// Canonicalize normalizes the object after validation.
+func (strategy) Canonicalize(obj runtime.Object) {
 }
 
 func (strategy) AllowCreateOnUpdate() bool {
@@ -62,8 +69,8 @@ func (strategy) AllowCreateOnUpdate() bool {
 func (strategy) PrepareForUpdate(obj, old runtime.Object) {
 }
 
-func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) fielderrors.ValidationErrorList {
-	return validation.ValidateThirdPartyResourceUpdate(old.(*expapi.ThirdPartyResource), obj.(*expapi.ThirdPartyResource))
+func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidateThirdPartyResourceUpdate(obj.(*extensions.ThirdPartyResource), old.(*extensions.ThirdPartyResource))
 }
 
 func (strategy) AllowUnconditionalUpdate() bool {
@@ -73,7 +80,7 @@ func (strategy) AllowUnconditionalUpdate() bool {
 // Matcher returns a generic matcher for a given label and field selector.
 func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		sa, ok := obj.(*expapi.ThirdPartyResource)
+		sa, ok := obj.(*extensions.ThirdPartyResource)
 		if !ok {
 			return false, fmt.Errorf("not a ThirdPartyResource")
 		}
@@ -83,6 +90,6 @@ func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 }
 
 // SelectableFields returns a label set that can be used for filter selection
-func SelectableFields(obj *expapi.ThirdPartyResource) labels.Set {
+func SelectableFields(obj *extensions.ThirdPartyResource) labels.Set {
 	return labels.Set{}
 }

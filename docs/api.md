@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/api.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/docs/api.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -37,7 +38,7 @@ Primary system and API concepts are documented in the [User guide](user-guide/RE
 
 Overall API conventions are described in the [API conventions doc](devel/api-conventions.md).
 
-Complete API details are documented via [Swagger](http://swagger.io/). The Kubernetes apiserver (aka "master") exports an API that can be used to retrieve the [Swagger spec](https://github.com/swagger-api/swagger-spec/tree/master/schemas/v1.2) for the Kubernetes API, by default at `/swaggerapi`, and a UI you can use to browse the API documentation at `/swagger-ui`. We also periodically update a [statically generated UI](http://kubernetes.io/third_party/swagger-ui/).
+Complete API details are documented via [Swagger](http://swagger.io/). The Kubernetes apiserver (aka "master") exports an API that can be used to retrieve the [Swagger spec](https://github.com/swagger-api/swagger-spec/tree/master/schemas/v1.2) for the Kubernetes API, by default at `/swaggerapi`. It also exports a UI you can use to browse the API documentation at `/swagger-ui` if the apiserver is passed --enable-swagger-ui=true flag. We also host generated [API reference docs](api-reference/README.md).
 
 Remote access to the API is discussed in the [access doc](admin/accessing-the-api.md).
 
@@ -47,6 +48,34 @@ Kubernetes also stores its serialized state (currently in [etcd](https://coreos.
 
 Kubernetes itself is decomposed into multiple components, which interact through its API.
 
+## Adding APIs to Kubernetes
+
+Every API that is added to Kubernetes carries with it increased cost and complexity for all parts of the Kubernetes ecosystem.  New APIs imply new code to maintain,
+new tests that may flake, new documentation that users are required to understand, increased cognitive load for kubectl users and many other incremental costs.
+
+Of course, the addition of new APIs also enables new functionality that empowers users to simply do things that may have been previously complex, costly or both.
+
+Given this balance between increasing the complexity of the project versus the reduction of complexity in user actions, we have set out to set up a set of criteria
+to guide how we as a development community decide when an API should be added to the set of core Kubernetes APIs.
+
+The criteria for inclusion are as follows:
+   * Within the Kubernetes ecosystem, there is a single well known definition of such an API.  As an example, `cron` has a well understood and generally accepted
+specification, whereas there are countless different systems for definition workflows of dependent actions (e.g. Celery et al.).
+   * The API object is expected to be generally useful to greater than 50% of the Kubernetes users.  This is to ensure that we don't build up a collection of niche APIs
+that users rarely need.
+   * There is general consensus in the Kubernetes community that the API object is in the "Kubernetes layer".  See ["What is Kubernetes?"](whatisk8s.md) for a detailed
+explanation of what we believe the "Kubernetes layer" to be.
+
+Of course for every set of rules, we need to ensure that we are not hamstrung or limited by slavish devotion to those rules. Thus we also introduce two exceptions
+for adding APIs in Kubernetes that violate these criteria.
+
+These exceptions are:
+   * There is no other way to implement the functionality in Kubernetes. We are not sure there are any examples of this anymore, but we retain this exception just in case
+we have overlooked something.
+   * Exceptional circumstances, as judged by the Kubernetes committers and discussed in community meeting prior to inclusion of the API.  We hope (expect?) that this
+exception will be used rarely if at all.
+
+
 ## API changes
 
 In our experience, any system that is successful needs to grow and change as new use cases emerge or existing ones change. Therefore, we expect the Kubernetes API to continuously change and grow. However, we intend to not break compatibility with existing clients, for an extended period of time. In general, new API resources and new resource fields can be expected to be added frequently. Elimination of resources or fields will require following a deprecation process. The precise deprecation policy for eliminating features is TBD, but once we reach our 1.0 milestone, there will be a specific policy.
@@ -55,11 +84,67 @@ What constitutes a compatible change and how to change the API are detailed by t
 
 ## API versioning
 
-To make it easier to eliminate fields or restructure resource representations, Kubernetes supports multiple API versions, each at a different API path prefix, such as `/api/v1beta3`. These are simply different interfaces to read and/or modify the same underlying resources. In general, all API resources are accessible via all API versions, though there may be some cases in the future where that is not true.
+To make it easier to eliminate fields or restructure resource representations, Kubernetes supports
+multiple API versions, each at a different API path, such as `/api/v1` or
+`/apis/extensions/v1beta1`.
 
 We chose to version at the API level rather than at the resource or field level to ensure that the API presents a clear, consistent view of system resources and behavior, and to enable controlling access to end-of-lifed and/or experimental APIs.
 
-The [API and release versioning proposal](design/versioning.md) describes the current thinking on the API version evolution process.
+Note that API versioning and Software versioning are only indirectly related.  The [API and release
+versioning proposal](design/versioning.md) describes the relationship between API versioning and
+software versioning.
+
+
+Different API versions imply different levels of stability and support.  The criteria for each level are described
+in more detail in the [API Changes documentation](devel/api_changes.md#alpha-beta-and-stable-versions).  They are summarized here:
+
+- Alpha level:
+  - The version names contain `alpha` (e.g. `v1alpha1`).
+  - May be buggy.  Enabling the feature may expose bugs.  Disabled by default.
+  - Support for feature may be dropped at any time without notice.
+  - The API may change in incompatible ways in a later software release without notice.
+  - Recommended for use only in short-lived testing clusters, due to increased risk of bugs and lack of long-term support.
+- Beta level:
+  - The version names contain `beta` (e.g. `v2beta3`).
+  - Code is well tested.  Enabling the feature is considered safe.  Enabled by default.
+  - Support for the overall feature will not be dropped, though details may change.
+  - The schema and/or semantics of objects may change in incompatible ways in a subsequent beta or stable release.  When this happens,
+    we will provide instructions for migrating to the next version.  This may require deleting, editing, and re-creating
+    API objects.  The editing process may require some thought.   This may require downtime for applications that rely on the feature.
+  - Recommended for only non-business-critical uses because of potential for incompatible changes in subsequent releases.  If you have
+    multiple clusters which can be upgraded independently, you may be able to relax this restriction.
+  - **Please do try our beta features and give feedback on them!  Once they exit beta, it may not be practical for us to make more changes.**
+- Stable level:
+  - The version name is `vX` where `X` is an integer.
+  - Stable versions of features will appear in released software for many subsequent versions.
+
+## API groups
+
+To make it easier to extend the Kubernetes API, we are in the process of implementing [*API
+groups*](proposals/api-group.md).  These are simply different interfaces to read and/or modify the
+same underlying resources.  The API group is specified in a REST path and in the `apiVersion` field
+of a serialized object.
+
+Currently there are two API groups in use:
+
+1. the "core" group, which is at REST path `/api/v1` and is not specified as part of the `apiVersion` field, e.g.
+   `apiVersion: v1`.
+1. the "extensions" group, which is at REST path `/apis/extensions/$VERSION`, and which uses
+  `apiVersion: extensions/$VERSION` (e.g. currently `apiVersion: extensions/v1beta1`).
+  This holds types which will probably move to another API group eventually.
+1. the "componentconfig" and "metrics" API groups.
+
+
+In the future we expect that there will be more API groups, all at REST path `/apis/$API_GROUP` and
+using `apiVersion: $API_GROUP/$VERSION`.  We expect that there will be a way for [third parties to
+create their own API groups](design/extending-api.md), and to avoid naming collisions.
+
+## Enabling resources in the extensions group
+
+DaemonSets, Deployments, HorizontalPodAutoscalers, Ingress, Jobs and ReplicaSets are enabled by default.
+Other extensions resources can be enabled by setting runtime-config on
+apiserver. runtime-config accepts comma separated values. For ex: to disable deployments and jobs, set
+`--runtime-config=extensions/v1beta1/deployments=false,extensions/v1beta1/jobs=false`
 
 ## v1beta1, v1beta2, and v1beta3 are deprecated; please move to v1 ASAP
 
@@ -67,7 +152,7 @@ As of June 4, 2015, the Kubernetes v1 API has been enabled by default. The v1bet
 
 ### v1 conversion tips (from v1beta3)
 
-We're working to convert all documentation and examples to v1. A simple [API conversion tool](admin/cluster-management.md#switching-your-config-files-to-a-new-api-version) has been written to simplify the translation process. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
+We're working to convert all documentation and examples to v1. Use `kubectl create --validate` in order to validate your json or yaml against our Swagger spec.
 
 Changes to services are the most significant difference between v1beta3 and v1.
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -39,8 +37,8 @@ func (c *FakeLimitRanges) Get(name string) (*api.LimitRange, error) {
 	return obj.(*api.LimitRange), err
 }
 
-func (c *FakeLimitRanges) List(label labels.Selector) (*api.LimitRangeList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("limitranges", c.Namespace, label, nil), &api.LimitRangeList{})
+func (c *FakeLimitRanges) List(opts api.ListOptions) (*api.LimitRangeList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("limitranges", c.Namespace, opts), &api.LimitRangeList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -71,7 +69,6 @@ func (c *FakeLimitRanges) Delete(name string) error {
 	return err
 }
 
-func (c *FakeLimitRanges) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("limitranges", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, nil
+func (c *FakeLimitRanges) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("limitranges", c.Namespace, opts))
 }

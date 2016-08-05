@@ -1,4 +1,4 @@
-# Copyright 2015 Google Inc. All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:14.04
+FROM centos
 MAINTAINER Jan Safranek, jsafrane@redhat.com
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get update -qq && apt-get install -y glusterfs-server -qq
+ADD gluster.repo /etc/yum.repos.d/
+RUN yum -y install hostname glusterfs-server && yum clean all
 ADD glusterd.vol /etc/glusterfs/
 ADD run_gluster.sh /usr/local/bin/
 ADD index.html /vol/
 RUN chmod 644 /vol/index.html
 
-EXPOSE 24007/tcp 24008/tcp 49152/tcp
+EXPOSE 24007/tcp 49152/tcp
 
 ENTRYPOINT ["/usr/local/bin/run_gluster.sh"]

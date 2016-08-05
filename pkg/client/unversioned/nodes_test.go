@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package unversioned_test
 
 import (
 	"net/url"
@@ -23,7 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -31,26 +32,27 @@ func getNodesResourceName() string {
 	return "nodes"
 }
 
-func TestListMinions(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+func TestListNodes(t *testing.T) {
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
 		},
-		Response: Response{StatusCode: 200, Body: &api.NodeList{ListMeta: api.ListMeta{ResourceVersion: "1"}}},
+		Response: simple.Response{StatusCode: 200, Body: &api.NodeList{ListMeta: unversioned.ListMeta{ResourceVersion: "1"}}},
 	}
-	response, err := c.Setup().Nodes().List(labels.Everything(), fields.Everything())
+	response, err := c.Setup(t).Nodes().List(api.ListOptions{})
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
-func TestListMinionsLabels(t *testing.T) {
-	labelSelectorQueryParamName := api.LabelSelectorQueryParam(testapi.Version())
-	c := &testClient{
-		Request: testRequest{
+func TestListNodesLabels(t *testing.T) {
+	labelSelectorQueryParamName := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
-			Query:  buildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
-		Response: Response{
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
+			Query:  simple.BuildQueryValues(url.Values{labelSelectorQueryParamName: []string{"foo=bar,name=baz"}})},
+		Response: simple.Response{
 			StatusCode: 200,
 			Body: &api.NodeList{
 				Items: []api.Node{
@@ -66,39 +68,43 @@ func TestListMinionsLabels(t *testing.T) {
 			},
 		},
 	}
-	c.Setup()
-	c.QueryValidator[labelSelectorQueryParamName] = validateLabels
+	c.Setup(t)
+	defer c.Close()
+	c.QueryValidator[labelSelectorQueryParamName] = simple.ValidateLabels
 	selector := labels.Set{"foo": "bar", "name": "baz"}.AsSelector()
-	receivedNodeList, err := c.Nodes().List(selector, fields.Everything())
+	options := api.ListOptions{LabelSelector: selector}
+	receivedNodeList, err := c.Nodes().List(options)
 	c.Validate(t, receivedNodeList, err)
 }
 
-func TestGetMinion(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+func TestGetNode(t *testing.T) {
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", "1"),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "1"),
 		},
-		Response: Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "minion-1"}}},
+		Response: simple.Response{StatusCode: 200, Body: &api.Node{ObjectMeta: api.ObjectMeta{Name: "node-1"}}},
 	}
-	response, err := c.Setup().Nodes().Get("1")
+	response, err := c.Setup(t).Nodes().Get("1")
+	defer c.Close()
 	c.Validate(t, response, err)
 }
 
-func TestGetMinionWithNoName(t *testing.T) {
-	c := &testClient{Error: true}
-	receivedNode, err := c.Setup().Nodes().Get("")
-	if (err != nil) && (err.Error() != nameRequiredError) {
-		t.Errorf("Expected error: %v, but got %v", nameRequiredError, err)
+func TestGetNodeWithNoName(t *testing.T) {
+	c := &simple.Client{Error: true}
+	receivedNode, err := c.Setup(t).Nodes().Get("")
+	defer c.Close()
+	if (err != nil) && (err.Error() != simple.NameRequiredError) {
+		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
 
 	c.Validate(t, receivedNode, err)
 }
 
-func TestCreateMinion(t *testing.T) {
-	requestMinion := &api.Node{
+func TestCreateNode(t *testing.T) {
+	requestNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{
-			Name: "minion-1",
+			Name: "node-1",
 		},
 		Status: api.NodeStatus{
 			Capacity: api.ResourceList{
@@ -110,34 +116,36 @@ func TestCreateMinion(t *testing.T) {
 			Unschedulable: false,
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "POST",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", ""),
-			Body:   requestMinion},
-		Response: Response{
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", ""),
+			Body:   requestNode},
+		Response: simple.Response{
 			StatusCode: 200,
-			Body:       requestMinion,
+			Body:       requestNode,
 		},
 	}
-	receivedMinion, err := c.Setup().Nodes().Create(requestMinion)
-	c.Validate(t, receivedMinion, err)
+	receivedNode, err := c.Setup(t).Nodes().Create(requestNode)
+	defer c.Close()
+	c.Validate(t, receivedNode, err)
 }
 
-func TestDeleteMinion(t *testing.T) {
-	c := &testClient{
-		Request: testRequest{
+func TestDeleteNode(t *testing.T) {
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "DELETE",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", "foo"),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
 		},
-		Response: Response{StatusCode: 200},
+		Response: simple.Response{StatusCode: 200},
 	}
-	err := c.Setup().Nodes().Delete("foo")
+	err := c.Setup(t).Nodes().Delete("foo")
+	defer c.Close()
 	c.Validate(t, nil, err)
 }
 
-func TestUpdateMinion(t *testing.T) {
-	requestMinion := &api.Node{
+func TestUpdateNode(t *testing.T) {
+	requestNode := &api.Node{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			ResourceVersion: "1",
@@ -152,13 +160,14 @@ func TestUpdateMinion(t *testing.T) {
 			Unschedulable: true,
 		},
 	}
-	c := &testClient{
-		Request: testRequest{
+	c := &simple.Client{
+		Request: simple.Request{
 			Method: "PUT",
-			Path:   testapi.ResourcePath(getNodesResourceName(), "", "foo"),
+			Path:   testapi.Default.ResourcePath(getNodesResourceName(), "", "foo"),
 		},
-		Response: Response{StatusCode: 200, Body: requestMinion},
+		Response: simple.Response{StatusCode: 200, Body: requestNode},
 	}
-	response, err := c.Setup().Nodes().Update(requestMinion)
+	response, err := c.Setup(t).Nodes().Update(requestNode)
+	defer c.Close()
 	c.Validate(t, response, err)
 }

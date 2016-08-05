@@ -8,16 +8,19 @@ spec:
       cpu: "2"
       memory: 1Gi
     min:
-      cpu: 250m
+      cpu: 200m
       memory: 6Mi
     type: Pod
   - default:
-      cpu: 250m
+      cpu: 300m
+      memory: 200Mi
+    defaultRequest:
+      cpu: 200m
       memory: 100Mi
     max:
       cpu: "2"
       memory: 1Gi
     min:
-      cpu: 250m
-      memory: 6Mi
+      cpu: 100m
+      memory: 3Mi
     type: Container

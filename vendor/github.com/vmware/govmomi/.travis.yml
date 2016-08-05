@@ -1,0 +1,12 @@
+sudo: false
+
+language: go
+
+go:
+   - 1.6
+
+before_install:
+  - make vendor
+
+script:
+  - make check test

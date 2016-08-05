@@ -1,0 +1,21 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx
+  labels:
+    name: nginx-undo
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      name: nginx-undo
+  template:
+    metadata:
+      labels:
+        name: nginx-undo
+    spec:
+      containers:
+      - name: nginx
+        image: gcr.io/google-containers/nginx:test-cmd
+        ports:
+        - containerPort: 80

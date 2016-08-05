@@ -1,0 +1,245 @@
+#cloud-config
+
+write_files:
+  - path: /opt/bin/regen-apiserver-list.sh
+    permissions: 0755
+    content: |
+      #!/bin/sh
+      m=$(echo $(etcdctl ls --recursive /corekube/apiservers | cut -d/ -f4 | sort) | tr ' ' ,)
+      mkdir -p /run/kubelet
+      echo "APISERVER_IPS=$m" > /run/kubelet/apiservers.env
+      echo "FIRST_APISERVER_URL=https://${m%%\,*}:6443" >> /run/kubelet/apiservers.env
+  - path: /opt/bin/download-release.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash
+      # This temp URL is only good for the length of time specified at cluster creation time.
+      # Afterward, it will result in a 403.
+      OBJECT_URL="CLOUD_FILES_URL"
+      if [ ! -s /opt/kubernetes.tar.gz ]
+      then
+        echo "Downloading release ($OBJECT_URL)"
+        wget "${OBJECT_URL}" -O /opt/kubernetes.tar.gz
+        echo "Unpacking release"
+        rm -rf /opt/kubernetes || false
+        tar xzf /opt/kubernetes.tar.gz -C /opt/
+      else
+        echo "kubernetes release found. Skipping download."
+      fi
+  - path: /run/config-kubelet.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash -e
+      set -x
+      /usr/bin/mkdir -p /var/lib/kubelet
+      cat > /var/lib/kubelet/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kubelet
+        user:
+          token: KUBELET_TOKEN
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kubelet
+        name: service-account-context
+      current-context: service-account-context
+      EOF
+  - path: /run/config-kube-proxy.sh
+    permissions: 0755
+    content: |
+      #!/bin/bash -e
+      set -x
+      /usr/bin/mkdir -p /var/lib/kube-proxy
+      cat > /var/lib/kube-proxy/kubeconfig << EOF
+      apiVersion: v1
+      kind: Config
+      users:
+      - name: kube-proxy
+        user:
+          token: KUBE_PROXY_TOKEN
+      clusters:
+      - name: local
+        cluster:
+          insecure-skip-tls-verify: true
+      contexts:
+      - context:
+          cluster: local
+          user: kube-proxy
+        name: service-account-context
+      current-context: service-account-context
+      EOF
+
+coreos:
+  etcd:
+    name: kubernetes-node-INDEX
+    discovery: https://discovery.etcd.io/DISCOVERY_ID
+    addr: $private_ipv4:4001
+    peer-addr: $private_ipv4:7001
+    peer-bind-addr: $private_ipv4:7001
+
+  flannel:
+    ip_masq: true
+    interface: eth2
+
+  fleet:
+    public-ip: $private_ipv4
+    metadata: kubernetes_role=minion
+
+  update:
+    reboot-strategy: etcd-lock
+
+  units:
+    - name: etcd.service
+      command: start
+    - name: fleet.service
+      command: start
+    - name: flanneld.service
+      drop-ins:
+        - name: 50-flannel.conf
+          content: |
+            [Unit]
+            Requires=etcd.service
+            After=etcd.service
+
+            [Service]
+            ExecStartPre=-/usr/bin/etcdctl mk /coreos.com/network/config '{"Network":"KUBE_NETWORK", "Backend": {"Type": "host-gw"}}'
+      command: start
+    - name: docker.service
+      command: start
+      drop-ins:
+        - name: 51-docker-mirror.conf
+          content: |
+            [Unit]
+            # making sure that flanneld finished startup, otherwise containers
+            # won't land in flannel's network...
+            Requires=flanneld.service
+            After=flanneld.service
+            Restart=Always
+    - name: download-release.service
+      command: start
+      content: |
+        [Unit]
+        Description=Downloads Kubernetes Release
+        After=network-online.target
+        Requires=network-online.target
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/bash /opt/bin/download-release.sh
+    - name: kubelet.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Kubelet
+        Documentation=https://github.com/kubernetes/kubernetes
+        After=network-online.target
+        Requires=network-online.target
+        After=docker.service
+        Requires=docker.service
+        After=download-release.service
+        Requires=download-release.service
+        [Service]
+        EnvironmentFile=/run/kubelet/apiservers.env
+        ExecStartPre=/run/config-kubelet.sh
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kubelet /opt/bin/kubelet
+        ExecStart=/opt/bin/kubelet \
+        --address=$private_ipv4 \
+        --api-servers=${FIRST_APISERVER_URL} \
+        --cluster-dns=DNS_SERVER_IP \
+        --cluster-domain=DNS_DOMAIN \
+        --healthz-bind-address=$private_ipv4 \
+        --hostname-override=$private_ipv4 \
+        --logtostderr=true \
+        --v=2
+        Restart=always
+        RestartSec=5
+        KillMode=process
+    - name: kube-proxy.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Proxy
+        Documentation=https://github.com/kubernetes/kubernetes
+        After=network-online.target
+        Requires=network-online.target
+        After=docker.service
+        Requires=docker.service
+        After=download-release.service
+        Requires=download-release.service
+        [Service]
+        EnvironmentFile=/run/kubelet/apiservers.env
+        ExecStartPre=/run/config-kube-proxy.sh
+        ExecStartPre=/usr/bin/ln -sf /opt/kubernetes/server/bin/kube-proxy /opt/bin/kube-proxy
+        ExecStart=/opt/bin/kube-proxy \
+        --bind-address=$private_ipv4 \
+        --kubeconfig=/var/lib/kube-proxy/kubeconfig \
+        --logtostderr=true \
+        --hostname-override=$private_ipv4 \
+        --master=${FIRST_APISERVER_URL}
+        Restart=always
+        RestartSec=5
+    - name: kubelet-sighup.path
+      command: start
+      content: |
+        [Path]
+        PathChanged=/run/kubelet/apiservers.env
+    - name: kubelet-sighup.service
+      command: start
+      content: |
+        [Service]
+        ExecStart=/usr/bin/pkill -SIGHUP -f kubelet
+    - name: kube-proxy-sighup.path
+      command: start
+      content: |
+        [Path]
+        PathChanged=/run/kubelet/apiservers.env
+    - name: kube-proxy-sighup.service
+      command: start
+      content: |
+        [Service]
+        ExecStart=/usr/bin/pkill -SIGHUP -f kube-proxy
+    - name: apiserver-finder.service
+      command: start
+      content: |
+        [Unit]
+        Description=Kubernetes Apiserver finder
+        After=network-online.target
+        Requires=network-online.target
+        After=etcd.service
+        Requires=etcd.service
+        [Service]
+        ExecStartPre=/opt/bin/regen-apiserver-list.sh
+        ExecStart=/usr/bin/etcdctl exec-watch --recursive /corekube/apiservers -- /opt/bin/regen-apiserver-list.sh
+        Restart=always
+        RestartSec=30
+    - name: cbr0.netdev
+      command: start
+      content: |
+        [NetDev]
+        Kind=bridge
+        Name=cbr0
+    - name: cbr0.network
+      command: start
+      content: |
+        [Match]
+        Name=cbr0
+
+        [Network]
+        Address=10.240.INDEX.1/24
+    - name: nat.service
+      command: start
+      content: |
+        [Unit]
+        Description=NAT container->outside traffic
+
+        [Service]
+        ExecStart=/usr/sbin/iptables -t nat -A POSTROUTING -o eth0 -s 10.240.INDEX.0/24 -j MASQUERADE
+        ExecStart=/usr/sbin/iptables -t nat -A POSTROUTING -o eth1 -s 10.240.INDEX.0/24 -j MASQUERADE
+        RemainAfterExit=yes
+        Type=oneshot

@@ -18,4 +18,4 @@ spec:
         - /tmp/health
       initialDelaySeconds: 15
       timeoutSeconds: 1
-    name: liveness
+    name: liveness-exec

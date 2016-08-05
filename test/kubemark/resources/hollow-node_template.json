@@ -1,0 +1,134 @@
+{
+	"kind": "ReplicationController",
+	"apiVersion": "v1",
+	"metadata": {
+		"name": "hollow-node",
+		"labels": {
+			"name": "hollow-node"
+		}
+	},
+	"spec": {
+		"replicas": ##numreplicas##,
+		"selector": {
+			"name": "hollow-node"
+		},
+		"template": {
+		  "metadata": {
+				"labels": {
+					"name": "hollow-node"
+				}
+			},
+			"spec": {
+				"volumes": [
+					{
+						"name": "kubeconfig-volume",
+						"secret": {
+							"secretName": "kubeconfig"
+						}
+					},
+					{
+						"name": "logs-volume",
+						"hostPath": {
+							"path": "/var/logs"
+						}
+					}
+				],
+				"containers": [
+				{
+					"name": "hollow-kubelet",
+					"image": "gcr.io/##project##/kubemark:latest",
+					"ports": [
+						{"containerPort": 4194},
+						{"containerPort": 10250},
+						{"containerPort": 10255}
+					],
+					"env": [
+						{
+							"name": "CONTENT_TYPE",
+							"valueFrom": {
+								"configMapKeyRef": {
+									"name": "node-configmap",
+									"key": "content.type"
+								}
+							}
+						},
+						{
+							"name": "MY_POD_NAME",
+							"valueFrom": {
+								"fieldRef": {
+									"fieldPath": "metadata.name"
+									}
+							}
+						}
+					],
+					"command": [
+						"/bin/sh",
+						"-c",
+						"./kubemark.sh --morph=kubelet $(CONTENT_TYPE) --v=2 1>>/var/logs/kubelet_$(MY_POD_NAME).log 2>&1"
+					],
+					"volumeMounts": [
+						{
+							"name": "kubeconfig-volume",
+							"mountPath": "/kubeconfig"
+						},
+						{
+							"name": "logs-volume",
+							"mountPath": "/var/logs"
+						}
+					],
+					"resources": {
+						"requests": {
+							"cpu": "50m",
+							"memory": "100M"
+						}
+					}
+
+				},
+				{
+					"name": "hollow-proxy",
+					"image": "gcr.io/##project##/kubemark:latest",
+					"env": [
+						{
+							"name": "CONTENT_TYPE",
+							"valueFrom": {
+								"configMapKeyRef": {
+									"name": "node-configmap",
+									"key": "content.type"
+								}
+							}
+						},
+						{
+							"name": "MY_POD_NAME",
+							"valueFrom": {
+								"fieldRef": {
+									"fieldPath": "metadata.name"
+									}
+							}
+						}
+					],
+					"command": [
+						"/bin/sh",
+						"-c",
+						"./kubemark.sh --morph=proxy $(CONTENT_TYPE) --v=2 1>>/var/logs/kube_proxy_$(MY_POD_NAME).log 2>&1"
+					],
+					"volumeMounts": [
+						{
+							"name": "kubeconfig-volume",
+							"mountPath": "/kubeconfig"
+						},
+						{
+							"name": "logs-volume",
+							"mountPath": "/var/logs"
+						}
+					],
+					"resources": {
+						"requests": {
+							"cpu": "20m",
+							"memory": "100M"
+						}
+					}
+				}]
+			}
+		}
+	}
+}

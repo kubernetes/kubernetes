@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostexec
+  labels:
+    app: hostexec
+spec:
+  containers:
+  - name: hostexec
+    image: gcr.io/google_containers/hostexec:1.2
+  securityContext:
+    hostNetwork: true

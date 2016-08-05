@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/examples/celery-rabbitmq/README.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/examples/celery-rabbitmq/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -57,7 +58,7 @@ At the end of the example, we will have:
 
 ## Prerequisites
 
-You should already have turned up a Kubernetes cluster. To get the most of this example, ensure that Kubernetes will create more than one node (e.g. by setting your `NUM_MINIONS` environment variable to 2 or more).
+You should already have turned up a Kubernetes cluster. To get the most of this example, ensure that Kubernetes will create more than one node (e.g. by setting your `NUM_NODES` environment variable to 2 or more).
 
 
 ## Step 1: Start the RabbitMQ service
@@ -71,7 +72,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    name: rabbitmq
+    component: rabbitmq
   name: rabbitmq-service
 spec:
   ports:
@@ -81,7 +82,7 @@ spec:
     component: rabbitmq
 ```
 
-[Download example](rabbitmq-service.yaml)
+[Download example](rabbitmq-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE rabbitmq-service.yaml -->
 
 To start the service, run:
@@ -104,12 +105,10 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: rabbitmq
+    component: rabbitmq
   name: rabbitmq-controller
 spec:
   replicas: 1
-  selector:
-    component: rabbitmq
   template:
     metadata:
       labels:
@@ -126,7 +125,7 @@ spec:
             cpu: 100m
 ```
 
-[Download example](rabbitmq-controller.yaml)
+[Download example](rabbitmq-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE rabbitmq-controller.yaml -->
 
 Running `$ kubectl create -f examples/celery-rabbitmq/rabbitmq-controller.yaml` brings up a replication controller that ensures one pod exists which is running a RabbitMQ instance.
@@ -145,12 +144,10 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: celery
+    component: celery
   name: celery-controller
 spec:
   replicas: 1
-  selector:
-    component: celery
   template:
     metadata:
       labels:
@@ -167,7 +164,7 @@ spec:
             cpu: 100m
 ```
 
-[Download example](celery-controller.yaml)
+[Download example](celery-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE celery-controller.yaml -->
 
 There are several things to point out here...
@@ -227,7 +224,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    name: flower
+    component: flower
   name: flower-service
 spec:
   ports:
@@ -238,7 +235,7 @@ spec:
   type: LoadBalancer
 ```
 
-[Download example](flower-service.yaml)
+[Download example](flower-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE flower-service.yaml -->
 
 It is marked as external (LoadBalanced). However on many platforms you will have to add an explicit firewall rule to open port 5555.
@@ -259,12 +256,10 @@ apiVersion: v1
 kind: ReplicationController
 metadata:
   labels:
-    name: flower
+    component: flower
   name: flower-controller
 spec:
   replicas: 1
-  selector:
-    component: flower
   template:
     metadata:
       labels:
@@ -277,9 +272,16 @@ spec:
         resources:
           limits:
             cpu: 100m
+        livenessProbe:
+          httpGet:
+            # Path to probe; should be cheap, but representative of typical behavior
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
 ```
 
-[Download example](flower-controller.yaml)
+[Download example](flower-controller.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE flower-controller.yaml -->
 
 This will bring up a new pod with Flower installed and port 5555 (Flower's default port) exposed through the service endpoint. This image uses the following command to start Flower:
@@ -302,8 +304,8 @@ rabbitmq-controller-5eb2l                      1/1       Running      0         
 `kubectl get service flower-service` will help you to get the external IP addresses of the flower service.
 
 ```
-NAME             LABELS        SELECTOR                         IP(S)            PORT(S)
-flower-service   name=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
+NAME             LABELS             SELECTOR                         IP(S)            PORT(S)
+flower-service   component=flower   app=taskQueue,component=flower   10.0.44.166      5555/TCP
                                                                 162.222.181.180
 ```
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,10 +24,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
-	"k8s.io/kubernetes/pkg/kubelet"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 func TestExtractFromNonExistentFile(t *testing.T) {
@@ -44,13 +47,13 @@ func TestUpdateOnNonExistentFile(t *testing.T) {
 	NewSourceFile("random_non_existent_path", "localhost", time.Millisecond, ch)
 	select {
 	case got := <-ch:
-		update := got.(kubelet.PodUpdate)
-		expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
+		update := got.(kubetypes.PodUpdate)
+		expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
 		if !api.Semantic.DeepDerivative(expected, update) {
 			t.Fatalf("Expected %#v, Got %#v", expected, update)
 		}
 
-	case <-time.After(time.Second):
+	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("Expected update, timeout instead")
 	}
 }
@@ -73,12 +76,12 @@ func TestReadPodsFromFile(t *testing.T) {
 	var testCases = []struct {
 		desc     string
 		pod      runtime.Object
-		expected kubelet.PodUpdate
+		expected kubetypes.PodUpdate
 	}{
 		{
 			desc: "Simple pod",
 			pod: &api.Pod{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Pod",
 					APIVersion: "",
 				},
@@ -88,15 +91,20 @@ func TestReadPodsFromFile(t *testing.T) {
 					Namespace: "mynamespace",
 				},
 				Spec: api.PodSpec{
-					Containers: []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					Containers:      []api.Container{{Name: "image", Image: "test/image", SecurityContext: securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					SecurityContext: &api.PodSecurityContext{},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
 				},
 			},
-			expected: CreatePodUpdate(kubelet.SET, kubelet.FileSource, &api.Pod{
+			expected: CreatePodUpdate(kubetypes.SET, kubetypes.FileSource, &api.Pod{
 				ObjectMeta: api.ObjectMeta{
-					Name:      "test-" + hostname,
-					UID:       "12345",
-					Namespace: "mynamespace",
-					SelfLink:  getSelfLink("test-"+hostname, "mynamespace"),
+					Name:        "test-" + hostname,
+					UID:         "12345",
+					Namespace:   "mynamespace",
+					Annotations: map[string]string{kubetypes.ConfigHashAnnotationKey: "12345"},
+					SelfLink:    getSelfLink("test-"+hostname, "mynamespace"),
 				},
 				Spec: api.PodSpec{
 					NodeName:                      hostname,
@@ -107,8 +115,12 @@ func TestReadPodsFromFile(t *testing.T) {
 						Name:  "image",
 						Image: "test/image",
 						TerminationMessagePath: "/dev/termination-log",
-						ImagePullPolicy:        "IfNotPresent",
+						ImagePullPolicy:        "Always",
 						SecurityContext:        securitycontext.ValidSecurityContextWithContainerDefaults()}},
+					SecurityContext: &api.PodSecurityContext{},
+				},
+				Status: api.PodStatus{
+					Phase: api.PodPending,
 				},
 			}),
 		},
@@ -117,11 +129,11 @@ func TestReadPodsFromFile(t *testing.T) {
 	for _, testCase := range testCases {
 		func() {
 			var versionedPod runtime.Object
-			err := testapi.Converter().Convert(&testCase.pod, &versionedPod)
+			err := testapi.Default.Converter().Convert(&testCase.pod, &versionedPod)
 			if err != nil {
 				t.Fatalf("%s: error in versioning the pod: %v", testCase.desc, err)
 			}
-			fileContents, err := testapi.Codec().Encode(versionedPod)
+			fileContents, err := runtime.Encode(testapi.Default.Codec(), versionedPod)
 			if err != nil {
 				t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 			}
@@ -133,7 +145,7 @@ func TestReadPodsFromFile(t *testing.T) {
 			NewSourceFile(file.Name(), hostname, time.Millisecond, ch)
 			select {
 			case got := <-ch:
-				update := got.(kubelet.PodUpdate)
+				update := got.(kubetypes.PodUpdate)
 				for _, pod := range update.Pods {
 					if errs := validation.ValidatePod(pod); len(errs) > 0 {
 						t.Errorf("%s: Invalid pod %#v, %#v", testCase.desc, pod, errs)
@@ -142,7 +154,7 @@ func TestReadPodsFromFile(t *testing.T) {
 				if !api.Semantic.DeepEqual(testCase.expected, update) {
 					t.Errorf("%s: Expected %#v, Got %#v", testCase.desc, testCase.expected, update)
 				}
-			case <-time.After(time.Second):
+			case <-time.After(wait.ForeverTestTimeout):
 				t.Errorf("%s: Expected update, timeout instead", testCase.desc)
 			}
 		}()
@@ -163,7 +175,7 @@ func TestExtractFromBadDataFile(t *testing.T) {
 }
 
 func TestExtractFromEmptyDir(t *testing.T) {
-	dirName, err := ioutil.TempDir("", "foo")
+	dirName, err := utiltesting.MkTmpdir("file-test")
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -176,8 +188,8 @@ func TestExtractFromEmptyDir(t *testing.T) {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 
-	update := (<-ch).(kubelet.PodUpdate)
-	expected := CreatePodUpdate(kubelet.SET, kubelet.FileSource)
+	update := (<-ch).(kubetypes.PodUpdate)
+	expected := CreatePodUpdate(kubetypes.SET, kubetypes.FileSource)
 	if !api.Semantic.DeepEqual(expected, update) {
 		t.Errorf("Expected %#v, Got %#v", expected, update)
 	}

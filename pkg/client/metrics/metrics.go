@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package metrics provides utilities for registering client metrics to Prometheus.
 package metrics
 
 import (
@@ -26,6 +27,8 @@ import (
 const restClientSubsystem = "rest_client"
 
 var (
+	// RequestLatency is a Prometheus Summary metric type partitioned by
+	// "verb" and "url" labels. It is used for the rest client latency metrics.
 	RequestLatency = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Subsystem: restClientSubsystem,
@@ -35,19 +38,30 @@ var (
 		},
 		[]string{"verb", "url"},
 	)
+
+	RequestResult = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Subsystem: restClientSubsystem,
+			Name:      "request_status_codes",
+			Help:      "Number of http requests, partitioned by metadata",
+		},
+		[]string{"code", "method", "host"},
+	)
 )
 
 var registerMetrics sync.Once
 
-// Register all metrics.
+// Register registers all metrics to Prometheus with
+// respect to the RequestLatency.
 func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		prometheus.MustRegister(RequestLatency)
+		prometheus.MustRegister(RequestResult)
 	})
 }
 
-// Gets the time since the specified start in microseconds.
+// Calculates the time since the specified start in microseconds.
 func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }

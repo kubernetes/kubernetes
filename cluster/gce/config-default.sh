@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,39 +16,67 @@
 
 # TODO(jbeda): Provide a way to override project
 # gcloud multiplexing for shared GCE/GKE tests.
+KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+source "${KUBE_ROOT}/cluster/gce/config-common.sh"
+
 GCLOUD=gcloud
 ZONE=${KUBE_GCE_ZONE:-us-central1-b}
-MASTER_SIZE=${MASTER_SIZE:-n1-standard-1}
-MINION_SIZE=${MINION_SIZE:-n1-standard-1}
-NUM_MINIONS=${NUM_MINIONS:-4}
+REGION=${ZONE%-*}
+RELEASE_REGION_FALLBACK=${RELEASE_REGION_FALLBACK:-false}
+REGIONAL_KUBE_ADDONS=${REGIONAL_KUBE_ADDONS:-true}
+NODE_SIZE=${NODE_SIZE:-n1-standard-2}
+NUM_NODES=${NUM_NODES:-3}
+MASTER_SIZE=${MASTER_SIZE:-n1-standard-$(get-master-size)}
 MASTER_DISK_TYPE=pd-ssd
 MASTER_DISK_SIZE=${MASTER_DISK_SIZE:-20GB}
-MINION_DISK_TYPE=pd-standard
-MINION_DISK_SIZE=${MINION_DISK_SIZE:-100GB}
-REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-false}
-PREEMPTIBLE_MINION=${PREEMPTIBLE_MINION:-false}
+NODE_DISK_TYPE=${NODE_DISK_TYPE:-pd-standard}
+NODE_DISK_SIZE=${NODE_DISK_SIZE:-100GB}
+REGISTER_MASTER_KUBELET=${REGISTER_MASTER:-true}
+PREEMPTIBLE_NODE=${PREEMPTIBLE_NODE:-false}
+PREEMPTIBLE_MASTER=${PREEMPTIBLE_MASTER:-false}
 
-OS_DISTRIBUTION=${KUBE_OS_DISTRIBUTION:-debian}
-MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-container-vm-v20150806}
+MASTER_OS_DISTRIBUTION=${KUBE_MASTER_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-gci}}
+NODE_OS_DISTRIBUTION=${KUBE_NODE_OS_DISTRIBUTION:-${KUBE_OS_DISTRIBUTION:-debian}}
+# By default a cluster will be started with the master on GCI and nodes on
+# containervm. If you are updating the containervm version, update this
+# variable.
+CVM_VERSION=container-v1-3-v20160604
+MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-google-containers}
-MINION_IMAGE=${KUBE_GCE_MINION_IMAGE:-"${MASTER_IMAGE}"}
-MINION_IMAGE_PROJECT=${KUBE_GCE_MINION_PROJECT:-"${MASTER_IMAGE_PROJECT}"}
+NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${CVM_VERSION}}
+NODE_IMAGE_PROJECT=${KUBE_GCE_NODE_PROJECT:-google-containers}
 CONTAINER_RUNTIME=${KUBE_CONTAINER_RUNTIME:-docker}
-RKT_VERSION=${KUBE_RKT_VERSION:-0.5.5}
+RKT_VERSION=${KUBE_RKT_VERSION:-1.9.1}
+RKT_STAGE1_IMAGE=${KUBE_RKT_STAGE1_IMAGE:-coreos.com/rkt/stage1-coreos}
 
 NETWORK=${KUBE_GCE_NETWORK:-default}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
+CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
+INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
-MINION_TAG="${INSTANCE_PREFIX}-minion"
+NODE_TAG="${INSTANCE_PREFIX}-minion"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
-CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/16}"
-MINION_SCOPES="${MINION_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
+CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/14}"
+if [[ "${FEDERATION:-}" == true ]]; then
+    NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro,https://www.googleapis.com/auth/ndev.clouddns.readwrite}"
+else
+    NODE_SCOPES="${NODE_SCOPES:-compute-rw,monitoring,logging-write,storage-ro}"
+fi
 
-# Increase the sleep interval value if concerned about API rate limits. 3, in seconds, is the default.
-POLL_SLEEP_INTERVAL=3
-SERVICE_CLUSTER_IP_RANGE="10.0.0.0/16"  # formerly PORTAL_NET
+
+# Extra docker options for nodes.
+EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS:-}"
+
+SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
 ALLOCATE_NODE_CIDRS=true
+
+# When set to true, Docker Cache is enabled by default as part of the cluster bring up.
+ENABLE_DOCKER_REGISTRY_CACHE=true
+
+# Optional: Deploy a L7 loadbalancer controller to fulfill Ingress requests:
+#   glbc           - CE L7 Load Balancer Controller
+ENABLE_L7_LOADBALANCING="${KUBE_ENABLE_L7_LOADBALANCING:-glbc}"
 
 # Optional: Cluster monitoring to setup as part of the cluster bring up:
 #   none           - No cluster monitoring setup
@@ -56,7 +84,7 @@ ALLOCATE_NODE_CIDRS=true
 #   google         - Heapster, Google Cloud Monitoring, and Google Cloud Logging
 #   googleinfluxdb - Enable influxdb and google (except GCM)
 #   standalone     - Heapster only. Metrics available via Heapster REST API.
-ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-googleinfluxdb}"
+ENABLE_CLUSTER_MONITORING="${KUBE_ENABLE_CLUSTER_MONITORING:-influxdb}"
 
 # Optional: Enable node logging.
 ENABLE_NODE_LOGGING="${KUBE_ENABLE_NODE_LOGGING:-true}"
@@ -68,17 +96,20 @@ ELASTICSEARCH_LOGGING_REPLICAS=1
 
 # Optional: Don't require https for registries in our local RFC1918 network
 if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
-  EXTRA_DOCKER_OPTS="--insecure-registry 10.0.0.0/8"
+  EXTRA_DOCKER_OPTS="${EXTRA_DOCKER_OPTS} --insecure-registry 10.0.0.0/8"
 fi
+
+# Optional: customize runtime config
+RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 # Optional: Install cluster DNS.
 ENABLE_CLUSTER_DNS="${KUBE_ENABLE_CLUSTER_DNS:-true}"
-DNS_SERVER_IP="10.0.0.10"
-DNS_DOMAIN="cluster.local"
+DNS_SERVER_IP="${KUBE_DNS_SERVER_IP:-10.0.0.10}"
+DNS_DOMAIN="${KUBE_DNS_DOMAIN:-cluster.local}"
 DNS_REPLICAS=1
 
 # Optional: Install cluster docker registry.
-ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-true}"
+ENABLE_CLUSTER_REGISTRY="${KUBE_ENABLE_CLUSTER_REGISTRY:-false}"
 CLUSTER_REGISTRY_DISK="${CLUSTER_REGISTRY_PD:-${INSTANCE_PREFIX}-kube-system-kube-registry}"
 CLUSTER_REGISTRY_DISK_SIZE="${CLUSTER_REGISTRY_DISK_SIZE:-200GB}"
 CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
@@ -86,17 +117,37 @@ CLUSTER_REGISTRY_DISK_TYPE_GCE="${CLUSTER_REGISTRY_DISK_TYPE_GCE:-pd-standard}"
 # Optional: Install Kubernetes UI
 ENABLE_CLUSTER_UI="${KUBE_ENABLE_CLUSTER_UI:-true}"
 
+# Optional: Install node problem detector.
+ENABLE_NODE_PROBLEM_DETECTOR="${KUBE_ENABLE_NODE_PROBLEM_DETECTOR:-true}"
+
 # Optional: Create autoscaler for cluster's nodes.
-# NOT WORKING YET!
-ENABLE_NODE_AUTOSCALER="${KUBE_ENABLE_NODE_AUTOSCALER:-false}"
-if [[ "${ENABLE_NODE_AUTOSCALER}" == "true" ]]; then
-  AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-1}"
-  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-${NUM_MINIONS}}"
-  TARGET_NODE_UTILIZATION="${KUBE_TARGET_NODE_UTILIZATION:-0.7}"
+ENABLE_CLUSTER_AUTOSCALER="${KUBE_ENABLE_CLUSTER_AUTOSCALER:-false}"
+if [[ "${ENABLE_CLUSTER_AUTOSCALER}" == "true" ]]; then
+  AUTOSCALER_MIN_NODES="${KUBE_AUTOSCALER_MIN_NODES:-}"
+  AUTOSCALER_MAX_NODES="${KUBE_AUTOSCALER_MAX_NODES:-}"
+  AUTOSCALER_ENABLE_SCALE_DOWN="${KUBE_AUTOSCALER_ENABLE_SCALE_DOWN:-true}"
 fi
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,NamespaceExists,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+# If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,ResourceQuota
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
+
+# Networking plugin specific settings.
+NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, flannel, kubenet
+OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
+OPENCONTRAIL_KUBERNETES_TAG="${OPENCONTRAIL_KUBERNETES_TAG:-master}"
+OPENCONTRAIL_PUBLIC_SUBNET="${OPENCONTRAIL_PUBLIC_SUBNET:-10.1.0.0/16}"
+
+# Network Policy plugin specific settings.
+NETWORK_POLICY_PROVIDER="${NETWORK_POLICY_PROVIDER:-none}" # calico
+
+# How should the kubelet configure hairpin mode?
+HAIRPIN_MODE="${HAIRPIN_MODE:-promiscuous-bridge}" # promiscuous-bridge, hairpin-veth, none
+# Optional: if set to true, kube-up will configure the cluster to run e2e tests.
+E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
+
+# Evict pods whenever compute resource availability on the nodes gets below a threshold.
+EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi}"

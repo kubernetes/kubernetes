@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,40 +17,48 @@ limitations under the License.
 package cmd
 
 import (
+	"io"
+	"net/url"
 	"os"
 	"os/signal"
 
 	"github.com/golang/glog"
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/portforward"
+	"k8s.io/kubernetes/pkg/client/unversioned/remotecommand"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	portforward_example = `
-# listens on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
-$ kubectl port-forward mypod 5000 6000
+var (
+	portforward_example = dedent.Dedent(`
+		# Listen on ports 5000 and 6000 locally, forwarding data to/from ports 5000 and 6000 in the pod
+		kubectl port-forward mypod 5000 6000
 
-# listens on port 8888 locally, forwarding to 5000 in the pod
-$ kubectl port-forward mypod 8888:5000
+		# Listen on port 8888 locally, forwarding to 5000 in the pod
+		kubectl port-forward mypod 8888:5000
 
-# listens on a random port locally, forwarding to 5000 in the pod
-$ kubectl port-forward mypod :5000
+		# Listen on a random port locally, forwarding to 5000 in the pod
+		kubectl port-forward mypod :5000
 
-# listens on a random port locally, forwarding to 5000 in the pod
-$ kubectl port-forward  mypod 0:5000`
+		# Listen on a random port locally, forwarding to 5000 in the pod
+		kubectl port-forward  mypod 0:5000`)
 )
 
-func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
+func NewCmdPortForward(f *cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "port-forward POD [LOCAL_PORT:]REMOTE_PORT [...[LOCAL_PORT_N:]REMOTE_PORT_N]",
-		Short:   "Forward one or more local ports to a pod.",
+		Short:   "Forward one or more local ports to a pod",
 		Long:    "Forward one or more local ports to a pod.",
 		Example: portforward_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunPortForward(f, cmd, args, &defaultPortForwarder{})
+			pf := &defaultPortForwarder{
+				cmdOut: cmdOut,
+				cmdErr: cmdErr,
+			}
+			err := RunPortForward(f, cmd, args, pf)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -60,13 +68,19 @@ func NewCmdPortForward(f *cmdutil.Factory) *cobra.Command {
 }
 
 type portForwarder interface {
-	ForwardPorts(req *client.Request, config *client.Config, ports []string, stopChan <-chan struct{}) error
+	ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error
 }
 
-type defaultPortForwarder struct{}
+type defaultPortForwarder struct {
+	cmdOut, cmdErr io.Writer
+}
 
-func (*defaultPortForwarder) ForwardPorts(req *client.Request, config *client.Config, ports []string, stopChan <-chan struct{}) error {
-	fw, err := portforward.New(req, config, ports, stopChan)
+func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
+	dialer, err := remotecommand.NewExecutor(config, method, url)
+	if err != nil {
+		return err
+	}
+	fw, err := portforward.New(dialer, ports, stopChan, f.cmdOut, f.cmdErr)
 	if err != nil {
 		return err
 	}
@@ -130,5 +144,5 @@ func RunPortForward(f *cmdutil.Factory, cmd *cobra.Command, args []string, fw po
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return fw.ForwardPorts(req, config, args, stopCh)
+	return fw.ForwardPorts("POST", req.URL(), config, args, stopCh)
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,9 +22,14 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/jsonpath"
+
+	"github.com/golang/glog"
 )
 
 // Sorting printer sorts list types before delegating to another printer.
@@ -32,11 +37,11 @@ import (
 type SortingPrinter struct {
 	SortField string
 	Delegate  ResourcePrinter
+	Decoder   runtime.Decoder
 }
 
 func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
-	if !runtime.IsListType(obj) {
-		fmt.Fprintf(out, "Not a list, skipping: %#v\n", obj)
+	if !meta.IsListType(obj) {
 		return s.Delegate.PrintObj(obj, out)
 	}
 
@@ -46,37 +51,87 @@ func (s *SortingPrinter) PrintObj(obj runtime.Object, out io.Writer) error {
 	return s.Delegate.PrintObj(obj, out)
 }
 
+// TODO: implement HandledResources()
+func (p *SortingPrinter) HandledResources() []string {
+	return []string{}
+}
+
 func (s *SortingPrinter) sortObj(obj runtime.Object) error {
-	objs, err := runtime.ExtractList(obj)
+	objs, err := meta.ExtractList(obj)
 	if err != nil {
 		return err
 	}
 	if len(objs) == 0 {
 		return nil
 	}
-	parser := jsonpath.New("sorting")
-	parser.Parse(s.SortField)
-	values, err := parser.FindResults(reflect.ValueOf(objs[0]).Elem().Interface())
+
+	sorter, err := SortObjects(s.Decoder, objs, s.SortField)
 	if err != nil {
 		return err
 	}
+
+	switch list := obj.(type) {
+	case *v1.List:
+		outputList := make([]runtime.RawExtension, len(objs))
+		for ix := range objs {
+			outputList[ix] = list.Items[sorter.OriginalPosition(ix)]
+		}
+		list.Items = outputList
+		return nil
+	}
+	return meta.SetList(obj, objs)
+}
+
+func SortObjects(decoder runtime.Decoder, objs []runtime.Object, fieldInput string) (*RuntimeSort, error) {
+	parser := jsonpath.New("sorting")
+
+	field, err := massageJSONPath(fieldInput)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := parser.Parse(field); err != nil {
+		return nil, err
+	}
+
+	for ix := range objs {
+		item := objs[ix]
+		switch u := item.(type) {
+		case *runtime.Unknown:
+			var err error
+			if objs[ix], _, err = decoder.Decode(u.Raw, nil, nil); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	values, err := parser.FindResults(reflect.ValueOf(objs[0]).Elem().Interface())
+	if err != nil {
+		return nil, err
+	}
 	if len(values) == 0 {
-		return fmt.Errorf("couldn't find any field with path: %s", s.SortField)
+		return nil, fmt.Errorf("couldn't find any field with path: %s", field)
 	}
-	sorter := &RuntimeSort{
-		field: s.SortField,
-		objs:  objs,
-	}
+
+	sorter := NewRuntimeSort(field, objs)
 	sort.Sort(sorter)
-	runtime.SetList(obj, sorter.objs)
-	return nil
+	return sorter, nil
 }
 
 // RuntimeSort is an implementation of the golang sort interface that knows how to sort
 // lists of runtime.Object
 type RuntimeSort struct {
-	field string
-	objs  []runtime.Object
+	field        string
+	objs         []runtime.Object
+	origPosition []int
+}
+
+func NewRuntimeSort(field string, objs []runtime.Object) *RuntimeSort {
+	sorter := &RuntimeSort{field: field, objs: objs, origPosition: make([]int, len(objs))}
+	for ix := range objs {
+		sorter.origPosition[ix] = ix
+	}
+	return sorter
 }
 
 func (r *RuntimeSort) Len() int {
@@ -85,6 +140,47 @@ func (r *RuntimeSort) Len() int {
 
 func (r *RuntimeSort) Swap(i, j int) {
 	r.objs[i], r.objs[j] = r.objs[j], r.objs[i]
+	r.origPosition[i], r.origPosition[j] = r.origPosition[j], r.origPosition[i]
+}
+
+func isLess(i, j reflect.Value) (bool, error) {
+	switch i.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return i.Int() < j.Int(), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return i.Uint() < j.Uint(), nil
+	case reflect.Float32, reflect.Float64:
+		return i.Float() < j.Float(), nil
+	case reflect.String:
+		return i.String() < j.String(), nil
+	case reflect.Ptr:
+		return isLess(i.Elem(), j.Elem())
+	case reflect.Struct:
+		// sort unversioned.Time
+		in := i.Interface()
+		if t, ok := in.(unversioned.Time); ok {
+			return t.Before(j.Interface().(unversioned.Time)), nil
+		}
+		// fallback to the fields comparison
+		for idx := 0; idx < i.NumField(); idx++ {
+			less, err := isLess(i.Field(idx), j.Field(idx))
+			if err != nil || !less {
+				return less, err
+			}
+		}
+		return true, nil
+	case reflect.Array, reflect.Slice:
+		// note: the length of i and j may be different
+		for idx := 0; idx < integer.IntMin(i.Len(), j.Len()); idx++ {
+			less, err := isLess(i.Index(idx), j.Index(idx))
+			if err != nil || !less {
+				return less, err
+			}
+		}
+		return true, nil
+	default:
+		return false, fmt.Errorf("unsortable type: %v", i.Kind())
+	}
 }
 
 func (r *RuntimeSort) Less(i, j int) bool {
@@ -106,18 +202,18 @@ func (r *RuntimeSort) Less(i, j int) bool {
 	iField := iValues[0][0]
 	jField := jValues[0][0]
 
-	switch iField.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return iField.Int() < jField.Int()
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return iField.Uint() < jField.Uint()
-	case reflect.Float32, reflect.Float64:
-		return iField.Float() < jField.Float()
-	case reflect.String:
-		return iField.String() < jField.String()
-	default:
-		glog.Fatalf("Field %s in %v is an unsortable type: %s", r.field, iObj, iField.Kind().String())
+	less, err := isLess(iField, jField)
+	if err != nil {
+		glog.Fatalf("Field %s in %v is an unsortable type: %s, err: %v", r.field, iObj, iField.Kind().String(), err)
 	}
-	// default to preserving order
-	return i < j
+	return less
+}
+
+// Returns the starting (original) position of a particular index.  e.g. If OriginalPosition(0) returns 5 than the
+// the item currently at position 0 was at position 5 in the original unsorted array.
+func (r *RuntimeSort) OriginalPosition(ix int) int {
+	if ix < 0 || ix > len(r.origPosition) {
+		return -1
+	}
+	return r.origPosition[ix]
 }

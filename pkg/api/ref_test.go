@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,21 +20,30 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
 type FakeAPIObject struct{}
 
-func (*FakeAPIObject) IsAnAPIObject() {}
+func (obj *FakeAPIObject) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 type ExtensionAPIObject struct {
-	TypeMeta
+	unversioned.TypeMeta
 	ObjectMeta
 }
 
-func (*ExtensionAPIObject) IsAnAPIObject() {}
+func (obj *ExtensionAPIObject) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
 
 func TestGetReference(t *testing.T) {
+
+	// when vendoring kube, if you don't force the set of registered versions (like make test does)
+	// then you run into trouble because the types aren't registered in the scheme by anything.  This does the
+	// register manually to allow unit test execution
+	if _, _, err := Scheme.ObjectKinds(&Pod{}); err != nil {
+		AddToScheme(Scheme)
+	}
+
 	table := map[string]struct {
 		obj       runtime.Object
 		ref       *ObjectReference
@@ -62,7 +71,7 @@ func TestGetReference(t *testing.T) {
 		},
 		"serviceList": {
 			obj: &ServiceList{
-				ListMeta: ListMeta{
+				ListMeta: unversioned.ListMeta{
 					ResourceVersion: "42",
 					SelfLink:        "/api/version2/services",
 				},
@@ -75,7 +84,7 @@ func TestGetReference(t *testing.T) {
 		},
 		"extensionAPIObject": {
 			obj: &ExtensionAPIObject{
-				TypeMeta: TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind: "ExtensionAPIObject",
 				},
 				ObjectMeta: ObjectMeta{
@@ -95,7 +104,7 @@ func TestGetReference(t *testing.T) {
 		},
 		"badSelfLink": {
 			obj: &ServiceList{
-				ListMeta: ListMeta{
+				ListMeta: unversioned.ListMeta{
 					ResourceVersion: "42",
 					SelfLink:        "version2/services",
 				},

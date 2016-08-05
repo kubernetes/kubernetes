@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package kubelet is the package that contains the libraries that drive the Kubelet binary.
 // The kubelet is responsible for node level pod management.  It runs on each worker in the cluster.
-package kubelet
+package kubelet // import "k8s.io/kubernetes/pkg/kubelet"

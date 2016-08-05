@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,41 +17,16 @@ limitations under the License.
 package kubelet
 
 import (
-	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/client/record"
+	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 )
 
-type fakeEvent struct {
-	object    runtime.Object
-	timestamp util.Time
-	reason    string
-	message   string
-}
-
-type fakeRecorder struct {
-	events []fakeEvent
-}
-
-func (f fakeRecorder) Event(object runtime.Object, reason, message string) {
-	f.events = append(f.events, fakeEvent{object, util.Now(), reason, message})
-}
-
-func (f fakeRecorder) Eventf(object runtime.Object, reason, messageFmt string, args ...interface{}) {
-	f.events = append(f.events, fakeEvent{object, util.Now(), reason, fmt.Sprintf(messageFmt, args...)})
-}
-
-func (f fakeRecorder) PastEventf(object runtime.Object, timestamp util.Time, reason, messageFmt string, args ...interface{}) {
-	f.events = append(f.events, fakeEvent{object, timestamp, reason, fmt.Sprintf(messageFmt, args...)})
-}
-
 func TestBasic(t *testing.T) {
-	fakeRecorder := fakeRecorder{}
-	mockCadvisor := &cadvisor.Fake{}
+	fakeRecorder := &record.FakeRecorder{}
+	mockCadvisor := &cadvisortest.Fake{}
 	node := &api.ObjectReference{}
 	oomWatcher := NewOOMWatcher(mockCadvisor, fakeRecorder)
 	err := oomWatcher.Start(node)

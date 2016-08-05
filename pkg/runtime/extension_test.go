@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ func TestEmbeddedRawExtensionMarshal(t *testing.T) {
 		Ext runtime.RawExtension
 	}
 
-	extension := test{Ext: runtime.RawExtension{RawJSON: []byte(`{"foo":"bar"}`)}}
+	extension := test{Ext: runtime.RawExtension{Raw: []byte(`{"foo":"bar"}`)}}
 	data, err := json.Marshal(extension)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

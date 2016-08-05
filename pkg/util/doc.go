@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,4 +17,4 @@ limitations under the License.
 // Package util implements various utility functions used in both testing and implementation
 // of Kubernetes. Package util may not depend on any other package in the Kubernetes
 // package tree.
-package util
+package util // import "k8s.io/kubernetes/pkg/util"

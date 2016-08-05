@@ -1,3 +1,17 @@
+# Copyright 2016 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 #
 # Redis Dockerfile
 #
@@ -5,30 +19,7 @@
 #
 
 # Pull base image.
-FROM ubuntu
-
-# Install Redis.
-RUN \
-  cd /tmp && \
-  # Modify to stay at this version rather then always update.
-
-  #################################################################
-  ###################### REDIS INSTALL ############################
-  wget http://download.redis.io/releases/redis-2.8.19.tar.gz && \
-  tar xvzf redis-2.8.19.tar.gz && \
-  cd redis-2.8.19 && \
-  ################################################################
-  ################################################################
-  make && \
-  make install && \
-  cp -f src/redis-sentinel /usr/local/bin && \
-  mkdir -p /etc/redis && \
-  cp -f *.conf /etc/redis && \
-  rm -rf /tmp/redis-stable* && \
-  sed -i 's/^\(bind .*\)$/# \1/' /etc/redis/redis.conf && \
-  sed -i 's/^\(daemonize .*\)$/# \1/' /etc/redis/redis.conf && \
-  sed -i 's/^\(dir .*\)$/# \1\ndir \/data/' /etc/redis/redis.conf && \
-  sed -i 's/^\(logfile .*\)$/# \1/' /etc/redis/redis.conf
+FROM redis
 
 # Define mountable directories.
 VOLUME ["/data"]

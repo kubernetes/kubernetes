@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,11 +22,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/errors"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // Repair is a controller loop that periodically examines all service ClusterIP allocations
@@ -64,15 +65,20 @@ func NewRepair(interval time.Duration, registry service.Registry, network *net.I
 
 // RunUntil starts the controller until the provided ch is closed.
 func (c *Repair) RunUntil(ch chan struct{}) {
-	util.Until(func() {
+	wait.Until(func() {
 		if err := c.RunOnce(); err != nil {
-			util.HandleError(err)
+			runtime.HandleError(err)
 		}
 	}, c.interval, ch)
 }
 
 // RunOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) RunOnce() error {
+	return client.RetryOnConflict(client.DefaultBackoff, c.runOnce)
+}
+
+// runOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
+func (c *Repair) runOnce() error {
 	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
 	// or if they are executed against different leaders,
 	// the ordering guarantee required to ensure no IP is allocated twice is violated.
@@ -84,19 +90,21 @@ func (c *Repair) RunOnce() error {
 	// important when we start apiserver and etcd at the same time.
 	var latest *api.RangeAllocation
 	var err error
-	for i := 0; i < 10; i++ {
-		if latest, err = c.alloc.Get(); err != nil {
-			time.Sleep(time.Second)
-		} else {
-			break
-		}
-	}
+	err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+		latest, err = c.alloc.Get()
+		return err == nil, err
+	})
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
 
 	ctx := api.WithNamespace(api.NewDefaultContext(), api.NamespaceAll)
-	list, err := c.registry.ListServices(ctx, labels.Everything(), fields.Everything())
+	// We explicitly send no resource version, since the resource version
+	// of 'latest' is from a different collection, it's not comparable to
+	// the service collection. The caching layer keeps per-collection RVs,
+	// and this is proper, since in theory the collections could be hosted
+	// in separate etcd (or even non-etcd) instances.
+	list, err := c.registry.ListServices(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
@@ -109,7 +117,7 @@ func (c *Repair) RunOnce() error {
 		ip := net.ParseIP(svc.Spec.ClusterIP)
 		if ip == nil {
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
+			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
 			continue
 		}
 		switch err := r.Allocate(ip); err {
@@ -117,11 +125,11 @@ func (c *Repair) RunOnce() error {
 		case ipallocator.ErrAllocated:
 			// TODO: send event
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
+			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s was assigned to multiple services; please recreate", ip, svc.Name, svc.Namespace))
 		case ipallocator.ErrNotInRange:
 			// TODO: send event
 			// cluster IP is broken, reallocate
-			util.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
+			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
 		case ipallocator.ErrFull:
 			// TODO: send event
 			return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services", r)
@@ -130,12 +138,14 @@ func (c *Repair) RunOnce() error {
 		}
 	}
 
-	err = r.Snapshot(latest)
-	if err != nil {
-		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
+	if err := r.Snapshot(latest); err != nil {
+		return fmt.Errorf("unable to snapshot the updated service IP allocations: %v", err)
 	}
 
 	if err := c.alloc.CreateOrUpdate(latest); err != nil {
+		if errors.IsConflict(err) {
+			return err
+		}
 		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
 	}
 	return nil

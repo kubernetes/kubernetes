@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/proxy"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // Abstraction over TCP/UDP sockets which are proxied.
@@ -46,7 +46,11 @@ type proxySocket interface {
 }
 
 func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, error) {
-	host := ip.String()
+	host := ""
+	if ip != nil {
+		host = ip.String()
+	}
+
 	switch strings.ToUpper(string(protocol)) {
 	case "TCP":
 		listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
@@ -69,7 +73,7 @@ func newProxySocket(protocol api.Protocol, ip net.IP, port int) (proxySocket, er
 }
 
 // How long we wait for a connection to a backend in seconds
-var endpointDialTimeout = []time.Duration{1, 2, 4, 8}
+var endpointDialTimeout = []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, 1 * time.Second, 2 * time.Second}
 
 // tcpProxySocket implements proxySocket.  Close() is implemented by net.Listener.  When Close() is called,
 // no new connections are allowed but existing connections are left untouched.
@@ -83,8 +87,9 @@ func (tcp *tcpProxySocket) ListenPort() int {
 }
 
 func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string, proxier *Proxier) (out net.Conn, err error) {
-	for _, retryTimeout := range endpointDialTimeout {
-		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr)
+	sessionAffinityReset := false
+	for _, dialTimeout := range endpointDialTimeout {
+		endpoint, err := proxier.loadBalancer.NextEndpoint(service, srcAddr, sessionAffinityReset)
 		if err != nil {
 			glog.Errorf("Couldn't find an endpoint for %s: %v", service, err)
 			return nil, err
@@ -92,12 +97,13 @@ func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string
 		glog.V(3).Infof("Mapped service %q to endpoint %s", service, endpoint)
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
-		outConn, err := net.DialTimeout(protocol, endpoint, retryTimeout*time.Second)
+		outConn, err := net.DialTimeout(protocol, endpoint, dialTimeout)
 		if err != nil {
 			if isTooManyFDsError(err) {
 				panic("Dial failed: " + err.Error())
 			}
 			glog.Errorf("Dial failed: %v", err)
+			sessionAffinityReset = true
 			continue
 		}
 		return outConn, nil
@@ -107,7 +113,7 @@ func tryConnect(service proxy.ServicePortName, srcAddr net.Addr, protocol string
 
 func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
 	for {
-		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
+		if !myInfo.isAlive() {
 			// The service port was closed or replaced.
 			return
 		}
@@ -121,14 +127,14 @@ func (tcp *tcpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serv
 			if isClosedError(err) {
 				return
 			}
-			if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
+			if !myInfo.isAlive() {
 				// Then the service port was just closed so the accept failure is to be expected.
 				return
 			}
 			glog.Errorf("Accept failed: %v", err)
 			continue
 		}
-		glog.V(2).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
+		glog.V(3).Infof("Accepted TCP connection from %v to %v", inConn.RemoteAddr(), inConn.LocalAddr())
 		outConn, err := tryConnect(service, inConn.(*net.TCPConn).RemoteAddr(), "tcp", proxier)
 		if err != nil {
 			glog.Errorf("Failed to connect to balancer: %v", err)
@@ -149,8 +155,6 @@ func proxyTCP(in, out *net.TCPConn) {
 	go copyBytes("from backend", in, out, &wg)
 	go copyBytes("to backend", out, in, &wg)
 	wg.Wait()
-	in.Close()
-	out.Close()
 }
 
 func copyBytes(direction string, dest, src *net.TCPConn, wg *sync.WaitGroup) {
@@ -158,11 +162,13 @@ func copyBytes(direction string, dest, src *net.TCPConn, wg *sync.WaitGroup) {
 	glog.V(4).Infof("Copying %s: %s -> %s", direction, src.RemoteAddr(), dest.RemoteAddr())
 	n, err := io.Copy(dest, src)
 	if err != nil {
-		glog.Errorf("I/O error: %v", err)
+		if !isClosedError(err) {
+			glog.Errorf("I/O error: %v", err)
+		}
 	}
 	glog.V(4).Infof("Copied %d bytes %s: %s -> %s", n, direction, src.RemoteAddr(), dest.RemoteAddr())
-	dest.CloseWrite()
-	src.CloseRead()
+	dest.Close()
+	src.Close()
 }
 
 // udpProxySocket implements proxySocket.  Close() is implemented by net.UDPConn.  When Close() is called,
@@ -194,7 +200,7 @@ func newClientCache() *clientCache {
 func (udp *udpProxySocket) ProxyLoop(service proxy.ServicePortName, myInfo *serviceInfo, proxier *Proxier) {
 	var buffer [4096]byte // 4KiB should be enough for most whole-packets
 	for {
-		if info, exists := proxier.getServiceInfo(service); !exists || info != myInfo {
+		if !myInfo.isAlive() {
 			// The service port was closed or replaced.
 			break
 		}
@@ -243,7 +249,7 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 	if !found {
 		// TODO: This could spin up a new goroutine to make the outbound connection,
 		// and keep accepting inbound traffic.
-		glog.V(2).Infof("New UDP connection from %s", cliAddr)
+		glog.V(3).Infof("New UDP connection from %s", cliAddr)
 		var err error
 		svrConn, err = tryConnect(service, cliAddr, "udp", proxier)
 		if err != nil {
@@ -255,7 +261,7 @@ func (udp *udpProxySocket) getBackendConn(activeClients *clientCache, cliAddr ne
 		}
 		activeClients.clients[cliAddr.String()] = svrConn
 		go func(cliAddr net.Addr, svrConn net.Conn, activeClients *clientCache, timeout time.Duration) {
-			defer util.HandleCrash()
+			defer runtime.HandleCrash()
 			udp.proxyClient(cliAddr, svrConn, activeClients, timeout)
 		}(cliAddr, svrConn, activeClients, timeout)
 	}

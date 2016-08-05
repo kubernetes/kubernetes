@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: dns-backend
-          image: ddysher/dns-backend
+          image: gcr.io/google_containers/example-dns-backend:v1
           ports:
             - name: backend-port
               containerPort: 8000

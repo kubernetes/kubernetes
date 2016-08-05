@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/net"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 var (
@@ -52,7 +53,7 @@ func (r *randomAllocator) Release(_ int) {
 // newPortAllocator builds PortAllocator for a given PortRange. If the PortRange is empty
 // then a random port allocator is returned; otherwise, a new range-based allocator
 // is returned.
-func newPortAllocator(r util.PortRange) PortAllocator {
+func newPortAllocator(r net.PortRange) PortAllocator {
 	if r.Base == 0 {
 		return &randomAllocator{}
 	}
@@ -66,14 +67,14 @@ const (
 )
 
 type rangeAllocator struct {
-	util.PortRange
+	net.PortRange
 	ports chan int
 	used  big.Int
 	lock  sync.Mutex
 	rand  *rand.Rand
 }
 
-func newPortRangeAllocator(r util.PortRange) PortAllocator {
+func newPortRangeAllocator(r net.PortRange) PortAllocator {
 	if r.Base == 0 || r.Size == 0 {
 		panic("illegal argument: may not specify an empty port range")
 	}
@@ -82,7 +83,7 @@ func newPortRangeAllocator(r util.PortRange) PortAllocator {
 		ports:     make(chan int, portsBufSize),
 		rand:      rand.New(rand.NewSource(time.Now().UnixNano())),
 	}
-	go util.Until(func() { ra.fillPorts(util.NeverStop) }, nextFreePortCooldown, util.NeverStop)
+	go wait.Until(func() { ra.fillPorts(wait.NeverStop) }, nextFreePortCooldown, wait.NeverStop)
 	return ra
 }
 

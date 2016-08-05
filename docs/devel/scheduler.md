@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/devel/scheduler.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/docs/devel/scheduler.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -47,7 +48,7 @@ will filter out nodes that don't have at least that much resources available (co
 as the capacity of the node minus the sum of the resource requests of the containers that
 are already running on the node). Second, it applies a set of "priority functions"
 that rank the nodes that weren't filtered out by the predicate check. For example,
-it tries to spread Pods across nodes while at the same time favoring the least-loaded
+it tries to spread Pods across nodes and zones while at the same time favoring the least-loaded
 nodes (where "load" here is sum of the resource requests of the containers running on the node,
 divided by the node's capacity).
 Finally, the node with the highest priority is chosen

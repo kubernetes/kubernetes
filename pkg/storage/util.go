@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,12 +17,14 @@ limitations under the License.
 package storage
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/fielderrors"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 type SimpleUpdateFunc func(runtime.Object) (runtime.Object, error)
@@ -35,20 +37,68 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 	}
 }
 
+// SimpleFilter implements Filter interface.
+type SimpleFilter struct {
+	filterFunc  func(runtime.Object) bool
+	triggerFunc func() []MatchValue
+}
+
+func (s *SimpleFilter) Filter(obj runtime.Object) bool {
+	return s.filterFunc(obj)
+}
+
+func (s *SimpleFilter) Trigger() []MatchValue {
+	return s.triggerFunc()
+}
+
+func NewSimpleFilter(
+	filterFunc func(runtime.Object) bool,
+	triggerFunc func() []MatchValue) Filter {
+	return &SimpleFilter{
+		filterFunc:  filterFunc,
+		triggerFunc: triggerFunc,
+	}
+}
+
+func EverythingFunc(runtime.Object) bool {
+	return true
+}
+
+func NoTriggerFunc() []MatchValue {
+	return nil
+}
+
+func NoTriggerPublisher(runtime.Object) []MatchValue {
+	return nil
+}
+
 // ParseWatchResourceVersion takes a resource version argument and converts it to
 // the etcd version we should pass to helper.Watch(). Because resourceVersion is
 // an opaque value, the default watch behavior for non-zero watch is to watch
 // the next value (if you pass "1", you will see updates from "2" onwards).
-func ParseWatchResourceVersion(resourceVersion, kind string) (uint64, error) {
+func ParseWatchResourceVersion(resourceVersion string) (uint64, error) {
 	if resourceVersion == "" || resourceVersion == "0" {
 		return 0, nil
 	}
 	version, err := strconv.ParseUint(resourceVersion, 10, 64)
 	if err != nil {
-		// TODO: Does this need to be a ValidationErrorList?  I can't convince myself it does.
-		return 0, errors.NewInvalid(kind, "", fielderrors.ValidationErrorList{fielderrors.NewFieldInvalid("resourceVersion", resourceVersion, err.Error())})
+		return 0, NewInvalidError(field.ErrorList{
+			// Validation errors are supposed to return version-specific field
+			// paths, but this is probably close enough.
+			field.Invalid(field.NewPath("resourceVersion"), resourceVersion, err.Error()),
+		})
 	}
-	return version + 1, nil
+	return version, nil
+}
+
+// ParseListResourceVersion takes a resource version argument and converts it to
+// the etcd version.
+func ParseListResourceVersion(resourceVersion string) (uint64, error) {
+	if resourceVersion == "" {
+		return 0, nil
+	}
+	version, err := strconv.ParseUint(resourceVersion, 10, 64)
+	return version, err
 }
 
 func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
@@ -56,7 +106,11 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return prefix + "/" + meta.Namespace() + "/" + meta.Name(), nil
+	name := meta.GetName()
+	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+		return "", fmt.Errorf("invalid name: %v", msgs)
+	}
+	return prefix + "/" + meta.GetNamespace() + "/" + name, nil
 }
 
 func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
@@ -64,5 +118,34 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return prefix + "/" + meta.Name(), nil
+	name := meta.GetName()
+	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+		return "", fmt.Errorf("invalid name: %v", msgs)
+	}
+	return prefix + "/" + name, nil
+}
+
+// hasPathPrefix returns true if the string matches pathPrefix exactly, or if is prefixed with pathPrefix at a path segment boundary
+func hasPathPrefix(s, pathPrefix string) bool {
+	// Short circuit if s doesn't contain the prefix at all
+	if !strings.HasPrefix(s, pathPrefix) {
+		return false
+	}
+
+	pathPrefixLength := len(pathPrefix)
+
+	if len(s) == pathPrefixLength {
+		// Exact match
+		return true
+	}
+	if strings.HasSuffix(pathPrefix, "/") {
+		// pathPrefix already ensured a path segment boundary
+		return true
+	}
+	if s[pathPrefixLength:pathPrefixLength+1] == "/" {
+		// The next character in s is a path segment boundary
+		// Check this instead of normalizing pathPrefix to avoid allocating on every call
+		return true
+	}
+	return false
 }

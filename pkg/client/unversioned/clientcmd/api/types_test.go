@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 	"github.com/ghodss/yaml"
 )
 
-func ExampleEmptyConfig() {
+func Example_emptyConfig() {
 	defaultConfig := NewConfig()
 
 	output, err := yaml.Marshal(defaultConfig)
@@ -39,18 +39,16 @@ func ExampleEmptyConfig() {
 	// users: {}
 }
 
-func ExampleOfOptionsConfig() {
+func Example_ofOptionsConfig() {
 	defaultConfig := NewConfig()
 	defaultConfig.Preferences.Colors = true
 	defaultConfig.Clusters["alfa"] = &Cluster{
 		Server:                "https://alfa.org:8080",
-		APIVersion:            "v1beta2",
 		InsecureSkipTLSVerify: true,
 		CertificateAuthority:  "path/to/my/cert-ca-filename",
 	}
 	defaultConfig.Clusters["bravo"] = &Cluster{
 		Server:                "https://bravo.org:8080",
-		APIVersion:            "v1beta1",
 		InsecureSkipTLSVerify: false,
 	}
 	defaultConfig.AuthInfos["white-mage-via-cert"] = &AuthInfo{
@@ -60,14 +58,23 @@ func ExampleOfOptionsConfig() {
 	defaultConfig.AuthInfos["red-mage-via-token"] = &AuthInfo{
 		Token: "my-secret-token",
 	}
+	defaultConfig.AuthInfos["black-mage-via-auth-provider"] = &AuthInfo{
+		AuthProvider: &AuthProviderConfig{
+			Name: "gcp",
+			Config: map[string]string{
+				"foo":   "bar",
+				"token": "s3cr3t-t0k3n",
+			},
+		},
+	}
 	defaultConfig.Contexts["bravo-as-black-mage"] = &Context{
 		Cluster:   "bravo",
-		AuthInfo:  "black-mage-via-file",
+		AuthInfo:  "black-mage-via-auth-provider",
 		Namespace: "yankee",
 	}
 	defaultConfig.Contexts["alfa-as-black-mage"] = &Context{
 		Cluster:   "alfa",
-		AuthInfo:  "black-mage-via-file",
+		AuthInfo:  "black-mage-via-auth-provider",
 		Namespace: "zulu",
 	}
 	defaultConfig.Contexts["alfa-as-white-mage"] = &Context{
@@ -86,20 +93,18 @@ func ExampleOfOptionsConfig() {
 	// clusters:
 	//   alfa:
 	//     LocationOfOrigin: ""
-	//     api-version: v1beta2
 	//     certificate-authority: path/to/my/cert-ca-filename
 	//     insecure-skip-tls-verify: true
 	//     server: https://alfa.org:8080
 	//   bravo:
 	//     LocationOfOrigin: ""
-	//     api-version: v1beta1
 	//     server: https://bravo.org:8080
 	// contexts:
 	//   alfa-as-black-mage:
 	//     LocationOfOrigin: ""
 	//     cluster: alfa
 	//     namespace: zulu
-	//     user: black-mage-via-file
+	//     user: black-mage-via-auth-provider
 	//   alfa-as-white-mage:
 	//     LocationOfOrigin: ""
 	//     cluster: alfa
@@ -108,11 +113,18 @@ func ExampleOfOptionsConfig() {
 	//     LocationOfOrigin: ""
 	//     cluster: bravo
 	//     namespace: yankee
-	//     user: black-mage-via-file
+	//     user: black-mage-via-auth-provider
 	// current-context: alfa-as-white-mage
 	// preferences:
 	//   colors: true
 	// users:
+	//   black-mage-via-auth-provider:
+	//     LocationOfOrigin: ""
+	//     auth-provider:
+	//       config:
+	//         foo: bar
+	//         token: s3cr3t-t0k3n
+	//       name: gcp
 	//   red-mage-via-token:
 	//     LocationOfOrigin: ""
 	//     token: my-secret-token

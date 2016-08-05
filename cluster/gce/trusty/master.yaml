@@ -1,0 +1,230 @@
+From nobody Thu May 13 20:33:00 2016
+Content-Type: multipart/mixed; boundary="===================================="
+MIME-Version: 1.0
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-master.conf"
+
+#upstart-job
+
+description "Download and install k8s binaries and configurations"
+
+start on cloud-config
+
+script
+{
+	set -o errexit
+	set -o nounset
+
+	# Fetch the script for installing master binary and configuration files.
+	curl --fail --retry 5 --retry-delay 3 --silent --show-error \
+		-H "X-Google-Metadata-Request: True" \
+		-o /etc/kube-configure.sh \
+		http://metadata.google.internal/computeMetadata/v1/instance/attributes/configure-sh
+	. /etc/kube-configure.sh
+	set_broken_motd
+	echo "Downloading kube-env file"
+	download_kube_env
+	. /etc/kube-env
+	echo "Install kube master binary and configuration files"
+	install_kube_binary_config
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-env.conf"
+
+#upstart-job
+
+description "Prepare kube master environment"
+
+start on stopped kube-install-master
+
+script
+{
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure-helper.sh
+	. /etc/kube-env
+	echo "Configuring hostname"
+	config_hostname
+	echo "Configuring IP firewall rules"
+	config_ip_firewall
+	echo "Creating required directories"
+	create_dirs
+	echo "Mount master PD"
+	mount_master_pd
+	echo "Creating kubernetes master auth file"
+	create_master_auth
+	echo "Creating master instance kubelet auth file"
+	create_master_kubelet_auth
+	echo "Assemble kubelet command line"
+	# Kubelet command flags will be written in /etc/default/kubelet
+	assemble_kubelet_flags
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-packages.conf"
+
+#upstart-job
+
+description "Install packages needed to run kubernetes"
+
+start on stopped kube-install-master
+
+script
+{
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure-helper.sh
+	install_critical_packages
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-install-additional-packages.conf"
+
+#upstart-job
+
+description "Install additional packages used by kubernetes"
+
+start on stopped kube-install-packages
+
+script
+{
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure-helper.sh
+	install_additional_packages
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kubelet.conf"
+
+#upstart-job
+
+description "Run kubelet service"
+
+start on stopped kube-install-packages and stopped kube-env
+
+respawn
+
+script
+{
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure-helper.sh
+	start_kubelet
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
+end script
+
+# Wait for 10s to start kubelet again.
+post-stop exec sleep 10
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-docker.conf"
+
+#upstart-job
+
+description "Restart docker daemon"
+
+start on started kubelet
+
+script
+{
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure-helper.sh
+	. /etc/kube-env
+	restart_docker_daemon
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-master-components.conf"
+
+#upstart-job
+
+description "Start kube-master components and addons pods"
+
+start on stopped kube-docker
+
+script
+{
+	set -o errexit
+	set -o nounset
+
+	. /etc/kube-configure-helper.sh
+	. /etc/kube-env
+	start_etcd_servers
+	start_fluentd
+	compute_master_manifest_variables
+	start_kube_apiserver
+	start_kube_controller_manager
+	start_kube_scheduler
+	start_kube_addons
+	start_cluster_autoscaler
+	reset_motd
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
+end script
+
+--====================================
+MIME-Version: 1.0
+Content-Type: text/upstart-job; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Content-Disposition: attachment; filename="kube-master-health-monitoring.conf"
+
+#upstart-job
+
+description "Kubenetes master health monitoring"
+
+start on stopped kube-docker
+
+respawn
+
+script
+{
+	set -o errexit
+	set -o nounset
+
+	# Wait for a minute to let docker and kubelet processes finish initialization.
+	# TODO(andyzheng0831): replace it with a more reliable method if possible.
+	sleep 60
+	. /etc/kube-configure-helper.sh
+	. /etc/kube-env
+	health_monitoring
+} 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
+end script
+
+# Wait for 10s to start it again.
+post-stop exec sleep 10
+
+--====================================--

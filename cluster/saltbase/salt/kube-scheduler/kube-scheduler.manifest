@@ -1,8 +1,11 @@
 {% set params = "" -%}
 
-{% if pillar['log_level'] is defined -%}
-{% set params = params + " " + pillar['log_level'] -%}
+{% set log_level = pillar['log_level'] -%}
+{% if pillar['scheduler_test_log_level'] is defined -%}
+  {% set log_level = pillar['scheduler_test_log_level'] -%}
 {% endif -%}
+
+{% set params = params + log_level -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['scheduler_test_args'] is defined -%}
@@ -14,17 +17,21 @@
 "kind": "Pod",
 "metadata": {
   "name":"kube-scheduler",
-  "namespace": "kube-system"
+  "namespace": "kube-system",
+  "labels": {
+    "tier": "control-plane",
+    "component": "kube-scheduler"
+  }
 },
 "spec":{
 "hostNetwork": true,
 "containers":[
     {
     "name": "kube-scheduler",
-    "image": "gcr.io/google_containers/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
+    "image": "{{pillar['kube_docker_registry']}}/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
     "resources": {
-      "limits": {
-        "cpu": "200m"
+      "requests": {
+        "cpu": "100m"
       }
     },
     "command": [

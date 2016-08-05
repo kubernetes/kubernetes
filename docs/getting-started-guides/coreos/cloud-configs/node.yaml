@@ -18,17 +18,12 @@ coreos:
   fleet:
     metadata: "role=node"
   units:
+    - name: etcd2.service
+      command: start
     - name: fleet.service
       command: start
     - name: flanneld.service
       command: start
-      drop-ins:
-        - name: 50-network-config.conf
-          content: |
-            [Unit]
-            Requires=etcd2.service
-            [Service]
-            ExecStartPre=/usr/bin/etcdctl set /coreos.com/network/config '{"Network":"10.244.0.0/16", "Backend": {"Type": "vxlan"}}'
     - name: docker.service
       command: start
     - name: setup-network-environment.service
@@ -52,12 +47,12 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes Proxy
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=setup-network-environment.service
         After=setup-network-environment.service
 
         [Service]
-        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-proxy -z /opt/bin/kube-proxy https://storage.googleapis.com/kubernetes-release/release/v1.0.3/bin/linux/amd64/kube-proxy
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kube-proxy -z /opt/bin/kube-proxy https://storage.googleapis.com/kubernetes-release/release/v1.1.2/bin/linux/amd64/kube-proxy
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kube-proxy
         # wait for kubernetes master to be up and ready
         ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080
@@ -71,13 +66,13 @@ coreos:
       content: |
         [Unit]
         Description=Kubernetes Kubelet
-        Documentation=https://github.com/GoogleCloudPlatform/kubernetes
+        Documentation=https://github.com/kubernetes/kubernetes
         Requires=setup-network-environment.service
         After=setup-network-environment.service
 
         [Service]
         EnvironmentFile=/etc/network-environment
-        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kubelet -z /opt/bin/kubelet https://storage.googleapis.com/kubernetes-release/release/v1.0.3/bin/linux/amd64/kubelet
+        ExecStartPre=/usr/bin/curl -L -o /opt/bin/kubelet -z /opt/bin/kubelet https://storage.googleapis.com/kubernetes-release/release/v1.1.2/bin/linux/amd64/kubelet
         ExecStartPre=/usr/bin/chmod +x /opt/bin/kubelet
         # wait for kubernetes master to be up and ready
         ExecStartPre=/opt/bin/wupiao <master-private-ip> 8080

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,8 +22,7 @@ import (
 	"net/url"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -56,13 +55,29 @@ type Storage interface {
 	New() runtime.Object
 }
 
+// KindProvider specifies a different kind for its API than for its internal storage.  This is necessary for external
+// objects that are not compiled into the api server.  For such objects, there is no in-memory representation for
+// the object, so they must be represented as generic objects (e.g. runtime.Unknown), but when we present the object as part of
+// API discovery we want to present the specific kind, not the generic internal representation.
+type KindProvider interface {
+	Kind() string
+}
+
 // Lister is an object that can retrieve resources that match the provided field and label criteria.
 type Lister interface {
 	// NewList returns an empty object that can be used with the List call.
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	NewList() runtime.Object
-	// List selects resources in the storage which match to the selector.
-	List(ctx api.Context, label labels.Selector, field fields.Selector) (runtime.Object, error)
+	// List selects resources in the storage which match to the selector. 'options' can be nil.
+	List(ctx api.Context, options *api.ListOptions) (runtime.Object, error)
+}
+
+// Exporter is an object that knows how to strip a RESTful resource for export
+type Exporter interface {
+	// Export an object.  Fields that are not user specified (e.g. Status, ObjectMeta.ResourceVersion) are stripped out
+	// Returns the stripped object.  If 'exact' is true, fields that are specific to the cluster (e.g. namespace) are
+	// retained, otherwise they are stripped also.
+	Export(ctx api.Context, name string, opts unversioned.ExportOptions) (runtime.Object, error)
 }
 
 // Getter is an object that can retrieve a named RESTful resource.
@@ -89,7 +104,7 @@ type GetterWithOptions interface {
 	// value of the request path below the object will be included as the named
 	// string in the serialization of the runtime object. E.g., returning "path"
 	// will convert the trailing request scheme value to "path" in the map[string][]string
-	// passed to the convertor.
+	// passed to the converter.
 	NewGetOptions() (runtime.Object, bool, string)
 }
 
@@ -126,6 +141,17 @@ func (w GracefulDeleteAdapter) Delete(ctx api.Context, name string, options *api
 	return w.Deleter.Delete(ctx, name)
 }
 
+// CollectionDeleter is an object that can delete a collection
+// of RESTful resources.
+type CollectionDeleter interface {
+	// DeleteCollection selects all resources in the storage matching given 'listOptions'
+	// and deletes them. If 'options' are provided, the resource will attempt to honor
+	// them or return an invalid request error.
+	// DeleteCollection may not be atomic - i.e. it may delete some objects and still
+	// return an error after it. On success, returns a list of deleted objects.
+	DeleteCollection(ctx api.Context, options *api.DeleteOptions, listOptions *api.ListOptions) (runtime.Object, error)
+}
+
 // Creater is an object that can create an instance of a RESTful object.
 type Creater interface {
 	// New returns an empty object that can be used with Create after request data has been put into it.
@@ -148,6 +174,19 @@ type NamedCreater interface {
 	Create(ctx api.Context, name string, obj runtime.Object) (runtime.Object, error)
 }
 
+// UpdatedObjectInfo provides information about an updated object to an Updater.
+// It requires access to the old object in order to return the newly updated object.
+type UpdatedObjectInfo interface {
+	// Returns preconditions built from the updated object, if applicable.
+	// May return nil, or a preconditions object containing nil fields,
+	// if no preconditions can be determined from the updated object.
+	Preconditions() *api.Preconditions
+
+	// UpdatedObject returns the updated object, given a context and old object.
+	// The only time an empty oldObj should be passed in is if a "create on update" is occurring (there is no oldObj).
+	UpdatedObject(ctx api.Context, oldObj runtime.Object) (newObj runtime.Object, err error)
+}
+
 // Updater is an object that can update an instance of a RESTful object.
 type Updater interface {
 	// New returns an empty object that can be used with Update after request data has been put into it.
@@ -157,14 +196,14 @@ type Updater interface {
 	// Update finds a resource in the storage and updates it. Some implementations
 	// may allow updates creates the object - they should set the created boolean
 	// to true.
-	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
+	Update(ctx api.Context, name string, objInfo UpdatedObjectInfo) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater is a storage object that must support both create and update.
 // Go prevents embedded interfaces that implement the same method.
 type CreaterUpdater interface {
 	Creater
-	Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error)
+	Update(ctx api.Context, name string, objInfo UpdatedObjectInfo) (runtime.Object, bool, error)
 }
 
 // CreaterUpdater must satisfy the Updater interface.
@@ -183,7 +222,7 @@ type Watcher interface {
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
 	// particular version.
-	Watch(ctx api.Context, label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error)
+	Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error)
 }
 
 // StandardStorage is an interface covering the common verbs. Provided for testing whether a
@@ -193,6 +232,7 @@ type StandardStorage interface {
 	Lister
 	CreaterUpdater
 	GracefulDeleter
+	CollectionDeleter
 	Watcher
 }
 
@@ -202,20 +242,24 @@ type Redirector interface {
 	ResourceLocation(ctx api.Context, id string) (remoteLocation *url.URL, transport http.RoundTripper, err error)
 }
 
-// ConnectHandler is a handler for HTTP connection requests. It extends the standard
-// http.Handler interface by adding a method that returns an error object if an error
-// occurred during the handling of the request.
-type ConnectHandler interface {
-	http.Handler
-
-	// RequestError returns an error if one occurred during handling of an HTTP request
-	RequestError() error
+// Responder abstracts the normal response behavior for a REST method and is passed to callers that
+// may wish to handle the response directly in some cases, but delegate to the normal error or object
+// behavior in other cases.
+type Responder interface {
+	// Object writes the provided object to the response. Invoking this method multiple times is undefined.
+	Object(statusCode int, obj runtime.Object)
+	// Error writes the provided error to the response. This method may only be invoked once.
+	Error(err error)
 }
 
-// Connecter is a storage object that responds to a connection request
+// Connecter is a storage object that responds to a connection request.
 type Connecter interface {
-	// Connect returns a ConnectHandler that will handle the request/response for a request
-	Connect(ctx api.Context, id string, options runtime.Object) (ConnectHandler, error)
+	// Connect returns an http.Handler that will handle the request/response for a given API invocation.
+	// The provided responder may be used for common API responses. The responder will write both status
+	// code and body, so the ServeHTTP method should exit after invoking the responder. The Handler will
+	// be used for a single API request and then discarded. The Responder is guaranteed to write to the
+	// same http.ResponseWriter passed to ServeHTTP.
+	Connect(ctx api.Context, id string, options runtime.Object, r Responder) (http.Handler, error)
 
 	// NewConnectOptions returns an empty options object that will be used to pass
 	// options to the Connect method. If nil, then a nil options object is passed to
@@ -259,5 +303,4 @@ type ConnectRequest struct {
 	ResourcePath string
 }
 
-// IsAnAPIObject makes ConnectRequest a runtime.Object
-func (*ConnectRequest) IsAnAPIObject() {}
+func (obj *ConnectRequest) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }

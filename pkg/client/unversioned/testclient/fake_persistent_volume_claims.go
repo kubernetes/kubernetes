@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -37,8 +35,8 @@ func (c *FakePersistentVolumeClaims) Get(name string) (*api.PersistentVolumeClai
 	return obj.(*api.PersistentVolumeClaim), err
 }
 
-func (c *FakePersistentVolumeClaims) List(label labels.Selector, field fields.Selector) (*api.PersistentVolumeClaimList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("persistentvolumeclaims", c.Namespace, label, field), &api.PersistentVolumeClaimList{})
+func (c *FakePersistentVolumeClaims) List(opts api.ListOptions) (*api.PersistentVolumeClaimList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("persistentvolumeclaims", c.Namespace, opts), &api.PersistentVolumeClaimList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -69,19 +67,12 @@ func (c *FakePersistentVolumeClaims) Delete(name string) error {
 	return err
 }
 
-func (c *FakePersistentVolumeClaims) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("persistentvolumeclaims", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+func (c *FakePersistentVolumeClaims) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("persistentvolumeclaims", c.Namespace, opts))
 }
 
 func (c *FakePersistentVolumeClaims) UpdateStatus(claim *api.PersistentVolumeClaim) (*api.PersistentVolumeClaim, error) {
-	action := UpdateActionImpl{}
-	action.Verb = "update"
-	action.Resource = "persistentvolumeclaims"
-	action.Subresource = "status"
-	action.Object = claim
-
-	obj, err := c.Fake.Invokes(action, claim)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("persistentvolumeclaims", "status", c.Namespace, claim), claim)
 	if obj == nil {
 		return nil, err
 	}

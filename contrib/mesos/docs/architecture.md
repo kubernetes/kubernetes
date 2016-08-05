@@ -8,7 +8,7 @@ the executor component integrates Kubernetes kubelet services and the Mesos exec
 
 Multiple Mesos masters are typically configured to coordinate leadership election via Zookeeper.
 Future releases of Mesos may implement leader election protocols [differently][2].
-Kubernetes maintains its internal registry (pods, replication controllers, bindings, minions, services) in etcd.
+Kubernetes maintains its internal registry (pods, replication controllers, bindings, nodes, services) in etcd.
 Users typically interact with Kubernetes using the `kubectl` command to manage Kubernetes primitives.
 
 When a pod is created in Kubernetes, the k8sm scheduler creates an associated Mesos task and queues it for scheduling.

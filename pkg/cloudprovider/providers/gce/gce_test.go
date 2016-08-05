@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_cloud
+package gce
 
 import (
+	"reflect"
 	"testing"
 )
 
 func TestGetRegion(t *testing.T) {
+	zoneName := "us-central1-b"
+	regionName, err := GetGCERegion(zoneName)
+	if err != nil {
+		t.Fatalf("unexpected error from GetGCERegion: %v", err)
+	}
+	if regionName != "us-central1" {
+		t.Errorf("Unexpected region from GetGCERegion: %s", regionName)
+	}
 	gce := &GCECloud{
-		zone: "us-central1-b",
+		localZone: zoneName,
+		region:    regionName,
 	}
 	zones, ok := gce.Zones()
 	if !ok {
@@ -34,34 +44,6 @@ func TestGetRegion(t *testing.T) {
 	}
 	if zone.Region != "us-central1" {
 		t.Errorf("Unexpected region: %s", zone.Region)
-	}
-}
-
-func TestGetHostTag(t *testing.T) {
-	tests := []struct {
-		host     string
-		expected string
-	}{
-		{
-			host:     "kubernetes-minion-559o",
-			expected: "kubernetes-minion",
-		},
-		{
-			host:     "gke-test-ea6e8c80-node-8ytk",
-			expected: "gke-test-ea6e8c80-node",
-		},
-		{
-			host:     "kubernetes-minion-559o.c.PROJECT_NAME.internal",
-			expected: "kubernetes-minion",
-		},
-	}
-
-	gce := &GCECloud{}
-	for _, test := range tests {
-		hostTag := gce.computeHostTag(test.host)
-		if hostTag != test.expected {
-			t.Errorf("expected: %s, saw: %s for %s", test.expected, hostTag, test.host)
-		}
 	}
 }
 
@@ -118,11 +100,61 @@ func TestComparingHostURLs(t *testing.T) {
 
 	for _, test := range tests {
 		link1 := hostURLToComparablePath(test.host1)
-		link2 := makeComparableHostPath(test.zone, test.name)
+		testInstance := &gceInstance{
+			Name: canonicalizeInstanceName(test.name),
+			Zone: test.zone,
+		}
+		link2 := testInstance.makeComparableHostPath()
 		if test.expectEqual && link1 != link2 {
 			t.Errorf("expected link1 and link2 to be equal, got %s and %s", link1, link2)
 		} else if !test.expectEqual && link1 == link2 {
 			t.Errorf("expected link1 and link2 not to be equal, got %s and %s", link1, link2)
 		}
+	}
+}
+
+func TestScrubDNS(t *testing.T) {
+	tcs := []struct {
+		nameserversIn  []string
+		searchesIn     []string
+		nameserversOut []string
+		searchesOut    []string
+	}{
+		{
+			nameserversIn:  []string{"1.2.3.4", "5.6.7.8"},
+			nameserversOut: []string{"1.2.3.4", "5.6.7.8"},
+		},
+		{
+			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "google.internal."},
+			searchesOut: []string{"c.prj.internal.", "google.internal."},
+		},
+		{
+			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "zone.c.prj.internal.", "google.internal."},
+			searchesOut: []string{"c.prj.internal.", "zone.c.prj.internal.", "google.internal."},
+		},
+		{
+			searchesIn:  []string{"c.prj.internal.", "12345678910.google.internal.", "zone.c.prj.internal.", "google.internal.", "unexpected"},
+			searchesOut: []string{"c.prj.internal.", "zone.c.prj.internal.", "google.internal.", "unexpected"},
+		},
+	}
+	gce := &GCECloud{}
+	for i := range tcs {
+		n, s := gce.ScrubDNS(tcs[i].nameserversIn, tcs[i].searchesIn)
+		if !reflect.DeepEqual(n, tcs[i].nameserversOut) {
+			t.Errorf("Expected %v, got %v", tcs[i].nameserversOut, n)
+		}
+		if !reflect.DeepEqual(s, tcs[i].searchesOut) {
+			t.Errorf("Expected %v, got %v", tcs[i].searchesOut, s)
+		}
+	}
+}
+
+func TestCreateFirewallFails(t *testing.T) {
+	name := "loadbalancer"
+	region := "us-central1"
+	desc := "description"
+	gce := &GCECloud{}
+	if err := gce.createFirewall(name, region, desc, nil, nil, nil); err == nil {
+		t.Errorf("error expected when creating firewall without any tags found")
 	}
 }

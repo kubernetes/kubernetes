@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ _SECONDS=1000          # number of seconds to measure throughput.
 FE="1"                # amount of Web server  
 LG="1"                # amount of load generators
 SLAVE="1"             # amount of redis slaves 
-TEST="1"              # 0 = Dont run tests, 1 = Do run tests.
+TEST="1"              # 0 = Don't run tests, 1 = Do run tests.
 NS="default"       # namespace
 
 kubectl="${1:-$kubectl}"
@@ -36,7 +36,7 @@ _SECONDS="${3:-$_SECONDS}"   # number of seconds to measure throughput.
 FE="${4:-$FE}"       # amount of Web server  
 LG="${5:-$LG}"        # amount of load generators
 SLAVE="${6:-$SLAVE}"     # amount of redis slaves 
-TEST="${7:-$TEST}"      # 0 = Dont run tests, 1 = Do run tests.
+TEST="${7:-$TEST}"      # 0 = Don't run tests, 1 = Do run tests.
 NS="${8:-$NS}"          # namespace
 
 echo "Running w/ args: kubectl $kubectl version $VERSION sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS"
@@ -253,7 +253,7 @@ function pollfor {
   do
       ### Just testing that the front end comes up.  Not sure how to test total entries etc... (yet)
       echo "Trying curl ... $PUBLIC_IP:3000 , attempt $i . expect a few failures while pulling images... "
-      curl "$PUBLIC_IP:3000" > result
+      curl --max-time 1 "$PUBLIC_IP:3000" > result
       cat result
       cat result | grep -q "k8-bps"
       if [ $? -eq 0 ]; then
@@ -279,7 +279,7 @@ function tests {
     for i in `seq 1 $_SECONDS`;
      do
         echo "curl : $PUBLIC_IP:3000 , $i of $_SECONDS"
-        curr_cnt="`curl "$PUBLIC_IP:3000/llen"`" 
+        curr_cnt="`curl --max-time 1 "$PUBLIC_IP:3000/llen"`" 
         ### Write CSV File of # of trials / total transcations.
         echo "$i $curr_cnt" >> result
         echo "total transactions so far : $curr_cnt"

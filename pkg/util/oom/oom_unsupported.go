@@ -1,7 +1,7 @@
 // +build !cgo !linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,17 +24,17 @@ import (
 
 var unsupportedErr = errors.New("setting OOM scores is unsupported in this build")
 
-func NewOomAdjuster() *OomAdjuster {
-	return &OomAdjuster{
-		ApplyOomScoreAdj:          unsupportedApplyOomScoreAdj,
-		ApplyOomScoreAdjContainer: unsupportedApplyOomScoreAdjContainer,
+func NewOOMAdjuster() *OOMAdjuster {
+	return &OOMAdjuster{
+		ApplyOOMScoreAdj:          unsupportedApplyOOMScoreAdj,
+		ApplyOOMScoreAdjContainer: unsupportedApplyOOMScoreAdjContainer,
 	}
 }
 
-func unsupportedApplyOomScoreAdj(pid int, oomScoreAdj int) error {
+func unsupportedApplyOOMScoreAdj(pid int, oomScoreAdj int) error {
 	return unsupportedErr
 }
 
-func unsupportedApplyOomScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
+func unsupportedApplyOOMScoreAdjContainer(cgroupName string, oomScoreAdj, maxTries int) error {
 	return unsupportedErr
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,61 +17,78 @@ limitations under the License.
 package etcd
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/registry/service"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
-	etcdgeneric.Etcd
+	*registry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against services.
-func NewREST(s storage.Interface) *REST {
-	prefix := "/services/specs"
-	store := etcdgeneric.Etcd{
+func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
+	prefix := "/" + opts.ResourcePrefix
+
+	newListFunc := func() runtime.Object { return &api.ServiceList{} }
+	storageInterface := opts.Decorator(
+		opts.Storage,
+		cachesize.GetWatchCacheSizeByResource(cachesize.Services),
+		&api.Service{},
+		prefix,
+		service.Strategy,
+		newListFunc,
+		storage.NoTriggerPublisher,
+	)
+
+	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.Service{} },
-		NewListFunc: func() runtime.Object { return &api.ServiceList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
-			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+			return registry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+			return registry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Service).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return MatchServices(label, field)
-		},
-		EndpointName: "services",
+		PredicateFunc:           service.MatchServices,
+		QualifiedResource:       api.Resource("services"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
-		CreateStrategy: rest.Services,
-		UpdateStrategy: rest.Services,
+		CreateStrategy: service.Strategy,
+		UpdateStrategy: service.Strategy,
+		DeleteStrategy: service.Strategy,
+		ExportStrategy: service.Strategy,
 
-		Storage: s,
+		Storage: storageInterface,
 	}
-	return &REST{store}
+	statusStore := *store
+	statusStore.UpdateStrategy = service.StatusStrategy
+	return &REST{store}, &StatusREST{store: &statusStore}
 }
 
-// FIXME: Move it.
-func MatchServices(label labels.Selector, field fields.Selector) generic.Matcher {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: ServiceAttributes}
+// StatusREST implements the REST endpoint for changing the status of a service.
+type StatusREST struct {
+	store *registry.Store
 }
 
-func ServiceAttributes(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	service, ok := obj.(*api.Service)
-	if !ok {
-		return nil, nil, fmt.Errorf("invalid object type %#v", obj)
-	}
-	return service.Labels, fields.Set{
-		"metadata.name": service.Name,
-	}, nil
+func (r *StatusREST) New() runtime.Object {
+	return &api.Service{}
+}
+
+// Get retrieves the object from the storage. It is required to support Patch.
+func (r *StatusREST) Get(ctx api.Context, name string) (runtime.Object, error) {
+	return r.store.Get(ctx, name)
+}
+
+// Update alters the status subset of an object.
+func (r *StatusREST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	return r.store.Update(ctx, name, objInfo)
 }

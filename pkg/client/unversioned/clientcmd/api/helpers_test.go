@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -206,7 +206,7 @@ func TestFlattenSuccess(t *testing.T) {
 
 }
 
-func ExampleMinifyAndShorten() {
+func Example_minifyAndShorten() {
 	certFile, _ := ioutil.TempFile("", "")
 	defer os.Remove(certFile.Name())
 	keyFile, _ := ioutil.TempFile("", "")

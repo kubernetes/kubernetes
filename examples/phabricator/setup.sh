@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,5 @@
 
 echo "Create Phabricator replication controller" && kubectl create -f phabricator-controller.json
 echo "Create Phabricator service" && kubectl create -f phabricator-service.json
-echo "Create Authenticator replication controller" && kubectl create -f authenticator-controller.json
 echo "Create firewall rule" && gcloud compute firewall-rules create phabricator-node-80 --allow=tcp:80 --target-tags kubernetes-minion
 

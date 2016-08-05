@@ -1,0 +1,20 @@
+# A headless service to create DNS records
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: zk
+  labels:
+    app: zk
+spec:
+  ports:
+  - port: 2888
+    name: peer
+  - port: 3888
+    name: leader-election
+  # *.zk.default.svc.cluster.local
+  clusterIP: None
+  selector:
+    app: zk
+

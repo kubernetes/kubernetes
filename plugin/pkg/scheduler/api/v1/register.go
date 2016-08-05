@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,17 +17,18 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/api"
 )
 
-// Codec encodes internal objects to the v1 scheme
-var Codec = runtime.CodecFor(api.Scheme, "v1")
+// SchemeGroupVersion is group version used to register these objects
+// TODO this should be in the "scheduler" group
+var SchemeGroupVersion = unversioned.GroupVersion{Group: "", Version: "v1"}
 
 func init() {
-	api.Scheme.AddKnownTypes("v1",
+	api.Scheme.AddKnownTypes(SchemeGroupVersion,
 		&Policy{},
 	)
 }
 
-func (*Policy) IsAnAPIObject() {}
+func (obj *Policy) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

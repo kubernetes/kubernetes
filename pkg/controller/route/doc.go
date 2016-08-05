@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package routecontroller contains code for syncing cloud routing rules with
+// Package route contains code for syncing cloud routing rules with
 // the list of registered nodes.
-package routecontroller
+package route // import "k8s.io/kubernetes/pkg/controller/route"

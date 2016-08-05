@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,57 +18,52 @@ package etcd
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/generic"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 )
 
 type REST struct {
-	*etcdgeneric.Etcd
+	*registry.Store
 }
 
 // NewREST returns a RESTStorage object that will work against endpoints.
-func NewREST(s storage.Interface, useCacher bool) *REST {
-	prefix := "/services/endpoints"
+func NewREST(opts generic.RESTOptions) *REST {
+	prefix := "/" + opts.ResourcePrefix
 
-	storageInterface := s
-	if useCacher {
-		config := storage.CacherConfig{
-			CacheCapacity:  1000,
-			Storage:        s,
-			Type:           &api.Endpoints{},
-			ResourcePrefix: prefix,
-			KeyFunc: func(obj runtime.Object) (string, error) {
-				return storage.NamespaceKeyFunc(prefix, obj)
-			},
-			NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
-		}
-		storageInterface = storage.NewCacher(config)
-	}
+	newListFunc := func() runtime.Object { return &api.EndpointsList{} }
+	storageInterface := opts.Decorator(
+		opts.Storage,
+		cachesize.GetWatchCacheSizeByResource(cachesize.Endpoints),
+		&api.Endpoints{},
+		prefix,
+		endpoint.Strategy,
+		newListFunc,
+		storage.NoTriggerPublisher,
+	)
 
-	store := &etcdgeneric.Etcd{
+	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &api.Endpoints{} },
-		NewListFunc: func() runtime.Object { return &api.EndpointsList{} },
+		NewListFunc: newListFunc,
 		KeyRootFunc: func(ctx api.Context) string {
-			return etcdgeneric.NamespaceKeyRootFunc(ctx, prefix)
+			return registry.NamespaceKeyRootFunc(ctx, prefix)
 		},
 		KeyFunc: func(ctx api.Context, name string) (string, error) {
-			return etcdgeneric.NamespaceKeyFunc(ctx, prefix, name)
+			return registry.NamespaceKeyFunc(ctx, prefix, name)
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*api.Endpoints).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return endpoint.MatchEndpoints(label, field)
-		},
-		EndpointName: "endpoints",
+		PredicateFunc:           endpoint.MatchEndpoints,
+		QualifiedResource:       api.Resource("endpoints"),
+		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 
 		CreateStrategy: endpoint.Strategy,
 		UpdateStrategy: endpoint.Strategy,
+		DeleteStrategy: endpoint.Strategy,
 
 		Storage: storageInterface,
 	}

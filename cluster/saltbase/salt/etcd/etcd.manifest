@@ -1,8 +1,25 @@
+{% set cluster_state = 'new' -%}
+{% set hostname = pillar.get('hostname', '') -%}
+{% set etcd_cluster_array = (pillar.get('initial_etcd_cluster') or hostname).split(',') -%}
+{% set etcd_cluster = '' -%}
+{# We use vars dictionary to pass variables set inside the for loop, because jinja defines new variables inside the for loop that hide variables from the outside. #}
+{% set vars = {'etcd_cluster': '', 'cluster_state': cluster_state} -%}
+{% for host in etcd_cluster_array -%}
+  {% if etcd_cluster != '' -%}
+    {% set cluster_state = 'existing' -%}
+    {% set etcd_cluster = etcd_cluster ~ ',' -%}
+  {% endif -%}
+  {% set etcd_cluster = etcd_cluster ~ 'etcd-' ~ host ~ '=http://' ~ host ~ ':' ~ server_port -%}
+  {% do vars.update({'etcd_cluster': etcd_cluster, 'cluster_state': cluster_state}) -%}
+{% endfor -%}
+{% set etcd_cluster = vars.etcd_cluster -%}
+{% set cluster_state = vars.cluster_state -%}
+
 {
 "apiVersion": "v1",
 "kind": "Pod",
 "metadata": {
-  "name":"etcd-server",
+  "name":"etcd-server{{ suffix }}",
   "namespace": "kube-system"
 },
 "spec":{
@@ -10,24 +27,35 @@
 "containers":[
     {
     "name": "etcd-container",
-    "image": "gcr.io/google_containers/etcd:2.0.12",
+    "image": "gcr.io/google_containers/etcd:2.2.1",
     "resources": {
-      "limits": {
-        "cpu": "200m"
+      "requests": {
+        "cpu": {{ cpulimit }}
       }
     },
     "command": [
               "/bin/sh",
               "-c",
-              "/usr/local/bin/etcd --addr 127.0.0.1:4001 --bind-addr 127.0.0.1:4001 --data-dir /var/etcd/data 1>>/var/log/etcd.log 2>&1"
+              "/usr/local/bin/etcd --name etcd-{{ hostname }} --listen-peer-urls http://{{ hostname }}:{{ server_port }} --initial-advertise-peer-urls http://{{ hostname }}:{{ server_port }} --advertise-client-urls http://127.0.0.1:{{ port }} --listen-client-urls http://127.0.0.1:{{ port }} --data-dir /var/etcd/data{{ suffix }} --initial-cluster-state {{ cluster_state }} --initial-cluster {{ etcd_cluster }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
             ],
+    "livenessProbe": {
+      "httpGet": {
+        "host": "127.0.0.1",
+        "port": {{ port }},
+        "path": "/health"
+      },
+      "initialDelaySeconds": 15,
+      "timeoutSeconds": 15
+    },
     "ports":[
       { "name": "serverport",
-        "containerPort": 2380,
-        "hostPort": 2380},{
+        "containerPort": {{ server_port }},
+        "hostPort": {{ server_port }} 
+      },{
        "name": "clientport",
-        "containerPort": 4001,
-        "hostPort": 4001}
+        "containerPort": {{ port }},
+        "hostPort": {{ port }}
+      }
         ],
     "volumeMounts": [
       {"name": "varetcd",
@@ -35,7 +63,7 @@
        "readOnly": false
       },
       {"name": "varlogetcd",
-       "mountPath": "/var/log/etcd.log",
+       "mountPath": "/var/log/etcd{{ suffix }}.log",
        "readOnly": false
       }
      ]
@@ -48,7 +76,7 @@
   },
   { "name": "varlogetcd",
     "hostPath": {
-        "path": "/var/log/etcd.log"}
+        "path": "/var/log/etcd{{ suffix }}.log"}
   }
 ]
 }}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,6 +80,11 @@ func (j *jwtProvider) Enabled() bool {
 		j.config.TokenURL = j.tokenUrl
 	}
 	return true
+}
+
+// LazyProvide implements DockerConfigProvider. Should never be called.
+func (j *jwtProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
+	return nil
 }
 
 // Provide implements DockerConfigProvider

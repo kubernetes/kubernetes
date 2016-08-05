@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,21 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package namespacecontroller
+package namespace
 
 import (
-	"fmt"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/metrics"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -36,20 +38,53 @@ import (
 
 // NamespaceController is responsible for performing actions dependent upon a namespace phase
 type NamespaceController struct {
-	controller     *framework.Controller
-	StopEverything chan struct{}
+	// client that purges namespace content, must have list/delete privileges on all content
+	kubeClient clientset.Interface
+	// clientPool manages a pool of dynamic clients
+	clientPool dynamic.ClientPool
+	// store that holds the namespaces
+	store cache.Store
+	// controller that observes the namespaces
+	controller *framework.Controller
+	// namespaces that have been queued up for processing by workers
+	queue workqueue.RateLimitingInterface
+	// list of preferred group versions and their corresponding resource set for namespace deletion
+	groupVersionResources []unversioned.GroupVersionResource
+	// opCache is a cache to remember if a particular operation is not supported to aid dynamic client.
+	opCache operationNotSupportedCache
+	// finalizerToken is the finalizer token managed by this controller
+	finalizerToken api.FinalizerName
 }
 
 // NewNamespaceController creates a new NamespaceController
-func NewNamespaceController(kubeClient client.Interface, resyncPeriod time.Duration) *NamespaceController {
-	var controller *framework.Controller
-	_, controller = framework.NewInformer(
+func NewNamespaceController(
+	kubeClient clientset.Interface,
+	clientPool dynamic.ClientPool,
+	groupVersionResources []unversioned.GroupVersionResource,
+	resyncPeriod time.Duration,
+	finalizerToken api.FinalizerName) *NamespaceController {
+	// create the controller so we can inject the enqueue function
+	namespaceController := &NamespaceController{
+		kubeClient: kubeClient,
+		clientPool: clientPool,
+		queue:      workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		groupVersionResources: groupVersionResources,
+		opCache:               operationNotSupportedCache{},
+		finalizerToken:        finalizerToken,
+	}
+
+	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("namespace_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
+	}
+
+	// configure the backing store/controller
+	store, controller := framework.NewInformer(
 		&cache.ListWatch{
-			ListFunc: func() (runtime.Object, error) {
-				return kubeClient.Namespaces().List(labels.Everything(), fields.Everything())
+			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+				return kubeClient.Core().Namespaces().List(options)
 			},
-			WatchFunc: func(resourceVersion string) (watch.Interface, error) {
-				return kubeClient.Namespaces().Watch(labels.Everything(), fields.Everything(), resourceVersion)
+			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
+				return kubeClient.Core().Namespaces().Watch(options)
 			},
 		},
 		&api.Namespace{},
@@ -57,335 +92,98 @@ func NewNamespaceController(kubeClient client.Interface, resyncPeriod time.Durat
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				namespace := obj.(*api.Namespace)
-				if err := syncNamespace(kubeClient, *namespace); err != nil {
-					if estimate, ok := err.(*contentRemainingError); ok {
-						go func() {
-							// Estimate is the aggregate total of TerminationGracePeriodSeconds, which defaults to 30s
-							// for pods.  However, most processes will terminate faster - within a few seconds, probably
-							// with a peak within 5-10s.  So this division is a heuristic that avoids waiting the full
-							// duration when in many cases things complete more quickly. The extra second added is to
-							// ensure we never wait 0 seconds.
-							t := estimate.Estimate/2 + 1
-							glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", namespace.Name, t)
-							time.Sleep(time.Duration(t) * time.Second)
-							if err := controller.Requeue(namespace); err != nil {
-								util.HandleError(err)
-							}
-						}()
-						return
-					}
-					util.HandleError(err)
-				}
+				namespaceController.enqueueNamespace(namespace)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				namespace := newObj.(*api.Namespace)
-				if err := syncNamespace(kubeClient, *namespace); err != nil {
-					if estimate, ok := err.(*contentRemainingError); ok {
-						go func() {
-							t := estimate.Estimate/2 + 1
-							glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", namespace.Name, t)
-							time.Sleep(time.Duration(t) * time.Second)
-							if err := controller.Requeue(namespace); err != nil {
-								util.HandleError(err)
-							}
-						}()
-						return
-					}
-					util.HandleError(err)
-				}
+				namespaceController.enqueueNamespace(namespace)
 			},
 		},
 	)
 
-	return &NamespaceController{
-		controller: controller,
+	namespaceController.store = store
+	namespaceController.controller = controller
+	return namespaceController
+}
+
+// enqueueNamespace adds an object to the controller work queue
+// obj could be an *api.Namespace, or a DeletionFinalStateUnknown item.
+func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		return
 	}
+	nm.queue.Add(key)
 }
 
-// Run begins observing the system.  It starts a goroutine and returns immediately.
-func (nm *NamespaceController) Run() {
-	if nm.StopEverything == nil {
-		nm.StopEverything = make(chan struct{})
-		go nm.controller.Run(nm.StopEverything)
+// worker processes the queue of namespace objects.
+// Each namespace can be in the queue at most once.
+// The system ensures that no two workers can process
+// the same namespace at the same time.
+func (nm *NamespaceController) worker() {
+	workFunc := func() bool {
+		key, quit := nm.queue.Get()
+		if quit {
+			return true
+		}
+		defer nm.queue.Done(key)
+
+		err := nm.syncNamespaceFromKey(key.(string))
+		if err == nil {
+			// no error, forget this entry and return
+			nm.queue.Forget(key)
+			return false
+		}
+
+		if estimate, ok := err.(*contentRemainingError); ok {
+			t := estimate.Estimate/2 + 1
+			glog.V(4).Infof("Content remaining in namespace %s, waiting %d seconds", key, t)
+			nm.queue.AddAfter(key, time.Duration(t)*time.Second)
+		} else {
+			// rather than wait for a full resync, re-add the namespace to the queue to be processed
+			nm.queue.AddRateLimited(key)
+			utilruntime.HandleError(err)
+		}
+		return false
 	}
-}
 
-// Stop gracefully shutsdown this controller
-func (nm *NamespaceController) Stop() {
-	if nm.StopEverything != nil {
-		close(nm.StopEverything)
-		nm.StopEverything = nil
-	}
-}
+	for {
+		quit := workFunc()
 
-// finalized returns true if the spec.finalizers is empty list
-func finalized(namespace api.Namespace) bool {
-	return len(namespace.Spec.Finalizers) == 0
-}
-
-// finalize will finalize the namespace for kubernetes
-func finalize(kubeClient client.Interface, namespace api.Namespace) (*api.Namespace, error) {
-	namespaceFinalize := api.Namespace{}
-	namespaceFinalize.ObjectMeta = namespace.ObjectMeta
-	namespaceFinalize.Spec = namespace.Spec
-	finalizerSet := util.NewStringSet()
-	for i := range namespace.Spec.Finalizers {
-		if namespace.Spec.Finalizers[i] != api.FinalizerKubernetes {
-			finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
+		if quit {
+			return
 		}
 	}
-	namespaceFinalize.Spec.Finalizers = make([]api.FinalizerName, 0, len(finalizerSet))
-	for _, value := range finalizerSet.List() {
-		namespaceFinalize.Spec.Finalizers = append(namespaceFinalize.Spec.Finalizers, api.FinalizerName(value))
-	}
-	return kubeClient.Namespaces().Finalize(&namespaceFinalize)
 }
 
-type contentRemainingError struct {
-	Estimate int64
-}
+// syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
+func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
+	startTime := time.Now()
+	defer glog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Now().Sub(startTime))
 
-func (e *contentRemainingError) Error() string {
-	return fmt.Sprintf("some content remains in the namespace, estimate %d seconds before it is removed", e.Estimate)
-}
-
-// deleteAllContent will delete all content known to the system in a namespace. It returns an estimate
-// of the time remaining before the remaining resources are deleted. If estimate > 0 not all resources
-// are guaranteed to be gone.
-func deleteAllContent(kubeClient client.Interface, namespace string, before util.Time) (estimate int64, err error) {
-	err = deleteServiceAccounts(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteServices(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteReplicationControllers(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	estimate, err = deletePods(kubeClient, namespace, before)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteSecrets(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deletePersistentVolumeClaims(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteLimitRanges(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteResourceQuotas(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-	err = deleteEvents(kubeClient, namespace)
-	if err != nil {
-		return estimate, err
-	}
-
-	return estimate, nil
-}
-
-// syncNamespace makes namespace life-cycle decisions
-func syncNamespace(kubeClient client.Interface, namespace api.Namespace) (err error) {
-	if namespace.DeletionTimestamp == nil {
+	obj, exists, err := nm.store.GetByKey(key)
+	if !exists {
+		glog.Infof("Namespace has been deleted %v", key)
 		return nil
 	}
-	glog.V(4).Infof("Syncing namespace %s", namespace.Name)
-
-	// if there is a deletion timestamp, and the status is not terminating, then update status
-	if !namespace.DeletionTimestamp.IsZero() && namespace.Status.Phase != api.NamespaceTerminating {
-		newNamespace := api.Namespace{}
-		newNamespace.ObjectMeta = namespace.ObjectMeta
-		newNamespace.Status = namespace.Status
-		newNamespace.Status.Phase = api.NamespaceTerminating
-		result, err := kubeClient.Namespaces().Status(&newNamespace)
-		if err != nil {
-			return err
-		}
-		// work with the latest copy so we can proceed to clean up right away without another interval
-		namespace = *result
-	}
-
-	// if the namespace is already finalized, delete it
-	if finalized(namespace) {
-		err = kubeClient.Namespaces().Delete(namespace.Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-		return nil
-	}
-
-	// there may still be content for us to remove
-	estimate, err := deleteAllContent(kubeClient, namespace.Name, *namespace.DeletionTimestamp)
 	if err != nil {
+		glog.Infof("Unable to retrieve namespace %v from store: %v", key, err)
+		nm.queue.Add(key)
 		return err
 	}
-	if estimate > 0 {
-		return &contentRemainingError{estimate}
-	}
-
-	// we have removed content, so mark it finalized by us
-	result, err := finalize(kubeClient, namespace)
-	if err != nil {
-		return err
-	}
-
-	// now check if all finalizers have reported that we delete now
-	if finalized(*result) {
-		err = kubeClient.Namespaces().Delete(namespace.Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-
-	return nil
+	namespace := obj.(*api.Namespace)
+	return syncNamespace(nm.kubeClient, nm.clientPool, nm.opCache, nm.groupVersionResources, namespace, nm.finalizerToken)
 }
 
-func deleteLimitRanges(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.LimitRanges(ns).List(labels.Everything())
-	if err != nil {
-		return err
+// Run starts observing the system with the specified number of workers.
+func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
+	defer utilruntime.HandleCrash()
+	go nm.controller.Run(stopCh)
+	for i := 0; i < workers; i++ {
+		go wait.Until(nm.worker, time.Second, stopCh)
 	}
-	for i := range items.Items {
-		err := kubeClient.LimitRanges(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteResourceQuotas(kubeClient client.Interface, ns string) error {
-	resourceQuotas, err := kubeClient.ResourceQuotas(ns).List(labels.Everything())
-	if err != nil {
-		return err
-	}
-	for i := range resourceQuotas.Items {
-		err := kubeClient.ResourceQuotas(ns).Delete(resourceQuotas.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteServiceAccounts(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ServiceAccounts(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.ServiceAccounts(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteServices(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Services(ns).List(labels.Everything())
-	if err != nil {
-		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.Services(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteReplicationControllers(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.ReplicationControllers(ns).List(labels.Everything())
-	if err != nil {
-		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.ReplicationControllers(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func deletePods(kubeClient client.Interface, ns string, before util.Time) (int64, error) {
-	items, err := kubeClient.Pods(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return 0, err
-	}
-	expired := util.Now().After(before.Time)
-	var deleteOptions *api.DeleteOptions
-	if expired {
-		deleteOptions = api.NewDeleteOptions(0)
-	}
-	estimate := int64(0)
-	for i := range items.Items {
-		if items.Items[i].Spec.TerminationGracePeriodSeconds != nil {
-			grace := *items.Items[i].Spec.TerminationGracePeriodSeconds
-			if grace > estimate {
-				estimate = grace
-			}
-		}
-		err := kubeClient.Pods(ns).Delete(items.Items[i].Name, deleteOptions)
-		if err != nil && !errors.IsNotFound(err) {
-			return 0, err
-		}
-	}
-	if expired {
-		estimate = 0
-	}
-	return estimate, nil
-}
-
-func deleteEvents(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Events(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.Events(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func deleteSecrets(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.Secrets(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.Secrets(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
-}
-
-func deletePersistentVolumeClaims(kubeClient client.Interface, ns string) error {
-	items, err := kubeClient.PersistentVolumeClaims(ns).List(labels.Everything(), fields.Everything())
-	if err != nil {
-		return err
-	}
-	for i := range items.Items {
-		err := kubeClient.PersistentVolumeClaims(ns).Delete(items.Items[i].Name)
-		if err != nil && !errors.IsNotFound(err) {
-			return err
-		}
-	}
-	return nil
+	<-stopCh
+	glog.Infof("Shutting down NamespaceController")
+	nm.queue.ShutDown()
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,226 +19,159 @@ package remotecommand
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"net/url"
 
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/conversion/queryparams"
-	"k8s.io/kubernetes/pkg/runtime"
+
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/transport"
+	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
-type upgrader interface {
-	upgrade(*client.Request, *client.Config) (httpstream.Connection, error)
+// StreamOptions holds information pertaining to the current streaming session: supported stream
+// protocols, input/output streams, if the client is requesting a TTY, and a terminal size queue to
+// support terminal resizing.
+type StreamOptions struct {
+	SupportedProtocols []string
+	Stdin              io.Reader
+	Stdout             io.Writer
+	Stderr             io.Writer
+	Tty                bool
+	TerminalSizeQueue  term.TerminalSizeQueue
 }
 
-type defaultUpgrader struct{}
-
-func (u *defaultUpgrader) upgrade(req *client.Request, config *client.Config) (httpstream.Connection, error) {
-	return req.Upgrade(config, spdy.NewRoundTripper)
+// Executor is an interface for transporting shell-style streams.
+type Executor interface {
+	// Stream initiates the transport of the standard shell streams. It will transport any
+	// non-nil stream to a remote system, and return an error if a problem occurs. If tty
+	// is set, the stderr stream is not used (raw TTY manages stdout and stderr over the
+	// stdout stream).
+	Stream(options StreamOptions) error
 }
 
-type Streamer struct {
-	req    *client.Request
-	config *client.Config
-	stdin  io.Reader
-	stdout io.Writer
-	stderr io.Writer
-	tty    bool
-
-	upgrader upgrader
+// StreamExecutor supports the ability to dial an httpstream connection and the ability to
+// run a command line stream protocol over that dialer.
+type StreamExecutor interface {
+	Executor
+	httpstream.Dialer
 }
 
-// Executor executes a command on a pod container
-type Executor struct {
-	Streamer
-	command []string
+// streamExecutor handles transporting standard shell streams over an httpstream connection.
+type streamExecutor struct {
+	upgrader  httpstream.UpgradeRoundTripper
+	transport http.RoundTripper
+
+	method string
+	url    *url.URL
 }
 
-// New creates a new RemoteCommandExecutor
-func New(req *client.Request, config *client.Config, command []string, stdin io.Reader, stdout, stderr io.Writer, tty bool) *Executor {
-	return &Executor{
-		command: command,
-		Streamer: Streamer{
-			req:    req,
-			config: config,
-			stdin:  stdin,
-			stdout: stdout,
-			stderr: stderr,
-			tty:    tty,
-		},
-	}
-}
-
-type Attach struct {
-	Streamer
-}
-
-// NewAttach creates a new RemoteAttach
-func NewAttach(req *client.Request, config *client.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) *Attach {
-	return &Attach{
-		Streamer: Streamer{
-			req:    req,
-			config: config,
-			stdin:  stdin,
-			stdout: stdout,
-			stderr: stderr,
-			tty:    tty,
-		},
-	}
-}
-
-// Execute sends a remote command execution request, upgrading the
-// connection and creating streams to represent stdin/stdout/stderr. Data is
-// copied between these streams and the supplied stdin/stdout/stderr parameters.
-func (e *Attach) Execute() error {
-	opts := api.PodAttachOptions{
-		Stdin:  (e.stdin != nil),
-		Stdout: (e.stdout != nil),
-		Stderr: (!e.tty && e.stderr != nil),
-		TTY:    e.tty,
-	}
-
-	if err := e.setupRequestParameters(&opts); err != nil {
-		return err
-	}
-
-	return e.doStream()
-}
-
-// Execute sends a remote command execution request, upgrading the
-// connection and creating streams to represent stdin/stdout/stderr. Data is
-// copied between these streams and the supplied stdin/stdout/stderr parameters.
-func (e *Executor) Execute() error {
-	opts := api.PodExecOptions{
-		Stdin:   (e.stdin != nil),
-		Stdout:  (e.stdout != nil),
-		Stderr:  (!e.tty && e.stderr != nil),
-		TTY:     e.tty,
-		Command: e.command,
-	}
-
-	if err := e.setupRequestParameters(&opts); err != nil {
-		return err
-	}
-
-	return e.doStream()
-}
-
-func (e *Streamer) setupRequestParameters(obj runtime.Object) error {
-	versioned, err := api.Scheme.ConvertToVersion(obj, e.config.Version)
+// NewExecutor connects to the provided server and upgrades the connection to
+// multiplexed bidirectional streams. The current implementation uses SPDY,
+// but this could be replaced with HTTP/2 once it's available, or something else.
+// TODO: the common code between this and portforward could be abstracted.
+func NewExecutor(config *restclient.Config, method string, url *url.URL) (StreamExecutor, error) {
+	tlsConfig, err := restclient.TLSConfigFor(config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	params, err := queryparams.Convert(versioned)
+
+	upgradeRoundTripper := spdy.NewRoundTripper(tlsConfig)
+	wrapper, err := restclient.HTTPWrappersForConfig(config, upgradeRoundTripper)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	for k, v := range params {
-		for _, vv := range v {
-			e.req.Param(k, vv)
-		}
-	}
-	return nil
+
+	return &streamExecutor{
+		upgrader:  upgradeRoundTripper,
+		transport: wrapper,
+		method:    method,
+		url:       url,
+	}, nil
 }
 
-func (e *Streamer) doStream() error {
-	if e.upgrader == nil {
-		e.upgrader = &defaultUpgrader{}
+// NewStreamExecutor upgrades the request so that it supports multiplexed bidirectional
+// streams. This method takes a stream upgrader and an optional function that is invoked
+// to wrap the round tripper. This method may be used by clients that are lower level than
+// Kubernetes clients or need to provide their own upgrade round tripper.
+func NewStreamExecutor(upgrader httpstream.UpgradeRoundTripper, fn func(http.RoundTripper) http.RoundTripper, method string, url *url.URL) (StreamExecutor, error) {
+	var rt http.RoundTripper = upgrader
+	if fn != nil {
+		rt = fn(rt)
 	}
-	conn, err := e.upgrader.upgrade(e.req, e.config)
+	return &streamExecutor{
+		upgrader:  upgrader,
+		transport: rt,
+		method:    method,
+		url:       url,
+	}, nil
+}
+
+// Dial opens a connection to a remote server and attempts to negotiate a SPDY
+// connection. Upon success, it returns the connection and the protocol
+// selected by the server.
+func (e *streamExecutor) Dial(protocols ...string) (httpstream.Connection, string, error) {
+	rt := transport.DebugWrappers(e.transport)
+
+	// TODO the client probably shouldn't be created here, as it doesn't allow
+	// flexibility to allow callers to configure it.
+	client := &http.Client{Transport: rt}
+
+	req, err := http.NewRequest(e.method, e.url.String(), nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("error creating request: %v", err)
+	}
+	for i := range protocols {
+		req.Header.Add(httpstream.HeaderProtocolVersion, protocols[i])
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	conn, err := e.upgrader.NewConnection(resp)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return conn, resp.Header.Get(httpstream.HeaderProtocolVersion), nil
+}
+
+type streamCreator interface {
+	CreateStream(headers http.Header) (httpstream.Stream, error)
+}
+
+type streamProtocolHandler interface {
+	stream(conn streamCreator) error
+}
+
+// Stream opens a protocol streamer to the server and streams until a client closes
+// the connection or the server disconnects.
+func (e *streamExecutor) Stream(options StreamOptions) error {
+	conn, protocol, err := e.Dial(options.SupportedProtocols...)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	doneChan := make(chan struct{}, 2)
-	errorChan := make(chan error)
+	var streamer streamProtocolHandler
 
-	cp := func(s string, dst io.Writer, src io.Reader) {
-		glog.V(4).Infof("Copying %s", s)
-		defer glog.V(4).Infof("Done copying %s", s)
-		if _, err := io.Copy(dst, src); err != nil && err != io.EOF {
-			glog.Errorf("Error copying %s: %v", s, err)
-		}
-		if s == api.StreamTypeStdout || s == api.StreamTypeStderr {
-			doneChan <- struct{}{}
-		}
+	switch protocol {
+	case remotecommand.StreamProtocolV3Name:
+		streamer = newStreamProtocolV3(options)
+	case remotecommand.StreamProtocolV2Name:
+		streamer = newStreamProtocolV2(options)
+	case "":
+		glog.V(4).Infof("The server did not negotiate a streaming protocol version. Falling back to %s", remotecommand.StreamProtocolV1Name)
+		fallthrough
+	case remotecommand.StreamProtocolV1Name:
+		streamer = newStreamProtocolV1(options)
 	}
 
-	headers := http.Header{}
-	headers.Set(api.StreamType, api.StreamTypeError)
-	errorStream, err := conn.CreateStream(headers)
-	if err != nil {
-		return err
-	}
-	go func() {
-		message, err := ioutil.ReadAll(errorStream)
-		if err != nil && err != io.EOF {
-			errorChan <- fmt.Errorf("Error reading from error stream: %s", err)
-			return
-		}
-		if len(message) > 0 {
-			errorChan <- fmt.Errorf("Error executing remote command: %s", message)
-			return
-		}
-	}()
-	defer errorStream.Reset()
-
-	if e.stdin != nil {
-		headers.Set(api.StreamType, api.StreamTypeStdin)
-		remoteStdin, err := conn.CreateStream(headers)
-		if err != nil {
-			return err
-		}
-		defer remoteStdin.Reset()
-		// TODO this goroutine will never exit cleanly (the io.Copy never unblocks)
-		// because stdin is not closed until the process exits. If we try to call
-		// stdin.Close(), it returns no error but doesn't unblock the copy. It will
-		// exit when the process exits, instead.
-		go cp(api.StreamTypeStdin, remoteStdin, e.stdin)
-	}
-
-	waitCount := 0
-	completedStreams := 0
-
-	if e.stdout != nil {
-		waitCount++
-		headers.Set(api.StreamType, api.StreamTypeStdout)
-		remoteStdout, err := conn.CreateStream(headers)
-		if err != nil {
-			return err
-		}
-		defer remoteStdout.Reset()
-		go cp(api.StreamTypeStdout, e.stdout, remoteStdout)
-	}
-
-	if e.stderr != nil && !e.tty {
-		waitCount++
-		headers.Set(api.StreamType, api.StreamTypeStderr)
-		remoteStderr, err := conn.CreateStream(headers)
-		if err != nil {
-			return err
-		}
-		defer remoteStderr.Reset()
-		go cp(api.StreamTypeStderr, e.stderr, remoteStderr)
-	}
-
-Loop:
-	for {
-		select {
-		case <-doneChan:
-			completedStreams++
-			if completedStreams == waitCount {
-				break Loop
-			}
-		case err := <-errorChan:
-			return err
-		}
-	}
-
-	return nil
+	return streamer.stream(conn)
 }

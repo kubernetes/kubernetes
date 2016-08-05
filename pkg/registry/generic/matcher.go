@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,20 +17,44 @@ limitations under the License.
 package generic
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 // AttrFunc returns label and field sets for List or Watch to compare against, or an error.
 type AttrFunc func(obj runtime.Object) (label labels.Set, field fields.Set, err error)
 
+// ObjectMetaFieldsSet returns a fields set that represents the ObjectMeta.
+func ObjectMetaFieldsSet(objectMeta api.ObjectMeta, hasNamespaceField bool) fields.Set {
+	if !hasNamespaceField {
+		return fields.Set{
+			"metadata.name": objectMeta.Name,
+		}
+	}
+	return fields.Set{
+		"metadata.name":      objectMeta.Name,
+		"metadata.namespace": objectMeta.Namespace,
+	}
+}
+
+// MergeFieldsSets merges a fields'set from fragment into the source.
+func MergeFieldsSets(source fields.Set, fragment fields.Set) fields.Set {
+	for k, value := range fragment {
+		source[k] = value
+	}
+	return source
+}
+
 // SelectionPredicate implements a generic predicate that can be passed to
 // GenericRegistry's List or Watch methods. Implements the Matcher interface.
 type SelectionPredicate struct {
-	Label    labels.Selector
-	Field    fields.Selector
-	GetAttrs AttrFunc
+	Label       labels.Selector
+	Field       fields.Selector
+	GetAttrs    AttrFunc
+	IndexFields []string
 }
 
 // Matches returns true if the given object's labels and fields (as
@@ -47,7 +71,7 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	return s.Label.Matches(labels) && s.Field.Matches(fields), nil
 }
 
-// MatchesSingle will return (name, true) iff s.Field matches on the object's
+// MatchesSingle will return (name, true) if and only if s.Field matches on the object's
 // name.
 func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 	// TODO: should be namespace.name
@@ -55,6 +79,20 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 		return name, true
 	}
 	return "", false
+}
+
+// For any index defined by IndexFields, if a matcher can match only (a subset)
+// of objects that return <value> for a given index, a pair (<index name>, <value>)
+// wil be returned.
+// TODO: Consider supporting also labels.
+func (s *SelectionPredicate) MatcherIndex() []storage.MatchValue {
+	var result []storage.MatchValue
+	for _, field := range s.IndexFields {
+		if value, ok := s.Field.RequiresExactMatch(field); ok {
+			result = append(result, storage.MatchValue{IndexName: field, Value: value})
+		}
+	}
+	return result
 }
 
 // Matcher can return true if an object matches the Matcher's selection
@@ -71,9 +109,10 @@ type Matcher interface {
 	// include the object's namespace.
 	MatchesSingle() (key string, matchesSingleObject bool)
 
-	// TODO: when we start indexing objects, add something like the below:
-	//         MatchesIndices() (indexName []string, indexValue []string)
-	//       where indexName/indexValue are the same length.
+	// For any known index, if a matcher can match only (a subset) of objects
+	// that return <value> for a given index, a pair (<index name>, <value>)
+	// will be returned.
+	MatcherIndex() []storage.MatchValue
 }
 
 // MatcherFunc makes a matcher from the provided function. For easy definition
@@ -93,6 +132,11 @@ func (m matcherFunc) Matches(obj runtime.Object) (bool, error) {
 // implementation of Matcher.
 func (m matcherFunc) MatchesSingle() (string, bool) {
 	return "", false
+}
+
+// MatcherIndex always returns empty list.
+func (m matcherFunc) MatcherIndex() []storage.MatchValue {
+	return nil
 }
 
 // MatchOnKey returns a matcher that will send only the object matching key
@@ -118,38 +162,3 @@ var (
 	_ = Matcher(&SelectionPredicate{})
 	_ = Matcher(matcherFunc(nil))
 )
-
-// DecoratorFunc can mutate the provided object prior to being returned.
-type DecoratorFunc func(obj runtime.Object) error
-
-// FilterList filters any list object that conforms to the api conventions,
-// provided that 'm' works with the concrete type of list. d is an optional
-// decorator for the returned functions. Only matching items are decorated.
-func FilterList(list runtime.Object, m Matcher, d DecoratorFunc) (filtered runtime.Object, err error) {
-	// TODO: push a matcher down into tools.etcdHelper to avoid all this
-	// nonsense. This is a lot of unnecessary copies.
-	items, err := runtime.ExtractList(list)
-	if err != nil {
-		return nil, err
-	}
-	var filteredItems []runtime.Object
-	for _, obj := range items {
-		match, err := m.Matches(obj)
-		if err != nil {
-			return nil, err
-		}
-		if match {
-			if d != nil {
-				if err := d(obj); err != nil {
-					return nil, err
-				}
-			}
-			filteredItems = append(filteredItems, obj)
-		}
-	}
-	err = runtime.SetList(list, filteredItems)
-	if err != nil {
-		return nil, err
-	}
-	return list, nil
-}

@@ -1,0 +1,69 @@
+{% set kubeconfig = "--kubeconfig=/var/lib/kube-proxy/kubeconfig" -%}
+{% if grains.api_servers is defined -%}
+  {% set api_servers = "--master=https://" + grains.api_servers -%}
+{% else -%}
+  {% set ips = salt['mine.get']('roles:kubernetes-master', 'network.ip_addrs', 'grain').values() -%}
+  {% set api_servers = "--master=https://" + ips[0][0] -%}
+{% endif -%}
+{% if grains['cloud'] is defined and grains.cloud in [ 'aws', 'gce', 'vagrant', 'vsphere', 'photon-controller', 'openstack', 'azure-legacy' ]  %}
+  {% set api_servers_with_port = api_servers -%}
+{% else -%}
+  {% set api_servers_with_port = api_servers + ":6443" -%}
+{% endif -%}
+{% set test_args = "" -%}
+{% if pillar['kubeproxy_test_args'] is defined -%}
+  {% set test_args=pillar['kubeproxy_test_args'] %}
+{% endif -%}
+{% set cluster_cidr = "" -%}
+{% if pillar['cluster_cidr'] is defined -%}
+  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
+{% endif -%}
+
+{% set log_level = pillar['log_level'] -%}
+{% if pillar['kubeproxy_test_log_level'] is defined -%}
+  {% set log_level = pillar['kubeproxy_test_log_level'] -%}
+{% endif -%}
+
+# kube-proxy podspec
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-proxy
+  namespace: kube-system
+  labels:
+    tier: node
+    component: kube-proxy
+spec:
+  hostNetwork: true
+  containers:
+  - name: kube-proxy
+    image: {{pillar['kube_docker_registry']}}/kube-proxy:{{pillar['kube-proxy_docker_tag']}}
+    resources:
+      requests:
+        cpu: {{ cpurequest }}
+    command:
+    - /bin/sh
+    - -c
+    - kube-proxy {{api_servers_with_port}} {{kubeconfig}} {{cluster_cidr}} --resource-container="" {{log_level}} {{test_args}} 1>>/var/log/kube-proxy.log 2>&1
+    securityContext:
+      privileged: true
+    volumeMounts:
+    - mountPath: /etc/ssl/certs
+      name: ssl-certs-host
+      readOnly: true
+    - mountPath: /var/log
+      name: varlog
+      readOnly: false
+    - mountPath: /var/lib/kube-proxy/kubeconfig
+      name: kubeconfig
+      readOnly: false
+  volumes:
+  - hostPath:
+      path: /usr/share/ca-certificates
+    name: ssl-certs-host
+  - hostPath:
+      path: /var/lib/kube-proxy/kubeconfig
+    name: kubeconfig
+  - hostPath:
+      path: /var/log
+    name: varlog

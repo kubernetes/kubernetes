@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,8 +31,16 @@ set -o xtrace
 # space.
 export HOME=${WORKSPACE} # Nothing should want Jenkins $HOME
 export PATH=$PATH:/usr/local/go/bin
-export KUBE_RELEASE_RUN_TESTS=n
 export KUBE_SKIP_CONFIRMATIONS=y
+
+# Skip gcloud update checking
+export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
+
+# FEDERATION?
+: ${FEDERATION:="false"}
+: ${RELEASE_INFRA_PUSH:="false"}
+: ${KUBE_RELEASE_RUN_TESTS:="n"}
+export KUBE_RELEASE_RUN_TESTS RELEASE_INFRA_PUSH FEDERATION
 
 # Clean stuff out. Assume the last build left the tree in an odd
 # state.
@@ -49,9 +57,26 @@ git clean -fdx
 # Build
 go run ./hack/e2e.go -v --build
 
-[[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]] || {
-    # Push to GCS
-    ./build/push-ci-build.sh
-}
+# Push to GCS?
+if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
+  echo "Not pushed to GCS..."
+elif ${RELEASE_INFRA_PUSH-}; then
+  readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
+  mkdir -p ${WORKSPACE}/_tmp
+  git clone https://github.com/kubernetes/release ${release_infra_clone}
+
+  if [[ ! -x ${release_infra_clone}/push-ci-build.sh ]]; then
+    echo "FATAL: Something went wrong." \
+         "${release_infra_clone}/push-ci-build.sh isn't available. Exiting..." >&2
+    exit 1
+  fi
+
+  ${FEDERATION} && federation_flag="--federation"
+  # Use --nomock to do the real thing
+  #$release_infra_clone/push-ci-build.sh --nomock ${federation_flag-}
+  ${release_infra_clone}/push-ci-build.sh ${federation_flag-}
+else
+  ./build/push-ci-build.sh
+fi
 
 sha256sum _output/release-tars/kubernetes*.tar.gz

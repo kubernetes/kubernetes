@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,33 +17,29 @@ limitations under the License.
 package etcd
 
 import (
-	"reflect"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	etcdgeneric "k8s.io/kubernetes/pkg/registry/generic/etcd"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/tools"
-	"k8s.io/kubernetes/pkg/tools/etcdtest"
-	"k8s.io/kubernetes/pkg/util"
-
-	"github.com/coreos/go-etcd/etcd"
+	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
-func newStorage(t *testing.T) (*REST, *tools.FakeEtcdClient) {
-	etcdStorage, fakeClient := registrytest.NewEtcdStorage(t)
-	return NewREST(etcdStorage), fakeClient
+func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
+	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
+	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
+	return NewREST(restOptions), server
 }
 
-func TestLimitRangeCreate(t *testing.T) {
-	limitRange := &api.LimitRange{
+func validNewLimitRange() *api.LimitRange {
+	return &api.LimitRange{
 		ObjectMeta: api.ObjectMeta{
 			Name:      "foo",
-			Namespace: "default",
+			Namespace: api.NamespaceDefault,
 		},
 		Spec: api.LimitRangeSpec{
 			Limits: []api.LimitRangeItem{
@@ -61,72 +57,91 @@ func TestLimitRangeCreate(t *testing.T) {
 			},
 		},
 	}
+}
 
-	nodeWithLimitRange := tools.EtcdResponseWithError{
-		R: &etcd.Response{
-			Node: &etcd.Node{
-				Value:         runtime.EncodeOrDie(testapi.Codec(), limitRange),
-				ModifiedIndex: 1,
-				CreatedIndex:  1,
-			},
+func TestCreate(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Store).GeneratesName()
+	validLimitRange := validNewLimitRange()
+	validLimitRange.ObjectMeta = api.ObjectMeta{}
+	test.TestCreate(
+		// valid
+		validLimitRange,
+		// invalid
+		&api.LimitRange{
+			ObjectMeta: api.ObjectMeta{Name: "_-a123-a_"},
 		},
-		E: nil,
-	}
+	)
+}
 
-	emptyNode := tools.EtcdResponseWithError{
-		R: &etcd.Response{},
-		E: tools.EtcdErrorNotFound,
-	}
-
-	ctx := api.NewDefaultContext()
-	key := "foo"
-	prefix := etcdtest.AddPrefix("limitranges")
-
-	path, err := etcdgeneric.NamespaceKeyFunc(ctx, prefix, key)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-
-	table := map[string]struct {
-		existing tools.EtcdResponseWithError
-		expect   tools.EtcdResponseWithError
-		toCreate runtime.Object
-		errOK    func(error) bool
-	}{
-		"normal": {
-			existing: emptyNode,
-			expect:   nodeWithLimitRange,
-			toCreate: limitRange,
-			errOK:    func(err error) bool { return err == nil },
+func TestUpdate(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Store).AllowCreateOnUpdate()
+	test.TestUpdate(
+		// valid
+		validNewLimitRange(),
+		// updateFunc
+		func(obj runtime.Object) runtime.Object {
+			object := obj.(*api.LimitRange)
+			object.Spec.Limits = []api.LimitRangeItem{
+				{
+					Type: api.LimitTypePod,
+					Max: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("1000"),
+						api.ResourceMemory: resource.MustParse("100000"),
+					},
+					Min: api.ResourceList{
+						api.ResourceCPU:    resource.MustParse("10"),
+						api.ResourceMemory: resource.MustParse("1000"),
+					},
+				},
+			}
+			return object
 		},
-		"preExisting": {
-			existing: nodeWithLimitRange,
-			expect:   nodeWithLimitRange,
-			toCreate: limitRange,
-			errOK:    errors.IsAlreadyExists,
+	)
+}
+
+func TestDelete(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Store)
+	test.TestDelete(validNewLimitRange())
+}
+
+func TestGet(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Store)
+	test.TestGet(validNewLimitRange())
+}
+
+func TestList(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Store)
+	test.TestList(validNewLimitRange())
+}
+
+func TestWatch(t *testing.T) {
+	storage, server := newStorage(t)
+	defer server.Terminate(t)
+	test := registrytest.New(t, storage.Store)
+	test.TestWatch(
+		validNewLimitRange(),
+		// matching labels
+		[]labels.Set{},
+		// not matching labels
+		[]labels.Set{
+			{"foo": "bar"},
 		},
-	}
-
-	for name, item := range table {
-		storage, fakeClient := newStorage(t)
-		fakeClient.Data[path] = item.existing
-		_, err := storage.Create(ctx, item.toCreate)
-		if !item.errOK(err) {
-			t.Errorf("%v: unexpected error: %v", name, err)
-		}
-
-		received := fakeClient.Data[path]
-		var limitRange api.LimitRange
-		if err := testapi.Codec().DecodeInto([]byte(received.R.Node.Value), &limitRange); err != nil {
-			t.Errorf("unexpected error: %v", err)
-		}
-		// Unset CreationTimestamp and UID which are set automatically by infrastructure.
-		limitRange.ObjectMeta.CreationTimestamp = util.Time{}
-		limitRange.ObjectMeta.UID = ""
-		received.R.Node.Value = runtime.EncodeOrDie(testapi.Codec(), &limitRange)
-
-		if e, a := item.expect, received; !reflect.DeepEqual(e, a) {
-			t.Errorf("%v:\n%s", name, util.ObjectDiff(e, a))
-		}
-	}
+		// matching fields
+		[]fields.Set{},
+		// not matching fields
+		[]fields.Set{
+			{"metadata.name": "bar"},
+			{"name": "foo"},
+		},
+	)
 }

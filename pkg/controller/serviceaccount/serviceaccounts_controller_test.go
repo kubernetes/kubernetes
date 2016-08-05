@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,35 +17,17 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 type serverResponse struct {
 	statusCode int
 	obj        interface{}
-}
-
-func makeTestServer(t *testing.T, namespace string, serviceAccountResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
-	fakeServiceAccountsHandler := util.FakeHandler{
-		StatusCode:   serviceAccountResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), serviceAccountResponse.obj.(runtime.Object)),
-	}
-
-	mux := http.NewServeMux()
-	mux.Handle(testapi.ResourcePath("serviceAccounts", namespace, ""), &fakeServiceAccountsHandler)
-	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		t.Errorf("unexpected request: %v", req.RequestURI)
-		res.WriteHeader(http.StatusNotFound)
-	})
-	return httptest.NewServer(mux), &fakeServiceAccountsHandler
 }
 
 func TestServiceAccountCreation(t *testing.T) {
@@ -101,7 +83,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		"new active namespace missing serviceaccounts": {
 			ExistingServiceAccounts:      []*api.ServiceAccount{},
 			AddedNamespace:               activeNS,
-			ExpectCreatedServiceAccounts: util.NewStringSet(defaultName, managedName).List(),
+			ExpectCreatedServiceAccounts: sets.NewString(defaultName, managedName).List(),
 		},
 		"new active namespace missing serviceaccount": {
 			ExistingServiceAccounts:      []*api.ServiceAccount{managedServiceAccount},
@@ -123,7 +105,7 @@ func TestServiceAccountCreation(t *testing.T) {
 		"updated active namespace missing serviceaccounts": {
 			ExistingServiceAccounts:      []*api.ServiceAccount{},
 			UpdatedNamespace:             activeNS,
-			ExpectCreatedServiceAccounts: util.NewStringSet(defaultName, managedName).List(),
+			ExpectCreatedServiceAccounts: sets.NewString(defaultName, managedName).List(),
 		},
 		"updated active namespace missing serviceaccount": {
 			ExistingServiceAccounts:      []*api.ServiceAccount{defaultServiceAccount},
@@ -168,9 +150,12 @@ func TestServiceAccountCreation(t *testing.T) {
 	}
 
 	for k, tc := range testcases {
-		client := testclient.NewSimpleFake(defaultServiceAccount, managedServiceAccount)
+		client := fake.NewSimpleClientset(defaultServiceAccount, managedServiceAccount)
 		options := DefaultServiceAccountsControllerOptions()
-		options.Names = util.NewStringSet(defaultName, managedName)
+		options.ServiceAccounts = []api.ServiceAccount{
+			{ObjectMeta: api.ObjectMeta{Name: defaultName}},
+			{ObjectMeta: api.ObjectMeta{Name: managedName}},
+		}
 		controller := NewServiceAccountsController(client, options)
 
 		if tc.ExistingNamespace != nil {
@@ -203,7 +188,7 @@ func TestServiceAccountCreation(t *testing.T) {
 				t.Errorf("%s: Unexpected action %s", k, action)
 				break
 			}
-			createdAccount := action.(testclient.CreateAction).GetObject().(*api.ServiceAccount)
+			createdAccount := action.(core.CreateAction).GetObject().(*api.ServiceAccount)
 			if createdAccount.Name != expectedName {
 				t.Errorf("%s: Expected %s to be created, got %s", k, expectedName, createdAccount.Name)
 			}

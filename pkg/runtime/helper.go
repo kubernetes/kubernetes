@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,111 +18,73 @@ package runtime
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/util/errors"
 )
 
-// IsListType returns true if the provided Object has a slice called Items
-func IsListType(obj Object) bool {
-	_, err := GetItemsPtr(obj)
-	return err == nil
+// unsafeObjectConvertor implements ObjectConvertor using the unsafe conversion path.
+type unsafeObjectConvertor struct {
+	*Scheme
 }
 
-// GetItemsPtr returns a pointer to the list object's Items member.
-// If 'list' doesn't have an Items member, it's not really a list type
-// and an error will be returned.
-// This function will either return a pointer to a slice, or an error, but not both.
-func GetItemsPtr(list Object) (interface{}, error) {
-	v, err := conversion.EnforcePtr(list)
-	if err != nil {
-		return nil, err
-	}
-	items := v.FieldByName("Items")
-	if !items.IsValid() {
-		return nil, fmt.Errorf("no Items field in %#v", list)
-	}
-	switch items.Kind() {
-	case reflect.Interface, reflect.Ptr:
-		target := reflect.TypeOf(items.Interface()).Elem()
-		if target.Kind() != reflect.Slice {
-			return nil, fmt.Errorf("items: Expected slice, got %s", target.Kind())
-		}
-		return items.Interface(), nil
-	case reflect.Slice:
-		return items.Addr().Interface(), nil
-	default:
-		return nil, fmt.Errorf("items: Expected slice, got %s", items.Kind())
-	}
+var _ ObjectConvertor = unsafeObjectConvertor{}
+
+// ConvertToVersion converts in to the provided outVersion without copying the input first, which
+// is only safe if the output object is not mutated or reused.
+func (c unsafeObjectConvertor) ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (Object, error) {
+	return c.Scheme.UnsafeConvertToVersion(in, outVersion)
 }
 
-// ExtractList returns obj's Items element as an array of runtime.Objects.
-// Returns an error if obj is not a List type (does not have an Items member).
-// TODO: move me to pkg/api/meta
-func ExtractList(obj Object) ([]Object, error) {
-	itemsPtr, err := GetItemsPtr(obj)
-	if err != nil {
-		return nil, err
-	}
-	items, err := conversion.EnforcePtr(itemsPtr)
-	if err != nil {
-		return nil, err
-	}
-	list := make([]Object, items.Len())
-	for i := range list {
-		raw := items.Index(i)
-		var found bool
-		switch raw.Kind() {
-		case reflect.Interface, reflect.Ptr:
-			list[i], found = raw.Interface().(Object)
-		default:
-			list[i], found = raw.Addr().Interface().(Object)
-		}
-		if !found {
-			return nil, fmt.Errorf("item[%v]: Expected object, got %#v(%s)", i, raw.Interface(), raw.Kind())
-		}
-	}
-	return list, nil
+// UnsafeObjectConvertor performs object conversion without copying the object structure,
+// for use when the converted object will not be reused or mutated. Primarily for use within
+// versioned codecs, which use the external object for serialization but do not return it.
+func UnsafeObjectConvertor(scheme *Scheme) ObjectConvertor {
+	return unsafeObjectConvertor{scheme}
 }
 
-// objectSliceType is the type of a slice of Objects
-var objectSliceType = reflect.TypeOf([]Object{})
-
-// SetList sets the given list object's Items member have the elements given in
-// objects.
-// Returns an error if list is not a List type (does not have an Items member),
-// or if any of the objects are not of the right type.
-// TODO: move me to pkg/api/meta
-func SetList(list Object, objects []Object) error {
-	itemsPtr, err := GetItemsPtr(list)
-	if err != nil {
-		return err
+// SetField puts the value of src, into fieldName, which must be a member of v.
+// The value of src must be assignable to the field.
+func SetField(src interface{}, v reflect.Value, fieldName string) error {
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() {
+		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
 	}
-	items, err := conversion.EnforcePtr(itemsPtr)
-	if err != nil {
-		return err
-	}
-	if items.Type() == objectSliceType {
-		items.Set(reflect.ValueOf(objects))
+	srcValue := reflect.ValueOf(src)
+	if srcValue.Type().AssignableTo(field.Type()) {
+		field.Set(srcValue)
 		return nil
 	}
-	slice := reflect.MakeSlice(items.Type(), len(objects), len(objects))
-	for i := range objects {
-		dest := slice.Index(i)
-		src, err := conversion.EnforcePtr(objects[i])
-		if err != nil {
-			return err
-		}
-		if src.Type().AssignableTo(dest.Type()) {
-			dest.Set(src)
-		} else if src.Type().ConvertibleTo(dest.Type()) {
-			dest.Set(src.Convert(dest.Type()))
-		} else {
-			return fmt.Errorf("item[%d]: Type mismatch: Expected %v, got %v", i, dest.Type(), src.Type())
-		}
+	if srcValue.Type().ConvertibleTo(field.Type()) {
+		field.Set(srcValue.Convert(field.Type()))
+		return nil
 	}
-	items.Set(slice)
-	return nil
+	return fmt.Errorf("couldn't assign/convert %v to %v", srcValue.Type(), field.Type())
+}
+
+// Field puts the value of fieldName, which must be a member of v, into dest,
+// which must be a variable to which this field's value can be assigned.
+func Field(v reflect.Value, fieldName string, dest interface{}) error {
+	field := v.FieldByName(fieldName)
+	if !field.IsValid() {
+		return fmt.Errorf("couldn't find %v field in %#v", fieldName, v.Interface())
+	}
+	destValue, err := conversion.EnforcePtr(dest)
+	if err != nil {
+		return err
+	}
+	if field.Type().AssignableTo(destValue.Type()) {
+		destValue.Set(field)
+		return nil
+	}
+	if field.Type().ConvertibleTo(destValue.Type()) {
+		destValue.Set(field.Convert(destValue.Type()))
+		return nil
+	}
+	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), destValue.Type())
 }
 
 // fieldPtr puts the address of fieldName, which must be a member of v,
@@ -149,26 +111,58 @@ func FieldPtr(v reflect.Value, fieldName string, dest interface{}) error {
 	return fmt.Errorf("couldn't assign/convert %v to %v", field.Type(), v.Type())
 }
 
+// EncodeList ensures that each object in an array is converted to a Unknown{} in serialized form.
+// TODO: accept a content type.
+func EncodeList(e Encoder, objects []Object) error {
+	var errs []error
+	for i := range objects {
+		data, err := Encode(e, objects[i])
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		// TODO: Set ContentEncoding and ContentType.
+		objects[i] = &Unknown{Raw: data}
+	}
+	return errors.NewAggregate(errs)
+}
+
+func decodeListItem(obj *Unknown, decoders []Decoder) (Object, error) {
+	for _, decoder := range decoders {
+		// TODO: Decode based on ContentType.
+		obj, err := Decode(decoder, obj.Raw)
+		if err != nil {
+			if IsNotRegisteredError(err) {
+				continue
+			}
+			return nil, err
+		}
+		return obj, nil
+	}
+	// could not decode, so leave the object as Unknown, but give the decoders the
+	// chance to set Unknown.TypeMeta if it is available.
+	for _, decoder := range decoders {
+		if err := DecodeInto(decoder, obj.Raw, obj); err == nil {
+			return obj, nil
+		}
+	}
+	return obj, nil
+}
+
 // DecodeList alters the list in place, attempting to decode any objects found in
-// the list that have the runtime.Unknown type. Any errors that occur are returned
+// the list that have the Unknown type. Any errors that occur are returned
 // after the entire list is processed. Decoders are tried in order.
-func DecodeList(objects []Object, decoders ...ObjectDecoder) []error {
+func DecodeList(objects []Object, decoders ...Decoder) []error {
 	errs := []error(nil)
 	for i, obj := range objects {
 		switch t := obj.(type) {
 		case *Unknown:
-			for _, decoder := range decoders {
-				if !decoder.Recognizes(t.APIVersion, t.Kind) {
-					continue
-				}
-				obj, err := decoder.Decode(t.RawJSON)
-				if err != nil {
-					errs = append(errs, err)
-					break
-				}
-				objects[i] = obj
+			decoded, err := decodeListItem(t, decoders)
+			if err != nil {
+				errs = append(errs, err)
 				break
 			}
+			objects[i] = decoded
 		}
 	}
 	return errs
@@ -179,9 +173,9 @@ type MultiObjectTyper []ObjectTyper
 
 var _ ObjectTyper = MultiObjectTyper{}
 
-func (m MultiObjectTyper) DataVersionAndKind(data []byte) (version, kind string, err error) {
+func (m MultiObjectTyper) ObjectKinds(obj Object) (gvks []unversioned.GroupVersionKind, unversionedType bool, err error) {
 	for _, t := range m {
-		version, kind, err = t.DataVersionAndKind(data)
+		gvks, unversionedType, err = t.ObjectKinds(obj)
 		if err == nil {
 			return
 		}
@@ -189,21 +183,30 @@ func (m MultiObjectTyper) DataVersionAndKind(data []byte) (version, kind string,
 	return
 }
 
-func (m MultiObjectTyper) ObjectVersionAndKind(obj Object) (version, kind string, err error) {
+func (m MultiObjectTyper) Recognizes(gvk unversioned.GroupVersionKind) bool {
 	for _, t := range m {
-		version, kind, err = t.ObjectVersionAndKind(obj)
-		if err == nil {
-			return
-		}
-	}
-	return
-}
-
-func (m MultiObjectTyper) Recognizes(version, kind string) bool {
-	for _, t := range m {
-		if t.Recognizes(version, kind) {
+		if t.Recognizes(gvk) {
 			return true
 		}
 	}
 	return false
 }
+
+// SetZeroValue would set the object of objPtr to zero value of its type.
+func SetZeroValue(objPtr Object) error {
+	v, err := conversion.EnforcePtr(objPtr)
+	if err != nil {
+		return err
+	}
+	v.Set(reflect.Zero(v.Type()))
+	return nil
+}
+
+// DefaultFramer is valid for any stream that can read objects serially without
+// any separation in the stream.
+var DefaultFramer = defaultFramer{}
+
+type defaultFramer struct{}
+
+func (defaultFramer) NewFrameReader(r io.ReadCloser) io.ReadCloser { return r }
+func (defaultFramer) NewFrameWriter(w io.Writer) io.Writer         { return w }

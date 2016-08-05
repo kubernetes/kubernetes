@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,8 +15,11 @@ limitations under the License.
 */
 
 /*
- * This test checks that various VolumeSources are working. For each volume
- * type it creates a server pod, exporting simple 'index.html' file.
+ * This test checks that various VolumeSources are working.
+ *
+ * There are two ways, how to test the volumes:
+ * 1) With containerized server (NFS, Ceph, Gluster, iSCSI, ...)
+ * The test creates a server pod, exporting simple 'index.html' file.
  * Then it uses appropriate VolumeSource to import this file into a client pod
  * and checks that the pod can see the file. It does so by importing the file
  * into web server root and loadind the index.html from it.
@@ -27,16 +30,29 @@ limitations under the License.
  *
  * Note that the server containers are for testing purposes only and should not
  * be used in production.
+ *
+ * 2) With server outside of Kubernetes (Cinder, ...)
+ * Appropriate server (e.g. OpenStack Cinder) must exist somewhere outside
+ * the tested Kubernetes cluster. The test itself creates a new volume,
+ * and checks, that Kubernetes can use it as a volume.
  */
 
 package e2e
 
 import (
 	"fmt"
-	"k8s.io/kubernetes/pkg/api"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
+	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/test/e2e/framework"
+
+	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -71,7 +87,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 
 		serverPodPorts[i] = api.ContainerPort{
 			Name:          portName,
-			ContainerPort: config.serverPorts[i],
+			ContainerPort: int32(config.serverPorts[i]),
 			Protocol:      api.ProtocolTCP,
 		}
 	}
@@ -99,7 +115,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 	privileged := new(bool)
 	*privileged = true
 	serverPod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -125,14 +141,14 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 			Volumes: volumes,
 		},
 	}
-	_, err := podClient.Create(serverPod)
-	expectNoError(err, "Failed to create %s pod: %v", serverPod.Name, err)
+	serverPod, err := podClient.Create(serverPod)
+	framework.ExpectNoError(err, "Failed to create %s pod: %v", serverPod.Name, err)
 
-	expectNoError(waitForPodRunningInNamespace(client, serverPod.Name, config.namespace))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, serverPod))
 
 	By("locating the server pod")
 	pod, err := podClient.Get(serverPod.Name)
-	expectNoError(err, "Cannot locate the server pod %v: %v", serverPod.Name, err)
+	framework.ExpectNoError(err, "Cannot locate the server pod %v: %v", serverPod.Name, err)
 
 	By("sleeping a bit to give the server time to start")
 	time.Sleep(20 * time.Second)
@@ -140,26 +156,45 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 }
 
 // Clean both server and client pods.
-func volumeTestCleanup(client *client.Client, config VolumeTestConfig) {
+func volumeTestCleanup(f *framework.Framework, config VolumeTestConfig) {
 	By(fmt.Sprint("cleaning the environment after ", config.prefix))
 
 	defer GinkgoRecover()
 
+	client := f.Client
 	podClient := client.Pods(config.namespace)
 
-	// ignore all errors, the pods may not be even created
-	podClient.Delete(config.prefix+"-client", nil)
-	podClient.Delete(config.prefix+"-server", nil)
+	err := podClient.Delete(config.prefix+"-client", nil)
+	if err != nil {
+		// Log the error before failing test: if the test has already failed,
+		// framework.ExpectNoError() won't print anything to logs!
+		glog.Warningf("Failed to delete client pod: %v", err)
+		framework.ExpectNoError(err, "Failed to delete client pod: %v", err)
+	}
+
+	if config.serverImage != "" {
+		if err := f.WaitForPodTerminated(config.prefix+"-client", ""); !apierrs.IsNotFound(err) {
+			framework.ExpectNoError(err, "Failed to wait client pod terminated: %v", err)
+		}
+		// See issue #24100.
+		// Prevent umount errors by making sure making sure the client pod exits cleanly *before* the volume server pod exits.
+		By("sleeping a bit so client can stop and unmount")
+		time.Sleep(20 * time.Second)
+
+		err = podClient.Delete(config.prefix+"-server", nil)
+		if err != nil {
+			glog.Warningf("Failed to delete server pod: %v", err)
+			framework.ExpectNoError(err, "Failed to delete server pod: %v", err)
+		}
+	}
 }
 
 // Start a client pod using given VolumeSource (exported by startVolumeServer())
 // and check that the pod sees the data from the server pod.
-func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api.VolumeSource, expectedContent string) {
+func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api.VolumeSource, fsGroup *int64, expectedContent string) {
 	By(fmt.Sprint("starting ", config.prefix, " client"))
-	podClient := client.Pods(config.namespace)
-
 	clientPod := &api.Pod{
-		TypeMeta: api.TypeMeta{
+		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
@@ -172,21 +207,28 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:  config.prefix + "-client",
-					Image: "gcr.io/google_containers/nginx:1.7.9",
-					Ports: []api.ContainerPort{
-						{
-							Name:          "web",
-							ContainerPort: 80,
-							Protocol:      api.ProtocolTCP,
-						},
+					Name:       config.prefix + "-client",
+					Image:      "gcr.io/google_containers/busybox:1.24",
+					WorkingDir: "/opt",
+					// An imperative and easily debuggable container which reads vol contents for
+					// us to scan in the tests or by eye.
+					// We expect that /opt is empty in the minimal containers which we use in this test.
+					Command: []string{
+						"/bin/sh",
+						"-c",
+						"while true ; do cat /opt/index.html ; sleep 2 ; ls -altrh /opt/  ; sleep 2 ; done ",
 					},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      config.prefix + "-volume",
-							MountPath: "/usr/share/nginx/html",
+							MountPath: "/opt/",
 						},
 					},
+				},
+			},
+			SecurityContext: &api.PodSecurityContext{
+				SELinuxOptions: &api.SELinuxOptions{
+					Level: "s0:c0,c1",
 				},
 			},
 			Volumes: []api.Volume{
@@ -197,73 +239,146 @@ func testVolumeClient(client *client.Client, config VolumeTestConfig, volume api
 			},
 		},
 	}
-	if _, err := podClient.Create(clientPod); err != nil {
-		Failf("Failed to create %s pod: %v", clientPod.Name, err)
+	podsNamespacer := client.Pods(config.namespace)
+
+	if fsGroup != nil {
+		clientPod.Spec.SecurityContext.FSGroup = fsGroup
 	}
-	expectNoError(waitForPodRunningInNamespace(client, clientPod.Name, config.namespace))
+	clientPod, err := podsNamespacer.Create(clientPod)
+	if err != nil {
+		framework.Failf("Failed to create %s pod: %v", clientPod.Name, err)
+	}
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(client, clientPod))
 
-	By("reading a web page from the client")
-	body, err := client.Get().
-		Namespace(config.namespace).
-		Prefix("proxy").
-		Resource("pods").
-		Name(clientPod.Name).
-		DoRaw()
-	expectNoError(err, "Cannot read web page: %v", err)
-	Logf("body: %v", string(body))
+	By("Checking that text file contents are perfect.")
+	_, err = framework.LookForStringInPodExec(config.namespace, clientPod.Name, []string{"cat", "/opt/index.html"}, expectedContent, time.Minute)
+	Expect(err).NotTo(HaveOccurred(), "failed: finding the contents of the mounted file.")
 
-	By("checking the page content")
-	Expect(body).To(ContainSubstring(expectedContent))
+	if fsGroup != nil {
+
+		By("Checking fsGroup is correct.")
+		_, err = framework.LookForStringInPodExec(config.namespace, clientPod.Name, []string{"ls", "-ld", "/opt"}, strconv.Itoa(int(*fsGroup)), time.Minute)
+		Expect(err).NotTo(HaveOccurred(), "failed: getting the right priviliges in the file %v", int(*fsGroup))
+	}
 }
 
-var _ = Describe("Volumes", func() {
-	clean := true // If 'false', the test won't clear its namespace (and pods and services) upon completion. Useful for debugging.
+// Insert index.html with given content into given volume. It does so by
+// starting and auxiliary pod which writes the file there.
+// The volume must be writable.
+func injectHtml(client *client.Client, config VolumeTestConfig, volume api.VolumeSource, content string) {
+	By(fmt.Sprint("starting ", config.prefix, " injector"))
+	podClient := client.Pods(config.namespace)
 
+	injectPod := &api.Pod{
+		TypeMeta: unversioned.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: config.prefix + "-injector",
+			Labels: map[string]string{
+				"role": config.prefix + "-injector",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:    config.prefix + "-injector",
+					Image:   "gcr.io/google_containers/busybox:1.24",
+					Command: []string{"/bin/sh"},
+					Args:    []string{"-c", "echo '" + content + "' > /mnt/index.html && chmod o+rX /mnt /mnt/index.html"},
+					VolumeMounts: []api.VolumeMount{
+						{
+							Name:      config.prefix + "-volume",
+							MountPath: "/mnt",
+						},
+					},
+				},
+			},
+			SecurityContext: &api.PodSecurityContext{
+				SELinuxOptions: &api.SELinuxOptions{
+					Level: "s0:c0,c1",
+				},
+			},
+			RestartPolicy: api.RestartPolicyNever,
+			Volumes: []api.Volume{
+				{
+					Name:         config.prefix + "-volume",
+					VolumeSource: volume,
+				},
+			},
+		},
+	}
+
+	defer func() {
+		podClient.Delete(config.prefix+"-injector", nil)
+	}()
+
+	injectPod, err := podClient.Create(injectPod)
+	framework.ExpectNoError(err, "Failed to create injector pod: %v", err)
+	err = framework.WaitForPodSuccessInNamespace(client, injectPod.Name, injectPod.Spec.Containers[0].Name, injectPod.Namespace)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func deleteCinderVolume(name string) error {
+	// Try to delete the volume for several seconds - it takes
+	// a while for the plugin to detach it.
+	var output []byte
+	var err error
+	timeout := time.Second * 120
+
+	framework.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
+		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
+		if err == nil {
+			framework.Logf("Cinder volume %s deleted", name)
+			return nil
+		} else {
+			framework.Logf("Failed to delete volume %s: %v", name, err)
+		}
+	}
+	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
+	return err
+}
+
+// These tests need privileged containers, which are disabled by default.  Run
+// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
+var _ = framework.KubeDescribe("Volumes [Feature:Volumes]", func() {
+	f := framework.NewDefaultFramework("volume")
+
+	// If 'false', the test won't clear its volumes upon completion. Useful for debugging,
+	// note that namespace deletion is handled by delete-namespace flag
+	clean := true
 	// filled in BeforeEach
 	var c *client.Client
 	var namespace *api.Namespace
 
 	BeforeEach(func() {
-		var err error
-		c, err = loadClient()
-		Expect(err).NotTo(HaveOccurred())
-		By("Building a namespace api object")
-		namespace, err = createTestingNS("volume", c)
-		Expect(err).NotTo(HaveOccurred())
-	})
-
-	AfterEach(func() {
-		if clean {
-			if err := deleteNS(c, namespace.Name); err != nil {
-				Failf("Couldn't delete ns %s", err)
-			}
-		}
+		c = f.Client
+		namespace = f.Namespace
 	})
 
 	////////////////////////////////////////////////////////////////////////
 	// NFS
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] NFS", func() {
+	framework.KubeDescribe("NFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "nfs",
-				serverImage: "gcr.io/google_containers/volume-nfs",
+				serverImage: "gcr.io/google_containers/volume-nfs:0.6",
 				serverPorts: []int{2049},
 			}
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
 			serverIP := pod.Status.PodIP
-			Logf("NFS server IP address: %v", serverIP)
+			framework.Logf("NFS server IP address: %v", serverIP)
 
 			volume := api.VolumeSource{
 				NFS: &api.NFSVolumeSource{
@@ -273,7 +388,7 @@ var _ = Describe("Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			testVolumeClient(c, config, volume, "Hello from NFS!")
+			testVolumeClient(c, config, volume, nil, "Hello from NFS!")
 		})
 	})
 
@@ -281,30 +396,27 @@ var _ = Describe("Volumes", func() {
 	// Gluster
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] GlusterFS", func() {
+	framework.KubeDescribe("GlusterFS", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "gluster",
-				serverImage: "gcr.io/google_containers/volume-gluster",
+				serverImage: "gcr.io/google_containers/volume-gluster:0.2",
 				serverPorts: []int{24007, 24008, 49152},
 			}
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
 			serverIP := pod.Status.PodIP
-			Logf("Gluster server IP address: %v", serverIP)
+			framework.Logf("Gluster server IP address: %v", serverIP)
 
 			// create Endpoints for the server
 			endpoints := api.Endpoints{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Endpoints",
 					APIVersion: "v1",
 				},
@@ -338,7 +450,7 @@ var _ = Describe("Volumes", func() {
 			}()
 
 			if _, err := endClient.Create(&endpoints); err != nil {
-				Failf("Failed to create endpoints for Gluster server: %v", err)
+				framework.Failf("Failed to create endpoints for Gluster server: %v", err)
 			}
 
 			volume := api.VolumeSource{
@@ -350,7 +462,7 @@ var _ = Describe("Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volumes-tester/gluster/index.html
-			testVolumeClient(c, config, volume, "Hello from GlusterFS!")
+			testVolumeClient(c, config, volume, nil, "Hello from GlusterFS!")
 		})
 	})
 
@@ -358,18 +470,17 @@ var _ = Describe("Volumes", func() {
 	// iSCSI
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
+	// The test needs privileged containers, which are disabled by default.
 	// Also, make sure that iscsiadm utility and iscsi target kernel modules
 	// are installed on all nodes!
 	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=iSCSI"
 
-	Describe("[Skipped] iSCSI", func() {
+	framework.KubeDescribe("iSCSI", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "iscsi",
-				serverImage: "gcr.io/google_containers/volume-iscsi",
+				serverImage: "gcr.io/google_containers/volume-iscsi:0.1",
 				serverPorts: []int{3260},
 				volumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -379,25 +490,26 @@ var _ = Describe("Volumes", func() {
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
 			serverIP := pod.Status.PodIP
-			Logf("iSCSI server IP address: %v", serverIP)
+			framework.Logf("iSCSI server IP address: %v", serverIP)
 
 			volume := api.VolumeSource{
 				ISCSI: &api.ISCSIVolumeSource{
 					TargetPortal: serverIP + ":3260",
 					// from test/images/volumes-tester/iscsi/initiatorname.iscsi
-					IQN:      "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
-					Lun:      0,
-					FSType:   "ext2",
-					ReadOnly: true,
+					IQN:    "iqn.2003-01.org.linux-iscsi.f21.x8664:sn.4b0aae584f7c",
+					Lun:    0,
+					FSType: "ext2",
 				},
 			}
+
+			fsGroup := int64(1234)
 			// Must match content of test/images/volumes-tester/iscsi/block.tar.gz
-			testVolumeClient(c, config, volume, "Hello from iSCSI")
+			testVolumeClient(c, config, volume, &fsGroup, "Hello from iSCSI")
 		})
 	})
 
@@ -405,17 +517,12 @@ var _ = Describe("Volumes", func() {
 	// Ceph RBD
 	////////////////////////////////////////////////////////////////////////
 
-	// Marked with [Skipped] to skip the test by default (see driver.go),
-	// the test needs privileged containers, which are disabled by default.
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=RBD"
-
-	// Run the test with "go run hack/e2e.go ... --ginkgo.focus=Volume"
-	Describe("[Skipped] Ceph RBD", func() {
+	framework.KubeDescribe("Ceph RBD", func() {
 		It("should be mountable", func() {
 			config := VolumeTestConfig{
 				namespace:   namespace.Name,
 				prefix:      "rbd",
-				serverImage: "gcr.io/google_containers/volume-rbd",
+				serverImage: "gcr.io/google_containers/volume-rbd:0.1",
 				serverPorts: []int{6789},
 				volumes: map[string]string{
 					// iSCSI container needs to insert modules from the host
@@ -426,16 +533,16 @@ var _ = Describe("Volumes", func() {
 
 			defer func() {
 				if clean {
-					volumeTestCleanup(c, config)
+					volumeTestCleanup(f, config)
 				}
 			}()
 			pod := startVolumeServer(c, config)
 			serverIP := pod.Status.PodIP
-			Logf("Ceph server IP address: %v", serverIP)
+			framework.Logf("Ceph server IP address: %v", serverIP)
 
 			// create secrets for the server
 			secret := api.Secret{
-				TypeMeta: api.TypeMeta{
+				TypeMeta: unversioned.TypeMeta{
 					Kind:       "Secret",
 					APIVersion: "v1",
 				},
@@ -457,7 +564,7 @@ var _ = Describe("Volumes", func() {
 			}()
 
 			if _, err := secClient.Create(&secret); err != nil {
-				Failf("Failed to create secrets for Ceph RBD: %v", err)
+				framework.Failf("Failed to create secrets for Ceph RBD: %v", err)
 			}
 
 			volume := api.VolumeSource{
@@ -469,14 +576,198 @@ var _ = Describe("Volumes", func() {
 					SecretRef: &api.LocalObjectReference{
 						Name: config.prefix + "-secret",
 					},
-					FSType:   "ext2",
-					ReadOnly: true,
+					FSType: "ext2",
 				},
 			}
+			fsGroup := int64(1234)
+
 			// Must match content of test/images/volumes-tester/gluster/index.html
-			testVolumeClient(c, config, volume, "Hello from RBD")
+			testVolumeClient(c, config, volume, &fsGroup, "Hello from RBD")
 
 		})
 	})
+	////////////////////////////////////////////////////////////////////////
+	// Ceph
+	////////////////////////////////////////////////////////////////////////
 
+	framework.KubeDescribe("CephFS", func() {
+		It("should be mountable", func() {
+			config := VolumeTestConfig{
+				namespace:   namespace.Name,
+				prefix:      "cephfs",
+				serverImage: "gcr.io/google_containers/volume-ceph:0.1",
+				serverPorts: []int{6789},
+			}
+
+			defer func() {
+				if clean {
+					volumeTestCleanup(f, config)
+				}
+			}()
+			pod := startVolumeServer(c, config)
+			serverIP := pod.Status.PodIP
+			framework.Logf("Ceph server IP address: %v", serverIP)
+			By("sleeping a bit to give ceph server time to initialize")
+			time.Sleep(20 * time.Second)
+
+			// create ceph secret
+			secret := &api.Secret{
+				TypeMeta: unversioned.TypeMeta{
+					Kind:       "Secret",
+					APIVersion: "v1",
+				},
+				ObjectMeta: api.ObjectMeta{
+					Name: config.prefix + "-secret",
+				},
+				// Must use the ceph keyring at contrib/for-tests/volumes-ceph/ceph/init.sh
+				// and encode in base64
+				Data: map[string][]byte{
+					"key": []byte("AQAMgXhVwBCeDhAA9nlPaFyfUSatGD4drFWDvQ=="),
+				},
+			}
+
+			defer func() {
+				if clean {
+					if err := c.Secrets(namespace.Name).Delete(secret.Name); err != nil {
+						framework.Failf("unable to delete secret %v: %v", secret.Name, err)
+					}
+				}
+			}()
+
+			var err error
+			if secret, err = c.Secrets(namespace.Name).Create(secret); err != nil {
+				framework.Failf("unable to create test secret %s: %v", secret.Name, err)
+			}
+
+			volume := api.VolumeSource{
+				CephFS: &api.CephFSVolumeSource{
+					Monitors:  []string{serverIP + ":6789"},
+					User:      "kube",
+					SecretRef: &api.LocalObjectReference{Name: config.prefix + "-secret"},
+					ReadOnly:  true,
+				},
+			}
+			// Must match content of contrib/for-tests/volumes-ceph/ceph/index.html
+			testVolumeClient(c, config, volume, nil, "Hello Ceph!")
+		})
+	})
+
+	////////////////////////////////////////////////////////////////////////
+	// OpenStack Cinder
+	////////////////////////////////////////////////////////////////////////
+
+	// This test assumes that OpenStack client tools are installed
+	// (/usr/bin/nova, /usr/bin/cinder and /usr/bin/keystone)
+	// and that the usual OpenStack authentication env. variables are set
+	// (OS_USERNAME, OS_PASSWORD, OS_TENANT_NAME at least).
+
+	framework.KubeDescribe("Cinder", func() {
+		It("should be mountable", func() {
+			framework.SkipUnlessProviderIs("openstack")
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "cinder",
+			}
+
+			// We assume that namespace.Name is a random string
+			volumeName := namespace.Name
+			By("creating a test Cinder volume")
+			output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
+			outputString := string(output[:])
+			framework.Logf("cinder output:\n%s", outputString)
+			Expect(err).NotTo(HaveOccurred())
+
+			defer func() {
+				// Ignore any cleanup errors, there is not much we can do about
+				// them. They were already logged.
+				deleteCinderVolume(volumeName)
+			}()
+
+			// Parse 'id'' from stdout. Expected format:
+			// |     attachments     |                  []                  |
+			// |  availability_zone  |                 nova                 |
+			// ...
+			// |          id         | 1d6ff08f-5d1c-41a4-ad72-4ef872cae685 |
+			volumeID := ""
+			for _, line := range strings.Split(outputString, "\n") {
+				fields := strings.Fields(line)
+				if len(fields) != 5 {
+					continue
+				}
+				if fields[1] != "id" {
+					continue
+				}
+				volumeID = fields[3]
+				break
+			}
+			framework.Logf("Volume ID: %s", volumeID)
+			Expect(volumeID).NotTo(Equal(""))
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					volumeTestCleanup(f, config)
+				}
+			}()
+			volume := api.VolumeSource{
+				Cinder: &api.CinderVolumeSource{
+					VolumeID: volumeID,
+					FSType:   "ext3",
+					ReadOnly: false,
+				},
+			}
+
+			// Insert index.html into the test volume with some random content
+			// to make sure we don't see the content from previous test runs.
+			content := "Hello from Cinder from namespace " + volumeName
+			injectHtml(c, config, volume, content)
+
+			fsGroup := int64(1234)
+			testVolumeClient(c, config, volume, &fsGroup, content)
+		})
+	})
+
+	////////////////////////////////////////////////////////////////////////
+	// GCE PD
+	////////////////////////////////////////////////////////////////////////
+
+	framework.KubeDescribe("PD", func() {
+		It("should be mountable", func() {
+			framework.SkipUnlessProviderIs("gce", "gke")
+			config := VolumeTestConfig{
+				namespace: namespace.Name,
+				prefix:    "pd",
+			}
+
+			By("creating a test gce pd volume")
+			volumeName, err := createPDWithRetry()
+			Expect(err).NotTo(HaveOccurred())
+
+			defer func() {
+				deletePDWithRetry(volumeName)
+			}()
+
+			defer func() {
+				if clean {
+					framework.Logf("Running volumeTestCleanup")
+					volumeTestCleanup(f, config)
+				}
+			}()
+			volume := api.VolumeSource{
+				GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+					PDName:   volumeName,
+					FSType:   "ext3",
+					ReadOnly: false,
+				},
+			}
+
+			// Insert index.html into the test volume with some random content
+			// to make sure we don't see the content from previous test runs.
+			content := "Hello from GCE PD from namespace " + volumeName
+			injectHtml(c, config, volume, content)
+
+			fsGroup := int64(1234)
+			testVolumeClient(c, config, volume, &fsGroup, content)
+		})
+	})
 })

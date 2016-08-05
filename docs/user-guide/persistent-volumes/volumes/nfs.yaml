@@ -8,5 +8,5 @@ spec:
   accessModes:
     - ReadWriteOnce
   nfs:
-    path: /tmp
+    path: /somepath
     server: 172.17.0.2

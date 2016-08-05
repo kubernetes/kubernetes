@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,17 +22,17 @@ import (
 	"net/http"
 	"testing"
 
-	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	f, tf, codec := NewTestFactory()
+	f, tf, codec, ns := NewTestFactory()
 	tf.Describer = d
-	tf.Client = &client.FakeRESTClient{
-		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, &internalType{Name: "foo"})},
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})},
 	}
 	tf.Namespace = "non-default"
 	buf := bytes.NewBuffer([]byte{})
@@ -51,15 +51,15 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
-	tf.Client = &client.FakeRESTClient{
-		Codec: codec,
-		Client: client.HTTPClientFunc(func(req *http.Request) (*http.Response, error) {
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
-				return &http.Response{StatusCode: 200, Body: objBody(codec, &rc.Items[0])}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -70,7 +70,7 @@ func TestDescribeObject(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDescribe(f, buf)
-	cmd.Flags().Set("filename", "../../../examples/guestbook/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../examples/guestbook/legacy/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	if d.Name != "redis-master" || d.Namespace != "test" {
@@ -84,12 +84,12 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
-	tf.Client = &client.FakeRESTClient{
-		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Body: objBody(codec, pods)},
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"
@@ -98,5 +98,45 @@ func TestDescribeListObjects(t *testing.T) {
 	cmd.Run(cmd, []string{"pods"})
 	if buf.String() != fmt.Sprintf("%s\n\n%s\n\n", d.Output, d.Output) {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestDescribeObjectShowEvents(t *testing.T) {
+	pods, _, _ := testData()
+	f, tf, codec, ns := NewAPIFactory()
+	d := &testDescriber{Output: "test output"}
+	tf.Describer = d
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf)
+	cmd.Flags().Set("show-events", "true")
+	cmd.Run(cmd, []string{"pods"})
+	if d.Settings.ShowEvents != true {
+		t.Errorf("ShowEvents = true expected, got ShowEvents = %v", d.Settings.ShowEvents)
+	}
+}
+
+func TestDescribeObjectSkipEvents(t *testing.T) {
+	pods, _, _ := testData()
+	f, tf, codec, ns := NewAPIFactory()
+	d := &testDescriber{Output: "test output"}
+	tf.Describer = d
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+	}
+
+	tf.Namespace = "test"
+	buf := bytes.NewBuffer([]byte{})
+	cmd := NewCmdDescribe(f, buf)
+	cmd.Flags().Set("show-events", "false")
+	cmd.Run(cmd, []string{"pods"})
+	if d.Settings.ShowEvents != false {
+		t.Errorf("ShowEvents = false expected, got ShowEvents = %v", d.Settings.ShowEvents)
 	}
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -38,8 +36,8 @@ func (c *FakeNamespaces) Get(name string) (*api.Namespace, error) {
 	return obj.(*api.Namespace), err
 }
 
-func (c *FakeNamespaces) List(label labels.Selector, field fields.Selector) (*api.NamespaceList, error) {
-	obj, err := c.Fake.Invokes(NewRootListAction("namespaces", label, field), &api.NamespaceList{})
+func (c *FakeNamespaces) List(opts api.ListOptions) (*api.NamespaceList, error) {
+	obj, err := c.Fake.Invokes(NewRootListAction("namespaces", opts), &api.NamespaceList{})
 	if obj == nil {
 		return nil, err
 	}
@@ -53,7 +51,7 @@ func (c *FakeNamespaces) Create(namespace *api.Namespace) (*api.Namespace, error
 		return nil, err
 	}
 
-	return obj.(*api.Namespace), c.Fake.Err()
+	return obj.(*api.Namespace), err
 }
 
 func (c *FakeNamespaces) Update(namespace *api.Namespace) (*api.Namespace, error) {
@@ -70,9 +68,8 @@ func (c *FakeNamespaces) Delete(name string) error {
 	return err
 }
 
-func (c *FakeNamespaces) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewRootWatchAction("namespaces", label, field, resourceVersion), nil)
-	return c.Fake.Watch, nil
+func (c *FakeNamespaces) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewRootWatchAction("namespaces", opts))
 }
 
 func (c *FakeNamespaces) Finalize(namespace *api.Namespace) (*api.Namespace, error) {

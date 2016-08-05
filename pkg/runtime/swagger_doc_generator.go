@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -65,11 +65,14 @@ func fmtRawDoc(rawDoc string) string {
 
 	for _, line := range strings.Split(rawDoc, "\n") {
 		line = strings.TrimRight(line, " ")
-
-		if line == "" { // Keep paragraphs
+		leading := strings.TrimLeft(line, " ")
+		switch {
+		case len(line) == 0: // Keep paragraphs
 			delPrevChar()
 			buffer.WriteString("\n\n")
-		} else if !strings.HasPrefix(strings.TrimLeft(line, " "), "TODO") { // Ignore one line TODOs
+		case strings.HasPrefix(leading, "TODO"): // Ignore one line TODOs
+		case strings.HasPrefix(leading, "+"): // Ignore instructions to go2idl
+		default:
 			if strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t") {
 				delPrevChar()
 				line = "\n" + line + "\n" // Replace it with newline. This is useful when we have a line with: "Example:\n\tJSON-someting..."
@@ -108,6 +111,37 @@ func fieldName(field *ast.Field) string {
 		return field.Type.(*ast.Ident).Name
 	}
 	return jsonTag
+}
+
+// A buffer of lines that will be written.
+type bufferedLine struct {
+	line        string
+	indentation int
+}
+
+type buffer struct {
+	lines []bufferedLine
+}
+
+func newBuffer() *buffer {
+	return &buffer{
+		lines: make([]bufferedLine, 0),
+	}
+}
+
+func (b *buffer) addLine(line string, indent int) {
+	b.lines = append(b.lines, bufferedLine{line, indent})
+}
+
+func (b *buffer) flushLines(w io.Writer) error {
+	for _, line := range b.lines {
+		indentation := strings.Repeat("\t", line.indentation)
+		fullLine := fmt.Sprintf("%s%s", indentation, line.line)
+		if _, err := io.WriteString(w, fullLine); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeFuncHeader(b *buffer, structName string, indent int) {

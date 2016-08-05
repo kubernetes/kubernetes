@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,15 +19,16 @@ package procfs
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path"
 	"strconv"
 	"strings"
 )
 
-type ProcFs struct{}
+type ProcFS struct{}
 
-func NewProcFs() ProcFsInterface {
-	return &ProcFs{}
+func NewProcFS() ProcFSInterface {
+	return &ProcFS{}
 }
 
 func containerNameFromProcCgroup(content string) (string, error) {
@@ -44,10 +45,13 @@ func containerNameFromProcCgroup(content string) (string, error) {
 // getFullContainerName gets the container name given the root process id of the container.
 // Eg. If the devices cgroup for the container is stored in /sys/fs/cgroup/devices/docker/nginx,
 // return docker/nginx. Assumes that the process is part of exactly one cgroup hierarchy.
-func (pfs *ProcFs) GetFullContainerName(pid int) (string, error) {
+func (pfs *ProcFS) GetFullContainerName(pid int) (string, error) {
 	filePath := path.Join("/proc", strconv.Itoa(pid), "cgroup")
 	content, err := ioutil.ReadFile(filePath)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return "", os.ErrNotExist
+		}
 		return "", err
 	}
 	return containerNameFromProcCgroup(string(content))

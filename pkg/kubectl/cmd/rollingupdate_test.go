@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,11 @@ import (
 )
 
 func TestValidateArgs(t *testing.T) {
-	f, _, _ := NewAPIFactory()
+	f, _, _, _ := NewAPIFactory()
 
 	tests := []struct {
 		flags     map[string]string
+		filenames []string
 		args      []string
 		expectErr bool
 		testName  string
@@ -41,11 +42,9 @@ func TestValidateArgs(t *testing.T) {
 			testName:  "no file, no image",
 		},
 		{
-			flags: map[string]string{
-				"filename": "bar.yaml",
-			},
-			args:     []string{"foo"},
-			testName: "valid file example",
+			filenames: []string{"bar.yaml"},
+			args:      []string{"foo"},
+			testName:  "valid file example",
 		},
 		{
 			flags: map[string]string{
@@ -63,9 +62,9 @@ func TestValidateArgs(t *testing.T) {
 		},
 		{
 			flags: map[string]string{
-				"image":    "foo:v2",
-				"filename": "bar.yaml",
+				"image": "foo:v2",
 			},
+			filenames: []string{"bar.yaml"},
 			args:      []string{"foo", "foo-v2"},
 			expectErr: true,
 			testName:  "both filename and image example",
@@ -80,7 +79,7 @@ func TestValidateArgs(t *testing.T) {
 				cmd.Flags().Set(key, val)
 			}
 		}
-		_, _, _, _, err := validateArguments(cmd, test.args)
+		err := validateArguments(cmd, test.filenames, test.args)
 		if err != nil && !test.expectErr {
 			t.Errorf("unexpected error: %v (%s)", err, test.testName)
 		}

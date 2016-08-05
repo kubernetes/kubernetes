@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,8 @@ package oom
 // This is a struct instead of an interface to allow injection of process ID listers and
 // applying OOM score in tests.
 // TODO: make this an interface, and inject a mock ioutil struct for testing.
-type OomAdjuster struct {
+type OOMAdjuster struct {
 	pidLister                 func(cgroupName string) ([]int, error)
-	ApplyOomScoreAdj          func(pid int, oomScoreAdj int) error
-	ApplyOomScoreAdjContainer func(cgroupName string, oomScoreAdj, maxTries int) error
+	ApplyOOMScoreAdj          func(pid int, oomScoreAdj int) error
+	ApplyOOMScoreAdjContainer func(cgroupName string, oomScoreAdj, maxTries int) error
 }

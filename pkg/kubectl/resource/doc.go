@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,4 +21,4 @@ limitations under the License.
 // standard command line arguments and parameters into a Visitor that can iterate
 // over all of the identified resources, whether on the server or on the local
 // filesystem.
-package resource
+package resource // import "k8s.io/kubernetes/pkg/kubectl/resource"

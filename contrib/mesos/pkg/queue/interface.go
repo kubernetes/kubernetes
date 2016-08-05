@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ package queue
 import (
 	"time"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/client/cache"
 )
 
 type EventType int
@@ -59,7 +59,7 @@ type FIFO interface {
 	// ready, they are returned in the order in which they were added/updated.
 	// The item is removed from the queue (and the store) before it is returned,
 	// so if you don't successfully process it, you need to add it back with Add().
-	Pop() interface{}
+	Pop(cancel <-chan struct{}) interface{}
 
 	// Await attempts to Pop within the given interval; upon success the non-nil
 	// item is returned, otherwise nil
@@ -101,3 +101,6 @@ type UniqueDeadlined interface {
 	UniqueID
 	Deadlined
 }
+
+// WithoutCancel returns a chan that may never be closed and always blocks
+func WithoutCancel() <-chan struct{} { return nil }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package gce_cloud
+package gce
 
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"
@@ -56,13 +57,14 @@ func init() {
 	prometheus.MustRegister(getTokenFailCounter)
 }
 
-type altTokenSource struct {
+type AltTokenSource struct {
 	oauthClient *http.Client
 	tokenURL    string
-	throttle    util.RateLimiter
+	tokenBody   string
+	throttle    flowcontrol.RateLimiter
 }
 
-func (a *altTokenSource) Token() (*oauth2.Token, error) {
+func (a *AltTokenSource) Token() (*oauth2.Token, error) {
 	a.throttle.Accept()
 	getTokenCounter.Inc()
 	t, err := a.token()
@@ -72,8 +74,8 @@ func (a *altTokenSource) Token() (*oauth2.Token, error) {
 	return t, err
 }
 
-func (a *altTokenSource) token() (*oauth2.Token, error) {
-	req, err := http.NewRequest("GET", a.tokenURL, nil)
+func (a *AltTokenSource) token() (*oauth2.Token, error) {
+	req, err := http.NewRequest("POST", a.tokenURL, strings.NewReader(a.tokenBody))
 	if err != nil {
 		return nil, err
 	}
@@ -86,24 +88,25 @@ func (a *altTokenSource) token() (*oauth2.Token, error) {
 		return nil, err
 	}
 	var tok struct {
-		AccessToken       string `json:"accessToken"`
-		ExpiryTimeSeconds int64  `json:"expiryTimeSeconds,string"`
+		AccessToken string    `json:"accessToken"`
+		ExpireTime  time.Time `json:"expireTime"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&tok); err != nil {
 		return nil, err
 	}
 	return &oauth2.Token{
 		AccessToken: tok.AccessToken,
-		Expiry:      time.Unix(tok.ExpiryTimeSeconds, 0),
+		Expiry:      tok.ExpireTime,
 	}, nil
 }
 
-func newAltTokenSource(tokenURL string) oauth2.TokenSource {
+func NewAltTokenSource(tokenURL, tokenBody string) oauth2.TokenSource {
 	client := oauth2.NewClient(oauth2.NoContext, google.ComputeTokenSource(""))
-	a := &altTokenSource{
+	a := &AltTokenSource{
 		oauthClient: client,
 		tokenURL:    tokenURL,
-		throttle:    util.NewTokenBucketRateLimiter(tokenURLQPS, tokenURLBurst),
+		tokenBody:   tokenBody,
+		throttle:    flowcontrol.NewTokenBucketRateLimiter(tokenURLQPS, tokenURLBurst),
 	}
 	return oauth2.ReuseTokenSource(nil, a)
 }

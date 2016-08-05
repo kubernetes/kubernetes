@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,8 +42,8 @@ var (
 	gitMajor string = "" // major version, always numeric
 	gitMinor string = "" // minor version, numeric possibly followed by "+"
 
-	// semantic version, dervied by build scripts (see
-	// https://github.com/GoogleCloudPlatform/kubernetes/blob/master/docs/design/versioning.md
+	// semantic version, derived by build scripts (see
+	// https://github.com/kubernetes/kubernetes/blob/master/docs/design/versioning.md
 	// for a detailed discussion of this field)
 	//
 	// TODO: This field is still called "gitVersion" for legacy
@@ -54,4 +54,6 @@ var (
 	gitVersion   string = "v0.0.0-master+$Format:%h$"
 	gitCommit    string = "$Format:%H$"    // sha1 from git, output of $(git rev-parse HEAD)
 	gitTreeState string = "not a git tree" // state of git tree, either "clean" or "dirty"
+
+	buildDate string = "1970-01-01T00:00:00Z" // build date in ISO8601 format, output of $(date -u +'%Y-%m-%dT%H:%M:%SZ')
 )

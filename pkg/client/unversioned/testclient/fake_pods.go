@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package testclient
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -39,13 +39,22 @@ func (c *FakePods) Get(name string) (*api.Pod, error) {
 	return obj.(*api.Pod), err
 }
 
-func (c *FakePods) List(label labels.Selector, field fields.Selector) (*api.PodList, error) {
-	obj, err := c.Fake.Invokes(NewListAction("pods", c.Namespace, label, field), &api.PodList{})
+func (c *FakePods) List(opts api.ListOptions) (*api.PodList, error) {
+	obj, err := c.Fake.Invokes(NewListAction("pods", c.Namespace, opts), &api.PodList{})
 	if obj == nil {
 		return nil, err
 	}
-
-	return obj.(*api.PodList), err
+	label := opts.LabelSelector
+	if label == nil {
+		label = labels.Everything()
+	}
+	list := &api.PodList{}
+	for _, pod := range obj.(*api.PodList).Items {
+		if label.Matches(labels.Set(pod.Labels)) {
+			list.Items = append(list.Items, pod)
+		}
+	}
+	return list, err
 }
 
 func (c *FakePods) Create(pod *api.Pod) (*api.Pod, error) {
@@ -71,9 +80,8 @@ func (c *FakePods) Delete(name string, options *api.DeleteOptions) error {
 	return err
 }
 
-func (c *FakePods) Watch(label labels.Selector, field fields.Selector, resourceVersion string) (watch.Interface, error) {
-	c.Fake.Invokes(NewWatchAction("pods", c.Namespace, label, field, resourceVersion), nil)
-	return c.Fake.Watch, c.Fake.Err()
+func (c *FakePods) Watch(opts api.ListOptions) (watch.Interface, error) {
+	return c.Fake.InvokesWatch(NewWatchAction("pods", c.Namespace, opts))
 }
 
 func (c *FakePods) Bind(binding *api.Binding) error {
@@ -88,16 +96,22 @@ func (c *FakePods) Bind(binding *api.Binding) error {
 }
 
 func (c *FakePods) UpdateStatus(pod *api.Pod) (*api.Pod, error) {
-	action := UpdateActionImpl{}
-	action.Verb = "update"
-	action.Resource = "pods"
-	action.Subresource = "status"
-	action.Object = pod
-
-	obj, err := c.Fake.Invokes(action, pod)
+	obj, err := c.Fake.Invokes(NewUpdateSubresourceAction("pods", "status", c.Namespace, pod), pod)
 	if obj == nil {
 		return nil, err
 	}
 
 	return obj.(*api.Pod), err
+}
+
+func (c *FakePods) GetLogs(name string, opts *api.PodLogOptions) *restclient.Request {
+	action := GenericActionImpl{}
+	action.Verb = "get"
+	action.Namespace = c.Namespace
+	action.Resource = "pod"
+	action.Subresource = "logs"
+	action.Value = opts
+
+	_, _ = c.Fake.Invokes(action, &api.Pod{})
+	return &restclient.Request{}
 }

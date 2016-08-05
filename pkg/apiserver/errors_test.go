@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,38 +24,42 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
 func TestErrorsToAPIStatus(t *testing.T) {
-	cases := map[error]api.Status{
-		errors.NewNotFound("foo", "bar"): {
-			Status:  api.StatusFailure,
+	cases := map[error]unversioned.Status{
+		errors.NewNotFound(unversioned.GroupResource{Group: "legacy.kubernetes.io", Resource: "foos"}, "bar"): {
+			Status:  unversioned.StatusFailure,
 			Code:    http.StatusNotFound,
-			Reason:  api.StatusReasonNotFound,
-			Message: "foo \"bar\" not found",
-			Details: &api.StatusDetails{
-				Kind: "foo",
-				Name: "bar",
+			Reason:  unversioned.StatusReasonNotFound,
+			Message: "foos.legacy.kubernetes.io \"bar\" not found",
+			Details: &unversioned.StatusDetails{
+				Group: "legacy.kubernetes.io",
+				Kind:  "foos",
+				Name:  "bar",
 			},
 		},
-		errors.NewAlreadyExists("foo", "bar"): {
-			Status:  api.StatusFailure,
+		errors.NewAlreadyExists(api.Resource("foos"), "bar"): {
+			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "AlreadyExists",
-			Message: "foo \"bar\" already exists",
-			Details: &api.StatusDetails{
-				Kind: "foo",
-				Name: "bar",
+			Message: "foos \"bar\" already exists",
+			Details: &unversioned.StatusDetails{
+				Group: "",
+				Kind:  "foos",
+				Name:  "bar",
 			},
 		},
-		errors.NewConflict("foo", "bar", stderrs.New("failure")): {
-			Status:  api.StatusFailure,
+		errors.NewConflict(api.Resource("foos"), "bar", stderrs.New("failure")): {
+			Status:  unversioned.StatusFailure,
 			Code:    http.StatusConflict,
 			Reason:  "Conflict",
-			Message: "foo \"bar\" cannot be updated: failure",
-			Details: &api.StatusDetails{
-				Kind: "foo",
-				Name: "bar",
+			Message: "Operation cannot be fulfilled on foos \"bar\": failure",
+			Details: &unversioned.StatusDetails{
+				Group: "",
+				Kind:  "foos",
+				Name:  "bar",
 			},
 		},
 	}

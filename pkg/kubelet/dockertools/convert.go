@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,17 +18,34 @@ package dockertools
 
 import (
 	"fmt"
+	"strings"
 
-	docker "github.com/fsouza/go-dockerclient"
+	dockertypes "github.com/docker/engine-api/types"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/types"
 )
 
 // This file contains helper functions to convert docker API types to runtime
 // (kubecontainer) types.
+const (
+	statusRunningPrefix = "Up"
+	statusExitedPrefix  = "Exited"
+)
 
-// Converts docker.APIContainers to kubecontainer.Container.
-func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, error) {
+func mapState(state string) kubecontainer.ContainerState {
+	// Parse the state string in dockertypes.Container. This could break when
+	// we upgrade docker.
+	switch {
+	case strings.HasPrefix(state, statusRunningPrefix):
+		return kubecontainer.ContainerStateRunning
+	case strings.HasPrefix(state, statusExitedPrefix):
+		return kubecontainer.ContainerStateExited
+	default:
+		return kubecontainer.ContainerStateUnknown
+	}
+}
+
+// Converts dockertypes.Container to kubecontainer.Container.
+func toRuntimeContainer(c *dockertypes.Container) (*kubecontainer.Container, error) {
 	if c == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
 	}
@@ -37,24 +54,31 @@ func toRuntimeContainer(c *docker.APIContainers) (*kubecontainer.Container, erro
 	if err != nil {
 		return nil, err
 	}
+
 	return &kubecontainer.Container{
-		ID:      types.UID(c.ID),
+		ID:      kubecontainer.DockerID(c.ID).ContainerID(),
 		Name:    dockerName.ContainerName,
 		Image:   c.Image,
+		ImageID: c.ImageID,
 		Hash:    hash,
-		Created: c.Created,
+		// (random-liu) docker uses status to indicate whether a container is running or exited.
+		// However, in kubernetes we usually use state to indicate whether a container is running or exited,
+		// while use status to indicate the comprehensive status of the container. So we have different naming
+		// norm here.
+		State: mapState(c.Status),
 	}, nil
 }
 
-// Converts docker.APIImages to kubecontainer.Image.
-func toRuntimeImage(image *docker.APIImages) (*kubecontainer.Image, error) {
+// Converts dockertypes.Image to kubecontainer.Image.
+func toRuntimeImage(image *dockertypes.Image) (*kubecontainer.Image, error) {
 	if image == nil {
 		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime image")
 	}
 
 	return &kubecontainer.Image{
-		ID:   image.ID,
-		Tags: image.RepoTags,
-		Size: image.VirtualSize,
+		ID:          image.ID,
+		RepoTags:    image.RepoTags,
+		RepoDigests: image.RepoDigests,
+		Size:        image.VirtualSize,
 	}, nil
 }

@@ -1,0 +1,128 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: heapster-v1.1.0
+  namespace: kube-system
+  labels:
+    k8s-app: heapster
+    kubernetes.io/cluster-service: "true"
+    version: v1.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: heapster
+      version: v1.1.0
+  template:
+    metadata:
+      labels:
+        k8s-app: heapster
+        version: v1.1.0
+    spec:
+      containers:
+        - image: gcr.io/google_containers/heapster:v1.1.0
+          name: heapster
+          resources:
+            # keep request = limit to keep this container in guaranteed class
+            limits:
+              cpu: 100m
+              memory: 300Mi
+            requests:
+              cpu: 100m
+              memory: 300Mi
+          command:
+            - /heapster
+            - --source=kubernetes.summary_api:''
+            - --sink=influxdb:http://monitoring-influxdb:8086
+            - --sink=gcm:?metrics=autoscaling
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+            - name: usrsharecacerts
+              mountPath: /usr/share/ca-certificates
+              readOnly: true
+        - image: gcr.io/google_containers/heapster:v1.1.0
+          name: eventer
+          resources:
+            # keep request = limit to keep this container in guaranteed class
+            limits:
+              cpu: 100m
+              memory: 300Mi
+            requests:
+              cpu: 100m
+              memory: 300Mi
+          command:
+            - /eventer
+            - --source=kubernetes:''
+            - --sink=gcl
+          volumeMounts:
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+            - name: usrsharecacerts
+              mountPath: /usr/share/ca-certificates
+              readOnly: true
+        - image: gcr.io/google_containers/addon-resizer:1.0
+          name: heapster-nanny
+          resources:
+            limits:
+              cpu: 50m
+              memory: 100Mi
+            requests:
+              cpu: 50m
+              memory: 100Mi
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - /pod_nanny
+            - --cpu=100m
+            - --extra-cpu=0m
+            - --memory=300Mi
+            - --extra-memory=4Mi
+            - --threshold=5
+            - --deployment=heapster-v1.1.0
+            - --container=heapster
+            - --poll-period=300000
+        - image: gcr.io/google_containers/addon-resizer:1.0
+          name: eventer-nanny
+          resources:
+            limits:
+              cpu: 50m
+              memory: 100Mi
+            requests:
+              cpu: 50m
+              memory: 100Mi
+          env:
+            - name: MY_POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: MY_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+          command:
+            - /pod_nanny
+            - --cpu=100m
+            - --extra-cpu=0m
+            - --memory=300Mi
+            - --extra-memory=307200Ki
+            - --threshold=5
+            - --deployment=heapster-v1.1.0
+            - --container=eventer
+            - --poll-period=300000
+      volumes:
+        - name: ssl-certs
+          hostPath:
+            path: "/etc/ssl/certs"
+        - name: usrsharecacerts
+          hostPath:
+            path: "/usr/share/ca-certificates"

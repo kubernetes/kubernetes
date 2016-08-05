@@ -1,0 +1,43 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{.FEDERATION_CONTROLLER_MANAGER_DEPLOYMENT_NAME}}
+  namespace: {{.FEDERATION_NAMESPACE}}
+  labels:
+    app: federated-cluster
+spec:
+  template:
+    metadata:
+      name: federation-controller-manager
+      labels:
+        app: federated-cluster
+        module: federation-controller-manager
+    spec:
+      volumes:
+      - name: ssl-certs
+        hostPath:
+          path: /etc/ssl/certs
+      containers:
+      - name: controller-manager
+        volumeMounts:
+        - name: ssl-certs
+          readOnly: true
+          mountPath: /etc/ssl/certs
+        image: {{.FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO}}:{{.FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG}}
+        command:
+        - /usr/local/bin/federation-controller-manager
+        - --master=https://{{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}:443
+        - --dns-provider={{.FEDERATION_DNS_PROVIDER}}
+        - --dns-provider-config={{.FEDERATION_DNS_PROVIDER_CONFIG}}
+        - --federation-name={{.FEDERATION_NAME}}
+        - --zone-name={{.DNS_ZONE_NAME}}
+        ports:
+        - containerPort: 443
+          name: https
+        - containerPort: 8080
+          name: local
+        env:
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace

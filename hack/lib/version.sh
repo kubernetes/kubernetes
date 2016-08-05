@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -107,18 +107,11 @@ kube::version::load_version_vars() {
   source "${version_file}"
 }
 
-# golang 1.5 wants `-X key=val`, but golang 1.4- REQUIRES `-X key val`
 kube::version::ldflag() {
   local key=${1}
   local val=${2}
 
-  GO_VERSION=($(go version))
-
-  if [[ -z $(echo "${GO_VERSION[2]}" | grep -E 'go1.5') ]]; then
-    echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key} ${val}"
-  else
-    echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
-  fi
+  echo "-X ${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}"
 }
 
 # Prints the value that needs to be passed to the -ldflags parameter of go build
@@ -126,7 +119,7 @@ kube::version::ldflag() {
 kube::version::ldflags() {
   kube::version::get_version_vars
 
-  local -a ldflags=()
+  local -a ldflags=($(kube::version::ldflag "buildDate" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"))
   if [[ -n ${KUBE_GIT_COMMIT-} ]]; then
     ldflags+=($(kube::version::ldflag "gitCommit" "${KUBE_GIT_COMMIT}"))
     ldflags+=($(kube::version::ldflag "gitTreeState" "${KUBE_GIT_TREE_STATE}"))

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
 type Signal <-chan struct{}
@@ -90,7 +90,7 @@ func After(f func()) Signal {
 	ch := make(chan struct{})
 	go func() {
 		defer close(ch)
-		defer util.HandleCrash()
+		defer runtime.HandleCrash()
 		if f != nil {
 			f()
 		}
@@ -111,7 +111,7 @@ func Until(f func(), period time.Duration, stopCh <-chan struct{}) {
 		default:
 		}
 		func() {
-			defer util.HandleCrash()
+			defer runtime.HandleCrash()
 			f()
 		}()
 		select {

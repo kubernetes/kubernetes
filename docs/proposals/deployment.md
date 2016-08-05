@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/docs/proposals/deployment.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/docs/proposals/deployment.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -69,7 +70,9 @@ type DeploymentSpec struct {
   Replicas *int
 
   // Label selector for pods. Existing ReplicationControllers whose pods are
-  // selected by this will be scaled down.
+  // selected by this will be scaled down. New ReplicationControllers will be
+  // created with this selector, with a unique label `pod-template-hash`.
+  // If Selector is empty, it is defaulted to the labels present on the Pod template.
   Selector map[string]string
 
   // Describes the pods that will be created.
@@ -77,40 +80,31 @@ type DeploymentSpec struct {
 
   // The deployment strategy to use to replace existing pods with new ones.
   Strategy DeploymentStrategy
-
-  // Key of the selector that is added to existing RCs (and label key that is
-  // added to its pods) to prevent the existing RCs to select new pods (and old
-  // pods being selected by new RC).
-  // Users can set this to an empty string to indicate that the system should
-  // not add any selector and label. If unspecified, system uses
-  // "deployment.kubernetes.io/podTemplateHash".
-  // Value of this key is hash of DeploymentSpec.PodTemplateSpec.
-  UniqueLabelKey *string
 }
 
 type DeploymentStrategy struct {
   // Type of deployment. Can be "Recreate" or "RollingUpdate".
-  Type DeploymentType
+  Type DeploymentStrategyType
 
   // TODO: Update this to follow our convention for oneOf, whatever we decide it
   // to be.
-  // Rolling update config params. Present only if DeploymentType =
+  // Rolling update config params. Present only if DeploymentStrategyType =
   // RollingUpdate.
-  RollingUpdate *RollingUpdateDeploymentSpec
+  RollingUpdate *RollingUpdateDeploymentStrategy
 }
 
-type DeploymentType string
+type DeploymentStrategyType string
 
 const (
   // Kill all existing pods before creating new ones.
-  DeploymentRecreate DeploymentType = "Recreate"
+  RecreateDeploymentStrategyType DeploymentStrategyType = "Recreate"
 
   // Replace the old RCs by new one using rolling update i.e gradually scale down the old RCs and scale up the new one.
-  DeploymentRollingUpdate DeploymentType = "RollingUpdate"
+  RollingUpdateDeploymentStrategyType DeploymentStrategyType = "RollingUpdate"
 )
 
 // Spec to control the desired behavior of rolling update.
-type RollingUpdateDeploymentSpec struct {
+type RollingUpdateDeploymentStrategy struct {
   // The maximum number of pods that can be unavailable during the update.
   // Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
   // Absolute number is calculated from percentage by rounding up.
@@ -167,7 +161,7 @@ For each pending deployment, it will:
    selector to all these RCs (and the corresponding label to their pods) to ensure
    that they do not select the newly created pods (or old pods get selected by
    new RC).
-   - The label key will be "deployment.kubernetes.io/podTemplateHash".
+   - The label key will be "pod-template-hash".
    - The label value will be hash of the podTemplateSpec for that RC without
      this label. This value will be unique for all RCs, since PodTemplateSpec should be unique.
    - If the RCs and pods dont already have this label and selector:
@@ -175,10 +169,10 @@ For each pending deployment, it will:
        ensure that all new pods that they create will have this label.
      - Then we will add this label to their existing pods and then add this as a selector
        to that RC.
-3. Find if there exists an RC for which value of "deployment.kubernetes.io/podTemplateHash" label
+3. Find if there exists an RC for which value of "pod-template-hash" label
    is same as hash of DeploymentSpec.PodTemplateSpec. If it exists already, then
    this is the RC that will be ramped up. If there is no such RC, then we create
-   a new one using DeploymentSpec and then add a "deployment.kubernetes.io/podTemplateHash" label
+   a new one using DeploymentSpec and then add a "pod-template-hash" label
    to it. RCSpec.replicas = 0 for a newly created RC.
 4. Scale up the new RC and scale down the olds ones as per the DeploymentStrategy.
    - Raise an event if we detect an error, like new pods failing to come up.
@@ -186,7 +180,7 @@ For each pending deployment, it will:
    and the old RCs have been ramped down to 0.
 6. Cleanup.
 
-DeploymentController is stateless so that it can recover incase it crashes during a deployment.
+DeploymentController is stateless so that it can recover in case it crashes during a deployment.
 
 ### MinReadySeconds
 
@@ -246,7 +240,7 @@ To begin with, we will support 2 types of deployment:
   This results in a slower deployment, but there is no downtime. At all times
   during the deployment, there are a few pods available (old or new). The number
   of available pods and when is a pod considered "available" can be configured
-  using RollingUpdateDeploymentSpec.
+  using RollingUpdateDeploymentStrategy.
 
 In future, we want to support more deployment types.
 
@@ -254,13 +248,13 @@ In future, we want to support more deployment types.
 
 Apart from the above, we want to add support for the following:
 * Running the deployment process in a pod: In future, we can run the deployment process in a pod. Then users can define their own custom deployments and we can run it using the image name.
-* More DeploymentTypes: https://github.com/openshift/origin/blob/master/examples/deployment/README.md#deployment-types lists most commonly used ones.
+* More DeploymentStrategyTypes: https://github.com/openshift/origin/blob/master/examples/deployment/README.md#deployment-types lists most commonly used ones.
 * Triggers: Deployment will have a trigger field to identify what triggered the deployment. Options are: Manual/UserTriggered, Autoscaler, NewImage.
 * Automatic rollback on error: We want to support automatic rollback on error or timeout.
 
 ## References
 
-- https://github.com/GoogleCloudPlatform/kubernetes/issues/1743 has most of the
+- https://github.com/kubernetes/kubernetes/issues/1743 has most of the
   discussion that resulted in this proposal.
 
 

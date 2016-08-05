@@ -1,0 +1,2 @@
+guestbook-example:
+    description: Launch the guestbook example in your k8s cluster

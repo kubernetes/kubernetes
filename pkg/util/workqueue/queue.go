@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,15 @@ package workqueue
 import (
 	"sync"
 )
+
+type Interface interface {
+	Add(item interface{})
+	Len() int
+	Get() (item interface{}, shutdown bool)
+	Done(item interface{})
+	ShutDown()
+	ShuttingDown() bool
+}
 
 // New constructs a new workqueue (see the package comment).
 func New() *Type {
@@ -134,4 +143,11 @@ func (q *Type) ShutDown() {
 	defer q.cond.L.Unlock()
 	q.shuttingDown = true
 	q.cond.Broadcast()
+}
+
+func (q *Type) ShuttingDown() bool {
+	q.cond.L.Lock()
+	defer q.cond.L.Unlock()
+
+	return q.shuttingDown
 }

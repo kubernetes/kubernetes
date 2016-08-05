@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,11 +22,13 @@ import (
 	"reflect"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/yaml"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // ObjectRetriever abstracts the implementation for retrieving or setting generic
@@ -35,9 +37,16 @@ import (
 type ObjectRetriever interface {
 	// Kind should return a resource or a list of resources (depending on the provided kind and
 	// name). It should return an error if the caller should communicate an error to the server.
-	Kind(kind, name string) (runtime.Object, error)
+	Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Object, error)
 	// Add adds a runtime object for test purposes into this object.
 	Add(runtime.Object) error
+}
+
+// ObjectScheme abstracts the implementation of common operations on objects.
+type ObjectScheme interface {
+	runtime.ObjectCreater
+	runtime.ObjectCopier
+	runtime.ObjectTyper
 }
 
 // ObjectReaction returns a ReactionFunc that takes a generic action string of the form
@@ -47,34 +56,46 @@ type ObjectRetriever interface {
 // ObjectRetriever interface to satisfy retrieval of lists or retrieval of single items.
 // TODO: add support for sub resources
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
-	return func(action Action) (runtime.Object, error) {
-		_, kind, err := mapper.VersionAndKindForResource(action.GetResource())
+
+	return func(action Action) (bool, runtime.Object, error) {
+		kind, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
 		if err != nil {
-			return nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
+			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
 
 		// TODO: have mapper return a Kind for a subresource?
 		switch castAction := action.(type) {
 		case ListAction:
-			return o.Kind(kind+"List", "")
+			kind.Kind += "List"
+			resource, err := o.Kind(kind, "")
+			return true, resource, err
+
 		case GetAction:
-			return o.Kind(kind, castAction.GetName())
+			resource, err := o.Kind(kind, castAction.GetName())
+			return true, resource, err
+
 		case DeleteAction:
-			return o.Kind(kind, castAction.GetName())
+			resource, err := o.Kind(kind, castAction.GetName())
+			return true, resource, err
+
 		case CreateAction:
-			meta, err := api.ObjectMetaFor(castAction.GetObject())
+			accessor, err := meta.Accessor(castAction.GetObject())
 			if err != nil {
-				return nil, err
+				return true, nil, err
 			}
-			return o.Kind(kind, meta.Name)
+			resource, err := o.Kind(kind, accessor.GetName())
+			return true, resource, err
+
 		case UpdateAction:
-			meta, err := api.ObjectMetaFor(castAction.GetObject())
+			accessor, err := meta.Accessor(castAction.GetObject())
 			if err != nil {
-				return nil, err
+				return true, nil, err
 			}
-			return o.Kind(kind, meta.Name)
+			resource, err := o.Kind(kind, accessor.GetName())
+			return true, resource, err
+
 		default:
-			return nil, fmt.Errorf("no reaction implemented for %s", action)
+			return false, nil, fmt.Errorf("no reaction implemented for %s", action)
 		}
 	}
 }
@@ -90,7 +111,7 @@ func AddObjectsFromPath(path string, o ObjectRetriever, decoder runtime.Decoder)
 	if err != nil {
 		return err
 	}
-	obj, err := decoder.Decode(data)
+	obj, err := runtime.Decode(decoder, data)
 	if err != nil {
 		return err
 	}
@@ -103,8 +124,8 @@ func AddObjectsFromPath(path string, o ObjectRetriever, decoder runtime.Decoder)
 type objects struct {
 	types   map[string][]runtime.Object
 	last    map[string]int
-	scheme  runtime.ObjectScheme
-	decoder runtime.ObjectDecoder
+	scheme  ObjectScheme
+	decoder runtime.Decoder
 }
 
 var _ ObjectRetriever = &objects{}
@@ -119,7 +140,7 @@ var _ ObjectRetriever = &objects{}
 // as a runtime.Object if Status == Success).  If multiple PodLists are provided, they
 // will be returned in order by the Kind call, and the last PodList will be reused for
 // subsequent calls.
-func NewObjects(scheme runtime.ObjectScheme, decoder runtime.ObjectDecoder) ObjectRetriever {
+func NewObjects(scheme ObjectScheme, decoder runtime.Decoder) ObjectRetriever {
 	return objects{
 		types:   make(map[string][]runtime.Object),
 		last:    make(map[string]int),
@@ -128,23 +149,25 @@ func NewObjects(scheme runtime.ObjectScheme, decoder runtime.ObjectDecoder) Obje
 	}
 }
 
-func (o objects) Kind(kind, name string) (runtime.Object, error) {
-	empty, _ := o.scheme.New("", kind)
+func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.Object, error) {
+	kind.Version = runtime.APIVersionInternal
+
+	empty, _ := o.scheme.New(kind)
 	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
 
-	arr, ok := o.types[kind]
+	arr, ok := o.types[kind.Kind]
 	if !ok {
-		if strings.HasSuffix(kind, "List") {
-			itemKind := kind[:len(kind)-4]
+		if strings.HasSuffix(kind.Kind, "List") {
+			itemKind := kind.Kind[:len(kind.Kind)-4]
 			arr, ok := o.types[itemKind]
 			if !ok {
 				return empty, nil
 			}
-			out, err := o.scheme.New("", kind)
+			out, err := o.scheme.New(kind)
 			if err != nil {
 				return nilValue, err
 			}
-			if err := runtime.SetList(out, arr); err != nil {
+			if err := meta.SetList(out, arr); err != nil {
 				return nilValue, err
 			}
 			if out, err = o.scheme.Copy(out); err != nil {
@@ -152,27 +175,27 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 			}
 			return out, nil
 		}
-		return nilValue, errors.NewNotFound(kind, name)
+		return nilValue, errors.NewNotFound(unversioned.GroupResource{Group: kind.Group, Resource: kind.Kind}, name)
 	}
 
-	index := o.last[kind]
+	index := o.last[kind.Kind]
 	if index >= len(arr) {
 		index = len(arr) - 1
 	}
 	if index < 0 {
-		return nilValue, errors.NewNotFound(kind, name)
+		return nilValue, errors.NewNotFound(unversioned.GroupResource{Group: kind.Group, Resource: kind.Kind}, name)
 	}
 	out, err := o.scheme.Copy(arr[index])
 	if err != nil {
 		return nilValue, err
 	}
-	o.last[kind] = index + 1
+	o.last[kind.Kind] = index + 1
 
-	if status, ok := out.(*api.Status); ok {
+	if status, ok := out.(*unversioned.Status); ok {
 		if status.Details != nil {
-			status.Details.Kind = kind
+			status.Details.Kind = kind.Kind
 		}
-		if status.Status != api.StatusSuccess {
+		if status.Status != unversioned.StatusSuccess {
 			return nilValue, &errors.StatusError{ErrStatus: *status}
 		}
 	}
@@ -181,18 +204,19 @@ func (o objects) Kind(kind, name string) (runtime.Object, error) {
 }
 
 func (o objects) Add(obj runtime.Object) error {
-	_, kind, err := o.scheme.ObjectVersionAndKind(obj)
+	gvks, _, err := o.scheme.ObjectKinds(obj)
 	if err != nil {
 		return err
 	}
+	kind := gvks[0].Kind
 
 	switch {
-	case runtime.IsListType(obj):
+	case meta.IsListType(obj):
 		if kind != "List" {
 			o.types[kind] = append(o.types[kind], obj)
 		}
 
-		list, err := runtime.ExtractList(obj)
+		list, err := meta.ExtractList(obj)
 		if err != nil {
 			return err
 		}
@@ -205,11 +229,85 @@ func (o objects) Add(obj runtime.Object) error {
 			}
 		}
 	default:
-		if status, ok := obj.(*api.Status); ok && status.Details != nil {
+		if status, ok := obj.(*unversioned.Status); ok && status.Details != nil {
 			kind = status.Details.Kind
 		}
 		o.types[kind] = append(o.types[kind], obj)
 	}
 
 	return nil
+}
+
+func DefaultWatchReactor(watchInterface watch.Interface, err error) WatchReactionFunc {
+	return func(action Action) (bool, watch.Interface, error) {
+		return true, watchInterface, err
+	}
+}
+
+// SimpleReactor is a Reactor.  Each reaction function is attached to a given verb,resource tuple.  "*" in either field matches everything for that value.
+// For instance, *,pods matches all verbs on pods.  This allows for easier composition of reaction functions
+type SimpleReactor struct {
+	Verb     string
+	Resource string
+
+	Reaction ReactionFunc
+}
+
+func (r *SimpleReactor) Handles(action Action) bool {
+	verbCovers := r.Verb == "*" || r.Verb == action.GetVerb()
+	if !verbCovers {
+		return false
+	}
+	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource()
+	if !resourceCovers {
+		return false
+	}
+
+	return true
+}
+
+func (r *SimpleReactor) React(action Action) (bool, runtime.Object, error) {
+	return r.Reaction(action)
+}
+
+// SimpleWatchReactor is a WatchReactor.  Each reaction function is attached to a given resource.  "*" matches everything for that value.
+// For instance, *,pods matches all verbs on pods.  This allows for easier composition of reaction functions
+type SimpleWatchReactor struct {
+	Resource string
+
+	Reaction WatchReactionFunc
+}
+
+func (r *SimpleWatchReactor) Handles(action Action) bool {
+	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource()
+	if !resourceCovers {
+		return false
+	}
+
+	return true
+}
+
+func (r *SimpleWatchReactor) React(action Action) (bool, watch.Interface, error) {
+	return r.Reaction(action)
+}
+
+// SimpleProxyReactor is a ProxyReactor.  Each reaction function is attached to a given resource.  "*" matches everything for that value.
+// For instance, *,pods matches all verbs on pods.  This allows for easier composition of reaction functions.
+type SimpleProxyReactor struct {
+	Resource string
+
+	Reaction ProxyReactionFunc
+}
+
+func (r *SimpleProxyReactor) Handles(action Action) bool {
+	resourceCovers := r.Resource == "*" || r.Resource == action.GetResource()
+	if !resourceCovers {
+		return false
+	}
+
+	return true
+}
+
+func (r *SimpleProxyReactor) React(action Action) (bool, restclient.ResponseWrapper, error) {
+	return r.Reaction(action)
 }

@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -18,9 +18,10 @@
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
 
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
-The latest 1.0.x release of this document can be found
-[here](http://releases.k8s.io/release-1.0/examples/explorer/README.md).
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/examples/explorer/README.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -42,12 +43,12 @@ Currently, you can look at:
  * The filesystem to make sure the mounted volumes and files are also what you expect.
  * Perform DNS lookups, to see how DNS works.
 
-`pod.json` is supplied as an example. You can control the port it serves on with the -port flag.
+`pod.yaml` is supplied as an example. You can control the port it serves on with the -port flag.
 
 Example from command line (the DNS lookup looks better from a web browser):
 
 ```console
-$ kubectl create -f examples/explorer/pod.json
+$ kubectl create -f examples/explorer/pod.yaml
 $ kubectl proxy &
 Starting to serve on localhost:8001
 

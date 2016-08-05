@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@
 # The following are test-specific settings.
 CLUSTER_NAME="${CLUSTER_NAME:-${USER}-gke-e2e}"
 NETWORK=${KUBE_GKE_NETWORK:-e2e}
-MINION_TAG="k8s-${CLUSTER_NAME}-node"
+NODE_TAG="k8s-${CLUSTER_NAME}-node"
+IMAGE_TYPE="${KUBE_GKE_IMAGE_TYPE:-}"
 
 
 # For ease of maintenance, extract any pieces that do not vary between default

@@ -1,5 +1,0 @@
-[Unit]
-Description=start stop test
-
-[Service]
-ExecStart=/bin/sleep 400

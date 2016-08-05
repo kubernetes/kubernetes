@@ -47,34 +47,11 @@ monit:
   file:
     - managed
     - source: salt://supervisor/kubelet-checker.sh
+    - template: jinja
     - user: root
     - group: root
     - mode: 755
     - makedirs: True
-
-{% if "kubernetes-pool" in grains.get('roles', []) %}
-/etc/supervisor/conf.d/kube-proxy.conf:
-  file:
-    - managed
-    - source: salt://supervisor/kube-proxy.conf
-    - user: root
-    - group: root
-    - mode: 644
-    - makedirs: True
-    - require_in: 
-      - pkg: supervisor
-    - require: 
-      - file: /usr/sbin/kube-proxy-checker.sh
-
-/usr/sbin/kube-proxy-checker.sh:
-  file:
-    - managed
-    - source: salt://supervisor/kube-proxy-checker.sh
-    - user: root
-    - group: root
-    - mode: 755
-    - makedirs: True
-{% endif %}
 
 {% if grains['roles'][0] == 'kubernetes-master' -%}
 /etc/supervisor/conf.d/kube-addons.conf:

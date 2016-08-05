@@ -1,0 +1,484 @@
+// Copyright 2015 The rkt Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// *************************************************** //
+// ************ WARNING - HERE BE DRAGONS ************ //
+//                                                     //
+//   The API defined here is proposed, experimental,   //
+//   and (for now) subject to change at any time.      //
+//                                                     //
+//  If you think you want to use it, or for any other  //
+//     queries, contact <rkt-dev@googlegroups.com>     //
+//      or file an issue on github.com/coreos/rkt      //
+//                                                     //
+// *************************************************** //
+// ****************** END WARNING ******************** //
+
+syntax = "proto3";
+
+package v1alpha;
+
+// ImageType defines the supported image type.
+enum ImageType {
+        IMAGE_TYPE_UNDEFINED = 0;
+        IMAGE_TYPE_APPC      = 1;
+        IMAGE_TYPE_DOCKER    = 2;
+        IMAGE_TYPE_OCI       = 3;
+}
+
+// ImageFormat defines the format of the image.
+message ImageFormat {
+        // Type of the image, required.
+        ImageType type = 1;
+
+        // Version of the image format, required.
+        string version = 2;
+}
+
+// Image describes the image's information.
+message Image {
+        // Base format of the image, required. This indicates the original format
+        // for the image as nowadays all the image formats will be transformed to
+        // ACI.
+        ImageFormat base_format = 1;
+
+        // ID of the image, a string that can be used to uniquely identify the image,
+        // e.g. sha512 hash of the ACIs, required.
+        string id = 2;
+
+        // Name of the image in the image manifest, e.g. 'coreos.com/etcd', optional.
+        string name = 3;
+
+        // Version of the image, e.g. 'latest', '2.0.10', optional.
+        string version = 4;
+
+        // Timestamp of when the image is imported, it is the seconds since epoch, optional.
+        int64 import_timestamp = 5;
+
+        // JSON-encoded byte array that represents the image manifest, optional.
+        bytes manifest = 6;
+
+        // Size is the size in bytes of this image in the store.
+        int64 size = 7;
+
+        // Annotations on this image.
+        repeated KeyValue annotations = 8;
+}
+
+// Network describes the network information of a pod.
+message Network {
+        // Name of the network that a pod belongs to, required.
+        string name = 1;
+
+        // Pod's IPv4 address within the network, optional if IPv6 address is given.
+        string ipv4 = 2;
+
+        // Pod's IPv6 address within the network, optional if IPv4 address is given.
+        string ipv6 = 3;
+}
+
+// AppState defines the possible states of the app.
+enum AppState {
+        APP_STATE_UNDEFINED = 0;
+        APP_STATE_RUNNING   = 1;
+        APP_STATE_EXITED    = 2;
+}
+
+// App describes the information of an app that's running in a pod.
+message App {
+        // Name of the app, required.
+        string name = 1;
+
+        // Image used by the app, required. However, this may only contain the image id
+        // if it is returned by ListPods().
+        Image image = 2;
+
+        // State of the app. optional, non-empty only if it's returned by InspectPod().
+        AppState state = 3;
+
+        // Exit code of the app. optional, only valid if it's returned by InspectPod() and
+        // the app has already exited.
+        sint32 exit_code = 4;
+
+	// Annotations for this app.
+        repeated KeyValue annotations = 5;
+}
+
+// PodState defines the possible states of the pod.
+// See https://github.com/coreos/rkt/blob/master/Documentation/devel/pod-lifecycle.md for a detailed
+// explanation of each state.
+enum PodState {
+        POD_STATE_UNDEFINED = 0;
+
+        // States before the pod is running.
+        POD_STATE_EMBRYO    = 1; // Pod is created, ready to entering 'preparing' state.
+        POD_STATE_PREPARING = 2; // Pod is being prepared. On success it will become 'prepared', otherwise it will become 'aborted prepared'.
+        POD_STATE_PREPARED  = 3; // Pod has been successfully prepared, ready to enter 'running' state. it can also enter 'deleting' if it's garbage collected before running.
+
+        // State that indicates the pod is running.
+        POD_STATE_RUNNING = 4; // Pod is running, when it exits, it will become 'exited'.
+
+        // States that indicates the pod is exited, and will never run.
+        POD_STATE_ABORTED_PREPARE = 5; // Pod failed to prepare, it will only be garbage collected and will never run again.
+        POD_STATE_EXITED          = 6; // Pod has exited, it now can be garbage collected.
+        POD_STATE_DELETING        = 7; // Pod is being garbage collected, after that it will enter 'garbage' state.
+        POD_STATE_GARBAGE         = 8; // Pod is marked as garbage collected, it no longer exists on the machine.
+}
+
+// Pod describes a pod's information.
+// If a pod is in Embryo, Preparing, AbortedPrepare state,
+// only id and state will be returned.
+//
+// If a pod is in other states, the pod manifest and
+// apps will be returned when 'detailed' is true in the request.
+//
+// A valid pid of the stage1 process of the pod will be returned
+// if the pod is Running has run once.
+//
+// Networks are only returned when a pod is in Running.
+message Pod {
+        // ID of the pod, in the form of a UUID.
+        string id = 1;
+
+        // PID of the stage1 process of the pod.
+        sint32 pid = 2;
+
+        // State of the pod.
+        PodState state = 3;
+
+        // List of apps in the pod.
+        repeated App apps = 4;
+
+        // Network information of the pod.
+        // Note that a pod can be in multiple networks.
+        repeated Network networks = 5;
+
+        // JSON-encoded byte array that represents the pod manifest of the pod.
+        bytes manifest = 6;
+
+        // Annotations on this pod.
+        repeated KeyValue annotations = 7;
+
+        // Cgroup of the pod, empty if the pod is not running.
+        string cgroup = 8;
+
+        // Timestamp of when the pod is created, nanoseconds since epoch.
+        // Zero if the pod is not created.
+        int64 created_at = 9;
+
+        // Timestamp of when the pod is started, nanoseconds since epoch.
+        // Zero if the pod is not started.
+        int64 started_at = 10;
+
+        // Timestamp of when the pod is moved to exited-garbage/garbage,
+        // in nanoseconds since epoch.
+        // Zero if the pod is not moved to exited-garbage/garbage yet.
+        int64 gc_marked_at = 11;
+}
+
+message KeyValue {
+        // Key part of the key-value pair.
+        string Key = 1;
+        // Value part of the key-value pair.
+        string value = 2;
+}
+
+// PodFilter defines the condition that the returned pods need to satisfy in ListPods().
+// The conditions are combined by 'AND', and different filters are combined by 'OR'.
+message PodFilter {
+        // If not empty, the pods that have any of the ids will be returned.
+        repeated string ids = 1;
+
+        // If not empty, the pods that have any of the states will be returned.
+        repeated PodState states = 2;
+
+        // If not empty, the pods that all of the apps will be returned.
+        repeated string app_names = 3;
+
+        // If not empty, the pods that have all of the images(in the apps) will be returned
+        repeated string image_ids = 4;
+
+        // If not empty, the pods that are in all of the networks will be returned.
+        repeated string network_names = 5;
+
+        // If not empty, the pods that have all of the annotations will be returned.
+        repeated KeyValue annotations = 6;
+
+        // If not empty, the pods whose cgroup are listed will be returned.
+        repeated string cgroups = 7;
+
+        // If not empty, the pods whose these cgroup belong to will be returned.
+        // i.e. the pod's cgroup is a prefix of the specified cgroup
+        repeated string pod_sub_cgroups = 8;
+}
+
+// ImageFilter defines the condition that the returned images need to satisfy in ListImages().
+// The conditions are combined by 'AND', and different filters are combined by 'OR'.
+message ImageFilter {
+        // If not empty, the images that have any of the ids will be returned.
+        repeated string ids = 1;
+
+        // if not empty, the images that have any of the prefixes in the name will be returned.
+        repeated string prefixes = 2;
+
+        // If not empty, the images that have any of the base names will be returned.
+        // For example, both 'coreos.com/etcd' and 'k8s.io/etcd' will be returned if 'etcd' is included,
+        // however 'k8s.io/etcd-backup' will not be returned.
+        repeated string base_names = 3;
+
+        // If not empty, the images that have any of the keywords in the name will be returned.
+        // For example, both 'kubernetes-etcd', 'etcd:latest' will be returned if 'etcd' is included,
+        repeated string keywords = 4;
+
+        // If not empty, the images that have all of the labels will be returned.
+        repeated KeyValue labels = 5;
+
+        // If set, the images that are imported after this timestamp will be returned.
+        int64 imported_after = 6;
+
+        // If set, the images that are imported before this timestamp will be returned.
+        int64 imported_before = 7;
+
+        // If not empty, the images that have all of the annotations will be returned.
+        repeated KeyValue annotations = 8;
+
+        // If not empty, the images that have any of the exact full names will be returned.
+        repeated string full_names = 9;
+}
+
+// GlobalFlags describes the flags that passed to rkt api service when it is launched.
+message GlobalFlags {
+        // Data directory.
+        string dir = 1;
+
+        // System configuration directory.
+        string system_config_dir = 2;
+
+        // Local configuration directory.
+        string local_config_dir = 3;
+
+        // User configuration directory.
+        string user_config_dir = 4;
+
+        // Insecure flags configurates what security features to disable.
+        string insecure_flags = 5;
+
+        // Whether to automatically trust gpg keys fetched from https
+        bool trust_keys_from_https = 6;
+}
+
+// Info describes the information of rkt on the machine.
+message Info {
+        // Version of rkt, required, in the form of Semantic Versioning 2.0.0 (http://semver.org/).
+        string rkt_version = 1;
+
+        // Version of appc, required, in the form of Semantic Versioning 2.0.0 (http://semver.org/).
+        string appc_version = 2;
+
+        // Latest version of the api that's supported by the service, required, in the form of Semantic Versioning 2.0.0 (http://semver.org/).
+        string api_version = 3;
+
+        // The global flags that passed to the rkt api service when it's launched.
+        GlobalFlags global_flags = 4;
+}
+
+// EventType defines the type of the events that will be received via ListenEvents().
+enum EventType {
+        EVENT_TYPE_UNDEFINED = 0;
+
+        // Pod events.
+        EVENT_TYPE_POD_PREPARED          = 1;
+        EVENT_TYPE_POD_PREPARE_ABORTED   = 2;
+        EVENT_TYPE_POD_STARTED           = 3;
+        EVENT_TYPE_POD_EXITED            = 4;
+        EVENT_TYPE_POD_GARBAGE_COLLECTED = 5;
+
+        // App events.
+        EVENT_TYPE_APP_STARTED = 6;
+        EVENT_TYPE_APP_EXITED  = 7; // (XXX)yifan: Maybe also return exit code in the event object?
+
+        // Image events.
+        EVENT_TYPE_IMAGE_IMPORTED = 8;
+        EVENT_TYPE_IMAGE_REMOVED  = 9;
+}
+
+// Event describes the events that will be received via ListenEvents().
+message Event {
+        // Type of the event, required.
+        EventType type = 1;
+
+        // ID of the subject that causes the event, required.
+        // If the event is a pod or app event, the id is the pod's uuid.
+        // If the event is an image event, the id is the image's id.
+        string id = 2;
+
+        // Name of the subject that causes the event, required.
+        // If the event is a pod event, the name is the pod's name.
+        // If the event is an app event, the name is the app's name.
+        // If the event is an image event, the name is the image's name.
+        string from = 3;
+
+        // Timestamp of when the event happens, it is the seconds since epoch, required.
+        int64 time = 4;
+
+        // Data of the event, in the form of key-value pairs, optional.
+        repeated KeyValue data = 5;
+}
+
+// EventFilter defines the condition that the returned events needs to satisfy in ListImages().
+// The condition are combined by 'AND'.
+message EventFilter {
+        // If not empty, then only returns the events that have the listed types.
+        repeated EventType types = 1;
+
+        // If not empty, then only returns the events whose 'id' is included in the listed ids.
+        repeated string ids = 2;
+
+        // If not empty, then only returns the events whose 'from' is included in the listed names.
+        repeated string names = 3;
+
+        // If set, then only returns the events after this timestamp.
+        // If the server starts after since_time, then only the events happened after the start of the server will be returned.
+        // If since_time is a future timestamp, then no events will be returned until that time.
+        int64 since_time = 4;
+
+        // If set, then only returns the events before this timestamp.
+        // If it is a future timestamp, then the event stream will be closed at that moment.
+        int64 until_time = 5;
+}
+
+// Request for GetInfo().
+message GetInfoRequest {}
+
+// Response for GetInfo().
+message GetInfoResponse {
+        Info info = 1; // Required.
+}
+
+// Request for ListPods().
+message ListPodsRequest {
+        repeated PodFilter filters = 1; // Optional.
+        bool detail = 2; // Optional.
+}
+
+// Response for ListPods().
+message ListPodsResponse {
+        repeated Pod pods = 1; // Required.
+}
+
+// Request for InspectPod().
+message InspectPodRequest {
+        // ID of the pod which we are querying status for, required.
+        string id = 1;
+}
+
+// Response for InspectPod().
+message InspectPodResponse {
+        Pod pod = 1; // Required.
+}
+
+// Request for ListImages().
+message ListImagesRequest {
+        repeated ImageFilter filters = 1; // Optional.
+        bool detail = 2; // Optional.
+}
+
+// Response for ListImages().
+message ListImagesResponse {
+        repeated Image images = 1; // Required.
+}
+
+// Request for InspectImage().
+message InspectImageRequest {
+        string id = 1; // Required.
+}
+
+// Response for InspectImage().
+message InspectImageResponse {
+        Image image = 1; // Required.
+}
+
+// Request for ListenEvents().
+message ListenEventsRequest {
+        EventFilter filter = 1; // Optional.
+}
+
+// Response for ListenEvents().
+message ListenEventsResponse {
+        // Aggregate multiple events to reduce round trips, optional as the response can contain no events.
+        repeated Event events = 1;
+}
+
+// Request for GetLogs().
+message GetLogsRequest {
+        // ID of the pod which we will get logs from, required.
+        string pod_id = 1;
+
+        // Name of the app within the pod which we will get logs
+        // from, optional. If not set, then the logs of all the
+        // apps within the pod will be returned.
+        string app_name = 2;
+
+        // Number of most recent lines to return, optional.
+        int32 lines = 3;
+
+        // If true, then a response stream will not be closed,
+        // and new log response will be sent via the stream, default is false.
+        bool follow = 4;
+
+        // If set, then only the logs after the timestamp will
+        // be returned, optional.
+        int64 since_time = 5;
+
+        // If set, then only the logs before the timestamp will
+        // be returned, optional.
+        int64 until_time = 6;
+}
+
+// Response for GetLogs().
+message GetLogsResponse {
+        // List of the log lines that returned, optional as the response can contain no logs.
+        repeated string lines = 1;
+}
+
+// PublicAPI defines the read-only APIs that will be supported.
+// These will be handled over TCP sockets.
+service PublicAPI {
+        // GetInfo gets the rkt's information on the machine.
+        rpc GetInfo (GetInfoRequest) returns (GetInfoResponse) {}
+
+        // ListPods lists rkt pods on the machine.
+        rpc ListPods (ListPodsRequest) returns (ListPodsResponse) {}
+
+        // InspectPod gets detailed pod information of the specified pod.
+        rpc InspectPod (InspectPodRequest) returns (InspectPodResponse) {}
+
+        // ListImages lists the images on the machine.
+        rpc ListImages (ListImagesRequest) returns (ListImagesResponse) {}
+
+        // InspectImage gets the detailed image information of the specified image.
+        rpc InspectImage (InspectImageRequest) returns (InspectImageResponse) {}
+
+        // ListenEvents listens for the events, it will return a response stream
+        // that will contain event objects.
+        rpc ListenEvents (ListenEventsRequest) returns (stream ListenEventsResponse) {}
+
+        // GetLogs gets the logs for a pod, if the app is also specified, then only the logs
+        // of the app will be returned.
+        //
+        // If 'follow' in the 'GetLogsRequest' is set to 'true', then the response stream
+        // will not be closed after the first response, the future logs will be sent via
+        // the stream.
+        rpc GetLogs(GetLogsRequest) returns (stream GetLogsResponse) {}
+}

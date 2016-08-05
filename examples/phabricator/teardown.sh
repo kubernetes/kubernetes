@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-echo "Deleting Authenticator replication controller" && kubectl stop rc authenticator-controller
 echo "Deleting Phabricator service" && kubectl delete -f phabricator-service.json
-echo "Deleting Phabricator replication controller" && kubectl stop rc phabricator-controller
-
+echo "Deleting Phabricator replication controller" && kubectl delete rc phabricator-controller
 echo "Delete firewall rule" && gcloud compute firewall-rules delete -q phabricator-node-80
 

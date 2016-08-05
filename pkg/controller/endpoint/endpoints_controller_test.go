@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package endpointcontroller
+package endpoint
 
 import (
 	"fmt"
@@ -24,18 +24,24 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	endptspkg "k8s.io/kubernetes/pkg/api/endpoints"
-	_ "k8s.io/kubernetes/pkg/api/latest"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/client/unversioned/cache"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	_ "k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/client/cache"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/intstr"
+	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
-func addPods(store cache.Store, namespace string, nPods int, nPorts int) {
-	for i := 0; i < nPods; i++ {
+var alwaysReady = func() bool { return true }
+
+func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int) {
+	for i := 0; i < nPods+nNotReady; i++ {
 		p := &api.Pod{
-			TypeMeta: api.TypeMeta{APIVersion: testapi.Version()},
+			TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 			ObjectMeta: api.ObjectMeta{
 				Namespace: namespace,
 				Name:      fmt.Sprintf("pod%d", i),
@@ -54,97 +60,14 @@ func addPods(store cache.Store, namespace string, nPods int, nPorts int) {
 				},
 			},
 		}
+		if i >= nPods {
+			p.Status.Conditions[0].Status = api.ConditionFalse
+		}
 		for j := 0; j < nPorts; j++ {
 			p.Spec.Containers[0].Ports = append(p.Spec.Containers[0].Ports,
-				api.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: 8080 + j})
+				api.ContainerPort{Name: fmt.Sprintf("port%d", i), ContainerPort: int32(8080 + j)})
 		}
 		store.Add(p)
-	}
-}
-
-func TestFindPort(t *testing.T) {
-	testCases := []struct {
-		name       string
-		containers []api.Container
-		port       util.IntOrString
-		expected   int
-		pass       bool
-	}{{
-		name:       "valid int, no ports",
-		containers: []api.Container{{}},
-		port:       util.NewIntOrStringFromInt(93),
-		expected:   93,
-		pass:       true,
-	}, {
-		name: "valid int, with ports",
-		containers: []api.Container{{Ports: []api.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "TCP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}}}},
-		port:     util.NewIntOrStringFromInt(93),
-		expected: 93,
-		pass:     true,
-	}, {
-		name:       "valid str, no ports",
-		containers: []api.Container{{}},
-		port:       util.NewIntOrStringFromString("p"),
-		expected:   0,
-		pass:       false,
-	}, {
-		name: "valid str, one ctr with ports",
-		containers: []api.Container{{Ports: []api.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}, {
-			Name:          "q",
-			ContainerPort: 33,
-			Protocol:      "TCP",
-		}}}},
-		port:     util.NewIntOrStringFromString("q"),
-		expected: 33,
-		pass:     true,
-	}, {
-		name: "valid str, two ctr with ports",
-		containers: []api.Container{{}, {Ports: []api.ContainerPort{{
-			Name:          "",
-			ContainerPort: 11,
-			Protocol:      "UDP",
-		}, {
-			Name:          "p",
-			ContainerPort: 22,
-			Protocol:      "TCP",
-		}, {
-			Name:          "q",
-			ContainerPort: 33,
-			Protocol:      "TCP",
-		}}}},
-		port:     util.NewIntOrStringFromString("q"),
-		expected: 33,
-		pass:     true,
-	}}
-
-	for _, tc := range testCases {
-		port, err := findPort(&api.Pod{Spec: api.PodSpec{Containers: tc.containers}},
-			&api.ServicePort{Protocol: "TCP", TargetPort: tc.port})
-		if err != nil && tc.pass {
-			t.Errorf("unexpected error for %s: %v", tc.name, err)
-		}
-		if err == nil && !tc.pass {
-			t.Errorf("unexpected non-error for %s: %d", tc.name, port)
-		}
-		if port != tc.expected {
-			t.Errorf("wrong result for %s: expected %d, got %d", tc.name, tc.expected, port)
-		}
 	}
 }
 
@@ -153,14 +76,14 @@ type serverResponse struct {
 	obj        interface{}
 }
 
-func makeTestServer(t *testing.T, namespace string, endpointsResponse serverResponse) (*httptest.Server, *util.FakeHandler) {
-	fakeEndpointsHandler := util.FakeHandler{
+func makeTestServer(t *testing.T, namespace string, endpointsResponse serverResponse) (*httptest.Server, *utiltesting.FakeHandler) {
+	fakeEndpointsHandler := utiltesting.FakeHandler{
 		StatusCode:   endpointsResponse.statusCode,
-		ResponseBody: runtime.EncodeOrDie(testapi.Codec(), endpointsResponse.obj.(runtime.Object)),
+		ResponseBody: runtime.EncodeOrDie(testapi.Default.Codec(), endpointsResponse.obj.(runtime.Object)),
 	}
 	mux := http.NewServeMux()
-	mux.Handle(testapi.ResourcePath("endpoints", namespace, ""), &fakeEndpointsHandler)
-	mux.Handle(testapi.ResourcePath("endpoints/", namespace, ""), &fakeEndpointsHandler)
+	mux.Handle(testapi.Default.ResourcePath("endpoints", namespace, ""), &fakeEndpointsHandler)
+	mux.Handle(testapi.Default.ResourcePath("endpoints/", namespace, ""), &fakeEndpointsHandler)
 	mux.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
 		t.Errorf("unexpected request: %v", req.RequestURI)
 		res.WriteHeader(http.StatusNotFound)
@@ -183,8 +106,9 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec:       api.ServiceSpec{Ports: []api.ServicePort{{Port: 80}}},
@@ -199,7 +123,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 	// below.
 	testServer, _ := makeTestServer(t, api.NamespaceAll,
 		serverResponse{http.StatusOK, &api.EndpointsList{
-			ListMeta: api.ListMeta{
+			ListMeta: unversioned.ListMeta{
 				ResourceVersion: "1",
 			},
 			Items: []api.Endpoints{{
@@ -215,8 +139,9 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
 	endpoints.checkLeftoverEndpoints()
 
 	if e, a := 1, endpoints.queue.Len(); e != a {
@@ -243,17 +168,32 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+
+	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80}},
+			Ports:    []api.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "TCP"}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequestCount(t, 0)
+	endpointsHandler.ValidateRequestCount(t, 2)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsProtocolUDP(t *testing.T) {
@@ -271,17 +211,31 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80}},
+			Ports:    []api.ServicePort{{Port: 80, TargetPort: intstr.FromInt(8080), Protocol: "UDP"}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequestCount(t, 0)
+	endpointsHandler.ValidateRequestCount(t, 2)
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []api.EndpointSubset{{
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "UDP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
@@ -296,18 +250,19 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Subsets: []api.EndpointSubset{},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
-	addPods(endpoints.podStore.Store, ns, 1, 1)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
@@ -318,7 +273,84 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+}
+
+func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns,
+		serverResponse{http.StatusOK, &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				Namespace:       ns,
+				ResourceVersion: "1",
+			},
+			Subsets: []api.EndpointSubset{},
+		}})
+	defer testServer.Close()
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 0, 1, 1)
+	endpoints.serviceStore.Store.Add(&api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []api.EndpointSubset{{
+			NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Ports:             []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+}
+
+func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
+	ns := "other"
+	testServer, endpointsHandler := makeTestServer(t, ns,
+		serverResponse{http.StatusOK, &api.Endpoints{
+			ObjectMeta: api.ObjectMeta{
+				Name:            "foo",
+				Namespace:       ns,
+				ResourceVersion: "1",
+			},
+			Subsets: []api.EndpointSubset{},
+		}})
+	defer testServer.Close()
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 1, 1, 1)
+	endpoints.serviceStore.Store.Add(&api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
+		Spec: api.ServiceSpec{
+			Selector: map[string]string{},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
+		},
+	})
+	endpoints.syncService(ns + "/foo")
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       ns,
+			ResourceVersion: "1",
+		},
+		Subsets: []api.EndpointSubset{{
+			Addresses:         []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.5", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}}},
+			Ports:             []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
+		}},
+	})
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexisting(t *testing.T) {
@@ -336,18 +368,19 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
-	addPods(endpoints.podStore.Store, ns, 1, 1)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
@@ -358,7 +391,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
@@ -376,18 +409,19 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
-	addPods(endpoints.podStore.Store, api.NamespaceDefault, 1, 1)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, api.NamespaceDefault, 1, 1, 0)
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: api.NamespaceDefault},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", api.NamespaceDefault, "foo"), "GET", nil)
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", api.NamespaceDefault, "foo"), "GET", nil)
 }
 
 func TestSyncEndpointsItems(t *testing.T) {
@@ -395,17 +429,18 @@ func TestSyncEndpointsItems(t *testing.T) {
 	testServer, endpointsHandler := makeTestServer(t, ns,
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
-	addPods(endpoints.podStore.Store, ns, 3, 2)
-	addPods(endpoints.podStore.Store, "blah", 5, 2) // make sure these aren't found!
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 3, 2, 0)
+	addPods(endpoints.podStore.Indexer, "blah", 5, 2, 0) // make sure these aren't found!
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: ns},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
 			Ports: []api.ServicePort{
-				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
-				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)},
+				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt(8088)},
 			},
 		},
 	})
@@ -421,7 +456,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 			{Name: "port1", Port: 8088, Protocol: "TCP"},
 		},
 	}}
-	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{
 			ResourceVersion: "",
 		},
@@ -429,7 +464,7 @@ func TestSyncEndpointsItems(t *testing.T) {
 	})
 	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
 	endpointsHandler.ValidateRequestCount(t, 2)
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
 func TestSyncEndpointsItemsWithLabels(t *testing.T) {
@@ -437,9 +472,10 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	testServer, endpointsHandler := makeTestServer(t, ns,
 		serverResponse{http.StatusOK, &api.Endpoints{}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
-	addPods(endpoints.podStore.Store, ns, 3, 2)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 3, 2, 0)
 	serviceLabels := map[string]string{"foo": "bar"}
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{
@@ -450,8 +486,8 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
 			Ports: []api.ServicePort{
-				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)},
-				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8088)},
+				{Name: "port0", Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)},
+				{Name: "port1", Port: 88, Protocol: "TCP", TargetPort: intstr.FromInt(8088)},
 			},
 		},
 	})
@@ -467,7 +503,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 			{Name: "port1", Port: 8088, Protocol: "TCP"},
 		},
 	}}
-	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{
 			ResourceVersion: "",
 			Labels:          serviceLabels,
@@ -476,7 +512,7 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	})
 	// endpointsHandler should get 2 requests - one for "GET" and the next for "POST".
 	endpointsHandler.ValidateRequestCount(t, 2)
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, ""), "POST", &data)
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, ""), "POST", &data)
 }
 
 func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
@@ -497,9 +533,10 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			}},
 		}})
 	defer testServer.Close()
-	client := client.NewOrDie(&client.Config{Host: testServer.URL, Version: testapi.Version()})
-	endpoints := NewEndpointController(client)
-	addPods(endpoints.podStore.Store, ns, 1, 1)
+	client := clientset.NewForConfigOrDie(&restclient.Config{Host: testServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	endpoints := NewEndpointControllerFromClient(client, controller.NoResyncPeriodFunc)
+	endpoints.podStoreSynced = alwaysReady
+	addPods(endpoints.podStore.Indexer, ns, 1, 1, 0)
 	serviceLabels := map[string]string{"baz": "blah"}
 	endpoints.serviceStore.Store.Add(&api.Service{
 		ObjectMeta: api.ObjectMeta{
@@ -509,11 +546,11 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 		},
 		Spec: api.ServiceSpec{
 			Selector: map[string]string{"foo": "bar"},
-			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: util.NewIntOrStringFromInt(8080)}},
+			Ports:    []api.ServicePort{{Port: 80, Protocol: "TCP", TargetPort: intstr.FromInt(8080)}},
 		},
 	})
 	endpoints.syncService(ns + "/foo")
-	data := runtime.EncodeOrDie(testapi.Codec(), &api.Endpoints{
+	data := runtime.EncodeOrDie(testapi.Default.Codec(), &api.Endpoints{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "foo",
 			Namespace:       ns,
@@ -525,5 +562,5 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
-	endpointsHandler.ValidateRequest(t, testapi.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
+	endpointsHandler.ValidateRequest(t, testapi.Default.ResourcePath("endpoints", ns, "foo"), "PUT", &data)
 }

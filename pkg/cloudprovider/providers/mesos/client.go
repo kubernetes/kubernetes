@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package mesos
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -32,11 +33,12 @@ import (
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
 const defaultClusterName = "mesos"
 
-var noLeadingMasterError = fmt.Errorf("there is no current leading master available to query")
+var noLeadingMasterError = errors.New("there is no current leading master available to query")
 
 type mesosClient struct {
 	masterLock    sync.RWMutex
@@ -48,13 +50,14 @@ type mesosClient struct {
 }
 
 type slaveNode struct {
-	hostname  string
-	resources *api.NodeResources
+	hostname       string
+	kubeletRunning bool
+	resources      *api.NodeResources
 }
 
 type mesosState struct {
 	clusterName string
-	nodes       []*slaveNode
+	nodes       map[string]*slaveNode // by hostname
 }
 
 type stateCache struct {
@@ -89,20 +92,26 @@ func (c *stateCache) cachedState(ctx context.Context) (*mesosState, error) {
 // clusterName returns the cached Mesos cluster name.
 func (c *stateCache) clusterName(ctx context.Context) (string, error) {
 	cached, err := c.cachedState(ctx)
-	return cached.clusterName, err
+	if err != nil {
+		return "", err
+	}
+	return cached.clusterName, nil
 }
 
 // nodes returns the cached list of slave nodes.
-func (c *stateCache) nodes(ctx context.Context) ([]*slaveNode, error) {
+func (c *stateCache) nodes(ctx context.Context) (map[string]*slaveNode, error) {
 	cached, err := c.cachedState(ctx)
-	return cached.nodes, err
+	if err != nil {
+		return nil, err
+	}
+	return cached.nodes, nil
 }
 
 func newMesosClient(
 	md detector.Master,
 	mesosHttpClientTimeout, stateCacheTTL time.Duration) (*mesosClient, error) {
 
-	tr := &http.Transport{}
+	tr := utilnet.SetTransportDefaults(&http.Transport{})
 	httpClient := &http.Client{
 		Transport: tr,
 		Timeout:   mesosHttpClientTimeout,
@@ -128,17 +137,11 @@ func createMesosClient(
 	client.state.refill = client.pollMasterForState
 	first := true
 	if err := md.Detect(detector.OnMasterChanged(func(info *mesos.MasterInfo) {
-		client.masterLock.Lock()
-		defer client.masterLock.Unlock()
-		if info == nil {
-			client.master = ""
-		} else if host := info.GetHostname(); host != "" {
-			client.master = host
-		} else {
-			client.master = unpackIPv4(info.GetIp())
-		}
-		if len(client.master) > 0 {
-			client.master = fmt.Sprintf("%s:%d", client.master, info.GetPort())
+		host, port := extractMasterAddress(info)
+		if len(host) > 0 {
+			client.masterLock.Lock()
+			defer client.masterLock.Unlock()
+			client.master = fmt.Sprintf("%s:%d", host, port)
 			if first {
 				first = false
 				close(initialMaster)
@@ -152,6 +155,28 @@ func createMesosClient(
 	return client, nil
 }
 
+func extractMasterAddress(info *mesos.MasterInfo) (host string, port int) {
+	if info != nil {
+		host = info.GetAddress().GetHostname()
+		if host == "" {
+			host = info.GetAddress().GetIp()
+		}
+
+		if host != "" {
+			// use port from Address
+			port = int(info.GetAddress().GetPort())
+		} else {
+			// deprecated: get host and port directly from MasterInfo (and not Address)
+			host = info.GetHostname()
+			if host == "" {
+				host = unpackIPv4(info.GetIp())
+			}
+			port = int(info.GetPort())
+		}
+	}
+	return
+}
+
 func unpackIPv4(ip uint32) string {
 	octets := make([]byte, 4, 4)
 	binary.BigEndian.PutUint32(octets, ip)
@@ -159,9 +184,9 @@ func unpackIPv4(ip uint32) string {
 	return ipv4.String()
 }
 
-// listSlaves returns a (possibly cached) list of slave nodes.
+// listSlaves returns a (possibly cached) map of slave nodes by hostname.
 // Callers must not mutate the contents of the returned slice.
-func (c *mesosClient) listSlaves(ctx context.Context) ([]*slaveNode, error) {
+func (c *mesosClient) listSlaves(ctx context.Context) (map[string]*slaveNode, error) {
 	return c.state.nodes(ctx)
 }
 
@@ -190,20 +215,8 @@ func (c *mesosClient) pollMasterForState(ctx context.Context) (*mesosState, erro
 
 	//TODO(jdef) should not assume master uses http (what about https?)
 
-	uri := fmt.Sprintf("http://%s/state.json", master)
-	req, err := http.NewRequest("GET", uri, nil)
-	if err != nil {
-		return nil, err
-	}
 	var state *mesosState
-	err = c.httpDo(ctx, req, func(res *http.Response, err error) error {
-		if err != nil {
-			return err
-		}
-		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			return fmt.Errorf("HTTP request failed with code %d: %v", res.StatusCode, res.Status)
-		}
+	successHandler := func(res *http.Response) error {
 		blob, err1 := ioutil.ReadAll(res.Body)
 		if err1 != nil {
 			return err1
@@ -211,8 +224,51 @@ func (c *mesosClient) pollMasterForState(ctx context.Context) (*mesosState, erro
 		log.V(3).Infof("Got mesos state, content length %v", len(blob))
 		state, err1 = parseMesosState(blob)
 		return err1
-	})
-	return state, err
+	}
+	// thinking here is that we may get some other status codes from mesos at some point:
+	// - authentication
+	// - redirection (possibly from http to https)
+	// ...
+	for _, tt := range []struct {
+		uri      string
+		handlers map[int]func(*http.Response) error
+	}{
+		{
+			uri: fmt.Sprintf("http://%s/state", master),
+			handlers: map[int]func(*http.Response) error{
+				200: successHandler,
+			},
+		},
+		{
+			uri: fmt.Sprintf("http://%s/state.json", master),
+			handlers: map[int]func(*http.Response) error{
+				200: successHandler,
+			},
+		},
+	} {
+		req, err := http.NewRequest("GET", tt.uri, nil)
+		if err != nil {
+			return nil, err
+		}
+		err = c.httpDo(ctx, req, func(res *http.Response, err error) error {
+			if err != nil {
+				return err
+			}
+			defer res.Body.Close()
+			if handler, ok := tt.handlers[res.StatusCode]; ok {
+				err1 := handler(res)
+				if err1 != nil {
+					return err1
+				}
+			}
+			// no handler for this error code, proceed to the next connection type
+			return nil
+		})
+		if state != nil || err != nil {
+			return state, err
+		}
+	}
+	return nil, errors.New("failed to sync with Mesos master")
 }
 
 func parseMesosState(blob []byte) (*mesosState, error) {
@@ -224,12 +280,36 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			Hostname  string                 `json:"hostname"`  // ex: 10.22.211.18, or slave-123.nowhere.com
 			Resources map[string]interface{} `json:"resources"` // ex: {"mem": 123, "ports": "[31000-3200]"}
 		} `json:"slaves"`
+		Frameworks []*struct {
+			Id        string `json:"id"`  // ex: 20151105-093752-3745622208-5050-1-0000
+			Pid       string `json:"pid"` // ex: scheduler(1)@192.168.65.228:57124
+			Executors []*struct {
+				SlaveId    string `json:"slave_id"`    // ex: 20151105-093752-3745622208-5050-1-S1
+				ExecutorId string `json:"executor_id"` // ex: 6704d375c68fee1e_k8sm-executor
+				Name       string `json:"name"`        // ex: Kubelet-Executor
+			} `json:"executors"`
+		} `json:"frameworks"`
 	}
+
 	state := &State{ClusterName: defaultClusterName}
 	if err := json.Unmarshal(blob, state); err != nil {
 		return nil, err
 	}
-	nodes := []*slaveNode{}
+
+	executorSlaveIds := map[string]struct{}{}
+	for _, f := range state.Frameworks {
+		for _, e := range f.Executors {
+			// Note that this simple comparison breaks when we support more than one
+			// k8s instance in a cluster. At the moment this is not possible for
+			// a number of reasons.
+			// TODO(sttts): find way to detect executors of this k8s instance
+			if e.Name == KubernetesExecutorName {
+				executorSlaveIds[e.SlaveId] = struct{}{}
+			}
+		}
+	}
+
+	nodes := map[string]*slaveNode{} // by hostname
 	for _, slave := range state.Slaves {
 		if slave.Hostname == "" {
 			continue
@@ -263,7 +343,10 @@ func parseMesosState(blob []byte) (*mesosState, error) {
 			}
 			log.V(4).Infof("node %q reporting capacity %v", node.hostname, cap)
 		}
-		nodes = append(nodes, node)
+		if _, ok := executorSlaveIds[slave.Id]; ok {
+			node.kubeletRunning = true
+		}
+		nodes[node.hostname] = node
 	}
 
 	result := &mesosState{

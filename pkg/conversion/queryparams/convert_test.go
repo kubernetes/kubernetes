@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package queryparams
+package queryparams_test
 
 import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
-	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/conversion/queryparams"
 )
 
 type namedString string
@@ -38,7 +40,7 @@ type bar struct {
 	Ignored2 string
 }
 
-func (*bar) IsAnAPIObject() {}
+func (obj *bar) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 type foo struct {
 	Str       string            `json:"str"`
@@ -51,7 +53,27 @@ type foo struct {
 	Testmap   map[string]string `json:"testmap,omitempty"`
 }
 
-func (*foo) IsAnAPIObject() {}
+func (obj *foo) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+
+type baz struct {
+	Ptr  *int  `json:"ptr"`
+	Bptr *bool `json:"bptr,omitempty"`
+}
+
+func (obj *baz) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
+
+// childStructs tests some of the types we serialize to query params for log API calls
+// notably, the nested time struct
+type childStructs struct {
+	Container    string            `json:"container,omitempty"`
+	Follow       bool              `json:"follow,omitempty"`
+	Previous     bool              `json:"previous,omitempty"`
+	SinceSeconds *int64            `json:"sinceSeconds,omitempty"`
+	SinceTime    *unversioned.Time `json:"sinceTime,omitempty"`
+	EmptyTime    *unversioned.Time `json:"emptyTime"`
+}
+
+func (obj *childStructs) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObjectKind }
 
 func validateResult(t *testing.T, input interface{}, actual, expected url.Values) {
 	local := url.Values{}
@@ -65,7 +87,6 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 			} else {
 				t.Errorf("%#v: values don't match: actual: %#v, expected: %#v", input, v, ev)
 			}
-			break
 		}
 		delete(local, k)
 	}
@@ -75,8 +96,11 @@ func validateResult(t *testing.T, input interface{}, actual, expected url.Values
 }
 
 func TestConvert(t *testing.T) {
+	sinceSeconds := int64(123)
+	sinceTime := unversioned.Date(2000, 1, 1, 12, 34, 56, 0, time.UTC)
+
 	tests := []struct {
-		input    runtime.Object
+		input    interface{}
 		expected url.Values
 	}{
 		{
@@ -104,12 +128,12 @@ func TestConvert(t *testing.T) {
 		},
 		{
 			input: &foo{
-				Str: "ignore embedded struct",
+				Str: "don't ignore embedded struct",
 				Foobar: bar{
 					Float1: 5.0,
 				},
 			},
-			expected: url.Values{"str": {"ignore embedded struct"}},
+			expected: url.Values{"str": {"don't ignore embedded struct"}, "float1": {"5"}, "float2": {"0"}},
 		},
 		{
 			// Ignore untagged fields
@@ -131,13 +155,57 @@ func TestConvert(t *testing.T) {
 			},
 			expected: url.Values{"str": {""}, "namedStr": {"named str"}},
 		},
+		{
+			input: &baz{
+				Ptr:  intp(5),
+				Bptr: boolp(true),
+			},
+			expected: url.Values{"ptr": {"5"}, "bptr": {"true"}},
+		},
+		{
+			input: &baz{
+				Bptr: boolp(true),
+			},
+			expected: url.Values{"ptr": {""}, "bptr": {"true"}},
+		},
+		{
+			input: &baz{
+				Ptr: intp(5),
+			},
+			expected: url.Values{"ptr": {"5"}},
+		},
+		{
+			input: &childStructs{
+				Container:    "mycontainer",
+				Follow:       true,
+				Previous:     true,
+				SinceSeconds: &sinceSeconds,
+				SinceTime:    &sinceTime, // test a custom marshaller
+				EmptyTime:    nil,        // test a nil custom marshaller without omitempty
+			},
+			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "sinceTime": {"2000-01-01T12:34:56Z"}, "emptyTime": {""}},
+		},
+		{
+			input: &childStructs{
+				Container:    "mycontainer",
+				Follow:       true,
+				Previous:     true,
+				SinceSeconds: &sinceSeconds,
+				SinceTime:    nil, // test a nil custom marshaller with omitempty
+			},
+			expected: url.Values{"container": {"mycontainer"}, "follow": {"true"}, "previous": {"true"}, "sinceSeconds": {"123"}, "emptyTime": {""}},
+		},
 	}
 
 	for _, test := range tests {
-		result, err := Convert(test.input)
+		result, err := queryparams.Convert(test.input)
 		if err != nil {
 			t.Errorf("Unexpected error while converting %#v: %v", test.input, err)
 		}
 		validateResult(t, test.input, result, test.expected)
 	}
 }
+
+func intp(n int) *int { return &n }
+
+func boolp(b bool) *bool { return &b }

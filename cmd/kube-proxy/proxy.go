@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,11 +19,12 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
 	"k8s.io/kubernetes/cmd/kube-proxy/app"
+	"k8s.io/kubernetes/cmd/kube-proxy/app/options"
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -34,17 +35,22 @@ func init() {
 }
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	s := app.NewProxyServer()
-	s.AddFlags(pflag.CommandLine)
+	config := options.NewProxyConfig()
+	config.AddFlags(pflag.CommandLine)
 
-	util.InitFlags()
+	flag.InitFlags()
 	util.InitLogs()
 	defer util.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 
-	if err := s.Run(pflag.CommandLine.Args()); err != nil {
+	s, err := app.NewProxyServerDefault(config)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+		os.Exit(1)
+	}
+
+	if err = s.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
