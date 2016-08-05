@@ -2059,24 +2059,27 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 		return fit, "UnexpectedError", message
 	}
 	if !fit {
-		// If there are failed predicates, we only return the first one as a reason.
 		var reason string
 		var message string
-		if len(reasons) > 0 {
-			r := reasons[0]
-			if re, ok := r.(*predicates.PredicateFailureError); ok {
-				reason = re.PredicateName
-				message = re.Error()
-				glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
-			} else if re, ok := r.(*predicates.InsufficientResourceError); ok {
-				reason = fmt.Sprintf("OutOf%s", re.ResourceName)
-				message := re.Error()
-				glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
-			} else {
-				reason = "UnexpectedPredicateFailureType"
-				message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
-				glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
-			}
+		if len(reasons) == 0 {
+			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			return fit, "UnknownReason", message
+		}
+		// If there are failed predicates, we only return the first one as a reason.
+		r := reasons[0]
+		if re, ok := r.(*predicates.PredicateFailureError); ok {
+			reason = re.PredicateName
+			message = re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		} else if re, ok := r.(*predicates.InsufficientResourceError); ok {
+			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		} else {
+			reason = "UnexpectedPredicateFailureType"
+			message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 		}
 		return fit, reason, message
 	}
