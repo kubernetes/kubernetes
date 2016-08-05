@@ -108,7 +108,7 @@ func validateHost(runtime string) error {
 	}
 
 	// Check kernel support.
-	if !isAppArmorEnabled() {
+	if !IsAppArmorEnabled() {
 		return errors.New("AppArmor is not enabled on the host")
 	}
 
@@ -206,11 +206,11 @@ func getAppArmorFS() (string, error) {
 	return "", errors.New("securityfs not found")
 }
 
-// isAppArmorEnabled returns true if apparmor is enabled for the host.
+// IsAppArmorEnabled returns true if apparmor is enabled for the host.
 // This function is forked from
 // https://github.com/opencontainers/runc/blob/1a81e9ab1f138c091fe5c86d0883f87716088527/libcontainer/apparmor/apparmor.go
 // to avoid the libapparmor dependency.
-func isAppArmorEnabled() bool {
+func IsAppArmorEnabled() bool {
 	if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil && os.Getenv("container") == "" {
 		if _, err = os.Stat("/sbin/apparmor_parser"); err == nil {
 			buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")
