@@ -10989,7 +10989,7 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 					},
 					"dnsPolicy": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Set DNS policy for containers within the pod. One of 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\".",
+							Description: "Set DNS policy for containers within the pod. One of 'ClusterFirstAlways', 'ClusterFirst' or 'Default'. Defaults to \"ClusterFirst\" unless hostNetwork is true, otherwise Default. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstAlways'.",
 							Type:        []string{"string"},
 							Format:      "",
 						},

@@ -1478,8 +1478,13 @@ type DNSPolicy string
 
 const (
 	// DNSClusterFirst indicates that the pod should use cluster DNS
-	// first, if it is available, then fall back on the default (as
-	// determined by kubelet) DNS settings.
+	// first, if it is available, then fall back on the default
+	// (as determined by kubelet) DNS settings.
+	DNSClusterFirstAlways DNSPolicy = "ClusterFirstAlways"
+
+	// DNSClusterFirst indicates that the pod should use cluster DNS
+	// first unless hostNetwork is true, if it is available, then
+	// fall back on the default (as determined by kubelet) DNS settings.
 	DNSClusterFirst DNSPolicy = "ClusterFirst"
 
 	// DNSDefault indicates that the pod should use the default (as
@@ -1806,8 +1811,9 @@ type PodSpec struct {
 	// Value must be a positive integer.
 	ActiveDeadlineSeconds *int64 `json:"activeDeadlineSeconds,omitempty" protobuf:"varint,5,opt,name=activeDeadlineSeconds"`
 	// Set DNS policy for containers within the pod.
-	// One of 'ClusterFirst' or 'Default'.
-	// Defaults to "ClusterFirst".
+	// One of 'ClusterFirstAlways', 'ClusterFirst' or 'Default'.
+	// Defaults to "ClusterFirst" unless hostNetwork is true, otherwise Default.
+	// To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstAlways'.
 	DNSPolicy DNSPolicy `json:"dnsPolicy,omitempty" protobuf:"bytes,6,opt,name=dnsPolicy,casttype=DNSPolicy"`
 	// NodeSelector is a selector which must be true for the pod to fit on a node.
 	// Selector which must match a node's labels for the pod to be scheduled on that node.

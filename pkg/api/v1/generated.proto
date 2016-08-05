@@ -2161,8 +2161,9 @@ message PodSpec {
   optional int64 activeDeadlineSeconds = 5;
 
   // Set DNS policy for containers within the pod.
-  // One of 'ClusterFirst' or 'Default'.
-  // Defaults to "ClusterFirst".
+  // One of 'ClusterFirstAlways', 'ClusterFirst' or 'Default'.
+  // Defaults to "ClusterFirst" unless hostNetwork is true, otherwise Default.
+  // To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to 'ClusterFirstAlways'.
   optional string dnsPolicy = 6;
 
   // NodeSelector is a selector which must be true for the pod to fit on a node.

@@ -3917,7 +3917,7 @@ The PetSet guarantees that a given network identity will always map to the same 
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">dnsPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for containers within the pod. One of <em>ClusterFirst</em> or <em>Default</em>. Defaults to "ClusterFirst".</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for containers within the pod. One of <em>ClusterFirstAlways</em>, <em>ClusterFirst</em> or <em>Default</em>. Defaults to "ClusterFirst" unless hostNetwork is true, otherwise Default. To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to <em>ClusterFirstAlways</em>.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4396,7 +4396,7 @@ The PetSet guarantees that a given network identity will always map to the same 
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-09-27 23:59:43 UTC
+Last updated 2016-10-03 17:13:36 UTC
 </div>
 </div>
 </body>
