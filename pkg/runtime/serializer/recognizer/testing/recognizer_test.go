@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package recognizer
+package testing
 
 import (
 	"testing"
@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
+	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 )
 
 type A struct{}
@@ -31,7 +32,7 @@ func (A) GetObjectKind() unversioned.ObjectKind { return unversioned.EmptyObject
 func TestRecognizer(t *testing.T) {
 	s := runtime.NewScheme()
 	s.AddKnownTypes(unversioned.GroupVersion{Version: "v1"}, &A{})
-	d := NewDecoder(
+	d := recognizer.NewDecoder(
 		json.NewSerializer(json.DefaultMetaFactory, s, s, false),
 		json.NewYAMLSerializer(json.DefaultMetaFactory, s, s),
 	)
