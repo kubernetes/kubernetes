@@ -4359,7 +4359,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">dnsPolicy</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for containers within the pod. One of <em>ClusterFirst</em> or <em>Default</em>. Defaults to "ClusterFirst".</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Set DNS policy for containers within the pod. One of <em>ClusterFirstWithHostNet</em>, <em>ClusterFirst</em> or <em>Default</em>. Defaults to "ClusterFirst". To have DNS options set along with hostNetwork, you have to specify DNS policy explicitly to <em>ClusterFirstWithHostNet</em>.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>

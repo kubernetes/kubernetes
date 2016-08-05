@@ -274,13 +274,14 @@ func (kl *Kubelet) GetPodCgroupParent(pod *v1.Pod) (cm.CgroupName, string) {
 
 // GenerateRunContainerOptions generates the RunContainerOptions, which can be used by
 // the container runtime to set parameters for launching a container.
-func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
+func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
 	var err error
+	useClusterFirstPolicy := false
 	_, cgroupParent := kl.GetPodCgroupParent(pod)
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: cgroupParent}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	opts.Hostname = hostname
 	podName := volumehelper.GetUniquePodName(pod)
@@ -290,16 +291,16 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 	// TODO(random-liu): Move following convert functions into pkg/kubelet/container
 	opts.Devices, err = kl.makeDevices(pod, container)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	opts.Envs, err = kl.makeEnvironmentVariables(pod, container, podIP)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// Disabling adding TerminationMessagePath on Windows as these files would be mounted as docker volume and
@@ -313,9 +314,9 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		}
 	}
 
-	opts.DNS, opts.DNSSearch, err = kl.GetClusterDNS(pod)
+	opts.DNS, opts.DNSSearch, useClusterFirstPolicy, err = kl.GetClusterDNS(pod)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
@@ -323,7 +324,7 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Contai
 		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
 	}
 
-	return opts, nil
+	return opts, useClusterFirstPolicy, nil
 }
 
 var masterServices = sets.NewString("kubernetes")
