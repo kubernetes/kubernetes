@@ -159,12 +159,12 @@ type fakeRuntimeHelper struct {
 	err         error
 }
 
-func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
-	return nil, fmt.Errorf("Not implemented")
+func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
+	return nil, false, fmt.Errorf("Not implemented")
 }
 
-func (f *fakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
-	return f.dnsServers, f.dnsSearches, f.err
+func (f *fakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) {
+	return f.dnsServers, f.dnsSearches, false, f.err
 }
 
 func (f *fakeRuntimeHelper) GeneratePodHostNameAndDomain(pod *v1.Pod) (string, string, error) {

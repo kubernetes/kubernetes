@@ -77,21 +77,21 @@ var _ kubecontainer.RuntimeHelper = &fakeRuntimeHelper{}
 
 var testPodContainerDir string
 
-func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
+func (f *fakeRuntimeHelper) GenerateRunContainerOptions(pod *v1.Pod, container *v1.Container, podIP string) (*kubecontainer.RunContainerOptions, bool, error) {
 	var opts kubecontainer.RunContainerOptions
 	var err error
 	if len(container.TerminationMessagePath) != 0 {
 		testPodContainerDir, err = ioutil.TempDir("", "fooPodContainerDir")
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		opts.PodContainerDir = testPodContainerDir
 	}
-	return &opts, nil
+	return &opts, false, nil
 }
 
-func (f *fakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, error) {
-	return nil, nil, fmt.Errorf("not implemented")
+func (f *fakeRuntimeHelper) GetClusterDNS(pod *v1.Pod) ([]string, []string, bool, error) {
+	return nil, nil, false, fmt.Errorf("not implemented")
 }
 
 // This is not used by docker runtime.

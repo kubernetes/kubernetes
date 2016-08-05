@@ -75,7 +75,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	}
 
 	if !kubecontainer.IsHostNetworkPod(pod) {
-		dnsServers, dnsSearches, err := m.runtimeHelper.GetClusterDNS(pod)
+		dnsServers, dnsSearches, _, err := m.runtimeHelper.GetClusterDNS(pod)
 		if err != nil {
 			return nil, err
 		}
@@ -99,7 +99,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 	portMappings := []*runtimeapi.PortMapping{}
 	for _, c := range pod.Spec.Containers {
 		// TODO: use a separate interface to only generate portmappings
-		opts, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, "")
+		opts, _, err := m.runtimeHelper.GenerateRunContainerOptions(pod, &c, "")
 		if err != nil {
 			return nil, err
 		}
