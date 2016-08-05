@@ -40,6 +40,19 @@ WAIT_FOR_URL_API_SERVER=${WAIT_FOR_URL_API_SERVER:-10}
 ENABLE_DAEMON=${ENABLE_DAEMON:-false}
 HOSTNAME_OVERRIDE=${HOSTNAME_OVERRIDE:-"127.0.0.1"}
 CLOUD_PROVIDER=${CLOUD_PROVIDER:-""}
+CLOUD_CONFIG=${CLOUD_CONFIG:-""}
+
+# sanity check for OpenStack provider
+if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
+    if [ "${CLOUD_CONFIG}" == "" ]; then
+        echo "Missing CLOUD_CONFIG env for OpenStack provider!"
+        exit 1
+    fi
+    if [ ! -f "${CLOUD_CONFIG}" ]; then
+        echo "Cloud config ${CLOUD_CONFIG} doesn't exit"
+        exit 1
+    fi
+fi
 
 if [ "$(id -u)" != "0" ]; then
     echo "WARNING : This script MAY be run as root for docker socket / iptables functionality; if failures occur, retry as root." 2>&1
@@ -290,6 +303,7 @@ function start_apiserver {
       --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
       --service-cluster-ip-range="10.0.0.0/24" \
       --cloud-provider="${CLOUD_PROVIDER}" \
+      --cloud-config="${CLOUD_CONFIG}" \
       --cors-allowed-origins="${API_CORS_ALLOWED_ORIGINS}" >"${APISERVER_LOG}" 2>&1 &
     APISERVER_PID=$!
 
@@ -313,6 +327,7 @@ function start_controller_manager {
       ${node_cidr_args} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --cloud-provider="${CLOUD_PROVIDER}" \
+      --cloud-config="${CLOUD_CONFIG}" \
       --master="${API_HOST}:${API_PORT}" >"${CTLRMGR_LOG}" 2>&1 &
     CTLRMGR_PID=$!
 }
@@ -367,6 +382,7 @@ function start_kubelet {
         --rkt-stage1-image="${RKT_STAGE1_IMAGE}" \
         --hostname-override="${HOSTNAME_OVERRIDE}" \
         --cloud-provider="${CLOUD_PROVIDER}" \
+        --cloud-config="${CLOUD_CONFIG}" \
         --address="${KUBELET_HOST}" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
@@ -381,6 +397,21 @@ function start_kubelet {
       # unless that file does not already exist; clean up an existing
       # dockerized kubelet that might be running.
       cleanup_dockerized_kubelet
+      cred_bind=""
+      # path to cloud credentails. 
+      cloud_cred=""
+      if [ "${CLOUD_PROVIDER}" == "aws" ]; then
+          cloud_cred="${HOME}/.aws/credentials"
+      fi
+      if [ "${CLOUD_PROVIDER}" == "gce" ]; then
+          cloud_cred="${HOME}/.config/gcloud"
+      fi
+      if [ "${CLOUD_PROVIDER}" == "openstack" ]; then
+          cloud_cred="${CLOUD_CONFIG}"
+      fi
+      if  [[ -n "${cloud_cred}" ]]; then
+          cred_bind="--volume=${cloud_cred}:${cloud_cred}:ro"
+      fi
 
       docker run \
         --volume=/:/rootfs:ro \
@@ -388,12 +419,14 @@ function start_kubelet {
         --volume=/sys:/sys:ro \
         --volume=/var/lib/docker/:/var/lib/docker:ro \
         --volume=/var/lib/kubelet/:/var/lib/kubelet:rw,z \
+        --volume=/dev:/dev \
+        ${cred_bind} \
         --net=host \
         --privileged=true \
         -i \
         --cidfile=$KUBELET_CIDFILE \
         gcr.io/google_containers/kubelet \
-        /kubelet --v=3 --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT" --resource-container="" &> $KUBELET_LOG &
+        /kubelet --v=${LOG_LEVEL} --containerized ${priv_arg}--chaos-chance="${CHAOS_CHANCE}" --hostname-override="${HOSTNAME_OVERRIDE}" --cloud-provider="${CLOUD_PROVIDER}" --cloud-config="${CLOUD_CONFIG}" \ --address="127.0.0.1" --api-servers="${API_HOST}:${API_PORT}" --port="$KUBELET_PORT"  &> $KUBELET_LOG &
     fi
 }
 
