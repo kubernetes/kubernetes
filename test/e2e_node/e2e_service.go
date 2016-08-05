@@ -37,6 +37,11 @@ import (
 
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 var reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
+var containerize = flag.Bool("containerize", true, "If true, start services in containers.")
+var apiserverImage = flag.String("apiserver-image", "gcr.io/google_containers/kube-apiserver", "Container image of apiserver.")
+var apiserverBinary = flag.String("apiserver-binary", "/usr/local/bin/kube-apiserver", "Apiserver binary in the container image.")
+var etcdImage = flag.String("etcd-image", "gcr.io/google_containers/etcd:2.2.1", "Container image of etcd.")
+var etcdBinary = flag.String("etcd-binary", "/usr/local/bin/etcd", "Etcd binary in the container image.")
 
 type e2eService struct {
 	killCmds []*killCmd
@@ -176,22 +181,40 @@ func (es *e2eService) stop() {
 	}
 }
 
+func getEtcdStartCommand() ([]string, error) {
+	// TODO(random-liu): Always containerize in the future.
+	if *containerize {
+		// TODO(random-liu): runtime abstraction
+		return []string{
+			"sudo", "docker", "run",
+			"--rm=true", "--net=host",
+			*etcdImage, *etcdBinary,
+		}, nil
+	} else {
+		etcdPath, err := exec.LookPath("etcd")
+		if err != nil {
+			glog.Infof("etcd not found in PATH. Defaulting to %s...", defaultEtcdPath)
+			_, err = os.Stat(defaultEtcdPath)
+			if err != nil {
+				return nil, fmt.Errorf("etcd binary not found")
+			}
+			etcdPath = defaultEtcdPath
+		}
+		return []string{etcdPath}, nil
+	}
+}
+
 func (es *e2eService) startEtcd() (*killCmd, error) {
 	dataDir, err := ioutil.TempDir("", "node-e2e")
 	if err != nil {
 		return nil, err
 	}
 	es.etcdDataDir = dataDir
-	etcdPath, err := exec.LookPath("etcd")
+	startCmd, err := getEtcdStartCommand()
 	if err != nil {
-		glog.Infof("etcd not found in PATH. Defaulting to %s...", defaultEtcdPath)
-		_, err = os.Stat(defaultEtcdPath)
-		if err != nil {
-			return nil, fmt.Errorf("etcd binary not found")
-		}
-		etcdPath = defaultEtcdPath
+		return nil, err
 	}
-	cmd := exec.Command(etcdPath)
+	cmd := exec.Command(startCmd[0], startCmd[1:]...)
 	// Execute etcd in the data directory instead of using --data-dir because the flag sometimes requires additional
 	// configuration (e.g. --name in version 0.4.9)
 	cmd.Dir = es.etcdDataDir
@@ -202,14 +225,27 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 	return &killCmd{name: "etcd", cmd: cmd}, es.startServer(hcc)
 }
 
+func getApiserverStartCommand() []string {
+	if *containerize {
+		return []string{
+			"sudo", "docker", "run",
+			"--rm=true", "--net=host",
+			*apiserverImage, *apiserverBinary,
+		}
+	} else {
+		return []string{"sudo", getApiServerBin()}
+	}
+}
+
 func (es *e2eService) startApiServer() (*killCmd, error) {
-	cmd := exec.Command("sudo", getApiServerBin(),
+	startCmd := getApiserverStartCommand()
+	cmd := exec.Command(startCmd[0], append(startCmd[1:],
 		"--etcd-servers", "http://127.0.0.1:4001",
 		"--insecure-bind-address", "0.0.0.0",
 		"--service-cluster-ip-range", "10.0.0.1/24",
 		"--kubelet-port", "10250",
 		"--allow-privileged", "true",
-		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
+		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr")...,
 	)
 	hcc := newHealthCheckCommand(
 		"http://127.0.0.1:8080/healthz",
@@ -270,7 +306,8 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		}
 		cmdArgs = append(cmdArgs,
 			"--network-plugin=kubenet",
-			"--network-plugin-dir", filepath.Join(cwd, CNIDirectory, "bin")) // Enable kubenet
+			// TODO(random-liu): Change the network plugin directory to be a flag
+			"--network-plugin-dir", filepath.Join(cwd, "cni", "bin")) // Enable kubenet
 	}
 
 	cmd := exec.Command("sudo", cmdArgs...)
@@ -345,6 +382,7 @@ type killCmd struct {
 	override *exec.Cmd
 }
 
+// TODO(random-liu): Use docker stop to stop services started with docker.
 func (k *killCmd) Kill() error {
 	name := k.name
 	cmd := k.cmd

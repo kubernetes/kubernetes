@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package remote
 
 import (
 	"flag"
@@ -29,7 +29,9 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
+
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/test/e2e_node"
 )
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
@@ -82,10 +84,10 @@ func GetHostnameOrIp(hostname string) string {
 // the binaries k8s required for node e2e tests
 func CreateTestArchive() (string, error) {
 	// Build the executables
-	buildGo()
+	e2e_node.BuildGo()
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := getK8sBuildOutputDir()
+	buildOutputDir, err := e2e_node.GetK8sBuildOutputDir()
 	if err != nil {
 		glog.Fatalf("Failed to locate kubernetes build output directory %v", err)
 	}
@@ -214,7 +216,8 @@ func RunRemote(archive string, host string, cleanup bool, junitFileNumber int, s
 	// Run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
-		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d %s", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFileNumber, testArgs),
+		// TODO(random-liu): Containerize the remote test.
+		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --containerize=false --stop-services=%t --node-name=%s --report-dir=%s/results --junit-file-number=%d %s", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFileNumber, testArgs),
 	)
 	aggErrs := []error{}
 

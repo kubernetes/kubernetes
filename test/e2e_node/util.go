@@ -23,7 +23,6 @@ import (
 var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
 
 var disableKubenet = flag.Bool("disable-kubenet", false, "If true, start kubelet without kubenet")
-var buildServices = flag.Bool("build-services", true, "If true, build local executables")
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 

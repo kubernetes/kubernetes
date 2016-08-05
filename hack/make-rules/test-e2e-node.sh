@@ -57,19 +57,19 @@ fi
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
 if [[ $parallelism > 1 ]]; then
-  ginkgoflags="$ginkgoflags -nodes=$parallelism "
+  ginkgoflags="$ginkgoflags --nodes=$parallelism "
 fi
 
 if [[ $focus != "" ]]; then
-  ginkgoflags="$ginkgoflags -focus=$focus "
+  ginkgoflags="$ginkgoflags --focus=$focus "
 fi
 
 if [[ $skip != "" ]]; then
-  ginkgoflags="$ginkgoflags -skip=$skip "
+  ginkgoflags="$ginkgoflags --skip=$skip "
 fi
 
 if [[ $run_until_failure != "" ]]; then
-  ginkgoflags="$ginkgoflags -untilItFails=$run_until_failure "
+  ginkgoflags="$ginkgoflags --untilItFails=$run_until_failure "
 fi
 
 
@@ -126,7 +126,7 @@ if [ $remote = true ] ; then
   echo "Ginkgo Flags: $ginkgoflags"
   echo "Instance Metadata: $metadata"
   # Invoke the runner
-  go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
+  go run test/e2e_node/runner/e2e/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
     --zone="$zone" --project="$project"  \
     --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
@@ -161,8 +161,9 @@ else
 
   # Test using the host the script was run on
   # Provided for backwards compatibility
-  "${ginkgo}" $ginkgoflags "${KUBE_ROOT}/test/e2e_node/" --report-dir=${report} \
-    -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true \
-    --start-services=true --stop-services=true $test_args
+  go run test/e2e_node/runner/local/run_local.go --ginkgo-flags="$ginkgoflags" \
+    --test-flags=" --report-dir=${report} --alsologtostderr --v 2 --node-name $(hostname) \
+    --start-services=true --stop-services=true $test_args" --build-dependencies=true \
+    --logtostderr --v 2
   exit $?
 fi
