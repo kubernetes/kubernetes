@@ -19,12 +19,13 @@ package componentstatus
 import (
 	"fmt"
 
+	"sync"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
 	"k8s.io/kubernetes/pkg/runtime"
-	"sync"
 )
 
 type REST struct {

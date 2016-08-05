@@ -28,6 +28,9 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/gcfg.v1"
+
+	"github.com/golang/glog"
 	"github.com/rackspace/gophercloud"
 	osvolumeattach "github.com/rackspace/gophercloud/openstack/compute/v2/extensions/volumeattach"
 	osservers "github.com/rackspace/gophercloud/openstack/compute/v2/servers"
@@ -36,9 +39,7 @@ import (
 	"github.com/rackspace/gophercloud/rackspace/blockstorage/v1/volumes"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/servers"
 	"github.com/rackspace/gophercloud/rackspace/compute/v2/volumeattach"
-	"gopkg.in/gcfg.v1"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )

@@ -21,9 +21,10 @@ import (
 	"reflect"
 	"strings"
 
+	"testing"
+
 	"k8s.io/kubernetes/pkg/api"
 	api_pod "k8s.io/kubernetes/pkg/api/pod"
-	"testing"
 )
 
 func TestPetIDName(t *testing.T) {

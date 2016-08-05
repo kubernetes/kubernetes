@@ -17,11 +17,12 @@ limitations under the License.
 package node
 
 import (
-	"github.com/golang/glog"
 	"math/big"
 	"net"
 	"reflect"
 	"testing"
+
+	"github.com/golang/glog"
 )
 
 func TestCIDRSetFullyAllocated(t *testing.T) {

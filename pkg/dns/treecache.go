@@ -19,8 +19,9 @@ package dns
 import (
 	"bytes"
 	"encoding/json"
-	skymsg "github.com/skynetservices/skydns/msg"
 	"strings"
+
+	skymsg "github.com/skynetservices/skydns/msg"
 )
 
 type TreeCache struct {
