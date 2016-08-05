@@ -29,12 +29,13 @@ node:
     --allow-privileged
     --cluster-dns=${DNS_SERVER_IP}
     --cluster-domain=${DNS_DOMAIN}
-    --config=/var/lib/kubelet/manifests &
+    --config=/var/lib/kubelet/manifests 2>&1 | sed 's/^/kubelet: /' 1>&2 &
     hyperkube proxy
     --hostname-override=$${HOSTNAME_OVERRIDE}
     --master=http://apiserver:8888
     --conntrack-max=0
-    --v=4 &
+    --conntrack-max-per-core=0
+    --v=4 2>&1 | sed 's/^/proxy:   /' 1>&2 &
     wait \$$(jobs -p)
     "
   command: []
