@@ -244,15 +244,15 @@ func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtim
 	return containerID, nil
 }
 
-func (r *FakeRuntimeService) StartContainer(rawContainerID string) error {
+func (r *FakeRuntimeService) StartContainer(containerID string) error {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "StartContainer")
 
-	c, ok := r.Containers[rawContainerID]
+	c, ok := r.Containers[containerID]
 	if !ok {
-		return fmt.Errorf("container %s not found", rawContainerID)
+		return fmt.Errorf("container %s not found", containerID)
 	}
 
 	// Set container to running.
@@ -264,15 +264,15 @@ func (r *FakeRuntimeService) StartContainer(rawContainerID string) error {
 	return nil
 }
 
-func (r *FakeRuntimeService) StopContainer(rawContainerID string, timeout int64) error {
+func (r *FakeRuntimeService) StopContainer(containerID string, timeout int64) error {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "StopContainer")
 
-	c, ok := r.Containers[rawContainerID]
+	c, ok := r.Containers[containerID]
 	if !ok {
-		return fmt.Errorf("container %q not found", rawContainerID)
+		return fmt.Errorf("container %q not found", containerID)
 	}
 
 	// Set container to exited state.
@@ -284,14 +284,14 @@ func (r *FakeRuntimeService) StopContainer(rawContainerID string, timeout int64)
 	return nil
 }
 
-func (r *FakeRuntimeService) RemoveContainer(rawContainerID string) error {
+func (r *FakeRuntimeService) RemoveContainer(containerID string) error {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "RemoveContainer")
 
 	// Remove the container
-	delete(r.Containers, rawContainerID)
+	delete(r.Containers, containerID)
 
 	return nil
 }
@@ -335,15 +335,15 @@ func (r *FakeRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter) 
 	return result, nil
 }
 
-func (r *FakeRuntimeService) ContainerStatus(rawContainerID string) (*runtimeApi.ContainerStatus, error) {
+func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error) {
 	r.Lock()
 	defer r.Unlock()
 
 	r.Called = append(r.Called, "ContainerStatus")
 
-	c, ok := r.Containers[rawContainerID]
+	c, ok := r.Containers[containerID]
 	if !ok {
-		return nil, fmt.Errorf("container %q not found", rawContainerID)
+		return nil, fmt.Errorf("container %q not found", containerID)
 	}
 
 	return &runtimeApi.ContainerStatus{
@@ -363,7 +363,7 @@ func (r *FakeRuntimeService) ContainerStatus(rawContainerID string) (*runtimeApi
 	}, nil
 }
 
-func (r *FakeRuntimeService) Exec(rawContainerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+func (r *FakeRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
 	r.Lock()
 	defer r.Unlock()
 

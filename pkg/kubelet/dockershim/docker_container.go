@@ -174,19 +174,19 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 }
 
 // StartContainer starts the container.
-func (ds *dockerService) StartContainer(rawContainerID string) error {
-	return ds.client.StartContainer(rawContainerID)
+func (ds *dockerService) StartContainer(containerID string) error {
+	return ds.client.StartContainer(containerID)
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
-func (ds *dockerService) StopContainer(rawContainerID string, timeout int64) error {
-	return ds.client.StopContainer(rawContainerID, int(timeout))
+func (ds *dockerService) StopContainer(containerID string, timeout int64) error {
+	return ds.client.StopContainer(containerID, int(timeout))
 }
 
 // RemoveContainer removes the container.
 // TODO: If a container is still running, should we forcibly remove it?
-func (ds *dockerService) RemoveContainer(rawContainerID string) error {
-	return ds.client.RemoveContainer(rawContainerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
+func (ds *dockerService) RemoveContainer(containerID string) error {
+	return ds.client.RemoveContainer(containerID, dockertypes.ContainerRemoveOptions{RemoveVolumes: true})
 }
 
 func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time, time.Time, error) {
@@ -209,8 +209,8 @@ func getContainerTimestamps(r *dockertypes.ContainerJSON) (time.Time, time.Time,
 }
 
 // ContainerStatus returns the container status.
-func (ds *dockerService) ContainerStatus(rawContainerID string) (*runtimeApi.ContainerStatus, error) {
-	r, err := ds.client.InspectContainer(rawContainerID)
+func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error) {
+	r, err := ds.client.InspectContainer(containerID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (ds *dockerService) ContainerStatus(rawContainerID string) (*runtimeApi.Con
 	// Parse the timstamps.
 	createdAt, startedAt, finishedAt, err := getContainerTimestamps(r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", rawContainerID, err)
+		return nil, fmt.Errorf("failed to parse timestamp for container %q: %v", containerID, err)
 	}
 
 	// Convert the mounts.
@@ -295,6 +295,6 @@ func (ds *dockerService) ContainerStatus(rawContainerID string) (*runtimeApi.Con
 // Exec execute a command in the container.
 // TODO: Need to handle terminal resizing before implementing this function.
 // https://github.com/kubernetes/kubernetes/issues/29579.
-func (ds *dockerService) Exec(rawContainerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+func (ds *dockerService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
 	return fmt.Errorf("not implemented")
 }
