@@ -14,22 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package release_1_4
+package v1beta1
 
-// These imports are the API groups the client will support.
 import (
 	"fmt"
 
-	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	"k8s.io/client-go/1.4/pkg/api"
+	"k8s.io/client-go/1.4/pkg/runtime"
 )
 
-func init() {
-	if missingVersions := registered.ValidateEnvRequestedVersions(); len(missingVersions) != 0 {
-		panic(fmt.Sprintf("KUBE_API_VERSIONS contains versions that are not installed: %q.", missingVersions))
+func addConversionFuncs(scheme *runtime.Scheme) {
+	err := api.Scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "Cluster",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+	if err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
 	}
 }

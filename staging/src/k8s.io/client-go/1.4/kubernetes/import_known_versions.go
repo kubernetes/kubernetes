@@ -14,18 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package release_1_4
+package kubernetes
 
 // These imports are the API groups the client will support.
 import (
 	"fmt"
 
-	_ "k8s.io/kubernetes/pkg/api/install"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	_ "k8s.io/client-go/1.4/pkg/api/install"
+	"k8s.io/client-go/1.4/pkg/apimachinery/registered"
+	_ "k8s.io/client-go/1.4/pkg/apis/authorization/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/autoscaling/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/batch/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/extensions/install"
 )
 
 func init() {
