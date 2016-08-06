@@ -38,9 +38,16 @@ export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
 
 # FEDERATION?
 : ${FEDERATION:="false"}
-: ${RELEASE_INFRA_PUSH:="false"}
 : ${KUBE_RELEASE_RUN_TESTS:="n"}
-export KUBE_RELEASE_RUN_TESTS RELEASE_INFRA_PUSH FEDERATION
+
+# New kubernetes/release/push-ci-build.sh values
+# RELEASE_INFRA_PUSH=true when we're using kubernetes/release/push-ci-build.sh
+: ${RELEASE_INFRA_PUSH:="false"}
+# SET_NOMOCK_FLAG=true means we're doing full pushes and we pass --nomock to 
+# push-ci-build.sh. This is set to false in the
+# testing jobs and only used in the RELEASE_INFRA_PUSH=true scope below.
+: ${SET_NOMOCK_FLAG:="true"}
+export KUBE_RELEASE_RUN_TESTS RELEASE_INFRA_PUSH FEDERATION SET_NOMOCK_FLAG
 
 # Clean stuff out. Assume the last build left the tree in an odd
 # state.
@@ -67,14 +74,17 @@ elif ${RELEASE_INFRA_PUSH-}; then
 
   if [[ ! -x ${release_infra_clone}/push-ci-build.sh ]]; then
     echo "FATAL: Something went wrong." \
-         "${release_infra_clone}/push-ci-build.sh isn't available. Exiting..." >&2
+         "${release_infra_clone}/push-ci-build.sh isn't available." \
+         "Exiting..." >&2
     exit 1
   fi
 
+  [[ -n "$KUBE_GCS_RELEASE_BUCKET" ]] \
+   && bucket_flag="--bucket=$KUBE_GCS_RELEASE_BUCKET"
   ${FEDERATION} && federation_flag="--federation"
-  # Use --nomock to do the real thing
-  #$release_infra_clone/push-ci-build.sh --nomock ${federation_flag-}
-  ${release_infra_clone}/push-ci-build.sh ${federation_flag-}
+  ${SET_NOMOCK_FLAG} && mock_flag="--nomock"
+  ${release_infra_clone}/push-ci-build.sh ${bucket_flag-} ${federation_flag-} \
+                                          ${mock_flag-}
 else
   ./build/push-ci-build.sh
 fi
