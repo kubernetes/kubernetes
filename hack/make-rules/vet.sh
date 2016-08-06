@@ -43,7 +43,7 @@ done
 
 if [[ ${#targets[@]} -eq 0 ]]; then
   # Do not run on third_party directories.
-  targets=$(go list ./... | egrep -v "/(third_party|vendor)/")
+  targets=$(go list -e ./... | egrep -v "/(third_party|vendor|staging)/")
 fi
 
 go vet "${goflags[@]:+${goflags[@]}}" ${targets[@]}
