@@ -38,6 +38,7 @@ function kfind() {
         -not \(                    \
             \(                     \
                 -path ./vendor -o  \
+                -path ./staging -o \
                 -path ./_\* -o     \
                 -path ./.\* -o     \
                 -path ./docs -o    \
