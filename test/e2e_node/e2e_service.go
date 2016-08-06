@@ -47,6 +47,7 @@ type e2eService struct {
 	nodeName      string
 	logFiles      map[string]logFileData
 	cgroupsPerQOS bool
+	evictionHard  string
 }
 
 type logFileData struct {
@@ -61,7 +62,7 @@ const (
 	defaultEtcdPath = "/tmp/etcd"
 )
 
-func newE2eService(nodeName string, cgroupsPerQOS bool, context *SharedContext) *e2eService {
+func newE2eService(nodeName string, cgroupsPerQOS bool, evictionHard string, context *SharedContext) *e2eService {
 	// Special log files that need to be collected for additional debugging.
 	var logFiles = map[string]logFileData{
 		"kern.log":   {[]string{"/var/log/kern.log"}, []string{"-k"}},
@@ -73,6 +74,7 @@ func newE2eService(nodeName string, cgroupsPerQOS bool, context *SharedContext) 
 		nodeName:      nodeName,
 		logFiles:      logFiles,
 		cgroupsPerQOS: cgroupsPerQOS,
+		evictionHard:  evictionHard,
 	}
 }
 
@@ -263,6 +265,8 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
+		"--eviction-hard", es.evictionHard,
+		"--eviction-pressure-transition-period", "30s",
 	)
 	if es.cgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
