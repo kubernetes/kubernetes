@@ -32,7 +32,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -215,8 +215,8 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
 	runtime.ReallyCrash = true
-	util.InitLogs()
-	defer util.FlushLogs()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	// Disable skipped tests unless they are explicitly requested.
