@@ -699,7 +699,7 @@ func (dm *DockerManager) runContainer(
 	securityContextProvider.ModifyHostConfig(pod, container, dockerOpts.HostConfig, supplementalGids)
 	createResp, err := dm.client.CreateContainer(dockerOpts)
 	if err != nil {
-		dm.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container with error: %v", err)
+		dm.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
 		return kubecontainer.ContainerID{}, err
 	}
 	if len(createResp.Warnings) != 0 {
@@ -780,7 +780,7 @@ func (dm *DockerManager) GetContainers(all bool) ([]*kubecontainer.Container, er
 	for _, c := range containers {
 		converted, err := toRuntimeContainer(c)
 		if err != nil {
-			glog.Errorf("Error examining the container: %v", err)
+			glog.Errorf("Error examining the container %v: %v", c.ID, err)
 			continue
 		}
 		result = append(result, converted)
@@ -805,13 +805,13 @@ func (dm *DockerManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	for _, c := range containers {
 		converted, err := toRuntimeContainer(c)
 		if err != nil {
-			glog.Errorf("Error examining the container: %v", err)
+			glog.Errorf("Error examining the container %v: %v", c.ID, err)
 			continue
 		}
 
 		podUID, podName, podNamespace, err := getPodInfoFromContainer(c)
 		if err != nil {
-			glog.Errorf("Error examining the container: %v", err)
+			glog.Errorf("Error examining the container %v: %v", c.ID, err)
 			continue
 		}
 
@@ -1287,7 +1287,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 			err := dm.KillContainerInPod(container.ID, containerSpec, pod, "Need to kill pod.", gracePeriodOverride)
 			if err != nil {
 				killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-				glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, runningPod.ID)
+				glog.Errorf("Failed to delete container %v: %v; Skipping pod %q", container.ID.ID, err, runningPod.ID)
 			}
 			containerResults <- killContainerResult
 		}(container)
@@ -1319,7 +1319,7 @@ func (dm *DockerManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecont
 		result.AddSyncResult(killContainerResult)
 		if err := dm.KillContainerInPod(networkContainer.ID, networkSpec, pod, "Need to kill pod.", gracePeriodOverride); err != nil {
 			killContainerResult.Fail(kubecontainer.ErrKillContainer, err.Error())
-			glog.Errorf("Failed to delete container: %v; Skipping pod %q", err, runningPod.ID)
+			glog.Errorf("Failed to delete container %v: %v; Skipping pod %q", networkContainer.ID.ID, err, runningPod.ID)
 		}
 	}
 	return
