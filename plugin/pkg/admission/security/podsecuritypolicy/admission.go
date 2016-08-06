@@ -35,6 +35,7 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/maps"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -189,6 +190,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 	var generatedInitSCs []*api.SecurityContext
 
 	errs := field.ErrorList{}
+	originalAnnotations := maps.CopySS(pod.Annotations)
 
 	psc, err := provider.CreatePodSecurityContext(pod)
 	if err != nil {
@@ -243,7 +245,8 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 	}
 
 	if len(errs) > 0 {
-		// ensure psc is not mutated if there are errors
+		// ensure pod is not mutated if there are errors
+		pod.Annotations = originalAnnotations
 		pod.Spec.SecurityContext = originalPSC
 		return errs
 	}
