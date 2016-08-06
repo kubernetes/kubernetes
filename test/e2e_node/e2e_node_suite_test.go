@@ -125,7 +125,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 	shared := &SharedContext{}
 	if *startServices {
-		e2es = newE2eService(framework.TestContext.NodeName, framework.TestContext.CgroupsPerQOS, shared)
+		e2es = newE2eService(framework.TestContext.NodeName, framework.TestContext.CgroupsPerQOS, framework.TestContext.EvictionHard, shared)
 		if err := e2es.start(); err != nil {
 			Fail(fmt.Sprintf("Unable to start node services.\n%v", err))
 		}
