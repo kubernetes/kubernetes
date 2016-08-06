@@ -520,7 +520,7 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 		if err := r.c.ReplicationControllers(r.ns).Delete(oldRc.Name, nil); err != nil {
 			return err
 		}
-		fmt.Fprintf(config.Out, "Renaming %s to %s\n", newRc.Name, oldRc.Name)
+		fmt.Fprintf(config.Out, "Renaming %s to %s\n", oldRc.Name, newRc.Name)
 		return Rename(r.c, newRc, oldRc.Name)
 	case PreserveRollingUpdateCleanupPolicy:
 		return nil
