@@ -481,14 +481,14 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		zones := getZones(item.fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+				remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeController.nodeStatusMap[value.Value], nodeController.daemonSetStore)
 				if remaining {
 					nodeController.zoneTerminationEvictor[zone].Add(value.Value)
 				}
 				return true, 0
 			})
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, value.AddedAt, nodeController.maximumGracePeriod)
+				terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeController.nodeStatusMap[value.Value], value.AddedAt, nodeController.maximumGracePeriod)
 				return true, 0
 			})
 		}
@@ -1014,14 +1014,14 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		zones := getZones(fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				remaining, _ := deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+				remaining, _ := deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.nodeStatusMap[value.Value], nodeController.daemonSetStore)
 				if remaining {
 					nodeController.zoneTerminationEvictor[zone].Add(value.Value)
 				}
 				return true, 0
 			})
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				terminatePods(fakeNodeHandler, nodeController.recorder, value.Value, value.AddedAt, nodeController.maximumGracePeriod)
+				terminatePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.nodeStatusMap[value.Value], value.AddedAt, nodeController.maximumGracePeriod)
 				return true, 0
 			})
 		}
@@ -1544,7 +1544,7 @@ func TestNodeDeletion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	nodeController.zonePodEvictor[""].Try(func(value TimedValue) (bool, time.Duration) {
-		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.nodeStatusMap[value.Value], nodeController.daemonSetStore)
 		return true, 0
 	})
 	podEvicted := false
@@ -1693,6 +1693,98 @@ func TestCheckPod(t *testing.T) {
 		}
 		if !tc.prune && deleteCalls != 0 {
 			t.Errorf("[%v] expected number of delete calls to be 0 but got %v", i, deleteCalls)
+		}
+	}
+}
+
+func TestPodIsForgivable(t *testing.T) {
+	now := time.Now()
+	nodeName := "new"
+	tcs := []struct {
+		pod              api.Pod
+		expectForgivable bool
+	}{
+		//stay bound on the node forever
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod1",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "taint.alpha.kubernetes.io/nodedown",
+							"value": "",
+							"effect": "NoExecute",
+							"operator": "Exists"
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{NodeName: nodeName},
+			},
+			expectForgivable: true,
+		},
+		//duration is less than forgivenessSeconds
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod2",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "taint.alpha.kubernetes.io/nodedown",
+							"value": "",
+							"effect": "NoExecute",
+							"operator": "Exists",
+							"forgivenessSeconds": 1000
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{NodeName: nodeName},
+			},
+			expectForgivable: true,
+		},
+		//duration is greater than forgivenessSeconds
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod3",
+					Annotations: map[string]string{
+						api.TolerationsAnnotationKey: `
+						[{
+							"key": "taint.alpha.kubernetes.io/nodedown",
+							"value": "",
+							"effect": "NoExecute",
+							"operator": "Exists",
+							"forgivenessSeconds":10
+						}]`,
+					},
+				},
+				Spec: api.PodSpec{NodeName: nodeName},
+			},
+			expectForgivable: false,
+		},
+		//pod don't have forgiveness toleration
+		{
+			pod: api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod4",
+				},
+				Spec: api.PodSpec{NodeName: nodeName},
+			},
+			expectForgivable: false,
+		},
+	}
+	nodeController, _ := NewNodeControllerFromClient(nil, nil, 0, 0, 0, 0, 0, nil, nil, 0, false)
+	nodeController.nodeStore.Store.Add(newNode(nodeName))
+	nodeController.nodeStatusMap[nodeName] = nodeStatusData{
+		status:                   api.NodeStatus{},
+		probeTimestamp:           unversioned.NewTime(now.Add(-time.Second * 50)),
+		readyTransitionTimestamp: unversioned.NewTime(now.Add(-time.Second * 50)),
+	}
+	for i, tc := range tcs {
+		result := isPodForgivable(tc.pod, nodeController.nodeStatusMap[nodeName].readyTransitionTimestamp)
+		if result != tc.expectForgivable {
+			t.Errorf("[%v] expected response of IsPodForgivable calls to be %t but got %t", i, tc.expectForgivable, result)
 		}
 	}
 }

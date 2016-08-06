@@ -7355,6 +7355,11 @@ func (m *Toleration) MarshalTo(data []byte) (int, error) {
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.Effect)))
 	i += copy(data[i:], m.Effect)
+	if m.ForgivenessSeconds != nil {
+		data[i] = 0x28
+		i++
+		i = encodeVarintGenerated(data, i, uint64(*m.ForgivenessSeconds))
+	}
 	return i, nil
 }
 
@@ -10143,6 +10148,9 @@ func (m *Toleration) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.Effect)
 	n += 1 + l + sovGenerated(uint64(l))
+	if m.ForgivenessSeconds != nil {
+		n += 1 + sovGenerated(uint64(*m.ForgivenessSeconds))
+	}
 	return n
 }
 
@@ -12338,6 +12346,7 @@ func (this *Toleration) String() string {
 		`Operator:` + fmt.Sprintf("%v", this.Operator) + `,`,
 		`Value:` + fmt.Sprintf("%v", this.Value) + `,`,
 		`Effect:` + fmt.Sprintf("%v", this.Effect) + `,`,
+		`ForgivenessSeconds:` + valueToStringGenerated(this.ForgivenessSeconds) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -35963,6 +35972,26 @@ func (m *Toleration) Unmarshal(data []byte) error {
 			}
 			m.Effect = TaintEffect(data[iNdEx:postIndex])
 			iNdEx = postIndex
+		case 5:
+			if wireType != 0 {
+				return fmt.Errorf("proto: wrong wireType = %d for field ForgivenessSeconds", wireType)
+			}
+			var v int64
+			for shift := uint(0); ; shift += 7 {
+				if shift >= 64 {
+					return ErrIntOverflowGenerated
+				}
+				if iNdEx >= l {
+					return io.ErrUnexpectedEOF
+				}
+				b := data[iNdEx]
+				iNdEx++
+				v |= (int64(b) & 0x7F) << shift
+				if b < 0x80 {
+					break
+				}
+			}
+			m.ForgivenessSeconds = &v
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])
