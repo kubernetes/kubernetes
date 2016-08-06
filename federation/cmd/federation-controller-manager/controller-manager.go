@@ -24,8 +24,8 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app"
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
@@ -38,8 +38,8 @@ func main() {
 	s.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 

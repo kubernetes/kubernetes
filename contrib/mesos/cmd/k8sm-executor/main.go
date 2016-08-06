@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
@@ -34,8 +35,8 @@ func main() {
 	s.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 
