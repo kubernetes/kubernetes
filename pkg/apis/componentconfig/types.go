@@ -397,6 +397,18 @@ type KubeletConfiguration struct {
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
 	KubeReserved utilconfig.ConfigurationMap `json:"kubeReserved"`
+	// If true, Kubelet ensures a set of iptables rules are present on host.
+	// These rules will serve as utility for various components, e.g. KubeProxy.
+	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
+	ConfigIPTablesUtil bool `json:"configIPTablesUtil"`
+	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
+	// Values must be within the range [0, 31].
+	// Warning: Please match the value of corresponding parameter in kube-proxy
+	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
+	IPTablesMasqueradeBit *int32 `json:"iptablesMasqueradeBit"`
+	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
+	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
+	IPTablesDropBit *int32 `json:"iptablesDropBit"`
 }
 
 type KubeSchedulerConfiguration struct {

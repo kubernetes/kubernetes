@@ -337,6 +337,17 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.KubeReserved == nil {
 		obj.KubeReserved = make(map[string]string)
 	}
+	if obj.ConfigIPTablesUtil == nil {
+		obj.ConfigIPTablesUtil = boolVar(true)
+	}
+	if obj.IPTablesMasqueradeBit == nil {
+		temp := int32(14)
+		obj.IPTablesMasqueradeBit = &temp
+	}
+	if obj.IPTablesDropBit == nil {
+		temp := int32(15)
+		obj.IPTablesDropBit = &temp
+	}
 }
 
 func boolVar(b bool) *bool {
