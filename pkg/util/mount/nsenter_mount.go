@@ -19,11 +19,13 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/golang/glog"
+	"github.com/syndtr/gocapability/capability"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -58,7 +60,16 @@ type NsenterMounter struct {
 	paths map[string]string
 }
 
-func NewNsenterMounter() *NsenterMounter {
+func NewNsenterMounter() (*NsenterMounter, error) {
+	// check if we have CAP_SYS_ADMIN to setgroup properly
+	pid, err := capability.NewPid(os.Getpid())
+	if err != nil {
+		return nil, err
+	}
+	if !pid.Get(capability.EFFECTIVE, capability.CAP_SYS_ADMIN) {
+		return nil, fmt.Errorf("Kubelet needs to run in a privileged container")
+	}
+
 	m := &NsenterMounter{
 		paths: map[string]string{
 			"mount":   "",
@@ -80,7 +91,7 @@ func NewNsenterMounter() *NsenterMounter {
 		}
 		// TODO: error, so that the kubelet can stop if the mounts don't exist
 	}
-	return m
+	return m, nil
 }
 
 // NsenterMounter implements mount.Interface

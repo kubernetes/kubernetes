@@ -143,7 +143,10 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 	var writer io.Writer = &io.StdWriter{}
 	if s.Containerized {
 		glog.V(2).Info("Running kubelet in containerized mode (experimental)")
-		mounter = mount.NewNsenterMounter()
+		mounter, err = mount.NewNsenterMounter()
+		if err != nil {
+			return nil, err
+		}
 		writer = &io.NsenterWriter{}
 	}
 
