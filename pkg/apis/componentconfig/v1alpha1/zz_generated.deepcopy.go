@@ -378,6 +378,27 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.KubeReserved = nil
 		}
 		out.ProtectKernelDefaults = in.ProtectKernelDefaults
+		if in.ConfigIPTablesUtil != nil {
+			in, out := &in.ConfigIPTablesUtil, &out.ConfigIPTablesUtil
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.ConfigIPTablesUtil = nil
+		}
+		if in.IPTablesMasqueradeBit != nil {
+			in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.IPTablesMasqueradeBit = nil
+		}
+		if in.IPTablesDropBit != nil {
+			in, out := &in.IPTablesDropBit, &out.IPTablesDropBit
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.IPTablesDropBit = nil
+		}
 		return nil
 	}
 }

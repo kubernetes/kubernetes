@@ -78,6 +78,7 @@ concurrent-service-syncs
 concurrent-resource-quota-syncs
 concurrent-serviceaccount-token-syncs
 concurrent-gc-syncs
+config-iptables-util
 config-sync-period
 configure-cbr0
 configure-cloud-routes
@@ -230,6 +231,7 @@ insecure-port
 insecure-skip-tls-verify
 instance-metadata
 instance-name-prefix
+iptables-drop-bit
 iptables-masquerade-bit
 iptables-sync-period
 ir-data-source

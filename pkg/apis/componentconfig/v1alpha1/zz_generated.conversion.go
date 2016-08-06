@@ -320,6 +320,11 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 		out.KubeReserved = nil
 	}
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
+	if err := api.Convert_Pointer_bool_To_bool(&in.ConfigIPTablesUtil, &out.ConfigIPTablesUtil, s); err != nil {
+		return err
+	}
+	out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
+	out.IPTablesDropBit = in.IPTablesDropBit
 	return nil
 }
 
@@ -485,6 +490,11 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 		out.KubeReserved = nil
 	}
 	out.ProtectKernelDefaults = in.ProtectKernelDefaults
+	if err := api.Convert_bool_To_Pointer_bool(&in.ConfigIPTablesUtil, &out.ConfigIPTablesUtil, s); err != nil {
+		return err
+	}
+	out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
+	out.IPTablesDropBit = in.IPTablesDropBit
 	return nil
 }
 
