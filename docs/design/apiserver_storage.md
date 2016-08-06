@@ -69,33 +69,34 @@ We also believe we should start a side-by-side storage implementation to reach t
 // Storage provides read-write access to the objects based on string key.
 type Storage interface {
 	// Wait waits until the storage has seen any version >= given version.
-	Wait(ctx context.Context, version uint64)
+	// If version == 0, it provides a guarantee that once returning reads should see all writes from this interface.
+	Wait(ctx context.Context, version int64)
 
 	// Put puts an object with a key, and returns current object on given key.
 	// If conditions is not nil, it will do atomic Put. If compare failed, it will return existing object on given key.
 	// See "Conditions" docs for more details on compare logic and returned error.
-	Put(ctx context.Context, key StorageKey, obj runtime.Object, conditions *Conditions) (KeyResponse, error)
+	Put(ctx context.Context, key StorageKey, obj runtime.Object, conditions *Conditions) (*KeyResponse, error)
 
 	// Delete deletes a key and its object, and returns deleted object on given key.
 	// conditions has the same guarantee as Put().
-	Delete(ctx context.Context, key StorageKey, conditions *Conditions) (KeyResponse, error)
+	Delete(ctx context.Context, key StorageKey, conditions *Conditions) (*KeyResponse, error)
 
 	// Get gets the current object of given key.
 	// If version = 0, it will serve data from local cache.
 	// If version > 0, it will get the current state of the key at the time given version is committed.
 	// If no object exists on the key, it will return not found error.
-	Get(ctx context.Context, key StorageKey, version uint64) (KeyResponse, error)
+	Get(ctx context.Context, key StorageKey, version int64) (*KeyResponse, error)
 
 	// List lists all objects that has give prefix in keys and satisfies selectors.
 	// version has the same guarantee as Get().
-	List(ctx context.Context, prefix StorageKey, version uint64, ss ...Selector) (ListResponse, error)
+	List(ctx context.Context, prefix StorageKey, version int64, ss ...Selector) (*ListResponse, error)
 
 	// WatchPrefix watches a prefix after given version. If version is 0, we will watch from current state.
 	// It returns notifications of any keys that has given prefix.
 	// Given selectors, it returns events that contained object of interest, either of current and previous.
 	// If there is any problem establishing the watch channel, it will return error.
 	// After channel is established, any error will be returned from WatchChan immediately before it's closed.
-	WatchPrefix(ctx context.Context, prefix StorageKey, version uint64, ss ...Selector) (WatchChan, error)
+	WatchPrefix(ctx context.Context, prefix StorageKey, version int64, ss ...Selector) (WatchChan, error)
 
 	// AddIndex adds a new index.
 	// An index indicates a field(s) of a type of an object that would be queried or watched frequently and
@@ -108,17 +109,18 @@ type Storage interface {
 	DeleteIndex(indexName string)
 }
 
-// KeyResponse...
+// KeyResponse contains the object as a response for a key.
 type KeyResponse struct {
 	Object runtime.Object
-	Version uint64
+	// Version is the storage version of the object in this response.
+	Version int64
 }
 
-// ListResponse...
+// ListResponse contains objects as a response for a prefix.
 type ListResponse struct {
 	Keys []*KeyResponse
 	// HeadVersion is the latest version known by this storage.
-	HeadVersion uint64
+	HeadVersion int64
 }
 
 // Conditions is used in do atomic conditional operations.
@@ -127,7 +129,7 @@ type Conditions struct {
 	// PrevVersion is used to compare with existing object’s version.
 	// Compare would only succeed if versions were matched.
 	// Note that PrevVersion=0 means no previous object existed.
-	PrevVersion unit64
+	PrevVersion int64
 }
 
 // FieldValueGetFunc returns the value in the object corresponding to given field.
