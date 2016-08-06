@@ -282,9 +282,9 @@ func (kl *Kubelet) recordNodeStatusEvent(eventtype, event string) {
 	kl.recorder.Eventf(kl.nodeRef, eventtype, event, "Node %s status is now: %s", kl.nodeName, event)
 }
 
-// Set addresses for the node.
+// Set IP addresses for the node.
 func (kl *Kubelet) setNodeAddress(node *api.Node) error {
-	// Set addresses for the node.
+
 	if kl.cloud != nil {
 		instances, ok := kl.cloud.Instances()
 		if !ok {
@@ -293,56 +293,46 @@ func (kl *Kubelet) setNodeAddress(node *api.Node) error {
 		// TODO(roberthbailey): Can we do this without having credentials to talk
 		// to the cloud provider?
 		// TODO(justinsb): We can if CurrentNodeName() was actually CurrentNode() and returned an interface
+		// TODO: If IP addresses couldn't be fetched from the cloud provider, should kubelet fallback on the other methods for getting the IP below?
 		nodeAddresses, err := instances.NodeAddresses(kl.nodeName)
 		if err != nil {
 			return fmt.Errorf("failed to get node address from cloud provider: %v", err)
 		}
 		node.Status.Addresses = nodeAddresses
 	} else {
+		var ipAddr net.IP
+		var err error
+
+		// 1) Use nodeIP if set
+		// 2) If the user has specified an IP to HostnameOverride, use it
+		// 3) Lookup the IP from node name by DNS and use the first non-loopback ipv4 address
+		// 4) Try to get the IP from the network interface used as default gateway
 		if kl.nodeIP != nil {
-			node.Status.Addresses = []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: kl.nodeIP.String()},
-				{Type: api.NodeInternalIP, Address: kl.nodeIP.String()},
-			}
+			ipAddr = kl.nodeIP
 		} else if addr := net.ParseIP(kl.hostname); addr != nil {
-			node.Status.Addresses = []api.NodeAddress{
-				{Type: api.NodeLegacyHostIP, Address: addr.String()},
-				{Type: api.NodeInternalIP, Address: addr.String()},
-			}
+			ipAddr = addr
 		} else {
-			addrs, err := net.LookupIP(node.Name)
-			if err != nil {
-				return fmt.Errorf("can't get ip address of node %s: %v", node.Name, err)
-			} else if len(addrs) == 0 {
-				return fmt.Errorf("no ip address for node %v", node.Name)
-			} else {
-				// check all ip addresses for this node.Name and try to find the first non-loopback IPv4 address.
-				// If no match is found, it uses the IP of the interface with gateway on it.
-				for _, ip := range addrs {
-					if ip.IsLoopback() {
-						continue
-					}
-
-					if ip.To4() != nil {
-						node.Status.Addresses = []api.NodeAddress{
-							{Type: api.NodeLegacyHostIP, Address: ip.String()},
-							{Type: api.NodeInternalIP, Address: ip.String()},
-						}
-						break
-					}
+			var addrs []net.IP
+			addrs, err = net.LookupIP(node.Name)
+			for _, addr := range addrs {
+				if !addr.IsLoopback() && addr.To4() != nil {
+					ipAddr = addr
+					break
 				}
+			}
 
-				if len(node.Status.Addresses) == 0 {
-					ip, err := utilnet.ChooseHostInterface()
-					if err != nil {
-						return err
-					}
+			if ipAddr == nil {
+				ipAddr, err = utilnet.ChooseHostInterface()
+			}
+		}
 
-					node.Status.Addresses = []api.NodeAddress{
-						{Type: api.NodeLegacyHostIP, Address: ip.String()},
-						{Type: api.NodeInternalIP, Address: ip.String()},
-					}
-				}
+		if ipAddr == nil {
+			// We tried everything we could, but the IP address wasn't fetchable; error out
+			return fmt.Errorf("can't get ip address of node %s. error: %v", node.Name, err)
+		} else {
+			node.Status.Addresses = []api.NodeAddress{
+				{Type: api.NodeLegacyHostIP, Address: ipAddr.String()},
+				{Type: api.NodeInternalIP, Address: ipAddr.String()},
 			}
 		}
 	}
