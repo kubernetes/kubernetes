@@ -182,7 +182,12 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 		return nil, err
 	}
 	es.etcdDataDir = dataDir
-	etcdPath, err := exec.LookPath("etcd")
+	var etcdPath string
+	// CoreOS ships a binary named 'etcd' which is really old, so prefer 'etcd2' if it exists
+	etcdPath, err = exec.LookPath("etcd2")
+	if err != nil {
+		etcdPath, err = exec.LookPath("etcd")
+	}
 	if err != nil {
 		glog.Infof("etcd not found in PATH. Defaulting to %s...", defaultEtcdPath)
 		_, err = os.Stat(defaultEtcdPath)
@@ -191,7 +196,9 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 		}
 		etcdPath = defaultEtcdPath
 	}
-	cmd := exec.Command(etcdPath)
+	cmd := exec.Command(etcdPath,
+		"--listen-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001",
+		"--advertise-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001")
 	// Execute etcd in the data directory instead of using --data-dir because the flag sometimes requires additional
 	// configuration (e.g. --name in version 0.4.9)
 	cmd.Dir = es.etcdDataDir
