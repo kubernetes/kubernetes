@@ -18,6 +18,7 @@ package volume
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -192,6 +193,15 @@ func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
 		prefix = prefix[:maxLength-pvLen-1]
 	}
 	return prefix + "-" + pvName
+}
+
+// Check if the path from the mounter is empty.
+func GetPath(mounter Mounter) (string, error) {
+	path := mounter.GetPath()
+	if path == "" {
+		return "", fmt.Errorf("Path is empty %s", reflect.TypeOf(mounter).String())
+	}
+	return path, nil
 }
 
 // ChooseZone implements our heuristics for choosing a zone for volume creation based on the volume name

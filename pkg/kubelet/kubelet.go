@@ -1012,7 +1012,11 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 	for _, vol := range volumes {
 		if vol.Mounter.GetAttributes().Managed && vol.Mounter.GetAttributes().SupportsSELinux {
 			// Relabel the volume and its content to match the 'Level' of the pod
-			err := filepath.Walk(vol.Mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
+			path, err := volume.GetPath(vol.Mounter)
+			if err != nil {
+				return err
+			}
+			err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
@@ -1053,7 +1057,10 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName,
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}
-		hostPath := vol.Mounter.GetPath()
+		hostPath, err := volume.GetPath(vol.Mounter)
+		if err != nil {
+			return nil, err
+		}
 		if mount.SubPath != "" {
 			hostPath = filepath.Join(hostPath, mount.SubPath)
 		}
