@@ -281,21 +281,6 @@ func (m *Master) InstallAPIs(c *Config) {
 			glog.Fatalf("Error getting third party storage: %v", err)
 		}
 		m.thirdPartyResources = map[string]*thirdPartyEntry{}
-
-		extensionResources := m.getExtensionResources(c)
-		extensionsGroupMeta := registered.GroupOrDie(extensions.GroupName)
-
-		apiGroupInfo := genericapiserver.APIGroupInfo{
-			GroupMeta: *extensionsGroupMeta,
-			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
-				"v1beta1": extensionResources,
-			},
-			OptionsExternalVersion: &registered.GroupOrDie(api.GroupName).GroupVersion,
-			Scheme:                 api.Scheme,
-			ParameterCodec:         api.ParameterCodec,
-			NegotiatedSerializer:   api.Codecs,
-		}
-		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 
 	restOptionsGetter := func(resource unversioned.GroupResource) generic.RESTOptions {
@@ -574,7 +559,7 @@ func (m *Master) removeThirdPartyStorage(path, resource string) error {
 func (m *Master) RemoveThirdPartyResource(path string) error {
 	ix := strings.LastIndex(path, "/")
 	if ix == -1 {
-		return fmt.Errorf("unexpected path: %s", path)
+		return fmt.Errorf("expected <api-group>/<resource-plural-name>, saw: %s", path)
 	}
 	resource := path[ix+1:]
 	path = path[0:ix]

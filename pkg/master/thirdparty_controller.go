@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apiserver"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -32,7 +33,7 @@ import (
 const thirdpartyprefix = "/apis"
 
 // dynamicLister is used to list resources for dynamic third party
-// apis.
+// apis. It implements the apiserver.APIResourceLister interface
 type dynamicLister struct {
 	m    *Master
 	path string
@@ -41,6 +42,8 @@ type dynamicLister struct {
 func (d dynamicLister) ListAPIResources() []unversioned.APIResource {
 	return d.m.getExistingThirdPartyResources(d.path)
 }
+
+var _ apiserver.APIResourceLister = &dynamicLister{}
 
 func makeThirdPartyPath(group string) string {
 	if len(group) == 0 {
@@ -63,7 +66,7 @@ type resourceInterface interface {
 	// Is a particular third party resource currently installed?
 	HasThirdPartyResource(rsrc *expapi.ThirdPartyResource) (bool, error)
 	// List all currently installed third party resources, the returned
-	// names are <api-group-path>/<resource-plural-name>
+	// names are of the form <api-group-path>/<resource-plural-name>
 	ListThirdPartyResources() []string
 }
 

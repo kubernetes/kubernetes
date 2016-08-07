@@ -582,7 +582,7 @@ func initThirdPartyMultiple(t *testing.T, versions, names []string) (*Master, *e
 		if !hasRsrc {
 			err := master.InstallThirdPartyResource(api)
 			if !assert.NoError(err) {
-				t.Logf("Failed to install API: %v", err)
+				t.Errorf("Failed to install API: %v", err)
 				t.FailNow()
 			}
 		} else {

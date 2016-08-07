@@ -124,6 +124,7 @@ const (
 	MaxTimeoutSecs = 600
 )
 
+// staticLister mplements the APIResourceLister interface
 type staticLister struct {
 	list []unversioned.APIResource
 }
@@ -131,6 +132,8 @@ type staticLister struct {
 func (s staticLister) ListAPIResources() []unversioned.APIResource {
 	return s.list
 }
+
+var _ APIResourceLister = &staticLister{}
 
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
