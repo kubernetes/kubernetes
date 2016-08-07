@@ -116,7 +116,7 @@ type ClusterLifecycleHandlerFuncs struct {
 func NewFederatedInformer(
 	federationClient federation_release_1_4.Interface,
 	targetInformerFactory TargetInformerFactory,
-	clusterLifecycle ClusterLifecycleHandlerFuncs) FederatedInformer {
+	clusterLifecycle *ClusterLifecycleHandlerFuncs) FederatedInformer {
 
 	federatedInformer := &federatedInformerImpl{
 		targetInformerFactory: targetInformerFactory,
