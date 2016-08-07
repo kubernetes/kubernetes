@@ -952,11 +952,29 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 
 	// test when the pod anti affinity rule is not satisfied, the pod would stay pending.
 	It("validates that InterPodAntiAffinity is respected if matching 2", func() {
-		// launch a pod to find a node which can launch a pod. We intentionally do
-		// not just take the node list and choose the first of them. Depending on the
-		// cluster and the scheduler it might be that a "normal" pod cannot be
-		// scheduled onto it.
-		By("Trying to launch a pod with a label to get a node which can launch it.")
+		// launch pods to find nodes which can launch a pod. We intentionally do
+		// not just take the node list and choose the first and the second of them.
+		// Depending on the cluster and the scheduler it might be that a "normal" pod
+		// cannot be scheduled onto it.
+		By("Launching two pods on two distinct nodes to get two node names")
+		CreateHostPortPods(f, "host-port", 2, true)
+		defer framework.DeleteRC(f.Client, f.Namespace.Name, "host-port")
+		podList, err := c.Pods(ns).List(api.ListOptions{})
+		ExpectNoError(err)
+		Expect(len(podList.Items)).To(Equal(2))
+		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
+		Expect(nodeNames[0]).ToNot(Equal(nodeNames[1]))
+
+		By("Applying a random label to both nodes.")
+		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
+		v := "china-e2etest"
+		for _, nodeName := range nodeNames {
+			framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+			framework.ExpectNodeHasLabel(c, nodeName, k, v)
+			defer framework.RemoveLabelOffNode(c, nodeName, k)
+		}
+
+		By("Trying to launch another pod on the first node with the service label.")
 		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -973,6 +991,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
+				NodeSelector: map[string]string{k: v}, // only launch on our two nodes
 			},
 		})
 		framework.ExpectNoError(err)
@@ -980,17 +999,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
-		nodeName := pod.Spec.NodeName
-
-		By("Trying to apply a random label on the found node.")
-		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
-		v := "china-e2etest"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
-
-		By("Trying to launch the pod, now with podAffinity with same Labels.")
-		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
+		By("Trying to launch another pod, now with podAntiAffinity with same Labels.")
+		labelPodName := "with-podantiaffinity-" + string(uuid.NewUUID())
 		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1022,6 +1032,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
+				NodeSelector: map[string]string{k: v}, // only launch on our two nodes, contradicting the podAntiAffinity
 			},
 		})
 		framework.ExpectNoError(err)
@@ -1031,7 +1042,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, labelPodName, 2, 0, ns)
+		verifyResult(c, labelPodName, 3, 1, ns)
 	})
 
 	// test the pod affinity successful matching scenario with multiple Label Operators.
