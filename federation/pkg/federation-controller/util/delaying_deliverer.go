@@ -153,3 +153,8 @@ func (d *DelayingDeliverer) DeliverAt(key string, value interface{}, deliveryTim
 func (d *DelayingDeliverer) DeliverAfter(key string, value interface{}, delay time.Duration) {
 	d.DeliverAt(key, value, time.Now().Add(delay))
 }
+
+// Gets target chanel of the deliverer.
+func (d *DelayingDeliverer) GetTargetChannel() chan *DelayingDelivererItem {
+	return d.targetChannel
+}
