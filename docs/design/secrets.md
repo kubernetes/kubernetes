@@ -534,7 +534,7 @@ When the container's command runs, the pieces of the key will be available in:
 The container is then free to use the secret data to establish an ssh
 connection.
 
-### Use-Case: Pods with pod / test credentials
+### Use-Case: Pods with prod / test credentials
 
 This example illustrates a pod which consumes a secret containing prod
 credentials and another pod which consumes a secret with test environment
