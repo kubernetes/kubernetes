@@ -187,7 +187,11 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	volume.SetVolumeOwnership(b, fsGroup)
+	err = volume.SetVolumeOwnership(b, fsGroup)
+	if err != nil {
+		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		return err
+	}
 
 	return nil
 }
