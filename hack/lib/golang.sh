@@ -162,15 +162,31 @@ readonly KUBE_ALL_TARGETS=(
 )
 readonly KUBE_ALL_BINARIES=("${KUBE_ALL_TARGETS[@]##*/}")
 
+# These binaries does not contain any C code at all, and may therefore be compiled statically without involving gcc
+# Binaries that does contain C code are also compiled statically, but there gcc first statically compiles the C code, and the
+# statically linked C code is then injected into static Go code.
+# Again, this lists all those binaries that do not contain C code:
 readonly KUBE_STATIC_LIBRARIES=(
   kube-apiserver
   kube-controller-manager
   kube-dns
   kube-scheduler
   kube-proxy
-  kubectl
   federation-apiserver
   federation-controller-manager
+
+  kubectl
+
+  gendocs
+  genkubedocs
+  genman
+  genyaml
+  mungedocs
+  genswaggertypedocs
+  linkcheck
+  src # This is the k8spetstore binary, but with a very confusing name
+  genfeddocs
+  ginkgo
 )
 
 kube::golang::is_statically_linked_library() {
@@ -236,13 +252,10 @@ kube::golang::set_platform_envs() {
     # Dynamic CGO linking for other server architectures than linux/amd64 goes here
     # If you want to include support for more server platforms than these, add arch-specific gcc names here
     if [[ ${platform} == "linux/arm" ]]; then
-      export CGO_ENABLED=1
       export CC=arm-linux-gnueabi-gcc
     elif [[ ${platform} == "linux/arm64" ]]; then
-      export CGO_ENABLED=1
       export CC=aarch64-linux-gnu-gcc
     elif [[ ${platform} == "linux/ppc64le" ]]; then
-      export CGO_ENABLED=1
       export CC=powerpc64le-linux-gnu-gcc
     fi
   fi
@@ -251,7 +264,6 @@ kube::golang::set_platform_envs() {
 kube::golang::unset_platform_envs() {
   unset GOOS
   unset GOARCH
-  unset CGO_ENABLED
   unset CC
 }
 
@@ -483,7 +495,7 @@ kube::golang::build_binaries_for_platform() {
     kube::log::progress "    "
     for binary in "${statics[@]:+${statics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      CGO_ENABLED=0 go build -o "${outfile}" \
+      CGO_ENABLED=0 go build -o "${outfile}" -a -installsuffix cgo \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
@@ -492,27 +504,29 @@ kube::golang::build_binaries_for_platform() {
     done
     for binary in "${nonstatics[@]:+${nonstatics[@]}}"; do
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      go build -o "${outfile}" \
+      CGO_ENABLED=1 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
+        -ldflags "${goldflags} -extldflags \"-static\"" \
         "${binary}"
       kube::log::progress "*"
     done
     kube::log::progress "\n"
   else
-    # Use go install.
-    if [[ "${#nonstatics[@]}" != 0 ]]; then
-      go install "${goflags[@]:+${goflags[@]}}" \
-        -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
-        "${nonstatics[@]:+${nonstatics[@]}}"
-    fi
     if [[ "${#statics[@]}" != 0 ]]; then
-      CGO_ENABLED=0 go install -installsuffix cgo "${goflags[@]:+${goflags[@]}}" \
+      CGO_ENABLED=0 go install -a -installsuffix cgo \
+        "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags}" \
         "${statics[@]:+${statics[@]}}"
+    fi
+    # Use go install.
+    if [[ "${#nonstatics[@]}" != 0 ]]; then
+      CGO_ENABLED=1 go install \
+        "${goflags[@]:+${goflags[@]}}" \
+        -gcflags "${gogcflags}" \
+        -ldflags "${goldflags} -extldflags \"-static\"" \
+        "${nonstatics[@]:+${nonstatics[@]}}"
     fi
   fi
 
@@ -542,16 +556,17 @@ kube::golang::build_binaries_for_platform() {
     # doing a staleness check on k8s.io/kubernetes/test/e2e package always
     # returns true (always stale). And that's why we need to install the
     # test package.
-    go install "${goflags[@]:+${goflags[@]}}" \
+    go install \
+        "${goflags[@]:+${goflags[@]}}" \
         -gcflags "${gogcflags}" \
-        -ldflags "${goldflags}" \
+        -ldflags "${goldflags} -extldflags \"-static\"" \
         "${testpkg}"
 
     mkdir -p "$(dirname ${outfile})"
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
       -gcflags "${gogcflags}" \
-      -ldflags "${goldflags}" \
+      -ldflags "${goldflags} -extldflags \"-static\"" \
       -o "${outfile}" \
       "${testpkg}"
   done
