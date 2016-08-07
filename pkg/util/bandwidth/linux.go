@@ -33,6 +33,8 @@ import (
 	"github.com/golang/glog"
 )
 
+// TODO: Remove dependency on tc, use vishvanada/netlink instead
+
 // tcShaper provides an implementation of the BandwidthShaper interface on Linux using the 'tc' tool.
 // In general, using this requires that the caller posses the NET_CAP_ADMIN capability, though if you
 // do this within an container, it only requires the NS_CAPABLE capability for manipulations to that

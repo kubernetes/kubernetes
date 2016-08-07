@@ -226,7 +226,7 @@ func (kl *Kubelet) reconcileCBR0(podCIDR string) error {
 	}
 	// Set cbr0 interface address to first address in IPNet
 	cidr.IP.To4()[3] += 1
-	if err := ensureCbr0(cidr, kl.hairpinMode == componentconfig.PromiscuousBridge, kl.babysitDaemons); err != nil {
+	if err := ensureBridge("cbr0", 1460, cidr, kl.hairpinMode == componentconfig.PromiscuousBridge, kl.babysitDaemons); err != nil {
 		return err
 	}
 	if kl.shapingEnabled() {
