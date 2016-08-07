@@ -206,7 +206,6 @@ func TestBasicTokenFile(t *testing.T) {
 		Server: "https://localhost:8443",
 	}
 	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
-		Token: "shouldbeoverwritten",
 		TokenFile: f.Name(),
 	}
 	config.Contexts["clean"] = &clientcmdapi.Context{
@@ -223,6 +222,44 @@ func TestBasicTokenFile(t *testing.T) {
 	}
 
 	matchStringArg(token, clientConfig.BearerToken, t)
+}
+
+func TestPrecedenceTokenFile(t *testing.T) {
+	token := "exampletoken"
+	f, err := ioutil.TempFile("", "tokenfile")
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+	defer os.Remove(f.Name())
+	if err := ioutil.WriteFile(f.Name(), []byte(token), 0644); err != nil {
+		t.Errorf("Unexpected error: %v", err)
+		return
+	}
+
+	config := clientcmdapi.NewConfig()
+	config.Clusters["clean"] = &clientcmdapi.Cluster{
+		Server: "https://localhost:8443",
+	}
+	expectedToken := "expected"
+	config.AuthInfos["clean"] = &clientcmdapi.AuthInfo{
+		Token:     expectedToken,
+		TokenFile: f.Name(),
+	}
+	config.Contexts["clean"] = &clientcmdapi.Context{
+		Cluster:  "clean",
+		AuthInfo: "clean",
+	}
+	config.CurrentContext = "clean"
+
+	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{}, nil)
+
+	clientConfig, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	matchStringArg(expectedToken, clientConfig.BearerToken, t)
 }
 
 func TestCreateClean(t *testing.T) {

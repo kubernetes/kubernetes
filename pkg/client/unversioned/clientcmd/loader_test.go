@@ -78,7 +78,7 @@ var (
 	}
 	testConfigTokenFileAlpha = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"red-user": {Token: "red-token"}},
+			"red-user": {}},
 		Clusters: map[string]*clientcmdapi.Cluster{
 			"cow-cluster": {Server: "http://cow.org:8080"}},
 		Contexts: map[string]*clientcmdapi.Context{
@@ -98,26 +98,35 @@ func TestTokenFile(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 		return
 	}
-	testConfigTokenFileAlpha.AuthInfos["red-user"].TokenFile = f.Name()
 
-	sourceFile, _ := ioutil.TempFile("", "source")
-	defer os.Remove(sourceFile.Name())
-	WriteToFile(testConfigTokenFileAlpha, sourceFile.Name())
-
-	loadingRules := ClientConfigLoadingRules{
-		ExplicitPath: sourceFile.Name(),
+	paths := []string{
+		// Relative
+		filepath.Base(f.Name()),
+		// Absolute
+		f.Name(),
 	}
 
-	config, err := loadingRules.Load();
-	if err != nil {
-		t.Errorf("unexpected error %v", err)
-	}
-	t.Logf("FOOBAR: %v", config)
-	if config.AuthInfos["red-user"].Token != token {
-		t.Errorf("Expected: %s, saw: %s", token, config.AuthInfos["red-user"].Token)
+	for _, path := range paths {
+		testConfigTokenFileAlpha.AuthInfos["red-user"].TokenFile = path
+
+		sourceFile, _ := ioutil.TempFile("", "source")
+		defer os.Remove(sourceFile.Name())
+		WriteToFile(testConfigTokenFileAlpha, sourceFile.Name())
+
+		loadingRules := ClientConfigLoadingRules{
+			ExplicitPath: sourceFile.Name(),
+		}
+
+		config, err := loadingRules.Load()
+		if err != nil {
+			t.Errorf("unexpected error %v", err)
+		}
+		if config.AuthInfos["red-user"].Token != token {
+			t.Errorf("Expected: %s, saw: %s", token, config.AuthInfos["red-user"].Token)
+		}
 	}
 }
-	
+
 func TestNonExistentCommandLineFile(t *testing.T) {
 	loadingRules := ClientConfigLoadingRules{
 		ExplicitPath: "bogus_file",
