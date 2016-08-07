@@ -244,11 +244,6 @@ func (c *Cacher) startCaching(stopChannel <-chan struct{}) {
 }
 
 // Implements storage.Interface.
-func (c *Cacher) Backends(ctx context.Context) []string {
-	return c.storage.Backends(ctx)
-}
-
-// Implements storage.Interface.
 func (c *Cacher) Versioner() Versioner {
 	return c.storage.Versioner()
 }
