@@ -139,10 +139,15 @@ type ExtenderArgs struct {
 	Nodes api.NodeList `json:"nodes"`
 }
 
+// FailedNodesMap represents the filtered out nodes, with node names and failure messages
+type FailedNodesMap map[string]string
+
 // ExtenderFilterResult represents the results of a filter call to an extender
 type ExtenderFilterResult struct {
 	// Filtered set of nodes where the pod can be scheduled
 	Nodes api.NodeList `json:"nodes,omitempty"`
+	// Filtered out nodes where the pod can't be scheduled and the failure messages
+	FailedNodes FailedNodesMap `json:"failedNodes,omitempty"`
 	// Error message indicating failure
 	Error string `json:"error,omitempty"`
 }
