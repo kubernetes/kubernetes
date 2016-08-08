@@ -167,11 +167,11 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// That said, don't allow mirror pods to reference ServiceAccounts or SecretVolumeSources either
 	if _, isMirrorPod := pod.Annotations[kubelet.ConfigMirrorAnnotationKey]; isMirrorPod {
 		if len(pod.Spec.ServiceAccountName) != 0 {
-			return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference service accounts"))
+			return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference service accounts"))
 		}
 		for _, volume := range pod.Spec.Volumes {
 			if volume.VolumeSource.Secret != nil {
-				return admission.NewForbidden(a, fmt.Errorf("A mirror pod may not reference secrets"))
+				return admission.NewForbidden(a, fmt.Errorf("a mirror pod may not reference secrets"))
 			}
 		}
 		return nil
@@ -185,7 +185,7 @@ func (s *serviceAccount) Admit(a admission.Attributes) (err error) {
 	// Ensure the referenced service account exists
 	serviceAccount, err := s.getServiceAccount(a.GetNamespace(), pod.Spec.ServiceAccountName)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
+		return admission.NewForbidden(a, fmt.Errorf("error looking up service account %s/%s: %v", a.GetNamespace(), pod.Spec.ServiceAccountName, err))
 	}
 	if serviceAccount == nil {
 		// TODO: convert to a ServerTimeout error (or other error that sends a Retry-After header)
@@ -324,7 +324,7 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 		}
 		secretName := source.Secret.SecretName
 		if !mountableSecrets.Has(secretName) {
-			return fmt.Errorf("Volume with secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", secretName, serviceAccount.Name)
+			return fmt.Errorf("volume with secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", secretName, serviceAccount.Name)
 		}
 	}
 
@@ -332,7 +332,7 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 		for _, env := range container.Env {
 			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("Init container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+					return fmt.Errorf("init container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
 				}
 			}
 		}
@@ -342,7 +342,7 @@ func (s *serviceAccount) limitSecretReferences(serviceAccount *api.ServiceAccoun
 		for _, env := range container.Env {
 			if env.ValueFrom != nil && env.ValueFrom.SecretKeyRef != nil {
 				if !mountableSecrets.Has(env.ValueFrom.SecretKeyRef.Name) {
-					return fmt.Errorf("Container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
+					return fmt.Errorf("container %s with envVar %s referencing secret.secretName=\"%s\" is not allowed because service account %s does not reference that secret", container.Name, env.Name, env.ValueFrom.SecretKeyRef.Name, serviceAccount.Name)
 				}
 			}
 		}
