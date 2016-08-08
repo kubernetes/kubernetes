@@ -175,6 +175,8 @@ type FsStats struct {
 	UsedBytes *uint64 `json:"usedBytes,omitempty"`
 	// InodesFree represents the free inodes in the filesystem.
 	InodesFree *uint64 `json:"inodesFree,omitempty"`
+	// Inodes represents the total inodes in the filesystem.
+	Inodes *uint64 `json:"inodes,omitempty"`
 }
 
 // UserDefinedMetricType defines how the metric should be interpreted by the user.
