@@ -203,7 +203,11 @@ func (r *ResourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	result := make(map[float64]float64, len(percentiles))
-	usages := r.buffers[containerName]
+	usages := make([]*framework.ContainerResourceUsage, len(r.buffers[containerName]))
+	// must make a copy of array, otherwise the timeseries order is changed
+	for i, usage := range r.buffers[containerName] {
+		usages[i] = usage
+	}
 	sort.Sort(resourceUsageByCPU(usages))
 	for _, q := range percentiles {
 		index := int(float64(len(usages))*q) - 1
