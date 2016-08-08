@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
@@ -150,6 +151,9 @@ func checkErr(prefix string, err error, handleErr func(string, int)) {
 			}
 		case utilerrors.Aggregate:
 			handleErr(MultipleErrors(prefix, err.Errors()), DefaultErrorExitCode)
+		case utilexec.ExitError:
+			// do not print anything, only terminate with given error
+			handleErr("", err.ExitStatus())
 		default: // for any other error type
 			msg, ok := StandardErrorMessage(err)
 			if !ok {
