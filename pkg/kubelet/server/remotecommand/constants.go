@@ -36,6 +36,11 @@ const (
 	// attachment/execution. It is the third version of the subprotocol and
 	// adds support for resizing container terminals.
 	StreamProtocolV3Name = "v3.channel.k8s.io"
+
+	// The SPDY subprotocol "v4.channel.k8s.io" is used for remote command
+	// attachment/execution. It is the 4th version of the subprotocol and
+	// adds support for exit codes.
+	StreamProtocolV4Name = "v4.channel.k8s.io"
 )
 
-var SupportedStreamingProtocols = []string{StreamProtocolV3Name, StreamProtocolV2Name, StreamProtocolV1Name}
+var SupportedStreamingProtocols = []string{StreamProtocolV4Name, StreamProtocolV3Name, StreamProtocolV2Name, StreamProtocolV1Name}

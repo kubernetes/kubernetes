@@ -88,7 +88,7 @@ type context struct {
 	stdinStream  io.ReadCloser
 	stdoutStream io.WriteCloser
 	stderrStream io.WriteCloser
-	errorStream  io.WriteCloser
+	writeError   func(message string, rc *int) error
 	resizeStream io.ReadCloser
 	resizeChan   chan term.Size
 	tty          bool
@@ -168,6 +168,8 @@ func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *opt
 
 	var handler protocolHandler
 	switch protocol {
+	case StreamProtocolV4Name:
+		handler = &v4ProtocolHandler{}
 	case StreamProtocolV3Name:
 		handler = &v3ProtocolHandler{}
 	case StreamProtocolV2Name:
@@ -206,6 +208,58 @@ type protocolHandler interface {
 	supportsTerminalResizing() bool
 }
 
+// v4ProtocolHandler implements the V4 protocol version for streaming command execution. It only differs
+// in from v3 in the error stream format using an ExitError with the process' exit code.
+type v4ProtocolHandler struct{}
+
+func (*v4ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*context, error) {
+	ctx := &context{}
+	receivedStreams := 0
+	replyChan := make(chan struct{})
+	stop := make(chan struct{})
+	defer close(stop)
+WaitForStreams:
+	for {
+		select {
+		case stream := <-streams:
+			streamType := stream.Headers().Get(api.StreamType)
+			switch streamType {
+			case api.StreamTypeError:
+				ctx.writeError = v4WriteErrorFunc(stream) // write json errors
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			case api.StreamTypeStdin:
+				ctx.stdinStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			case api.StreamTypeStdout:
+				ctx.stdoutStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			case api.StreamTypeStderr:
+				ctx.stderrStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			case api.StreamTypeResize:
+				ctx.resizeStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			default:
+				runtime.HandleError(fmt.Errorf("Unexpected stream type: %q", streamType))
+			}
+		case <-replyChan:
+			receivedStreams++
+			if receivedStreams == expectedStreams {
+				break WaitForStreams
+			}
+		case <-expired:
+			// TODO find a way to return the error to the user. Maybe use a separate
+			// stream to report errors?
+			return nil, errors.New("timed out waiting for client to create streams")
+		}
+	}
+
+	return ctx, nil
+}
+
+// supportsTerminalResizing returns true because v4ProtocolHandler supports it
+func (*v4ProtocolHandler) supportsTerminalResizing() bool { return true }
+
 // v3ProtocolHandler implements the V3 protocol version for streaming command execution.
 type v3ProtocolHandler struct{}
 
@@ -222,7 +276,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(api.StreamType)
 			switch streamType {
 			case api.StreamTypeError:
-				ctx.errorStream = stream
+				ctx.writeError = v1WriteErrorFunc(stream)
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			case api.StreamTypeStdin:
 				ctx.stdinStream = stream
@@ -273,7 +327,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(api.StreamType)
 			switch streamType {
 			case api.StreamTypeError:
-				ctx.errorStream = stream
+				ctx.writeError = v1WriteErrorFunc(stream)
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			case api.StreamTypeStdin:
 				ctx.stdinStream = stream
@@ -321,7 +375,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(api.StreamType)
 			switch streamType {
 			case api.StreamTypeError:
-				ctx.errorStream = stream
+				ctx.writeError = v1WriteErrorFunc(stream)
 
 				// This defer statement shouldn't be here, but due to previous refactoring, it ended up in
 				// here. This is what 1.0.x kubelets do, so we're retaining that behavior. This is fixed in
@@ -373,5 +427,36 @@ func handleResizeEvents(stream io.Reader, channel chan<- term.Size) {
 			break
 		}
 		channel <- size
+	}
+}
+
+func v1WriteErrorFunc(stream io.WriteCloser) func(msg string, rc *int) error {
+	return func(msg string, rc *int) error {
+		_, err := stream.Write([]byte(msg))
+		return err
+	}
+}
+
+// V4ExitErrorMessage objects are marshaled as json in the error channel.
+type V4ExitErrorMessage struct {
+	// Message is the actual human readable text error message.
+	Message string `json:"message"`
+
+	// ExitCode is the process exit code.
+	ExitCode *int `json:"exitcode,omitempty"`
+}
+
+func v4WriteErrorFunc(stream io.WriteCloser) func(msg string, rc *int) error {
+	return func(msg string, rc *int) error {
+		m := V4ExitErrorMessage{
+			Message:  msg,
+			ExitCode: rc,
+		}
+		bs, err := json.Marshal(&m)
+		if err != nil {
+			return err
+		}
+		_, err = stream.Write(bs)
+		return err
 	}
 }
