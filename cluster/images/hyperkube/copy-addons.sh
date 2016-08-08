@@ -20,9 +20,13 @@
 # This way we're using the latest manifests from hyperkube without updating
 # kube-addon-manager which is used for other deployments too
 
+# Inside /etc/kubernetes/addons, there are two directories: singlenode and multinode
+# If "singlenode" is passed to this script; those manifests are copied to the addon-manager and vice versa with "multinode"
+SUBDIRECTORY=$1
+
 # While there is no data copied over to the emptyDir, try to copy it.
-while [[ ! -d /srv/kubernetes/addons ]]; do
-	cp -r /etc/kubernetes/* /srv/kubernetes/
+while [[ -z $(ls /srv/kubernetes/addons) ]]; do
+	cp -r /etc/kubernetes/addons/${SUBDIRECTORY}/* /srv/kubernetes/addons/
 done
 
 # Then sleep forever

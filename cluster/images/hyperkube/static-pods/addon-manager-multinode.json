@@ -21,7 +21,7 @@
         "volumeMounts": [
           {
             "name": "addons",
-            "mountPath": "/etc/kubernetes/",
+            "mountPath": "/etc/kubernetes/addons",
             "readOnly": true
           }
         ]
@@ -30,12 +30,13 @@
         "name": "kube-addon-manager-data",
         "image": "REGISTRY/hyperkube-ARCH:VERSION",
         "command": [
-          "/copy-addons.sh"
+          "/copy-addons.sh",
+          "multinode"
         ],
         "volumeMounts": [
           {
             "name": "addons",
-            "mountPath": "/srv/kubernetes/",
+            "mountPath": "/srv/kubernetes/addons",
             "readOnly": false
           }
         ]
