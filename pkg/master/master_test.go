@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/namespace"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
@@ -700,7 +701,8 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 			})
 
 			if test.items != nil {
-				err := createThirdPartyList(master.thirdPartyStorage,
+				err := createThirdPartyList(
+					generic.NewRawStorage(master.thirdPartyStorage),
 					fmt.Sprintf("/ThirdPartyResourceData/%s/%s/default", group, plural.Resource),
 					test.items)
 				if !assert.NoError(err, test.test) {

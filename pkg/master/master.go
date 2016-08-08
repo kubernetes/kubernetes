@@ -81,9 +81,9 @@ import (
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	thirdpartyresourcedataetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata/etcd"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 	etcdmetrics "k8s.io/kubernetes/pkg/storage/etcd/metrics"
 	etcdutil "k8s.io/kubernetes/pkg/storage/etcd/util"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -141,7 +141,7 @@ type Master struct {
 	serviceNodePortAllocator  service.RangeRegistry
 
 	// storage for third party objects
-	thirdPartyStorage storage.Interface
+	thirdPartyStorage *storagebackend.Config
 	// map from api path to a tuple of (storage for the objects, APIGroup)
 	thirdPartyResources map[string]thirdPartyEntry
 	// protects the map
@@ -275,7 +275,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	// TODO seems like this bit ought to be unconditional and the REST API is controlled by the config
 	if c.APIResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources")) {
 		var err error
-		m.thirdPartyStorage, err = c.StorageFactory.New(extensions.Resource("thirdpartyresources"))
+		m.thirdPartyStorage, err = c.StorageFactory.NewConfig(extensions.Resource("thirdpartyresources"))
 		if err != nil {
 			glog.Fatalf("Error getting third party storage: %v", err)
 		}
@@ -348,7 +348,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		return
 	}
 
-	serviceStorage, err := c.StorageFactory.New(api.Resource("services"))
+	serviceStorageConfig, err := c.StorageFactory.NewConfig(api.Resource("services"))
 	if err != nil {
 		glog.Fatal(err.Error())
 	}
@@ -356,7 +356,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	serviceClusterIPAllocator := ipallocator.NewAllocatorCIDRRange(serviceClusterIPRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd := etcdallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorage)
+		etcd := etcdallocator.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), serviceStorageConfig)
 		serviceClusterIPRegistry = etcd
 		return etcd
 	})
@@ -366,7 +366,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	serviceNodePortAllocator := portallocator.NewPortAllocatorCustom(m.ServiceNodePortRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
-		etcd := etcdallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), serviceStorage)
+		etcd := etcdallocator.NewEtcd(mem, "/ranges/servicenodeports", api.Resource("servicenodeportallocations"), serviceStorageConfig)
 		serviceNodePortRegistry = etcd
 		return etcd
 	})
@@ -690,7 +690,7 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 }
 
 func (m *Master) GetRESTOptionsOrDie(c *Config, resource unversioned.GroupResource) generic.RESTOptions {
-	storage, err := c.StorageFactory.New(resource)
+	storage, err := c.StorageFactory.NewConfig(resource)
 	if err != nil {
 		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
 	}
