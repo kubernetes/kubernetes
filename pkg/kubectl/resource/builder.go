@@ -86,7 +86,27 @@ type resourceTuple struct {
 // NewBuilder creates a builder that operates on generic objects.
 func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper, decoder runtime.Decoder) *Builder {
 	return &Builder{
-		mapper:        &Mapper{typer, mapper, clientMapper, decoder},
+		mapper: &Mapper{
+			ObjectTyper:  typer,
+			RESTMapper:   mapper,
+			ClientMapper: clientMapper,
+			Decoder:      decoder,
+			dynamic:      false,
+		},
+		requireObject: true,
+	}
+}
+
+// NewDynamicBuilder creates a builder that operates on generic objects.
+func NewDynamicBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper) *Builder {
+	return &Builder{
+		mapper: &Mapper{
+			ObjectTyper:  typer,
+			RESTMapper:   mapper,
+			ClientMapper: clientMapper,
+			Decoder:      runtime.UnstructuredJSONScheme,
+			dynamic:      true,
+		},
 		requireObject: true,
 	}
 }
@@ -546,7 +566,7 @@ func (b *Builder) visitorResult() *Result {
 			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 				selectorNamespace = ""
 			}
-			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))
+			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export, b.mapper.dynamic))
 		}
 		if b.continueOnError {
 			return &Result{visitor: EagerVisitorList(visitors), sources: visitors}
@@ -609,7 +629,7 @@ func (b *Builder) visitorResult() *Result {
 				}
 			}
 
-			info := NewInfo(client, mapping, selectorNamespace, tuple.Name, b.export)
+			info := NewInfo(client, mapping, selectorNamespace, tuple.Name, b.export, b.mapper.dynamic)
 			items = append(items, info)
 		}
 
@@ -658,7 +678,7 @@ func (b *Builder) visitorResult() *Result {
 
 		visitors := []Visitor{}
 		for _, name := range b.names {
-			info := NewInfo(client, mapping, selectorNamespace, name, b.export)
+			info := NewInfo(client, mapping, selectorNamespace, name, b.export, b.mapper.dynamic)
 			visitors = append(visitors, info)
 		}
 		return &Result{singular: isSingular, visitor: VisitorList(visitors), sources: visitors}

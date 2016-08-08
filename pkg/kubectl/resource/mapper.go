@@ -43,6 +43,8 @@ type Mapper struct {
 	meta.RESTMapper
 	ClientMapper
 	runtime.Decoder
+
+	dynamic bool
 }
 
 // InfoForData creates an Info object for the given data. An error is returned
@@ -54,19 +56,21 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	if err != nil {
 		return nil, fmt.Errorf("unable to decode %q: %v", source, err)
 	}
-	var obj runtime.Object
-	var versioned runtime.Object
-	if isThirdParty, gvkOut, err := thirdpartyresourcedata.IsThirdPartyObject(data, gvk); err != nil {
-		return nil, err
-	} else if isThirdParty {
-		obj, err = runtime.Decode(thirdpartyresourcedata.NewDecoder(nil, gvkOut.Kind), data)
-		versioned = obj
-		gvk = gvkOut
-	} else {
-		obj, versioned = versions.Last(), versions.First()
-	}
-	if err != nil {
-		return nil, fmt.Errorf("unable to decode %q: %v [%v]", source, err, gvk)
+
+	obj, versioned := versions.Last(), versions.First()
+	if !m.dynamic {
+		isThirdParty, gvkOut, err := thirdpartyresourcedata.IsThirdPartyObject(data, gvk)
+		if err != nil {
+			return nil, err
+		}
+		if isThirdParty {
+			obj, err = runtime.Decode(thirdpartyresourcedata.NewDecoder(nil, gvkOut.Kind), data)
+			versioned = obj
+			gvk = gvkOut
+			if err != nil {
+				return nil, fmt.Errorf("unable to decode %q: %v [%v]", source, err, gvk)
+			}
+		}
 	}
 	mapping, err := m.RESTMapping(gvk.GroupKind(), gvk.Version)
 	if err != nil {
@@ -91,6 +95,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 		VersionedObject: versioned,
 		Object:          obj,
 		ResourceVersion: resourceVersion,
+		Dynamic:         m.dynamic,
 	}, nil
 }
 
@@ -127,6 +132,7 @@ func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []unversioned.G
 
 		Object:          obj,
 		ResourceVersion: resourceVersion,
+		Dynamic:         m.dynamic,
 	}, nil
 }
 

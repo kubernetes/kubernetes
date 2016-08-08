@@ -18,6 +18,7 @@ package resource
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,9 +27,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/yaml"
@@ -88,16 +92,19 @@ type Info struct {
 	ResourceVersion string
 	// Optional, should this resource be exported, stripped of cluster-specific and instance specific fields
 	Export bool
+	// Optional, specifies that the objects are meant to be used with a dynamic client
+	Dynamic bool
 }
 
 // NewInfo returns a new info object
-func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string, export bool) *Info {
+func NewInfo(client RESTClient, mapping *meta.RESTMapping, namespace, name string, export bool, dynamic bool) *Info {
 	return &Info{
 		Client:    client,
 		Mapping:   mapping,
 		Namespace: namespace,
 		Name:      name,
 		Export:    export,
+		Dynamic:   dynamic,
 	}
 }
 
@@ -106,9 +113,44 @@ func (i *Info) Visit(fn VisitorFunc) error {
 	return fn(i, nil)
 }
 
+// DynamicClient attempts to make a dynamic client from the Info's RESTClient.
+func (i *Info) DynamicClient() (*dynamic.Client, error) {
+	rc, ok := i.Client.(*restclient.RESTClient)
+	if !ok {
+		return nil, errors.New("could not build dynamic client from RESTClient")
+	}
+
+	dc, err := dynamic.FromRESTClient(rc)
+	if err != nil {
+		return nil, err
+	}
+
+	return dc.ParameterCodec(dynamic.VersionedParameterEncoderWithV1Fallback), nil
+}
+
+// APIResource returns and APIResource for the Info object.
+func (i *Info) APIResource() *unversioned.APIResource {
+	return &unversioned.APIResource{
+		Name:       i.Mapping.Resource,
+		Namespaced: i.Namespaced(),
+		Kind:       i.Mapping.GroupVersionKind.Kind,
+	}
+}
+
 // Get retrieves the object from the Namespace and Name fields
 func (i *Info) Get() (err error) {
-	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
+	var obj runtime.Object
+	if i.Dynamic {
+		dc, err := i.DynamicClient()
+		if err != nil {
+			return err
+		}
+		// TODO how to put ?export=true for handling i.Export?
+		obj, err = dc.Resource(i.APIResource(), i.Namespace).Get(i.Name)
+	} else {
+		obj, err = NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -156,6 +198,17 @@ func (i *Info) Namespaced() bool {
 
 // Watch returns server changes to this object after it was retrieved.
 func (i *Info) Watch(resourceVersion string) (watch.Interface, error) {
+	if i.Dynamic {
+		dc, err := i.DynamicClient()
+		if err != nil {
+			return nil, err
+		}
+
+		return dc.Resource(i.APIResource(), i.Namespace).Watch(&api.ListOptions{
+			ResourceVersion: resourceVersion,
+			Watch:           true,
+		})
+	}
 	return NewHelper(i.Client, i.Mapping).WatchSingle(i.Namespace, i.Name, resourceVersion)
 }
 
@@ -618,13 +671,7 @@ func RetrieveLatest(info *Info, err error) error {
 	if info.Namespaced() && len(info.Namespace) == 0 {
 		return fmt.Errorf("no namespace set on resource %s %q", info.Mapping.Resource, info.Name)
 	}
-	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name, info.Export)
-	if err != nil {
-		return err
-	}
-	info.Object = obj
-	info.ResourceVersion, _ = info.Mapping.MetadataAccessor.ResourceVersion(obj)
-	return nil
+	return info.Get()
 }
 
 // RetrieveLazy updates the object if it has not been loaded yet.
