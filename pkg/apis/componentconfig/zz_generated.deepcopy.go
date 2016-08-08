@@ -266,6 +266,8 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.SystemCgroups = in.SystemCgroups
 		out.CgroupRoot = in.CgroupRoot
 		out.ContainerRuntime = in.ContainerRuntime
+		out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
+		out.RemoteImageEndpoint = in.RemoteImageEndpoint
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
