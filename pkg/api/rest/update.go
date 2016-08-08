@@ -41,7 +41,7 @@ type RESTUpdateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
-	PrepareForUpdate(obj, old runtime.Object)
+	PrepareForUpdate(ctx api.Context, obj, old runtime.Object)
 	// ValidateUpdate is invoked after default fields in the object have been
 	// filled in before the object is persisted.  This method should not mutate
 	// the object.
@@ -93,7 +93,7 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 	}
 	objectMeta.Generation = oldMeta.Generation
 
-	strategy.PrepareForUpdate(obj, old)
+	strategy.PrepareForUpdate(ctx, obj, old)
 
 	// Ensure some common fields, like UID, are validated for all resources.
 	errs, err := validateCommonFields(obj, old)

@@ -42,7 +42,7 @@ func (strategy) NamespaceScoped() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	cleanSecretReferences(obj.(*api.ServiceAccount))
 }
 
@@ -58,7 +58,7 @@ func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (strategy) PrepareForUpdate(obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	cleanSecretReferences(obj.(*api.ServiceAccount))
 }
 

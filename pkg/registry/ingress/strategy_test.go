@@ -78,7 +78,7 @@ func TestIngressStrategy(t *testing.T) {
 	}
 
 	ingress := newIngress()
-	Strategy.PrepareForCreate(&ingress)
+	Strategy.PrepareForCreate(ctx, &ingress)
 	if len(ingress.Status.LoadBalancer.Ingress) != 0 {
 		t.Error("Ingress should not allow setting status on create")
 	}
@@ -89,7 +89,7 @@ func TestIngressStrategy(t *testing.T) {
 	invalidIngress := newIngress()
 	invalidIngress.ResourceVersion = "4"
 	invalidIngress.Spec = extensions.IngressSpec{}
-	Strategy.PrepareForUpdate(&invalidIngress, &ingress)
+	Strategy.PrepareForUpdate(ctx, &invalidIngress, &ingress)
 	errs = Strategy.ValidateUpdate(ctx, &invalidIngress, &ingress)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
@@ -119,7 +119,7 @@ func TestIngressStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	StatusStrategy.PrepareForUpdate(&newIngress, &oldIngress)
+	StatusStrategy.PrepareForUpdate(ctx, &newIngress, &oldIngress)
 	if newIngress.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
 		t.Errorf("Ingress status updates should allow change of status fields")
 	}

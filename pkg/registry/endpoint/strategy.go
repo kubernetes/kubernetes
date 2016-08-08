@@ -45,11 +45,11 @@ func (endpointsStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (endpointsStrategy) PrepareForCreate(obj runtime.Object) {
+func (endpointsStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (endpointsStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (endpointsStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 // Validate validates a new endpoints.

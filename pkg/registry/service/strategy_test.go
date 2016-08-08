@@ -93,7 +93,7 @@ func TestExportService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := Strategy.Export(test.objIn, test.exact)
+		err := Strategy.Export(api.NewContext(), test.objIn, test.exact)
 		if err != nil {
 			if !test.expectErr {
 				t.Errorf("unexpected error: %v", err)
@@ -238,7 +238,7 @@ func TestServiceStatusStrategy(t *testing.T) {
 			},
 		},
 	}
-	StatusStrategy.PrepareForUpdate(&newService, &oldService)
+	StatusStrategy.PrepareForUpdate(ctx, &newService, &oldService)
 	if newService.Status.LoadBalancer.Ingress[0].IP != "127.0.0.2" {
 		t.Errorf("Service status updates should allow change of status fields")
 	}

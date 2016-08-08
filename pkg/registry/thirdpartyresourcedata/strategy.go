@@ -48,7 +48,7 @@ func (strategy) NamespaceScoped() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
@@ -63,7 +63,7 @@ func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (strategy) PrepareForUpdate(obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {

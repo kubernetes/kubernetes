@@ -54,7 +54,7 @@ func (csrStrategy) AllowCreateOnUpdate() bool {
 // information about the requesting user to be injected by the registry
 // interface. Clear everything else.
 // TODO: check these ordering assumptions. better way to inject user info?
-func (csrStrategy) PrepareForCreate(obj runtime.Object) {
+func (csrStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	csr := obj.(*certificates.CertificateSigningRequest)
 
 	// Be explicit that users cannot create pre-approved certificate requests.
@@ -64,7 +64,7 @@ func (csrStrategy) PrepareForCreate(obj runtime.Object) {
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users
 // on update. Certificate requests are immutable after creation except via subresources.
-func (csrStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (csrStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 
@@ -97,13 +97,13 @@ func (csrStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (s csrStrategy) Export(obj runtime.Object, exact bool) error {
+func (s csrStrategy) Export(ctx api.Context, obj runtime.Object, exact bool) error {
 	csr, ok := obj.(*certificates.CertificateSigningRequest)
 	if !ok {
 		// unexpected programmer error
 		return fmt.Errorf("unexpected object: %v", obj)
 	}
-	s.PrepareForCreate(obj)
+	s.PrepareForCreate(ctx, obj)
 	if exact {
 		return nil
 	}
@@ -119,7 +119,7 @@ type csrStatusStrategy struct {
 
 var StatusStrategy = csrStatusStrategy{Strategy}
 
-func (csrStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (csrStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 
@@ -145,7 +145,7 @@ type csrApprovalStrategy struct {
 
 var ApprovalStrategy = csrApprovalStrategy{Strategy}
 
-func (csrApprovalStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (csrApprovalStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newCSR := obj.(*certificates.CertificateSigningRequest)
 	oldCSR := old.(*certificates.CertificateSigningRequest)
 

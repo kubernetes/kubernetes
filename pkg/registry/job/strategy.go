@@ -46,13 +46,13 @@ func (jobStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a job before creation.
-func (jobStrategy) PrepareForCreate(obj runtime.Object) {
+func (jobStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	job := obj.(*batch.Job)
 	job.Status = batch.JobStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (jobStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (jobStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Status = oldJob.Status
@@ -144,7 +144,7 @@ type jobStatusStrategy struct {
 
 var StatusStrategy = jobStatusStrategy{Strategy}
 
-func (jobStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (jobStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.Job)
 	oldJob := old.(*batch.Job)
 	newJob.Spec = oldJob.Spec
