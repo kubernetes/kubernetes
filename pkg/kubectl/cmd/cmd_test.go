@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -274,6 +275,20 @@ func NewAPIFactory() (*cmdutil.Factory, *testFactory, runtime.Codec, runtime.Neg
 	f := &cmdutil.Factory{
 		Object: func(discovery bool) (meta.RESTMapper, runtime.ObjectTyper) {
 			return testapi.Default.RESTMapper(), api.Scheme
+		},
+		DynamicObject: func() (meta.RESTMapper, runtime.ObjectTyper) {
+			groupResources := testDynamicResources()
+			mapper := discovery.NewRESTMapper(groupResources,
+				func(unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+					return &meta.VersionInterfaces{
+						ObjectConvertor:  &runtime.UnstructuredObjectConverter{},
+						MetadataAccessor: meta.NewAccessor(),
+					}, nil
+				})
+
+			typer := cmdutil.NewDynamicObjectTyper(groupResources)
+
+			return kubectl.ShortcutExpander{RESTMapper: mapper}, typer
 		},
 		Client: func() (*client.Client, error) {
 			// Swap out the HTTP client out of the client with the fake's version.
