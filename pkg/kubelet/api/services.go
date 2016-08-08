@@ -43,17 +43,17 @@ type RuntimeService interface {
 	// CreateContainer creates a new container in specified PodSandbox.
 	CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error)
 	// StartContainer starts the container.
-	StartContainer(rawContainerID string) error
+	StartContainer(containerID string) error
 	// StopContainer stops a running container with a grace period (i.e., timeout).
-	StopContainer(rawContainerID string, timeout int64) error
+	StopContainer(containerID string, timeout int64) error
 	// RemoveContainer removes the container.
-	RemoveContainer(rawContainerID string) error
+	RemoveContainer(containerID string) error
 	// ListContainers lists all containers by filters.
 	ListContainers(filter *runtimeApi.ContainerFilter) ([]*runtimeApi.Container, error)
 	// ContainerStatus returns the status of the container.
-	ContainerStatus(rawContainerID string) (*runtimeApi.ContainerStatus, error)
+	ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error)
 	// Exec executes a command in the container.
-	Exec(rawContainerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error
+	Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error
 }
 
 // ImageManagerService interface should be implemented by a container image

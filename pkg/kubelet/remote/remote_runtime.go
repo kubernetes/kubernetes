@@ -165,15 +165,15 @@ func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runt
 }
 
 // StartContainer starts the container.
-func (r *RemoteRuntimeService) StartContainer(rawContainerID string) error {
+func (r *RemoteRuntimeService) StartContainer(containerID string) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
 	_, err := r.runtimeClient.StartContainer(ctx, &runtimeApi.StartContainerRequest{
-		ContainerId: &rawContainerID,
+		ContainerId: &containerID,
 	})
 	if err != nil {
-		glog.Errorf("StartContainer %q from runtime service failed: %v", rawContainerID, err)
+		glog.Errorf("StartContainer %q from runtime service failed: %v", containerID, err)
 		return err
 	}
 
@@ -181,16 +181,16 @@ func (r *RemoteRuntimeService) StartContainer(rawContainerID string) error {
 }
 
 // StopContainer stops a running container with a grace period (i.e., timeout).
-func (r *RemoteRuntimeService) StopContainer(rawContainerID string, timeout int64) error {
+func (r *RemoteRuntimeService) StopContainer(containerID string, timeout int64) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
 	_, err := r.runtimeClient.StopContainer(ctx, &runtimeApi.StopContainerRequest{
-		ContainerId: &rawContainerID,
+		ContainerId: &containerID,
 		Timeout:     &timeout,
 	})
 	if err != nil {
-		glog.Errorf("StopContainer %q from runtime service failed: %v", rawContainerID, err)
+		glog.Errorf("StopContainer %q from runtime service failed: %v", containerID, err)
 		return err
 	}
 
@@ -199,15 +199,15 @@ func (r *RemoteRuntimeService) StopContainer(rawContainerID string, timeout int6
 
 // RemoveContainer removes the container. If the container is running, the container
 // should be forced to removal.
-func (r *RemoteRuntimeService) RemoveContainer(rawContainerID string) error {
+func (r *RemoteRuntimeService) RemoveContainer(containerID string) error {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
 	_, err := r.runtimeClient.RemoveContainer(ctx, &runtimeApi.RemoveContainerRequest{
-		ContainerId: &rawContainerID,
+		ContainerId: &containerID,
 	})
 	if err != nil {
-		glog.Errorf("RemoveContainer %q from runtime service failed: %v", rawContainerID, err)
+		glog.Errorf("RemoveContainer %q from runtime service failed: %v", containerID, err)
 		return err
 	}
 
@@ -231,15 +231,15 @@ func (r *RemoteRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter
 }
 
 // ContainerStatus returns the container status.
-func (r *RemoteRuntimeService) ContainerStatus(rawContainerID string) (*runtimeApi.ContainerStatus, error) {
+func (r *RemoteRuntimeService) ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
 	resp, err := r.runtimeClient.ContainerStatus(ctx, &runtimeApi.ContainerStatusRequest{
-		ContainerId: &rawContainerID,
+		ContainerId: &containerID,
 	})
 	if err != nil {
-		glog.Errorf("ContainerStatus %q from runtime service failed: %v", rawContainerID, err)
+		glog.Errorf("ContainerStatus %q from runtime service failed: %v", containerID, err)
 		return nil, err
 	}
 
@@ -248,6 +248,6 @@ func (r *RemoteRuntimeService) ContainerStatus(rawContainerID string) (*runtimeA
 
 // Exec executes a command in the container.
 // TODO: support terminal resizing for exec, refer https://github.com/kubernetes/kubernetes/issues/29579.
-func (r *RemoteRuntimeService) Exec(rawContainerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
+func (r *RemoteRuntimeService) Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error {
 	return fmt.Errorf("Not implemented")
 }
