@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
 )
@@ -52,7 +53,15 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 	err := executor.ExecInContainer(podName, uid, container, cmd, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
 	if err != nil {
 		msg := fmt.Sprintf("error executing command in container: %v", err)
+		var rc *int
+		if exitErr, ok := err.(utilexec.ExitError); ok {
+			msg = exitErr.Error()
+			if exitErr.Exited() {
+				c := exitErr.ExitStatus()
+				rc = &c
+			}
+		}
 		runtime.HandleError(errors.New(msg))
-		fmt.Fprint(ctx.errorStream, msg)
+		ctx.writeError(msg, rc)
 	}
 }

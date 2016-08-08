@@ -2884,11 +2884,7 @@ func (kl *Kubelet) RunInContainer(podFullName string, podUID types.UID, containe
 	var buffer bytes.Buffer
 	output := ioutils.WriteCloserWrapper(&buffer)
 	err = kl.runner.ExecInContainer(container.ID, cmd, nil, output, output, false, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return buffer.Bytes(), nil
+	return buffer.Bytes(), err
 }
 
 // ExecInContainer executes a command in a container, connecting the supplied

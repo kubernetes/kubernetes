@@ -49,6 +49,6 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 	if err != nil {
 		msg := fmt.Sprintf("error attaching to container: %v", err)
 		runtime.HandleError(errors.New(msg))
-		fmt.Fprint(ctx.errorStream, msg)
+		ctx.writeError(msg, nil)
 	}
 }
