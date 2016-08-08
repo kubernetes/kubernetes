@@ -32,6 +32,11 @@
               "apiserver",
               "--service-cluster-ip-range={{ cidr }}",
               "--insecure-bind-address=0.0.0.0",
+              {% if etcd_dir -%}
+              "--etcd-cafile={{ etcd_ca }}",
+              "--etcd-keyfile={{ etcd_key }}",
+              "--etcd-certfile={{ etcd_cert }}",
+              {%- endif %}
               "--etcd-servers={{ connection_string }}",
               "--admission-control=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota",
               "--client-ca-file=/srv/kubernetes/ca.crt",
@@ -47,7 +52,13 @@
         {
           "name": "data",
           "mountPath": "/srv/kubernetes"
+        },
+        {% if etcd_dir -%}
+        {
+          "name": "etcd-tls",
+          "mountPath": "{{ etcd_dir }}"
         }
+        {%- endif %}
       ]
     },
     {
@@ -81,7 +92,15 @@
           "path": "/srv/kubernetes"
       },
       "name": "data"
+    },
+    {% if etcd_dir -%}
+    {
+      "hostPath": {
+        "path": "{{ etcd_dir }}"
+      },
+      "name": "etcd-tls"
     }
+    {%- endif %}
   ]
  }
 }
