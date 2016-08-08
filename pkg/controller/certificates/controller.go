@@ -17,12 +17,9 @@ limitations under the License.
 package certificates
 
 import (
+	"strings"
 	"time"
 
-	"github.com/cloudflare/cfssl/config"
-	"github.com/cloudflare/cfssl/signer"
-	"github.com/cloudflare/cfssl/signer/local"
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -32,10 +29,16 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 	"k8s.io/kubernetes/pkg/watch"
+
+	"github.com/cloudflare/cfssl/config"
+	"github.com/cloudflare/cfssl/signer"
+	"github.com/cloudflare/cfssl/signer/local"
+	"github.com/golang/glog"
 )
 
 type CertificateController struct {
@@ -49,12 +52,14 @@ type CertificateController struct {
 	updateHandler func(csr *certificates.CertificateSigningRequest) error
 	syncHandler   func(csrKey string) error
 
+	approveAllKubeletCSRs bool
+
 	signer *local.Signer
 
 	queue *workqueue.Type
 }
 
-func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string) (*CertificateController, error) {
+func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approveAllKubeletCSRs bool) (*CertificateController, error) {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -71,9 +76,10 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 	}
 
 	cc := &CertificateController{
-		kubeClient: kubeClient,
-		queue:      workqueue.New(),
-		signer:     ca,
+		kubeClient:            kubeClient,
+		queue:                 workqueue.New(),
+		signer:                ca,
+		approveAllKubeletCSRs: approveAllKubeletCSRs,
 	}
 
 	// Manage the addition/update of certificate requests
@@ -180,6 +186,51 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 		return nil
 	}
 	csr := obj.(*certificates.CertificateSigningRequest)
+
+	func() {
+		if !cc.approveAllKubeletCSRs ||
+			IsCertificateRequestApproved(csr) ||
+			!IsCertificateRequestDenied(csr) {
+			return
+		}
+
+		isKubeletBootstrapGroup := false
+		for _, g := range csr.Spec.Groups {
+			if g == "system:kubelet-bootstrap" {
+				isKubeletBootstrapGroup = true
+				break
+			}
+		}
+		if !isKubeletBootstrapGroup {
+			return
+		}
+
+		x509cr, err := utilcertificates.ParseCertificateRequestObject(csr)
+		if err != nil {
+			glog.Errorf("unable to parse csr %q: %v", csr.ObjectMeta.Name, err)
+			return
+		}
+		if !strings.HasPrefix(x509cr.Subject.CommonName, "system:node:") {
+			return
+		}
+		isNodeGroup := false
+		for _, g := range x509cr.Subject.Organization {
+			if g == "system:node" {
+				isNodeGroup = true
+				break
+			}
+		}
+		if !isNodeGroup {
+			return
+		}
+
+		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
+			Type:    certificates.CertificateApproved,
+			Reason:  "AutoApproved",
+			Message: "Auto approving of all kubelet CSRs is enabled on the controller manager",
+		})
+		csr, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateApproval(csr)
+	}()
 
 	// At this point, the controller needs to:
 	// 1. Check the approval conditions
