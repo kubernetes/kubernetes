@@ -229,6 +229,7 @@ include-extended-apis
 included-types-overrides
 input-base
 input-dirs
+insecure-experimental-approve-all-kubelet-csrs-for-group
 insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
