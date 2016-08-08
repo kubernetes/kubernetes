@@ -18,6 +18,7 @@ package persistentvolume
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -215,7 +216,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 			}
 			// Mark the claim as Pending and try to find a match in the next
 			// periodic syncClaim
-			if _, err = ctrl.updateClaimPhase(claim, api.ClaimPending); err != nil {
+			if _, err = ctrl.updateClaimStatus(claim, api.ClaimPending, nil); err != nil {
 				return err
 			}
 			return nil
@@ -244,7 +245,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 			// OBSERVATION: pvc is "Pending"
 			// Retry later.
 			glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume %q requested and not found, will try again next time", claimToClaimKey(claim), claim.Spec.VolumeName)
-			if _, err = ctrl.updateClaimPhase(claim, api.ClaimPending); err != nil {
+			if _, err = ctrl.updateClaimStatus(claim, api.ClaimPending, nil); err != nil {
 				return err
 			}
 			return nil
@@ -282,7 +283,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 				if !hasAnnotation(claim.ObjectMeta, annBoundByController) {
 					glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: volume already bound to different claim by user, will retry later", claimToClaimKey(claim))
 					// User asked for a specific PV, retry later
-					if _, err = ctrl.updateClaimPhase(claim, api.ClaimPending); err != nil {
+					if _, err = ctrl.updateClaimStatus(claim, api.ClaimPending, nil); err != nil {
 						return err
 					}
 					return nil
@@ -306,7 +307,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 	// [Unit test set 3]
 	if claim.Spec.VolumeName == "" {
 		// Claim was bound before but not any more.
-		if _, err := ctrl.updateClaimPhaseWithEvent(claim, api.ClaimLost, api.EventTypeWarning, "ClaimLost", "Bound claim has lost reference to PersistentVolume. Data on the volume is lost!"); err != nil {
+		if _, err := ctrl.updateClaimStatusWithEvent(claim, api.ClaimLost, nil, api.EventTypeWarning, "ClaimLost", "Bound claim has lost reference to PersistentVolume. Data on the volume is lost!"); err != nil {
 			return err
 		}
 		return nil
@@ -317,7 +318,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 	}
 	if !found {
 		// Claim is bound to a non-existing volume.
-		if _, err = ctrl.updateClaimPhaseWithEvent(claim, api.ClaimLost, api.EventTypeWarning, "ClaimLost", "Bound claim has lost its PersistentVolume. Data on the volume is lost!"); err != nil {
+		if _, err = ctrl.updateClaimStatusWithEvent(claim, api.ClaimLost, nil, api.EventTypeWarning, "ClaimLost", "Bound claim has lost its PersistentVolume. Data on the volume is lost!"); err != nil {
 			return err
 		}
 		return nil
@@ -354,7 +355,7 @@ func (ctrl *PersistentVolumeController) syncBoundClaim(claim *api.PersistentVolu
 			// Claim is bound but volume has a different claimant.
 			// Set the claim phase to 'Lost', which is a terminal
 			// phase.
-			if _, err = ctrl.updateClaimPhaseWithEvent(claim, api.ClaimLost, api.EventTypeWarning, "ClaimMisbound", "Two claims are bound to the same volume, this one is bound incorrectly"); err != nil {
+			if _, err = ctrl.updateClaimStatusWithEvent(claim, api.ClaimLost, nil, api.EventTypeWarning, "ClaimMisbound", "Two claims are bound to the same volume, this one is bound incorrectly"); err != nil {
 				return err
 			}
 			return nil
@@ -517,14 +518,15 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *api.PersistentVolume)
 	}
 }
 
-// updateClaimPhase saves new claim phase to API server.
-func (ctrl *PersistentVolumeController) updateClaimPhase(claim *api.PersistentVolumeClaim, phase api.PersistentVolumeClaimPhase) (*api.PersistentVolumeClaim, error) {
-	glog.V(4).Infof("updating PersistentVolumeClaim[%s]: set phase %s", claimToClaimKey(claim), phase)
-	if claim.Status.Phase == phase {
-		// Nothing to do.
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s]: phase %s already set", claimToClaimKey(claim), phase)
-		return claim, nil
-	}
+// updateClaimStatus saves new claim.Status to API server.
+// Parameters:
+//  claim - claim to update
+//  phasephase - phase to set
+//  volume - volume which Capacity is set into claim.Status.Capacity
+func (ctrl *PersistentVolumeController) updateClaimStatus(claim *api.PersistentVolumeClaim, phase api.PersistentVolumeClaimPhase, volume *api.PersistentVolume) (*api.PersistentVolumeClaim, error) {
+	glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s", claimToClaimKey(claim), phase)
+
+	dirty := false
 
 	clone, err := conversion.NewCloner().DeepCopy(claim)
 	if err != nil {
@@ -535,33 +537,76 @@ func (ctrl *PersistentVolumeController) updateClaimPhase(claim *api.PersistentVo
 		return nil, fmt.Errorf("Unexpected claim cast error : %v", claimClone)
 	}
 
-	claimClone.Status.Phase = phase
+	if claim.Status.Phase != phase {
+		claimClone.Status.Phase = phase
+		dirty = true
+	}
+
+	if volume == nil {
+		// Need to reset AccessModes and Capacity
+		if claim.Status.AccessModes != nil {
+			claimClone.Status.AccessModes = nil
+			dirty = true
+		}
+		if claim.Status.Capacity != nil {
+			claimClone.Status.Capacity = nil
+			dirty = true
+		}
+	} else {
+		// Need to update AccessModes and Capacity
+		if !reflect.DeepEqual(claim.Status.AccessModes, volume.Spec.AccessModes) {
+			claimClone.Status.AccessModes = volume.Spec.AccessModes
+			dirty = true
+		}
+
+		volumeCap, ok := volume.Spec.Capacity[api.ResourceStorage]
+		if !ok {
+			return nil, fmt.Errorf("PersistentVolume %q is without a storage capacity", volume.Name)
+		}
+		claimCap, ok := claim.Status.Capacity[api.ResourceStorage]
+		if !ok || volumeCap.Cmp(claimCap) != 0 {
+			claimClone.Status.Capacity = volume.Spec.Capacity
+			dirty = true
+		}
+	}
+
+	if !dirty {
+		// Nothing to do.
+		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: phase %s already set", claimToClaimKey(claim), phase)
+		return claim, nil
+	}
+
 	newClaim, err := ctrl.kubeClient.Core().PersistentVolumeClaims(claimClone.Namespace).UpdateStatus(claimClone)
 	if err != nil {
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s]: set phase %s failed: %v", claimToClaimKey(claim), phase, err)
+		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: set phase %s failed: %v", claimToClaimKey(claim), phase, err)
 		return newClaim, err
 	}
 	_, err = ctrl.storeClaimUpdate(newClaim)
 	if err != nil {
-		glog.V(4).Infof("updating PersistentVolumeClaim[%s]: cannot update internal cache: %v", claimToClaimKey(claim), err)
+		glog.V(4).Infof("updating PersistentVolumeClaim[%s] status: cannot update internal cache: %v", claimToClaimKey(claim), err)
 		return newClaim, err
 	}
 	glog.V(2).Infof("claim %q entered phase %q", claimToClaimKey(claim), phase)
 	return newClaim, nil
 }
 
-// updateClaimPhaseWithEvent saves new claim phase to API server and emits given
-// event on the claim. It saves the phase and emits the event only when the
-// phase has actually changed from the version saved in API server.
-func (ctrl *PersistentVolumeController) updateClaimPhaseWithEvent(claim *api.PersistentVolumeClaim, phase api.PersistentVolumeClaimPhase, eventtype, reason, message string) (*api.PersistentVolumeClaim, error) {
-	glog.V(4).Infof("updating updateClaimPhaseWithEvent[%s]: set phase %s", claimToClaimKey(claim), phase)
+// updateClaimStatusWithEvent saves new claim.Status to API server and emits
+// given event on the claim. It saves the status and emits the event only when
+// the status has actually changed from the version saved in API server.
+// Parameters:
+//   claim - claim to update
+//   phasephase - phase to set
+//   volume - volume which Capacity is set into claim.Status.Capacity
+//   eventtype, reason, message - event to send, see EventRecorder.Event()
+func (ctrl *PersistentVolumeController) updateClaimStatusWithEvent(claim *api.PersistentVolumeClaim, phase api.PersistentVolumeClaimPhase, volume *api.PersistentVolume, eventtype, reason, message string) (*api.PersistentVolumeClaim, error) {
+	glog.V(4).Infof("updating updateClaimStatusWithEvent[%s]: set phase %s", claimToClaimKey(claim), phase)
 	if claim.Status.Phase == phase {
 		// Nothing to do.
-		glog.V(4).Infof("updating updateClaimPhaseWithEvent[%s]: phase %s already set", claimToClaimKey(claim), phase)
+		glog.V(4).Infof("updating updateClaimStatusWithEvent[%s]: phase %s already set", claimToClaimKey(claim), phase)
 		return claim, nil
 	}
 
-	newClaim, err := ctrl.updateClaimPhase(claim, phase)
+	newClaim, err := ctrl.updateClaimStatus(claim, phase, volume)
 	if err != nil {
 		return nil, err
 	}
@@ -791,7 +836,7 @@ func (ctrl *PersistentVolumeController) bind(volume *api.PersistentVolume, claim
 	}
 	claim = updatedClaim
 
-	if updatedClaim, err = ctrl.updateClaimPhase(claim, api.ClaimBound); err != nil {
+	if updatedClaim, err = ctrl.updateClaimStatus(claim, api.ClaimBound, volume); err != nil {
 		glog.V(3).Infof("error binding volume %q to claim %q: failed saving the claim status: %v", volume.Name, claimToClaimKey(claim), err)
 		return err
 	}
