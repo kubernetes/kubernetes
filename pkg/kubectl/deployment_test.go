@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,22 +21,63 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
-func TestNamespaceGenerate(t *testing.T) {
+func TestDeploymentGenerate(t *testing.T) {
 	tests := []struct {
 		params    map[string]interface{}
-		expected  *api.Namespace
+		expected  *extensions.Deployment
 		expectErr bool
-		index     int
 	}{
 		{
 			params: map[string]interface{}{
-				"name": "foo",
+				"name":  "foo",
+				"image": []string{"abc/app:v4"},
 			},
-			expected: &api.Namespace{
+			expected: &extensions.Deployment{
 				ObjectMeta: api.ObjectMeta{
-					Name: "foo",
+					Name:   "foo",
+					Labels: map[string]string{"app": "foo"},
+				},
+				Spec: extensions.DeploymentSpec{
+					Replicas: 1,
+					Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Template: api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"app": "foo"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{{Name: "app:v4", Image: "abc/app:v4"}},
+						},
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			params: map[string]interface{}{
+				"name":  "foo",
+				"image": []string{"abc/app:v4", "zyx/ape"},
+			},
+			expected: &extensions.Deployment{
+				ObjectMeta: api.ObjectMeta{
+					Name:   "foo",
+					Labels: map[string]string{"app": "foo"},
+				},
+				Spec: extensions.DeploymentSpec{
+					Replicas: 1,
+					Selector: &unversioned.LabelSelector{MatchLabels: map[string]string{"app": "foo"}},
+					Template: api.PodTemplateSpec{
+						ObjectMeta: api.ObjectMeta{
+							Labels: map[string]string{"app": "foo"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{{Name: "app:v4", Image: "abc/app:v4"},
+								{Name: "ape", Image: "zyx/ape"}},
+						},
+					},
 				},
 			},
 			expectErr: false,
@@ -59,7 +100,8 @@ func TestNamespaceGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name_wrong_key": "some_value",
+				"name":  "foo",
+				"image": []string{},
 			},
 			expectErr: true,
 		},
@@ -70,7 +112,7 @@ func TestNamespaceGenerate(t *testing.T) {
 			expectErr: true,
 		},
 	}
-	generator := NamespaceGeneratorV1{}
+	generator := DeploymentBasicGeneratorV1{}
 	for index, test := range tests {
 		obj, err := generator.Generate(test.params)
 		switch {
@@ -85,8 +127,8 @@ func TestNamespaceGenerate(t *testing.T) {
 		case !test.expectErr && err == nil:
 			// do nothing and drop through
 		}
-		if !reflect.DeepEqual(obj.(*api.Namespace), test.expected) {
-			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Namespace))
+		if !reflect.DeepEqual(obj.(*extensions.Deployment), test.expected) {
+			t.Errorf("%v\nexpected:\n%#v\nsaw:\n%#v", index, test.expected, obj.(*extensions.Deployment))
 		}
 	}
 }
