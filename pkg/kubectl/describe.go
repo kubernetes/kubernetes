@@ -719,9 +719,9 @@ func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
 		"    DiskName:\t%v\n"+
 		"    DiskURI:\t%v\n"+
 		"    FSType:\t%v\n"+
-		"    CachingMode:\t%v"+
+		"    CachingMode:\t%v\n"+
 		"    ReadOnly:\t%v\n",
-		d.DiskName, d.DataDiskURI, d.FSType, d.CachingMode, d.ReadOnly)
+		d.DiskName, d.DataDiskURI, *d.FSType, *d.CachingMode, *d.ReadOnly)
 }
 
 type PersistentVolumeDescriber struct {
