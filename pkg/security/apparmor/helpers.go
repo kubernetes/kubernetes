@@ -30,7 +30,7 @@ const (
 	// The profile specifying the runtime default.
 	ProfileRuntimeDefault = "runtime/default"
 	// The prefix for specifying profiles loaded on the node.
-	ProfileNamePrefix = "local/"
+	ProfileNamePrefix = "localhost/"
 )
 
 // Checks whether app armor is required for pod to be run.

@@ -62,10 +62,10 @@ func TestValidateProfile(t *testing.T) {
 		{"", true},
 		{"runtime/default", true},
 		{"baz", false}, // Missing local prefix.
-		{"local//usr/sbin/ntpd", true},
-		{"local/foo-bar", true},
-		{"local/unloaded", false}, // Not loaded.
-		{"local/", false},
+		{"localhost//usr/sbin/ntpd", true},
+		{"localhost/foo-bar", true},
+		{"localhost/unloaded", false}, // Not loaded.
+		{"localhost/", false},
 	}
 
 	for _, test := range tests {
@@ -90,7 +90,7 @@ func TestValidateBadHost(t *testing.T) {
 	}{
 		{"", true},
 		{"runtime/default", false},
-		{"local/docker-default", false},
+		{"localhost/docker-default", false},
 	}
 
 	for _, test := range tests {
@@ -114,12 +114,12 @@ func TestValidateValidHost(t *testing.T) {
 	}{
 		{"", true},
 		{"runtime/default", true},
-		{"local/docker-default", true},
-		{"local/foo-container", true},
-		{"local//usr/sbin/ntpd", true},
+		{"localhost/docker-default", true},
+		{"localhost/foo-container", true},
+		{"localhost//usr/sbin/ntpd", true},
 		{"docker-default", false},
-		{"local/foo", false},
-		{"local/", false},
+		{"localhost/foo", false},
+		{"localhost/", false},
 	}
 
 	for _, test := range tests {
