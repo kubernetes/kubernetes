@@ -402,8 +402,6 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps) error {
 	hostname := nodeutil.GetHostname(kubeCfg.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
-	// TODO(mtaufen): Was there actually any reason to check len(kcfg.NodeName) == 0?
-	//            --> Was anyone passing a kcfg.NodeName simultaneously with a non-nil kcfg.Cloud?
 	nodeName := hostname
 	if kubeDeps.Cloud != nil {
 		var err error
