@@ -49,12 +49,14 @@ type CertificateController struct {
 	updateHandler func(csr *certificates.CertificateSigningRequest) error
 	syncHandler   func(csrKey string) error
 
+	approveAllKubeletCSRs bool
+
 	signer *local.Signer
 
 	queue *workqueue.Type
 }
 
-func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string) (*CertificateController, error) {
+func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approveAllKubeletCSRs bool) (*CertificateController, error) {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -71,9 +73,10 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 	}
 
 	cc := &CertificateController{
-		kubeClient: kubeClient,
-		queue:      workqueue.New(),
-		signer:     ca,
+		kubeClient:            kubeClient,
+		queue:                 workqueue.New(),
+		signer:                ca,
+		approveAllKubeletCSRs: approveAllKubeletCSRs,
 	}
 
 	// Manage the addition/update of certificate requests
@@ -180,6 +183,32 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 		return nil
 	}
 	csr := obj.(*certificates.CertificateSigningRequest)
+
+	func() {
+		if !cc.approveAllKubeletCSRs ||
+			IsCertificateRequestApproved(csr) ||
+			!IsCertificateRequestDenied(csr) {
+			return
+		}
+
+		isKubeletBootstrapGroup := false
+		for _, g := range csr.Spec.Groups {
+			if g == "system:kubelet-bootstrap" {
+				isKubeletBootstrapGroup = true
+			}
+		}
+
+		if !isKubeletBootstrapGroup {
+			return
+		}
+
+		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
+			Type:    certificates.CertificateApproved,
+			Reason:  "AutoApproved",
+			Message: "Auto approving of all kubelet CSRs is enabled on the controller manager",
+		})
+		csr, err = cc.kubeClient.Certificates().CertificateSigningRequests().UpdateApproval(csr)
+	}()
 
 	// At this point, the controller needs to:
 	// 1. Check the approval conditions
