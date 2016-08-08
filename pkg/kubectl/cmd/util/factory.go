@@ -165,6 +165,7 @@ const (
 	HorizontalPodAutoscalerV1Beta1GeneratorName = "horizontalpodautoscaler/v1beta1"
 	HorizontalPodAutoscalerV1GeneratorName      = "horizontalpodautoscaler/v1"
 	DeploymentV1Beta1GeneratorName              = "deployment/v1beta1"
+	DeploymentBasicV1Beta1GeneratorName         = "deployment-basic/v1beta1"
 	JobV1Beta1GeneratorName                     = "job/v1beta1"
 	JobV1GeneratorName                          = "job/v1"
 	ScheduledJobV2Alpha1GeneratorName           = "scheduledjob/v2alpha1"
@@ -191,6 +192,9 @@ func DefaultGenerators(cmdName string) map[string]kubectl.Generator {
 	}
 	generators["service-loadbalancer"] = map[string]kubectl.Generator{
 		ServiceLoadBalancerGeneratorV1Name: kubectl.ServiceLoadBalancerGeneratorV1{},
+	}
+	generators["deployment"] = map[string]kubectl.Generator{
+		DeploymentBasicV1Beta1GeneratorName: kubectl.DeploymentBasicGeneratorV1{},
 	}
 	generators["run"] = map[string]kubectl.Generator{
 		RunV1GeneratorName:                kubectl.BasicReplicationController{},
