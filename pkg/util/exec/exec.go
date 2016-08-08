@@ -140,3 +140,28 @@ func (eew ExitErrorWrapper) ExitStatus() int {
 	}
 	return ws.ExitStatus()
 }
+
+// CodeExitError is an implementation of ExitError consisting of an error object
+// and an exit code (the upper bits of os.exec.ExitStatus).
+type CodeExitError struct {
+	Err  error
+	Code int
+}
+
+var _ ExitError = CodeExitError{}
+
+func (e CodeExitError) Error() string {
+	return e.Err.Error()
+}
+
+func (e CodeExitError) String() string {
+	return e.Err.Error()
+}
+
+func (e CodeExitError) Exited() bool {
+	return true
+}
+
+func (e CodeExitError) ExitStatus() int {
+	return e.Code
+}

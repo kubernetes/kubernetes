@@ -236,9 +236,12 @@ func TestVersionedConn(t *testing.T) {
 				}
 			}
 			conn := NewConn(supportedProtocols)
-			var selectedProtocol string
+			// note that it's not enough to wait for conn.ready to avoid a race here. Hence,
+			// we use a channel.
+			selectedProtocol := make(chan string, 0)
 			s, addr := newServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-				selectedProtocol, _, _ = conn.Open(w, req)
+				p, _, _ := conn.Open(w, req)
+				selectedProtocol <- p
 			}))
 			defer s.Close()
 
@@ -261,7 +264,7 @@ func TestVersionedConn(t *testing.T) {
 			}
 
 			<-conn.ready
-			if got, expected := selectedProtocol, test.expected; got != expected {
+			if got, expected := <-selectedProtocol, test.expected; got != expected {
 				t.Fatalf("test %d: unexpected protocol version: got=%s expected=%s", i, got, expected)
 			}
 		}()

@@ -265,6 +265,16 @@ func TestCheckNoResourceMatchError(t *testing.T) {
 	})
 }
 
+func TestCheckExitError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			uexec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
+			"",
+			42,
+		},
+	})
+}
+
 func testCheckError(t *testing.T, tests []checkErrTestCase) {
 	var errReturned string
 	var codeReturned int
