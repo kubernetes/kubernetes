@@ -64,7 +64,7 @@ func TestExecutorNoArgs(t *testing.T) {
 func TestExecutorWithArgs(t *testing.T) {
 	ex := New()
 
-	cmd := ex.Command("/bin/echo", "stdout")
+	cmd := ex.Command("echo", "stdout")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Errorf("expected success, got %+v", err)
