@@ -273,6 +273,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		{
 			Message: "Cluster Management Commands:",
 			Commands: []*cobra.Command{
+				NewCmdCertificate(f, out),
 				NewCmdClusterInfo(f, out),
 				NewCmdTop(f, out),
 				NewCmdCordon(f, out),

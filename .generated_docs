@@ -6,6 +6,10 @@ docs/admin/kube-controller-manager.md
 docs/admin/kube-proxy.md
 docs/admin/kube-scheduler.md
 docs/admin/kubelet.md
+docs/man/man1/kubectl-alpha-certificate-approve.1
+docs/man/man1/kubectl-alpha-certificate-deny.1
+docs/man/man1/kubectl-alpha-certificate.1
+docs/man/man1/kubectl-alpha.1
 docs/man/man1/kubectl-annotate.1
 docs/man/man1/kubectl-api-versions.1
 docs/man/man1/kubectl-apply.1
@@ -79,6 +83,10 @@ docs/man/man1/kubectl-uncordon.1
 docs/man/man1/kubectl-version.1
 docs/man/man1/kubectl.1
 docs/user-guide/kubectl/kubectl.md
+docs/user-guide/kubectl/kubectl_alpha.md
+docs/user-guide/kubectl/kubectl_alpha_certificate.md
+docs/user-guide/kubectl/kubectl_alpha_certificate_approve.md
+docs/user-guide/kubectl/kubectl_alpha_certificate_deny.md
 docs/user-guide/kubectl/kubectl_annotate.md
 docs/user-guide/kubectl/kubectl_api-versions.md
 docs/user-guide/kubectl/kubectl_apply.md
@@ -150,6 +158,7 @@ docs/user-guide/kubectl/kubectl_top_pod.md
 docs/user-guide/kubectl/kubectl_uncordon.md
 docs/user-guide/kubectl/kubectl_version.md
 docs/yaml/kubectl/kubectl.yaml
+docs/yaml/kubectl/kubectl_alpha.yaml
 docs/yaml/kubectl/kubectl_annotate.yaml
 docs/yaml/kubectl/kubectl_api-versions.yaml
 docs/yaml/kubectl/kubectl_apply.yaml
