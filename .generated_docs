@@ -27,6 +27,7 @@ docs/man/man1/kubectl-config.1
 docs/man/man1/kubectl-convert.1
 docs/man/man1/kubectl-cordon.1
 docs/man/man1/kubectl-create-configmap.1
+docs/man/man1/kubectl-create-deployment.1
 docs/man/man1/kubectl-create-namespace.1
 docs/man/man1/kubectl-create-quota.1
 docs/man/man1/kubectl-create-secret-docker-registry.1
@@ -93,6 +94,7 @@ docs/user-guide/kubectl/kubectl_convert.md
 docs/user-guide/kubectl/kubectl_cordon.md
 docs/user-guide/kubectl/kubectl_create.md
 docs/user-guide/kubectl/kubectl_create_configmap.md
+docs/user-guide/kubectl/kubectl_create_deployment.md
 docs/user-guide/kubectl/kubectl_create_namespace.md
 docs/user-guide/kubectl/kubectl_create_quota.md
 docs/user-guide/kubectl/kubectl_create_secret.md
