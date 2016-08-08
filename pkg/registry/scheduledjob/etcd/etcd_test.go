@@ -45,7 +45,7 @@ func validNewScheduledJob() *batch.ScheduledJob {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "* * * * * ?",
+			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
@@ -92,7 +92,7 @@ func TestUpdate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
 	test := registrytest.New(t, storage.Store)
-	schedule := "1 1 1 1 1 ?"
+	schedule := "1 1 1 1 ?"
 	test.TestUpdate(
 		// valid
 		validNewScheduledJob(),

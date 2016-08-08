@@ -44,7 +44,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 			SelfLink:  "/apis/extensions/v1beta1/namespaces/snazzycats/jobs/myscheduledjob",
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "0 0 * * * * ?",
+			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				ObjectMeta: api.ObjectMeta{

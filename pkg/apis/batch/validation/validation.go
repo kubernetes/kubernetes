@@ -205,9 +205,18 @@ func validateConcurrencyPolicy(concurrencyPolicy *batch.ConcurrencyPolicy, fldPa
 
 func validateScheduleFormat(schedule string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	_, err := cron.Parse(schedule)
+	tmpSchedule := schedule
+	if len(schedule) > 0 && schedule[0] != '@' {
+		tmpSchedule = "0 " + schedule
+	}
+	obj, err := cron.Parse(tmpSchedule)
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, schedule, err.Error()))
+	}
+	if ssObj, ok := obj.(*cron.SpecSchedule); ok {
+		if ssObj.Second != 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath, schedule, "seconds must be always 0"))
+		}
 	}
 
 	return allErrs
