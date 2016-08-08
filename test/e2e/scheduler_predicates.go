@@ -26,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/system"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -198,17 +197,10 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		c = f.Client
 		ns = f.Namespace.Name
 		nodeList = &api.NodeList{}
-		nodes, err := c.Nodes().List(api.ListOptions{})
-		masterNodes = sets.NewString()
-		for _, node := range nodes.Items {
-			if system.IsMasterNode(&node) {
-				masterNodes.Insert(node.Name)
-			} else {
-				nodeList.Items = append(nodeList.Items, node)
-			}
-		}
 
-		err = framework.CheckTestingNSDeletedExcept(c, ns)
+		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(c)
+
+		err := framework.CheckTestingNSDeletedExcept(c, ns)
 		framework.ExpectNoError(err)
 
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
