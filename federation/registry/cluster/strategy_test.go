@@ -79,7 +79,7 @@ func TestClusterStrategy(t *testing.T) {
 	}
 
 	cluster := validNewCluster()
-	Strategy.PrepareForCreate(cluster)
+	Strategy.PrepareForCreate(ctx, cluster)
 	if len(cluster.Status.Conditions) != 0 {
 		t.Errorf("Cluster should not allow setting conditions on create")
 	}
@@ -89,7 +89,7 @@ func TestClusterStrategy(t *testing.T) {
 	}
 
 	invalidCluster := invalidNewCluster()
-	Strategy.PrepareForUpdate(invalidCluster, cluster)
+	Strategy.PrepareForUpdate(ctx, invalidCluster, cluster)
 	if reflect.DeepEqual(invalidCluster.Spec, cluster.Spec) ||
 		!reflect.DeepEqual(invalidCluster.Status, cluster.Status) {
 		t.Error("Only spec is expected being changed")
@@ -114,7 +114,7 @@ func TestClusterStatusStrategy(t *testing.T) {
 
 	cluster := validNewCluster()
 	invalidCluster := invalidNewCluster()
-	StatusStrategy.PrepareForUpdate(cluster, invalidCluster)
+	StatusStrategy.PrepareForUpdate(ctx, cluster, invalidCluster)
 	if !reflect.DeepEqual(invalidCluster.Spec, cluster.Spec) ||
 		reflect.DeepEqual(invalidCluster.Status, cluster.Status) {
 		t.Logf("== cluster.Spec: %v\n", cluster.Spec)

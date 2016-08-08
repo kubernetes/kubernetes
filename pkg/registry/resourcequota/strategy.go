@@ -44,13 +44,13 @@ func (resourcequotaStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (resourcequotaStrategy) PrepareForCreate(obj runtime.Object) {
+func (resourcequotaStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	resourcequota := obj.(*api.ResourceQuota)
 	resourcequota.Status = api.ResourceQuotaStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (resourcequotaStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (resourcequotaStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newResourcequota := obj.(*api.ResourceQuota)
 	oldResourcequota := old.(*api.ResourceQuota)
 	newResourcequota.Status = oldResourcequota.Status
@@ -87,7 +87,7 @@ type resourcequotaStatusStrategy struct {
 
 var StatusStrategy = resourcequotaStatusStrategy{Strategy}
 
-func (resourcequotaStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (resourcequotaStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newResourcequota := obj.(*api.ResourceQuota)
 	oldResourcequota := old.(*api.ResourceQuota)
 	newResourcequota.Spec = oldResourcequota.Spec

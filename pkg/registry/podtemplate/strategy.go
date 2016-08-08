@@ -44,7 +44,7 @@ func (podTemplateStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podTemplateStrategy) PrepareForCreate(obj runtime.Object) {
+func (podTemplateStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	_ = obj.(*api.PodTemplate)
 }
 
@@ -64,7 +64,7 @@ func (podTemplateStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podTemplateStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (podTemplateStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	_ = obj.(*api.PodTemplate)
 }
 
@@ -77,7 +77,7 @@ func (podTemplateStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (podTemplateStrategy) Export(obj runtime.Object, exact bool) error {
+func (podTemplateStrategy) Export(ctx api.Context, obj runtime.Object, exact bool) error {
 	// Do nothing
 	return nil
 }

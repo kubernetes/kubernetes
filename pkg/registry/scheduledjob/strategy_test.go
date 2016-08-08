@@ -64,7 +64,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(scheduledJob)
+	Strategy.PrepareForCreate(ctx, scheduledJob)
 	if len(scheduledJob.Status.Active) != 0 {
 		t.Errorf("ScheduledJob does not allow setting status on create")
 	}
@@ -84,7 +84,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 	}
 
 	// ensure we do not change status
-	Strategy.PrepareForUpdate(updatedScheduledJob, scheduledJob)
+	Strategy.PrepareForUpdate(ctx, updatedScheduledJob, scheduledJob)
 	if updatedScheduledJob.Status.Active != nil {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
 	}
@@ -147,7 +147,7 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 		},
 	}
 
-	StatusStrategy.PrepareForUpdate(newScheduledJob, oldScheduledJob)
+	StatusStrategy.PrepareForUpdate(ctx, newScheduledJob, oldScheduledJob)
 	if newScheduledJob.Status.LastScheduleTime == nil {
 		t.Errorf("ScheduledJob status updates must allow changes to scheduledJob status")
 	}

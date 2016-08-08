@@ -55,7 +55,7 @@ func TestPetSetStrategy(t *testing.T) {
 		Status: apps.PetSetStatus{Replicas: 3},
 	}
 
-	Strategy.PrepareForCreate(ps)
+	Strategy.PrepareForCreate(ctx, ps)
 	if ps.Status.Replicas != 0 {
 		t.Error("PetSet should not allow setting status.pets on create")
 	}
@@ -73,14 +73,14 @@ func TestPetSetStrategy(t *testing.T) {
 		},
 		Status: apps.PetSetStatus{Replicas: 4},
 	}
-	Strategy.PrepareForUpdate(validPs, ps)
+	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) != 0 {
 		t.Errorf("Updating spec.Replicas is allowed on a petset.")
 	}
 
 	validPs.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "bar"}}
-	Strategy.PrepareForUpdate(validPs, ps)
+	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error since updates are disallowed on petsets.")
@@ -130,7 +130,7 @@ func TestPetSetStatusStrategy(t *testing.T) {
 			Replicas: 2,
 		},
 	}
-	StatusStrategy.PrepareForUpdate(newPS, oldPS)
+	StatusStrategy.PrepareForUpdate(ctx, newPS, oldPS)
 	if newPS.Status.Replicas != 2 {
 		t.Errorf("PetSet status updates should allow change of pets: %v", newPS.Status.Replicas)
 	}

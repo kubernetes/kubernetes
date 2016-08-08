@@ -875,11 +875,11 @@ func (e *Store) Export(ctx api.Context, name string, opts unversioned.ExportOpti
 	}
 
 	if e.ExportStrategy != nil {
-		if err = e.ExportStrategy.Export(obj, opts.Exact); err != nil {
+		if err = e.ExportStrategy.Export(ctx, obj, opts.Exact); err != nil {
 			return nil, err
 		}
 	} else {
-		e.CreateStrategy.PrepareForCreate(obj)
+		e.CreateStrategy.PrepareForCreate(ctx, obj)
 	}
 	return obj, nil
 }

@@ -42,10 +42,10 @@ func (eventStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (eventStrategy) PrepareForCreate(obj runtime.Object) {
+func (eventStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
-func (eventStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (eventStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {

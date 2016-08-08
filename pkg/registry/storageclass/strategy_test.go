@@ -42,7 +42,7 @@ func TestStorageClassStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(storageClass)
+	Strategy.PrepareForCreate(ctx, storageClass)
 
 	errs := Strategy.Validate(ctx, storageClass)
 	if len(errs) != 0 {
@@ -60,7 +60,7 @@ func TestStorageClassStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForUpdate(newStorageClass, storageClass)
+	Strategy.PrepareForUpdate(ctx, newStorageClass, storageClass)
 
 	errs = Strategy.ValidateUpdate(ctx, newStorageClass, storageClass)
 	if len(errs) == 0 {

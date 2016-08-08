@@ -56,10 +56,10 @@ func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
-func (strategy) PrepareForUpdate(obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 func (strategy) Canonicalize(obj runtime.Object) {

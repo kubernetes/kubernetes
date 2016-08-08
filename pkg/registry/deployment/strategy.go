@@ -46,7 +46,7 @@ func (deploymentStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (deploymentStrategy) PrepareForCreate(obj runtime.Object) {
+func (deploymentStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	deployment := obj.(*extensions.Deployment)
 	deployment.Status = extensions.DeploymentStatus{}
 	deployment.Generation = 1
@@ -68,7 +68,7 @@ func (deploymentStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (deploymentStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (deploymentStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newDeployment := obj.(*extensions.Deployment)
 	oldDeployment := old.(*extensions.Deployment)
 	newDeployment.Status = oldDeployment.Status
@@ -98,7 +98,7 @@ type deploymentStatusStrategy struct {
 var StatusStrategy = deploymentStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (deploymentStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (deploymentStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newDeployment := obj.(*extensions.Deployment)
 	oldDeployment := old.(*extensions.Deployment)
 	newDeployment.Spec = oldDeployment.Spec
