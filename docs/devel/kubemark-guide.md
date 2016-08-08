@@ -61,9 +61,10 @@ resources from everything else.
 
 ## Requirements
 
-To run Kubemark you need a Kubernetes cluster for running all your HollowNodes
-and a dedicated machine for a master. Master machine has to be directly routable
-from HollowNodes. You also need an access to some Docker repository.
+To run Kubemark you need a Kubernetes cluster (called `external cluster`)
+for running all your HollowNodes and a dedicated machine for a master.
+Master machine has to be directly routable from HollowNodes. You also need an
+access to some Docker repository.
 
 Currently scripts are written to be easily usable by GCE, but it should be
 relatively straightforward to port them to different providers or bare metal.
@@ -81,10 +82,11 @@ port Kubemark to different providers.
 
 ### Starting a Kubemark cluster
 
-To start a Kubemark cluster on GCE you need to create an external cluster (it
-can be GCE, GKE or any other cluster) by yourself, build a kubernetes release
-(e.g. by running `make quick-release`) and run `test/kubemark/start-kubemark.sh`
-script. This script will create a VM for master components, Pods for HollowNodes
+To start a Kubemark cluster on GCE you need to create an external kubernetes
+cluster (it can be GCE, GKE or anything else) by yourself, make sure that kubeconfig
+points to it by default, build a kubernetes release (e.g. by running
+`make quick-release`) and run `test/kubemark/start-kubemark.sh` script.
+This script will create a VM for master components, Pods for HollowNodes
 and do all the setup necessary to let them talk to each other. It will use the
 configuration stored in `cluster/kubemark/config-default.sh` - you can tweak it
 however you want, but note that some features may not be implemented yet, as
