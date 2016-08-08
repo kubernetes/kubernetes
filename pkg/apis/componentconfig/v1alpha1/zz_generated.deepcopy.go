@@ -21,9 +21,10 @@ limitations under the License.
 package v1alpha1
 
 import (
+	reflect "reflect"
+
 	api "k8s.io/kubernetes/pkg/api"
 	conversion "k8s.io/kubernetes/pkg/conversion"
-	reflect "reflect"
 )
 
 func init() {
@@ -130,7 +131,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.TLSCertFile = in.TLSCertFile
 		out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 		out.CertDirectory = in.CertDirectory
-		out.BootstrapAuthToken = in.BootstrapAuthToken
 		out.HostnameOverride = in.HostnameOverride
 		out.PodInfraContainerImage = in.PodInfraContainerImage
 		out.DockerEndpoint = in.DockerEndpoint

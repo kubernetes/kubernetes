@@ -74,12 +74,10 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 		"If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key "+
 		"are generated for the public address and saved to the directory passed to --cert-dir.")
 	fs.StringVar(&s.TLSPrivateKeyFile, "tls-private-key-file", s.TLSPrivateKeyFile, "File containing x509 private key matching --tls-cert-file.")
-	fs.StringVar(&s.CertDirectory, "cert-dir", s.CertDirectory, "The directory where the TLS certs are located (by default /var/run/kubernetes). "+
-		"If --tls-cert-file and --tls-private-key-file are provided, this flag will be ignored.")
-	fs.StringVar(&s.BootstrapAuthToken, "bootstrap-auth-token", s.BootstrapAuthToken, ""+
-		"A string token that is used to get an issued certificate from API server. "+
+	fs.BoolVar(&s.RequestTLSCert, "request-tls-cert", s.RequestTLSCert, ""+
+		"A boolean that specifies whether kubelet should request the API server to get TLS cert, the authentication information is in the kubeconfig. "+
 		"If --tls-cert-file and --tls-private-key-file do not exist in the filesystem, neither can kubelet find certificate or keys in --tls-cert-dir, "+
-		"then it will generate a self-signed private key, and use this token to get a matched certificate from the API server. "+
+		"then kubelet will generate a self-signed private key, and get a matched certificate from the API server. "+
 		"The certificate and private key will be stored in --tls-cert-file and --tls-private-key-file respectively if --tls-cert-file or --tls-private-key-file are not empty, "+
 		"otherwise they will be stored in --cert-dir (default to /var/run/kubernetes).")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")

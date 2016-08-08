@@ -425,6 +425,9 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
 		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
+
+		// TODO(yifan): We should also make sure that certificate contains
+		// accurate Common name and SANs for the current hostname and IP.
 		if !crypto.FoundCertOrKey(s.TLSCertFile, s.TLSPrivateKeyFile) {
 			if err := createCertAndKey(s); err != nil {
 				return nil, err
@@ -451,8 +454,8 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 // If this fails or the token is empty, then self-generates cert and key pair.
 func createCertAndKey(s *options.KubeletServer) error {
 	var err error
-	if s.BootstrapAuthToken != "" {
-		if err = getCertFromAPIServer(s); err != nil {
+	if s.RequestTLSCert {
+		if err = requestCertFromAPIServer(s); err != nil {
 			// Clean up cert and key.
 			if err := os.Remove(s.TLSCertFile); err != nil {
 				glog.Warningf("Failed to clean up TLS cert file %q: %v", s.TLSCertFile, err)
@@ -474,20 +477,18 @@ func createCertAndKey(s *options.KubeletServer) error {
 	return fmt.Errorf("unable to generate self-signed cert: %v", err)
 }
 
-// getCertFromAPIServer will:
+// requestCertFromAPIServer will:
 // (1) Create a restful client for doing the certificate signing request.
 // (2) Generate key pair and certificate signing request.
 //     The private key is stored to disk.
 // (3) Send request to API server and watch for the issued certificate.
 // (4) Once (3) succeeds, dump the certificate to disk.
-func getCertFromAPIServer(s *options.KubeletServer) error {
+func requestCertFromAPIServer(s *options.KubeletServer) error {
 	// (1).
 	clientConfig, err := CreateAPIServerClientConfig(s)
 	if err != nil {
 		return fmt.Errorf("unable to create API server client config: %v", err)
 	}
-	// Embed our bootstrap auth token in each request.
-	clientConfig.BearerToken = s.BootstrapAuthToken
 
 	certificatesclient, err := unversionedcertificates.NewForConfig(clientConfig)
 	if err != nil {
