@@ -212,6 +212,8 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		ConfigureCBR0:                s.ConfigureCBR0,
 		ContainerManager:             nil,
 		ContainerRuntime:             s.ContainerRuntime,
+		RemoteRuntimeEndpoint:        s.RemoteRuntimeEndpoint,
+		RemoteImageEndpoint:          s.RemoteImageEndpoint,
 		RuntimeRequestTimeout:        s.RuntimeRequestTimeout.Duration,
 		CPUCFSQuota:                  s.CPUCFSQuota,
 		DiskSpacePolicy:              diskSpacePolicy,
@@ -797,6 +799,8 @@ type KubeletConfig struct {
 	ConfigureCBR0                  bool
 	ContainerManager               cm.ContainerManager
 	ContainerRuntime               string
+	RemoteRuntimeEndpoint          string
+	RemoteImageEndpoint            string
 	RuntimeRequestTimeout          time.Duration
 	CPUCFSQuota                    bool
 	DiskSpacePolicy                kubelet.DiskSpacePolicy
@@ -941,6 +945,8 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.CgroupsPerQOS,
 		kc.CgroupRoot,
 		kc.ContainerRuntime,
+		kc.RemoteRuntimeEndpoint,
+		kc.RemoteImageEndpoint,
 		kc.RuntimeRequestTimeout,
 		kc.RktPath,
 		kc.RktAPIEndpoint,
