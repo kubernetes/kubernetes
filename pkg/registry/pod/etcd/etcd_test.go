@@ -144,9 +144,9 @@ func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime
 
 func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
-	failDeleteStorage := FailDeletionStorage{etcdStorage, called}
-	restOptions := generic.RESTOptions{Storage: failDeleteStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
+	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 3}
 	storage := NewStorage(restOptions, nil, nil)
+	storage.Pod.Store.Storage = FailDeletionStorage{storage.Pod.Store.Storage, called}
 	return storage.Pod, server
 }
 

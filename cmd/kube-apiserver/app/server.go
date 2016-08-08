@@ -186,7 +186,7 @@ func Run(s *options.APIServer) error {
 	if s.ServiceAccountLookup {
 		// If we need to look up service accounts and tokens,
 		// go directly to etcd to avoid recursive auth insanity
-		storage, err := storageFactory.New(api.Resource("serviceaccounts"))
+		storage, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
 		if err != nil {
 			glog.Fatalf("Unable to get serviceaccounts storage: %v", err)
 		}
@@ -227,7 +227,7 @@ func Run(s *options.APIServer) error {
 
 	if modeEnabled(apiserver.ModeRBAC) {
 		mustGetRESTOptions := func(resource string) generic.RESTOptions {
-			s, err := storageFactory.New(rbac.Resource(resource))
+			s, err := storageFactory.NewConfig(rbac.Resource(resource))
 			if err != nil {
 				glog.Fatalf("Unable to get %s storage: %v", resource, err)
 			}

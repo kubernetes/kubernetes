@@ -18,14 +18,16 @@ package registry
 
 import (
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
-// Creates a cacher on top of the given 'storageInterface'.
+// Creates a cacher based given storageConfig.
 func StorageWithCacher(
-	storageInterface storage.Interface,
+	storageConfig *storagebackend.Config,
 	capacity int,
 	objectType runtime.Object,
 	resourcePrefix string,
@@ -33,9 +35,12 @@ func StorageWithCacher(
 	newListFunc func() runtime.Object,
 	triggerFunc storage.TriggerPublisherFunc) storage.Interface {
 
-	config := storage.CacherConfig{
+	// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
+	// Currently it has two layers of same storage interface -- cacher and low level kv.
+	s := generic.NewRawStorage(storageConfig)
+	cacherConfig := storage.CacherConfig{
 		CacheCapacity:        capacity,
-		Storage:              storageInterface,
+		Storage:              s,
 		Versioner:            etcdstorage.APIObjectVersioner{},
 		Type:                 objectType,
 		ResourcePrefix:       resourcePrefix,
@@ -43,14 +48,14 @@ func StorageWithCacher(
 		TriggerPublisherFunc: triggerFunc,
 	}
 	if scopeStrategy.NamespaceScoped() {
-		config.KeyFunc = func(obj runtime.Object) (string, error) {
+		cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
 			return storage.NamespaceKeyFunc(resourcePrefix, obj)
 		}
 	} else {
-		config.KeyFunc = func(obj runtime.Object) (string, error) {
+		cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
 			return storage.NoNamespaceKeyFunc(resourcePrefix, obj)
 		}
 	}
 
-	return storage.NewCacherFromConfig(config)
+	return storage.NewCacherFromConfig(cacherConfig)
 }
