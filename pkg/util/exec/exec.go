@@ -113,7 +113,7 @@ func (cmd *cmdWrapper) Output() ([]byte, error) {
 func handleError(err error) error {
 	if ee, ok := err.(*osexec.ExitError); ok {
 		// Force a compile fail if exitErrorWrapper can't convert to ExitError.
-		var x ExitError = &exitErrorWrapper{ee}
+		var x ExitError = &ExitErrorWrapper{ee}
 		return x
 	}
 	if ee, ok := err.(*osexec.Error); ok {
@@ -124,14 +124,16 @@ func handleError(err error) error {
 	return err
 }
 
-// exitErrorWrapper is an implementation of ExitError in terms of os/exec ExitError.
+// ExitErrorWrapper is an implementation of ExitError in terms of os/exec ExitError.
 // Note: standard exec.ExitError is type *os.ProcessState, which already implements Exited().
-type exitErrorWrapper struct {
+type ExitErrorWrapper struct {
 	*osexec.ExitError
 }
 
+var _ ExitError = ExitErrorWrapper{}
+
 // ExitStatus is part of the ExitError interface.
-func (eew exitErrorWrapper) ExitStatus() int {
+func (eew ExitErrorWrapper) ExitStatus() int {
 	ws, ok := eew.Sys().(syscall.WaitStatus)
 	if !ok {
 		panic("can't call ExitStatus() on a non-WaitStatus exitErrorWrapper")
