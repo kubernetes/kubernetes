@@ -185,7 +185,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 				// verify resource
 				By("Verifying resource")
-				verifyResource(f, testArg, rc)
+				verifyResource(f, itArg, rc)
 			})
 		}
 	})
@@ -242,7 +242,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 				// verify resource
 				By("Verifying resource")
-				verifyResource(f, testArg, rc)
+				verifyResource(f, itArg, rc)
 			})
 		}
 	})
