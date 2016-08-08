@@ -100,6 +100,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 		out.ClusterSigningCertFile = in.ClusterSigningCertFile
 		out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
+		out.ApproveAllCSRs = in.ApproveAllCSRs
 		out.EnableProfiling = in.EnableProfiling
 		out.ClusterName = in.ClusterName
 		out.ClusterCIDR = in.ClusterCIDR
