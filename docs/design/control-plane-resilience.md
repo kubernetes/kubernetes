@@ -179,7 +179,7 @@ well-bounded time period.
 Multiple stateless, self-hosted, self-healing API servers behind a HA
 load balancer, built out by the default "kube-up" automation on GCE,
 AWS and basic bare metal (BBM). Note that the single-host approach of
-hving etcd listen only on localhost to ensure that onyl API server can
+having etcd listen only on localhost to ensure that only API server can
 connect to it will no longer work, so alternative security will be
 needed in the regard (either using firewall rules, SSL certs, or
 something else). All necessary flags are currently supported to enable
