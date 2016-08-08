@@ -38,7 +38,7 @@ type fakePortForwarder struct {
 	pfErr  error
 }
 
-func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
+func (f *fakePortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
 	f.method = method
 	f.url = url
 	return f.pfErr
@@ -108,7 +108,7 @@ func TestPortForward(t *testing.T) {
 		cmd.Run(cmd, []string{"foo", ":5000", ":1000"})
 
 		if test.pfErr && err != ff.pfErr {
-			t.Errorf("%s: Unexpected exec error: %v", test.name, err)
+			t.Errorf("%s: Unexpected port-forward error: %v", test.name, err)
 		}
 		if !test.pfErr && err != nil {
 			t.Errorf("%s: Unexpected error: %v", test.name, err)
@@ -191,7 +191,7 @@ func TestPortForwardWithPFlag(t *testing.T) {
 		cmd.Run(cmd, []string{":5000", ":1000"})
 
 		if test.pfErr && err != ff.pfErr {
-			t.Errorf("%s: Unexpected exec error: %v", test.name, err)
+			t.Errorf("%s: Unexpected port-forward error: %v", test.name, err)
 		}
 		if !test.pfErr && err != nil {
 			t.Errorf("%s: Unexpected error: %v", test.name, err)
