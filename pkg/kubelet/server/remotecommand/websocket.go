@@ -32,6 +32,9 @@ const (
 	stderrChannel
 	errorChannel
 	resizeChannel
+
+	preV4WebsocketProtocolPrefix = ""
+	v4WebsocketProtocolPrefix    = "v4"
 )
 
 // createChannels returns the standard channel types for a shell connection (STDIN 0, STDOUT 1, STDERR 2)
@@ -67,7 +70,7 @@ func writeChannel(real bool) wsstream.ChannelType {
 // streams needed to perform an exec or an attach.
 func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *options, idleTimeout time.Duration) (*context, bool) {
 	channels := createChannels(opts)
-	conn := wsstream.NewConn(channels...)
+	conn := wsstream.NewConn([]string{preV4WebsocketProtocolPrefix, v4WebsocketProtocolPrefix}, channels...)
 	conn.SetIdleTimeout(idleTimeout)
 	streams, err := conn.Open(httplog.Unlogged(w), req)
 	if err != nil {
@@ -86,13 +89,21 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 		streams[errorChannel].Write([]byte{})
 	}
 
-	return &context{
+	ctx := &context{
 		conn:         conn,
 		stdinStream:  streams[stdinChannel],
 		stdoutStream: streams[stdoutChannel],
 		stderrStream: streams[stderrChannel],
-		errorStream:  streams[errorChannel],
 		tty:          opts.tty,
 		resizeStream: streams[resizeChannel],
-	}, true
+	}
+
+	switch conn.ProtocolPrefix() {
+	case v4WebsocketProtocolPrefix:
+		ctx.writeError = v4WriteErrorFunc(streams[errorChannel])
+	case preV4WebsocketProtocolPrefix:
+		ctx.writeError = v1WriteErrorFunc(streams[errorChannel])
+	}
+
+	return ctx, true
 }

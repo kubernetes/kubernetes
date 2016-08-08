@@ -36,6 +36,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
@@ -64,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
 	"k8s.io/kubernetes/pkg/types"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/system"
@@ -2054,7 +2056,15 @@ func (b kubectlBuilder) Exec() (string, error) {
 	select {
 	case err := <-errCh:
 		if err != nil {
-			return "", fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err)
+			var rc int = 127
+			if ee, ok := err.(*exec.ExitError); ok {
+				Logf("rc: %d", rc)
+				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
+			}
+			return "", uexec.CodeExitError{
+				Err:  fmt.Errorf("Error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v\n", cmd, cmd.Stdout, cmd.Stderr, err),
+				Code: rc,
+			}
 		}
 	case <-b.timeout:
 		b.cmd.Process.Kill()
