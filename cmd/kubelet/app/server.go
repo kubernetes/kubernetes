@@ -525,7 +525,6 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	return nil
 }
 
-// TODO(mtaufen): I think we can actually get podCfg out of kubeDeps now. Remember to look into this.
 func startKubelet(k kubelet.KubeletBootstrap, podCfg *config.PodConfig, kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps) error {
 
 	// start the kubelet
