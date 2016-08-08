@@ -54,22 +54,30 @@ spec:
             storage: 1Gi
 ---
 apiVersion: v1
-kind: Pod
+kind: ReplicationController
 metadata:
   name: calico-policy-controller
   namespace: kube-system
-  labels:
-    kubernetes.io/cluster-service: "true"
-    k8s-app: calico-policy
 spec:
-  hostNetwork: true
-  containers:
-    - name: calico-policy-controller
-      image: calico/kube-policy-controller:v0.2.0
-      env:
-        - name: ETCD_ENDPOINTS
-          value: "http://10.0.0.17:6666"
-        - name: K8S_API
-          value: "http://kubernetes:443"
-        - name: CONFIGURE_ETC_HOSTS
-          value: "true"
+  replicas: 1
+  selector:
+    k8s-app: calico-policy
+  template:
+    metadata:
+      name: calico-policy-controller
+      namespace: kube-system
+      labels:
+        kubernetes.io/cluster-service: "true"
+        k8s-app: calico-policy
+    spec:
+      hostNetwork: true
+      containers:
+        - name: calico-policy-controller
+          image: calico/kube-policy-controller:v0.2.0
+          env:
+            - name: ETCD_ENDPOINTS
+              value: "http://10.0.0.17:6666"
+            - name: K8S_API
+              value: "http://kubernetes:443"
+            - name: CONFIGURE_ETC_HOSTS
+              value: "true"

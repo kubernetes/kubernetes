@@ -526,11 +526,6 @@ function start-etcd-servers {
   prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
 }
 
-# Starts Calico policy controller pod and calico etcd petset.
-function start-calico-policy-controller {
-  kubectl create -f ${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/calico-policy-controller.yaml
-}
-
 # Calculates the following variables based on env variables, which will be used
 # by the manifests of several kube-master components.
 #   CLOUD_CONFIG_OPT
@@ -883,6 +878,9 @@ function start-kube-addons {
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range"
   fi
+  if [[ "${NETWORK_POLICY_PROVIDER}" == "calico" ]]; then
+    setup-addon-manifests "addons" "calico-policy-controller"
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
@@ -986,9 +984,6 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-kube-addons
   start-cluster-autoscaler
   start-lb-controller
-  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
-    start-calico-policy-controller
-  fi
 else
   start-kube-proxy
   # Kube-registry-proxy.
