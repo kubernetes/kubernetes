@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // CreateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -105,8 +106,8 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		return err
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	mapper, typer := f.DynamicObject()
+	r := resource.NewDynamicBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping)).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
@@ -156,9 +157,23 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 
 // createAndRefresh creates an object from input info and refreshes info with that object
 func createAndRefresh(info *resource.Info) error {
-	obj, err := resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
-	if err != nil {
-		return err
+	var obj runtime.Object
+	var err error
+	if info.Dynamic {
+		dc, err := info.DynamicClient()
+		if err != nil {
+			return err
+		}
+		info.Mapping.MetadataAccessor.SetResourceVersion(info.Object, "")
+		obj, err = dc.Resource(info.APIResource(), info.Namespace).Create(info.Object.(*runtime.Unstructured))
+		if err != nil {
+			return err
+		}
+	} else {
+		obj, err = resource.NewHelper(info.Client, info.Mapping).Create(info.Namespace, true, info.Object)
+		if err != nil {
+			return err
+		}
 	}
 	info.Refresh(obj, true)
 	return nil

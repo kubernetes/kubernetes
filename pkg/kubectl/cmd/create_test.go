@@ -19,9 +19,12 @@ package cmd
 import (
 	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 )
 
 func TestExtraArgsFail(t *testing.T) {
@@ -40,20 +43,30 @@ func TestCreateObject(t *testing.T) {
 	_, _, rc := testData()
 	rc.Items[0].Name = "redis-master-controller"
 
-	f, tf, codec, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
+	f, tf, codec, _ := NewAPIFactory()
+	contentConfig := dynamic.ContentConfig()
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		switch p, m := req.URL.Path, req.Method; {
+		case p == "/v1/namespaces/test/replicationcontrollers" && m == "POST":
+			rw.WriteHeader(http.StatusCreated)
+			codec.Encode(&rc.Items[0], rw)
+		default:
+			t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+		}
+	}))
+	defer srv.Close()
+	contentConfig.GroupVersion = &unversioned.GroupVersion{Version: "v1"}
+
+	cl, err := restclient.RESTClientFor(&restclient.Config{
+		ContentConfig: contentConfig,
+		Host:          srv.URL,
+	})
+	if err != nil {
+		t.Fatalf("unable to create rest client: %s", err)
 	}
+
+	tf.Printer = &testPrinter{}
+	tf.Client = cl
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -72,22 +85,33 @@ func TestCreateMultipleObject(t *testing.T) {
 	initTestErrorHandler(t)
 	_, svc, rc := testData()
 
-	f, tf, codec, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/services" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &svc.Items[0])}, nil
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
+	f, tf, codec, _ := NewAPIFactory()
+	contentConfig := dynamic.ContentConfig()
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		switch p, m := req.URL.Path, req.Method; {
+		case p == "/v1/namespaces/test/services" && m == "POST":
+			rw.WriteHeader(http.StatusCreated)
+			codec.Encode(&svc.Items[0], rw)
+		case p == "/v1/namespaces/test/replicationcontrollers" && m == "POST":
+			rw.WriteHeader(http.StatusCreated)
+			codec.Encode(&rc.Items[0], rw)
+		default:
+			t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+		}
+	}))
+	defer srv.Close()
+	contentConfig.GroupVersion = &unversioned.GroupVersion{Version: "v1"}
+
+	cl, err := restclient.RESTClientFor(&restclient.Config{
+		ContentConfig: contentConfig,
+		Host:          srv.URL,
+	})
+	if err != nil {
+		t.Fatalf("unable to create rest client: %s", err)
 	}
+
+	tf.Printer = &testPrinter{}
+	tf.Client = cl
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
@@ -108,20 +132,30 @@ func TestCreateDirectory(t *testing.T) {
 	_, _, rc := testData()
 	rc.Items[0].Name = "name"
 
-	f, tf, codec, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
-		NegotiatedSerializer: ns,
-		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
-			switch p, m := req.URL.Path, req.Method; {
-			case p == "/namespaces/test/replicationcontrollers" && m == "POST":
-				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
-			default:
-				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
-				return nil, nil
-			}
-		}),
+	f, tf, codec, _ := NewAPIFactory()
+	contentConfig := dynamic.ContentConfig()
+	srv := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		switch p, m := req.URL.Path, req.Method; {
+		case p == "/v1/namespaces/test/replicationcontrollers" && m == "POST":
+			rw.WriteHeader(http.StatusCreated)
+			codec.Encode(&rc.Items[0], rw)
+		default:
+			t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
+		}
+	}))
+	defer srv.Close()
+	contentConfig.GroupVersion = &unversioned.GroupVersion{Version: "v1"}
+
+	cl, err := restclient.RESTClientFor(&restclient.Config{
+		ContentConfig: contentConfig,
+		Host:          srv.URL,
+	})
+	if err != nil {
+		t.Fatalf("unable to create rest client: %s", err)
 	}
+
+	tf.Printer = &testPrinter{}
+	tf.Client = cl
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 
