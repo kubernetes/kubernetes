@@ -40,11 +40,7 @@ import (
 // Client is a Kubernetes client that allows you to access metadata
 // and manipulate metadata of a Kubernetes API group.
 type Client struct {
-	cl *restclient.RESTClient
-}
-
-type ClientWithParameterCodec struct {
-	client         *Client
+	cl             *restclient.RESTClient
 	parameterCodec runtime.ParameterCodec
 }
 
@@ -85,32 +81,21 @@ func (c *Client) GetRateLimiter() flowcontrol.RateLimiter {
 
 // Resource returns an API interface to the specified resource for this client's
 // group and version. If resource is not a namespaced resource, then namespace
-// is ignored.
+// is ignored. The ResourceClient inherits the parameter codec of c.
 func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
 	return &ResourceClient{
-		cl:       c.cl,
-		resource: resource,
-		ns:       namespace,
-	}
-}
-
-// ParameterCodec wraps a parameterCodec around the Client.
-func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *ClientWithParameterCodec {
-	return &ClientWithParameterCodec{
-		client:         c,
-		parameterCodec: parameterCodec,
-	}
-}
-
-// Resource returns an API interface to the specified resource for this client's
-// group and version. If resource is not a namespaced resource, then namespace
-// is ignored. The ResourceClient inherits the parameter codec of c.
-func (c *ClientWithParameterCodec) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
-	return &ResourceClient{
-		cl:             c.client.cl,
+		cl:             c.cl,
 		resource:       resource,
 		ns:             namespace,
 		parameterCodec: c.parameterCodec,
+	}
+}
+
+// ParameterCodec returns a client with the provided parameter codec.
+func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *Client {
+	return &Client{
+		cl:             c.cl,
+		parameterCodec: parameterCodec,
 	}
 }
 
