@@ -299,9 +299,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 	}
 
 	if kubeDeps.PodConfig == nil {
-		// TODO(mtaufen): This looks like something that would ultimately be appropriate
-		//                to apply as a default during the conversion between external
-		//                and internal KubeletConfiguration type.
 		var err error
 		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName)
 		if err != nil {
