@@ -33,8 +33,9 @@ var (
 		v1.ResourceMemory,
 		v1.ResourceStorage,
 	}
-	NodeColumns = []string{"NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP"}
-	PodColumns  = []string{"NAMESPACE", "NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP"}
+	NodeColumns     = []string{"NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP"}
+	PodColumns      = []string{"NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP"}
+	NamespaceColumn = "NAMESPACE"
 )
 
 type ResourceMetricsInfo struct {
@@ -59,9 +60,9 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics
 	w := kubectl.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
-	PrintColumnNames(w, NodeColumns)
+	printColumnNames(w, NodeColumns)
 	for _, m := range metrics {
-		PrintMetricsLine(w, &ResourceMetricsInfo{
+		printMetricsLine(w, &ResourceMetricsInfo{
 			Name:      m.Name,
 			Metrics:   m.Usage,
 			Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
@@ -70,28 +71,31 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics
 	return nil
 }
 
-func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metrics_api.PodMetrics, printContainers bool) error {
+func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metrics_api.PodMetrics, printContainers bool, withNamespace bool) error {
 	if len(metrics) == 0 {
 		return nil
 	}
 	w := kubectl.GetNewTabWriter(printer.out)
 	defer w.Flush()
 
-	PrintColumnNames(w, PodColumns)
+	if withNamespace {
+		printValue(w, NamespaceColumn)
+	}
+	printColumnNames(w, PodColumns)
 	for _, m := range metrics {
-		PrintSinglePodMetrics(w, &m, printContainers)
+		printSinglePodMetrics(w, &m, printContainers, withNamespace)
 	}
 	return nil
 }
 
-func PrintColumnNames(out io.Writer, names []string) {
+func printColumnNames(out io.Writer, names []string) {
 	for _, name := range names {
-		PrintValue(out, name)
+		printValue(out, name)
 	}
 	fmt.Fprintf(out, "\n")
 }
 
-func PrintSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContainers bool) {
+func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContainers bool, withNamespace bool) {
 	podMetrics := make(v1.ResourceList)
 	containers := make(map[string]v1.ResourceList)
 	for _, res := range MeasuredResources {
@@ -105,53 +109,56 @@ func PrintSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 			podMetrics[res] = quantity
 		}
 	}
-	PrintMetricsLine(out, &ResourceMetricsInfo{
+	printMetricsLine(out, &ResourceMetricsInfo{
 		Namespace: m.Namespace,
 		Name:      m.Name,
 		Metrics:   podMetrics,
 		Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
-	}, true)
+	}, withNamespace)
 
 	if printContainers {
 		for contName := range containers {
-			PrintMetricsLine(out, &ResourceMetricsInfo{
+			printMetricsLine(out, &ResourceMetricsInfo{
 				Namespace: "",
 				Name:      contName,
 				Metrics:   containers[contName],
 				Timestamp: "",
-			}, true)
+			}, withNamespace)
 		}
 	}
 }
 
-func PrintMetricsLine(out io.Writer, metrics *ResourceMetricsInfo, withNamespace bool) {
+func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo, withNamespace bool) {
 	if withNamespace {
-		PrintValue(out, metrics.Namespace)
+		printValue(out, metrics.Namespace)
 	}
-	PrintValue(out, metrics.Name)
-	PrintAllResourceUsages(out, metrics.Metrics)
-	PrintValue(out, metrics.Timestamp)
+	printValue(out, metrics.Name)
+	printAllResourceUsages(out, metrics.Metrics)
+	printValue(out, metrics.Timestamp)
 	fmt.Fprintf(out, "\n")
 }
 
-func PrintValue(out io.Writer, value interface{}) {
+func printValue(out io.Writer, value interface{}) {
 	fmt.Fprintf(out, "%v\t", value)
 }
 
-func PrintAllResourceUsages(out io.Writer, usage v1.ResourceList) {
+func printAllResourceUsages(out io.Writer, usage v1.ResourceList) {
 	for _, res := range MeasuredResources {
 		quantity := usage[res]
-		PrintSingleResourceUsage(out, res, quantity)
+		printSingleResourceUsage(out, res, quantity)
 		fmt.Fprintf(out, "\t")
 	}
 }
 
-func PrintSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quantity resource.Quantity) {
+func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quantity resource.Quantity) {
 	switch resourceType {
 	case v1.ResourceCPU:
 		fmt.Fprintf(out, "%vm", quantity.MilliValue())
-	case v1.ResourceMemory, v1.ResourceStorage:
-		fmt.Fprintf(out, "%v Mi", quantity.Value()/(1024*1024))
+	case v1.ResourceMemory:
+		fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
+	case v1.ResourceStorage:
+		// TODO: Change it after storage metrics collection is finished.
+		fmt.Fprintf(out, "-")
 	default:
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}
