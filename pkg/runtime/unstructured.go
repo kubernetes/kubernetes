@@ -103,10 +103,9 @@ func (s unstructuredJSONScheme) decodeInto(data []byte, obj Object) error {
 	case *UnstructuredList:
 		return s.decodeToList(data, x)
 	case *VersionedObjects:
-		u := new(Unstructured)
-		err := s.decodeToUnstructured(data, u)
+		o, err := s.decode(data)
 		if err == nil {
-			x.Objects = []Object{u}
+			x.Objects = []Object{o}
 		}
 		return err
 	default:
