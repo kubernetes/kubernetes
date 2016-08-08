@@ -26,6 +26,7 @@ import (
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/golang/glog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -74,7 +75,7 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 			go io.Copy(stdout, p)
 		}
 
-		return command.Wait()
+		err = command.Wait()
 	} else {
 		if stdin != nil {
 			// Use an os.Pipe here as it returns true *os.File objects.
@@ -96,8 +97,13 @@ func (*NsenterExecHandler) ExecInContainer(client DockerInterface, container *do
 			command.Stderr = stderr
 		}
 
-		return command.Run()
+		err = command.Run()
 	}
+
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		return &utilexec.ExitErrorWrapper{ExitError: exitErr}
+	}
+	return err
 }
 
 // NativeExecHandler executes commands in Docker containers using Docker's exec API.

@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -265,6 +266,16 @@ func TestCheckNoResourceMatchError(t *testing.T) {
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in group "thegroup"`,
 			DefaultErrorExitCode,
+		},
+	})
+}
+
+func TestCheckExitError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			uexec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
+			"",
+			42,
 		},
 	})
 }

@@ -37,6 +37,8 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 var (
@@ -114,7 +116,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the pod(s).")
 	cmd.Flags().BoolP("stdin", "i", false, "Keep stdin open on the container(s) in the pod, even if nothing is attached.")
 	cmd.Flags().BoolP("tty", "t", false, "Allocated a TTY for each container in the pod.")
-	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true.")
+	cmd.Flags().Bool("attach", false, "If true, wait for the Pod to start running, and then attach to the Pod as if 'kubectl attach ...' were called.  Default false, unless '-i/--stdin' is set, in which case the default is true. With '--restart=Never' the exit code of the container process is returned.")
 	cmd.Flags().Bool("leave-stdin-open", false, "If the pod is started in interactive mode or with stdin, leave stdin open after the first attach completes. By default, stdin will be closed after the first attach completes.")
 	cmd.Flags().String("restart", "Always", "The restart policy for this Pod.  Legal values [Always, OnFailure, Never].  If set to 'Always' a deployment is created for this pod, if set to 'OnFailure', a job is created for this pod, if set to 'Never', a regular pod is created. For the latter two --replicas must be 1.  Default 'Always'")
 	cmd.Flags().Bool("command", false, "If true and extra arguments are present, use them as the 'command' field in the container, rather than the 'args' field which is the default.")
@@ -128,7 +130,6 @@ func addRunFlags(cmd *cobra.Command) {
 }
 
 func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cobra.Command, args []string, argsLenAtDash int) error {
-	quiet := cmdutil.GetFlagBool(cmd, "quiet")
 	if len(os.Args) > 1 && os.Args[1] == "run-container" {
 		printDeprecationWarning("run", "run-container")
 	}
@@ -243,6 +244,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	}
 
 	if attach {
+		quiet := cmdutil.GetFlagBool(cmd, "quiet")
 		opts := &AttachOptions{
 			StreamOptions: StreamOptions{
 				In:    cmdIn,
@@ -273,9 +275,19 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		if err != nil {
 			return err
 		}
-		err = handleAttachPod(f, client, attachablePod, opts, quiet)
+		err = handleAttachPod(f, client, attachablePod.Namespace, attachablePod.Name, opts, quiet)
 		if err != nil {
 			return err
+		}
+
+		var pod *api.Pod
+		leaveStdinOpen := cmdutil.GetFlagBool(cmd, "leave-stdin-open")
+		waitForExitCode := !leaveStdinOpen && restartPolicy == api.RestartPolicyNever
+		if waitForExitCode {
+			pod, err = waitForPodTerminated(client, attachablePod.Namespace, attachablePod.Name, opts.Out, quiet)
+			if err != nil {
+				return err
+			}
 		}
 
 		if remove {
@@ -295,9 +307,37 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 				ResourceNames(mapping.Resource, name).
 				Flatten().
 				Do()
-			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper, quiet)
+			err = ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper, quiet)
+			if err != nil {
+				return err
+			}
 		}
-		return nil
+
+		// after removal is done, return successfully if we are not interested in the exit code
+		if !waitForExitCode {
+			return nil
+		}
+
+		switch pod.Status.Phase {
+		case api.PodSucceeded:
+			return nil
+		case api.PodFailed:
+			unknownRcErr := fmt.Errorf("pod %s/%s failed with unknown exit code", pod.Namespace, pod.Name)
+			if len(pod.Status.ContainerStatuses) == 0 || pod.Status.ContainerStatuses[0].State.Terminated == nil {
+				return unknownRcErr
+			}
+			// assume here that we have at most one status because kubectl-run only creates one container per pod
+			rc := pod.Status.ContainerStatuses[0].State.Terminated.ExitCode
+			if rc == 0 {
+				return unknownRcErr
+			}
+			return uexec.CodeExitError{
+				Err:  fmt.Errorf("pod %s/%s terminated", pod.Namespace, pod.Name),
+				Code: int(rc),
+			}
+		default:
+			return fmt.Errorf("pod %s/%s left in phase %s", pod.Namespace, pod.Name, pod.Status.Phase)
+		}
 	}
 
 	outputFormat := cmdutil.GetFlagString(cmd, "output")
@@ -325,37 +365,91 @@ func contains(resourcesList map[string]*unversioned.APIResourceList, resource un
 	return false
 }
 
-func waitForPodRunning(c *client.Client, pod *api.Pod, out io.Writer, quiet bool) (status api.PodPhase, err error) {
-	for {
-		pod, err := c.Pods(pod.Namespace).Get(pod.Name)
-		if err != nil {
-			return api.PodUnknown, err
-		}
-		ready := false
-		if pod.Status.Phase == api.PodRunning {
-			ready = true
-			for _, status := range pod.Status.ContainerStatuses {
-				if !status.Ready {
-					ready = false
-					break
-				}
-			}
-			if ready {
-				return api.PodRunning, nil
-			}
-		}
-		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
-			return pod.Status.Phase, nil
-		}
-		if !quiet {
-			fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: %v\n", pod.Namespace, pod.Name, pod.Status.Phase, ready)
-		}
-		time.Sleep(2 * time.Second)
+// waitForPod watches the given pod until the exitCondition is true. Each two seconds
+// the tick function is called e.g. for progress output.
+func waitForPod(c *client.Client, ns, name string, exitCondition func(*api.Pod) bool, tick func(*api.Pod)) (*api.Pod, error) {
+	pod, err := c.Pods(ns).Get(name)
+	if err != nil {
+		return nil, err
 	}
+	if exitCondition(pod) {
+		return pod, nil
+	}
+
+	tick(pod)
+
+	w, err := c.Pods(ns).Watch(api.SingleObject(api.ObjectMeta{Name: pod.Name, ResourceVersion: pod.ResourceVersion}))
+	if err != nil {
+		return nil, err
+	}
+
+	t := time.NewTicker(2 * time.Second)
+	defer t.Stop()
+	go func() {
+		for range t.C {
+			tick(pod)
+		}
+	}()
+
+	err = nil
+	result := pod
+	kubectl.WatchLoop(w, func(ev watch.Event) error {
+		switch ev.Type {
+		case watch.Added, watch.Modified:
+			pod = ev.Object.(*api.Pod)
+			if exitCondition(pod) {
+				result = pod
+				w.Stop()
+			}
+		case watch.Deleted:
+			w.Stop()
+		case watch.Error:
+			result = nil
+			err = fmt.Errorf("failed to watch pod %s/%s", ns, name)
+			w.Stop()
+		}
+		return nil
+	})
+
+	return result, err
 }
 
-func handleAttachPod(f *cmdutil.Factory, c *client.Client, pod *api.Pod, opts *AttachOptions, quiet bool) error {
-	status, err := waitForPodRunning(c, pod, opts.Out, quiet)
+func waitForPodRunning(c *client.Client, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
+	exitCondition := func(pod *api.Pod) bool {
+		switch pod.Status.Phase {
+		case api.PodRunning:
+			for _, status := range pod.Status.ContainerStatuses {
+				if !status.Ready {
+					return false
+				}
+			}
+			return true
+		case api.PodSucceeded, api.PodFailed:
+			return true
+		default:
+			return false
+		}
+	}
+	return waitForPod(c, ns, name, exitCondition, func(pod *api.Pod) {
+		if !quiet {
+			fmt.Fprintf(out, "Waiting for pod %s/%s to be running, status is %s, pod ready: false\n", pod.Namespace, pod.Name, pod.Status.Phase)
+		}
+	})
+}
+
+func waitForPodTerminated(c *client.Client, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
+	exitCondition := func(pod *api.Pod) bool {
+		return pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed
+	}
+	return waitForPod(c, ns, name, exitCondition, func(pod *api.Pod) {
+		if !quiet {
+			fmt.Fprintf(out, "Waiting for pod %s/%s to terminate, status is %s\n", pod.Namespace, pod.Name, pod.Status.Phase)
+		}
+	})
+}
+
+func handleAttachPod(f *cmdutil.Factory, c *client.Client, ns, name string, opts *AttachOptions, quiet bool) error {
+	pod, err := waitForPodRunning(c, ns, name, opts.Out, quiet)
 	if err != nil {
 		return err
 	}
@@ -363,7 +457,7 @@ func handleAttachPod(f *cmdutil.Factory, c *client.Client, pod *api.Pod, opts *A
 	if err != nil {
 		return err
 	}
-	if status == api.PodSucceeded || status == api.PodFailed {
+	if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
 		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName})
 		if err != nil {
 			return err
@@ -377,8 +471,8 @@ func handleAttachPod(f *cmdutil.Factory, c *client.Client, pod *api.Pod, opts *A
 		return err
 	}
 	opts.Client = c
-	opts.PodName = pod.Name
-	opts.Namespace = pod.Namespace
+	opts.PodName = name
+	opts.Namespace = ns
 	if err := opts.Run(); err != nil {
 		fmt.Fprintf(opts.Out, "Error attaching, falling back to logs: %v\n", err)
 		req, err := f.LogsForObject(pod, &api.PodLogOptions{Container: ctrName})
