@@ -694,6 +694,17 @@ func withLabelSelector(labels map[string]string, claims []*api.PersistentVolumeC
 	return claims
 }
 
+// withExpectedCapacity sets the claim.Spec.Capacity of the first claim in the
+// array to given value and returns the array.  Meant to be used to compose
+// claims specified inline in a test.
+func withExpectedCapacity(capacity string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+	claims[0].Status.Capacity = api.ResourceList{
+		api.ResourceName(api.ResourceStorage): resource.MustParse(capacity),
+	}
+
+	return claims
+}
+
 // withMessage saves given message into volume.Status.Message of the first
 // volume in the array and returns the array.  Meant to be used to compose
 // volumes specified inline in a test.
@@ -741,6 +752,15 @@ func newClaim(name, claimUID, capacity, boundToVolume string, phase api.Persiste
 			claim.Annotations[a] = "yes"
 		}
 	}
+
+	// Bound claims must have proper Status.
+	if phase == api.ClaimBound {
+		claim.Status.AccessModes = claim.Spec.AccessModes
+		// For most of the tests it's enough to copy claim's requested capacity,
+		// individual tests can adjust it using withExpectedCapacity()
+		claim.Status.Capacity = claim.Spec.Resources.Requests
+	}
+
 	return &claim
 }
 
