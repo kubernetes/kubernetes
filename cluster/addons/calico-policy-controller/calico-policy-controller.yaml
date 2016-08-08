@@ -3,6 +3,7 @@ kind: Service
 metadata:
   labels:
     k8s-app: calico-etcd
+    kubernetes.io/cluster-service: "true"
   name: calico-etcd
   namespace: kube-system
 spec:
@@ -17,6 +18,9 @@ kind: PetSet
 metadata:
   name: calico-etcd
   namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    k8s-app: calico-etcd
 spec:
   serviceName: calico-etcd
   replicas: 1
@@ -58,6 +62,9 @@ kind: ReplicationController
 metadata:
   name: calico-policy-controller
   namespace: kube-system
+  labels:
+    k8s-app: calico-policy
+    kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
   selector:
