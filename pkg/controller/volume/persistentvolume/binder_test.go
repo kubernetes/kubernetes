@@ -93,7 +93,7 @@ func TestSync(t *testing.T) {
 				newVolume("volume1-5_2", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
 			},
 			newClaimArray("claim1-5", "uid1-5", "1Gi", "", api.ClaimPending),
-			newClaimArray("claim1-5", "uid1-5", "1Gi", "volume1-5_1", api.ClaimBound, annBoundByController, annBindCompleted),
+			withExpectedCapacity("10Gi", newClaimArray("claim1-5", "uid1-5", "1Gi", "volume1-5_1", api.ClaimBound, annBoundByController, annBindCompleted)),
 			noevents, noerrors, testSyncClaim,
 		},
 		{
@@ -109,7 +109,7 @@ func TestSync(t *testing.T) {
 				newVolume("volume1-6_2", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
 			},
 			newClaimArray("claim1-6", "uid1-6", "1Gi", "", api.ClaimPending),
-			newClaimArray("claim1-6", "uid1-6", "1Gi", "volume1-6_1", api.ClaimBound, annBoundByController, annBindCompleted),
+			withExpectedCapacity("10Gi", newClaimArray("claim1-6", "uid1-6", "1Gi", "volume1-6_1", api.ClaimBound, annBoundByController, annBindCompleted)),
 			noevents, noerrors, testSyncClaim,
 		},
 		{
@@ -199,8 +199,8 @@ func TestSync(t *testing.T) {
 			"2-3 - claim prebound to unbound volume",
 			newVolumeArray("volume2-3", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
 			newVolumeArray("volume2-3", "1Gi", "uid2-3", "claim2-3", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
-			newClaimArray("claim2-3", "uid2-3", "10Gi", "volume2-3", api.ClaimPending),
-			newClaimArray("claim2-3", "uid2-3", "10Gi", "volume2-3", api.ClaimBound, annBindCompleted),
+			newClaimArray("claim2-3", "uid2-3", "1Gi", "volume2-3", api.ClaimPending),
+			newClaimArray("claim2-3", "uid2-3", "1Gi", "volume2-3", api.ClaimBound, annBindCompleted),
 			noevents, noerrors, testSyncClaim,
 		},
 		{
@@ -209,8 +209,8 @@ func TestSync(t *testing.T) {
 			"2-4 - claim prebound to prebound volume by name",
 			newVolumeArray("volume2-4", "1Gi", "", "claim2-4", api.VolumePending, api.PersistentVolumeReclaimRetain),
 			newVolumeArray("volume2-4", "1Gi", "uid2-4", "claim2-4", api.VolumeBound, api.PersistentVolumeReclaimRetain),
-			newClaimArray("claim2-4", "uid2-4", "10Gi", "volume2-4", api.ClaimPending),
-			newClaimArray("claim2-4", "uid2-4", "10Gi", "volume2-4", api.ClaimBound, annBindCompleted),
+			newClaimArray("claim2-4", "uid2-4", "1Gi", "volume2-4", api.ClaimPending),
+			newClaimArray("claim2-4", "uid2-4", "1Gi", "volume2-4", api.ClaimBound, annBindCompleted),
 			noevents, noerrors, testSyncClaim,
 		},
 		{
@@ -220,8 +220,8 @@ func TestSync(t *testing.T) {
 			"2-5 - claim prebound to prebound volume by UID",
 			newVolumeArray("volume2-5", "1Gi", "uid2-5", "claim2-5", api.VolumePending, api.PersistentVolumeReclaimRetain),
 			newVolumeArray("volume2-5", "1Gi", "uid2-5", "claim2-5", api.VolumeBound, api.PersistentVolumeReclaimRetain),
-			newClaimArray("claim2-5", "uid2-5", "10Gi", "volume2-5", api.ClaimPending),
-			newClaimArray("claim2-5", "uid2-5", "10Gi", "volume2-5", api.ClaimBound, annBindCompleted),
+			newClaimArray("claim2-5", "uid2-5", "1Gi", "volume2-5", api.ClaimPending),
+			newClaimArray("claim2-5", "uid2-5", "1Gi", "volume2-5", api.ClaimBound, annBindCompleted),
 			noevents, noerrors, testSyncClaim,
 		},
 		{
@@ -230,8 +230,8 @@ func TestSync(t *testing.T) {
 			"2-6 - claim prebound to already bound volume",
 			newVolumeArray("volume2-6", "1Gi", "uid2-6_1", "claim2-6_1", api.VolumeBound, api.PersistentVolumeReclaimRetain),
 			newVolumeArray("volume2-6", "1Gi", "uid2-6_1", "claim2-6_1", api.VolumeBound, api.PersistentVolumeReclaimRetain),
-			newClaimArray("claim2-6", "uid2-6", "10Gi", "volume2-6", api.ClaimBound),
-			newClaimArray("claim2-6", "uid2-6", "10Gi", "volume2-6", api.ClaimPending),
+			newClaimArray("claim2-6", "uid2-6", "1Gi", "volume2-6", api.ClaimBound),
+			newClaimArray("claim2-6", "uid2-6", "1Gi", "volume2-6", api.ClaimPending),
 			noevents, noerrors, testSyncClaim,
 		},
 		{
@@ -240,8 +240,8 @@ func TestSync(t *testing.T) {
 			"2-7 - claim bound by controller to already bound volume",
 			newVolumeArray("volume2-7", "1Gi", "uid2-7_1", "claim2-7_1", api.VolumeBound, api.PersistentVolumeReclaimRetain),
 			newVolumeArray("volume2-7", "1Gi", "uid2-7_1", "claim2-7_1", api.VolumeBound, api.PersistentVolumeReclaimRetain),
-			newClaimArray("claim2-7", "uid2-7", "10Gi", "volume2-7", api.ClaimBound, annBoundByController),
-			newClaimArray("claim2-7", "uid2-7", "10Gi", "volume2-7", api.ClaimBound, annBoundByController),
+			newClaimArray("claim2-7", "uid2-7", "1Gi", "volume2-7", api.ClaimBound, annBoundByController),
+			newClaimArray("claim2-7", "uid2-7", "1Gi", "volume2-7", api.ClaimBound, annBoundByController),
 			noevents, noerrors, testSyncClaimError,
 		},
 		{
@@ -251,8 +251,8 @@ func TestSync(t *testing.T) {
 			"2-8 - claim prebound to unbound volume that does not match the selector",
 			newVolumeArray("volume2-3", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
 			newVolumeArray("volume2-3", "1Gi", "uid2-3", "claim2-3", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
-			withLabelSelector(labels, newClaimArray("claim2-3", "uid2-3", "10Gi", "volume2-3", api.ClaimPending)),
-			withLabelSelector(labels, newClaimArray("claim2-3", "uid2-3", "10Gi", "volume2-3", api.ClaimBound, annBindCompleted)),
+			withLabelSelector(labels, newClaimArray("claim2-3", "uid2-3", "1Gi", "volume2-3", api.ClaimPending)),
+			withLabelSelector(labels, newClaimArray("claim2-3", "uid2-3", "1Gi", "volume2-3", api.ClaimBound, annBindCompleted)),
 			noevents, noerrors, testSyncClaim,
 		},
 
