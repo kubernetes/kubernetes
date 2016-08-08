@@ -62,7 +62,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 	newListFunc := func() runtime.Object { return &extensions.ReplicaSetList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.Replicasets),
 		&extensions.ReplicaSet{},
 		prefix,

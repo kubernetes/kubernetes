@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
 type REST struct {
@@ -32,13 +33,13 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work with testtype.
-func NewREST(s storage.Interface, storageDecorator generic.StorageDecorator) *REST {
+func NewREST(config *storagebackend.Config, storageDecorator generic.StorageDecorator) *REST {
 	prefix := "/testtype"
 	newListFunc := func() runtime.Object { return &testgroup.TestTypeList{} }
 	// Usually you should reuse your RESTCreateStrategy.
 	strategy := &NotNamespaceScoped{}
 	storageInterface := storageDecorator(
-		s, 100, &testgroup.TestType{}, prefix, strategy, newListFunc, storage.NoTriggerPublisher)
+		config, 100, &testgroup.TestType{}, prefix, strategy, newListFunc, storage.NoTriggerPublisher)
 	store := &registry.Store{
 		NewFunc: func() runtime.Object { return &testgroup.TestType{} },
 		// NewListFunc returns an object capable of storing results of an etcd list.

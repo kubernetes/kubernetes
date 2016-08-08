@@ -31,7 +31,7 @@ import (
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
-	restOptions := generic.RESTOptions{Storage: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
+	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
 	storageClassStorage := NewREST(restOptions)
 	return storageClassStorage, server
 }

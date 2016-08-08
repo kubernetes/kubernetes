@@ -37,7 +37,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 	newListFunc := func() runtime.Object { return &api.ConfigMapList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.ConfigMaps),
 		&api.ConfigMap{},
 		prefix,

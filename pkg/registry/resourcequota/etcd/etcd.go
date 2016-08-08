@@ -37,7 +37,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 	newListFunc := func() runtime.Object { return &api.ResourceQuotaList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.ResourceQuotas),
 		&api.ResourceQuota{},
 		prefix,
