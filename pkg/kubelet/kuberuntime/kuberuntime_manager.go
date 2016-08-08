@@ -50,7 +50,7 @@ var (
 	ErrVersionNotSupported = errors.New("Runtime api version is not supported")
 )
 
-type kubeGenericRuntimeManager struct {
+type KubeGenericRuntimeManager struct {
 	runtimeName         string
 	recorder            record.EventRecorder
 	osInterface         kubecontainer.OSInterface
@@ -96,8 +96,8 @@ func NewKubeGenericRuntimeManager(
 	cpuCFSQuota bool,
 	runtimeService internalApi.RuntimeService,
 	imageService internalApi.ImageManagerService,
-) (*kubeGenericRuntimeManager, error) {
-	kubeRuntimeManager := &kubeGenericRuntimeManager{
+) (*KubeGenericRuntimeManager, error) {
+	kubeRuntimeManager := &KubeGenericRuntimeManager{
 		recorder:            recorder,
 		cpuCFSQuota:         cpuCFSQuota,
 		livenessManager:     livenessManager,
@@ -151,7 +151,7 @@ func NewKubeGenericRuntimeManager(
 }
 
 // Type returns the type of the container runtime.
-func (m *kubeGenericRuntimeManager) Type() string {
+func (m *KubeGenericRuntimeManager) Type() string {
 	return m.runtimeName
 }
 
@@ -185,7 +185,7 @@ func (r runtimeVersion) Compare(other string) (int, error) {
 }
 
 // Version returns the version information of the container runtime.
-func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
+func (m *KubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
 	if err != nil {
 		glog.Errorf("Get remote runtime version failed: %v", err)
@@ -198,7 +198,7 @@ func (m *kubeGenericRuntimeManager) Version() (kubecontainer.Version, error) {
 // APIVersion returns the cached API version information of the container
 // runtime. Implementation is expected to update this cache periodically.
 // This may be different from the runtime engine's version.
-func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) {
+func (m *KubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) {
 	typedVersion, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
 	if err != nil {
 		glog.Errorf("Get remote runtime version failed: %v", err)
@@ -209,7 +209,7 @@ func (m *kubeGenericRuntimeManager) APIVersion() (kubecontainer.Version, error) 
 }
 
 // Status returns error if the runtime is unhealthy; nil otherwise.
-func (m *kubeGenericRuntimeManager) Status() error {
+func (m *KubeGenericRuntimeManager) Status() error {
 	_, err := m.runtimeService.Version(kubeRuntimeAPIVersion)
 	if err != nil {
 		glog.Errorf("Checkout remote runtime status failed: %v", err)
@@ -222,12 +222,12 @@ func (m *kubeGenericRuntimeManager) Status() error {
 // GetPods returns a list of containers grouped by pods. The boolean parameter
 // specifies whether the runtime returns all containers including those already
 // exited and dead containers (used for garbage collection).
-func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
+func (m *KubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
 // SyncPod syncs the running pod into the desired pod.
-func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
+func (m *KubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 	podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret,
 	backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	result.Fail(fmt.Errorf("not implemented"))
@@ -239,13 +239,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 // gracePeriodOverride if specified allows the caller to override the pod default grace period.
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
-func (m *kubeGenericRuntimeManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
+func (m *KubeGenericRuntimeManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
 	return fmt.Errorf("not implemented")
 }
 
 // GetPodStatus retrieves the status of the pod, including the
 // information of all containers in the pod that are visble in Runtime.
-func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
+func (m *KubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namespace string) (*kubecontainer.PodStatus, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -254,21 +254,21 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 // the network namespace path, it should return an error.
 // TODO: Change ContainerID to a Pod ID since the namespace is shared
 // by all containers in the pod.
-func (m *kubeGenericRuntimeManager) GetNetNS(containerID kubecontainer.ContainerID) (string, error) {
+func (m *KubeGenericRuntimeManager) GetNetNS(containerID kubecontainer.ContainerID) (string, error) {
 	return "", fmt.Errorf("not implemented")
 }
 
 // GetPodContainerID gets pod sandbox ID
-func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
+func (m *KubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
 	return kubecontainer.ContainerID{}, fmt.Errorf("not implemented")
 }
 
 // Forward the specified port from the specified pod to the stream.
-func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+func (m *KubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	return fmt.Errorf("not implemented")
 }
 
 // GarbageCollect removes dead containers using the specified container gc policy
-func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
+func (m *KubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
 	return fmt.Errorf("not implemented")
 }

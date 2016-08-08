@@ -76,7 +76,7 @@ func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int
 	return nil
 }
 
-func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageService internalApi.ImageManagerService) (*kubeGenericRuntimeManager, error) {
+func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageService internalApi.ImageManagerService) (*KubeGenericRuntimeManager, error) {
 	networkPlugin, _ := network.InitNetworkPlugin(
 		[]network.NetworkPlugin{},
 		"",

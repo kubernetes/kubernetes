@@ -31,7 +31,7 @@ import (
 // PullImage pulls an image from the network to local storage using the supplied
 // secrets if necessary.
 // TODO: pull image with qps and burst, ref https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/dockertools/docker.go#L120
-func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Secret) error {
+func (m *KubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Secret) error {
 	img := image.Image
 	repoToPull, _, _, err := parsers.ParseImageName(img)
 	if err != nil {
@@ -82,7 +82,7 @@ func (m *kubeGenericRuntimeManager) PullImage(image kubecontainer.ImageSpec, pul
 }
 
 // IsImagePresent checks whether the container image is already in the local storage.
-func (m *kubeGenericRuntimeManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
+func (m *KubeGenericRuntimeManager) IsImagePresent(image kubecontainer.ImageSpec) (bool, error) {
 	images, err := m.imageService.ListImages(&runtimeApi.ImageFilter{
 		Image: &runtimeApi.ImageSpec{
 			Image: &image.Image,
@@ -97,7 +97,7 @@ func (m *kubeGenericRuntimeManager) IsImagePresent(image kubecontainer.ImageSpec
 }
 
 // ListImages gets all images currently on the machine.
-func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) {
+func (m *KubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) {
 	var images []kubecontainer.Image
 
 	allImages, err := m.imageService.ListImages(nil)
@@ -119,7 +119,7 @@ func (m *kubeGenericRuntimeManager) ListImages() ([]kubecontainer.Image, error) 
 }
 
 // RemoveImage removes the specified image.
-func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) error {
+func (m *KubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) error {
 	err := m.imageService.RemoveImage(&runtimeApi.ImageSpec{Image: &image.Image})
 	if err != nil {
 		glog.Errorf("Remove image %q failed: %v", image.Image, err)
@@ -130,7 +130,7 @@ func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) e
 }
 
 // ImageStats returns the statistics of the image.
-func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, error) {
+func (m *KubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, error) {
 	// TODO: support image stats in new runtime interface
 	return nil, fmt.Errorf("not implemented")
 }

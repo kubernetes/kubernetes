@@ -23,7 +23,7 @@ import (
 	apitest "k8s.io/kubernetes/pkg/kubelet/api/testing"
 )
 
-func createTestFakeRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+func createTestFakeRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *KubeGenericRuntimeManager, error) {
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
 	fakeImageService := apitest.NewFakeImageService()
 	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService)
