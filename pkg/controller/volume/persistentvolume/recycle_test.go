@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Test single call to syncVolume, expecting recycling to happen.
@@ -39,7 +40,7 @@ func TestRecycleSync(t *testing.T) {
 			noevents, noerrors,
 			// Inject recycler into the controller and call syncVolume. The
 			// recycler simulates one recycle() call that succeeds.
-			wrapTestWithControllerConfig(operationRecycle, []error{nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationRecycle, []error{nil}, testSyncVolume),
 		},
 		{
 			// recycle volume bound by user
@@ -51,7 +52,7 @@ func TestRecycleSync(t *testing.T) {
 			noevents, noerrors,
 			// Inject recycler into the controller and call syncVolume. The
 			// recycler simulates one recycle() call that succeeds.
-			wrapTestWithControllerConfig(operationRecycle, []error{nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationRecycle, []error{nil}, testSyncVolume),
 		},
 		{
 			// recycle failure - plugin not found
@@ -70,7 +71,7 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
-			wrapTestWithControllerConfig(operationRecycle, []error{}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume),
 		},
 		{
 			// recycle failure - recycle returns error
@@ -80,7 +81,7 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
-			wrapTestWithControllerConfig(operationRecycle, []error{errors.New("Mock recycle error")}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationRecycle, []error{errors.New("Mock recycle error")}, testSyncVolume),
 		},
 		{
 			// recycle success(?) - volume is deleted before doRecycle() starts
@@ -90,7 +91,7 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Delete the volume before recycle operation starts
 				reactor.lock.Lock()
 				delete(reactor.volumes, "volume6-6")
@@ -107,7 +108,7 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Mark the volume as Available before the recycler starts
 				reactor.lock.Lock()
 				volume := reactor.volumes["volume6-7"]
@@ -128,7 +129,7 @@ func TestRecycleSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Mark the volume as Available before the recycler starts
 				reactor.lock.Lock()
 				volume := reactor.volumes["volume6-8"]
@@ -148,7 +149,7 @@ func TestRecycleSync(t *testing.T) {
 			noevents, noerrors,
 			// Inject recycler into the controller and call syncVolume. The
 			// recycler simulates one recycle() call that succeeds.
-			wrapTestWithControllerConfig(operationRecycle, []error{nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationRecycle, []error{nil}, testSyncVolume),
 		},
 		{
 			// volume has unknown reclaim policy - failure expected
@@ -160,7 +161,7 @@ func TestRecycleSync(t *testing.T) {
 			[]string{"Warning VolumeUnknownReclaimPolicy"}, noerrors, testSyncVolume,
 		},
 	}
-	runSyncTests(t, tests)
+	runSyncTests(t, tests, []*extensions.StorageClass{}, "")
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -188,9 +189,9 @@ func TestRecycleMultiSync(t *testing.T) {
 			noclaims,
 			noclaims,
 			[]string{"Warning VolumeFailedRecycle"}, noerrors,
-			wrapTestWithControllerConfig(operationRecycle, []error{errors.New("Mock recycle error"), nil}, testSyncVolume),
+			wrapTestWithReclaimCalls(operationRecycle, []error{errors.New("Mock recycle error"), nil}, testSyncVolume),
 		},
 	}
 
-	runMultisyncTests(t, tests)
+	runMultisyncTests(t, tests, []*extensions.StorageClass{}, "")
 }

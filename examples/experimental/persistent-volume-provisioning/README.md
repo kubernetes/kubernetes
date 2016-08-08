@@ -43,34 +43,49 @@ scripts that launch kube-controller-manager.
 
 ### Admin Configuration
 
-No configuration is required by the admin!  3 cloud providers will be provided in the alpha version
-of this feature: EBS, GCE, and Cinder.
+The admin must define `StorageClass` objects that describe named "classes" of storage offered in a cluster. Different classes might map to arbitrary levels or policies determined by the admin. When configuring a `StorageClass` object for persistent volume provisioning, the admin will need to describe the type of provisioner to use and the parameters that will be used by the provisioner when it provisions a `PersistentVolume` belonging to the class.
 
-When Kubernetes is running in one of those clouds, there will be an implied provisioner.
-There is no provisioner when running outside of any of those 3 cloud providers.
+The name of a StorageClass object is significant, and is how users can request a particular class, by specifying the name in their `PersistentVolumeClaim`. The `provisioner` field must be specified as it determines what volume plugin is used for provisioning PVs. 2 cloud providers will be provided in the beta version of this feature: EBS and GCE. The `parameters` field contains the parameters that describe volumes belonging to the storage class. Different parameters may be accepted depending on the `provisioner`. For example, the value `io1`, for the parameter `type`, and the parameter `iopsPerGB` are specific to EBS . When a parameter is omitted, some default is used.
 
-A fourth provisioner is included for testing and development only.  It creates HostPath volumes,
-which will never work outside of a single node cluster. It is not supported in any way except for
-local for testing and development. This provisioner may be used by passing
-`--enable-hostpath-provisioner=true` to the controller manager while bringing it up.
-When using the `hack/local_up_cluster.sh` script, this flag is turned off by default.
-It may be turned on by setting the environment variable `ENABLE_HOSTPATH_PROVISIONER`
-to true prior to running the script.
+#### AWS
 
+```yaml
+kind: StorageClass
+apiVersion: extensions/v1beta1
+metadata:
+  name: slow
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: io1
+  zone: us-east-1d
+  iopsPerGB: "10"
 ```
-env ENABLE_HOSTPATH_PROVISIONER=true hack/local-up-cluster.sh
+
+* `type`: `io1`, `gp2`, `sc1`, `st1`. See AWS docs for details. Default: `gp2`.
+* `zone`: AWS zone
+* `iopsPerGB`: only for `io1` volumes. I/O operations per second per GiB. AWS volume plugin multiplies this with size of requested volume to compute IOPS of the volume and caps it at 20 000 IOPS (maximum supported by AWS, see AWS docs).
+
+#### GCE
+
+```yaml
+kind: StorageClass
+apiVersion: extensions/v1beta1
+metadata:
+  name: slow
+provisioner: kubernetes.io/gce-pd
+parameters:
+  type: pd-standard
+  zone: us-central1-a
 ```
+
+* `type`: `pd-standard` or `pd-ssd`. Default: `pd-ssd`
+* `zone`: GCE zone
 
 ### User provisioning requests
 
 Users request dynamically provisioned storage by including a storage class in their `PersistentVolumeClaim`.
-The annotation `volume.alpha.kubernetes.io/storage-class` is used to access this experimental feature.
-In the future, admins will be able to define many storage classes.
-The storage class may remain in an annotation or become a field on the claim itself.
-
-> The value of the storage-class annotation does not matter in the alpha version of this feature.  There is
-a single implied provisioner per cloud (which creates 1 kind of volume in the provider).  The full version of the feature
-will require that this value matches what is configured by the administrator.
+The annotation `volume.beta.kubernetes.io/storage-class` is used to access this experimental feature. It is required that this value matches the name of a `StorageClass` configured by the administrator.
+In the future, the storage class may remain in an annotation or become a field on the claim itself.
 
 ```
 {
@@ -79,7 +94,7 @@ will require that this value matches what is configured by the administrator.
   "metadata": {
     "name": "claim1",
     "annotations": {
-        "volume.alpha.kubernetes.io/storage-class": "foo"
+        "volume.beta.kubernetes.io/storage-class": "slow"
     }
   },
   "spec": {
@@ -97,26 +112,28 @@ will require that this value matches what is configured by the administrator.
 
 ### Sample output
 
-This example uses HostPath but any provisioner would follow the same flow.
+This example uses gce but any provisioner would follow the same flow.
 
-First we note there are no Persistent Volumes in the cluster.  After creating a claim, we see a new PV is created
+First we note there are no Persistent Volumes in the cluster.  After creating a storage class and a claim including that storage class, we see a new PV is created
 and automatically bound to the claim requesting storage.
 
 
 ``` 
 $ kubectl get pv
 
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/gce-pd.yaml
+storageclass "slow" created
+
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json
-I1012 13:07:57.666759   22875 decoder.go:141] decoding stream as JSON
 persistentvolumeclaim "claim1" created
 
 $ kubectl get pv
-NAME                LABELS                                   CAPACITY   ACCESSMODES   STATUS    CLAIM            REASON    AGE
-pv-hostpath-r6z5o   createdby=hostpath-dynamic-provisioner   3Gi        RWO           Bound     default/claim1             2s
+NAME                                       CAPACITY   ACCESSMODES   STATUS    CLAIM                        REASON    AGE
+pvc-bb6d2f0c-534c-11e6-9348-42010af00002   3Gi        RWO           Bound     default/claim1                         4s
 
 $ kubectl get pvc
-NAME      LABELS    STATUS    VOLUME              CAPACITY   ACCESSMODES   AGE
-claim1    <none>    Bound     pv-hostpath-r6z5o   3Gi        RWO           7s
+NAME      LABELS    STATUS    VOLUME                                     CAPACITY   ACCESSMODES   AGE
+claim1    <none>    Bound     pvc-bb6d2f0c-534c-11e6-9348-42010af00002   3Gi        RWO           7s
 
 # delete the claim to release the volume
 $ kubectl delete pvc claim1
