@@ -618,13 +618,7 @@ func RetrieveLatest(info *Info, err error) error {
 	if info.Namespaced() && len(info.Namespace) == 0 {
 		return fmt.Errorf("no namespace set on resource %s %q", info.Mapping.Resource, info.Name)
 	}
-	obj, err := NewHelper(info.Client, info.Mapping).Get(info.Namespace, info.Name, info.Export)
-	if err != nil {
-		return err
-	}
-	info.Object = obj
-	info.ResourceVersion, _ = info.Mapping.MetadataAccessor.ResourceVersion(obj)
-	return nil
+	return info.Get()
 }
 
 // RetrieveLazy updates the object if it has not been loaded yet.
