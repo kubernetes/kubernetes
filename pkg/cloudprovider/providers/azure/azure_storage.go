@@ -22,6 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 )
 
+const (
+	maxLUN = 64 // max number of LUNs per VM
+)
+
 // attach a vhd to vm
 // the vhd must exist, can be identified by diskName, diskUri, and lun.
 func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, cachingMode compute.CachingTypes) error {
@@ -68,8 +72,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 	}
 	disks := *vm.Properties.StorageProfile.DataDisks
 	for i, disk := range disks {
-		if (disk.Name != nil && diskName != "" && *disk.Name == diskName) ||
-			(disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
+		if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
 			// found the disk
 			glog.V(4).Infof("detach disk: lun %d name %q uri %q", *disk.Lun, diskName, diskUri)
 			disks = append(disks[:i], disks[i+1:]...)
@@ -101,15 +104,14 @@ func (az *Cloud) GetDiskLun(diskName, diskUri, vmName string) (int32, error) {
 	disks := *vm.Properties.StorageProfile.DataDisks
 	for _, disk := range disks {
 		if disk.Lun != nil {
-			if (disk.Name != nil && diskName != "" && *disk.Name == diskName) ||
-				(disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
+			if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
 				// found the disk
 				glog.V(4).Infof("find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskUri)
 				return *disk.Lun, nil
 			}
 		}
 	}
-	return -1, cloudprovider.VolumeNotFound
+	return -1, VolumeNotFound
 }
 
 // search all vhd attachment on the host and find unused lun
@@ -121,7 +123,7 @@ func (az *Cloud) GetNextDiskLun(vmName string) (int32, error) {
 	} else if !exists {
 		return -1, cloudprovider.InstanceNotFound
 	}
-	used := make([]bool, 64)
+	used := make([]bool, maxLUN)
 	disks := *vm.Properties.StorageProfile.DataDisks
 	for _, disk := range disks {
 		if disk.Lun != nil {
@@ -133,5 +135,5 @@ func (az *Cloud) GetNextDiskLun(vmName string) (int32, error) {
 			return int32(k), nil
 		}
 	}
-	return -1, cloudprovider.VolumeNotFound
+	return -1, VolumeNotFound
 }

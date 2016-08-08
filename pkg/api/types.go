@@ -756,19 +756,19 @@ const (
 
 // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 type AzureDiskVolumeSource struct {
-	// Data Disk Name
+	// The Name of the data disk in the blob storage
 	DiskName string `json:"diskName"`
-	// Data Disk URI
+	// The URI the the data disk in the blob storage
 	DataDiskURI string `json:"diskURI"`
 	// Host Caching mode: None, Read Only, Read Write.
-	CachingMode AzureDataDiskCachingMode `json:"cachingMode,omitempty"`
+	CachingMode *AzureDataDiskCachingMode `json:"cachingMode,omitempty"`
 	// Filesystem type to mount.
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
-	FSType string `json:"fsType,omitempty"`
+	FSType *string `json:"fsType,omitempty"`
 	// Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
-	ReadOnly bool `json:"readOnly,omitempty"`
+	ReadOnly *bool `json:"readOnly,omitempty"`
 }
 
 // Adapts a ConfigMap into a volume.

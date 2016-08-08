@@ -15545,9 +15545,9 @@ func (x *AzureDiskVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			var yyq2 [5]bool
 			_, _, _ = yysep2, yyq2, yy2arr2
 			const yyr2 bool = false
-			yyq2[2] = x.CachingMode != ""
-			yyq2[3] = x.FSType != ""
-			yyq2[4] = x.ReadOnly != false
+			yyq2[2] = x.CachingMode != nil
+			yyq2[3] = x.FSType != nil
+			yyq2[4] = x.ReadOnly != nil
 			var yynn2 int
 			if yyr2 || yy2arr2 {
 				r.EncodeArrayStart(5)
@@ -15602,65 +15602,95 @@ func (x *AzureDiskVolumeSource) CodecEncodeSelf(e *codec1978.Encoder) {
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[2] {
-					x.CachingMode.CodecEncodeSelf(e)
+					if x.CachingMode == nil {
+						r.EncodeNil()
+					} else {
+						yy10 := *x.CachingMode
+						yy10.CodecEncodeSelf(e)
+					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
+					r.EncodeNil()
 				}
 			} else {
 				if yyq2[2] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("cachingMode"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					x.CachingMode.CodecEncodeSelf(e)
+					if x.CachingMode == nil {
+						r.EncodeNil()
+					} else {
+						yy12 := *x.CachingMode
+						yy12.CodecEncodeSelf(e)
+					}
 				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[3] {
-					yym13 := z.EncBinary()
-					_ = yym13
-					if false {
+					if x.FSType == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+						yy15 := *x.FSType
+						yym16 := z.EncBinary()
+						_ = yym16
+						if false {
+						} else {
+							r.EncodeString(codecSelferC_UTF81234, string(yy15))
+						}
 					}
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, "")
+					r.EncodeNil()
 				}
 			} else {
 				if yyq2[3] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("fsType"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym14 := z.EncBinary()
-					_ = yym14
-					if false {
+					if x.FSType == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeString(codecSelferC_UTF81234, string(x.FSType))
+						yy17 := *x.FSType
+						yym18 := z.EncBinary()
+						_ = yym18
+						if false {
+						} else {
+							r.EncodeString(codecSelferC_UTF81234, string(yy17))
+						}
 					}
 				}
 			}
 			if yyr2 || yy2arr2 {
 				z.EncSendContainerState(codecSelfer_containerArrayElem1234)
 				if yyq2[4] {
-					yym16 := z.EncBinary()
-					_ = yym16
-					if false {
+					if x.ReadOnly == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeBool(bool(x.ReadOnly))
+						yy20 := *x.ReadOnly
+						yym21 := z.EncBinary()
+						_ = yym21
+						if false {
+						} else {
+							r.EncodeBool(bool(yy20))
+						}
 					}
 				} else {
-					r.EncodeBool(false)
+					r.EncodeNil()
 				}
 			} else {
 				if yyq2[4] {
 					z.EncSendContainerState(codecSelfer_containerMapKey1234)
 					r.EncodeString(codecSelferC_UTF81234, string("readOnly"))
 					z.EncSendContainerState(codecSelfer_containerMapValue1234)
-					yym17 := z.EncBinary()
-					_ = yym17
-					if false {
+					if x.ReadOnly == nil {
+						r.EncodeNil()
 					} else {
-						r.EncodeBool(bool(x.ReadOnly))
+						yy22 := *x.ReadOnly
+						yym23 := z.EncBinary()
+						_ = yym23
+						if false {
+						} else {
+							r.EncodeBool(bool(yy22))
+						}
 					}
 				}
 			}
@@ -15739,21 +15769,46 @@ func (x *AzureDiskVolumeSource) codecDecodeSelfFromMap(l int, d *codec1978.Decod
 			}
 		case "cachingMode":
 			if r.TryDecodeAsNil() {
-				x.CachingMode = ""
+				if x.CachingMode != nil {
+					x.CachingMode = nil
+				}
 			} else {
-				x.CachingMode = AzureDataDiskCachingMode(r.DecodeString())
+				if x.CachingMode == nil {
+					x.CachingMode = new(AzureDataDiskCachingMode)
+				}
+				x.CachingMode.CodecDecodeSelf(d)
 			}
 		case "fsType":
 			if r.TryDecodeAsNil() {
-				x.FSType = ""
+				if x.FSType != nil {
+					x.FSType = nil
+				}
 			} else {
-				x.FSType = string(r.DecodeString())
+				if x.FSType == nil {
+					x.FSType = new(string)
+				}
+				yym8 := z.DecBinary()
+				_ = yym8
+				if false {
+				} else {
+					*((*string)(x.FSType)) = r.DecodeString()
+				}
 			}
 		case "readOnly":
 			if r.TryDecodeAsNil() {
-				x.ReadOnly = false
+				if x.ReadOnly != nil {
+					x.ReadOnly = nil
+				}
 			} else {
-				x.ReadOnly = bool(r.DecodeBool())
+				if x.ReadOnly == nil {
+					x.ReadOnly = new(bool)
+				}
+				yym10 := z.DecBinary()
+				_ = yym10
+				if false {
+				} else {
+					*((*bool)(x.ReadOnly)) = r.DecodeBool()
+				}
 			}
 		default:
 			z.DecStructFieldNotFound(-1, yys3)
@@ -15766,16 +15821,16 @@ func (x *AzureDiskVolumeSource) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	var h codecSelfer1234
 	z, r := codec1978.GenHelperDecoder(d)
 	_, _, _ = h, z, r
-	var yyj9 int
-	var yyb9 bool
-	var yyhl9 bool = l >= 0
-	yyj9++
-	if yyhl9 {
-		yyb9 = yyj9 > l
+	var yyj11 int
+	var yyb11 bool
+	var yyhl11 bool = l >= 0
+	yyj11++
+	if yyhl11 {
+		yyb11 = yyj11 > l
 	} else {
-		yyb9 = r.CheckBreak()
+		yyb11 = r.CheckBreak()
 	}
-	if yyb9 {
+	if yyb11 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -15785,13 +15840,13 @@ func (x *AzureDiskVolumeSource) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	} else {
 		x.DiskName = string(r.DecodeString())
 	}
-	yyj9++
-	if yyhl9 {
-		yyb9 = yyj9 > l
+	yyj11++
+	if yyhl11 {
+		yyb11 = yyj11 > l
 	} else {
-		yyb9 = r.CheckBreak()
+		yyb11 = r.CheckBreak()
 	}
-	if yyb9 {
+	if yyb11 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
@@ -15801,66 +15856,91 @@ func (x *AzureDiskVolumeSource) codecDecodeSelfFromArray(l int, d *codec1978.Dec
 	} else {
 		x.DataDiskURI = string(r.DecodeString())
 	}
-	yyj9++
-	if yyhl9 {
-		yyb9 = yyj9 > l
+	yyj11++
+	if yyhl11 {
+		yyb11 = yyj11 > l
 	} else {
-		yyb9 = r.CheckBreak()
+		yyb11 = r.CheckBreak()
 	}
-	if yyb9 {
+	if yyb11 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.CachingMode = ""
+		if x.CachingMode != nil {
+			x.CachingMode = nil
+		}
 	} else {
-		x.CachingMode = AzureDataDiskCachingMode(r.DecodeString())
+		if x.CachingMode == nil {
+			x.CachingMode = new(AzureDataDiskCachingMode)
+		}
+		x.CachingMode.CodecDecodeSelf(d)
 	}
-	yyj9++
-	if yyhl9 {
-		yyb9 = yyj9 > l
+	yyj11++
+	if yyhl11 {
+		yyb11 = yyj11 > l
 	} else {
-		yyb9 = r.CheckBreak()
+		yyb11 = r.CheckBreak()
 	}
-	if yyb9 {
+	if yyb11 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.FSType = ""
+		if x.FSType != nil {
+			x.FSType = nil
+		}
 	} else {
-		x.FSType = string(r.DecodeString())
+		if x.FSType == nil {
+			x.FSType = new(string)
+		}
+		yym16 := z.DecBinary()
+		_ = yym16
+		if false {
+		} else {
+			*((*string)(x.FSType)) = r.DecodeString()
+		}
 	}
-	yyj9++
-	if yyhl9 {
-		yyb9 = yyj9 > l
+	yyj11++
+	if yyhl11 {
+		yyb11 = yyj11 > l
 	} else {
-		yyb9 = r.CheckBreak()
+		yyb11 = r.CheckBreak()
 	}
-	if yyb9 {
+	if yyb11 {
 		z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 		return
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.ReadOnly = false
+		if x.ReadOnly != nil {
+			x.ReadOnly = nil
+		}
 	} else {
-		x.ReadOnly = bool(r.DecodeBool())
+		if x.ReadOnly == nil {
+			x.ReadOnly = new(bool)
+		}
+		yym18 := z.DecBinary()
+		_ = yym18
+		if false {
+		} else {
+			*((*bool)(x.ReadOnly)) = r.DecodeBool()
+		}
 	}
 	for {
-		yyj9++
-		if yyhl9 {
-			yyb9 = yyj9 > l
+		yyj11++
+		if yyhl11 {
+			yyb11 = yyj11 > l
 		} else {
-			yyb9 = r.CheckBreak()
+			yyb11 = r.CheckBreak()
 		}
-		if yyb9 {
+		if yyb11 {
 			break
 		}
 		z.DecSendContainerState(codecSelfer_containerArrayElem1234)
-		z.DecStructFieldNotFound(yyj9-1, "")
+		z.DecStructFieldNotFound(yyj11-1, "")
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayEnd1234)
 }

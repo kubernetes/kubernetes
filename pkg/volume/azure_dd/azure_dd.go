@@ -114,10 +114,10 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespa
 		return nil, err
 	}
 
-	fsType := azure.FSType
+	fsType := *azure.FSType
 	diskName := azure.DiskName
 	diskUri := azure.DataDiskURI
-	cachingMode := azure.CachingMode
+	cachingMode := *azure.CachingMode
 	return &azureDiskMounter{
 		azureDisk: &azureDisk{
 			podUID:      podUID,
@@ -130,7 +130,7 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespa
 			plugin:      plugin,
 		},
 		fsType:      fsType,
-		readOnly:    azure.ReadOnly,
+		readOnly:    *azure.ReadOnly,
 		diskMounter: &mount.SafeFormatAndMount{Interface: plugin.host.GetMounter(), Runner: exec.New()}}, nil
 }
 

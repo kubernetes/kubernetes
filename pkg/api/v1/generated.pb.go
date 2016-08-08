@@ -1171,22 +1171,28 @@ func (m *AzureDiskVolumeSource) MarshalTo(data []byte) (int, error) {
 	i++
 	i = encodeVarintGenerated(data, i, uint64(len(m.DataDiskURI)))
 	i += copy(data[i:], m.DataDiskURI)
-	data[i] = 0x1a
-	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.CachingMode)))
-	i += copy(data[i:], m.CachingMode)
-	data[i] = 0x22
-	i++
-	i = encodeVarintGenerated(data, i, uint64(len(m.FSType)))
-	i += copy(data[i:], m.FSType)
-	data[i] = 0x28
-	i++
-	if m.ReadOnly {
-		data[i] = 1
-	} else {
-		data[i] = 0
+	if m.CachingMode != nil {
+		data[i] = 0x1a
+		i++
+		i = encodeVarintGenerated(data, i, uint64(len(*m.CachingMode)))
+		i += copy(data[i:], *m.CachingMode)
 	}
-	i++
+	if m.FSType != nil {
+		data[i] = 0x22
+		i++
+		i = encodeVarintGenerated(data, i, uint64(len(*m.FSType)))
+		i += copy(data[i:], *m.FSType)
+	}
+	if m.ReadOnly != nil {
+		data[i] = 0x28
+		i++
+		if *m.ReadOnly {
+			data[i] = 1
+		} else {
+			data[i] = 0
+		}
+		i++
+	}
 	return i, nil
 }
 
@@ -8055,11 +8061,17 @@ func (m *AzureDiskVolumeSource) Size() (n int) {
 	n += 1 + l + sovGenerated(uint64(l))
 	l = len(m.DataDiskURI)
 	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.CachingMode)
-	n += 1 + l + sovGenerated(uint64(l))
-	l = len(m.FSType)
-	n += 1 + l + sovGenerated(uint64(l))
-	n += 2
+	if m.CachingMode != nil {
+		l = len(*m.CachingMode)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.FSType != nil {
+		l = len(*m.FSType)
+		n += 1 + l + sovGenerated(uint64(l))
+	}
+	if m.ReadOnly != nil {
+		n += 2
+	}
 	return n
 }
 
@@ -10623,9 +10635,9 @@ func (this *AzureDiskVolumeSource) String() string {
 	s := strings.Join([]string{`&AzureDiskVolumeSource{`,
 		`DiskName:` + fmt.Sprintf("%v", this.DiskName) + `,`,
 		`DataDiskURI:` + fmt.Sprintf("%v", this.DataDiskURI) + `,`,
-		`CachingMode:` + fmt.Sprintf("%v", this.CachingMode) + `,`,
-		`FSType:` + fmt.Sprintf("%v", this.FSType) + `,`,
-		`ReadOnly:` + fmt.Sprintf("%v", this.ReadOnly) + `,`,
+		`CachingMode:` + valueToStringGenerated(this.CachingMode) + `,`,
+		`FSType:` + valueToStringGenerated(this.FSType) + `,`,
+		`ReadOnly:` + valueToStringGenerated(this.ReadOnly) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -13323,7 +13335,8 @@ func (m *AzureDiskVolumeSource) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.CachingMode = AzureDataDiskCachingMode(data[iNdEx:postIndex])
+			s := AzureDataDiskCachingMode(data[iNdEx:postIndex])
+			m.CachingMode = &s
 			iNdEx = postIndex
 		case 4:
 			if wireType != 2 {
@@ -13352,7 +13365,8 @@ func (m *AzureDiskVolumeSource) Unmarshal(data []byte) error {
 			if postIndex > l {
 				return io.ErrUnexpectedEOF
 			}
-			m.FSType = string(data[iNdEx:postIndex])
+			s := string(data[iNdEx:postIndex])
+			m.FSType = &s
 			iNdEx = postIndex
 		case 5:
 			if wireType != 0 {
@@ -13373,7 +13387,8 @@ func (m *AzureDiskVolumeSource) Unmarshal(data []byte) error {
 					break
 				}
 			}
-			m.ReadOnly = bool(v != 0)
+			b := bool(v != 0)
+			m.ReadOnly = &b
 		default:
 			iNdEx = preIndex
 			skippy, err := skipGenerated(data[iNdEx:])

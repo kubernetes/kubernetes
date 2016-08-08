@@ -17639,14 +17639,14 @@
     "properties": {
      "diskName": {
       "type": "string",
-      "description": "Data Disk Name"
+      "description": "The Name of the data disk in the blob storage"
      },
      "diskURI": {
       "type": "string",
-      "description": "Data Disk URI"
+      "description": "The URI the data disk in the blob storage"
      },
      "cachingMode": {
-      "type": "string",
+      "$ref": "v1.AzureDataDiskCachingMode",
       "description": "Host Caching mode: None, Read Only, Read Write."
      },
      "fsType": {
@@ -17658,6 +17658,10 @@
       "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
      }
     }
+   },
+   "v1.AzureDataDiskCachingMode": {
+    "id": "v1.AzureDataDiskCachingMode",
+    "properties": {}
    },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",

@@ -153,7 +153,6 @@ type Routes interface {
 }
 
 var InstanceNotFound = errors.New("instance not found")
-var VolumeNotFound = errors.New("volume not found")
 
 // Zone represents the location of a particular machine.
 type Zone struct {

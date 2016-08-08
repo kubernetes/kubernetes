@@ -440,9 +440,27 @@ func DeepCopy_api_AzureDiskVolumeSource(in interface{}, out interface{}, c *conv
 		out := out.(*AzureDiskVolumeSource)
 		out.DiskName = in.DiskName
 		out.DataDiskURI = in.DataDiskURI
-		out.CachingMode = in.CachingMode
-		out.FSType = in.FSType
-		out.ReadOnly = in.ReadOnly
+		if in.CachingMode != nil {
+			in, out := &in.CachingMode, &out.CachingMode
+			*out = new(AzureDataDiskCachingMode)
+			**out = **in
+		} else {
+			out.CachingMode = nil
+		}
+		if in.FSType != nil {
+			in, out := &in.FSType, &out.FSType
+			*out = new(string)
+			**out = **in
+		} else {
+			out.FSType = nil
+		}
+		if in.ReadOnly != nil {
+			in, out := &in.ReadOnly, &out.ReadOnly
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.ReadOnly = nil
+		}
 		return nil
 	}
 }
@@ -2379,7 +2397,9 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		if in.AzureDisk != nil {
 			in, out := &in.AzureDisk, &out.AzureDisk
 			*out = new(AzureDiskVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_AzureDiskVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		} else {
 			out.AzureDisk = nil
 		}
@@ -3770,7 +3790,9 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 		if in.AzureDisk != nil {
 			in, out := &in.AzureDisk, &out.AzureDisk
 			*out = new(AzureDiskVolumeSource)
-			**out = **in
+			if err := DeepCopy_api_AzureDiskVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
 		} else {
 			out.AzureDisk = nil
 		}

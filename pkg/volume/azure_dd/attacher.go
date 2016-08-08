@@ -46,8 +46,9 @@ const (
 	checkSleepDuration = time.Second
 )
 
-// serialize concurrent attach
-var attachMutex = keymutex.NewKeyMutex()
+// Azure doesn't allow simultanious disk attach or detach on the same instance
+// serialize concurrent attach/detach per instance
+var attachDetachMutex = keymutex.NewKeyMutex()
 
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	azure, err := getAzureDiskManager(plugin.host.GetCloudProvider())
@@ -76,8 +77,8 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
-	attachMutex.LockKey(instanceid)
-	defer attachMutex.UnlockKey(instanceid)
+	attachDetachMutex.LockKey(instanceid)
+	defer attachDetachMutex.UnlockKey(instanceid)
 
 	lun, err := attacher.manager.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid)
 	if err == cloudprovider.InstanceNotFound {
@@ -97,7 +98,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q", volumeSource.DiskName, instanceid)
 		}
 
-		err = attacher.manager.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, lun, compute.CachingTypes(volumeSource.CachingMode))
+		err = attacher.manager.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, lun, compute.CachingTypes(*volumeSource.CachingMode))
 		if err == nil {
 			glog.V(4).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, instanceid)
 		} else {
@@ -147,15 +148,13 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, lunStr strin
 	}
 }
 
-func (attacher *azureDiskAttacher) GetDeviceMountPath(
-	spec *volume.Spec) (string, error) {
+func (attacher *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 	volumeSource, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
 	return makeGlobalPDPath(attacher.host, volumeSource.DiskName), nil
-
 }
 
 func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
@@ -183,7 +182,7 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 	}
 	if notMnt {
 		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Runner: exec.New()}
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, options)
+		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, *volumeSource.FSType, options)
 		if err != nil {
 			os.Remove(deviceMountPath)
 			return err
@@ -222,8 +221,8 @@ func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
 	}
-	attachMutex.LockKey(instanceid)
-	defer attachMutex.UnlockKey(instanceid)
+	attachDetachMutex.LockKey(instanceid)
+	defer attachDetachMutex.UnlockKey(instanceid)
 
 	glog.V(4).Infof("detach %v from host %q", dev, instanceid)
 	err = detacher.manager.DetachDiskByName(dev, "", instanceid)
@@ -262,7 +261,6 @@ func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
 	}
 
 	return nil
-
 }
 
 // Checks if the specified path exists
