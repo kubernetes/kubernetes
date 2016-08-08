@@ -240,6 +240,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 				Err:   cmdErr,
 				Stdin: interactive,
 				TTY:   tty,
+				Quiet: quiet,
 			},
 
 			CommandName: cmd.Parent().CommandPath() + " attach",
@@ -284,7 +285,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 				ResourceNames(mapping.Resource, name).
 				Flatten().
 				Do()
-			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper)
+			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper, quiet)
 		}
 		return nil
 	}

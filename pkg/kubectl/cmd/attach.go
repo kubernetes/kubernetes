@@ -220,7 +220,8 @@ func (p *AttachOptions) Run() error {
 	}
 
 	fn := func() error {
-		if stderr != nil {
+
+		if !p.Quiet && stderr != nil {
 			fmt.Fprintln(stderr, "If you don't see a command prompt, try pressing enter.")
 		}
 
