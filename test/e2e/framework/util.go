@@ -2914,6 +2914,10 @@ func AddOrUpdateTaintOnNode(c *client.Client, nodeName string, taint api.Taint) 
 
 	taintsData, err := json.Marshal(newTaints)
 	ExpectNoError(err)
+
+	if node.Annotations == nil {
+		node.Annotations = make(map[string]string)
+	}
 	node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
 	_, err = c.Nodes().Update(node)
 	ExpectNoError(err)
