@@ -32,6 +32,11 @@ const (
 	stderrChannel
 	errorChannel
 	resizeChannel
+
+	preV4BinaryWebsocketProtocol = wsstream.ChannelWebSocketProtocol
+	preV4Base64WebsocketProtocol = wsstream.Base64ChannelWebSocketProtocol
+	v4BinaryWebsocketProtocol    = "v4." + wsstream.ChannelWebSocketProtocol
+	v4Base64WebsocketProtocol    = "v4." + wsstream.Base64ChannelWebSocketProtocol
 )
 
 // createChannels returns the standard channel types for a shell connection (STDIN 0, STDOUT 1, STDERR 2)
@@ -67,9 +72,30 @@ func writeChannel(real bool) wsstream.ChannelType {
 // streams needed to perform an exec or an attach.
 func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *options, idleTimeout time.Duration) (*context, bool) {
 	channels := createChannels(opts)
-	conn := wsstream.NewConn(channels...)
+	conn := wsstream.NewConn(map[string]wsstream.ChannelProtocolConfig{
+		"": {
+			Binary:   true,
+			Channels: channels,
+		},
+		preV4BinaryWebsocketProtocol: {
+			Binary:   true,
+			Channels: channels,
+		},
+		preV4Base64WebsocketProtocol: {
+			Binary:   false,
+			Channels: channels,
+		},
+		v4BinaryWebsocketProtocol: {
+			Binary:   true,
+			Channels: channels,
+		},
+		v4Base64WebsocketProtocol: {
+			Binary:   false,
+			Channels: channels,
+		},
+	})
 	conn.SetIdleTimeout(idleTimeout)
-	streams, err := conn.Open(httplog.Unlogged(w), req)
+	negotiatedProtocol, streams, err := conn.Open(httplog.Unlogged(w), req)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("Unable to upgrade websocket connection: %v", err))
 		return nil, false
@@ -86,13 +112,21 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 		streams[errorChannel].Write([]byte{})
 	}
 
-	return &context{
+	ctx := &context{
 		conn:         conn,
 		stdinStream:  streams[stdinChannel],
 		stdoutStream: streams[stdoutChannel],
 		stderrStream: streams[stderrChannel],
-		errorStream:  streams[errorChannel],
 		tty:          opts.tty,
 		resizeStream: streams[resizeChannel],
-	}, true
+	}
+
+	switch negotiatedProtocol {
+	case v4BinaryWebsocketProtocol, v4Base64WebsocketProtocol:
+		ctx.writeStatus = v4WriteStatusFunc(streams[errorChannel])
+	default:
+		ctx.writeStatus = v1WriteStatusFunc(streams[errorChannel])
+	}
+
+	return ctx, true
 }

@@ -88,27 +88,6 @@ func (p *streamProtocolV2) createStreams(conn streamCreator) error {
 	return nil
 }
 
-func (p *streamProtocolV2) setupErrorStreamReading() chan error {
-	errorChan := make(chan error)
-
-	go func() {
-		defer runtime.HandleCrash()
-
-		message, err := ioutil.ReadAll(p.errorStream)
-		switch {
-		case err != nil && err != io.EOF:
-			errorChan <- fmt.Errorf("error reading from error stream: %s", err)
-		case len(message) > 0:
-			errorChan <- fmt.Errorf("error executing remote command: %s", message)
-		default:
-			errorChan <- nil
-		}
-		close(errorChan)
-	}()
-
-	return errorChan
-}
-
 func (p *streamProtocolV2) copyStdin() {
 	if p.Stdin != nil {
 		var once sync.Once
@@ -193,7 +172,7 @@ func (p *streamProtocolV2) stream(conn streamCreator) error {
 
 	// now that all the streams have been created, proceed with reading & copying
 
-	errorChan := p.setupErrorStreamReading()
+	errorChan := watchErrorStream(p.errorStream, &errorDecoderV2{})
 
 	p.copyStdin()
 
@@ -206,4 +185,11 @@ func (p *streamProtocolV2) stream(conn streamCreator) error {
 
 	// waits for errorStream to finish reading with an error or nil
 	return <-errorChan
+}
+
+// errorDecoderV2 interprets the error channel data as plain text.
+type errorDecoderV2 struct{}
+
+func (d *errorDecoderV2) decode(message []byte) error {
+	return fmt.Errorf("error executing remote command: %s", message)
 }

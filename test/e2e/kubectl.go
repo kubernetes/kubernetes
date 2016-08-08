@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -346,6 +347,49 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 					framework.Failf("Missing expected log result on proxy server for %s. Expected: %q, got %q", proxyVar, expectedProxyLog, proxyLog)
 				}
 			}
+		})
+
+		It("should return command exit codes", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			By("execing into a container with a successful command")
+			_, err := framework.NewKubectlCommand(nsFlag, "exec", "nginx", "--", "/bin/sh", "-c", "exit 0").Exec()
+			ExpectNoError(err)
+
+			By("execing into a container with a failing command")
+			_, err = framework.NewKubectlCommand(nsFlag, "exec", "nginx", "--", "/bin/sh", "-c", "exit 42").Exec()
+			ee, ok := err.(uexec.ExitError)
+			Expect(ok).To(Equal(true))
+			Expect(ee.ExitStatus()).To(Equal(42))
+
+			By("running a successful command")
+			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "success", "--", "/bin/sh", "-c", "exit 0").Exec()
+			ExpectNoError(err)
+
+			By("running a failing command")
+			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-1", "--", "/bin/sh", "-c", "exit 42").Exec()
+			ee, ok = err.(uexec.ExitError)
+			Expect(ok).To(Equal(true))
+			Expect(ee.ExitStatus()).To(Equal(42))
+
+			By("running a failing command without --restart=Never")
+			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "failure-2", "--", "/bin/sh", "-c", "cat && exit 42").
+				WithStdinData("abcd1234").
+				Exec()
+			ExpectNoError(err)
+
+			By("running a failing command without --restart=Never, but with --rm")
+			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=OnFailure", "--rm", "failure-3", "--", "/bin/sh", "-c", "cat && exit 42").
+				WithStdinData("abcd1234").
+				Exec()
+			ExpectNoError(err)
+			framework.WaitForPodToDisappear(f.Client, ns, "failure-3", labels.Everything(), 2*time.Second, wait.ForeverTestTimeout)
+
+			By("running a failing command with --leave-stdin-open")
+			_, err = framework.NewKubectlCommand(nsFlag, "run", "-i", "--image="+busyboxImage, "--restart=Never", "failure-4", "--leave-stdin-open", "--", "/bin/sh", "-c", "exit 42").
+				WithStdinData("abcd1234").
+				Exec()
+			ExpectNoError(err)
 		})
 
 		It("should support inline execution and attach", func() {

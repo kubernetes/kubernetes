@@ -17,12 +17,13 @@ limitations under the License.
 package remotecommand
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
@@ -47,8 +48,12 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 
 	err := attacher.AttachContainer(podName, uid, container, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
 	if err != nil {
-		msg := fmt.Sprintf("error attaching to container: %v", err)
-		runtime.HandleError(errors.New(msg))
-		fmt.Fprint(ctx.errorStream, msg)
+		err = fmt.Errorf("error attaching to container: %v", err)
+		runtime.HandleError(err)
+		ctx.writeStatus(apierrors.NewInternalError(err))
+	} else {
+		ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
+			Status: unversioned.StatusSuccess,
+		}})
 	}
 }
