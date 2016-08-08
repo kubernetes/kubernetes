@@ -50,12 +50,20 @@ func (csrStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users
-// on creation. Users cannot create any derived information, but we expect
-// information about the requesting user to be injected by the registry
-// interface. Clear everything else.
-// TODO: check these ordering assumptions. better way to inject user info?
+// on creation.
 func (csrStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	csr := obj.(*certificates.CertificateSigningRequest)
+
+	// Clear any user-specified info
+	csr.Spec.Username = ""
+	csr.Spec.UID = ""
+	csr.Spec.Groups = nil
+	// Inject user.Info from request context
+	if user, ok := api.UserFrom(ctx); ok {
+		csr.Spec.Username = user.GetName()
+		csr.Spec.UID = user.GetUID()
+		csr.Spec.Groups = user.GetGroups()
+	}
 
 	// Be explicit that users cannot create pre-approved certificate requests.
 	csr.Status = certificates.CertificateSigningRequestStatus{}

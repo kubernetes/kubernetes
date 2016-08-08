@@ -54,17 +54,6 @@ func (s *storage) ListCSRs(ctx api.Context, options *api.ListOptions) (*certific
 }
 
 func (s *storage) CreateCSR(ctx api.Context, csr *certificates.CertificateSigningRequest) error {
-	// Inject user.Info from request context if available and no
-	// information was supplied. Don't smash existing user information
-	// since it should be possible for a broadly-scoped user to request a
-	// certificate on behalf of a more limited user.
-	if user, ok := api.UserFrom(ctx); ok {
-		if csr.Spec.Username == "" {
-			csr.Spec.Username = user.GetName()
-			csr.Spec.UID = user.GetUID()
-			csr.Spec.Groups = user.GetGroups()
-		}
-	}
 	_, err := s.Create(ctx, csr)
 	return err
 }
