@@ -103,7 +103,7 @@ and can refer to it from other resource types, such as
 Here are several examples of *work lists*: lists of command lines that the user
 wants to run, each line its own Pod. (Note that in practice, a work list may not
 ever be written out in this form, but it exists in the mind of the Job creator,
-and it is a useful way to talk about the the intent of the user when discussing
+and it is a useful way to talk about the intent of the user when discussing
 alternatives for specifying Indexed Jobs).
 
 Note that we will not have the user express their requirements in work list
@@ -387,7 +387,7 @@ equal to the number of work items in the work list.
 
 Each pod that the job controller creates is intended to complete one work item
 from the work list. Since a pod may fail, several pods may, serially, attempt to
-complete the same index. Therefore, we call it a a *completion index* (or just
+complete the same index. Therefore, we call it a *completion index* (or just
 *index*), but not a *pod index*.
 
 For each completion index, in the range 1 to `.job.Spec.Completions`, the job
@@ -564,7 +564,7 @@ before. They will have a new annotation, but pod are expected to tolerate
 unfamiliar annotations.
 
 However, if the job controller version is reverted, to a version before this
-change, the jobs whose pod specs depend on the the new annotation will fail.
+change, the jobs whose pod specs depend on the new annotation will fail.
 This is okay for a Beta resource.
 
 #### Job Controller Changes
