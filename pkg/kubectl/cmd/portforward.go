@@ -40,6 +40,8 @@ type PortForwardOptions struct {
 	Client        *client.Client
 	Ports         []string
 	PortForwarder portForwarder
+	StopChannel   chan struct{}
+	ReadyChannel  chan struct{}
 }
 
 var (
@@ -87,19 +89,19 @@ func NewCmdPortForward(f *cmdutil.Factory, cmdOut, cmdErr io.Writer) *cobra.Comm
 }
 
 type portForwarder interface {
-	ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error
+	ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error
 }
 
 type defaultPortForwarder struct {
 	cmdOut, cmdErr io.Writer
 }
 
-func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, config *restclient.Config, ports []string, stopChan <-chan struct{}) error {
-	dialer, err := remotecommand.NewExecutor(config, method, url)
+func (f *defaultPortForwarder) ForwardPorts(method string, url *url.URL, opts PortForwardOptions) error {
+	dialer, err := remotecommand.NewExecutor(opts.Config, method, url)
 	if err != nil {
 		return err
 	}
-	fw, err := portforward.New(dialer, ports, stopChan, f.cmdOut, f.cmdErr)
+	fw, err := portforward.New(dialer, opts.Ports, opts.StopChannel, opts.ReadyChannel, f.cmdOut, f.cmdErr)
 	if err != nil {
 		return err
 	}
@@ -136,6 +138,7 @@ func (o *PortForwardOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, ar
 		return err
 	}
 
+	o.StopChannel = make(chan struct{}, 1)
 	return nil
 }
 
@@ -168,10 +171,9 @@ func (o PortForwardOptions) RunPortForward() error {
 	signal.Notify(signals, os.Interrupt)
 	defer signal.Stop(signals)
 
-	stopCh := make(chan struct{}, 1)
 	go func() {
 		<-signals
-		close(stopCh)
+		close(o.StopChannel)
 	}()
 
 	req := o.Client.RESTClient.Post().
@@ -180,5 +182,5 @@ func (o PortForwardOptions) RunPortForward() error {
 		Name(pod.Name).
 		SubResource("portforward")
 
-	return o.PortForwarder.ForwardPorts("POST", req.URL(), o.Config, o.Ports, stopCh)
+	return o.PortForwarder.ForwardPorts("POST", req.URL(), o)
 }

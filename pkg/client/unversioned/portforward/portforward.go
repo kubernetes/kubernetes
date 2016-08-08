@@ -108,7 +108,7 @@ func parsePorts(ports []string) ([]ForwardedPort, error) {
 }
 
 // New creates a new PortForwarder.
-func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
+func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, readyChan chan struct{}, out, errOut io.Writer) (*PortForwarder, error) {
 	if len(ports) == 0 {
 		return nil, errors.New("You must specify at least 1 port")
 	}
@@ -116,11 +116,12 @@ func New(dialer httpstream.Dialer, ports []string, stopChan <-chan struct{}, out
 	if err != nil {
 		return nil, err
 	}
+	readyChan = make(chan struct{})
 	return &PortForwarder{
 		dialer:   dialer,
 		ports:    parsedPorts,
 		stopChan: stopChan,
-		Ready:    make(chan struct{}),
+		Ready:    readyChan,
 		out:      out,
 		errOut:   errOut,
 	}, nil
