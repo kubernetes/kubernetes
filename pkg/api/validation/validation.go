@@ -849,6 +849,8 @@ func validateAzureFile(azure *api.AzureFileVolumeSource, fldPath *field.Path) fi
 	return allErrs
 }
 
+var supportedCachingModes = sets.NewString(string(api.AzureDataDiskCachingNone), string(api.AzureDataDiskCachingReadOnly), string(api.AzureDataDiskCachingReadWrite))
+
 func validateAzureDisk(azure *api.AzureDiskVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if azure.DiskName == "" {
@@ -856,6 +858,9 @@ func validateAzureDisk(azure *api.AzureDiskVolumeSource, fldPath *field.Path) fi
 	}
 	if azure.DataDiskURI == "" {
 		allErrs = append(allErrs, field.Required(fldPath.Child("diskURI"), ""))
+	}
+	if azure.CachingMode != nil && !supportedCachingModes.Has(string(*azure.CachingMode)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("cachingMode"), *azure.CachingMode, supportedCachingModes.List()))
 	}
 	return allErrs
 }
