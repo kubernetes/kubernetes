@@ -140,10 +140,16 @@ func (d *DelayingDeliverer) Stop() {
 	close(d.stopChannel)
 }
 
+// Delivers value at the given time.
 func (d *DelayingDeliverer) DeliverAt(key string, value interface{}, deliveryTime time.Time) {
 	d.updateChannel <- &DelayingDelivererItem{
 		Key:          key,
 		Value:        value,
 		DeliveryTime: deliveryTime,
 	}
+}
+
+// Delivers value after the given delay.
+func (d *DelayingDeliverer) DeliverAfter(key string, value interface{}, delay time.Duration) {
+	d.DeliverAt(key, value, time.Now().Add(delay))
 }
