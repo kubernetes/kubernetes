@@ -42,7 +42,7 @@ const (
 // TODO: Leverage dynamic Kubelet settings when it's implemented to only modify the kubelet eviction option in this test.
 // To manually trigger the test on a node with disk space just over 15Gi :
 //   make test-e2e-node FOCUS="hard eviction test" TEST_ARGS="--eviction-hard=nodefs.available<15Gi"
-var _ = framework.KubeDescribe("Kubelet Eviction Manager [FLAKY] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("kubelet-eviction-manager")
 	var podClient *framework.PodClient
 	var c *client.Client
