@@ -43,8 +43,8 @@ func TestControllerSync(t *testing.T) {
 		{
 			// addClaim gets a new claim. Check it's bound to a volume.
 			"5-2 - complete bind",
-			newVolumeArray("volume5-2", "10Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRetain),
-			newVolumeArray("volume5-2", "10Gi", "uid5-2", "claim5-2", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
+			newVolumeArray("volume5-2", "1Gi", "", "", api.VolumeAvailable, api.PersistentVolumeReclaimRetain),
+			newVolumeArray("volume5-2", "1Gi", "uid5-2", "claim5-2", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
 			noclaims, /* added in testAddClaim5_2 */
 			newClaimArray("claim5-2", "uid5-2", "1Gi", "volume5-2", api.ClaimBound, annBoundByController, annBindCompleted),
 			noevents, noerrors,
@@ -74,7 +74,7 @@ func TestControllerSync(t *testing.T) {
 		{
 			// deleteVolume with a bound volume. Check the claim is Lost.
 			"5-4 - delete volume",
-			newVolumeArray("volume5-4", "10Gi", "uid5-4", "claim5-4", api.VolumeBound, api.PersistentVolumeReclaimRetain),
+			newVolumeArray("volume5-4", "1Gi", "uid5-4", "claim5-4", api.VolumeBound, api.PersistentVolumeReclaimRetain),
 			novolumes,
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", api.ClaimBound, annBoundByController, annBindCompleted),
 			newClaimArray("claim5-4", "uid5-4", "1Gi", "volume5-4", api.ClaimLost, annBoundByController, annBindCompleted),
@@ -92,13 +92,13 @@ func TestControllerSync(t *testing.T) {
 			// is expected - it should stay bound.
 			"5-5 - add bound volume from 1.2",
 			novolumes,
-			[]*api.PersistentVolume{addVolumeAnnotation(newVolume("volume5-5", "10Gi", "uid5-5", "claim5-5", api.VolumeBound, api.PersistentVolumeReclaimDelete), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
+			[]*api.PersistentVolume{addVolumeAnnotation(newVolume("volume5-5", "1Gi", "uid5-5", "claim5-5", api.VolumeBound, api.PersistentVolumeReclaimDelete), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
 			newClaimArray("claim5-5", "uid5-5", "1Gi", "", api.ClaimPending),
 			newClaimArray("claim5-5", "uid5-5", "1Gi", "volume5-5", api.ClaimBound, annBindCompleted, annBoundByController),
 			noevents, noerrors,
 			// Custom test function that generates a add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-5", "10Gi", "uid5-5", "claim5-5", api.VolumeBound, api.PersistentVolumeReclaimDelete)
+				volume := newVolume("volume5-5", "1Gi", "uid5-5", "claim5-5", api.VolumeBound, api.PersistentVolumeReclaimDelete)
 				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)
 				reactor.addVolumeEvent(volume)
 				return nil
@@ -108,14 +108,14 @@ func TestControllerSync(t *testing.T) {
 			// updateVolume with provisioned volume from Kubernetes 1.2. No
 			// "action" is expected - it should stay bound.
 			"5-6 - update bound volume from 1.2",
-			[]*api.PersistentVolume{addVolumeAnnotation(newVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", api.VolumeBound, api.PersistentVolumeReclaimDelete), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
-			[]*api.PersistentVolume{addVolumeAnnotation(newVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", api.VolumeBound, api.PersistentVolumeReclaimDelete), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
+			[]*api.PersistentVolume{addVolumeAnnotation(newVolume("volume5-6", "1Gi", "uid5-6", "claim5-6", api.VolumeBound, api.PersistentVolumeReclaimDelete), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
+			[]*api.PersistentVolume{addVolumeAnnotation(newVolume("volume5-6", "1Gi", "uid5-6", "claim5-6", api.VolumeBound, api.PersistentVolumeReclaimDelete), pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)},
 			newClaimArray("claim5-6", "uid5-6", "1Gi", "volume5-6", api.ClaimBound),
 			newClaimArray("claim5-6", "uid5-6", "1Gi", "volume5-6", api.ClaimBound, annBindCompleted),
 			noevents, noerrors,
 			// Custom test function that generates a add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-6", "10Gi", "uid5-6", "claim5-6", api.VolumeBound, api.PersistentVolumeReclaimDelete)
+				volume := newVolume("volume5-6", "1Gi", "uid5-6", "claim5-6", api.VolumeBound, api.PersistentVolumeReclaimDelete)
 				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, pvProvisioningCompletedAnnotationValue)
 				reactor.modifyVolumeEvent(volume)
 				return nil
@@ -132,7 +132,7 @@ func TestControllerSync(t *testing.T) {
 			noevents, noerrors,
 			// Custom test function that generates a add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-7", "10Gi", "uid5-7", "claim5-7", api.VolumeBound, api.PersistentVolumeReclaimDelete)
+				volume := newVolume("volume5-7", "1Gi", "uid5-7", "claim5-7", api.VolumeBound, api.PersistentVolumeReclaimDelete)
 				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, "yes")
 				reactor.addVolumeEvent(volume)
 				return nil
@@ -149,7 +149,7 @@ func TestControllerSync(t *testing.T) {
 			noevents, noerrors,
 			// Custom test function that generates a add event
 			func(ctrl *PersistentVolumeController, reactor *volumeReactor, test controllerTest) error {
-				volume := newVolume("volume5-8", "10Gi", "uid5-8", "claim5-8", api.VolumeBound, api.PersistentVolumeReclaimDelete)
+				volume := newVolume("volume5-8", "1Gi", "uid5-8", "claim5-8", api.VolumeBound, api.PersistentVolumeReclaimDelete)
 				volume = addVolumeAnnotation(volume, pvProvisioningRequiredAnnotationKey, "yes")
 				reactor.modifyVolumeEvent(volume)
 				return nil
