@@ -55,7 +55,7 @@ The Kubelet is currently configured via command-line flags. This is painful for 
 
 - `kubelet-default`: The built-in default config that every Kubelet starts up with.
 - `api-default`: The defaults provided for omitted/nil fields by the API server.
-- `on-disk-config`: `KubeletConfiguration` provided on disk, used as a fallback when the Kubelet cannot cannot contact the API server.
+- `on-disk-config`: `KubeletConfiguration` provided on disk, used as a fallback when the Kubelet cannot contact the API server.
 - `minimal-config`: Conceptually, what the Kubelet needs to start up and contact the API server. This probably consists of the location of the API server and credentials to access the API server, and might be provided via flags or via `on-disk-config`.
 - `global-kubelet-configuration`: the `KubeletConfiguration` configmap set via the API server which is shared by all Kubelets in your cluster except those which have a `<node-name>-kubelet-configuration`.
 - `<node-name>-kubelet-configuration`: the `KubeletConfiguration` configmap specific to the node named `<node-name>`, also set via the API server.
