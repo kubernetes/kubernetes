@@ -53,6 +53,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	clientset "k8s.io/kubernetes/pkg/client/unversioned/adapters/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -83,6 +85,9 @@ type Factory struct {
 	// Returns interfaces for dealing with arbitrary runtime.Objects. If thirdPartyDiscovery is true, performs API calls
 	// to discovery dynamic API objects registered by third parties.
 	Object func(thirdPartyDiscovery bool) (meta.RESTMapper, runtime.ObjectTyper)
+	// Returns interfaces for dealing with arbitrary
+	// runtime.Unstructured. This performs API calls to discover types.
+	UnstructuredObject func() (meta.RESTMapper, runtime.ObjectTyper, error)
 	// Returns interfaces for decoding objects - if toInternal is set, decoded objects will be converted
 	// into their internal form (if possible). Eventually the internal form will be removed as an option,
 	// and only versioned objects will be returned.
@@ -96,6 +101,8 @@ type Factory struct {
 	// Returns a RESTClient for working with the specified RESTMapping or an error. This is intended
 	// for working with arbitrary resources and is not guaranteed to point to a Kubernetes APIServer.
 	ClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
+	// Returns a RESTClient for working with Unstructured objects.
+	UnstructuredClientForMapping func(mapping *meta.RESTMapping) (resource.RESTClient, error)
 	// Returns a Describer for displaying the specified RESTMapping type or an error.
 	Describer func(mapping *meta.RESTMapping) (kubectl.Describer, error)
 	// Returns a Printer for formatting objects of the given type or an error.
@@ -360,6 +367,46 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			}
 			return priorityRESTMapper, api.Scheme
 		},
+		UnstructuredObject: func() (meta.RESTMapper, runtime.ObjectTyper, error) {
+			cfg, err := clients.ClientConfigForVersion(nil)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			dc, err := discovery.NewDiscoveryClientForConfig(cfg)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			groupResources, err := discovery.GetAPIGroupResources(dc)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			// Register unknown APIs as third party for now to make
+			// validation happy. TODO perhaps make a dynamic schema
+			// validator to avoid this.
+			for _, group := range groupResources {
+				for _, version := range group.Group.Versions {
+					gv := unversioned.GroupVersion{Group: group.Group.Name, Version: version.Version}
+					if !registered.IsRegisteredVersion(gv) {
+						registered.AddThirdPartyAPIGroupVersions(gv)
+					}
+				}
+			}
+
+			mapper := discovery.NewRESTMapper(groupResources,
+				func(unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
+					return &meta.VersionInterfaces{
+						ObjectConvertor:  &runtime.UnstructuredObjectConverter{},
+						MetadataAccessor: meta.NewAccessor(),
+					}, nil
+				})
+
+			typer := NewDynamicObjectTyper(groupResources)
+
+			return kubectl.ShortcutExpander{RESTMapper: mapper}, typer, nil
+		},
 		Client: func() (*client.Client, error) {
 			return clients.ClientForVersion(nil)
 		},
@@ -389,6 +436,23 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
 				cfg.NegotiatedSerializer = thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, gvk.Kind, gv, gv)
 			}
+			return restclient.RESTClientFor(cfg)
+		},
+		UnstructuredClientForMapping: func(mapping *meta.RESTMapping) (resource.RESTClient, error) {
+			cfg, err := clientConfig.ClientConfig()
+			if err != nil {
+				return nil, err
+			}
+			if err := restclient.SetKubernetesDefaults(cfg); err != nil {
+				return nil, err
+			}
+			cfg.APIPath = "/apis"
+			if mapping.GroupVersionKind.Group == api.GroupName {
+				cfg.APIPath = "/api"
+			}
+			gv := mapping.GroupVersionKind.GroupVersion()
+			cfg.ContentConfig = dynamic.ContentConfig()
+			cfg.GroupVersion = &gv
 			return restclient.RESTClientFor(cfg)
 		},
 		Describer: func(mapping *meta.RESTMapping) (kubectl.Describer, error) {
@@ -1250,4 +1314,73 @@ func (f *Factory) NewBuilder(thirdPartyDiscovery bool) *resource.Builder {
 	mapper, typer := f.Object(thirdPartyDiscovery)
 
 	return resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true))
+}
+
+// TODO find a better place for dynamicObjectTyper
+
+// DynamicObjectTyper provides an ObjectTyper implmentation for
+// runtime.Unstructured object based on discovery information.
+type DynamicObjectTyper struct {
+	registered map[unversioned.GroupVersionKind]bool
+}
+
+func NewDynamicObjectTyper(groupResources []*discovery.APIGroupResources) *DynamicObjectTyper {
+	dot := &DynamicObjectTyper{registered: make(map[unversioned.GroupVersionKind]bool)}
+	for _, group := range groupResources {
+		for _, discoveryVersion := range group.Group.Versions {
+			resources, ok := group.VersionedResources[discoveryVersion.Version]
+			if !ok {
+				continue
+			}
+
+			gv := unversioned.GroupVersion{Group: group.Group.Name, Version: discoveryVersion.Version}
+			for _, resource := range resources {
+				dot.registered[gv.WithKind(resource.Kind)] = true
+			}
+		}
+	}
+	return dot
+}
+
+// ObjectKind returns the group,version,kind of the provided object, or an error
+// if the object in not *runtime.Unstructured or has no group,version,kind
+// information.
+func (d *DynamicObjectTyper) ObjectKind(obj runtime.Object) (unversioned.GroupVersionKind, error) {
+	if _, ok := obj.(*runtime.Unstructured); !ok {
+		return unversioned.GroupVersionKind{}, fmt.Errorf("type %T is invalid for dynamic object typer", obj)
+	}
+
+	return obj.GetObjectKind().GroupVersionKind(), nil
+}
+
+// ObjectKinds returns a slice of one element with the group,version,kind of the
+// provided object, or an error if the object is not *runtime.Unstructured or
+// has no group,version,kind information. unversionedType will always be false
+// because runtime.Unstructured object should always have group,version,kind
+// information set.
+func (d *DynamicObjectTyper) ObjectKinds(obj runtime.Object) (gvks []unversioned.GroupVersionKind, unversionedType bool, err error) {
+	gvk, err := d.ObjectKind(obj)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return []unversioned.GroupVersionKind{gvk}, false, nil
+}
+
+// Recognizes returns true if the provided group,version,kind was in the
+// discovery information.
+func (d *DynamicObjectTyper) Recognizes(gvk unversioned.GroupVersionKind) bool {
+	return d.registered[gvk]
+}
+
+// IsUnversioned returns false always because *runtime.Unstructured objects
+// should always have group,version,kind information set. ok will be true if the
+// object's group,version,kind is registered.
+func (d *DynamicObjectTyper) IsUnversioned(obj runtime.Object) (unversioned bool, ok bool) {
+	gvk, err := d.ObjectKind(obj)
+	if err != nil {
+		return false, false
+	}
+
+	return false, d.registered[gvk]
 }
