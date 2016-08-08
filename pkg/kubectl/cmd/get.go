@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -266,17 +267,22 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 
 		first := true
 		filteredResourceCount = 0
-		kubectl.WatchLoop(w, func(e watch.Event) error {
-			if !isList && first {
-				// drop the initial watch event in the single resource case
-				first = false
-				return nil
-			}
-			err := printer.PrintObj(e.Object, out)
-			if err == nil {
+		intr := interrupt.New(nil, w.Stop)
+		intr.Run(func() error {
+			_, err := watch.Until(0, w, func(e watch.Event) (bool, error) {
+				if !isList && first {
+					// drop the initial watch event in the single resource case
+					first = false
+					return false, nil
+				}
+				err := printer.PrintObj(e.Object, out)
+				if err != nil {
+					return false, err
+				}
 				filteredResourceCount++
 				cmdutil.PrintFilterCount(filteredResourceCount, mapping.Resource, errOut, filterOpts)
-			}
+				return false, nil
+			})
 			return err
 		})
 		return nil

@@ -357,8 +357,9 @@ var fieldMappings = versionToResourceToFieldMapping{
 			nodeUnschedulable: nodeUnschedulable,
 		},
 		"pods": clientFieldNameToAPIVersionFieldName{
-			podHost:   podHost,
-			podStatus: podStatus,
+			objectNameField: objectNameField,
+			podHost:         podHost,
+			podStatus:       podStatus,
 		},
 		"secrets": clientFieldNameToAPIVersionFieldName{
 			secretType: secretType,
