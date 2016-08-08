@@ -37,7 +37,7 @@ type REST struct {
 
 // NewREST returns a registry which will store CertificateSigningRequest in the given helper
 func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *ApprovalREST) {
-	prefix := "/certificatesigningrequests"
+	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &certificates.CertificateSigningRequestList{} }
 	storageInterface := opts.Decorator(
