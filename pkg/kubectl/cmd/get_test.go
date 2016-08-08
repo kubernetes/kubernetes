@@ -33,6 +33,7 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
@@ -87,6 +88,26 @@ func testData() (*api.PodList, *api.ServiceList, *api.ReplicationControllerList)
 		},
 	}
 	return pods, svc, rc
+}
+
+func testDynamicResources() []*discovery.APIGroupResources {
+	return []*discovery.APIGroupResources{
+		{
+			Group: unversioned.APIGroup{
+				Versions: []unversioned.GroupVersionForDiscovery{
+					{Version: "v1"},
+				},
+				PreferredVersion: unversioned.GroupVersionForDiscovery{Version: "v1"},
+			},
+			VersionedResources: map[string][]unversioned.APIResource{
+				"v1": {
+					{Name: "pods", Namespaced: true, Kind: "Pod"},
+					{Name: "services", Namespaced: true, Kind: "Service"},
+					{Name: "replicationcontrollers", Namespaced: true, Kind: "ReplicationController"},
+				},
+			},
+		},
+	}
 }
 
 func testComponentStatusData() *api.ComponentStatusList {
