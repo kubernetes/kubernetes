@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/pod"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/storage"
@@ -45,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"strings"
 )
 
 type testOrphanDeleteStrategy struct {
@@ -261,6 +263,7 @@ func TestStoreListResourceVersion(t *testing.T) {
 }
 
 func TestStoreCreate(t *testing.T) {
+	gracefulPeriod := int64(50)
 	podA := &api.Pod{
 		ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "test"},
 		Spec:       api.PodSpec{NodeName: "machine"},
@@ -273,6 +276,8 @@ func TestStoreCreate(t *testing.T) {
 	testContext := api.WithNamespace(api.NewContext(), "test")
 	destroyFunc, registry := NewTestGenericStoreRegistry(t)
 	defer destroyFunc()
+	// re-define delete strategy to have graceful delete capability
+	registry.DeleteStrategy = pod.Strategy
 
 	// create the object
 	objA, err := registry.Create(testContext, podA)
@@ -295,6 +300,31 @@ func TestStoreCreate(t *testing.T) {
 	_, err = registry.Create(testContext, podB)
 	if !errors.IsAlreadyExists(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+
+	// verify graceful delete capability is defined
+	_, ok := registry.DeleteStrategy.(rest.RESTGracefulDeleteStrategy)
+	if !ok {
+		t.Fatalf("No graceful capability set.")
+	}
+
+	// now delete pod with graceful period set
+	delOpts := &api.DeleteOptions{GracePeriodSeconds: &gracefulPeriod}
+	_, err = registry.Delete(testContext, podA.Name, delOpts)
+	if err != nil {
+		t.Fatalf("Failed to delete pod gracefully. Unexpected error: %v", err)
+	}
+
+	// try to create before graceful deletion period is over
+	_, err = registry.Create(testContext, podA)
+	if err == nil || !errors.IsAlreadyExists(err) {
+		t.Fatalf("Expected 'already exists' error from storage, but got %v", err)
+	}
+
+	// check the 'alredy exists' msg was edited
+	msg := &err.(*errors.StatusError).ErrStatus.Message
+	if !strings.Contains(*msg, "object is being deleted:") {
+		t.Errorf("Unexpected error without the 'object is being deleted:' in message: %v", err)
 	}
 }
 
