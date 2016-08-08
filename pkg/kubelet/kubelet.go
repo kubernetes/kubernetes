@@ -414,12 +414,8 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	oomWatcher := NewOOMWatcher(kubeDeps.CAdvisorInterface, kubeDeps.Recorder)
 
-	// TODO(mtaufen): This is an example of modification being done to the config. This may be necessary ATM, will investigate further.
-	//                I renamed configureCBR0 and flannelExperimentalOverlay to myConfigureCBR0 and myFlannelExperimentalOverlay to differentiate from kc sub-values.
-	//                Eventually these hacks should be removed (THEY SHOULD NEVER MAKE IT UPSTREAM!)
-	//                These values were originally args to this function, but no longer!
-	// TODO: remove when internal cbr0 implementation gets removed in favor
-	// of the kubenet network plugin
+	// TODO(mtaufen): remove when internal cbr0 implementation gets removed in favor
+	//                of the kubenet network plugin
 	var myConfigureCBR0 bool = kubeCfg.ConfigureCBR0
 	var myFlannelExperimentalOverlay bool = kubeCfg.ExperimentalFlannelOverlay
 	if kubeCfg.NetworkPluginName == "kubenet" {
