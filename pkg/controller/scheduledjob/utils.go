@@ -111,8 +111,8 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 	// How to handle concurrency control.
 	// How to detect changes to schedules or deleted schedules and then
 	// update the jobs?
-
-	sched, err := cron.Parse(schedule)
+	tmpSched := addSeconds(schedule)
+	sched, err := cron.Parse(tmpSched)
 	if err != nil {
 		return time.Unix(0, 0), fmt.Errorf("Unparseable schedule: %s : %s", schedule, err)
 	}
@@ -125,7 +125,8 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 // If there were missed times prior to the last known start time, then those are not returned.
 func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
-	sched, err := cron.Parse(sj.Spec.Schedule)
+	tmpSched := addSeconds(sj.Spec.Schedule)
+	sched, err := cron.Parse(tmpSched)
 	if err != nil {
 		return starts, fmt.Errorf("Unparseable schedule: %s : %s", sj.Spec.Schedule, err)
 	}
@@ -171,6 +172,15 @@ func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.T
 		}
 	}
 	return starts, nil
+}
+
+// TODO soltysh: this should be removed when https://github.com/robfig/cron/issues/58 is fixed
+func addSeconds(schedule string) string {
+	tmpSched := schedule
+	if len(schedule) > 0 && schedule[0] != '@' {
+		tmpSched = "0 " + schedule
+	}
+	return tmpSched
 }
 
 // XXX unit test this

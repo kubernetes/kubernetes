@@ -54,7 +54,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "* * * * * ?",
+			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
@@ -76,7 +76,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 	updatedScheduledJob := &batch.ScheduledJob{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.ScheduledJobSpec{
-			Schedule: "5 5 5 5 * ?",
+			Schedule: "5 5 5 * ?",
 		},
 		Status: batch.ScheduledJobStatus{
 			LastScheduleTime: &now,
@@ -109,7 +109,7 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	oldSchedule := "* * * * * ?"
+	oldSchedule := "* * * * ?"
 	oldScheduledJob := &batch.ScheduledJob{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "myscheduledjob",
@@ -134,7 +134,7 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 			ResourceVersion: "9",
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "5 5 5 * * ?",
+			Schedule:          "5 5 * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
