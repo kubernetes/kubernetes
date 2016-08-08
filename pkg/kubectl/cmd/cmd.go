@@ -233,6 +233,8 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
+	cmds.AddCommand(NewCmdAlpha(f, out))
+
 	cmds.AddCommand(NewCmdGet(f, out))
 	cmds.AddCommand(set.NewCmdSet(f, out))
 	cmds.AddCommand(NewCmdDescribe(f, out))
