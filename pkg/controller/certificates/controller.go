@@ -49,12 +49,14 @@ type CertificateController struct {
 	updateHandler func(csr *certificates.CertificateSigningRequest) error
 	syncHandler   func(csrKey string) error
 
+	approveAllCSRs bool
+
 	signer *local.Signer
 
 	queue *workqueue.Type
 }
 
-func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string) (*CertificateController, error) {
+func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Duration, caCertFile, caKeyFile string, approveAll bool) (*CertificateController, error) {
 	// Send events to the apiserver
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
@@ -180,6 +182,14 @@ func (cc *CertificateController) maybeSignCertificate(key string) error {
 		return nil
 	}
 	csr := obj.(*certificates.CertificateSigningRequest)
+
+	if cc.approveAllCSRs && !IsCertificateRequestApproved(csr) {
+		csr.Status.Conditions = append(csr.Status.Conditions, certificates.CertificateSigningRequestCondition{
+			Type:    certificates.CertificateApproved,
+			Reason:  "AutoApproved",
+			Message: "Auto approving of all CSRs is enabled on the controller manager",
+		})
+	}
 
 	// At this point, the controller needs to:
 	// 1. Check the approval conditions

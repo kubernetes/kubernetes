@@ -443,6 +443,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 				resyncPeriod,
 				s.ClusterSigningCertFile,
 				s.ClusterSigningKeyFile,
+				s.ApproveAllCSRs,
 			)
 			if err != nil {
 				glog.Errorf("Failed to start certificate controller: %v", err)

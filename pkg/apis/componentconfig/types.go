@@ -572,6 +572,10 @@ type KubeControllerManagerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// RSA or ECDSA private key used to issue cluster-scoped certificates
 	ClusterSigningKeyFile string `json:"clusterSigningKeyFile"`
+	// approveAllCSRs tells the CSR controller to approve all CSRs automatically.
+	// WARNING: this grants all users with access to the certificates API group
+	// the ability to create credentials for any user.
+	ApproveAllCSRs bool `json:"approveAllCSRs"`
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool `json:"enableProfiling"`
 	// clusterName is the instance prefix for the cluster.

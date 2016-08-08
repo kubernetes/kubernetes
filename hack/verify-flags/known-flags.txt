@@ -221,6 +221,7 @@ include-extended-apis
 included-types-overrides
 input-base
 input-dirs
+insecure-approve-all-csrs
 insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
