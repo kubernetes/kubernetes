@@ -75,9 +75,12 @@ The `kubelet` will support the ability to trigger eviction decisions on the foll
 |------------------|---------------------------------------------------------------------------------|
 | memory.available | memory.available := node.status.capacity[memory] - node.stats.memory.workingSet |
 | nodefs.available   | nodefs.available := node.stats.fs.available |
-| nodefs.inodesFree | nodefs.inodesFree := node.fs.inodesFree |
+| nodefs.inodesFree | nodefs.inodesFree := node.stats.fs.inodesFree |
 | imagefs.available | imagefs.available := node.stats.runtime.imagefs.available |
-| imagefs.inodesFree | imagefs.inodesFree := node.runtime.imageFs.inodesFree |
+| imagefs.inodesFree | imagefs.inodesFree := node.stats.runtime.imagefs.inodesFree |
+
+Each of the above signals support either a literal or percentage based value.  The percentage based value
+is calculated relative to the total capacity associated with each signal.
 
 `kubelet` supports only two filesystem partitions.
 
@@ -93,16 +96,24 @@ The `kubelet` will support the ability to specify eviction thresholds.
 
 An eviction threshold is of the following form:
 
-`<eviction-signal><operator><quantity>`
+`<eviction-signal><operator><quantity | int%>`
 
 * valid `eviction-signal` tokens as defined above.
 * valid `operator` tokens are `<`
 * valid `quantity` tokens must match the quantity representation used by Kubernetes
+* an eviction threshold can be expressed as a percentage if ends with `%` token.
 
 If threshold criteria are met, the `kubelet` will take pro-active action to attempt
 to reclaim the starved compute resource associated with the eviction signal.
 
 The `kubelet` will support soft and hard eviction thresholds.
+
+For example, if a node has `10Gi` of memory, and the desire is to induce eviction
+if available memory falls below `1Gi`, an eviction signal can be specified as either
+of the following (but not both).
+
+* `memory.available<10%`
+* `memory.available<1Gi`
 
 ### Soft Eviction Thresholds
 
