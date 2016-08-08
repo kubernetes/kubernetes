@@ -62,7 +62,7 @@ parameters:
 ```
 
 * `type`: `io1`, `gp2`, `sc1`, `st1`. See AWS docs for details. Default: `gp2`.
-* `zone`: AWS zone
+* `zone`: AWS zone. If not specified, a random zone in the same region as controller-manager will be chosen.
 * `iopsPerGB`: only for `io1` volumes. I/O operations per second per GiB. AWS volume plugin multiplies this with size of requested volume to compute IOPS of the volume and caps it at 20 000 IOPS (maximum supported by AWS, see AWS docs).
 
 #### GCE
@@ -79,7 +79,7 @@ parameters:
 ```
 
 * `type`: `pd-standard` or `pd-ssd`. Default: `pd-ssd`
-* `zone`: GCE zone
+* `zone`: GCE zone. If not specified, a random zone in the same region as controller-manager will be chosen.
 
 ### User provisioning requests
 
@@ -118,7 +118,7 @@ First we note there are no Persistent Volumes in the cluster.  After creating a 
 and automatically bound to the claim requesting storage.
 
 
-``` 
+```
 $ kubectl get pv
 
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/gce-pd.yaml

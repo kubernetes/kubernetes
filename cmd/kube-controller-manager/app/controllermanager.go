@@ -406,7 +406,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		// volumeSource, claimSource, classSource, eventRecorder
 		nil, nil, nil, nil,
 		s.VolumeConfiguration.EnableDynamicProvisioning,
-		// deault storageClass
+		// default storageClass
 		"",
 	)
 	volumeController.Run()

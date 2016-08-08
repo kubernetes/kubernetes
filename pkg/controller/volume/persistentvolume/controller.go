@@ -1106,7 +1106,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 	spec := vol.NewSpecFromPersistentVolume(volume, false)
 	if plugin == nil {
 		// The plugin that provisioned the volume was not found or the volume
-		// was not dynamically provisioned. Try a generic plugin.
+		// was not dynamically provisioned. Try to find a plugin by spec.
 		plugin, err = ctrl.volumePluginMgr.FindDeletablePluginBySpec(spec)
 		if err != nil {
 			// No deleter found. Emit an event and mark the volume Failed.
@@ -1317,7 +1317,7 @@ func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.Persi
 	}
 
 	// Find a plugin for the class
-	plugin, err := ctrl.volumePluginMgr.FindProvisionablePluginByName(string(storageClass.Provisioner))
+	plugin, err := ctrl.volumePluginMgr.FindProvisionablePluginByName(storageClass.Provisioner)
 	if err != nil {
 		return nil, nil, err
 	}

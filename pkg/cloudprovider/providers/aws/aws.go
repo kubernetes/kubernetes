@@ -229,7 +229,7 @@ type VolumeOptions struct {
 	VolumeType       string
 	AvailabilityZone string
 	// IOPSPerGB x CapacityGB will give total IOPS of the volume to create.
-	// IPSPerGB must be bigger than zero and smaller or equal to 30.
+	// IOPSPerGB must be bigger than zero and smaller or equal to 30.
 	// Calculated total IOPS will be capped at 20000 IOPS.
 	IOPSPerGB int
 }

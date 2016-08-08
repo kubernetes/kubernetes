@@ -62,8 +62,9 @@ func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	return allPlugins
 }
 
-// ProbeControllerVolumePlugins collects all persistent volume plugins into an easy to use list.
-// Only provisioner/recycler/deleter volume plugins should be returned.
+// ProbeControllerVolumePlugins collects all persistent volume plugins into an
+// easy to use list. Only volume plugins that implement any of
+// provisioner/recycler/deleter interface should be returned.
 func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
