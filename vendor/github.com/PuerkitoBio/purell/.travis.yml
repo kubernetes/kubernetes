@@ -1,0 +1,12 @@
+language: go
+
+go:
+    - 1.4
+    - tip
+
+install:
+    - go get github.com/PuerkitoBio/urlesc
+    - go build .
+
+script:
+    - go test -v
