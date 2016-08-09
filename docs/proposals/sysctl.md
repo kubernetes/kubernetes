@@ -254,6 +254,8 @@ Issues:
 
 ## Analysis of Sysctls on the initial Whitelist
 
+**Note:** The kmem accounting has fundamentally changed in kernel 4.5 (compare https://github.com/torvalds/linux/commit/a9bb7e620efdfd29b6d1c238041173e411670996): older kernels (e.g. 4.4 from Ubuntu 16.04, 3.10 from CentOS 7.2) use a blacklist (`__GFP_NOACCOUNT`), newer kernels (e.g. 4.6.x from Fedora 24) use a whitelist (`__GFP_ACCOUNT`). **In the following the analysis is done for kernel >= 4.5:**
+
 - `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`: configure System V shared memory
   * [x] **namespaced** in ipc ns
   * [x] **accounted for** as user memory in memcg, using sparse allocation (like tmpfs)
@@ -265,12 +267,12 @@ Issues:
   * [x] **namespaced** in ipc ns
 - `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`: configure System V messages
   * [x] **namespaced** in ipc ns
-  * [ ] [temporarily **allocated in kmem** in a linked message list](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58), but **not accounted for** in memcg
+  * [ ] [temporarily **allocated in kmem** in a linked message list](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58), but **not accounted for** in memcg **with kernel >= 4.5**
   * [ ] **defaults to** [8kb max packet size, 16384 kb total queue size, 32000 queues](http://lxr.linux.no/linux+v4.7/include/uapi/linux/msg.h#L75), **which might be too small** for certain applications
   * [ ] arbitrary values [up to INT_MAX](http://lxr.linux.no/linux+v4.7/ipc/ipc_sysctl.c#L135). Hence, **potential DoS attack vector** against the host
-- `fs.mqueue.*`: configure POSIX message queues
+- `fs.mqueue.*`: configure POSIX message queues. Here is a test-case which allocated 512 MB per container which is not accounted: https://github.com/sttts/kmem-ipc-msg-queues. A node with 8 GB will not survive that with >16 containers.
   * [x] **namespaced** in ipc ns
-  * [ ] uses the same [`load_msg`](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58) as System V messages, i.e. **no accounting**
+  * [ ] uses the same [`load_msg`](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58) as System V messages, i.e. **no accounting for kernel >= 4.5**
   * does [strict checking against rlimits](http://lxr.free-electrons.com/source/ipc/mqueue.c#L278) though
   * [ ] **defaults to** [256 queues, max queue length 10, message size 8kb](http://lxr.free-electrons.com/source/include/linux/ipc_namespace.h#L102)
   * [ ] can be customized via sysctls up to 64k max queue length, message size 16MB. Hence, **potential DoS attack vector** against the host
@@ -291,6 +293,8 @@ Issues:
 
 ### Summary
 
+#### For kernel >= 4.5
+
 | sysctl                 | namespaced    | accounted for by           |
 | ---------------------- | ------------- | -------------------------- |
 | kernel.shm*            | ipc           | memcg *)                   |
@@ -302,6 +306,18 @@ Issues:
 | net.core.wmem/rmem_max | -             | ?                          |
 
 *) a pod memory cgroup is necessary to catch segments from a dying process.
+
+#### For kernel <= 4.4
+
+| sysctl                 | namespaced    | accounted for by           |
+| ---------------------- | ------------- | -------------------------- |
+| kernel.shm*            | ipc           | memcg *)                   |
+| kernel.msg*            | ipc           | memcg                      |
+| fs.mqueue.*            | ipc           | memcg                      |
+| kernel.sem             | ipc           | memcg                      |
+| net.core.somaxconn     | net           | memcg                      |
+| net.*.tcp_wmem/rmem    | -             | kmem memcg for tcp buffers |
+| net.core.wmem/rmem_max | -             | ?                          |
 
 ## Proposed Design
 
