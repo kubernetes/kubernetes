@@ -57,6 +57,15 @@
 {% set etcd_servers = "--etcd-servers=http://127.0.0.1:4001" -%}
 {% set etcd_servers_overrides = "--etcd-servers-overrides=/events#http://127.0.0.1:4002" -%}
 
+{% set target_ram_mb = "" -%}
+{% if pillar['num_nodes'] is defined -%}
+  # Set amount of memory available for apiserver based on number of nodes.
+  # TODO: Once we start setting proper requests and limits for apiserver
+  # we should reuse the same logic here instead of current heuristic.
+  {% set tmp_ram_mb = pillar['num_nodes']|int * 60 %}
+  {% set target_ram_mb = "--target-ram-mb=" + tmp_ram_mb|string -%}
+{% endif -%}
+
 {% set service_cluster_ip_range = "" -%}
 {% if pillar['service_cluster_ip_range'] is defined -%}
   {% set service_cluster_ip_range = "--service-cluster-ip-range=" + pillar['service_cluster_ip_range'] -%}
@@ -124,15 +133,15 @@
 
 {% set enable_garbage_collector = "" -%}
 {% if pillar['enable_garbage_collector'] is defined -%}
-{% set enable_garbage_collector = "--enable-garbage-collector=" + pillar['enable_garbage_collector'] -%}
+  {% set enable_garbage_collector = "--enable-garbage-collector=" + pillar['enable_garbage_collector'] -%}
 {% endif -%}
 
-{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
+{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
 {% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['apiserver_test_args'] is defined -%}
-{% set params = params + " " + pillar['apiserver_test_args'] -%}
+  {% set params = params + " " + pillar['apiserver_test_args'] -%}
 {% endif -%}
 
 {
