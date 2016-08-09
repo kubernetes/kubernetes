@@ -64,19 +64,38 @@ readonly results_url=${gcs_build_path//"gs:/"/"https://console.cloud.google.com/
 readonly timestamp=$(date +%s)
 
 #########################################################################
+# $0 is called from different contexts so figure out where kubernetes is.
+# Sets non-exported global kubernetes_base_path and defaults to "."
+function set_kubernetes_base_path () {
+  for kubernetes_base_path in kubernetes go/src/k8s.io/kubernetes .; do
+    # Pick a canonical item to find in a kubernetes tree which could be a
+    # raw source tree or an expanded tarball.
+
+    [[ -f ${kubernetes_base_path}/cluster/common.sh ]] && break
+  done
+}
+
+#########################################################################
 # Try to discover the kubernetes version.
 # prints version
 function find_version() {
+  (
+  # Where are we?
+  # This could be set in the global scope at some point if we need to 
+  # discover the kubernetes path elsewhere.
+  set_kubernetes_base_path
+
+  cd ${kubernetes_base_path}
+
   if [[ -e "version" ]]; then
     cat version
   elif [[ -e "hack/lib/version.sh" ]]; then
-    (
     export KUBE_ROOT="."
     source "hack/lib/version.sh"
     kube::version::get_version_vars
     echo "${KUBE_GIT_VERSION-}"
-    )
   fi
+  )
 }
 
 function upload_version() {
