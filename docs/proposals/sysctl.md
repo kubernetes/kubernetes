@@ -289,6 +289,19 @@ Issues:
   - `net.ipv4.tcp_wmem`/`net.ipv4.tcp_wmem`/`net.core.rmem_max`/`net.core.wmem_max`: socket buffer sizes
     * [ ] **not namespaced in net ns**, and they are not even available under `/sys/net`
 
+### Summary
+
+| sysctl                 | namespaced    | accounted for by           |
+| ---------------------- | ------------- | -------------------------- |
+| kernel.shm*            | ipc           | memcg *)                   |
+| kernel.msg*            | ipc           | - (plain kmem kmalloc)     |
+| fs.mqueue.*            | ipc           | - (plain kmem kmalloc)     |
+| kernel.sem             | ipc           | - (plain kmem kmalloc)     |
+| net.core.somaxconn     | net           | -                          |
+| net.*.tcp_wmem/rmem    | -             | kmem memcg for tcp buffers |
+| net.core.wmem/rmem_max | -             | ?                          |
+
+*) a pod memory cgroup is necessary to catch segments from a dying process.
 
 ## Proposed Design
 
