@@ -293,6 +293,11 @@ Issues:
   - `net.ipv4.ip_local_port_range`: local tcp/udp port range
     * [x] **namespaced** in net ns
     * [x] **no memory involved**
+  - `net.ipv4.tcp_max_syn_backlog`: number of half-open connections
+    * [ ] **not namespaced**
+  - `net.ipv4.tcp_syncookies`: enable syn cookies
+    * [x] **namespaced** in net ns
+    * [x] **no memory involved**
 
 ### Summary
 
@@ -308,6 +313,8 @@ Issues:
 | net.*.tcp_wmem/rmem          | - 2)          | memcg                      |
 | net.core.wmem/rmem_max       | - 2)          | ?                          |
 | net.ipv4.ip_local_port_range | net           | no memory involved         |
+| net.ipv4.tcp_syncookies      | net           | no memory involved         |
+| net.ipv4.tcp_max_syn_backlog | - 2)          | ?                          |
 
 #### For kernel <= 4.4
 
@@ -321,6 +328,8 @@ Issues:
 | net.*.tcp_wmem/rmem          | - 2)          | memcg                      |
 | net.core.wmem/rmem_max       | - 2)          | ?                          |
 | net.ipv4.ip_local_port_range | net           | no memory involved         |
+| net.ipv4.tcp_syncookies      | net           | no memory involved         |
+| net.ipv4.tcp_max_syn_backlog | - 2)          | ?                          |
 
 1) a pod memory cgroup is necessary to catch segments from a dying process.
 2) only available in root-ns, not even visible in a container
