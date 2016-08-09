@@ -301,39 +301,25 @@ Issues:
 
 ### Summary
 
-#### For kernel >= 4.5
+| sysctl                       | namespaced | acc. for <= 4.4 | >= 4.5        |
+| ---------------------------- | ---------- | --------------- | ------------- |
+| kernel.shm*                  | ipc        | **memcg** 1)    | **memcg** 1)  |
+| kernel.msg*                  | ipc        | **memcg** 3)    | - 3)          |
+| fs.mqueue.*                  | ipc        | **memcg**       | -             |
+| kernel.sem                   | ipc        | **memcg**       | -             |
+| net.core.somaxconn           | net        | memcg? 4)       | memcg? 6) |
+| net.*.tcp_wmem/rmem          | - 2)       | **memcg**       | **memcg**? 6) |
+| net.core.wmem/rmem_max       | - 2)       | ?               | ?             |
+| net.ipv4.ip_local_port_range | net        | not needed 5)   | not needed 5) |
+| net.ipv4.tcp_syncookies      | net        | not needed 5)   | not needed 5) |
+| net.ipv4.tcp_max_syn_backlog | - 2)       | ?               | ?             |
 
-| sysctl                       | namespaced    | accounted for by           |
-| ---------------------------- | ------------- | -------------------------- |
-| kernel.shm*                  | ipc           | memcg 1)                   |
-| kernel.msg*                  | ipc           | - 3)                       |
-| fs.mqueue.*                  | ipc           | -                          |
-| kernel.sem                   | ipc           | -                          |
-| net.core.somaxconn           | net           | -                          |
-| net.*.tcp_wmem/rmem          | - 2)          | memcg                      |
-| net.core.wmem/rmem_max       | - 2)          | ?                          |
-| net.ipv4.ip_local_port_range | net           | no memory involved         |
-| net.ipv4.tcp_syncookies      | net           | no memory involved         |
-| net.ipv4.tcp_max_syn_backlog | - 2)          | ?                          |
-
-#### For kernel <= 4.4
-
-| sysctl                       | namespaced    | accounted for by           |
-| ---------------------------- | ------------- | -------------------------- |
-| kernel.shm*                  | ipc           | memcg 1)                   |
-| kernel.msg*                  | ipc           | memcg 3)                   |
-| fs.mqueue.*                  | ipc           | memcg                      |
-| kernel.sem                   | ipc           | memcg                      |
-| net.core.somaxconn           | net           | memcg b/c sockets are accounted for? |
-| net.*.tcp_wmem/rmem          | - 2)          | memcg                      |
-| net.core.wmem/rmem_max       | - 2)          | ?                          |
-| net.ipv4.ip_local_port_range | net           | no memory involved         |
-| net.ipv4.tcp_syncookies      | net           | no memory involved         |
-| net.ipv4.tcp_max_syn_backlog | - 2)          | ?                          |
-
-1) a pod memory cgroup is necessary to catch segments from a dying process.
-2) only available in root-ns, not even visible in a container
-3) compare https://github.com/sttts/kmem-ipc-msg-queues as a test-case
+1. a pod memory cgroup is necessary to catch segments from a dying process.
+2. only available in root-ns, not even visible in a container
+3. compare https://github.com/sttts/kmem-ipc-msg-queues as a test-case
+4. b/c sockets are accounted for?
+5. b/c no memory is involved, i.e. purely functional difference
+6. to be checked
 
 ## Proposed Design
 
