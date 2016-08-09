@@ -519,6 +519,12 @@ start_kube_apiserver() {
   params="${params} --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
 
+  if [ -n "${NUM_NODES:-}" ]; then
+    # Set amount of memory available for apiserver based on number of nodes.
+    # TODO: Once we start setting proper requests and limits for apiserver
+    # we should reuse the same logic here instead of current heuristic.
+    params="${params} --target-ram-mb=$((${NUM_NODES} * 60))"
+  fi
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi

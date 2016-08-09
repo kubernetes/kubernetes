@@ -635,6 +635,12 @@ function start-kube-apiserver {
   if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
     params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
   fi
+  if [[ -n "${NUM_NODES:-}" ]]; then
+    # Set amount of memory available for apiserver based on number of nodes.
+    # TODO: Once we start setting proper requests and limits for apiserver
+    # we should reuse the same logic here instead of current heuristic.
+    params+=" --target-ram-mb=$((${NUM_NODES} * 60))"
+  fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
