@@ -28,8 +28,8 @@ import (
 var (
 	version = "0.1.0"
 
-	fakeRuntimeName  = "fakeRuntime"
-	fakePodSandboxIP = "192.168.192.168"
+	FakeRuntimeName  = "fakeRuntime"
+	FakePodSandboxIP = "192.168.192.168"
 )
 
 type FakePodSandbox struct {
@@ -97,7 +97,7 @@ func (r *FakeRuntimeService) Version(apiVersion string) (*runtimeApi.VersionResp
 
 	return &runtimeApi.VersionResponse{
 		Version:           &version,
-		RuntimeName:       &fakeRuntimeName,
+		RuntimeName:       &FakeRuntimeName,
 		RuntimeVersion:    &version,
 		RuntimeApiVersion: &version,
 	}, nil
@@ -173,7 +173,7 @@ func (r *FakeRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeApi.
 		CreatedAt: s.CreatedAt,
 		State:     s.State,
 		Network: &runtimeApi.PodSandboxNetworkStatus{
-			Ip: &fakePodSandboxIP,
+			Ip: &FakePodSandboxIP,
 		},
 		Labels:      s.Labels,
 		Annotations: s.Annotations,

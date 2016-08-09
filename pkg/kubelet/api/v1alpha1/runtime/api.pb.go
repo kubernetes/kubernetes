@@ -1684,7 +1684,10 @@ type Container struct {
 	// State is the state of the container.
 	State *ContainerState `protobuf:"varint,5,opt,name=state,enum=runtime.ContainerState" json:"state,omitempty"`
 	// Labels are key value pairs that may be used to scope and select individual resources.
-	Labels           map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Labels map[string]string `protobuf:"bytes,6,rep,name=labels" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Annotations is an unstructured key value map that may be set by external
+	// tools to store and retrieve arbitrary metadata.
+	Annotations      map[string]string `protobuf:"bytes,7,rep,name=annotations" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	XXX_unrecognized []byte            `json:"-"`
 }
 
@@ -1730,6 +1733,13 @@ func (m *Container) GetState() ContainerState {
 func (m *Container) GetLabels() map[string]string {
 	if m != nil {
 		return m.Labels
+	}
+	return nil
+}
+
+func (m *Container) GetAnnotations() map[string]string {
+	if m != nil {
+		return m.Annotations
 	}
 	return nil
 }
