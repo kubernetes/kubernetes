@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
 	"github.com/evanphx/json-patch"
@@ -123,6 +124,7 @@ func checkErr(pref string, err error, handleErr func(string)) {
 		prefix := fmt.Sprintf("%sThe %s %q is invalid.\n", pref, details.Kind, details.Name)
 		errs := statusCausesToAggrError(details.Causes)
 		handleErr(MultilineError(prefix, errs))
+		return
 	}
 
 	if noMatch, ok := err.(*meta.NoResourceMatchError); ok {
@@ -142,9 +144,11 @@ func checkErr(pref string, err error, handleErr func(string)) {
 	// handle multiline errors
 	if clientcmd.IsConfigurationInvalid(err) {
 		handleErr(MultilineError(fmt.Sprintf("%sError in configuration: ", pref), err))
+		return
 	}
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
 		handleErr(MultipleErrors(pref, agg.Errors()))
+		return
 	}
 
 	msg, ok := StandardErrorMessage(err)
@@ -158,9 +162,15 @@ func checkErr(pref string, err error, handleErr func(string)) {
 }
 
 func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
-	errs := make([]error, len(scs))
-	for i, sc := range scs {
-		errs[i] = fmt.Errorf("%s: %s", sc.Field, sc.Message)
+	errs := make([]error, 0, len(scs))
+	errorMsgs := sets.NewString()
+	for _, sc := range scs {
+		// check for duplicate error messages and skip them
+		if errorMsgs.Has(fmt.Sprintf("%s, %s", sc.Field, sc.Message)) {
+			continue
+		}
+		errorMsgs.Insert(fmt.Sprintf("%s, %s", sc.Field, sc.Message))
+		errs = append(errs, fmt.Errorf("%s: %s", sc.Field, sc.Message))
 	}
 	return utilerrors.NewAggregate(errs)
 }
