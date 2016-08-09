@@ -41,7 +41,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		return nil, err
 	}
 
-	_, containerName, cid := buildContainerName(pod.Name, pod.Namespace, string(pod.UID), container)
+	_, containerName, cid := buildContainerName(pod, container)
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
 	containerLogsPath := getContainerLogsPath(containerName, string(pod.UID))
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil

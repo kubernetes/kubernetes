@@ -46,43 +46,36 @@ const (
 
 // buildSandboxName creates a name which can be reversed to identify sandbox full name
 func buildSandboxName(pod *api.Pod) string {
-	stableName := fmt.Sprintf("%s_%s_%s_%s_%s",
-		kubePrefix,
-		kubeSandboxNamePrefix,
-		pod.Name,
-		pod.Namespace,
-		string(pod.UID),
-	)
-	UID := fmt.Sprintf("%08x", rand.Uint32())
-	return fmt.Sprintf("%s_%s", stableName, UID)
+	_, sandboxName, _ := buildKubeGenericName(pod, kubeSandboxNamePrefix)
+	return sandboxName
 }
 
 // parseSandboxName unpacks a sandbox full name, returning the pod name, namespace and uid
 func parseSandboxName(name string) (string, string, string, error) {
-	parts := strings.Split(name, "_")
-	if len(parts) == 0 || parts[0] != kubePrefix {
-		err := fmt.Errorf("failed to parse sandbox name %q into parts", name)
-		return "", "", "", err
-	}
-	if len(parts) < 6 {
-		glog.Warningf("Found a sandbox with the %q prefix, but too few fields (%d): %q", kubePrefix, len(parts), name)
-		err := fmt.Errorf("sandbox name %q has fewer parts than expected %v", name, parts)
+	podName, podNamespace, podUID, _, _, err := parseContainerName(name)
+	if err != nil {
 		return "", "", "", err
 	}
 
-	return parts[2], parts[3], parts[4], nil
+	return podName, podNamespace, podUID, nil
 }
 
 // buildContainerName creates a name which can be reversed to identify container name.
 // This function returns stable name, unique name and an unique id.
-func buildContainerName(podName, podNamespace, podUID string, container *api.Container) (string, string, string) {
+func buildContainerName(pod *api.Pod, container *api.Container) (string, string, string) {
 	containerName := container.Name + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	return buildKubeGenericName(pod, containerName)
+}
+
+// buildKubeGenericName creates a name which can be reversed to identify container/sandbox name.
+// This function returns stable name, unique name and an unique id.
+func buildKubeGenericName(pod *api.Pod, containerName string) (string, string, string) {
 	stableName := fmt.Sprintf("%s_%s_%s_%s_%s",
 		kubePrefix,
 		containerName,
-		podName,
-		podNamespace,
-		podUID,
+		pod.Name,
+		pod.Namespace,
+		string(pod.UID),
 	)
 	UID := fmt.Sprintf("%08x", rand.Uint32())
 	return stableName, fmt.Sprintf("%s_%s", stableName, UID), UID
@@ -150,7 +143,6 @@ func milliCPUToQuota(milliCPU int64) (quota int64, period int64) {
 	// so in the above example, you are limited to 20% of a single CPU
 	// for multi-cpu environments, you just scale equivalent amounts
 	if milliCPU == 0 {
-		// take the default behavior from docker
 		return
 	}
 
