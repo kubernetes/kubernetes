@@ -865,7 +865,7 @@ list of parameters.  However, some popular base images do not include
 `/bin/bash`.  For example, `busybox` uses a compact `/bin/sh` implementation
 that does not support array syntax.
 
-Kubelet does support [expanding varaibles without a
+Kubelet does support [expanding variables without a
 shell](http://kubernetes.io/kubernetes/v1.1/docs/design/expansion.html).  But it does not
 allow for recursive substitution, which is required to extract the correct
 parameter from a list based on the completion index of the pod.  The syntax
