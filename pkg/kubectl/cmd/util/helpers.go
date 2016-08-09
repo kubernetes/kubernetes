@@ -159,7 +159,13 @@ func checkErr(pref string, err error, handleErr func(string)) {
 
 func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
 	errs := make([]error, len(scs))
+	dupCheck := map[string]bool{}
 	for i, sc := range scs {
+		// check for duplicate error messages and skip them
+		if _, exists := dupCheck[sc.Message]; exists {
+			continue
+		}
+		dupCheck[sc.Message] = true
 		errs[i] = fmt.Errorf("%s: %s", sc.Field, sc.Message)
 	}
 	return utilerrors.NewAggregate(errs)
