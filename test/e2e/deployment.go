@@ -1042,8 +1042,14 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment, true)
+	// Verify that the required pods have come up.
+	By("Waiting for all required pods to come up")
+	err = framework.VerifyPods(f.Client, ns, nginxImageName, false, deployment.Spec.Replicas)
+	if err != nil {
+		framework.Logf("error in waiting for pods to come up: %s", err)
+		Expect(err).NotTo(HaveOccurred())
+	}
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	first, err := deploymentutil.GetNewReplicaSet(deployment, c)
@@ -1063,9 +1069,9 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment, false)
-	Expect(err).NotTo(HaveOccurred())
+	if deployment.Status.AvailableReplicas < deploymentutil.MinAvailable(deployment) {
+		Expect(fmt.Errorf("Observed %d available replicas, less than min required %d", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))).NotTo(HaveOccurred())
+	}
 
 	By(fmt.Sprintf("Checking that the replica sets for %q are synced", deploymentName))
 	second, err := deploymentutil.GetNewReplicaSet(deployment, c)
@@ -1105,7 +1111,9 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	}
 
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment, true)
+	err = framework.WaitForDeploymentStatusValid(c, deployment)
+	Expect(err).NotTo(HaveOccurred())
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Update the deployment with a non-existent image so that the new replica set will be blocked.
@@ -1122,9 +1130,9 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	deployment, err = c.Extensions().Deployments(ns).Get(deploymentName)
 	Expect(err).NotTo(HaveOccurred())
 
-	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment, false)
-	Expect(err).NotTo(HaveOccurred())
+	if deployment.Status.AvailableReplicas < deploymentutil.MinAvailable(deployment) {
+		Expect(fmt.Errorf("Observed %d available replicas, less than min required %d", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment))).NotTo(HaveOccurred())
+	}
 
 	By(fmt.Sprintf("Checking that the replica sets for %q are synced", deploymentName))
 	oldRs, err := c.Extensions().ReplicaSets(rs.Namespace).Get(rs.Name)
@@ -1164,6 +1172,8 @@ func testScaledRolloutDeployment(f *framework.Framework) {
 	}
 
 	By(fmt.Sprintf("Waiting for deployment status to sync (current available: %d, minimum available: %d)", deployment.Status.AvailableReplicas, deploymentutil.MinAvailable(deployment)))
-	err = framework.WaitForDeploymentStatusValid(c, deployment, true)
+	err = framework.WaitForDeploymentStatusValid(c, deployment)
+	Expect(err).NotTo(HaveOccurred())
+	err = framework.WaitForDeploymentStatus(c, deployment)
 	Expect(err).NotTo(HaveOccurred())
 }
