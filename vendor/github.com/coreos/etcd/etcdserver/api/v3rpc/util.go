@@ -1,4 +1,4 @@
-// Copyright 2016 Nippon Telegraph and Telephone Corporation.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,30 +19,45 @@ import (
 	"github.com/coreos/etcd/etcdserver"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	"github.com/coreos/etcd/lease"
-	"github.com/coreos/etcd/storage"
+	"github.com/coreos/etcd/mvcc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 )
 
 func togRPCError(err error) error {
 	switch err {
-	case storage.ErrCompacted:
-		return rpctypes.ErrCompacted
-	case storage.ErrFutureRev:
-		return rpctypes.ErrFutureRev
+	case mvcc.ErrCompacted:
+		return rpctypes.ErrGRPCCompacted
+	case mvcc.ErrFutureRev:
+		return rpctypes.ErrGRPCFutureRev
 	case lease.ErrLeaseNotFound:
-		return rpctypes.ErrLeaseNotFound
+		return rpctypes.ErrGRPCLeaseNotFound
 	// TODO: handle error from raft and timeout
 	case etcdserver.ErrRequestTooLarge:
-		return rpctypes.ErrRequestTooLarge
+		return rpctypes.ErrGRPCRequestTooLarge
 	case etcdserver.ErrNoSpace:
-		return rpctypes.ErrNoSpace
+		return rpctypes.ErrGRPCNoSpace
+
+	case auth.ErrRootUserNotExist:
+		return rpctypes.ErrGRPCRootUserNotExist
+	case auth.ErrRootRoleNotExist:
+		return rpctypes.ErrGRPCRootRoleNotExist
 	case auth.ErrUserAlreadyExist:
-		return rpctypes.ErrUserAlreadyExist
+		return rpctypes.ErrGRPCUserAlreadyExist
 	case auth.ErrUserNotFound:
-		return rpctypes.ErrUserNotFound
+		return rpctypes.ErrGRPCUserNotFound
 	case auth.ErrRoleAlreadyExist:
-		return rpctypes.ErrRoleAlreadyExist
+		return rpctypes.ErrGRPCRoleAlreadyExist
+	case auth.ErrRoleNotFound:
+		return rpctypes.ErrGRPCRoleNotFound
+	case auth.ErrAuthFailed:
+		return rpctypes.ErrGRPCAuthFailed
+	case auth.ErrPermissionDenied:
+		return rpctypes.ErrGRPCPermissionDenied
+	case auth.ErrRoleNotGranted:
+		return rpctypes.ErrGRPCRoleNotGranted
+	case auth.ErrPermissionNotGranted:
+		return rpctypes.ErrGRPCPermissionNotGranted
 	default:
 		return grpc.Errorf(codes.Internal, err.Error())
 	}

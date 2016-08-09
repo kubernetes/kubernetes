@@ -155,10 +155,8 @@ const (
 	resetSliceElemToZeroValue bool = false
 )
 
-var (
-	oneByteArr    = [1]byte{0}
-	zeroByteSlice = oneByteArr[:0:0]
-)
+var oneByteArr = [1]byte{0}
+var zeroByteSlice = oneByteArr[:0:0]
 
 type charEncoding uint8
 
@@ -216,24 +214,6 @@ const (
 	containerArrayElem
 	containerArrayEnd
 )
-
-type rgetPoolT struct {
-	encNames [8]string
-	fNames   [8]string
-	etypes   [8]uintptr
-	sfis     [8]*structFieldInfo
-}
-
-var rgetPool = sync.Pool{
-	New: func() interface{} { return new(rgetPoolT) },
-}
-
-type rgetT struct {
-	fNames   []string
-	encNames []string
-	etypes   []uintptr
-	sfis     []*structFieldInfo
-}
 
 type containerStateRecv interface {
 	sendContainerState(containerState)
@@ -853,17 +833,14 @@ func (x *TypeInfos) get(rtid uintptr, rt reflect.Type) (pti *typeInfo) {
 			siInfo = parseStructFieldInfo(structInfoFieldName, x.structTag(f.Tag))
 			ti.toArray = siInfo.toArray
 		}
-		pi := rgetPool.Get()
-		pv := pi.(*rgetPoolT)
-		pv.etypes[0] = ti.baseId
-		vv := rgetT{pv.fNames[:0], pv.encNames[:0], pv.etypes[:1], pv.sfis[:0]}
-		x.rget(rt, rtid, nil, &vv, siInfo)
-		ti.sfip = make([]*structFieldInfo, len(vv.sfis))
-		ti.sfi = make([]*structFieldInfo, len(vv.sfis))
-		copy(ti.sfip, vv.sfis)
-		sort.Sort(sfiSortedByEncName(vv.sfis))
-		copy(ti.sfi, vv.sfis)
-		rgetPool.Put(pi)
+		sfip := make([]*structFieldInfo, 0, rt.NumField())
+		x.rget(rt, nil, make(map[string]bool, 16), &sfip, siInfo)
+
+		ti.sfip = make([]*structFieldInfo, len(sfip))
+		ti.sfi = make([]*structFieldInfo, len(sfip))
+		copy(ti.sfip, sfip)
+		sort.Sort(sfiSortedByEncName(sfip))
+		copy(ti.sfi, sfip)
 	}
 	// sfi = sfip
 
@@ -876,37 +853,16 @@ func (x *TypeInfos) get(rtid uintptr, rt reflect.Type) (pti *typeInfo) {
 	return
 }
 
-func (x *TypeInfos) rget(rt reflect.Type, rtid uintptr,
-	indexstack []int, pv *rgetT, siInfo *structFieldInfo,
+func (x *TypeInfos) rget(rt reflect.Type, indexstack []int, fnameToHastag map[string]bool,
+	sfi *[]*structFieldInfo, siInfo *structFieldInfo,
 ) {
-	// This will read up the fields and store how to access the value.
-	// It uses the go language's rules for embedding, as below:
-	//   - if a field has been seen while traversing, skip it
-	//   - if an encName has been seen while traversing, skip it
-	//   - if an embedded type has been seen, skip it
-	//
-	// Also, per Go's rules, embedded fields must be analyzed AFTER all top-level fields.
-	//
-	// Note: we consciously use slices, not a map, to simulate a set.
-	//       Typically, types have < 16 fields, and iteration using equals is faster than maps there
-
-	type anonField struct {
-		ft  reflect.Type
-		idx int
-	}
-
-	var anonFields []anonField
-
-LOOP:
-	for j, jlen := 0, rt.NumField(); j < jlen; j++ {
+	for j := 0; j < rt.NumField(); j++ {
 		f := rt.Field(j)
 		fkind := f.Type.Kind()
 		// skip if a func type, or is unexported, or structTag value == "-"
-		switch fkind {
-		case reflect.Func, reflect.Complex64, reflect.Complex128, reflect.UnsafePointer:
-			continue LOOP
+		if fkind == reflect.Func {
+			continue
 		}
-
 		// if r1, _ := utf8.DecodeRuneInString(f.Name); r1 == utf8.RuneError || !unicode.IsUpper(r1) {
 		if f.PkgPath != "" && !f.Anonymous { // unexported, not embedded
 			continue
@@ -930,8 +886,11 @@ LOOP:
 					ft = ft.Elem()
 				}
 				if ft.Kind() == reflect.Struct {
-					// handle anonymous fields after handling all the non-anon fields
-					anonFields = append(anonFields, anonField{ft, j})
+					indexstack2 := make([]int, len(indexstack)+1, len(indexstack)+4)
+					copy(indexstack2, indexstack)
+					indexstack2[len(indexstack)] = j
+					// indexstack2 := append(append(make([]int, 0, len(indexstack)+4), indexstack...), j)
+					x.rget(ft, indexstack2, fnameToHastag, sfi, siInfo)
 					continue
 				}
 			}
@@ -942,39 +901,26 @@ LOOP:
 			continue
 		}
 
+		// do not let fields with same name in embedded structs override field at higher level.
+		// this must be done after anonymous check, to allow anonymous field
+		// still include their child fields
+		if _, ok := fnameToHastag[f.Name]; ok {
+			continue
+		}
 		if f.Name == "" {
 			panic(noFieldNameToStructFieldInfoErr)
 		}
-
-		for _, k := range pv.fNames {
-			if k == f.Name {
-				continue LOOP
-			}
-		}
-		pv.fNames = append(pv.fNames, f.Name)
-
 		if si == nil {
 			si = parseStructFieldInfo(f.Name, stag)
 		} else if si.encName == "" {
 			si.encName = f.Name
 		}
-
-		for _, k := range pv.encNames {
-			if k == si.encName {
-				continue LOOP
-			}
-		}
-		pv.encNames = append(pv.encNames, si.encName)
-
 		// si.ikind = int(f.Type.Kind())
 		if len(indexstack) == 0 {
 			si.i = int16(j)
 		} else {
 			si.i = -1
-			si.is = make([]int, len(indexstack)+1)
-			copy(si.is, indexstack)
-			si.is[len(indexstack)] = j
-			// si.is = append(append(make([]int, 0, len(indexstack)+4), indexstack...), j)
+			si.is = append(append(make([]int, 0, len(indexstack)+4), indexstack...), j)
 		}
 
 		if siInfo != nil {
@@ -982,26 +928,8 @@ LOOP:
 				si.omitEmpty = true
 			}
 		}
-		pv.sfis = append(pv.sfis, si)
-	}
-
-	// now handle anonymous fields
-LOOP2:
-	for _, af := range anonFields {
-		// if etypes contains this, then do not call rget again (as the fields are already seen here)
-		ftid := reflect.ValueOf(af.ft).Pointer()
-		for _, k := range pv.etypes {
-			if k == ftid {
-				continue LOOP2
-			}
-		}
-		pv.etypes = append(pv.etypes, ftid)
-
-		indexstack2 := make([]int, len(indexstack)+1)
-		copy(indexstack2, indexstack)
-		indexstack2[len(indexstack)] = af.idx
-		// indexstack2 := append(append(make([]int, 0, len(indexstack)+4), indexstack...), j)
-		x.rget(af.ft, ftid, indexstack2, pv, siInfo)
+		*sfi = append(*sfi, si)
+		fnameToHastag[f.Name] = stag != ""
 	}
 }
 
@@ -1199,73 +1127,3 @@ type bytesISlice []bytesI
 func (p bytesISlice) Len() int           { return len(p) }
 func (p bytesISlice) Less(i, j int) bool { return bytes.Compare(p[i].v, p[j].v) == -1 }
 func (p bytesISlice) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-
-// -----------------
-
-type set []uintptr
-
-func (s *set) add(v uintptr) (exists bool) {
-	// e.ci is always nil, or len >= 1
-	// defer func() { fmt.Printf("$$$$$$$$$$$ cirRef Add: %v, exists: %v\n", v, exists) }()
-	x := *s
-	if x == nil {
-		x = make([]uintptr, 1, 8)
-		x[0] = v
-		*s = x
-		return
-	}
-	// typically, length will be 1. make this perform.
-	if len(x) == 1 {
-		if j := x[0]; j == 0 {
-			x[0] = v
-		} else if j == v {
-			exists = true
-		} else {
-			x = append(x, v)
-			*s = x
-		}
-		return
-	}
-	// check if it exists
-	for _, j := range x {
-		if j == v {
-			exists = true
-			return
-		}
-	}
-	// try to replace a "deleted" slot
-	for i, j := range x {
-		if j == 0 {
-			x[i] = v
-			return
-		}
-	}
-	// if unable to replace deleted slot, just append it.
-	x = append(x, v)
-	*s = x
-	return
-}
-
-func (s *set) remove(v uintptr) (exists bool) {
-	// defer func() { fmt.Printf("$$$$$$$$$$$ cirRef Rm: %v, exists: %v\n", v, exists) }()
-	x := *s
-	if len(x) == 0 {
-		return
-	}
-	if len(x) == 1 {
-		if x[0] == v {
-			x[0] = 0
-		}
-		return
-	}
-	for i, j := range x {
-		if j == v {
-			exists = true
-			x[i] = 0 // set it to 0, as way to delete it.
-			// copy(x[i:], x[i+1:])
-			// x = x[:len(x)-1]
-			return
-		}
-	}
-	return
-}

@@ -84,9 +84,15 @@ func mergeStruct(out, in reflect.Value) {
 		mergeAny(out.Field(i), in.Field(i), false, sprop.Prop[i])
 	}
 
-	if emIn, ok := in.Addr().Interface().(extendableProto); ok {
-		emOut := out.Addr().Interface().(extendableProto)
-		mergeExtension(emOut.ExtensionMap(), emIn.ExtensionMap())
+	if emIn, ok := extendable(in.Addr().Interface()); ok {
+		emOut, _ := extendable(out.Addr().Interface())
+		mIn, muIn := emIn.extensionsRead()
+		if mIn != nil {
+			mOut := emOut.extensionsWrite()
+			muIn.Lock()
+			mergeExtension(mOut, mIn)
+			muIn.Unlock()
+		}
 	}
 
 	uf := in.FieldByName("XXX_unrecognized")

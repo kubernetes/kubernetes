@@ -335,7 +335,8 @@ func writeStruct(w *textWriter, sv reflect.Value) error {
 				}
 				inner := fv.Elem().Elem() // interface -> *T -> T
 				tag := inner.Type().Field(0).Tag.Get("protobuf")
-				props.Parse(tag) // Overwrite the outer props.
+				props = new(Properties) // Overwrite the outer props var, but not its pointee.
+				props.Parse(tag)
 				// Write the value in the oneof, not the oneof itself.
 				fv = inner.Field(0)
 
@@ -573,12 +574,12 @@ func writeUnknownStruct(w *textWriter, data []byte) (err error) {
 			return ferr
 		}
 		if wire != WireStartGroup {
-			if err := w.WriteByte(':'); err != nil {
+			if err = w.WriteByte(':'); err != nil {
 				return err
 			}
 		}
 		if !w.compact || wire == WireStartGroup {
-			if err := w.WriteByte(' '); err != nil {
+			if err = w.WriteByte(' '); err != nil {
 				return err
 			}
 		}
@@ -727,7 +728,14 @@ func (w *textWriter) writeIndent() {
 	w.complete = false
 }
 
-func marshalText(w io.Writer, pb Message, compact bool) error {
+// TextMarshaler is a configurable text format marshaler.
+type TextMarshaler struct {
+	Compact bool // use compact text format (one line).
+}
+
+// Marshal writes a given protocol buffer in text format.
+// The only errors returned are from w.
+func (m *TextMarshaler) Marshal(w io.Writer, pb Message) error {
 	val := reflect.ValueOf(pb)
 	if pb == nil || val.IsNil() {
 		w.Write([]byte("<nil>"))
@@ -742,7 +750,7 @@ func marshalText(w io.Writer, pb Message, compact bool) error {
 	aw := &textWriter{
 		w:        ww,
 		complete: true,
-		compact:  compact,
+		compact:  m.Compact,
 	}
 
 	if tm, ok := pb.(encoding.TextMarshaler); ok {
@@ -769,25 +777,29 @@ func marshalText(w io.Writer, pb Message, compact bool) error {
 	return nil
 }
 
+// Text is the same as Marshal, but returns the string directly.
+func (m *TextMarshaler) Text(pb Message) string {
+	var buf bytes.Buffer
+	m.Marshal(&buf, pb)
+	return buf.String()
+}
+
+var (
+	defaultTextMarshaler = TextMarshaler{}
+	compactTextMarshaler = TextMarshaler{Compact: true}
+)
+
+// TODO: consider removing some of the Marshal functions below.
+
 // MarshalText writes a given protocol buffer in text format.
 // The only errors returned are from w.
-func MarshalText(w io.Writer, pb Message) error {
-	return marshalText(w, pb, false)
-}
+func MarshalText(w io.Writer, pb Message) error { return defaultTextMarshaler.Marshal(w, pb) }
 
 // MarshalTextString is the same as MarshalText, but returns the string directly.
-func MarshalTextString(pb Message) string {
-	var buf bytes.Buffer
-	marshalText(&buf, pb, false)
-	return buf.String()
-}
+func MarshalTextString(pb Message) string { return defaultTextMarshaler.Text(pb) }
 
 // CompactText writes a given protocol buffer in compact text format (one line).
-func CompactText(w io.Writer, pb Message) error { return marshalText(w, pb, true) }
+func CompactText(w io.Writer, pb Message) error { return compactTextMarshaler.Marshal(w, pb) }
 
 // CompactTextString is the same as CompactText, but returns the string directly.
-func CompactTextString(pb Message) string {
-	var buf bytes.Buffer
-	marshalText(&buf, pb, true)
-	return buf.String()
-}
+func CompactTextString(pb Message) string { return compactTextMarshaler.Text(pb) }

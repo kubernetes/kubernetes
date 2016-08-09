@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,6 +26,8 @@ import (
 	"github.com/coreos/etcd/raft/raftpb"
 	"github.com/coreos/etcd/wal/walpb"
 )
+
+const minSectorSize = 512
 
 type decoder struct {
 	mu  sync.Mutex
@@ -73,7 +75,9 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 		return err
 	}
 
-	data := make([]byte, l)
+	recBytes, padBytes := decodeFrameSize(l)
+
+	data := make([]byte, recBytes+padBytes)
 	if _, err = io.ReadFull(d.brs[0], data); err != nil {
 		// ReadFull returns io.EOF only if no bytes were read
 		// the decoder should treat this as an ErrUnexpectedEOF instead.
@@ -82,7 +86,10 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 		}
 		return err
 	}
-	if err := rec.Unmarshal(data); err != nil {
+	if err := rec.Unmarshal(data[:recBytes]); err != nil {
+		if d.isTornEntry(data) {
+			return io.ErrUnexpectedEOF
+		}
 		return err
 	}
 
@@ -90,12 +97,63 @@ func (d *decoder) decodeRecord(rec *walpb.Record) error {
 	if rec.Type != crcType {
 		d.crc.Write(rec.Data)
 		if err := rec.Validate(d.crc.Sum32()); err != nil {
+			if d.isTornEntry(data) {
+				return io.ErrUnexpectedEOF
+			}
 			return err
 		}
 	}
 	// record decoded as valid; point last valid offset to end of record
-	d.lastValidOff += l + 8
+	d.lastValidOff += recBytes + padBytes + 8
 	return nil
+}
+
+func decodeFrameSize(lenField int64) (recBytes int64, padBytes int64) {
+	// the record size is stored in the lower 56 bits of the 64-bit length
+	recBytes = int64(uint64(lenField) & ^(uint64(0xff) << 56))
+	// non-zero padding is indicated by set MSb / a negative length
+	if lenField < 0 {
+		// padding is stored in lower 3 bits of length MSB
+		padBytes = int64((uint64(lenField) >> 56) & 0x7)
+	}
+	return
+}
+
+// isTornEntry determines whether the last entry of the WAL was partially written
+// and corrupted because of a torn write.
+func (d *decoder) isTornEntry(data []byte) bool {
+	if len(d.brs) != 1 {
+		return false
+	}
+
+	fileOff := d.lastValidOff + 8
+	curOff := 0
+	chunks := [][]byte{}
+	// split data on sector boundaries
+	for curOff < len(data) {
+		chunkLen := int(minSectorSize - (fileOff % minSectorSize))
+		if chunkLen > len(data)-curOff {
+			chunkLen = len(data) - curOff
+		}
+		chunks = append(chunks, data[curOff:curOff+chunkLen])
+		fileOff += int64(chunkLen)
+		curOff += chunkLen
+	}
+
+	// if any data for a sector chunk is all 0, it's a torn write
+	for _, sect := range chunks {
+		isZero := true
+		for _, v := range sect {
+			if v != 0 {
+				isZero = false
+				break
+			}
+		}
+		if isZero {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *decoder) updateCRC(prevCrc uint32) {

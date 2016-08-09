@@ -24,9 +24,13 @@ func (p Procs) Len() int           { return len(p) }
 func (p Procs) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
 func (p Procs) Less(i, j int) bool { return p[i].PID < p[j].PID }
 
-// Self returns a process for the current process.
+// Self returns a process for the current process read via /proc/self.
 func Self() (Proc, error) {
-	return NewProc(os.Getpid())
+	fs, err := NewFS(DefaultMountPoint)
+	if err != nil {
+		return Proc{}, err
+	}
+	return fs.Self()
 }
 
 // NewProc returns a process for the given pid under /proc.
@@ -35,7 +39,6 @@ func NewProc(pid int) (Proc, error) {
 	if err != nil {
 		return Proc{}, err
 	}
-
 	return fs.NewProc(pid)
 }
 
@@ -45,8 +48,20 @@ func AllProcs() (Procs, error) {
 	if err != nil {
 		return Procs{}, err
 	}
-
 	return fs.AllProcs()
+}
+
+// Self returns a process for the current process.
+func (fs FS) Self() (Proc, error) {
+	p, err := fs.readlink("self")
+	if err != nil {
+		return Proc{}, err
+	}
+	pid, err := strconv.Atoi(strings.Replace(p, string(fs), "", -1))
+	if err != nil {
+		return Proc{}, err
+	}
+	return fs.NewProc(pid)
 }
 
 // NewProc returns a process for the given pid.
@@ -54,7 +69,6 @@ func (fs FS) NewProc(pid int) (Proc, error) {
 	if _, err := fs.stat(strconv.Itoa(pid)); err != nil {
 		return Proc{}, err
 	}
-
 	return Proc{PID: pid, fs: fs}, nil
 }
 
@@ -96,7 +110,22 @@ func (p Proc) CmdLine() ([]string, error) {
 		return nil, err
 	}
 
+	if len(data) < 1 {
+		return []string{}, nil
+	}
+
 	return strings.Split(string(data[:len(data)-1]), string(byte(0))), nil
+}
+
+// Executable returns the absolute path of the executable command of a process.
+func (p Proc) Executable() (string, error) {
+	exe, err := p.readlink("exe")
+
+	if os.IsNotExist(err) {
+		return "", nil
+	}
+
+	return exe, err
 }
 
 // FileDescriptors returns the currently open file descriptors of a process.
@@ -116,6 +145,26 @@ func (p Proc) FileDescriptors() ([]uintptr, error) {
 	}
 
 	return fds, nil
+}
+
+// FileDescriptorTargets returns the targets of all file descriptors of a process.
+// If a file descriptor is not a symlink to a file (like a socket), that value will be the empty string.
+func (p Proc) FileDescriptorTargets() ([]string, error) {
+	names, err := p.fileDescriptors()
+	if err != nil {
+		return nil, err
+	}
+
+	targets := make([]string, len(names))
+
+	for i, name := range names {
+		target, err := p.readlink("fd/" + name)
+		if err == nil {
+			targets[i] = target
+		}
+	}
+
+	return targets, nil
 }
 
 // FileDescriptorsLen returns the number of currently open file descriptors of
@@ -146,4 +195,8 @@ func (p Proc) fileDescriptors() ([]string, error) {
 
 func (p Proc) open(pa string) (*os.File, error) {
 	return p.fs.open(path.Join(strconv.Itoa(p.PID), pa))
+}
+
+func (p Proc) readlink(pa string) (string, error) {
+	return p.fs.readlink(path.Join(strconv.Itoa(p.PID), pa))
 }

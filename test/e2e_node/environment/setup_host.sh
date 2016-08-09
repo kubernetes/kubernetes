@@ -55,11 +55,11 @@ fi
 # Install etcd
 hash etcd 2>/dev/null
 if [ $? -ne 0 ]; then
-  curl -L  https://github.com/coreos/etcd/releases/download/v2.2.5/etcd-v2.2.5-linux-amd64.tar.gz -o etcd-v2.2.5-linux-amd64.tar.gz
-  tar xzvf etcd-v2.2.5-linux-amd64.tar.gz
-  sudo mv etcd-v2.2.5-linux-amd64/etcd* /usr/local/bin/
+  curl -L  https://github.com/coreos/etcd/releases/download/v3.0.3/etcd-v3.0.3-linux-amd64.tar.gz -o etcd-v3.0.3-linux-amd64.tar.gz
+  tar xzvf etcd-v3.0.3-linux-amd64.tar.gz
+  sudo mv etcd-v3.0.3-linux-amd64/etcd* /usr/local/bin/
   sudo chown root:root /usr/local/bin/etcd*
-  rm -r etcd-v2.2.5-linux-amd64*
+  rm -r etcd-v3.0.3-linux-amd64*
 fi
 
 # Install nsenter for ubuntu images
