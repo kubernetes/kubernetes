@@ -31,6 +31,7 @@ import (
 )
 
 var (
+	// TODO(fejta): change all these _ flags to -
 	build          = flag.Bool("build", false, "If true, build a new release. Otherwise, use whatever is there.")
 	checkNodeCount = flag.Bool("check_node_count", true, ""+
 		"By default, verify that the cluster has at least two nodes."+
@@ -60,6 +61,13 @@ const (
 	minNodeCount = 2
 )
 
+func appendError(errs []error, err error) []error {
+	if err != nil {
+		return append(errs, err)
+	}
+	return errs
+}
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
@@ -78,14 +86,10 @@ func main() {
 	}
 
 	if *isup {
-		status := 1
-		if IsUp() {
-			status = 0
-			log.Printf("Cluster is UP")
-		} else {
-			log.Printf("Cluster is DOWN")
+		if !IsUp() {
+			log.Fatal("Cluster is DOWN")
 		}
-		os.Exit(status)
+		log.Printf("Cluster is UP")
 	}
 
 	if *build {
@@ -93,26 +97,25 @@ func main() {
 		// it's OK to download the docker image.
 		cmd := exec.Command("make", "quick-release")
 		cmd.Stdin = os.Stdin
-		if !finishRunning("build-release", cmd) {
-			log.Fatal("Error building. Aborting.")
-		}
+		doOrDie("building kubernetes", finishRunning("build-release", cmd))
 	}
 
-	if *up && !TearDown() {
-		log.Fatal("Could not tear down previous cluster")
+	if *up {
+		doOrDie("tearing down previous cluster", TearDown())
 	}
+
+	var errs []error
 
 	beforeResources := ""
 	if *checkLeakedResources {
-		beforeResources = ListResources()
+		beforeResources, err = ListResources()
+		errs = appendError(errs, err)
 	}
 
 	os.Setenv("KUBECTL", strings.Join(append([]string{"./cluster/kubectl.sh"}, kubectlArgs()...), " "))
 
 	if *upgradeArgs != "" { // Start the cluster using a previous version.
-		if !UpgradeUp() {
-			log.Fatal("Failed to start cluster to upgrade. Aborting.")
-		}
+		doOrDie("starting cluster to upgrade", UpgradeUp())
 	} else { // Start the cluster using this version.
 		if *pushup {
 			if IsUp() {
@@ -126,109 +129,116 @@ func main() {
 			}
 		}
 		if *up {
-			if !Up() {
-				log.Fatal("Error starting e2e cluster. Aborting.")
-			}
+			doOrDie("starting e2e cluster", Up())
 		} else if *push {
-			if !finishRunning("push", exec.Command("./hack/e2e-internal/e2e-push.sh")) {
-				log.Fatal("Error pushing e2e cluster. Aborting.")
-			}
+			doOrDie("pushing e2e clsuter", finishRunning("push", exec.Command("./hack/e2e-internal/e2e-push.sh")))
 		}
 	}
 
 	upResources := ""
 	if *checkLeakedResources {
-		upResources = ListResources()
+		upResources, err = ListResources()
+		errs = appendError(errs, err)
 	}
-
-	success := true
 
 	if *ctlCmd != "" {
 		ctlArgs := strings.Fields(*ctlCmd)
 		os.Setenv("KUBE_CONFIG_FILE", "config-test.sh")
-		ctlSuccess := finishRunning("'kubectl "+*ctlCmd+"'", exec.Command("./cluster/kubectl.sh", ctlArgs...))
-		success = success && ctlSuccess
+		errs = appendError(errs, finishRunning("'kubectl "+*ctlCmd+"'", exec.Command("./cluster/kubectl.sh", ctlArgs...)))
 	}
 
 	if *upgradeArgs != "" {
-		upgradeSuccess := UpgradeTest(*upgradeArgs)
-		success = success && upgradeSuccess
+		errs = appendError(errs, UpgradeTest(*upgradeArgs))
 	}
 
 	if *test {
 		if *skewTests {
-			skewSuccess := SkewTest()
-			success = success && skewSuccess
+			errs = appendError(errs, SkewTest())
 		} else {
-			testSuccess := Test()
-			success = success && testSuccess
+			errs = appendError(errs, Test())
 		}
 	}
 
 	if *kubemark {
-		kubeSuccess := KubemarkTest()
-		success = success && kubeSuccess
+		errs = appendError(errs, KubemarkTest())
 	}
 
 	if *down {
-		if !success && *dump != "" {
+		if errs != nil && *dump != "" {
 			DumpClusterLogs(*dump)
 		}
-		tearSuccess := TearDown()
-		success = success && tearSuccess
+		errs = appendError(errs, TearDown())
 	}
 
 	if *checkLeakedResources {
 		log.Print("Sleeping for 30 seconds...") // Wait for eventually consistent listing
 		time.Sleep(30 * time.Second)
-		DiffResources(beforeResources, upResources, ListResources(), *dump)
+		afterResources, err := ListResources()
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			errs = appendError(errs, DiffResources(beforeResources, upResources, afterResources, *dump))
+		}
 	}
 
-	if !success {
-		os.Exit(1)
+	if errs != nil {
+		log.Fatalf("Encountered %d errors: %v", len(errs), errs)
 	}
 }
 
-func writeOrDie(dir, name, data string) string {
-	f, err := os.Create(filepath.Join(dir, name))
+func writeOrDie(dir, name, data string) (string, error) {
+	p := filepath.Join(dir, name)
+	f, err := os.Create(p)
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("Could not open %s: %s", p, err)
 	}
 	if _, err := f.WriteString(data); err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("Could not write %d chars: %s", len(data), err)
 	}
 	if err := f.Close(); err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("could not close %s: %s", p, err)
 	}
 	log.Printf("Created file: %s", f.Name())
-	return f.Name()
+	return f.Name(), nil
 }
 
-func DiffResources(before, clusterUp, after, location string) {
+func DiffResources(before, clusterUp, after, location string) error {
 	if location == "" {
 		var err error
 		location, err = ioutil.TempDir("", "e2e-check-resources")
 		if err != nil {
-			log.Fatal(err)
+			return fmt.Errorf("Could not create e2e-check-resources temp dir: %s", err)
 		}
 	}
-	bp := writeOrDie(location, "gcp-resources-before.txt", before)
-	writeOrDie(location, "gcp-resources-cluster-up.txt", clusterUp)
-	ap := writeOrDie(location, "gcp-resources-after.txt", after)
+	bp, err := writeOrDie(location, "gcp-resources-before.txt", before)
+	if err != nil {
+		return err
+	}
+	_, err = writeOrDie(location, "gcp-resources-cluster-up.txt", clusterUp)
+	if err != nil {
+		return err
+	}
+	ap, err := writeOrDie(location, "gcp-resources-after.txt", after)
+	if err != nil {
+		return err
+	}
 
 	cmd := exec.Command("diff", "-sw", "-U0", "-F^\\[.*\\]$", bp, ap)
 	if *verbose {
 		cmd.Stderr = os.Stderr
 	}
-	o, err := cmd.Output()
+	o, cerr := cmd.Output()
 	stdout := string(o)
-	writeOrDie(location, "gcp-resources-diff.txt", stdout)
-	if err == nil {
-		return
+	_, err = writeOrDie(location, "gcp-resources-diff.txt", stdout)
+	if err != nil {
+		return err
+	}
+	if cerr == nil { // No diffs
+		return nil
 	}
 	lines := strings.Split(stdout, "\n")
 	if len(lines) < 3 { // Ignore the +++ and --- header lines
-		return
+		return nil
 	}
 
 	var added []string
@@ -238,12 +248,12 @@ func DiffResources(before, clusterUp, after, location string) {
 		}
 	}
 	if len(added) > 0 {
-		log.Printf("Error: %d leaked resources", len(added))
-		log.Fatal(strings.Join(added, "\n"))
+		return fmt.Errorf("Error: %d leaked resources\n%v", len(added), strings.Join(added, "\n"))
 	}
+	return nil
 }
 
-func ListResources() string {
+func ListResources() (string, error) {
 	log.Printf("Listing resources...")
 	cmd := exec.Command("./cluster/gce/list-resources.sh")
 	if *verbose {
@@ -251,17 +261,17 @@ func ListResources() string {
 	}
 	stdout, err := cmd.Output()
 	if err != nil {
-		log.Fatalf("Failed to list resources (%s):\n%s", err, stdout)
+		return "", fmt.Errorf("Failed to list resources (%s):\n%s", err, stdout)
 	}
-	return string(stdout)
+	return string(stdout), nil
 }
 
-func TearDown() bool {
+func TearDown() error {
 	return finishRunning("teardown", exec.Command("./hack/e2e-internal/e2e-down.sh"))
 }
 
 // Up brings an e2e cluster up, recreating it if one is already running.
-func Up() bool {
+func Up() error {
 	return finishRunning("up", exec.Command("./hack/e2e-internal/e2e-up.sh"))
 }
 
@@ -289,19 +299,19 @@ func ValidateClusterSize() {
 
 // Is the e2e cluster up?
 func IsUp() bool {
-	return finishRunning("get status", exec.Command("./hack/e2e-internal/e2e-status.sh"))
+	return finishRunning("get status", exec.Command("./hack/e2e-internal/e2e-status.sh")) == nil
 }
 
-func DumpClusterLogs(location string) {
+func DumpClusterLogs(location string) error {
 	log.Printf("Dumping cluster logs to: %v", location)
-	finishRunning("dump cluster logs", exec.Command("./cluster/log-dump.sh", location))
+	return finishRunning("dump cluster logs", exec.Command("./cluster/log-dump.sh", location))
 }
 
-func KubemarkTest() bool {
+func KubemarkTest() error {
 	// Stop previous run
-	if !finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh")) {
-		log.Print("stop kubemark failed")
-		return false
+	err := finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	if err != nil {
+		return err
 	}
 
 	// Start new run
@@ -316,9 +326,9 @@ func KubemarkTest() bool {
 	}
 	os.Setenv("NUM_NODES", os.Getenv("KUBEMARK_NUM_NODES"))
 	os.Setenv("MASTER_SIZE", os.Getenv("KUBEMARK_MASTER_SIZE"))
-	if !finishRunning("Start Kubemark", exec.Command("./test/kubemark/start-kubemark.sh")) {
-		log.Print("Error: start kubemark failed")
-		return false
+	err = finishRunning("Start Kubemark", exec.Command("./test/kubemark/start-kubemark.sh"))
+	if err != nil {
+		return err
 	}
 
 	// Run kubemark tests
@@ -328,31 +338,36 @@ func KubemarkTest() bool {
 	}
 	test_args := os.Getenv("KUBEMARK_TEST_ARGS")
 
-	if !finishRunning("Run kubemark tests", exec.Command("./test/kubemark/run-e2e-tests.sh", "--ginkgo.focus="+focus, test_args)) {
-		log.Print("Error: run kubemark tests failed")
-		return false
+	err = finishRunning("Run kubemark tests", exec.Command("./test/kubemark/run-e2e-tests.sh", "--ginkgo.focus="+focus, test_args))
+	if err != nil {
+		return err
 	}
 
-	// Stop kubemark
-	if !finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh")) {
-		log.Print("Error: stop kubemark failed")
-		return false
+	err = finishRunning("Stop kubemark", exec.Command("./test/kubemark/stop-kubemark.sh"))
+	if err != nil {
+		return err
 	}
-	return true
+	return nil
 }
 
-func UpgradeUp() bool {
+func chdirSkew() (string, error) {
 	old, err := os.Getwd()
 	if err != nil {
-		log.Printf("Failed to os.Getwd(): %v", err)
-		return false
+		return "", fmt.Errorf("Failed to os.Getwd(): %v", err)
 	}
-	defer os.Chdir(old)
 	err = os.Chdir("../kubernetes_skew")
 	if err != nil {
-		log.Printf("Failed to cd ../kubernetes_skew: %v", err)
-		return false
+		return "", fmt.Errorf("Failed to cd ../kubernetes_skew: %v", err)
 	}
+	return old, nil
+}
+
+func UpgradeUp() error {
+	old, err := chdirSkew()
+	if err != nil {
+		return err
+	}
+	defer os.Chdir(old)
 	return finishRunning("UpgradeUp",
 		exec.Command(
 			"go", "run", "./hack/e2e.go",
@@ -364,18 +379,12 @@ func UpgradeUp() bool {
 		))
 }
 
-func UpgradeTest(args string) bool {
-	old, err := os.Getwd()
+func UpgradeTest(args string) error {
+	old, err := chdirSkew()
 	if err != nil {
-		log.Printf("Failed to os.Getwd(): %v", err)
-		return false
+		return err
 	}
 	defer os.Chdir(old)
-	err = os.Chdir("../kubernetes_skew")
-	if err != nil {
-		log.Printf("Failed to cd ../kubernetes_skew: %v", err)
-		return false
-	}
 	previous, present := os.LookupEnv("E2E_REPORT_PREFIX")
 	if present {
 		defer os.Setenv("E2E_REPORT_PREFIX", previous)
@@ -392,18 +401,12 @@ func UpgradeTest(args string) bool {
 			fmt.Sprintf("--check_version_skew=%t", *checkVersionSkew)))
 }
 
-func SkewTest() bool {
-	old, err := os.Getwd()
+func SkewTest() error {
+	old, err := chdirSkew()
 	if err != nil {
-		log.Printf("Failed to Getwd: %v", err)
-		return false
+		return err
 	}
 	defer os.Chdir(old)
-	err = os.Chdir("../kubernetes_skew")
-	if err != nil {
-		log.Printf("Failed to cd ../kubernetes_skew: %v", err)
-		return false
-	}
 	return finishRunning("Skewed Ginkgo tests",
 		exec.Command(
 			"go", "run", "./hack/e2e.go",
@@ -413,7 +416,7 @@ func SkewTest() bool {
 			fmt.Sprintf("--check_version_skew=%t", *checkVersionSkew)))
 }
 
-func Test() bool {
+func Test() error {
 	if !IsUp() {
 		log.Fatal("Testing requested, but e2e cluster not up!")
 	}
@@ -432,7 +435,7 @@ func Test() bool {
 	return finishRunning("Federated Ginkgo tests", exec.Command("./hack/federated-ginkgo-e2e.sh", strings.Fields(*testArgs)...))
 }
 
-func finishRunning(stepName string, cmd *exec.Cmd) bool {
+func finishRunning(stepName string, cmd *exec.Cmd) error {
 	if *verbose {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -443,10 +446,15 @@ func finishRunning(stepName string, cmd *exec.Cmd) bool {
 	}(time.Now())
 
 	if err := cmd.Run(); err != nil {
-		log.Printf("Error running %v: %v", stepName, err)
-		return false
+		return fmt.Errorf("Error running %v: %v", stepName, err)
 	}
-	return true
+	return nil
+}
+
+func doOrDie(msg string, err error) {
+	if err != nil {
+		log.Fatalf("error %s: %s", msg, err)
+	}
 }
 
 // returns either "", or a list of args intended for appending with the
