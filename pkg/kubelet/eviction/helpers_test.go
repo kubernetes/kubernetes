@@ -110,6 +110,41 @@ func TestParseThresholdConfig(t *testing.T) {
 				},
 			},
 		},
+		"inode flag values": {
+			evictionHard:            "imagefs.inodesFree<150Mi,nodefs.inodesFree<100Mi",
+			evictionSoft:            "imagefs.inodesFree<300Mi,nodefs.inodesFree<200Mi",
+			evictionSoftGracePeriod: "imagefs.inodesFree=30s,nodefs.inodesFree=30s",
+			evictionMinReclaim:      "imagefs.inodesFree=2Gi,nodefs.inodesFree=1Gi",
+			expectErr:               false,
+			expectThresholds: []Threshold{
+				{
+					Signal:     SignalImageFsInodesFree,
+					Operator:   OpLessThan,
+					Value:      quantityMustParse("150Mi"),
+					MinReclaim: quantityMustParse("2Gi"),
+				},
+				{
+					Signal:     SignalNodeFsInodesFree,
+					Operator:   OpLessThan,
+					Value:      quantityMustParse("100Mi"),
+					MinReclaim: quantityMustParse("1Gi"),
+				},
+				{
+					Signal:      SignalImageFsInodesFree,
+					Operator:    OpLessThan,
+					Value:       quantityMustParse("300Mi"),
+					GracePeriod: gracePeriod,
+					MinReclaim:  quantityMustParse("2Gi"),
+				},
+				{
+					Signal:      SignalNodeFsInodesFree,
+					Operator:    OpLessThan,
+					Value:       quantityMustParse("200Mi"),
+					GracePeriod: gracePeriod,
+					MinReclaim:  quantityMustParse("1Gi"),
+				},
+			},
+		},
 		"invalid-signal": {
 			evictionHard:            "mem.available<150Mi",
 			evictionSoft:            "",
@@ -311,7 +346,7 @@ func TestOrderedByDisk(t *testing.T) {
 		return result, found
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
 	expected := []*api.Pod{pod6, pod5, pod4, pod3, pod2, pod1}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -377,7 +412,7 @@ func TestOrderedByQoSDisk(t *testing.T) {
 		return result, found
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
+	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
 	expected := []*api.Pod{pod2, pod1, pod4, pod3, pod6, pod5}
 	for i := range expected {
 		if pods[i] != expected[i] {
