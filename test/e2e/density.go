@@ -319,9 +319,15 @@ func cleanupDensityTest(dtc DensityTestConfig) {
 		rcName := dtc.Configs[i].Name
 		rc, err := dtc.Client.ReplicationControllers(dtc.Namespace).Get(rcName)
 		if err == nil && rc.Spec.Replicas != 0 {
-			By("Cleaning up the replication controller")
-			err := framework.DeleteRC(dtc.Client, dtc.Namespace, rcName)
-			framework.ExpectNoError(err)
+			if framework.TestContext.GarbageCollectorEnabled {
+				By("Cleaning up only the replication controller, garbage collector will clean up the pods")
+				err := framework.DeleteOnlyRC(dtc.Client, dtc.Namespace, rcName)
+				framework.ExpectNoError(err)
+			} else {
+				By("Cleaning up the replication controller and pods")
+				err := framework.DeleteRC(dtc.Client, dtc.Namespace, rcName)
+				framework.ExpectNoError(err)
+			}
 		}
 	}
 }

@@ -3127,7 +3127,41 @@ func DeleteRC(c *client.Client, ns, name string) error {
 	if err != nil {
 		return fmt.Errorf("error while stopping RC: %s: %v", name, err)
 	}
-	err = waitForRCPodsGone(c, rc)
+	err = waitForRCPodsGone(c, rc, nil)
+	if err != nil {
+		return fmt.Errorf("error while deleting RC %s: %v", name, err)
+	}
+	terminatePodTime := time.Now().Sub(startTime) - deleteRCTime
+	Logf("Terminating RC %s pods took: %v", name, terminatePodTime)
+	return nil
+}
+
+// DeleteOnlyRC deletes only the Replication Controller and waits for GC to delete the pods.
+func DeleteOnlyRC(c *client.Client, ns, name string) error {
+	By(fmt.Sprintf("deleting replication controller %s in namespace %s, will wait for the garbage collector to delete the pods", name, ns))
+	rc, err := c.ReplicationControllers(ns).Get(name)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Logf("RC %s was already deleted: %v", name, err)
+			return nil
+		}
+		return err
+	}
+	startTime := time.Now()
+	falseVar := false
+	deleteOption := &api.DeleteOptions{OrphanDependents: &falseVar}
+	err = c.ReplicationControllers(ns).Delete(name, deleteOption)
+	if err != nil && apierrs.IsNotFound(err) {
+		Logf("RC %s was already deleted: %v", name, err)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	deleteRCTime := time.Now().Sub(startTime)
+	Logf("Deleting RC %s took: %v", name, deleteRCTime)
+	timeout := 10 * time.Minute
+	err = waitForRCPodsGone(c, rc, &timeout)
 	if err != nil {
 		return fmt.Errorf("error while deleting RC %s: %v", name, err)
 	}
@@ -3138,12 +3172,16 @@ func DeleteRC(c *client.Client, ns, name string) error {
 
 // waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
 // have completed termination).
-func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController) error {
+func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController, timeout *time.Duration) error {
+	if timeout == nil {
+		defaultTimeout := 2 * time.Minute
+		timeout = &defaultTimeout
+	}
 	labels := labels.SelectorFromSet(rc.Spec.Selector)
 	PodStore := NewPodStore(c, rc.Namespace, labels, fields.Everything())
 	defer PodStore.Stop()
 
-	return wait.PollImmediate(Poll, 2*time.Minute, func() (bool, error) {
+	return wait.PollImmediate(Poll, *timeout, func() (bool, error) {
 		if pods := PodStore.List(); len(pods) == 0 {
 			return true, nil
 		}
@@ -4306,7 +4344,7 @@ func ScaleRCByLabels(client *client.Client, ns string, l map[string]string, repl
 			return err
 		}
 		if replicas == 0 {
-			if err := waitForRCPodsGone(client, rc); err != nil {
+			if err := waitForRCPodsGone(client, rc, nil); err != nil {
 				return err
 			}
 		} else {
