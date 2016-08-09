@@ -287,7 +287,7 @@ Issues:
   - `net.core.somaxconn`: maximum queue length specifiable by listen.
     * [x] **namespaced** in net ns
     * [ ] **might have application influence** for high values as it limits the socket queue length
-    * [ ] TODO: accounting? No evidence found until now.
+    * [?] **No real evidence found until now for accounting**. The limit is checked by `sk_acceptq_is_full` at http://lxr.free-electrons.com/source/net/ipv4/tcp_ipv4.c#L1276. After that a new socket is created. Probably, the tcp socket buffer sysctls apply then, with their accounting, see below.
   - `net.ipv4.tcp_wmem`/`net.ipv4.tcp_wmem`/`net.core.rmem_max`/`net.core.wmem_max`: socket buffer sizes
     * [ ] **not namespaced in net ns**, and they are not even available under `/sys/net`
   - `net.ipv4.ip_local_port_range`: local tcp/udp port range
@@ -317,7 +317,7 @@ Issues:
 | kernel.msg*                  | ipc           | memcg 3)                   |
 | fs.mqueue.*                  | ipc           | memcg                      |
 | kernel.sem                   | ipc           | memcg                      |
-| net.core.somaxconn           | net           | ?                          |
+| net.core.somaxconn           | net           | memcg b/c sockets are accounted for? |
 | net.*.tcp_wmem/rmem          | - 2)          | memcg                      |
 | net.core.wmem/rmem_max       | - 2)          | ?                          |
 | net.ipv4.ip_local_port_range | net           | no memory involved         |
