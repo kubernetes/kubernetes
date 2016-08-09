@@ -3395,6 +3395,13 @@ func DeepCopy_api_Toleration(in interface{}, out interface{}, c *conversion.Clon
 		out.Operator = in.Operator
 		out.Value = in.Value
 		out.Effect = in.Effect
+		if in.ForgivenessSeconds != nil {
+			in, out := &in.ForgivenessSeconds, &out.ForgivenessSeconds
+			*out = new(int64)
+			**out = **in
+		} else {
+			out.ForgivenessSeconds = nil
+		}
 		return nil
 	}
 }

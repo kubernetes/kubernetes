@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -83,7 +84,7 @@ func cleanupOrphanedPods(pods []*api.Pod, nodeStore cache.Store, forcefulDeleteP
 
 // deletePods will delete all pods from master running on given node, and return true
 // if any pods were deleted.
-func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
+func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, nodeStatus nodeStatusData, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
 	options := api.ListOptions{FieldSelector: selector}
@@ -108,6 +109,10 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		// if the pod is managed by a daemonset, ignore it
 		_, err := daemonStore.GetPodDaemonSets(&pod)
 		if err == nil { // No error means at least one daemonset was found
+			continue
+		}
+		// if the pod is forgivable (wants to stay bound on the node), ignore it
+		if isPodForgivable(pod, nodeStatus.readyTransitionTimestamp) {
 			continue
 		}
 
@@ -209,7 +214,7 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 
 // update ready status of all pods running on given node from master
 // return true if success
-func markAllPodsNotReady(kubeClient clientset.Interface, nodeName string) error {
+func markAllPodsNotReady(kubeClient clientset.Interface, nodeName string, nodeStatus nodeStatusData) error {
 	glog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
 	opts := api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName)}
 	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(opts)
@@ -223,9 +228,14 @@ func markAllPodsNotReady(kubeClient clientset.Interface, nodeName string) error 
 		if pod.Spec.NodeName != nodeName {
 			continue
 		}
-
+		isForgive := isPodForgivable(pod, nodeStatus.readyTransitionTimestamp)
 		for i, cond := range pod.Status.Conditions {
 			if cond.Type == api.PodReady {
+				if isForgive {
+					for j := range pod.Status.ContainerStatuses {
+						pod.Status.ContainerStatuses[j].Ready = false
+					}
+				}
 				pod.Status.Conditions[i].Status = api.ConditionFalse
 				glog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
 				_, err := kubeClient.Core().Pods(pod.Namespace).UpdateStatus(&pod)
@@ -241,6 +251,35 @@ func markAllPodsNotReady(kubeClient clientset.Interface, nodeName string) error 
 		return nil
 	}
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
+}
+
+//isPodForgivable will check whether Pod need to be forgive. Return true if pod has forgiveness toleration and duration is greater than forgivenessSeconds
+func isPodForgivable(pod api.Pod, nodeReadyTransitionTimestamp unversioned.Time) bool {
+	tolerations, err := api.GetTolerationsFromPodAnnotations(pod.ObjectMeta.Annotations)
+	if err != nil {
+		return false
+	}
+	var forgivenessToleration api.Toleration
+	found := false
+	for _, toleration := range tolerations {
+		if toleration.Key == unversioned.TaintNodeDown && toleration.Effect == api.TaintEffectNoExecute {
+			found = true
+			forgivenessToleration = toleration
+			break
+		}
+	}
+
+	if !found {
+		return false
+	}
+
+	if forgivenessToleration.ForgivenessSeconds == nil {
+		return true
+	}
+
+	forgivePeriod := unversioned.NewTime(nodeReadyTransitionTimestamp.Time.Add(time.Duration(*forgivenessToleration.ForgivenessSeconds) * time.Second))
+
+	return unversioned.Now().Before(forgivePeriod)
 }
 
 func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName string) (bool, error) {
@@ -284,7 +323,7 @@ func recordNodeStatusChange(recorder record.EventRecorder, node *api.Node, new_s
 // terminatePods will ensure all pods on the given node that are in terminating state are eventually
 // cleaned up. Returns true if the node has no pods in terminating state, a duration that indicates how
 // long before we should check again (the next deadline for a pod to complete), or an error.
-func terminatePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, since time.Time, maxGracePeriod time.Duration) (bool, time.Duration, error) {
+func terminatePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, nodeStatus nodeStatusData, since time.Time, maxGracePeriod time.Duration) (bool, time.Duration, error) {
 	// the time before we should try again
 	nextAttempt := time.Duration(0)
 	// have we deleted all pods
@@ -306,6 +345,11 @@ func terminatePods(kubeClient clientset.Interface, recorder record.EventRecorder
 		}
 		// only clean terminated pods
 		if pod.DeletionGracePeriodSeconds == nil {
+			continue
+		}
+
+		// forgiveness check, whether pod can stay bound on the node
+		if isPodForgivable(pod, nodeStatus.readyTransitionTimestamp) {
 			continue
 		}
 

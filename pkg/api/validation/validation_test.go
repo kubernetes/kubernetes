@@ -3080,6 +3080,27 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
+		{ // populate forgiverness tolerations in annotations.
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "taint.alpha.kubernetes.io/nodedown",
+						"operator": "Exists",
+						"value": "",
+						"effect": "NoExecute",
+						"forgivenessSeconds": 60
+					}]`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
 		{ // populate tolerations exists operator in annotations.
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
@@ -3596,6 +3617,67 @@ func TestValidatePod(t *testing.T) {
 						"operator": "Exists",
 						"value": "bar",
 						"effect": "NoSchedule"
+					}]`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"Operator must be Exists when `key` is 'nodedown'": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "taint.alpha.kubernetes.io/nodedown",
+						"operator": "Equal",
+						"value": "bar",
+						"effect": "NoExecute"
+					}]`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"Effect must be NoExecute when `key` is 'nodedown'": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "taint.alpha.kubernetes.io/nodedown",
+						"operator": "Exists",
+						"value": "bar",
+						"effect": "NoSchedule"
+					}]`,
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"forgivenessSeconds must be greater than zero  when `key` is 'nodedown'": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.TolerationsAnnotationKey: `
+					[{
+						"key": "taint.alpha.kubernetes.io/nodedown",
+						"operator": "Exists",
+						"value": "bar",
+						"effect": "NoExecute",
+						"forgivenessSeconds": 0
 					}]`,
 				},
 			},

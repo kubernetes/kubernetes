@@ -1617,11 +1617,9 @@ const (
 	// Enforced by the scheduler and Kubelet.
 	// TaintEffectNoScheduleNoAdmit TaintEffect = "NoScheduleNoAdmit"
 	// NOT YET IMPLEMENTED. TODO: Uncomment field once it is implemented.
-	// Do not allow new pods to schedule onto the node unless they tolerate the taint,
-	// do not allow pods to start on Kubelet unless they tolerate the taint,
-	// and evict any already-running pods that do not tolerate the taint.
-	// Enforced by the scheduler and Kubelet.
-	// TaintEffectNoScheduleNoAdmitNoExecute = "NoScheduleNoAdmitNoExecute"
+	// Evict any already-running pods that do not tolerate the taint.
+	// Enforced by Kubelet.
+	TaintEffectNoExecute = "NoExecute"
 )
 
 // The pod this Toleration is attached to tolerates any taint that matches
@@ -1640,8 +1638,13 @@ type Toleration struct {
 	// Effect indicates the taint effect to match. Empty means match all taint effects.
 	// When specified, allowed values are NoSchedule and PreferNoSchedule.
 	Effect TaintEffect `json:"effect,omitempty" protobuf:"bytes,4,opt,name=effect,casttype=TaintEffect"`
-	// TODO: For forgiveness (#1574), we'd eventually add at least a grace period
-	// here, and possibly an occurrence threshold and period.
+	// ForgivenessSeconds Represents the period of time the toleration tolerates the taint.
+	// By default, if it is not set, which means tolerate the taint forever, don't evict me at any time.
+	// For any number N > 0, it means tolerate the taint only for N seconds,
+	// evict me after N seconds when the taint appeared.
+	// Set to <= 0 would not be allowed
+	// Currently only associated with the NoExecute toleration.
+	ForgivenessSeconds *int64 `json:"forgivenessSeconds,omitempty" protobuf:"varint,5,opt,name=forgivenessSeconds"`
 }
 
 // A toleration operator is the set of operators that can be used in a toleration.

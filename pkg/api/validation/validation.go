@@ -1609,6 +1609,23 @@ func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 		// validate the toleration key
 		allErrors = append(allErrors, unversionedvalidation.ValidateLabelName(toleration.Key, idxPath.Child("key"))...)
 
+		// validate forgiveness toleration
+		if toleration.Key == unversioned.TaintNodeDown {
+			if toleration.Operator != api.TolerationOpExists {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("operator"), toleration.Operator, "Operator must be Exists when `key` is 'nodedown'"))
+			}
+			if len(toleration.Value) > 0 {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("value"), toleration.Value, "value must be empty when `operator` is 'Exists'"))
+			}
+			if toleration.Effect != api.TaintEffectNoExecute {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("effect"), toleration.Effect, "Effect must be NoExecute when `key` is 'nodedown'"))
+			}
+			if toleration.ForgivenessSeconds != nil && *toleration.ForgivenessSeconds <= 0 {
+				allErrors = append(allErrors, field.Invalid(idxPath.Child("forgivenessSeconds"), toleration.ForgivenessSeconds, "forgivenessSeconds must be greater than zero  when `key` is 'nodedown'"))
+			}
+			continue
+		}
+
 		// validate toleration operator and value
 		switch toleration.Operator {
 		case api.TolerationOpEqual, "":

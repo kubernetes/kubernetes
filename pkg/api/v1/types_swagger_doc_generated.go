@@ -1689,11 +1689,12 @@ func (Taint) SwaggerDoc() map[string]string {
 }
 
 var map_Toleration = map[string]string{
-	"":         "The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
-	"key":      "Required. Key is the taint key that the toleration applies to.",
-	"operator": "operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
-	"value":    "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
-	"effect":   "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and PreferNoSchedule.",
+	"":                   "The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.",
+	"key":                "Required. Key is the taint key that the toleration applies to.",
+	"operator":           "operator represents a key's relationship to the value. Valid operators are Exists and Equal. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category.",
+	"value":              "Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.",
+	"effect":             "Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule and PreferNoSchedule.",
+	"forgivenessSeconds": "ForgivenessSeconds Represents the period of time the toleration tolerates the taint. By default, if it is not set, which means tolerate the taint forever, don't evict me at any time. For any number N > 0, it means tolerate the taint only for N seconds, evict me after N seconds when the taint appeared. Set to <= 0 would not be allowed Currently only associated with the NoExecute toleration.",
 }
 
 func (Toleration) SwaggerDoc() map[string]string {

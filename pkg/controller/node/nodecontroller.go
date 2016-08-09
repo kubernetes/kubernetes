@@ -386,7 +386,7 @@ func (nc *NodeController) Run(period time.Duration) {
 		defer nc.evictorLock.Unlock()
 		for k := range nc.zonePodEvictor {
 			nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-				remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nc.daemonSetStore)
+				remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nc.nodeStatusMap[value.Value], nc.daemonSetStore)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
 					return false, 0
@@ -407,7 +407,7 @@ func (nc *NodeController) Run(period time.Duration) {
 		defer nc.evictorLock.Unlock()
 		for k := range nc.zoneTerminationEvictor {
 			nc.zoneTerminationEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-				completed, remaining, err := terminatePods(nc.kubeClient, nc.recorder, value.Value, value.AddedAt, nc.maximumGracePeriod)
+				completed, remaining, err := terminatePods(nc.kubeClient, nc.recorder, value.Value, nc.nodeStatusMap[value.Value], value.AddedAt, nc.maximumGracePeriod)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
 					return false, 0
@@ -525,7 +525,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Report node event.
 			if currentReadyCondition.Status != api.ConditionTrue && observedReadyCondition.Status == api.ConditionTrue {
 				recordNodeStatusChange(nc.recorder, node, "NodeNotReady")
-				if err = markAllPodsNotReady(nc.kubeClient, node.Name); err != nil {
+				if err = markAllPodsNotReady(nc.kubeClient, node.Name, nc.nodeStatusMap[node.Name]); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
 				}
 			}
