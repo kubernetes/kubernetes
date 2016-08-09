@@ -92,7 +92,7 @@ function upload_version() {
   fi
 
   local -r json_file="${gcs_build_path}/started.json"
-  for upload_attempt in $(seq 3); do
+  for upload_attempt in {1..3}; do
     echo "Uploading version to: ${json_file} (attempt ${upload_attempt})"
     gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" <(
       echo "{"
@@ -153,7 +153,7 @@ function upload_artifacts_and_build_result() {
 
   echo -n 'Run finished at '; date -d "@${timestamp}"
 
-  for upload_attempt in $(seq 3); do
+  for upload_attempt in {1..3}; do
     echo "Uploading to ${gcs_build_path} (attempt ${upload_attempt})"
     echo "Uploading build result: ${build_result}"
     gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" <(

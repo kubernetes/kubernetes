@@ -1547,7 +1547,7 @@ function ssh-to-node {
 
   local ip=$(get_ssh_hostname ${node})
 
-  for try in $(seq 1 5); do
+  for try in {1..5}; do
     if ssh -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" ${SSH_USER}@${ip} "echo test > /dev/null"; then
       break
     fi

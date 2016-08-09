@@ -233,7 +233,7 @@ function pollfor {
   pass_http=0
 
   ### Test HTTP Server comes up.
-  for i in `seq 1 150`;
+  for i in {1..150};
   do
       ### Just testing that the front end comes up.  Not sure how to test total entries etc... (yet)
       echo "Trying curl ... $PUBLIC_IP:3000 , attempt $i . expect a few failures while pulling images... "
