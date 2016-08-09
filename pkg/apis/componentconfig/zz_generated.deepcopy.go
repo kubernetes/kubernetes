@@ -21,11 +21,10 @@ limitations under the License.
 package componentconfig
 
 import (
-	reflect "reflect"
-
 	api "k8s.io/kubernetes/pkg/api"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	config "k8s.io/kubernetes/pkg/util/config"
+	reflect "reflect"
 )
 
 func init() {
@@ -198,6 +197,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.TLSCertFile = in.TLSCertFile
 		out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 		out.CertDirectory = in.CertDirectory
+		out.RequestTLSCert = in.RequestTLSCert
 		out.HostnameOverride = in.HostnameOverride
 		out.PodInfraContainerImage = in.PodInfraContainerImage
 		out.DockerEndpoint = in.DockerEndpoint

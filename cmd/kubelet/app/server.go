@@ -504,8 +504,7 @@ func requestCertFromAPIServer(s *options.KubeletServer) error {
 		ips = []net.IP{nodeIP}
 	}
 
-	commonName := fmt.Sprintf("kubelet-%s", hostname)
-	req, err := utilcertificates.NewCertificateRequest(s.TLSPrivateKeyFile, &pkix.Name{CommonName: commonName}, []string{hostname}, ips)
+	req, err := utilcertificates.NewCertificateRequest(s.TLSPrivateKeyFile, &pkix.Name{CommonName: hostname}, []string{hostname}, ips)
 	if err != nil {
 		return fmt.Errorf("unable to generate certificate request: %v", err)
 	}
@@ -528,16 +527,18 @@ func requestCertFromAPIServer(s *options.KubeletServer) error {
 // It returns the API server's issued certificate (pem-encoded) on success.
 // If there is any errors, or the watch timeouts, it returns an error.
 func requestCertificate(client unversionedcertificates.CertificateSigningRequestsGetter, request []byte, defaultTimeoutSeconds int64) (certificate []byte, err error) {
-	if _, err = client.CertificateSigningRequests().Create(&certificates.CertificateSigningRequest{
+	res, err := client.CertificateSigningRequests().Create(&certificates.CertificateSigningRequest{
 		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
 		ObjectMeta: api.ObjectMeta{GenerateName: "csr-"},
 
 		// Username, UID, Groups will be injected by API server.
 		Spec: certificates.CertificateSigningRequestSpec{Request: request},
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
-
 	}
+
+	defer client.CertificateSigningRequests().Delete(res.Name, nil)
 
 	resultCh, err := client.CertificateSigningRequests().Watch(api.ListOptions{
 		Watch:          true,
