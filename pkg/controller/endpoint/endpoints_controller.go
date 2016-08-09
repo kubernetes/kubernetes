@@ -155,6 +155,7 @@ type EndpointController struct {
 // endpoints will be handled in parallel.
 func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+	glog.Info("Endpoint Controller starting")
 	go e.serviceController.Run(stopCh)
 	go e.podController.Run(stopCh)
 	for i := 0; i < workers; i++ {

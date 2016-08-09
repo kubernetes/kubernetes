@@ -29,7 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -75,7 +74,7 @@ type NodeStatus struct {
 	status StatusType
 }
 
-func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet) *RouteController {
+func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterName string, clusterCIDR *net.IPNet, syncPeriod time.Duration) *RouteController {
 	if kubeClient != nil && kubeClient.Core().GetRESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.Core().GetRESTClient().GetRateLimiter())
 	}
@@ -96,7 +95,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, clusterNam
 			},
 		},
 		&api.Node{},
-		controller.NoResyncPeriodFunc(),
+		syncPeriod,
 		framework.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				nodeStatus := NodeStatus{
