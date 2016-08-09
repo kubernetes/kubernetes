@@ -2188,14 +2188,13 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 	case e := <-plegCh:
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
-			pod, ok := kl.podManager.GetPodByUID(e.ID)
-			if !ok {
+			if pod, ok := kl.podManager.GetPodByUID(e.ID); ok {
+				glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
+				handler.HandlePodSyncs([]*api.Pod{pod})
+			} else {
 				// If the pod no longer exists, ignore the event.
 				glog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
-				break
 			}
-			glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
-			handler.HandlePodSyncs([]*api.Pod{pod})
 		}
 
 		if e.Type == pleg.ContainerDied {
