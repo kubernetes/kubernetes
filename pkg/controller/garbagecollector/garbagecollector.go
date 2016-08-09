@@ -504,7 +504,6 @@ func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				setObjectTypeMeta(newObj)
-				setObjectTypeMeta(oldObj)
 				event := &event{updateEvent, newObj, oldObj}
 				gc.propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: event})
 			},
