@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/namespace"
+	"k8s.io/kubernetes/pkg/registry/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/service"
 	servicecontroller "k8s.io/kubernetes/pkg/registry/service/ipallocator/controller"
 	portallocatorcontroller "k8s.io/kubernetes/pkg/registry/service/portallocator/controller"
@@ -45,11 +46,11 @@ type Controller struct {
 	NamespaceRegistry namespace.Registry
 	ServiceRegistry   service.Registry
 
-	ServiceClusterIPRegistry service.RangeRegistry
+	ServiceClusterIPRegistry rangeallocation.RangeRegistry
 	ServiceClusterIPInterval time.Duration
 	ServiceClusterIPRange    *net.IPNet
 
-	ServiceNodePortRegistry service.RangeRegistry
+	ServiceNodePortRegistry rangeallocation.RangeRegistry
 	ServiceNodePortInterval time.Duration
 	ServiceNodePortRange    utilnet.PortRange
 
