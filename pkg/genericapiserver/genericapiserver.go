@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
@@ -536,17 +537,6 @@ func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 	})
 }
 
-// TODO: Longer term we should read this from some config store, rather than a flag.
-func verifyClusterIPFlags(options *options.ServerRunOptions) {
-	if options.ServiceClusterIPRange.IP == nil {
-		glog.Fatal("No --service-cluster-ip-range specified")
-	}
-	var ones, bits = options.ServiceClusterIPRange.Mask.Size()
-	if bits-ones > 20 {
-		glog.Fatal("Specified --service-cluster-ip-range is too large")
-	}
-}
-
 func NewConfig(options *options.ServerRunOptions) *Config {
 	return &Config{
 		APIGroupPrefix:            options.APIGroupPrefix,
@@ -570,46 +560,8 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 	}
 }
 
-func verifyServiceNodePort(options *options.ServerRunOptions) {
-	if options.KubernetesServiceNodePort < 0 || options.KubernetesServiceNodePort > 65535 {
-		glog.Fatalf("--kubernetes-service-node-port %v must be between 0 and 65535, inclusive. If 0, the Kubernetes master service will be of type ClusterIP.", options.KubernetesServiceNodePort)
-	}
-
-	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
-		glog.Fatalf("Kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort))
-	}
-}
-
-func verifyEtcdServersList(options *options.ServerRunOptions) {
-	if len(options.StorageConfig.ServerList) == 0 {
-		glog.Fatalf("--etcd-servers must be specified")
-	}
-}
-
-func verifySecureAndInsecurePort(options *options.ServerRunOptions) {
-	if options.SecurePort < 0 || options.SecurePort > 65535 {
-		glog.Fatalf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", options.SecurePort)
-	}
-
-	// TODO: Allow 0 to turn off insecure port.
-	if options.InsecurePort < 1 || options.InsecurePort > 65535 {
-		glog.Fatalf("--insecure-port %v must be between 1 and 65535, inclusive.", options.InsecurePort)
-	}
-
-	if options.SecurePort == options.InsecurePort {
-		glog.Fatalf("--secure-port and --insecure-port cannot use the same port.")
-	}
-}
-
-func ValidateRunOptions(options *options.ServerRunOptions) {
-	verifyClusterIPFlags(options)
-	verifyServiceNodePort(options)
-	verifyEtcdServersList(options)
-	verifySecureAndInsecurePort(options)
-}
-
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
-	ValidateRunOptions(options)
+	genericvalidation.ValidateRunOptions(options)
 
 	// If advertise-address is not specified, use bind-address. If bind-address
 	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default

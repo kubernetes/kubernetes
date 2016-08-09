@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package validation
 
 import (
-	"k8s.io/kubernetes/examples/apiserver"
-	"k8s.io/kubernetes/pkg/util/flag"
-
 	"github.com/golang/glog"
-	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 )
 
-func main() {
-	serverRunOptions := apiserver.NewServerRunOptions()
-
-	// Parse command line flags.
-	serverRunOptions.AddUniversalFlags(pflag.CommandLine)
-	serverRunOptions.AddEtcdStorageFlags(pflag.CommandLine)
-	flag.InitFlags()
-
-	if err := apiserver.Run(serverRunOptions); err != nil {
-		glog.Fatalf("Error in bringing up the server: %v", err)
+func VerifyEtcdServersList(options *options.ServerRunOptions) {
+	if len(options.StorageConfig.ServerList) == 0 {
+		glog.Fatalf("--etcd-servers must be specified")
 	}
 }
