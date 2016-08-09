@@ -2059,23 +2059,40 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	}
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
-	fit, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
-	if !fit {
-		if re, ok := err.(*predicates.PredicateFailureError); ok {
-			reason := re.PredicateName
-			message := re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
-			return fit, reason, message
-		}
-		if re, ok := err.(*predicates.InsufficientResourceError); ok {
-			reason := fmt.Sprintf("OutOf%s", re.ResourceName)
-			message := re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
-			return fit, reason, message
-		}
-		reason := "UnexpectedPredicateFailureType"
+	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
+	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		return fit, "UnexpectedError", message
+	}
+	if !fit {
+		var reason string
+		var message string
+		if len(reasons) == 0 {
+			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			return fit, "UnknownReason", message
+		}
+		// If there are failed predicates, we only return the first one as a reason.
+		r := reasons[0]
+		switch re := r.(type) {
+		case *predicates.PredicateFailureError:
+			reason = re.PredicateName
+			message = re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		case *predicates.InsufficientResourceError:
+			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		case *predicates.FailureReason:
+			reason = re.GetReason()
+			message = fmt.Sprintf("Failure: %s", re.GetReason())
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		default:
+			reason = "UnexpectedPredicateFailureType"
+			message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		}
 		return fit, reason, message
 	}
 	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
