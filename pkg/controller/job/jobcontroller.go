@@ -197,11 +197,13 @@ func (jm *JobController) addPod(obj interface{}) {
 // If the labels of the pod have changed we need to awaken both the old
 // and new job. old and cur must be *api.Pod types.
 func (jm *JobController) updatePod(old, cur interface{}) {
-	if api.Semantic.DeepEqual(old, cur) {
-		// A periodic relist will send update events for all known pods.
+	curPod := cur.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	if curPod.ResourceVersion == oldPod.ResourceVersion {
+		// Periodic resync will send update events for all known pods.
+		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	curPod := cur.(*api.Pod)
 	if curPod.DeletionTimestamp != nil {
 		// when a pod is deleted gracefully it's deletion timestamp is first modified to reflect a grace period,
 		// and after such time has passed, the kubelet actually deletes it from the store. We receive an update
@@ -213,7 +215,6 @@ func (jm *JobController) updatePod(old, cur interface{}) {
 	if job := jm.getPodJob(curPod); job != nil {
 		jm.enqueueController(job)
 	}
-	oldPod := old.(*api.Pod)
 	// Only need to get the old job if the labels changed.
 	if !reflect.DeepEqual(curPod.Labels, oldPod.Labels) {
 		// If the old and new job are the same, the first one that syncs
