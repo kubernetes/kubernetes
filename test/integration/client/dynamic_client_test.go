@@ -92,7 +92,11 @@ func TestDynamicClient(t *testing.T) {
 	}
 
 	// check dynamic list
-	unstructuredList, err := dynamicClient.Resource(&resource, ns.Name).List(&v1.ListOptions{})
+	obj, err := dynamicClient.Resource(&resource, ns.Name).List(&v1.ListOptions{})
+	unstructuredList, ok := obj.(*runtime.UnstructuredList)
+	if !ok {
+		t.Fatalf("expected *runtime.UnstructuredList, got %#v", obj)
+	}
 	if err != nil {
 		t.Fatalf("unexpected error when listing pods: %v", err)
 	}
