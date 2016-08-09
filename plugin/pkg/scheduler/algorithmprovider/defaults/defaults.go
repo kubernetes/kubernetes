@@ -93,6 +93,8 @@ func init() {
 	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
+	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
+	factory.RegisterPriorityFunction("MostRequestedPriority", priorities.MostRequestedPriority, 1)
 }
 
 func defaultPredicates() sets.String {
