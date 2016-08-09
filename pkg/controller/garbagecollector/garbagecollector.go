@@ -497,7 +497,9 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
 				setObjectTypeMeta(newObj)
-				setObjectTypeMeta(oldObj)
+				// oldObj is obtained from the informer's cache, so it should
+				// have typeMeta set. Setting it again here causes data race.
+				// setObjectTypeMeta(oldObj)
 				event := event{updateEvent, newObj, oldObj}
 				p.eventQueue.Add(event)
 			},

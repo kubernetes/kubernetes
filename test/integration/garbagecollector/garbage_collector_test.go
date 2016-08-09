@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -143,6 +144,8 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 
 // This test simulates the cascading deletion.
 func TestCascadingDeletion(t *testing.T) {
+	glog.V(6).Infof("TestCascadingDeletion starts")
+	defer glog.V(6).Infof("TestCascadingDeletion ends")
 	s, gc, clientSet := setup(t)
 	defer s.Close()
 
@@ -250,6 +253,8 @@ func TestCascadingDeletion(t *testing.T) {
 // This test simulates the case where an object is created with an owner that
 // doesn't exist. It verifies the GC will delete such an object.
 func TestCreateWithNonExistentOwner(t *testing.T) {
+	glog.V(6).Infof("TestCreateWithNonExistentOwner starts")
+	defer glog.V(6).Infof("TestCreateWithNonExistentOwner ends")
 	s, gc, clientSet := setup(t)
 	defer s.Close()
 
