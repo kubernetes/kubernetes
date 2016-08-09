@@ -415,7 +415,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("service-node-ports", "see --service-node-port-range instead")
 
 	fs.StringVar(&s.StorageConfig.Type, "storage-backend", s.StorageConfig.Type,
-		"The storage backend for persistence. Options: 'etcd2' (default), 'etcd3'.")
+		"The storage backend for persistence. Options: 'etcd2', 'etcd3' (default).")
 
 	fs.IntVar(&s.StorageConfig.DeserializationCacheSize, "deserialization-cache-size", s.StorageConfig.DeserializationCacheSize,
 		"Number of deserialized json objects to cache in memory.")
