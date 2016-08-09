@@ -19,7 +19,6 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -37,18 +36,20 @@ There is a single pod in the service A , and a single pod on each node in
 the service B.
 
 Each pod is running a network monitor container (see test/images/network-monitor):
--  The A pod uses service discovery to locate the B pods and waits
-   to establish communication (if expected) with those pods.
--  Each B pod uses service discovery to locate the A pod and waits to
-   establish communication (if expected) with that pod.
+	-  The A pod uses service discovery to locate the B pods and waits
+	   to establish communication (if expected) with those pods.
+	-  Each B pod uses service discovery to locate the A pod and waits to
+	   establish communication (if expected) with that pod.
 
 We test the following:
--  Policy on, or off.  When policy is on we expect isolation between all pods across the
-   namespaces.
--  Policy on, but with rules allowing TCP communication between the pods in two services.
+	-  Namespace ingress isolation set to DefaultDeny
+	- Full TCP isolation
+	- Policy rules to allow mono-directional TCP connectivity
+	- Policy rules to allow bi-directional TCP connectivity
 
-TODO:
--  Test UDP traffic
+	TODO:
+	-  Test UDP traffic
+	-  Test progressively increased isolation (bidir->monodir->fully isolated)
 */
 
 // Summary is the data returned by /summary API on the network monitor container
@@ -67,26 +68,12 @@ const (
 var _ = framework.KubeDescribe("NetworkPolicy", func() {
 	f := framework.NewDefaultFramework("network-policy")
 
-	BeforeEach(func() {
-		// Assert basic external connectivity.
-		// Since this is not really a test of Kubernetes in any way, we
-		// leave it as a pre-test assertion, rather than a Gingko test.
-		By("Executing a successful http request from the external internet")
-		resp, err := http.Get("http://google.com")
-		if err != nil {
-			framework.Failf("Unable to connect/talk to the internet: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			framework.Failf("Unexpected error code, expected 200, got, %v (%v)", resp.StatusCode, resp)
-		}
-	})
-
-	It("should isolate containers in the same namespace when NetworkIsolation is enabled [Feature:NetworkPolicy]", func() {
+	It("should isolate containers in the same namespace when ingress isolation is DefaultDeny [Feature:NetworkPolicy]", func() {
 		nsA := f.Namespace
 		runIsolatedToBidirectionalTest(f, nsA, nsA)
 	})
 
-	It("should isolate containers in different namespaces when NetworkIsolation is enabled [Feature:NetworkPolicy]", func() {
+	It("should isolate containers in different namespaces when ingress isolation is DefaultDeny [Feature:NetworkPolicy]", func() {
 		// This test use two namespaces.  A single namespace is created by
 		// default.  Create another.
 		nsA := f.Namespace
@@ -105,9 +92,9 @@ func runIsolatedToBidirectionalTest(f *framework.Framework, nsA, nsB *api.Namesp
 
 	var err error
 
-	// Turn on isolation on both namespaces.
-	setNetworkIsolationAnnotations(f, nsA, true)
-	setNetworkIsolationAnnotations(f, nsB, true)
+	// Turn on ingress isolation on both namespaces.
+	setNamespaceIsolation(f, nsA, "DefaultDeny")
+	setNamespaceIsolation(f, nsB, "DefaultDeny")
 
 	// Get the available nodes.
 	nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
@@ -181,11 +168,6 @@ func runIsolatedToBidirectionalTest(f *framework.Framework, nsA, nsB *api.Namesp
 		TCPNumOutboundConnected: 0,
 		TCPNumInboundConnected:  0,
 	}
-	monitorConnectivity(f, nsA, serviceA.Name, expected)
-	monitorConnectivity(f, nsB, serviceB.Name, expected)
-
-	By("Waiting and rechecking full isolation")
-	time.Sleep(10 * time.Second)
 	monitorConnectivity(f, nsA, serviceA.Name, expected)
 	monitorConnectivity(f, nsB, serviceB.Name, expected)
 
@@ -387,13 +369,14 @@ func monitorConnectivity(f *framework.Framework, namespace *api.Namespace, servi
 	Expect(passed).To(Equal(true))
 }
 
-// Configure namespace network isolation by setting the network-isolation annotation
+// Configure namespace network isolation by setting the network-policy annotation
 // on the namespace.
-func setNetworkIsolationAnnotations(f *framework.Framework, namespace *api.Namespace, enableIsolation bool) {
+func setNamespaceIsolation(f *framework.Framework, namespace *api.Namespace, ingressIsolation string) {
 	var annotations = map[string]string{}
-	if enableIsolation {
+	if ingressIsolation != "" {
 		By(fmt.Sprintf("Enabling isolation through namespace annotations on namespace %v", namespace.Name))
-		annotations["net.beta.kubernetes.io/network-policy"] = `{"ingress":{"isolation":"DefaultDeny"}}`
+		policy := fmt.Sprintf(`{"ingress":{"isolation":"%s"}}`, ingressIsolation)
+		annotations["net.beta.kubernetes.io/network-policy"] = policy
 	} else {
 		By(fmt.Sprintf("Disabling isolation through namespace annotations on namespace %v", namespace.Name))
 		delete(annotations, "net.beta.kubernetes.io/network-policy")
