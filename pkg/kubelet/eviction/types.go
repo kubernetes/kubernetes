@@ -32,8 +32,12 @@ const (
 	SignalMemoryAvailable Signal = "memory.available"
 	// SignalNodeFsAvailable is amount of storage available on filesystem that kubelet uses for volumes, daemon logs, etc.
 	SignalNodeFsAvailable Signal = "nodefs.available"
+	// SignalNodeFsInodesFree is amount of inodes available on filesystem that kubelet uses for volumes, daemon logs, etc.
+	SignalNodeFsInodesFree Signal = "nodefs.inodesFree"
 	// SignalImageFsAvailable is amount of storage available on filesystem that container runtime uses for storing images and container writable layers.
 	SignalImageFsAvailable Signal = "imagefs.available"
+	// SignalImageFsInodesFree is amount of inodes available on filesystem that container runtime uses for storing images and container writeable layers.
+	SignalImageFsInodesFree Signal = "imagefs.inodesFree"
 )
 
 // fsStatsType defines the types of filesystem stats to collect.

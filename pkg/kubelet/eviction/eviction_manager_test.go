@@ -914,3 +914,228 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
 	}
 }
+
+func TestDiskPressureNodeFsInodes(t *testing.T) {
+	// TODO: we need to know inodes used when cadvisor supports per container stats
+	podMaker := func(name string, requests api.ResourceList, limits api.ResourceList) (*api.Pod, statsapi.PodStats) {
+		pod := newPod(name, []api.Container{
+			newContainer(name, requests, limits),
+		}, nil)
+		podStats := newPodInodeStats(pod)
+		return pod, podStats
+	}
+	summaryStatsMaker := func(rootFsInodesFree, rootFsInodes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
+		rootFsInodesFreeVal := resource.MustParse(rootFsInodesFree)
+		internalRootFsInodesFree := uint64(rootFsInodesFreeVal.Value())
+		rootFsInodesVal := resource.MustParse(rootFsInodes)
+		internalRootFsInodes := uint64(rootFsInodesVal.Value())
+		result := &statsapi.Summary{
+			Node: statsapi.NodeStats{
+				Fs: &statsapi.FsStats{
+					InodesFree: &internalRootFsInodesFree,
+					Inodes:     &internalRootFsInodes,
+				},
+			},
+			Pods: []statsapi.PodStats{},
+		}
+		for _, podStat := range podStats {
+			result.Pods = append(result.Pods, podStat)
+		}
+		return result
+	}
+	// TODO: pass inodes used in future when supported by cadvisor.
+	podsToMake := []struct {
+		name     string
+		requests api.ResourceList
+		limits   api.ResourceList
+	}{
+		{name: "best-effort-high", requests: newResourceList("", ""), limits: newResourceList("", "")},
+		{name: "best-effort-low", requests: newResourceList("", ""), limits: newResourceList("", "")},
+		{name: "burstable-high", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi")},
+		{name: "burstable-low", requests: newResourceList("100m", "100Mi"), limits: newResourceList("200m", "1Gi")},
+		{name: "guaranteed-high", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi")},
+		{name: "guaranteed-low", requests: newResourceList("100m", "1Gi"), limits: newResourceList("100m", "1Gi")},
+	}
+	pods := []*api.Pod{}
+	podStats := map[*api.Pod]statsapi.PodStats{}
+	for _, podToMake := range podsToMake {
+		pod, podStat := podMaker(podToMake.name, podToMake.requests, podToMake.limits)
+		pods = append(pods, pod)
+		podStats[pod] = podStat
+	}
+	activePodsFunc := func() []*api.Pod {
+		return pods
+	}
+
+	fakeClock := clock.NewFakeClock(time.Now())
+	podKiller := &mockPodKiller{}
+	diskInfoProvider := &mockDiskInfoProvider{dedicatedImageFs: false}
+	imageGC := &mockImageGC{freed: int64(0), err: nil}
+	nodeRef := &api.ObjectReference{Kind: "Node", Name: "test", UID: types.UID("test"), Namespace: ""}
+
+	config := Config{
+		MaxPodGracePeriodSeconds: 5,
+		PressureTransitionPeriod: time.Minute * 5,
+		Thresholds: []Threshold{
+			{
+				Signal:   SignalNodeFsInodesFree,
+				Operator: OpLessThan,
+				Value: ThresholdValue{
+					Quantity: quantityMustParse("1Mi"),
+				},
+			},
+			{
+				Signal:   SignalNodeFsInodesFree,
+				Operator: OpLessThan,
+				Value: ThresholdValue{
+					Quantity: quantityMustParse("2Mi"),
+				},
+				GracePeriod: time.Minute * 2,
+			},
+		},
+	}
+	summaryProvider := &fakeSummaryProvider{result: summaryStatsMaker("3Mi", "4Mi", podStats)}
+	manager := &managerImpl{
+		clock:           fakeClock,
+		killPodFunc:     podKiller.killPodNow,
+		imageGC:         imageGC,
+		config:          config,
+		recorder:        &record.FakeRecorder{},
+		summaryProvider: summaryProvider,
+		nodeRef:         nodeRef,
+		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
+		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+	}
+
+	// create a best effort pod to test admission
+	podToAdmit, _ := podMaker("pod-to-admit", newResourceList("", ""), newResourceList("", ""))
+
+	// synchronize
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have disk pressure
+	if manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should not report disk pressure")
+	}
+
+	// try to admit our pod (should succeed)
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+		t.Errorf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
+	}
+
+	// induce soft threshold
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1.5Mi", "4Mi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure since soft threshold was met")
+	}
+
+	// verify no pod was yet killed because there has not yet been enough time passed.
+	if podKiller.pod != nil {
+		t.Errorf("Manager should not have killed a pod yet, but killed: %v", podKiller.pod)
+	}
+
+	// step forward in time pass the grace period
+	fakeClock.Step(3 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("1.5Mi", "4Mi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure since soft threshold was met")
+	}
+
+	// verify the right pod was killed with the right grace period.
+	if podKiller.pod != pods[0] {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	}
+	if podKiller.gracePeriodOverride == nil {
+		t.Errorf("Manager chose to kill pod but should have had a grace period override.")
+	}
+	observedGracePeriod := *podKiller.gracePeriodOverride
+	if observedGracePeriod != manager.config.MaxPodGracePeriodSeconds {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", manager.config.MaxPodGracePeriodSeconds, observedGracePeriod)
+	}
+	// reset state
+	podKiller.pod = nil
+	podKiller.gracePeriodOverride = nil
+
+	// remove disk pressure
+	fakeClock.Step(20 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have disk pressure
+	if manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should not report disk pressure")
+	}
+
+	// induce disk pressure!
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("0.5Mi", "4Mi", podStats)
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have disk pressure
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure")
+	}
+
+	// check the right pod was killed
+	if podKiller.pod != pods[0] {
+		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod, pods[0])
+	}
+	observedGracePeriod = *podKiller.gracePeriodOverride
+	if observedGracePeriod != int64(0) {
+		t.Errorf("Manager chose to kill pod with incorrect grace period.  Expected: %d, actual: %d", 0, observedGracePeriod)
+	}
+
+	// try to admit our pod (should fail)
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+		t.Errorf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
+	}
+
+	// reduce disk pressure
+	fakeClock.Step(1 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
+	podKiller.pod = nil // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should have disk pressure (because transition period not yet met)
+	if !manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should report disk pressure")
+	}
+
+	// no pod should have been killed
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	}
+
+	// try to admit our pod (should fail)
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); result.Admit {
+		t.Errorf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, false, result.Admit)
+	}
+
+	// move the clock past transition period to ensure that we stop reporting pressure
+	fakeClock.Step(5 * time.Minute)
+	summaryProvider.result = summaryStatsMaker("3Mi", "4Mi", podStats)
+	podKiller.pod = nil // reset state
+	manager.synchronize(diskInfoProvider, activePodsFunc)
+
+	// we should not have disk pressure (because transition period met)
+	if manager.IsUnderDiskPressure() {
+		t.Errorf("Manager should not report disk pressure")
+	}
+
+	// no pod should have been killed
+	if podKiller.pod != nil {
+		t.Errorf("Manager chose to kill pod: %v when no pod should have been killed", podKiller.pod)
+	}
+
+	// try to admit our pod (should succeed)
+	if result := manager.Admit(&lifecycle.PodAdmitAttributes{Pod: podToAdmit}); !result.Admit {
+		t.Errorf("Admit pod: %v, expected: %v, actual: %v", podToAdmit, true, result.Admit)
+	}
+}

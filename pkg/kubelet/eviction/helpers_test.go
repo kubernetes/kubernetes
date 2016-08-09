@@ -191,6 +191,49 @@ func TestParseThresholdConfig(t *testing.T) {
 				},
 			},
 		},
+		"inode flag values": {
+			evictionHard:            "imagefs.inodesFree<150Mi,nodefs.inodesFree<100Mi",
+			evictionSoft:            "imagefs.inodesFree<300Mi,nodefs.inodesFree<200Mi",
+			evictionSoftGracePeriod: "imagefs.inodesFree=30s,nodefs.inodesFree=30s",
+			evictionMinReclaim:      "imagefs.inodesFree=2Gi,nodefs.inodesFree=1Gi",
+			expectErr:               false,
+			expectThresholds: []Threshold{
+				{
+					Signal:   SignalImageFsInodesFree,
+					Operator: OpLessThan,
+					Value: ThresholdValue{
+						Quantity: quantityMustParse("150Mi"),
+					},
+					MinReclaim: quantityMustParse("2Gi"),
+				},
+				{
+					Signal:   SignalNodeFsInodesFree,
+					Operator: OpLessThan,
+					Value: ThresholdValue{
+						Quantity: quantityMustParse("100Mi"),
+					},
+					MinReclaim: quantityMustParse("1Gi"),
+				},
+				{
+					Signal:   SignalImageFsInodesFree,
+					Operator: OpLessThan,
+					Value: ThresholdValue{
+						Quantity: quantityMustParse("300Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim:  quantityMustParse("2Gi"),
+				},
+				{
+					Signal:   SignalNodeFsInodesFree,
+					Operator: OpLessThan,
+					Value: ThresholdValue{
+						Quantity: quantityMustParse("200Mi"),
+					},
+					GracePeriod: gracePeriod,
+					MinReclaim:  quantityMustParse("1Gi"),
+				},
+			},
+		},
 		"invalid-signal": {
 			evictionHard:            "mem.available<150Mi",
 			evictionSoft:            "",
@@ -400,7 +443,7 @@ func TestOrderedByDisk(t *testing.T) {
 		return result, found
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
+	orderedBy(disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
 	expected := []*api.Pod{pod6, pod5, pod4, pod3, pod2, pod1}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -466,7 +509,7 @@ func TestOrderedByQoSDisk(t *testing.T) {
 		return result, found
 	}
 	pods := []*api.Pod{pod1, pod2, pod3, pod4, pod5, pod6}
-	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})).Sort(pods)
+	orderedBy(qosComparator, disk(statsFn, []fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)).Sort(pods)
 	expected := []*api.Pod{pod2, pod1, pod4, pod3, pod6, pod5}
 	for i := range expected {
 		if pods[i] != expected[i] {
@@ -608,6 +651,10 @@ func TestMakeSignalObservations(t *testing.T) {
 	imageFsCapacityBytes := uint64(1024 * 1024 * 2)
 	nodeFsAvailableBytes := uint64(1024)
 	nodeFsCapacityBytes := uint64(1024 * 2)
+	imageFsInodesFree := uint64(1024)
+	imageFsInodes := uint64(1024 * 1024)
+	nodeFsInodesFree := uint64(1024)
+	nodeFsInodes := uint64(1024 * 1024)
 	fakeStats := &statsapi.Summary{
 		Node: statsapi.NodeStats{
 			Memory: &statsapi.MemoryStats{
@@ -618,11 +665,15 @@ func TestMakeSignalObservations(t *testing.T) {
 				ImageFs: &statsapi.FsStats{
 					AvailableBytes: &imageFsAvailableBytes,
 					CapacityBytes:  &imageFsCapacityBytes,
+					InodesFree:     &imageFsInodesFree,
+					Inodes:         &imageFsInodes,
 				},
 			},
 			Fs: &statsapi.FsStats{
 				AvailableBytes: &nodeFsAvailableBytes,
 				CapacityBytes:  &nodeFsCapacityBytes,
+				InodesFree:     &nodeFsInodesFree,
+				Inodes:         &nodeFsInodes,
 			},
 		},
 		Pods: []statsapi.PodStats{},
@@ -664,6 +715,16 @@ func TestMakeSignalObservations(t *testing.T) {
 	if expectedBytes := int64(nodeFsCapacityBytes); nodeFsQuantity.capacity.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, nodeFsQuantity.capacity.Value())
 	}
+	nodeFsInodesQuantity, found := actualObservations[SignalNodeFsInodesFree]
+	if !found {
+		t.Errorf("Expected inodes free nodefs observation: %v", err)
+	}
+	if expected := int64(nodeFsInodesFree); nodeFsInodesQuantity.available.Value() != expected {
+		t.Errorf("Expected %v, actual: %v", expected, nodeFsInodesQuantity.available.Value())
+	}
+	if expected := int64(nodeFsInodes); nodeFsInodesQuantity.capacity.Value() != expected {
+		t.Errorf("Expected %v, actual: %v", expected, nodeFsInodesQuantity.capacity.Value())
+	}
 	imageFsQuantity, found := actualObservations[SignalImageFsAvailable]
 	if !found {
 		t.Errorf("Expected available imagefs observation: %v", err)
@@ -673,6 +734,16 @@ func TestMakeSignalObservations(t *testing.T) {
 	}
 	if expectedBytes := int64(imageFsCapacityBytes); imageFsQuantity.capacity.Value() != expectedBytes {
 		t.Errorf("Expected %v, actual: %v", expectedBytes, imageFsQuantity.capacity.Value())
+	}
+	imageFsInodesQuantity, found := actualObservations[SignalImageFsInodesFree]
+	if !found {
+		t.Errorf("Expected inodes free imagefs observation: %v", err)
+	}
+	if expected := int64(imageFsInodesFree); imageFsInodesQuantity.available.Value() != expected {
+		t.Errorf("Expected %v, actual: %v", expected, imageFsInodesQuantity.available.Value())
+	}
+	if expected := int64(imageFsInodes); imageFsInodesQuantity.capacity.Value() != expected {
+		t.Errorf("Expected %v, actual: %v", expected, imageFsInodesQuantity.capacity.Value())
 	}
 	for _, pod := range pods {
 		podStats, found := statsFunc(pod)
@@ -1202,6 +1273,22 @@ func testCompareThresholdValue(t *testing.T) {
 			t.Errorf("Test case: %v failed", i)
 		}
 	}
+}
+
+// newPodInodeStats returns stats with specified usage amounts.
+// TODO: in future, this should take a value for inodesUsed per container.
+func newPodInodeStats(pod *api.Pod) statsapi.PodStats {
+	result := statsapi.PodStats{
+		PodRef: statsapi.PodReference{
+			Name: pod.Name, Namespace: pod.Namespace, UID: string(pod.UID),
+		},
+	}
+	for range pod.Spec.Containers {
+		result.Containers = append(result.Containers, statsapi.ContainerStats{
+			Rootfs: &statsapi.FsStats{},
+		})
+	}
+	return result
 }
 
 // newPodDiskStats returns stats with specified usage amounts.
