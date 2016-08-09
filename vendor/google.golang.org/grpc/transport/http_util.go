@@ -62,13 +62,14 @@ const (
 )
 
 var (
-	clientPreface      = []byte(http2.ClientPreface)
-	http2RSTErrConvTab = map[http2.ErrCode]codes.Code{
+	clientPreface   = []byte(http2.ClientPreface)
+	http2ErrConvTab = map[http2.ErrCode]codes.Code{
 		http2.ErrCodeNo:                 codes.Internal,
 		http2.ErrCodeProtocol:           codes.Internal,
 		http2.ErrCodeInternal:           codes.Internal,
 		http2.ErrCodeFlowControl:        codes.ResourceExhausted,
 		http2.ErrCodeSettingsTimeout:    codes.Internal,
+		http2.ErrCodeStreamClosed:       codes.Internal,
 		http2.ErrCodeFrameSize:          codes.Internal,
 		http2.ErrCodeRefusedStream:      codes.Unavailable,
 		http2.ErrCodeCancel:             codes.Canceled,
@@ -76,6 +77,7 @@ var (
 		http2.ErrCodeConnect:            codes.Internal,
 		http2.ErrCodeEnhanceYourCalm:    codes.ResourceExhausted,
 		http2.ErrCodeInadequateSecurity: codes.PermissionDenied,
+		http2.ErrCodeHTTP11Required:     codes.FailedPrecondition,
 	}
 	statusCodeConvTab = map[codes.Code]http2.ErrCode{
 		codes.Internal:          http2.ErrCodeInternal,
@@ -89,6 +91,8 @@ var (
 // Records the states during HPACK decoding. Must be reset once the
 // decoding of the entire headers are finished.
 type decodeState struct {
+	err error // first error encountered decoding
+
 	encoding string
 	// statusCode caches the stream status received from the trailer
 	// the server sent. Client side only.
@@ -102,25 +106,11 @@ type decodeState struct {
 	mdata map[string][]string
 }
 
-// An hpackDecoder decodes HTTP2 headers which may span multiple frames.
-type hpackDecoder struct {
-	h     *hpack.Decoder
-	state decodeState
-	err   error // The err when decoding
-}
-
-// A headerFrame is either a http2.HeaderFrame or http2.ContinuationFrame.
-type headerFrame interface {
-	Header() http2.FrameHeader
-	HeaderBlockFragment() []byte
-	HeadersEnded() bool
-}
-
 // isReservedHeader checks whether hdr belongs to HTTP2 headers
 // reserved by gRPC protocol. Any other headers are classified as the
 // user-specified metadata.
 func isReservedHeader(hdr string) bool {
-	if hdr[0] == ':' {
+	if hdr != "" && hdr[0] == ':' {
 		return true
 	}
 	switch hdr {
@@ -137,100 +127,86 @@ func isReservedHeader(hdr string) bool {
 	}
 }
 
-func newHPACKDecoder() *hpackDecoder {
-	d := &hpackDecoder{}
-	d.h = hpack.NewDecoder(http2InitHeaderTableSize, func(f hpack.HeaderField) {
-		switch f.Name {
-		case "content-type":
-			if !strings.Contains(f.Value, "application/grpc") {
-				d.err = StreamErrorf(codes.FailedPrecondition, "transport: received the unexpected header")
-				return
-			}
-		case "grpc-encoding":
-			d.state.encoding = f.Value
-		case "grpc-status":
-			code, err := strconv.Atoi(f.Value)
-			if err != nil {
-				d.err = StreamErrorf(codes.Internal, "transport: malformed grpc-status: %v", err)
-				return
-			}
-			d.state.statusCode = codes.Code(code)
-		case "grpc-message":
-			d.state.statusDesc = f.Value
-		case "grpc-timeout":
-			d.state.timeoutSet = true
-			var err error
-			d.state.timeout, err = timeoutDecode(f.Value)
-			if err != nil {
-				d.err = StreamErrorf(codes.Internal, "transport: malformed time-out: %v", err)
-				return
-			}
-		case ":path":
-			d.state.method = f.Value
-		default:
-			if !isReservedHeader(f.Name) {
-				if f.Name == "user-agent" {
-					i := strings.LastIndex(f.Value, " ")
-					if i == -1 {
-						// There is no application user agent string being set.
-						return
-					}
-					// Extract the application user agent string.
-					f.Value = f.Value[:i]
-				}
-				if d.state.mdata == nil {
-					d.state.mdata = make(map[string][]string)
-				}
-				k, v, err := metadata.DecodeKeyValue(f.Name, f.Value)
-				if err != nil {
-					grpclog.Printf("Failed to decode (%q, %q): %v", f.Name, f.Value, err)
+// isWhitelistedPseudoHeader checks whether hdr belongs to HTTP2 pseudoheaders
+// that should be propagated into metadata visible to users.
+func isWhitelistedPseudoHeader(hdr string) bool {
+	switch hdr {
+	case ":authority":
+		return true
+	default:
+		return false
+	}
+}
+
+func (d *decodeState) setErr(err error) {
+	if d.err == nil {
+		d.err = err
+	}
+}
+
+func validContentType(t string) bool {
+	e := "application/grpc"
+	if !strings.HasPrefix(t, e) {
+		return false
+	}
+	// Support variations on the content-type
+	// (e.g. "application/grpc+blah", "application/grpc;blah").
+	if len(t) > len(e) && t[len(e)] != '+' && t[len(e)] != ';' {
+		return false
+	}
+	return true
+}
+
+func (d *decodeState) processHeaderField(f hpack.HeaderField) {
+	switch f.Name {
+	case "content-type":
+		if !validContentType(f.Value) {
+			d.setErr(StreamErrorf(codes.FailedPrecondition, "transport: received the unexpected content-type %q", f.Value))
+			return
+		}
+	case "grpc-encoding":
+		d.encoding = f.Value
+	case "grpc-status":
+		code, err := strconv.Atoi(f.Value)
+		if err != nil {
+			d.setErr(StreamErrorf(codes.Internal, "transport: malformed grpc-status: %v", err))
+			return
+		}
+		d.statusCode = codes.Code(code)
+	case "grpc-message":
+		d.statusDesc = f.Value
+	case "grpc-timeout":
+		d.timeoutSet = true
+		var err error
+		d.timeout, err = timeoutDecode(f.Value)
+		if err != nil {
+			d.setErr(StreamErrorf(codes.Internal, "transport: malformed time-out: %v", err))
+			return
+		}
+	case ":path":
+		d.method = f.Value
+	default:
+		if !isReservedHeader(f.Name) || isWhitelistedPseudoHeader(f.Name) {
+			if f.Name == "user-agent" {
+				i := strings.LastIndex(f.Value, " ")
+				if i == -1 {
+					// There is no application user agent string being set.
 					return
 				}
-				d.state.mdata[k] = append(d.state.mdata[k], v)
+				// Extract the application user agent string.
+				f.Value = f.Value[:i]
 			}
+			if d.mdata == nil {
+				d.mdata = make(map[string][]string)
+			}
+			k, v, err := metadata.DecodeKeyValue(f.Name, f.Value)
+			if err != nil {
+				grpclog.Printf("Failed to decode (%q, %q): %v", f.Name, f.Value, err)
+				return
+			}
+			d.mdata[k] = append(d.mdata[k], v)
 		}
-	})
-	return d
-}
-
-func (d *hpackDecoder) decodeClientHTTP2Headers(frame headerFrame) (endHeaders bool, err error) {
-	d.err = nil
-	_, err = d.h.Write(frame.HeaderBlockFragment())
-	if err != nil {
-		err = StreamErrorf(codes.Internal, "transport: HPACK header decode error: %v", err)
 	}
-
-	if frame.HeadersEnded() {
-		if closeErr := d.h.Close(); closeErr != nil && err == nil {
-			err = StreamErrorf(codes.Internal, "transport: HPACK decoder close error: %v", closeErr)
-		}
-		endHeaders = true
-	}
-
-	if err == nil && d.err != nil {
-		err = d.err
-	}
-	return
-}
-
-func (d *hpackDecoder) decodeServerHTTP2Headers(frame headerFrame) (endHeaders bool, err error) {
-	d.err = nil
-	_, err = d.h.Write(frame.HeaderBlockFragment())
-	if err != nil {
-		err = StreamErrorf(codes.Internal, "transport: HPACK header decode error: %v", err)
-	}
-
-	if frame.HeadersEnded() {
-		if closeErr := d.h.Close(); closeErr != nil && err == nil {
-			err = StreamErrorf(codes.Internal, "transport: HPACK decoder close error: %v", closeErr)
-		}
-		endHeaders = true
-	}
-
-	if err == nil && d.err != nil {
-		err = d.err
-	}
-	return
 }
 
 type timeoutUnit uint8
@@ -321,10 +297,11 @@ type framer struct {
 
 func newFramer(conn net.Conn) *framer {
 	f := &framer{
-		reader: conn,
+		reader: bufio.NewReaderSize(conn, http2IOBufSize),
 		writer: bufio.NewWriterSize(conn, http2IOBufSize),
 	}
 	f.fr = http2.NewFramer(f.writer, f.reader)
+	f.fr.ReadMetaHeaders = hpack.NewDecoder(http2InitHeaderTableSize, nil)
 	return f
 }
 
@@ -451,4 +428,8 @@ func (f *framer) flushWrite() error {
 
 func (f *framer) readFrame() (http2.Frame, error) {
 	return f.fr.ReadFrame()
+}
+
+func (f *framer) errorDetail() error {
+	return f.fr.ErrorDetail()
 }

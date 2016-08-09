@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -117,18 +117,34 @@ type peer struct {
 	stopc  chan struct{}
 }
 
-func startPeer(transport *Transport, urls types.URLs, local, to, cid types.ID, r Raft, fs *stats.FollowerStats, errorc chan error) *peer {
-	status := newPeerStatus(to)
+func startPeer(transport *Transport, urls types.URLs, peerID types.ID, fs *stats.FollowerStats) *peer {
+	plog.Infof("starting peer %s...", peerID)
+	defer plog.Infof("started peer %s", peerID)
+
+	status := newPeerStatus(peerID)
 	picker := newURLPicker(urls)
+	errorc := transport.ErrorC
+	r := transport.Raft
+	pipeline := &pipeline{
+		peerID:        peerID,
+		tr:            transport,
+		picker:        picker,
+		status:        status,
+		followerStats: fs,
+		raft:          r,
+		errorc:        errorc,
+	}
+	pipeline.start()
+
 	p := &peer{
-		id:             to,
+		id:             peerID,
 		r:              r,
 		status:         status,
 		picker:         picker,
-		msgAppV2Writer: startStreamWriter(to, status, fs, r),
-		writer:         startStreamWriter(to, status, fs, r),
-		pipeline:       newPipeline(transport, picker, local, to, cid, status, fs, r, errorc),
-		snapSender:     newSnapshotSender(transport, picker, local, to, cid, status, r, errorc),
+		msgAppV2Writer: startStreamWriter(peerID, status, fs, r),
+		writer:         startStreamWriter(peerID, status, fs, r),
+		pipeline:       pipeline,
+		snapSender:     newSnapshotSender(transport, picker, peerID, status),
 		sendc:          make(chan raftpb.Message),
 		recvc:          make(chan raftpb.Message, recvBufSize),
 		propc:          make(chan raftpb.Message, maxPendingProposals),
@@ -166,8 +182,26 @@ func startPeer(transport *Transport, urls types.URLs, local, to, cid types.ID, r
 		}
 	}()
 
-	p.msgAppV2Reader = startStreamReader(transport, picker, streamTypeMsgAppV2, local, to, cid, status, p.recvc, p.propc, errorc)
-	p.msgAppReader = startStreamReader(transport, picker, streamTypeMessage, local, to, cid, status, p.recvc, p.propc, errorc)
+	p.msgAppV2Reader = &streamReader{
+		peerID: peerID,
+		typ:    streamTypeMsgAppV2,
+		tr:     transport,
+		picker: picker,
+		status: status,
+		recvc:  p.recvc,
+		propc:  p.propc,
+	}
+	p.msgAppReader = &streamReader{
+		peerID: peerID,
+		typ:    streamTypeMessage,
+		tr:     transport,
+		picker: picker,
+		status: status,
+		recvc:  p.recvc,
+		propc:  p.propc,
+	}
+	p.msgAppV2Reader.start()
+	p.msgAppReader.start()
 
 	return p
 }
@@ -219,7 +253,7 @@ func (p *peer) attachOutgoingConn(conn *outgoingConn) {
 	}
 }
 
-func (p *peer) activeSince() time.Time { return p.status.activeSince }
+func (p *peer) activeSince() time.Time { return p.status.activeSince() }
 
 // Pause pauses the peer. The peer will simply drops all incoming
 // messages without returning an error.
@@ -241,6 +275,9 @@ func (p *peer) Resume() {
 }
 
 func (p *peer) stop() {
+	plog.Infof("stopping peer %s...", p.id)
+	defer plog.Infof("stopped peer %s", p.id)
+
 	close(p.stopc)
 	p.cancel()
 	p.msgAppV2Writer.stop()

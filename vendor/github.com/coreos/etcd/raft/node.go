@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -200,6 +200,7 @@ func StartNode(c *Config, peers []Peer) Node {
 	}
 
 	n := newNode()
+	n.logger = c.Logger
 	go n.run(r)
 	return &n
 }
@@ -212,6 +213,7 @@ func RestartNode(c *Config) Node {
 	r := newRaft(c)
 
 	n := newNode()
+	n.logger = c.Logger
 	go n.run(r)
 	return &n
 }
@@ -228,6 +230,8 @@ type node struct {
 	done       chan struct{}
 	stop       chan struct{}
 	status     chan chan Status
+
+	logger Logger
 }
 
 func newNode() node {
@@ -238,10 +242,13 @@ func newNode() node {
 		confstatec: make(chan pb.ConfState),
 		readyc:     make(chan Ready),
 		advancec:   make(chan struct{}),
-		tickc:      make(chan struct{}),
-		done:       make(chan struct{}),
-		stop:       make(chan struct{}),
-		status:     make(chan chan Status),
+		// make tickc a buffered chan, so raft node can buffer some ticks when the node
+		// is busy processing raft messages. Raft node will resume process buffered
+		// ticks when it becomes idle.
+		tickc:  make(chan struct{}, 128),
+		done:   make(chan struct{}),
+		stop:   make(chan struct{}),
+		status: make(chan chan Status),
 	}
 }
 
@@ -306,7 +313,7 @@ func (n *node) run(r *raft) {
 			r.Step(m)
 		case m := <-n.recvc:
 			// filter out response message from unknown From.
-			if _, ok := r.prs[m.From]; ok || !IsResponseMsg(m) {
+			if _, ok := r.prs[m.From]; ok || !IsResponseMsg(m.Type) {
 				r.Step(m) // raft never returns an error
 			}
 		case cc := <-n.confc:
@@ -325,7 +332,7 @@ func (n *node) run(r *raft) {
 				// block incoming proposal when local node is
 				// removed
 				if cc.NodeID == r.id {
-					n.propc = nil
+					propc = nil
 				}
 				r.removeNode(cc.NodeID)
 			case pb.ConfChangeUpdateNode:
@@ -381,6 +388,8 @@ func (n *node) Tick() {
 	select {
 	case n.tickc <- struct{}{}:
 	case <-n.done:
+	default:
+		n.logger.Warningf("A tick missed to fire. Node blocks too long!")
 	}
 }
 
@@ -392,7 +401,7 @@ func (n *node) Propose(ctx context.Context, data []byte) error {
 
 func (n *node) Step(ctx context.Context, m pb.Message) error {
 	// ignore unexpected local messages receiving over network
-	if IsLocalMsg(m) {
+	if IsLocalMsg(m.Type) {
 		// TODO: return an error?
 		return nil
 	}

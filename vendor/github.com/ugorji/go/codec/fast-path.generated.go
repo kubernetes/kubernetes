@@ -3124,11 +3124,7 @@ func fastpathEncodeTypeSwitchMap(iv interface{}, e *Encoder) bool {
 // -- -- fast path functions
 
 func (f *encFnInfo) fastpathEncSliceIntfR(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceIntfV(rv.Interface().([]interface{}), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceIntfV(rv.Interface().([]interface{}), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceIntfV(rv.Interface().([]interface{}), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceIntfV(v []interface{}, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3149,39 +3145,8 @@ func (_ fastpathT) EncSliceIntfV(v []interface{}, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceIntfV(v []interface{}, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		e.encode(v2)
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceStringR(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceStringV(rv.Interface().([]string), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceStringV(rv.Interface().([]string), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceStringV(rv.Interface().([]string), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceStringV(v []string, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3202,39 +3167,8 @@ func (_ fastpathT) EncSliceStringV(v []string, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceStringV(v []string, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeString(c_UTF8, v2)
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceFloat32R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceFloat32V(rv.Interface().([]float32), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceFloat32V(rv.Interface().([]float32), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceFloat32V(rv.Interface().([]float32), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceFloat32V(v []float32, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3255,39 +3189,8 @@ func (_ fastpathT) EncSliceFloat32V(v []float32, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceFloat32V(v []float32, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeFloat32(v2)
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceFloat64R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceFloat64V(rv.Interface().([]float64), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceFloat64V(rv.Interface().([]float64), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceFloat64V(rv.Interface().([]float64), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceFloat64V(v []float64, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3308,39 +3211,8 @@ func (_ fastpathT) EncSliceFloat64V(v []float64, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceFloat64V(v []float64, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeFloat64(v2)
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceUintR(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceUintV(rv.Interface().([]uint), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceUintV(rv.Interface().([]uint), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceUintV(rv.Interface().([]uint), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceUintV(v []uint, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3361,39 +3233,8 @@ func (_ fastpathT) EncSliceUintV(v []uint, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceUintV(v []uint, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeUint(uint64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceUint16R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceUint16V(rv.Interface().([]uint16), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceUint16V(rv.Interface().([]uint16), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceUint16V(rv.Interface().([]uint16), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceUint16V(v []uint16, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3414,39 +3255,8 @@ func (_ fastpathT) EncSliceUint16V(v []uint16, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceUint16V(v []uint16, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeUint(uint64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceUint32R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceUint32V(rv.Interface().([]uint32), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceUint32V(rv.Interface().([]uint32), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceUint32V(rv.Interface().([]uint32), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceUint32V(v []uint32, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3467,39 +3277,8 @@ func (_ fastpathT) EncSliceUint32V(v []uint32, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceUint32V(v []uint32, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeUint(uint64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceUint64R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceUint64V(rv.Interface().([]uint64), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceUint64V(rv.Interface().([]uint64), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceUint64V(rv.Interface().([]uint64), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceUint64V(v []uint64, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3520,39 +3299,8 @@ func (_ fastpathT) EncSliceUint64V(v []uint64, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceUint64V(v []uint64, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeUint(uint64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceUintptrR(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceUintptrV(rv.Interface().([]uintptr), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceUintptrV(rv.Interface().([]uintptr), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceUintptrV(rv.Interface().([]uintptr), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceUintptrV(v []uintptr, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3573,39 +3321,8 @@ func (_ fastpathT) EncSliceUintptrV(v []uintptr, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceUintptrV(v []uintptr, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		e.encode(v2)
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceIntR(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceIntV(rv.Interface().([]int), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceIntV(rv.Interface().([]int), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceIntV(rv.Interface().([]int), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceIntV(v []int, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3626,39 +3343,8 @@ func (_ fastpathT) EncSliceIntV(v []int, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceIntV(v []int, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeInt(int64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceInt8R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceInt8V(rv.Interface().([]int8), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceInt8V(rv.Interface().([]int8), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceInt8V(rv.Interface().([]int8), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceInt8V(v []int8, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3679,39 +3365,8 @@ func (_ fastpathT) EncSliceInt8V(v []int8, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceInt8V(v []int8, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeInt(int64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceInt16R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceInt16V(rv.Interface().([]int16), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceInt16V(rv.Interface().([]int16), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceInt16V(rv.Interface().([]int16), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceInt16V(v []int16, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3732,39 +3387,8 @@ func (_ fastpathT) EncSliceInt16V(v []int16, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceInt16V(v []int16, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeInt(int64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceInt32R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceInt32V(rv.Interface().([]int32), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceInt32V(rv.Interface().([]int32), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceInt32V(rv.Interface().([]int32), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceInt32V(v []int32, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3785,39 +3409,8 @@ func (_ fastpathT) EncSliceInt32V(v []int32, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceInt32V(v []int32, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeInt(int64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceInt64R(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceInt64V(rv.Interface().([]int64), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceInt64V(rv.Interface().([]int64), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceInt64V(rv.Interface().([]int64), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceInt64V(v []int64, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3838,39 +3431,8 @@ func (_ fastpathT) EncSliceInt64V(v []int64, checkNil bool, e *Encoder) {
 	}
 }
 
-func (_ fastpathT) EncAsMapSliceInt64V(v []int64, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeInt(int64(v2))
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
-	}
-}
-
 func (f *encFnInfo) fastpathEncSliceBoolR(rv reflect.Value) {
-	if f.ti.mbs {
-		fastpathTV.EncAsMapSliceBoolV(rv.Interface().([]bool), fastpathCheckNilFalse, f.e)
-	} else {
-		fastpathTV.EncSliceBoolV(rv.Interface().([]bool), fastpathCheckNilFalse, f.e)
-	}
+	fastpathTV.EncSliceBoolV(rv.Interface().([]bool), fastpathCheckNilFalse, f.e)
 }
 func (_ fastpathT) EncSliceBoolV(v []bool, checkNil bool, e *Encoder) {
 	ee := e.e
@@ -3888,33 +3450,6 @@ func (_ fastpathT) EncSliceBoolV(v []bool, checkNil bool, e *Encoder) {
 	}
 	if cr != nil {
 		cr.sendContainerState(containerArrayEnd)
-	}
-}
-
-func (_ fastpathT) EncAsMapSliceBoolV(v []bool, checkNil bool, e *Encoder) {
-	ee := e.e
-	cr := e.cr
-	if checkNil && v == nil {
-		ee.EncodeNil()
-		return
-	}
-	if len(v)%2 == 1 {
-		e.errorf("mapBySlice requires even slice length, but got %v", len(v))
-		return
-	}
-	ee.EncodeMapStart(len(v) / 2)
-	for j, v2 := range v {
-		if cr != nil {
-			if j%2 == 0 {
-				cr.sendContainerState(containerMapKey)
-			} else {
-				cr.sendContainerState(containerMapValue)
-			}
-		}
-		ee.EncodeBool(v2)
-	}
-	if cr != nil {
-		cr.sendContainerState(containerMapEnd)
 	}
 }
 
@@ -18177,7 +17712,7 @@ func (_ fastpathT) DecSliceIntfV(v []interface{}, checkNil bool, canChange bool,
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -18236,7 +17771,7 @@ func (_ fastpathT) DecSliceIntfV(v []interface{}, checkNil bool, canChange bool,
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]interface{}, 1, 4)
@@ -18311,7 +17846,7 @@ func (_ fastpathT) DecSliceStringV(v []string, checkNil bool, canChange bool, d 
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -18370,7 +17905,7 @@ func (_ fastpathT) DecSliceStringV(v []string, checkNil bool, canChange bool, d 
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]string, 1, 4)
@@ -18444,7 +17979,7 @@ func (_ fastpathT) DecSliceFloat32V(v []float32, checkNil bool, canChange bool, 
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -18503,7 +18038,7 @@ func (_ fastpathT) DecSliceFloat32V(v []float32, checkNil bool, canChange bool, 
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]float32, 1, 4)
@@ -18577,7 +18112,7 @@ func (_ fastpathT) DecSliceFloat64V(v []float64, checkNil bool, canChange bool, 
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -18636,7 +18171,7 @@ func (_ fastpathT) DecSliceFloat64V(v []float64, checkNil bool, canChange bool, 
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]float64, 1, 4)
@@ -18710,7 +18245,7 @@ func (_ fastpathT) DecSliceUintV(v []uint, checkNil bool, canChange bool, d *Dec
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -18769,7 +18304,7 @@ func (_ fastpathT) DecSliceUintV(v []uint, checkNil bool, canChange bool, d *Dec
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]uint, 1, 4)
@@ -18843,7 +18378,7 @@ func (_ fastpathT) DecSliceUint16V(v []uint16, checkNil bool, canChange bool, d 
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -18902,7 +18437,7 @@ func (_ fastpathT) DecSliceUint16V(v []uint16, checkNil bool, canChange bool, d 
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]uint16, 1, 4)
@@ -18976,7 +18511,7 @@ func (_ fastpathT) DecSliceUint32V(v []uint32, checkNil bool, canChange bool, d 
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -19035,7 +18570,7 @@ func (_ fastpathT) DecSliceUint32V(v []uint32, checkNil bool, canChange bool, d 
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]uint32, 1, 4)
@@ -19109,7 +18644,7 @@ func (_ fastpathT) DecSliceUint64V(v []uint64, checkNil bool, canChange bool, d 
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -19168,7 +18703,7 @@ func (_ fastpathT) DecSliceUint64V(v []uint64, checkNil bool, canChange bool, d 
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]uint64, 1, 4)
@@ -19242,7 +18777,7 @@ func (_ fastpathT) DecSliceUintptrV(v []uintptr, checkNil bool, canChange bool, 
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -19301,7 +18836,7 @@ func (_ fastpathT) DecSliceUintptrV(v []uintptr, checkNil bool, canChange bool, 
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]uintptr, 1, 4)
@@ -19375,7 +18910,7 @@ func (_ fastpathT) DecSliceIntV(v []int, checkNil bool, canChange bool, d *Decod
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -19434,7 +18969,7 @@ func (_ fastpathT) DecSliceIntV(v []int, checkNil bool, canChange bool, d *Decod
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]int, 1, 4)
@@ -19508,7 +19043,7 @@ func (_ fastpathT) DecSliceInt8V(v []int8, checkNil bool, canChange bool, d *Dec
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -19567,7 +19102,7 @@ func (_ fastpathT) DecSliceInt8V(v []int8, checkNil bool, canChange bool, d *Dec
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]int8, 1, 4)
@@ -19641,7 +19176,7 @@ func (_ fastpathT) DecSliceInt16V(v []int16, checkNil bool, canChange bool, d *D
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -19700,7 +19235,7 @@ func (_ fastpathT) DecSliceInt16V(v []int16, checkNil bool, canChange bool, d *D
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]int16, 1, 4)
@@ -19774,7 +19309,7 @@ func (_ fastpathT) DecSliceInt32V(v []int32, checkNil bool, canChange bool, d *D
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -19833,7 +19368,7 @@ func (_ fastpathT) DecSliceInt32V(v []int32, checkNil bool, canChange bool, d *D
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]int32, 1, 4)
@@ -19907,7 +19442,7 @@ func (_ fastpathT) DecSliceInt64V(v []int64, checkNil bool, canChange bool, d *D
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -19966,7 +19501,7 @@ func (_ fastpathT) DecSliceInt64V(v []int64, checkNil bool, canChange bool, d *D
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]int64, 1, 4)
@@ -20040,7 +19575,7 @@ func (_ fastpathT) DecSliceBoolV(v []bool, checkNil bool, canChange bool, d *Dec
 			changed = true
 		}
 		slh.End()
-		return v, changed
+		return
 	}
 
 	if containerLenS > 0 {
@@ -20099,7 +19634,7 @@ func (_ fastpathT) DecSliceBoolV(v []bool, checkNil bool, canChange bool, d *Dec
 				changed = true
 			}
 			slh.End()
-			return v, changed
+			return
 		}
 		if cap(v) == 0 {
 			v = make([]bool, 1, 4)
