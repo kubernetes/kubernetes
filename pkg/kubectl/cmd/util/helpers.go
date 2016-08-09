@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
 	"github.com/evanphx/json-patch"
@@ -159,7 +160,13 @@ func checkErr(pref string, err error, handleErr func(string)) {
 
 func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
 	errs := make([]error, len(scs))
+	errorMsgs := sets.NewString()
 	for i, sc := range scs {
+		// check for duplicate error messages and skip them
+		if errorMsgs.Has(sc.Message) {
+			continue
+		}
+		errorMsgs.Insert(sc.Message)
 		errs[i] = fmt.Errorf("%s: %s", sc.Field, sc.Message)
 	}
 	return utilerrors.NewAggregate(errs)
