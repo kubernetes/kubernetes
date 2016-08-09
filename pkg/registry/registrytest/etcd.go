@@ -30,21 +30,14 @@ import (
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/runtime"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 )
 
 func NewEtcdStorage(t *testing.T, group string) (*storagebackend.Config, *etcdtesting.EtcdTestServer) {
-	server := etcdtesting.NewUnsecuredEtcdTestClientServer(t)
-	config := &storagebackend.Config{
-		Type:                     "etcd2",
-		Prefix:                   etcdtest.PathPrefix(),
-		ServerList:               server.Client.Endpoints(),
-		DeserializationCacheSize: etcdtest.DeserializationCacheSize,
-		Codec: testapi.Groups[group].StorageCodec(),
-	}
+	server, config := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
+	config.Codec = testapi.Groups[group].StorageCodec()
 	return config, server
 }
 
