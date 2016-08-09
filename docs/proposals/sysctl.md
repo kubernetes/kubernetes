@@ -301,7 +301,7 @@ Issues:
 | sysctl                       | namespaced    | accounted for by           |
 | ---------------------------- | ------------- | -------------------------- |
 | kernel.shm*                  | ipc           | memcg 1)                   |
-| kernel.msg*                  | ipc           | -                          |
+| kernel.msg*                  | ipc           | - 3)                       |
 | fs.mqueue.*                  | ipc           | -                          |
 | kernel.sem                   | ipc           | -                          |
 | net.core.somaxconn           | net           | -                          |
@@ -314,7 +314,7 @@ Issues:
 | sysctl                       | namespaced    | accounted for by           |
 | ---------------------------- | ------------- | -------------------------- |
 | kernel.shm*                  | ipc           | memcg 1)                   |
-| kernel.msg*                  | ipc           | memcg                      |
+| kernel.msg*                  | ipc           | memcg 3)                   |
 | fs.mqueue.*                  | ipc           | memcg                      |
 | kernel.sem                   | ipc           | memcg                      |
 | net.core.somaxconn           | net           | ?                          |
@@ -324,6 +324,7 @@ Issues:
 
 1) a pod memory cgroup is necessary to catch segments from a dying process.
 2) only available in root-ns, not even visible in a container
+3) compare https://github.com/sttts/kmem-ipc-msg-queues as a test-case
 
 ## Proposed Design
 
