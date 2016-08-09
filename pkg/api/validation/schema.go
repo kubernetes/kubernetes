@@ -25,6 +25,7 @@ import (
 
 	"github.com/emicklei/go-restful/swagger"
 	"github.com/golang/glog"
+	apitypes "k8s.io/kubernetes/pkg/api"
 	apiutil "k8s.io/kubernetes/pkg/api/util"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -132,7 +133,6 @@ func (s *SwaggerSchema) validateItems(items interface{}) []error {
 			allErrs = append(allErrs, errs...)
 		}
 	}
-
 	return allErrs
 }
 
@@ -248,6 +248,19 @@ func (s *SwaggerSchema) ValidateObject(obj interface{}, fieldName, typeName stri
 		if value == nil {
 			glog.V(2).Infof("Skipping nil field: %s", key)
 			continue
+		}
+
+		// Validate correct ReclaimPolicy is used, otherwise, PV is created
+		// but recycler will fail when it is triggered as it is checked there
+		if key == "persistentVolumeReclaimPolicy" {
+			if !apitypes.ValidateReclaimPolicy(value.(string)) {
+				allErrs = append(allErrs, fmt.Errorf("invalid persistentVolumeReclaimPolicy value \"%s\" - expected values include %v, %v or %v",
+					value,
+					apitypes.PersistentVolumeReclaimDelete,
+					apitypes.PersistentVolumeReclaimRecycle,
+					apitypes.PersistentVolumeReclaimRetain))
+				continue
+			}
 		}
 		errs := s.validateField(value, fieldName+key, fieldType, &details)
 		if len(errs) > 0 {

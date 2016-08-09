@@ -304,6 +304,21 @@ func LoadBalancerStatusDeepCopy(lb *LoadBalancerStatus) *LoadBalancerStatus {
 	return c
 }
 
+// ValidateReclaimPolicy ensures proper values are used
+// for persistentVolumeReclaimPolicy in PV spec
+func ValidateReclaimPolicy(policy string) bool {
+	if policy == string(PersistentVolumeReclaimDelete) {
+		return true
+	}
+	if policy == string(PersistentVolumeReclaimRecycle) {
+		return true
+	}
+	if policy == string(PersistentVolumeReclaimRetain) {
+		return true
+	}
+	return false
+}
+
 // GetAccessModesAsString returns a string representation of an array of access modes.
 // modes, when present, are always in the same order: RWO,ROX,RWX.
 func GetAccessModesAsString(modes []PersistentVolumeAccessMode) string {
