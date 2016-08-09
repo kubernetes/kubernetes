@@ -36,7 +36,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
-import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+import k8s_io_kubernetes_pkg_api_unversioned1 "k8s.io/kubernetes/pkg/api/unversioned"
 import k8s_io_kubernetes_pkg_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 
 import strings "strings"
@@ -346,7 +346,7 @@ func (this *PetSetList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PetSetList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "PetSet", "PetSet", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -358,7 +358,7 @@ func (this *PetSetSpec) String() string {
 	}
 	s := strings.Join([]string{`&PetSetSpec{`,
 		`Replicas:` + valueToStringGenerated(this.Replicas) + `,`,
-		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned.LabelSelector", 1) + `,`,
+		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned1.LabelSelector", 1) + `,`,
 		`Template:` + strings.Replace(strings.Replace(this.Template.String(), "PodTemplateSpec", "k8s_io_kubernetes_pkg_api_v1.PodTemplateSpec", 1), `&`, ``, 1) + `,`,
 		`VolumeClaimTemplates:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.VolumeClaimTemplates), "PersistentVolumeClaim", "k8s_io_kubernetes_pkg_api_v1.PersistentVolumeClaim", 1), `&`, ``, 1) + `,`,
 		`ServiceName:` + fmt.Sprintf("%v", this.ServiceName) + `,`,
@@ -712,7 +712,7 @@ func (m *PetSetSpec) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Selector == nil {
-				m.Selector = &k8s_io_kubernetes_pkg_api_unversioned.LabelSelector{}
+				m.Selector = &k8s_io_kubernetes_pkg_api_unversioned1.LabelSelector{}
 			}
 			if err := m.Selector.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err

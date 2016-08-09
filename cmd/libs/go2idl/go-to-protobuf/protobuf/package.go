@@ -179,6 +179,7 @@ func (p *protobufPackage) generatorFunc(c *generator.Context) []generator.Genera
 	generators := []generator.Generator{}
 
 	p.Imports.AddNullable()
+	p.Imports.AddInline()
 
 	generators = append(generators, &genProtoIDL{
 		DefaultGen: generator.DefaultGen{

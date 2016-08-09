@@ -45,7 +45,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
-import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+import k8s_io_kubernetes_pkg_api_unversioned1 "k8s.io/kubernetes/pkg/api/unversioned"
 import k8s_io_kubernetes_pkg_api_v1 "k8s.io/kubernetes/pkg/api/v1"
 
 import strings "strings"
@@ -954,8 +954,8 @@ func (this *JobCondition) String() string {
 	s := strings.Join([]string{`&JobCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
-		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
-		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
 		`}`,
@@ -967,7 +967,7 @@ func (this *JobList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&JobList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Job", "Job", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -994,8 +994,8 @@ func (this *JobStatus) String() string {
 	}
 	s := strings.Join([]string{`&JobStatus{`,
 		`Conditions:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Conditions), "JobCondition", "JobCondition", 1), `&`, ``, 1) + `,`,
-		`StartTime:` + strings.Replace(fmt.Sprintf("%v", this.StartTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
-		`CompletionTime:` + strings.Replace(fmt.Sprintf("%v", this.CompletionTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`StartTime:` + strings.Replace(fmt.Sprintf("%v", this.StartTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1) + `,`,
+		`CompletionTime:` + strings.Replace(fmt.Sprintf("%v", this.CompletionTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1) + `,`,
 		`Active:` + fmt.Sprintf("%v", this.Active) + `,`,
 		`Succeeded:` + fmt.Sprintf("%v", this.Succeeded) + `,`,
 		`Failed:` + fmt.Sprintf("%v", this.Failed) + `,`,
@@ -1075,7 +1075,7 @@ func (this *ScheduledJobList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ScheduledJobList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ScheduledJob", "ScheduledJob", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -1101,7 +1101,7 @@ func (this *ScheduledJobStatus) String() string {
 	}
 	s := strings.Join([]string{`&ScheduledJobStatus{`,
 		`Active:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Active), "ObjectReference", "k8s_io_kubernetes_pkg_api_v1.ObjectReference", 1), `&`, ``, 1) + `,`,
-		`LastScheduleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScheduleTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`LastScheduleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScheduleTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -1872,7 +1872,7 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.StartTime == nil {
-				m.StartTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.StartTime = &k8s_io_kubernetes_pkg_api_unversioned1.Time{}
 			}
 			if err := m.StartTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -1905,7 +1905,7 @@ func (m *JobStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.CompletionTime == nil {
-				m.CompletionTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.CompletionTime = &k8s_io_kubernetes_pkg_api_unversioned1.Time{}
 			}
 			if err := m.CompletionTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -3055,7 +3055,7 @@ func (m *ScheduledJobStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.LastScheduleTime == nil {
-				m.LastScheduleTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.LastScheduleTime = &k8s_io_kubernetes_pkg_api_unversioned1.Time{}
 			}
 			if err := m.LastScheduleTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err

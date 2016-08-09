@@ -40,7 +40,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
-import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+import k8s_io_kubernetes_pkg_api_unversioned1 "k8s.io/kubernetes/pkg/api/unversioned"
 
 import strings "strings"
 import reflect "reflect"
@@ -535,7 +535,7 @@ func (this *HorizontalPodAutoscalerList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&HorizontalPodAutoscalerList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "HorizontalPodAutoscaler", "HorizontalPodAutoscaler", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -560,7 +560,7 @@ func (this *HorizontalPodAutoscalerStatus) String() string {
 	}
 	s := strings.Join([]string{`&HorizontalPodAutoscalerStatus{`,
 		`ObservedGeneration:` + valueToStringGenerated(this.ObservedGeneration) + `,`,
-		`LastScaleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScaleTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`LastScaleTime:` + strings.Replace(fmt.Sprintf("%v", this.LastScaleTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1) + `,`,
 		`CurrentReplicas:` + fmt.Sprintf("%v", this.CurrentReplicas) + `,`,
 		`DesiredReplicas:` + fmt.Sprintf("%v", this.DesiredReplicas) + `,`,
 		`CurrentCPUUtilizationPercentage:` + valueToStringGenerated(this.CurrentCPUUtilizationPercentage) + `,`,
@@ -1212,7 +1212,7 @@ func (m *HorizontalPodAutoscalerStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.LastScaleTime == nil {
-				m.LastScaleTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.LastScaleTime = &k8s_io_kubernetes_pkg_api_unversioned1.Time{}
 			}
 			if err := m.LastScaleTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err

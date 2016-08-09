@@ -22,6 +22,7 @@ syntax = 'proto2';
 package k8s.io.kubernetes.pkg.api.v1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/api/unversioned/extension.proto";
 import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
@@ -224,7 +225,7 @@ message ConfigMap {
 // Selects a key from a ConfigMap.
 message ConfigMapKeySelector {
   // The ConfigMap to select from.
-  optional LocalObjectReference localObjectReference = 1;
+  optional LocalObjectReference localObjectReference = 1 [(k8s.io.kubernetes.pkg.api.unversioned.inline) = true];
 
   // The key to select.
   optional string key = 2;
@@ -246,7 +247,7 @@ message ConfigMapList {
 // the items element is populated with specific mappings of keys to paths.
 // ConfigMap volumes support ownership management and SELinux relabeling.
 message ConfigMapVolumeSource {
-  optional LocalObjectReference localObjectReference = 1;
+  optional LocalObjectReference localObjectReference = 1 [(k8s.io.kubernetes.pkg.api.unversioned.inline) = true];
 
   // If unspecified, each key-value pair in the Data field of the referenced
   // ConfigMap will be projected into the volume as a file whose name is the
@@ -1728,7 +1729,7 @@ message PersistentVolumeSpec {
   map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> capacity = 1;
 
   // The actual volume backing the persistent volume.
-  optional PersistentVolumeSource persistentVolumeSource = 2;
+  optional PersistentVolumeSource persistentVolumeSource = 2 [(k8s.io.kubernetes.pkg.api.unversioned.inline) = true];
 
   // AccessModes contains all ways the volume can be mounted.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes
@@ -2264,7 +2265,7 @@ message PreferredSchedulingTerm {
 // alive or ready to receive traffic.
 message Probe {
   // The action taken to determine the health of a container
-  optional Handler handler = 1;
+  optional Handler handler = 1 [(k8s.io.kubernetes.pkg.api.unversioned.inline) = true];
 
   // Number of seconds after the container has started before liveness probes are initiated.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/pod-states.md#container-probes
@@ -2526,7 +2527,7 @@ message Secret {
 // SecretKeySelector selects a key of a Secret.
 message SecretKeySelector {
   // The name of the secret in the pod's namespace to select from.
-  optional LocalObjectReference localObjectReference = 1;
+  optional LocalObjectReference localObjectReference = 1 [(k8s.io.kubernetes.pkg.api.unversioned.inline) = true];
 
   // The key of the secret to select from.  Must be a valid secret key.
   optional string key = 2;
@@ -2835,7 +2836,7 @@ message Volume {
   // VolumeSource represents the location and type of the mounted volume.
   // If not specified, the Volume is implied to be an EmptyDir.
   // This implied behavior is deprecated and will be removed in a future version.
-  optional VolumeSource volumeSource = 2;
+  optional VolumeSource volumeSource = 2 [(k8s.io.kubernetes.pkg.api.unversioned.inline) = true];
 }
 
 // VolumeMount describes a mounting of a Volume within a container.

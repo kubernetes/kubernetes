@@ -406,7 +406,7 @@ func (this *CertificateSigningRequestCondition) String() string {
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
-		`LastUpdateTime:` + strings.Replace(strings.Replace(this.LastUpdateTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`LastUpdateTime:` + strings.Replace(strings.Replace(this.LastUpdateTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -416,7 +416,7 @@ func (this *CertificateSigningRequestList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&CertificateSigningRequestList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "CertificateSigningRequest", "CertificateSigningRequest", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")

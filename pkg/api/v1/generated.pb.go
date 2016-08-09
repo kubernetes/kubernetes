@@ -185,7 +185,8 @@ import fmt "fmt"
 import math "math"
 
 import k8s_io_kubernetes_pkg_api_resource "k8s.io/kubernetes/pkg/api/resource"
-import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+
+import k8s_io_kubernetes_pkg_api_unversioned1 "k8s.io/kubernetes/pkg/api/unversioned"
 import k8s_io_kubernetes_pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 
 import k8s_io_kubernetes_pkg_types "k8s.io/kubernetes/pkg/types"
@@ -10423,7 +10424,7 @@ func (this *ComponentStatusList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ComponentStatusList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ComponentStatus", "ComponentStatus", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -10466,7 +10467,7 @@ func (this *ConfigMapList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ConfigMapList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ConfigMap", "ConfigMap", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -10552,7 +10553,7 @@ func (this *ContainerStateRunning) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ContainerStateRunning{`,
-		`StartedAt:` + strings.Replace(strings.Replace(this.StartedAt.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`StartedAt:` + strings.Replace(strings.Replace(this.StartedAt.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -10566,8 +10567,8 @@ func (this *ContainerStateTerminated) String() string {
 		`Signal:` + fmt.Sprintf("%v", this.Signal) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
-		`StartedAt:` + strings.Replace(strings.Replace(this.StartedAt.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
-		`FinishedAt:` + strings.Replace(strings.Replace(this.FinishedAt.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`StartedAt:` + strings.Replace(strings.Replace(this.StartedAt.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
+		`FinishedAt:` + strings.Replace(strings.Replace(this.FinishedAt.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
 		`ContainerID:` + fmt.Sprintf("%v", this.ContainerID) + `,`,
 		`}`,
 	}, "")
@@ -10707,7 +10708,7 @@ func (this *EndpointsList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&EndpointsList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Endpoints", "Endpoints", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -10748,8 +10749,8 @@ func (this *Event) String() string {
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
 		`Source:` + strings.Replace(strings.Replace(this.Source.String(), "EventSource", "EventSource", 1), `&`, ``, 1) + `,`,
-		`FirstTimestamp:` + strings.Replace(strings.Replace(this.FirstTimestamp.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
-		`LastTimestamp:` + strings.Replace(strings.Replace(this.LastTimestamp.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`FirstTimestamp:` + strings.Replace(strings.Replace(this.FirstTimestamp.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
+		`LastTimestamp:` + strings.Replace(strings.Replace(this.LastTimestamp.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
 		`Count:` + fmt.Sprintf("%v", this.Count) + `,`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`}`,
@@ -10761,7 +10762,7 @@ func (this *EventList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&EventList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Event", "Event", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11048,7 +11049,7 @@ func (this *LimitRangeList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&LimitRangeList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "LimitRange", "LimitRange", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11069,7 +11070,7 @@ func (this *List) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&List{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "RawExtension", "k8s_io_kubernetes_pkg_runtime.RawExtension", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11149,7 +11150,7 @@ func (this *NamespaceList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&NamespaceList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Namespace", "Namespace", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11216,8 +11217,8 @@ func (this *NodeCondition) String() string {
 	s := strings.Join([]string{`&NodeCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
-		`LastHeartbeatTime:` + strings.Replace(strings.Replace(this.LastHeartbeatTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
-		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`LastHeartbeatTime:` + strings.Replace(strings.Replace(this.LastHeartbeatTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
 		`}`,
@@ -11239,7 +11240,7 @@ func (this *NodeList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&NodeList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Node", "Node", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11401,8 +11402,8 @@ func (this *ObjectMeta) String() string {
 		`UID:` + fmt.Sprintf("%v", this.UID) + `,`,
 		`ResourceVersion:` + fmt.Sprintf("%v", this.ResourceVersion) + `,`,
 		`Generation:` + fmt.Sprintf("%v", this.Generation) + `,`,
-		`CreationTimestamp:` + strings.Replace(strings.Replace(this.CreationTimestamp.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
-		`DeletionTimestamp:` + strings.Replace(fmt.Sprintf("%v", this.DeletionTimestamp), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`CreationTimestamp:` + strings.Replace(strings.Replace(this.CreationTimestamp.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
+		`DeletionTimestamp:` + strings.Replace(fmt.Sprintf("%v", this.DeletionTimestamp), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1) + `,`,
 		`DeletionGracePeriodSeconds:` + valueToStringGenerated(this.DeletionGracePeriodSeconds) + `,`,
 		`Labels:` + mapStringForLabels + `,`,
 		`Annotations:` + mapStringForAnnotations + `,`,
@@ -11471,7 +11472,7 @@ func (this *PersistentVolumeClaimList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PersistentVolumeClaimList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "PersistentVolumeClaim", "PersistentVolumeClaim", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11485,7 +11486,7 @@ func (this *PersistentVolumeClaimSpec) String() string {
 		`AccessModes:` + fmt.Sprintf("%v", this.AccessModes) + `,`,
 		`Resources:` + strings.Replace(strings.Replace(this.Resources.String(), "ResourceRequirements", "ResourceRequirements", 1), `&`, ``, 1) + `,`,
 		`VolumeName:` + fmt.Sprintf("%v", this.VolumeName) + `,`,
-		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned.LabelSelector", 1) + `,`,
+		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned1.LabelSelector", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -11528,7 +11529,7 @@ func (this *PersistentVolumeList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PersistentVolumeList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "PersistentVolume", "PersistentVolume", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11621,7 +11622,7 @@ func (this *PodAffinityTerm) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PodAffinityTerm{`,
-		`LabelSelector:` + strings.Replace(fmt.Sprintf("%v", this.LabelSelector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned.LabelSelector", 1) + `,`,
+		`LabelSelector:` + strings.Replace(fmt.Sprintf("%v", this.LabelSelector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned1.LabelSelector", 1) + `,`,
 		`Namespaces:` + fmt.Sprintf("%v", this.Namespaces) + `,`,
 		`TopologyKey:` + fmt.Sprintf("%v", this.TopologyKey) + `,`,
 		`}`,
@@ -11660,8 +11661,8 @@ func (this *PodCondition) String() string {
 	s := strings.Join([]string{`&PodCondition{`,
 		`Type:` + fmt.Sprintf("%v", this.Type) + `,`,
 		`Status:` + fmt.Sprintf("%v", this.Status) + `,`,
-		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
-		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`LastProbeTime:` + strings.Replace(strings.Replace(this.LastProbeTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
+		`LastTransitionTime:` + strings.Replace(strings.Replace(this.LastTransitionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
 		`}`,
@@ -11688,7 +11689,7 @@ func (this *PodList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PodList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Pod", "Pod", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11703,7 +11704,7 @@ func (this *PodLogOptions) String() string {
 		`Follow:` + fmt.Sprintf("%v", this.Follow) + `,`,
 		`Previous:` + fmt.Sprintf("%v", this.Previous) + `,`,
 		`SinceSeconds:` + valueToStringGenerated(this.SinceSeconds) + `,`,
-		`SinceTime:` + strings.Replace(fmt.Sprintf("%v", this.SinceTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`SinceTime:` + strings.Replace(fmt.Sprintf("%v", this.SinceTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1) + `,`,
 		`Timestamps:` + fmt.Sprintf("%v", this.Timestamps) + `,`,
 		`TailLines:` + valueToStringGenerated(this.TailLines) + `,`,
 		`LimitBytes:` + valueToStringGenerated(this.LimitBytes) + `,`,
@@ -11792,7 +11793,7 @@ func (this *PodStatus) String() string {
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`HostIP:` + fmt.Sprintf("%v", this.HostIP) + `,`,
 		`PodIP:` + fmt.Sprintf("%v", this.PodIP) + `,`,
-		`StartTime:` + strings.Replace(fmt.Sprintf("%v", this.StartTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1) + `,`,
+		`StartTime:` + strings.Replace(fmt.Sprintf("%v", this.StartTime), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1) + `,`,
 		`ContainerStatuses:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.ContainerStatuses), "ContainerStatus", "ContainerStatus", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11825,7 +11826,7 @@ func (this *PodTemplateList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PodTemplateList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "PodTemplate", "PodTemplate", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -11858,7 +11859,7 @@ func (this *PreferAvoidPodsEntry) String() string {
 	}
 	s := strings.Join([]string{`&PreferAvoidPodsEntry{`,
 		`PodSignature:` + strings.Replace(strings.Replace(this.PodSignature.String(), "PodSignature", "PodSignature", 1), `&`, ``, 1) + `,`,
-		`EvictionTime:` + strings.Replace(strings.Replace(this.EvictionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned.Time", 1), `&`, ``, 1) + `,`,
+		`EvictionTime:` + strings.Replace(strings.Replace(this.EvictionTime.String(), "Time", "k8s_io_kubernetes_pkg_api_unversioned1.Time", 1), `&`, ``, 1) + `,`,
 		`Reason:` + fmt.Sprintf("%v", this.Reason) + `,`,
 		`Message:` + fmt.Sprintf("%v", this.Message) + `,`,
 		`}`,
@@ -11937,7 +11938,7 @@ func (this *ReplicationControllerList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ReplicationControllerList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ReplicationController", "ReplicationController", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -12006,7 +12007,7 @@ func (this *ResourceQuotaList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ResourceQuotaList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ResourceQuota", "ResourceQuota", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -12157,7 +12158,7 @@ func (this *SecretList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&SecretList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Secret", "Secret", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -12228,7 +12229,7 @@ func (this *ServiceAccountList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ServiceAccountList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "ServiceAccount", "ServiceAccount", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -12239,7 +12240,7 @@ func (this *ServiceList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&ServiceList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "Service", "Service", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -24832,7 +24833,7 @@ func (m *ObjectMeta) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.DeletionTimestamp == nil {
-				m.DeletionTimestamp = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.DeletionTimestamp = &k8s_io_kubernetes_pkg_api_unversioned1.Time{}
 			}
 			if err := m.DeletionTimestamp.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -26136,7 +26137,7 @@ func (m *PersistentVolumeClaimSpec) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Selector == nil {
-				m.Selector = &k8s_io_kubernetes_pkg_api_unversioned.LabelSelector{}
+				m.Selector = &k8s_io_kubernetes_pkg_api_unversioned1.LabelSelector{}
 			}
 			if err := m.Selector.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -27841,7 +27842,7 @@ func (m *PodAffinityTerm) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.LabelSelector == nil {
-				m.LabelSelector = &k8s_io_kubernetes_pkg_api_unversioned.LabelSelector{}
+				m.LabelSelector = &k8s_io_kubernetes_pkg_api_unversioned1.LabelSelector{}
 			}
 			if err := m.LabelSelector.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -28867,7 +28868,7 @@ func (m *PodLogOptions) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.SinceTime == nil {
-				m.SinceTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.SinceTime = &k8s_io_kubernetes_pkg_api_unversioned1.Time{}
 			}
 			if err := m.SinceTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
@@ -30102,7 +30103,7 @@ func (m *PodStatus) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.StartTime == nil {
-				m.StartTime = &k8s_io_kubernetes_pkg_api_unversioned.Time{}
+				m.StartTime = &k8s_io_kubernetes_pkg_api_unversioned1.Time{}
 			}
 			if err := m.StartTime.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err
