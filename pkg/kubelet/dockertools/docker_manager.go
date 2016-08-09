@@ -332,7 +332,7 @@ var (
 // determineContainerIP determines the IP address of the given container.  It is expected
 // that the container passed is the infrastructure container of a pod and the responsibility
 // of the caller to ensure that the correct container is passed.
-func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *dockertypes.ContainerJSON) string {
+func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *dockertypes.ContainerJSON) (string, error) {
 	result := ""
 
 	if container.NetworkSettings != nil {
@@ -348,12 +348,13 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 		netStatus, err := dm.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.DockerID(container.ID).ContainerID())
 		if err != nil {
 			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), podName, err)
+			return result, err
 		} else if netStatus != nil {
 			result = netStatus.IP.String()
 		}
 	}
 
-	return result
+	return result, nil
 }
 
 func (dm *DockerManager) inspectContainer(id string, podName, podNamespace string) (*kubecontainer.ContainerStatus, string, error) {
@@ -404,7 +405,7 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = startedAt
 		if containerName == PodInfraContainerName {
-			ip = dm.determineContainerIP(podNamespace, podName, iResult)
+			ip, _ = dm.determineContainerIP(podNamespace, podName, iResult)
 		}
 		return &status, ip, nil
 	}
@@ -2049,7 +2050,12 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 			}
 
 			// Overwrite the podIP passed in the pod status, since we just started the infra container.
-			podIP = dm.determineContainerIP(pod.Namespace, pod.Name, podInfraContainer)
+			podIP, err = dm.determineContainerIP(pod.Namespace, pod.Name, podInfraContainer)
+			if err != nil {
+				glog.Errorf("Failed to inspect pod infra container: %v; Skipping pod %q", err, format.Pod(pod))
+				result.Fail(err)
+				return
+			}
 			glog.V(4).Infof("Determined pod ip after infra change: %q: %q", format.Pod(pod), podIP)
 		}
 	}
