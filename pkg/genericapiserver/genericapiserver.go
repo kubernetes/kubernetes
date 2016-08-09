@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -57,6 +58,7 @@ import (
 	systemd "github.com/coreos/go-systemd/daemon"
 	"github.com/emicklei/go-restful"
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/go-openapi/spec"
 	"github.com/golang/glog"
 )
 
@@ -919,6 +921,23 @@ func (s *GenericAPIServer) InstallSwaggerAPI() {
 		},
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, s.HandlerContainer)
+	openApiConfig := openapi.Config{
+		SwaggerConfig:  &swaggerConfig,
+		IgnorePrefixes: []string{"/swaggerapi"},
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Kubernetes APIs",
+				Version: "1.4",
+			},
+		},
+		FixOperation: OpenAPIFixOperation,
+		FixPath:      OpenAPIFixPath,
+		FixResponses: OpenAPIFixResponses,
+	}
+	err := openapi.RegisterOpenAPIService(&openApiConfig, s.HandlerContainer)
+	if err != nil {
+		glog.Fatalf("Failed to generate open api spec: %v", err)
+	}
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
