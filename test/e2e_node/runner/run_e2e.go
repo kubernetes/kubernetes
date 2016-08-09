@@ -27,6 +27,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
 	"sort"
 	"strings"
@@ -56,6 +57,7 @@ var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any i
 var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
 var setupNode = flag.Bool("setup-node", false, "When true, current user will be added to docker group on the test machine")
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
+var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
 
 var computeService *compute.Service
 
@@ -247,6 +249,13 @@ func main() {
 	// Set the exit code if there were failures
 	if !exitOk {
 		fmt.Printf("Failure: %d errors encountered.", errCount)
+		if *gubernator{
+			output, err := exec.Command("./test/e2e_node/g8r.sh").Output()
+			if err != nil {
+		        return
+		    }
+		    fmt.Printf("%s", output)
+		}
 		os.Exit(1)
 	}
 }

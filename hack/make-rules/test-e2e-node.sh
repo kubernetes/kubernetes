@@ -32,6 +32,7 @@ remote=${REMOTE:-"false"}
 images=${IMAGES:-""}
 hosts=${HOSTS:-""}
 metadata=${INSTANCE_METADATA:-""}
+gubernator=${GBR:-"false"}
 gci_image=$(gcloud compute images list --project google-containers \
     --no-standard-images --regexp="gci-dev.*" --format="table[no-heading](name)")
 if [[ $hosts == "" && $images == "" ]]; then
@@ -129,13 +130,26 @@ if [ $remote = true ] ; then
   echo "Ginkgo Flags: $ginkgoflags"
   echo "Instance Metadata: $metadata"
   # Invoke the runner
-  go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
-    --zone="$zone" --project="$project"  \
-    --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
-    --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
-    --image-project="$image_project" --instance-name-prefix="$instance_prefix" --setup-node="true" \
-    --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata"
-  exit $?
+  if [[ $gubernator = false || $remote = false ]]; then
+    go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
+      --zone="$zone" --project="$project" --gubernator="$gubernator" \
+      --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
+      --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
+      --image-project="$image_project" --instance-name-prefix="$instance_prefix" --setup-node="true" \
+      --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata"
+    exit $?
+  else
+    echo "GBR flag on"
+    go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
+      --zone="$zone" --project="$project" --gubernator="$gubernator" \
+      --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
+      --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \
+      --image-project="$image_project" --instance-name-prefix="$instance_prefix" --setup-node="true" \
+      --delete-instances="$delete_instances" --test_args="$test_args" --instance-metadata="$metadata" \
+      2>&1 | tee build-log.txt
+    ./test/e2e_node/g8r.sh
+    exit $?
+  fi
 
 else
   # Refresh sudo credentials if not running on GCE.
