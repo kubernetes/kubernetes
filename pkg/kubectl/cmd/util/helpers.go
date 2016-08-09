@@ -19,6 +19,7 @@ package util
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -27,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api/errors"
+	kerrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -38,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
 	"github.com/evanphx/json-patch"
@@ -59,10 +61,10 @@ type debugError interface {
 // souce is the filename or URL to the template file(*.json or *.yaml), or stdin to use to handle the resource.
 func AddSourceToErr(verb string, source string, err error) error {
 	if source != "" {
-		if statusError, ok := err.(errors.APIStatus); ok {
+		if statusError, ok := err.(kerrors.APIStatus); ok {
 			status := statusError.Status()
 			status.Message = fmt.Sprintf("error when %s %q: %v", verb, source, status.Message)
-			return &errors.StatusError{ErrStatus: status}
+			return &kerrors.StatusError{ErrStatus: status}
 		}
 		return fmt.Errorf("error when %s %q: %v", verb, source, err)
 	}
@@ -118,11 +120,12 @@ func checkErr(pref string, err error, handleErr func(string)) {
 		return
 	}
 
-	if errors.IsInvalid(err) {
-		details := err.(*errors.StatusError).Status().Details
+	if kerrors.IsInvalid(err) {
+		details := err.(*kerrors.StatusError).Status().Details
 		prefix := fmt.Sprintf("%sThe %s %q is invalid.\n", pref, details.Kind, details.Name)
 		errs := statusCausesToAggrError(details.Causes)
 		handleErr(MultilineError(prefix, errs))
+		return
 	}
 
 	if noMatch, ok := err.(*meta.NoResourceMatchError); ok {
@@ -142,9 +145,11 @@ func checkErr(pref string, err error, handleErr func(string)) {
 	// handle multiline errors
 	if clientcmd.IsConfigurationInvalid(err) {
 		handleErr(MultilineError(fmt.Sprintf("%sError in configuration: ", pref), err))
+		return
 	}
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
 		handleErr(MultipleErrors(pref, agg.Errors()))
+		return
 	}
 
 	msg, ok := StandardErrorMessage(err)
@@ -158,9 +163,16 @@ func checkErr(pref string, err error, handleErr func(string)) {
 }
 
 func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
-	errs := make([]error, len(scs))
-	for i, sc := range scs {
-		errs[i] = fmt.Errorf("%s: %s", sc.Field, sc.Message)
+	errs := make([]error, 0, len(scs))
+	errorMsgs := sets.NewString()
+	for _, sc := range scs {
+		// check for duplicate error messages and skip them
+		msg := fmt.Sprintf("%s: %s", sc.Field, sc.Message)
+		if errorMsgs.Has(msg) {
+			continue
+		}
+		errorMsgs.Insert(msg)
+		errs = append(errs, errors.New(msg))
 	}
 	return utilerrors.NewAggregate(errs)
 }
@@ -175,7 +187,7 @@ func StandardErrorMessage(err error) (string, bool) {
 	if debugErr, ok := err.(debugError); ok {
 		glog.V(4).Infof(debugErr.DebugError())
 	}
-	status, isStatus := err.(errors.APIStatus)
+	status, isStatus := err.(kerrors.APIStatus)
 	switch {
 	case isStatus:
 		switch s := status.Status(); {
@@ -184,7 +196,7 @@ func StandardErrorMessage(err error) (string, bool) {
 		default:
 			return fmt.Sprintf("Error from server: %s", err.Error()), true
 		}
-	case errors.IsUnexpectedObjectError(err):
+	case kerrors.IsUnexpectedObjectError(err):
 		return fmt.Sprintf("Server returned an unexpected response: %s", err.Error()), true
 	}
 	switch t := err.(type) {
@@ -503,7 +515,7 @@ func GetThirdPartyGroupVersions(discovery discovery.DiscoveryInterface) ([]unver
 	groupList, err := discovery.ServerGroups()
 	if err != nil {
 		// On forbidden or not found, just return empty lists.
-		if errors.IsForbidden(err) || errors.IsNotFound(err) {
+		if kerrors.IsForbidden(err) || kerrors.IsNotFound(err) {
 			return result, gvks, nil
 		}
 
