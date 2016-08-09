@@ -35,7 +35,9 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/garbagecollector"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -127,8 +129,12 @@ func setup(t *testing.T) (*httptest.Server, *garbagecollector.GarbageCollector, 
 	if err != nil {
 		t.Fatalf("Failed to get supported resources from server: %v", err)
 	}
-	clientPool := dynamic.NewClientPool(&restclient.Config{Host: s.URL}, dynamic.LegacyAPIPathResolverFunc)
-	gc, err := garbagecollector.NewGarbageCollector(clientPool, groupVersionResources)
+	config := &restclient.Config{Host: s.URL}
+	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
+	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	config.ContentConfig.NegotiatedSerializer = nil
+	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	gc, err := garbagecollector.NewGarbageCollector(metaOnlyClientPool, clientPool, groupVersionResources)
 	if err != nil {
 		t.Fatalf("Failed to create garbage collector")
 	}
@@ -215,7 +221,7 @@ func TestCascadingDeletion(t *testing.T) {
 	// sometimes the deletion of the RC takes long time to be observed by
 	// the gc, so wait for the garbage collector to observe the deletion of
 	// the toBeDeletedRC
-	if err := wait.Poll(10*time.Second, 120*time.Second, func() (bool, error) {
+	if err := wait.Poll(10*time.Second, 60*time.Second, func() (bool, error) {
 		return !gc.GraphHasUID([]types.UID{toBeDeletedRC.ObjectMeta.UID}), nil
 	}); err != nil {
 		t.Fatal(err)
