@@ -271,7 +271,10 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 	rescaleReason := ""
 	timestamp := time.Now()
 
-	if currentReplicas > hpa.Spec.MaxReplicas {
+	if scale.Spec.Replicas == 0 {
+		// Autoscaling is disabled for this resource
+		desiredReplicas = 0
+	} else if currentReplicas > hpa.Spec.MaxReplicas {
 		rescaleReason = "Current number of replicas above Spec.MaxReplicas"
 		desiredReplicas = hpa.Spec.MaxReplicas
 	} else if hpa.Spec.MinReplicas != nil && currentReplicas < *hpa.Spec.MinReplicas {
@@ -323,7 +326,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpa *autoscaling.HorizontalPo
 			desiredReplicas = *hpa.Spec.MinReplicas
 		}
 
-		// TODO: remove when pod idling is done.
+		//  never scale down to 0, reserved for disabling autoscaling
 		if desiredReplicas == 0 {
 			desiredReplicas = 1
 		}
