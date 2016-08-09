@@ -230,7 +230,7 @@ $kubectl create -f bps-load-gen-rc.json --namespace=$NS
 #This script assumes the cloud provider is able to create a load balancer. If this not the case, you may want to check out other ways to make the frontend service accessible from outside (https://github.com/kubernetes/kubernetes/blob/master/docs/services.md#external-services)
 function getIP {
   echo "Waiting up to 1 min for a public IP to be assigned by the cloud provider..."
-  for i in `seq 1 20`;
+  for i in {1..20};
   do
     PUBLIC_IP=$($kubectl get services/frontend --namespace=$NS -o template --template="{{range .status.loadBalancer.ingress}}{{.ip}}{{end}}")
       if [ -n "$PUBLIC_IP" ]; then
@@ -249,7 +249,7 @@ function pollfor {
   pass_http=0
 
   ### Test HTTP Server comes up.
-  for i in `seq 1 150`;
+  for i in {1..150};
   do
       ### Just testing that the front end comes up.  Not sure how to test total entries etc... (yet)
       echo "Trying curl ... $PUBLIC_IP:3000 , attempt $i . expect a few failures while pulling images... "
