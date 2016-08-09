@@ -485,11 +485,6 @@ function kube::build::source_targets() {
           \( -path ./_\* -o -path ./.git\* \) -prune  \
         \))
   )
-  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-    for contrib in "${KUBERNETES_CONTRIB}"; do
-      targets+=($(eval "kube::contrib::${contrib}::source_targets"))
-    done
-  fi
   echo "${targets[@]}"
 }
 
