@@ -73,6 +73,8 @@ type TestContextType struct {
 	CgroupsPerQOS bool
 	// The hard eviction thresholds
 	EvictionHard string
+	// If the garbage collector is enabled in the kube-apiserver and kube-controller-manager.
+	GarbageCollectorEnabled bool
 }
 
 type CloudConfig struct {
@@ -110,6 +112,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.Host, "host", "http://127.0.0.1:8080", "The host, or apiserver, to connect to")
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
+	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", false, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")
 }
 
 // Register flags specific to the cluster e2e test suite.

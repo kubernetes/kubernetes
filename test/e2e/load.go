@@ -339,5 +339,9 @@ func deleteRC(wg *sync.WaitGroup, config *framework.RCConfig, deletingTime time.
 	defer wg.Done()
 
 	sleepUpTo(deletingTime)
-	framework.ExpectNoError(framework.DeleteRC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+	if framework.TestContext.GarbageCollectorEnabled {
+		framework.ExpectNoError(framework.DeleteRCAndWaitForGC(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+	} else {
+		framework.ExpectNoError(framework.DeleteRCAndPods(config.Client, config.Namespace, config.Name), fmt.Sprintf("deleting rc %s", config.Name))
+	}
 }
