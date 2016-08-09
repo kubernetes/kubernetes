@@ -210,7 +210,7 @@ type multiGroupVersioner struct {
 }
 
 // NewMultiGroupVersioner creates a group versioner that returns gv for each specified group, and
-// prefers the first item in groups.
+// prefers the first item in groupKinds.
 func NewMultiGroupVersioner(gv unversioned.GroupVersion, groupKinds ...unversioned.GroupKind) GroupVersioner {
 	if len(groupKinds) == 0 || (len(groupKinds) == 1 && groupKinds[0].Group == gv.Group) {
 		return gv

@@ -182,6 +182,7 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	return err
 }
 
+// DirectEncoder serializes an object and ensures the GVK is set.
 type DirectEncoder struct {
 	runtime.Encoder
 	runtime.ObjectTyper

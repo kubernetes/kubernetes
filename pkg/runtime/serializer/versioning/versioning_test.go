@@ -56,7 +56,7 @@ func (d *testNestedDecodable) EncodeNestedObjects(e runtime.Encoder) error {
 	return d.nestedErr
 }
 
-func (d *testNestedDecodable) DecodeNestedObjects(d runtime.Decoder) error {
+func (d *testNestedDecodable) DecodeNestedObjects(_ runtime.Decoder) error {
 	d.nestedCalled = true
 	return d.nestedErr
 }
