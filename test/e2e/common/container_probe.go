@@ -90,6 +90,145 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		Expect(restartCount == 0).To(BeTrue(), "pod should have a restart count of 0 but got %v", restartCount)
 	})
 
+	It("should be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
+		runLivenessTest(f, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-exec",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/busybox:1.24",
+						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 10; rm -rf /tmp/health; sleep 600"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								Exec: &api.ExecAction{
+									Command: []string{"cat", "/tmp/health"},
+								},
+							},
+							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}, 1, defaultObservationTimeout)
+	})
+
+	It("should *not* be restarted with a exec \"cat /tmp/health\" liveness probe [Conformance]", func() {
+		runLivenessTest(f, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-exec",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/busybox:1.24",
+						Command: []string{"/bin/sh", "-c", "echo ok >/tmp/health; sleep 600"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								Exec: &api.ExecAction{
+									Command: []string{"cat", "/tmp/health"},
+								},
+							},
+							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}, 0, defaultObservationTimeout)
+	})
+
+	It("should be restarted with a /healthz http liveness probe [Conformance]", func() {
+		runLivenessTest(f, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-http",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/liveness:e2e",
+						Command: []string{"/server"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Path: "/healthz",
+									Port: intstr.FromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}, 1, defaultObservationTimeout)
+	})
+
+	// Slow by design (5 min)
+	It("should have monotonically increasing restart count [Conformance] [Slow]", func() {
+		runLivenessTest(f, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-http",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:    "liveness",
+						Image:   "gcr.io/google_containers/liveness:e2e",
+						Command: []string{"/server"},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Path: "/healthz",
+									Port: intstr.FromInt(8080),
+								},
+							},
+							InitialDelaySeconds: 5,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}, 5, time.Minute*5)
+	})
+
+	It("should *not* be restarted with a /healthz http liveness probe [Conformance]", func() {
+		runLivenessTest(f, &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:   "liveness-http",
+				Labels: map[string]string{"test": "liveness"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "liveness",
+						Image: "gcr.io/google_containers/nginx-slim:0.7",
+						Ports: []api.ContainerPort{{ContainerPort: 80}},
+						LivenessProbe: &api.Probe{
+							Handler: api.Handler{
+								HTTPGet: &api.HTTPGetAction{
+									Path: "/",
+									Port: intstr.FromInt(80),
+								},
+							},
+							InitialDelaySeconds: 15,
+							FailureThreshold:    1,
+						},
+					},
+				},
+			},
+		}, 0, defaultObservationTimeout)
+	})
+
 })
 
 func getContainerStartedTime(p *api.Pod, containerName string) (time.Time, error) {
@@ -170,4 +309,64 @@ func (b webserverProbeBuilder) build() *api.Probe {
 		probe.HTTPGet.Port = intstr.FromInt(81)
 	}
 	return probe
+}
+
+func runLivenessTest(f *framework.Framework, pod *api.Pod, expectNumRestarts int, timeout time.Duration) {
+	podClient := f.PodClient()
+	ns := f.Namespace.Name
+	Expect(pod.Spec.Containers).NotTo(BeEmpty())
+	containerName := pod.Spec.Containers[0].Name
+	// At the end of the test, clean up by removing the pod.
+	defer func() {
+		By("deleting the pod")
+		podClient.Delete(pod.Name, api.NewDeleteOptions(0))
+	}()
+	By(fmt.Sprintf("Creating pod %s in namespace %s", pod.Name, ns))
+	podClient.Create(pod)
+
+	// Wait until the pod is not pending. (Here we need to check for something other than
+	// 'Pending' other than checking for 'Running', since when failures occur, we go to
+	// 'Terminated' which can cause indefinite blocking.)
+	framework.ExpectNoError(framework.WaitForPodNotPending(f.Client, ns, pod.Name, pod.ResourceVersion),
+		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
+	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
+
+	// Check the pod's current state and verify that restartCount is present.
+	By("checking the pod's current state and verifying that restartCount is present")
+	pod, err := podClient.Get(pod.Name)
+	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
+	initialRestartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
+
+	// Wait for the restart state to be as desired.
+	deadline := time.Now().Add(timeout)
+	lastRestartCount := initialRestartCount
+	observedRestarts := int32(0)
+	for start := time.Now(); time.Now().Before(deadline); time.Sleep(2 * time.Second) {
+		pod, err = podClient.Get(pod.Name)
+		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
+		restartCount := api.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
+		if restartCount != lastRestartCount {
+			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
+				ns, pod.Name, restartCount, time.Since(start))
+			if restartCount < lastRestartCount {
+				framework.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
+					ns, pod.Name, lastRestartCount, restartCount)
+			}
+		}
+		observedRestarts = restartCount - initialRestartCount
+		if expectNumRestarts > 0 && int(observedRestarts) >= expectNumRestarts {
+			// Stop if we have observed more than expectNumRestarts restarts.
+			break
+		}
+		lastRestartCount = restartCount
+	}
+
+	// If we expected 0 restarts, fail if observed any restart.
+	// If we expected n restarts (n > 0), fail if we observed < n restarts.
+	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
+		int(observedRestarts) < expectNumRestarts) {
+		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
+			ns, pod.Name, expectNumRestarts, observedRestarts)
+	}
 }
