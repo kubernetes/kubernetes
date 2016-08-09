@@ -24,7 +24,7 @@ import (
 // NewFederationAPIServer creates a new hyperkube Server object that includes the
 // description and flags.
 func NewFederationAPIServer() *Server {
-	s := genericoptions.NewServerRunOptions()
+	s := genericoptions.NewServerRunOptions().WithEtcdOptions()
 
 	hks := Server{
 		SimpleUsage: "federation-apiserver",
@@ -33,6 +33,7 @@ func NewFederationAPIServer() *Server {
 			return app.Run(s)
 		},
 	}
-	s.AddFlags(hks.Flags())
+	s.AddUniversalFlags(hks.Flags())
+	s.AddEtcdStorageFlags(hks.Flags())
 	return &hks
 }

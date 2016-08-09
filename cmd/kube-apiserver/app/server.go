@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
@@ -81,6 +82,7 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *options.APIServer) error {
+	genericvalidation.VerifyEtcdServersList(s.ServerRunOptions)
 	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 
 	capabilities.Initialize(capabilities.Capabilities{

@@ -36,7 +36,7 @@ import (
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(options.NewServerRunOptions().LongRunningRequestRE)
+	regexp := regexp.MustCompile(options.NewServerRunOptions().WithEtcdOptions().LongRunningRequestRE)
 	dontMatch := []string{
 		"/api/v1/watch-namespace/",
 		"/api/v1/namespace-proxy/",
@@ -84,7 +84,7 @@ var groupVersions = []unversioned.GroupVersion{
 }
 
 func TestRun(t *testing.T) {
-	s := options.NewServerRunOptions()
+	s := options.NewServerRunOptions().WithEtcdOptions()
 	s.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet

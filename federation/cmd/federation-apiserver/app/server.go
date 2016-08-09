@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -42,8 +43,9 @@ import (
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	s := genericoptions.NewServerRunOptions()
-	s.AddFlags(pflag.CommandLine)
+	s := genericoptions.NewServerRunOptions().WithEtcdOptions()
+	s.AddUniversalFlags(pflag.CommandLine)
+	s.AddEtcdStorageFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "federation-apiserver",
 		Long: `The Kubernetes federation API server validates and configures data
@@ -59,6 +61,7 @@ cluster's shared state through which all other components interact.`,
 
 // Run runs the specified APIServer.  This should never exit.
 func Run(s *genericoptions.ServerRunOptions) error {
+	genericvalidation.VerifyEtcdServersList(s)
 	genericapiserver.DefaultAndValidateRunOptions(s)
 
 	// TODO: register cluster federation resources here.

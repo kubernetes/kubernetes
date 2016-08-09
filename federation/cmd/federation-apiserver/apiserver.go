@@ -36,8 +36,9 @@ import (
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	s := genericoptions.NewServerRunOptions()
-	s.AddFlags(pflag.CommandLine)
+	s := genericoptions.NewServerRunOptions().WithEtcdOptions()
+	s.AddUniversalFlags(pflag.CommandLine)
+	s.AddEtcdStorageFlags(pflag.CommandLine)
 
 	flag.InitFlags()
 	util.InitLogs()
