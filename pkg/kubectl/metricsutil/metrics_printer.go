@@ -33,13 +33,13 @@ var (
 		v1.ResourceMemory,
 		v1.ResourceStorage,
 	}
-	NodeColumns     = []string{"NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP"}
-	PodColumns      = []string{"NAME", "CPU", "MEMORY", "STORAGE", "TIMESTAMP"}
+	NodeColumns     = []string{"NAME", "CPU (cores)", "MEMORY (bytes)", "STORAGE (bytes)", "TIMESTAMP"}
+	PodColumns      = []string{"NAME", "CPU (cores)", "MEMORY (bytes)", "STORAGE (bytes)", "TIMESTAMP"}
 	NamespaceColumn = "NAMESPACE"
+	PodColumn       = "POD"
 )
 
 type ResourceMetricsInfo struct {
-	Namespace string
 	Name      string
 	Metrics   v1.ResourceList
 	Timestamp string
@@ -66,7 +66,7 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics
 			Name:      m.Name,
 			Metrics:   m.Usage,
 			Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
-		}, false)
+		})
 	}
 	return nil
 }
@@ -81,6 +81,9 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metrics_api.PodMetrics, 
 	if withNamespace {
 		printValue(w, NamespaceColumn)
 	}
+	if printContainers {
+		printValue(w, PodColumn)
+	}
 	printColumnNames(w, PodColumns)
 	for _, m := range metrics {
 		printSinglePodMetrics(w, &m, printContainers, withNamespace)
@@ -92,50 +95,54 @@ func printColumnNames(out io.Writer, names []string) {
 	for _, name := range names {
 		printValue(out, name)
 	}
-	fmt.Fprintf(out, "\n")
+	fmt.Fprint(out, "\n")
 }
 
-func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContainers bool, withNamespace bool) {
-	podMetrics := make(v1.ResourceList)
+func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContainersOnly bool, withNamespace bool) {
 	containers := make(map[string]v1.ResourceList)
+	podMetrics := make(v1.ResourceList)
 	for _, res := range MeasuredResources {
 		podMetrics[res], _ = resource.ParseQuantity("0")
 	}
 	for _, c := range m.Containers {
 		containers[c.Name] = c.Usage
-		for _, res := range MeasuredResources {
-			quantity := podMetrics[res]
-			quantity.Add(c.Usage[res])
-			podMetrics[res] = quantity
+		if !printContainersOnly {
+			for _, res := range MeasuredResources {
+				quantity := podMetrics[res]
+				quantity.Add(c.Usage[res])
+				podMetrics[res] = quantity
+			}
 		}
 	}
-	printMetricsLine(out, &ResourceMetricsInfo{
-		Namespace: m.Namespace,
-		Name:      m.Name,
-		Metrics:   podMetrics,
-		Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
-	}, withNamespace)
-
-	if printContainers {
+	if printContainersOnly {
 		for contName := range containers {
+			if withNamespace {
+				printValue(out, m.Namespace)
+			}
+			printValue(out, m.Name)
 			printMetricsLine(out, &ResourceMetricsInfo{
-				Namespace: "",
 				Name:      contName,
 				Metrics:   containers[contName],
-				Timestamp: "",
-			}, withNamespace)
+				Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
+			})
 		}
+	} else {
+		if withNamespace {
+			printValue(out, m.Namespace)
+		}
+		printMetricsLine(out, &ResourceMetricsInfo{
+			Name:      m.Name,
+			Metrics:   podMetrics,
+			Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
+		})
 	}
 }
 
-func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo, withNamespace bool) {
-	if withNamespace {
-		printValue(out, metrics.Namespace)
-	}
+func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo) {
 	printValue(out, metrics.Name)
 	printAllResourceUsages(out, metrics.Metrics)
 	printValue(out, metrics.Timestamp)
-	fmt.Fprintf(out, "\n")
+	fmt.Fprint(out, "\n")
 }
 
 func printValue(out io.Writer, value interface{}) {
@@ -146,7 +153,7 @@ func printAllResourceUsages(out io.Writer, usage v1.ResourceList) {
 	for _, res := range MeasuredResources {
 		quantity := usage[res]
 		printSingleResourceUsage(out, res, quantity)
-		fmt.Fprintf(out, "\t")
+		fmt.Fprint(out, "\t")
 	}
 }
 
@@ -158,7 +165,7 @@ func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quant
 		fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
 	case v1.ResourceStorage:
 		// TODO: Change it after storage metrics collection is finished.
-		fmt.Fprintf(out, "-")
+		fmt.Fprint(out, "-")
 	default:
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}
