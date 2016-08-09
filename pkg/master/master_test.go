@@ -59,7 +59,6 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	"k8s.io/kubernetes/pkg/storage/storagebackend"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -74,23 +73,13 @@ import (
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	server := etcdtesting.NewUnsecuredEtcdTestClientServer(t)
+	server, storageConfig := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	master := &Master{
 		GenericAPIServer: &genericapiserver.GenericAPIServer{},
 	}
 	config := Config{
 		Config: &genericapiserver.Config{},
-	}
-
-	storageConfig := storagebackend.Config{
-		Prefix:   etcdtest.PathPrefix(),
-		CAFile:   server.CAFile,
-		KeyFile:  server.KeyFile,
-		CertFile: server.CertFile,
-	}
-	for _, url := range server.ClientURLs {
-		storageConfig.ServerList = append(storageConfig.ServerList, url.String())
 	}
 
 	resourceEncoding := genericapiserver.NewDefaultResourceEncodingConfig()
@@ -101,7 +90,7 @@ func setUp(t *testing.T) (*Master, *etcdtesting.EtcdTestServer, Config, *assert.
 	resourceEncoding.SetVersionEncoding(extensions.GroupName, *testapi.Extensions.GroupVersion(), unversioned.GroupVersion{Group: extensions.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(rbac.GroupName, *testapi.Rbac.GroupVersion(), unversioned.GroupVersion{Group: rbac.GroupName, Version: runtime.APIVersionInternal})
 	resourceEncoding.SetVersionEncoding(certificates.GroupName, *testapi.Certificates.GroupVersion(), unversioned.GroupVersion{Group: certificates.GroupName, Version: runtime.APIVersionInternal})
-	storageFactory := genericapiserver.NewDefaultStorageFactory(storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
+	storageFactory := genericapiserver.NewDefaultStorageFactory(*storageConfig, testapi.StorageMediaType(), api.Codecs, resourceEncoding, DefaultAPIResourceConfigSource())
 
 	config.StorageFactory = storageFactory
 	config.APIResourceConfigSource = DefaultAPIResourceConfigSource()
