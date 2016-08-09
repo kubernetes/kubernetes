@@ -57,7 +57,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 		if err != nil {
 			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
 		}
-		rc := New(nil, nil, myClusterName, cidr)
+		rc := New(nil, nil, myClusterName, cidr, 0)
 		route := &cloudprovider.Route{
 			Name:            testCase.routeName,
 			TargetInstance:  "doesnt-matter-for-this-test",
@@ -146,7 +146,7 @@ func TestReconcile(t *testing.T) {
 			t.Error("Error in test: fakecloud doesn't support Routes()")
 		}
 		_, cidr, _ := net.ParseCIDR("10.120.0.0/16")
-		rc := New(routes, testCase.clientset, cluster, cidr)
+		rc := New(routes, testCase.clientset, cluster, cidr, 0)
 		nodeStatus := NodeStatus{
 			node:   &testCase.node,
 			status: testCase.statusType,
