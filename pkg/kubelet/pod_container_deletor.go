@@ -58,29 +58,33 @@ func newPodContainerDeletor(runtime kubecontainer.Runtime, containersToKeep int)
 	}
 }
 
-// getContainersToDeleteInPod returns the exited containers in a pod whose name matches the name inferred from exitedContainerID, ordered by the creation time from the latest to the earliest.
-func getContainersToDeleteInPod(exitedContainerID string, podStatus *kubecontainer.PodStatus, containersToKeep int) containerStatusbyCreatedList {
-	var matchedContainer *kubecontainer.ContainerStatus
-	var exitedContainers []*kubecontainer.ContainerStatus
-	// Find all exited containers in the pod
+// getContainersToDeleteInPod returns the exited containers in a pod whose name matches the name inferred from filterContainerId (if not empty), ordered by the creation time from the latest to the earliest.
+// If filterContainerId is empty, all dead containers in the pod are returned.
+func getContainersToDeleteInPod(filterContainerId string, podStatus *kubecontainer.PodStatus, containersToKeep int) containerStatusbyCreatedList {
+	matchedContainer := func(filterContainerId string, podStatus *kubecontainer.PodStatus) *kubecontainer.ContainerStatus {
+		if filterContainerId == "" {
+			return nil
+		}
+		for _, containerStatus := range podStatus.ContainerStatuses {
+			if containerStatus.ID.ID == filterContainerId {
+				return containerStatus
+			}
+		}
+		return nil
+	}(filterContainerId, podStatus)
+
+	if filterContainerId != "" && matchedContainer == nil {
+		glog.Warningf("Container %q not found in pod's containers", filterContainerId)
+		return containerStatusbyCreatedList{}
+	}
+
+	// Find the exited containers whose name matches the name of the container with id being filterContainerId
+	var candidates containerStatusbyCreatedList
 	for _, containerStatus := range podStatus.ContainerStatuses {
 		if containerStatus.State != kubecontainer.ContainerStateExited {
 			continue
 		}
-		if containerStatus.ID.ID == exitedContainerID {
-			matchedContainer = containerStatus
-		}
-		exitedContainers = append(exitedContainers, containerStatus)
-	}
-	if matchedContainer == nil {
-		glog.Warningf("Container %q not found in pod's exited containers", exitedContainerID)
-		return containerStatusbyCreatedList{}
-	}
-
-	// Find the exited containers whose name matches the name of the container with id being exitedContainerID
-	var candidates containerStatusbyCreatedList
-	for _, containerStatus := range exitedContainers {
-		if matchedContainer.Name == containerStatus.Name {
+		if matchedContainer == nil || matchedContainer.Name == containerStatus.Name {
 			candidates = append(candidates, containerStatus)
 		}
 	}
@@ -93,12 +97,13 @@ func getContainersToDeleteInPod(exitedContainerID string, podStatus *kubecontain
 }
 
 // deleteContainersInPod issues container deletion requests for containers selected by getContainersToDeleteInPod.
-func (p *podContainerDeletor) deleteContainersInPod(exitedContainerID string, podStatus *kubecontainer.PodStatus, removeAll bool) {
+func (p *podContainerDeletor) deleteContainersInPod(filterContainerId string, podStatus *kubecontainer.PodStatus, removeAll bool) {
 	containersToKeep := p.containersToKeep
 	if removeAll {
 		containersToKeep = 0
 	}
-	for _, candidate := range getContainersToDeleteInPod(exitedContainerID, podStatus, containersToKeep) {
+
+	for _, candidate := range getContainersToDeleteInPod(filterContainerId, podStatus, containersToKeep) {
 		select {
 		case p.worker <- candidate.ID:
 		default:
