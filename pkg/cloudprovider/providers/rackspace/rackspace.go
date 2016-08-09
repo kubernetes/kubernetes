@@ -372,10 +372,10 @@ func getAddressByServer(srv *osservers.Server) (string, error) {
 		s = firstAddr(srv.Addresses["private"])
 	}
 	if s == "" {
-		s = firstAddr(srv.Addresses["public"])
+		s = srv.AccessIPv4
 	}
 	if s == "" {
-		s = srv.AccessIPv4
+		s = firstAddr(srv.Addresses["public"])
 	}
 	if s == "" {
 		s = srv.AccessIPv6
