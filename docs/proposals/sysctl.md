@@ -394,7 +394,7 @@ For the first step of sysctl support it is considered *out of scope* to schedule
 
 One could imagine to offer certain non-namespaced sysctls as well which taint a host such that only containers with compatible sysctls settings are scheduled there. Moreover, there is no accounting of sysctl values if that makes any sense for a given sysctl.
 
-### SecurityContext Enforcement
+### SecurityContext Enforcement - Alternative 1: by name
 
 A list of permissible sysctls is to be added to `pkg/apis/extensions/types.go` (compare [security-context-constraints](security-context-constraints.md)):
 
@@ -412,6 +412,43 @@ type PodSecurityPolicySpec struct {
 The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value of `PodSecurityPolicySpec.Sysctls` with the sysctls of a given pod in `ValidatePodSecurityContext`.
 
 The default policy will be `*`, i.e. all whitelisted (and therefore known-to-be-namespaced) sysctls are allowed.
+
+### SecurityContext Enforcement - Sketch of Alternative 2: SysctlPolicy
+
+```go
+// SysctlPolicy defines how a sysctl may be set. If neither Values,
+// nor Min, Max are set, any value is allowed.
+type SysctlPolicy struct {
+    // Name is the name of a sysctl or a pattern for a name. It consists of
+    // dot separated name segments. A name segment matches [a-z]+[a-z_-0-9]* or
+    // equals "*". The later is interpretated as a wildcard for that name
+    // segment.
+    Name string `json:"name"`
+
+    // Values are allowed values to be set. Either Values is
+    // set or Min and Max.
+    Values []int64 `json:"values,omitempty"`
+
+    // Min is the minimal value allowed to be set.
+    Min *int64 `json:"min,omitempty"`
+
+    // Max is the maximum value allowed to be set.
+    Max *int64 `json:"max,omitempty"`
+
+    // Resources multiplied with the value. These are taken into account by the
+    // scheduler when calculating the available capacity of a node.
+    Resources ResourceList `json:"resources,omitempty"`
+}
+
+// PodSecurityPolicySpec defines the policy enforced on sysctls.
+type PodSecurityPolicySpec struct {
+    ...
+    // Sysctls is a white list of allowed sysctls in a pod spec.
+    Sysctls []SysctlPolicy `json:"sysctls,omitempty"`
+}
+```
+
+The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value of `PodSecurityPolicySpec.Sysctls` with the sysctls of a given pod in `ValidatePodSecurityContext`.
 
 ### Application of the given Sysctls
 
