@@ -279,7 +279,7 @@ Issues:
 - `kernel.sem`: configure System V semaphores
   * [x] **namespaced** in ipc ns
   * [ ] uses [plain kmalloc and vmalloc](http://lxr.free-electrons.com/source/ipc/util.c#L404) **without accounting**
-  * [x] **defaults to** [32000 ids and 32000 semaphores per id](http://lxr.free-electrons.com/source/include/uapi/linux/sem.h#L78), probably enough for all applications:
+  * [x] **defaults to** [32000 ids and 32000 semaphores per id](http://lxr.free-electrons.com/source/include/uapi/linux/sem.h#L78) (needing double digit number of bytes each), probably enough for all applications:
 
     > The values has been chosen to be larger than necessary for any known configuration. ([linux/sem.h](http://lxr.free-electrons.com/source/include/uapi/linux/sem.h#L69))
 
@@ -290,34 +290,40 @@ Issues:
     * [ ] TODO: accounting? No evidence found until now.
   - `net.ipv4.tcp_wmem`/`net.ipv4.tcp_wmem`/`net.core.rmem_max`/`net.core.wmem_max`: socket buffer sizes
     * [ ] **not namespaced in net ns**, and they are not even available under `/sys/net`
+  - `net.ipv4.ip_local_port_range`: local tcp/udp port range
+    * [x] **namespaced** in net ns
+    * [x] **no memory involved**
 
 ### Summary
 
 #### For kernel >= 4.5
 
-| sysctl                 | namespaced    | accounted for by           |
-| ---------------------- | ------------- | -------------------------- |
-| kernel.shm*            | ipc           | memcg *)                   |
-| kernel.msg*            | ipc           | - (plain kmem kmalloc)     |
-| fs.mqueue.*            | ipc           | - (plain kmem kmalloc)     |
-| kernel.sem             | ipc           | - (plain kmem kmalloc)     |
-| net.core.somaxconn     | net           | -                          |
-| net.*.tcp_wmem/rmem    | -             | kmem memcg for tcp buffers |
-| net.core.wmem/rmem_max | -             | ?                          |
-
-*) a pod memory cgroup is necessary to catch segments from a dying process.
+| sysctl                       | namespaced    | accounted for by           |
+| ---------------------------- | ------------- | -------------------------- |
+| kernel.shm*                  | ipc           | memcg 1)                   |
+| kernel.msg*                  | ipc           | -                          |
+| fs.mqueue.*                  | ipc           | -                          |
+| kernel.sem                   | ipc           | -                          |
+| net.core.somaxconn           | net           | -                          |
+| net.*.tcp_wmem/rmem          | - 2)          | memcg                      |
+| net.core.wmem/rmem_max       | - 2)          | ?                          |
+| net.ipv4.ip_local_port_range | net           | no memory involved         |
 
 #### For kernel <= 4.4
 
-| sysctl                 | namespaced    | accounted for by           |
-| ---------------------- | ------------- | -------------------------- |
-| kernel.shm*            | ipc           | memcg *)                   |
-| kernel.msg*            | ipc           | memcg                      |
-| fs.mqueue.*            | ipc           | memcg                      |
-| kernel.sem             | ipc           | memcg                      |
-| net.core.somaxconn     | net           | memcg                      |
-| net.*.tcp_wmem/rmem    | -             | kmem memcg for tcp buffers |
-| net.core.wmem/rmem_max | -             | ?                          |
+| sysctl                       | namespaced    | accounted for by           |
+| ---------------------------- | ------------- | -------------------------- |
+| kernel.shm*                  | ipc           | memcg 1)                   |
+| kernel.msg*                  | ipc           | memcg                      |
+| fs.mqueue.*                  | ipc           | memcg                      |
+| kernel.sem                   | ipc           | memcg                      |
+| net.core.somaxconn           | net           | ?                          |
+| net.*.tcp_wmem/rmem          | - 2)          | memcg                      |
+| net.core.wmem/rmem_max       | - 2)          | ?                          |
+| net.ipv4.ip_local_port_range | net           | no memory involved         |
+
+1) a pod memory cgroup is necessary to catch segments from a dying process.
+2) only available in root-ns, not even visible in a container
 
 ## Proposed Design
 
