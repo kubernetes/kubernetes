@@ -73,6 +73,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 	})
 
 	Context("create a batch of pods", func() {
+		// Zhou(ToDo): add more tests and the values are generous, set more precise limits after benchmark
 		densityTests := []DensityTest{
 			{
 				podsNr:   10,
@@ -87,8 +88,8 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				},
 				// percentile limit of single pod startup latency
 				podStartupLimits: framework.LatencyMetric{
-					Perc50: 10 * time.Second,
-					Perc90: 15 * time.Second,
+					Perc50: 16 * time.Second,
+					Perc90: 18 * time.Second,
 					Perc99: 20 * time.Second,
 				},
 				// upbound of startup latency of a batch of pods
@@ -191,6 +192,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 	})
 
 	Context("create a sequence of pods", func() {
+		// Zhou(ToDo): add more tests and the values are generous, set more precise limits after benchmark
 		densityTests := []DensityTest{
 			{
 				podsNr:   10,
