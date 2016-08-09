@@ -71,6 +71,7 @@ import (
 	pvcetcd "k8s.io/kubernetes/pkg/registry/persistentvolumeclaim/etcd"
 	podetcd "k8s.io/kubernetes/pkg/registry/pod/etcd"
 	podtemplateetcd "k8s.io/kubernetes/pkg/registry/podtemplate/etcd"
+	"k8s.io/kubernetes/pkg/registry/rangeallocation"
 	resourcequotaetcd "k8s.io/kubernetes/pkg/registry/resourcequota/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	"k8s.io/kubernetes/pkg/registry/service"
@@ -137,8 +138,8 @@ type Master struct {
 	namespaceRegistry         namespace.Registry
 	serviceRegistry           service.Registry
 	endpointRegistry          endpoint.Registry
-	serviceClusterIPAllocator service.RangeRegistry
-	serviceNodePortAllocator  service.RangeRegistry
+	serviceClusterIPAllocator rangeallocation.RangeRegistry
+	serviceNodePortAllocator  rangeallocation.RangeRegistry
 
 	// storage for third party objects
 	thirdPartyStorage storage.Interface
@@ -341,7 +342,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	serviceRESTStorage, serviceStatusStorage := serviceetcd.NewREST(restOptions("services"))
 	m.serviceRegistry = service.NewRegistry(serviceRESTStorage)
 
-	var serviceClusterIPRegistry service.RangeRegistry
+	var serviceClusterIPRegistry rangeallocation.RangeRegistry
 	serviceClusterIPRange := m.ServiceClusterIPRange
 	if serviceClusterIPRange == nil {
 		glog.Fatalf("service clusterIPRange is nil")
@@ -362,7 +363,7 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	})
 	m.serviceClusterIPAllocator = serviceClusterIPRegistry
 
-	var serviceNodePortRegistry service.RangeRegistry
+	var serviceNodePortRegistry rangeallocation.RangeRegistry
 	serviceNodePortAllocator := portallocator.NewPortAllocatorCustom(m.ServiceNodePortRange, func(max int, rangeSpec string) allocator.Interface {
 		mem := allocator.NewAllocationMap(max, rangeSpec)
 		// TODO etcdallocator package to return a storage interface via the storageFactory
