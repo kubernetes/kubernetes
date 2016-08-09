@@ -122,7 +122,7 @@ type ImageReview struct {
  
 // ImageReviewSpec is a description of the pod creation request.
 type ImageReviewSpec struct {
-	// Container is a subset of the information in theh container being created.
+	// Container is a subset of the information in the container being created.
 	Container ImageReviewContainerSpec
 	// Annotations is a list of key-value pairs extracted from the Pod's annotations.
 	// It only includes keys which match the pattern `*.image-policy.k8s.io/*`.
