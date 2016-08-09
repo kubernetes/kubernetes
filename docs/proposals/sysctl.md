@@ -271,7 +271,7 @@ Issues:
 - `fs.mqueue.*`: configure POSIX message queues
   * [x] **namespaced** in ipc ns
   * [ ] uses the same [`load_msg`](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58) as System V messages, i.e. **no accounting**
-  * does [strict checking again rlimits](http://lxr.free-electrons.com/source/ipc/mqueue.c#L278) though
+  * does [strict checking against rlimits](http://lxr.free-electrons.com/source/ipc/mqueue.c#L278) though
   * [ ] **defaults to** [256 queues, max queue length 10, message size 8kb](http://lxr.free-electrons.com/source/include/linux/ipc_namespace.h#L102)
   * [ ] can be customized via sysctls up to 64k max queue length, message size 16MB. Hence, **potential DoS attack vector** against the host
 - `kernel.sem`: configure System V semaphores
