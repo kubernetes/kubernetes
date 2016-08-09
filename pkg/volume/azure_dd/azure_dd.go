@@ -48,7 +48,7 @@ type azureDataDiskPlugin struct {
 
 // Abstract interface to disk operations.
 // azure cloud provider should implement it
-type azureManager interface {
+type azureCloudProvider interface {
 	// Attaches the disk to the host machine.
 	AttachDisk(diskName, diskUri, vmName string, lun int32, cachingMode compute.CachingTypes) error
 	// Detaches the disk, identified by disk name or uri, from the host machine.
@@ -103,10 +103,10 @@ func (plugin *azureDataDiskPlugin) GetAccessModes() []api.PersistentVolumeAccess
 }
 
 func (plugin *azureDataDiskPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	return plugin.newMounterInternal(spec, pod.Namespace, pod.UID, plugin.host.GetMounter())
+	return plugin.newMounterInternal(spec, pod.UID, plugin.host.GetMounter())
 }
 
-func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespace string, podUID types.UID, mounter mount.Interface) (volume.Mounter, error) {
+func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, mounter mount.Interface) (volume.Mounter, error) {
 	// azures used directly in a pod have a ReadOnly flag set by the pod author.
 	// azures used as a PersistentVolume gets the ReadOnly flag indirectly through the persistent-claim volume used to mount the PV
 	azure, err := getVolumeSource(spec)
@@ -125,7 +125,6 @@ func (plugin *azureDataDiskPlugin) newMounterInternal(spec *volume.Spec, namespa
 			diskName:    diskName,
 			diskUri:     diskUri,
 			cachingMode: cachingMode,
-			namespace:   namespace,
 			mounter:     mounter,
 			plugin:      plugin,
 		},
@@ -155,7 +154,6 @@ type azureDisk struct {
 	diskName    string
 	diskUri     string
 	cachingMode api.AzureDataDiskCachingMode
-	namespace   string
 	mounter     mount.Interface
 	plugin      *azureDataDiskPlugin
 	volume.MetricsNil
@@ -338,7 +336,7 @@ func getVolumeSource(spec *volume.Spec) (*api.AzureDiskVolumeSource, error) {
 }
 
 // Return cloud provider
-func getAzureDiskManager(cloudProvider cloudprovider.Interface) (azureManager, error) {
+func getAzureCloudProvider(cloudProvider cloudprovider.Interface) (azureCloudProvider, error) {
 	azureCloudProvider, ok := cloudProvider.(*azure.Cloud)
 	if !ok || azureCloudProvider == nil {
 		return nil, fmt.Errorf("Failed to get Azure Cloud Provider. GetCloudProvider returned %v instead", cloudProvider)

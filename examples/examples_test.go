@@ -404,6 +404,9 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/volumes/azure_file": {
 			"azure": &api.Pod{},
 		},
+		"../examples/volumes/azure_disk": {
+			"azure": &api.Pod{},
+		},
 	}
 
 	capabilities.SetForTests(capabilities.Capabilities{

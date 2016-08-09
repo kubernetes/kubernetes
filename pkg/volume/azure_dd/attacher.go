@@ -34,8 +34,8 @@ import (
 )
 
 type azureDiskAttacher struct {
-	host    volume.VolumeHost
-	manager azureManager
+	host          volume.VolumeHost
+	azureProvider azureCloudProvider
 }
 
 var _ volume.Attacher = &azureDiskAttacher{}
@@ -51,15 +51,15 @@ const (
 var attachDetachMutex = keymutex.NewKeyMutex()
 
 func (plugin *azureDataDiskPlugin) NewAttacher() (volume.Attacher, error) {
-	azure, err := getAzureDiskManager(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		glog.V(4).Infof("failed to get azure provider")
 		return nil, err
 	}
 
 	return &azureDiskAttacher{
-		host:    plugin.host,
-		manager: azure,
+		host:          plugin.host,
+		azureProvider: azure,
 	}, nil
 }
 
@@ -69,7 +69,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 		glog.V(2).Infof("failed to get azure disk spec")
 		return "", err
 	}
-	instanceid, err := attacher.manager.InstanceID(hostName)
+	instanceid, err := attacher.azureProvider.InstanceID(hostName)
 	if err != nil {
 		glog.V(2).Infof("failed to get azure instance id")
 		return "", fmt.Errorf("failed to get azure instance id for host %q", hostName)
@@ -80,7 +80,7 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 	attachDetachMutex.LockKey(instanceid)
 	defer attachDetachMutex.UnlockKey(instanceid)
 
-	lun, err := attacher.manager.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid)
+	lun, err := attacher.azureProvider.GetDiskLun(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid)
 	if err == cloudprovider.InstanceNotFound {
 		// Log error and continue with attach
 		glog.Warningf(
@@ -92,13 +92,13 @@ func (attacher *azureDiskAttacher) Attach(spec *volume.Spec, hostName string) (s
 		// Volume is already attached to node.
 		glog.V(4).Infof("Attach operation is successful. volume %q is already attached to node %q at lun %d.", volumeSource.DiskName, instanceid, lun)
 	} else {
-		lun, err = attacher.manager.GetNextDiskLun(instanceid)
+		lun, err = attacher.azureProvider.GetNextDiskLun(instanceid)
 		if err != nil {
 			glog.Warningf("no LUN available for instance %q", instanceid)
 			return "", fmt.Errorf("all LUNs are used, cannot attach volume %q to instance %q", volumeSource.DiskName, instanceid)
 		}
 
-		err = attacher.manager.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, lun, compute.CachingTypes(*volumeSource.CachingMode))
+		err = attacher.azureProvider.AttachDisk(volumeSource.DiskName, volumeSource.DataDiskURI, instanceid, lun, compute.CachingTypes(*volumeSource.CachingMode))
 		if err == nil {
 			glog.V(4).Infof("Attach operation successful: volume %q attached to node %q.", volumeSource.DataDiskURI, instanceid)
 		} else {
@@ -192,21 +192,21 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 }
 
 type azureDiskDetacher struct {
-	mounter mount.Interface
-	manager azureManager
+	mounter       mount.Interface
+	azureProvider azureCloudProvider
 }
 
 var _ volume.Detacher = &azureDiskDetacher{}
 
 func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
-	azure, err := getAzureDiskManager(plugin.host.GetCloudProvider())
+	azure, err := getAzureCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		return nil, err
 	}
 
 	return &azureDiskDetacher{
-		mounter: plugin.host.GetMounter(),
-		manager: azure,
+		mounter:       plugin.host.GetMounter(),
+		azureProvider: azure,
 	}, nil
 }
 
@@ -214,7 +214,7 @@ func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
 	if dev == "" {
 		return fmt.Errorf("invalid dev to detach: %q", dev)
 	}
-	instanceid, err := detacher.manager.InstanceID(hostName)
+	instanceid, err := detacher.azureProvider.InstanceID(hostName)
 	if err != nil {
 		return fmt.Errorf("failed to get azure instance id for host %q", hostName)
 	}
@@ -225,7 +225,7 @@ func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
 	defer attachDetachMutex.UnlockKey(instanceid)
 
 	glog.V(4).Infof("detach %v from host %q", dev, instanceid)
-	err = detacher.manager.DetachDiskByName(dev, "", instanceid)
+	err = detacher.azureProvider.DetachDiskByName(dev, "", instanceid)
 	if err != nil {
 		glog.V(2).Infof("failed to detach azure disk %q, err %v", dev, err)
 	}
