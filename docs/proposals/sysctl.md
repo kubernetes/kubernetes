@@ -454,11 +454,11 @@ The default policy will be `*`, i.e. all whitelisted (and therefore known-to-be-
 // SysctlPolicy defines how a sysctl may be set. If neither Values,
 // nor Min, Max are set, any value is allowed.
 type SysctlPolicy struct {
-    // Name is the name of a sysctl or a pattern for a name. It consists of
+    // Sysctl is the name of a sysctl or a pattern for a name. It consists of
     // dot separated name segments. A name segment matches [a-z]+[a-z_-0-9]* or
     // equals "*". The later is interpretated as a wildcard for that name
     // segment.
-    Name string `json:"name"`
+    Sysctl string `json:"sysctl"`
 
     // Values are allowed values to be set. Either Values is
     // set or Min and Max.
@@ -482,8 +482,6 @@ type PodSecurityPolicySpec struct {
     Sysctls []SysctlPolicy `json:"sysctls,omitempty"`
 }
 ```
-
-The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value of `PodSecurityPolicySpec.Sysctls` with the sysctls of a given pod in `ValidatePodSecurityContext`.
 
 ### Application of the given Sysctls
 
