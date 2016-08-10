@@ -93,6 +93,7 @@ type ServerRunOptions struct {
 	OIDCUsernameClaim         string
 	OIDCGroupsClaim           string
 	RuntimeConfig             config.ConfigurationMap
+	FeatureConfig             config.FeatureConfig
 	SecurePort                int
 	ServiceClusterIPRange     net.IPNet // TODO: make this a list
 	ServiceNodePortRange      utilnet.PortRange
@@ -134,6 +135,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxRequestsInFlight:     400,
 		MinRequestTimeout:       1800,
 		RuntimeConfig:           make(config.ConfigurationMap),
+		FeatureConfig:           config.NewFeatureConfig(),
 		SecurePort:              6443,
 		ServiceNodePortRange:    DefaultServiceNodePortRange,
 		StorageVersions:         registered.AllPreferredGroupVersions(),
@@ -451,4 +453,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
 		"The individual override format: resource#size, where size is a number. It takes effect "+
 		"when watch-cache is enabled.")
+
+	s.FeatureConfig.AddFlag(fs)
 }

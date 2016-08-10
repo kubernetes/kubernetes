@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/util/config"
 
 	"github.com/spf13/pflag"
 )
@@ -35,8 +36,9 @@ import (
 type CMServer struct {
 	componentconfig.KubeControllerManagerConfiguration
 
-	Master     string
-	Kubeconfig string
+	Master        string
+	Kubeconfig    string
+	FeatureConfig config.FeatureConfig
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -97,6 +99,7 @@ func NewCMServer() *CMServer {
 			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
 			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
 		},
+		FeatureConfig: config.NewFeatureConfig(),
 	}
 	s.LeaderElection.LeaderElect = true
 	return &s
@@ -174,4 +177,5 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableGarbageCollector, "enable-garbage-collector", s.EnableGarbageCollector, "Enables the generic garbage collector. MUST be synced with the corresponding flag of the kube-apiserver. WARNING: the generic garbage collector is an alpha feature.")
 	fs.Int32Var(&s.ConcurrentGCSyncs, "concurrent-gc-syncs", s.ConcurrentGCSyncs, "The number of garbage collector workers that are allowed to sync concurrently.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
+	s.FeatureConfig.AddFlag(fs)
 }
