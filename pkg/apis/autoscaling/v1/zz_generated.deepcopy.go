@@ -30,14 +30,14 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_CrossVersionObjectReference, InType: reflect.TypeOf(func() *CrossVersionObjectReference { var x *CrossVersionObjectReference; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HorizontalPodAutoscaler, InType: reflect.TypeOf(func() *HorizontalPodAutoscaler { var x *HorizontalPodAutoscaler; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HorizontalPodAutoscalerList, InType: reflect.TypeOf(func() *HorizontalPodAutoscalerList { var x *HorizontalPodAutoscalerList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HorizontalPodAutoscalerSpec, InType: reflect.TypeOf(func() *HorizontalPodAutoscalerSpec { var x *HorizontalPodAutoscalerSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HorizontalPodAutoscalerStatus, InType: reflect.TypeOf(func() *HorizontalPodAutoscalerStatus { var x *HorizontalPodAutoscalerStatus; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Scale, InType: reflect.TypeOf(func() *Scale { var x *Scale; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ScaleSpec, InType: reflect.TypeOf(func() *ScaleSpec { var x *ScaleSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ScaleStatus, InType: reflect.TypeOf(func() *ScaleStatus { var x *ScaleStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_CrossVersionObjectReference, InType: reflect.TypeOf(&CrossVersionObjectReference{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HorizontalPodAutoscaler, InType: reflect.TypeOf(&HorizontalPodAutoscaler{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HorizontalPodAutoscalerList, InType: reflect.TypeOf(&HorizontalPodAutoscalerList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HorizontalPodAutoscalerSpec, InType: reflect.TypeOf(&HorizontalPodAutoscalerSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_HorizontalPodAutoscalerStatus, InType: reflect.TypeOf(&HorizontalPodAutoscalerStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Scale, InType: reflect.TypeOf(&Scale{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ScaleSpec, InType: reflect.TypeOf(&ScaleSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ScaleStatus, InType: reflect.TypeOf(&ScaleStatus{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)

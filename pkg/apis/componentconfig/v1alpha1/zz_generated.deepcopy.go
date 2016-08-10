@@ -28,10 +28,10 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeProxyConfiguration, InType: reflect.TypeOf(func() *KubeProxyConfiguration { var x *KubeProxyConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeSchedulerConfiguration, InType: reflect.TypeOf(func() *KubeSchedulerConfiguration { var x *KubeSchedulerConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletConfiguration, InType: reflect.TypeOf(func() *KubeletConfiguration { var x *KubeletConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_LeaderElectionConfiguration, InType: reflect.TypeOf(func() *LeaderElectionConfiguration { var x *LeaderElectionConfiguration; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)

@@ -29,14 +29,14 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_LocalSubjectAccessReview, InType: reflect.TypeOf(func() *LocalSubjectAccessReview { var x *LocalSubjectAccessReview; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NonResourceAttributes, InType: reflect.TypeOf(func() *NonResourceAttributes { var x *NonResourceAttributes; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ResourceAttributes, InType: reflect.TypeOf(func() *ResourceAttributes { var x *ResourceAttributes; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SelfSubjectAccessReview, InType: reflect.TypeOf(func() *SelfSubjectAccessReview { var x *SelfSubjectAccessReview; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SelfSubjectAccessReviewSpec, InType: reflect.TypeOf(func() *SelfSubjectAccessReviewSpec { var x *SelfSubjectAccessReviewSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SubjectAccessReview, InType: reflect.TypeOf(func() *SubjectAccessReview { var x *SubjectAccessReview; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SubjectAccessReviewSpec, InType: reflect.TypeOf(func() *SubjectAccessReviewSpec { var x *SubjectAccessReviewSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SubjectAccessReviewStatus, InType: reflect.TypeOf(func() *SubjectAccessReviewStatus { var x *SubjectAccessReviewStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_LocalSubjectAccessReview, InType: reflect.TypeOf(&LocalSubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_NonResourceAttributes, InType: reflect.TypeOf(&NonResourceAttributes{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_ResourceAttributes, InType: reflect.TypeOf(&ResourceAttributes{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SelfSubjectAccessReview, InType: reflect.TypeOf(&SelfSubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SelfSubjectAccessReviewSpec, InType: reflect.TypeOf(&SelfSubjectAccessReviewSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SubjectAccessReview, InType: reflect.TypeOf(&SubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SubjectAccessReviewSpec, InType: reflect.TypeOf(&SubjectAccessReviewSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1beta1_SubjectAccessReviewStatus, InType: reflect.TypeOf(&SubjectAccessReviewStatus{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)

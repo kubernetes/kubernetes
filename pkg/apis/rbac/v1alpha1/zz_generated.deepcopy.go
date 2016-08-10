@@ -30,16 +30,16 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRole, InType: reflect.TypeOf(func() *ClusterRole { var x *ClusterRole; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRoleBinding, InType: reflect.TypeOf(func() *ClusterRoleBinding { var x *ClusterRoleBinding; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRoleBindingList, InType: reflect.TypeOf(func() *ClusterRoleBindingList { var x *ClusterRoleBindingList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRoleList, InType: reflect.TypeOf(func() *ClusterRoleList { var x *ClusterRoleList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PolicyRule, InType: reflect.TypeOf(func() *PolicyRule { var x *PolicyRule; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_Role, InType: reflect.TypeOf(func() *Role { var x *Role; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleBinding, InType: reflect.TypeOf(func() *RoleBinding { var x *RoleBinding; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleBindingList, InType: reflect.TypeOf(func() *RoleBindingList { var x *RoleBindingList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleList, InType: reflect.TypeOf(func() *RoleList { var x *RoleList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_Subject, InType: reflect.TypeOf(func() *Subject { var x *Subject; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRole, InType: reflect.TypeOf(&ClusterRole{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRoleBinding, InType: reflect.TypeOf(&ClusterRoleBinding{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRoleBindingList, InType: reflect.TypeOf(&ClusterRoleBindingList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRoleList, InType: reflect.TypeOf(&ClusterRoleList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PolicyRule, InType: reflect.TypeOf(&PolicyRule{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_Role, InType: reflect.TypeOf(&Role{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleBinding, InType: reflect.TypeOf(&RoleBinding{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleBindingList, InType: reflect.TypeOf(&RoleBindingList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleList, InType: reflect.TypeOf(&RoleList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_Subject, InType: reflect.TypeOf(&Subject{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)

@@ -29,15 +29,15 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(func() *IPVar { var x *IPVar; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(func() *KubeControllerManagerConfiguration { var x *KubeControllerManagerConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(func() *KubeProxyConfiguration { var x *KubeProxyConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeSchedulerConfiguration, InType: reflect.TypeOf(func() *KubeSchedulerConfiguration { var x *KubeSchedulerConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletConfiguration, InType: reflect.TypeOf(func() *KubeletConfiguration { var x *KubeletConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LeaderElectionConfiguration, InType: reflect.TypeOf(func() *LeaderElectionConfiguration { var x *LeaderElectionConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration, InType: reflect.TypeOf(func() *PersistentVolumeRecyclerConfiguration { var x *PersistentVolumeRecyclerConfiguration; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(func() *PortRangeVar { var x *PortRangeVar; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(func() *VolumeConfiguration { var x *VolumeConfiguration; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_IPVar, InType: reflect.TypeOf(&IPVar{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeControllerManagerConfiguration, InType: reflect.TypeOf(&KubeControllerManagerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeProxyConfiguration, InType: reflect.TypeOf(&KubeProxyConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeSchedulerConfiguration, InType: reflect.TypeOf(&KubeSchedulerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_KubeletConfiguration, InType: reflect.TypeOf(&KubeletConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_LeaderElectionConfiguration, InType: reflect.TypeOf(&LeaderElectionConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PersistentVolumeRecyclerConfiguration, InType: reflect.TypeOf(&PersistentVolumeRecyclerConfiguration{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_PortRangeVar, InType: reflect.TypeOf(&PortRangeVar{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_componentconfig_VolumeConfiguration, InType: reflect.TypeOf(&VolumeConfiguration{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
