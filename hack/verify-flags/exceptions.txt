@@ -11,6 +11,7 @@ cluster/centos/util.sh:  local node_ip=${node#*@}
 cluster/gce/configure-vm.sh:  advertise_address: '${EXTERNAL_IP}'
 cluster/gce/configure-vm.sh:  api_servers: '${KUBERNETES_MASTER_NAME}'
 cluster/gce/configure-vm.sh:  cloud_config: ${CLOUD_CONFIG}
+cluster/gce/configure-vm.sh:  env-to-grains "feature_gates"
 cluster/gce/configure-vm.sh:  env-to-grains "runtime_config"
 cluster/gce/configure-vm.sh:  kubelet_api_servers: '${KUBELET_APISERVER}'
 cluster/gce/gci/configure-helper.sh:      reconcile_cidr="false"
@@ -42,17 +43,21 @@ cluster/saltbase/salt/cluster-autoscaler/cluster-autoscaler.manifest:{% set para
 cluster/saltbase/salt/etcd/etcd.manifest:        "value": "{{ storage_backend }}"
 cluster/saltbase/salt/etcd/etcd.manifest:{% set storage_backend = pillar.get('storage_backend', 'etcd2') -%}
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
 cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = params + " " feature_gates %}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
+cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:{% set params = log_level + " " + feature_gates + " " + test_args -%}
+cluster/saltbase/salt/kube-scheduler/kube-scheduler.manifest:{% set params = params + log_level + " " + feature_gates -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
 cluster/saltbase/salt/kubelet/default:  {% set eviction_hard="--eviction-hard=" + pillar['eviction_hard'] %}
 cluster/saltbase/salt/kubelet/default:  {% set kubelet_port="--port=" + pillar['kubelet_port'] %}
 cluster/saltbase/salt/kubelet/default:  {% set node_labels="--node-labels=" + pillar['node_labels'] %}
+cluster/saltbase/salt/kubelet/default:{% if grains['feature_gates'] is defined -%}
 cluster/saltbase/salt/kubelet/default:{% if pillar.get('non_masquerade_cidr','') -%}
 cluster/saltbase/salt/opencontrail-networking-master/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
 cluster/saltbase/salt/opencontrail-networking-minion/init.sls:      - 'SERVICE_CLUSTER_IP_RANGE': '{{ pillar.get('service_cluster_ip_range') }}'
