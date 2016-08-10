@@ -310,6 +310,10 @@ type KubeletConfiguration struct {
 	// networkPluginDir is the full path of the directory in which to search
 	// for network plugins
 	NetworkPluginDir string `json:"networkPluginDir"`
+	// networkPluginMTU is the MTU to be passed to the network plugin,
+	// and overrides the default MTU for cases where it cannot be automatically
+	// computed (such as IPSEC).
+	NetworkPluginMTU int32 `json:"networkPluginMTU"`
 	// volumePluginDir is the full path of the directory in which to search
 	// for additional third party volume plugins
 	VolumePluginDir string `json:"volumePluginDir"`

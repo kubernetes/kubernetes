@@ -46,6 +46,7 @@ func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImage
 		nettest.NewFakeHost(nil),
 		componentconfig.HairpinNone,
 		"10.0.0.0/8",
+		network.UseDefaultMTU,
 	)
 	osInterface := &containertest.FakeOS{}
 	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, networkPlugin, osInterface)

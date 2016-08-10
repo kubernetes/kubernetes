@@ -340,6 +340,7 @@ minion-path-override
 namespace-sync-period
 network-plugin
 network-plugin-dir
+network-plugin-mtu
 no-headers
 no-suggestions
 node-cidr-mask-size
