@@ -31,7 +31,7 @@ var (
 )
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&TestType{},
 		&TestTypeList{},
@@ -41,8 +41,10 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&v1.ListOptions{},
 		&v1.DeleteOptions{},
 		&unversioned.Status{},
-		&v1.ExportOptions{})
+		&v1.ExportOptions{},
+	)
 	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
+	return nil
 }
 
 func (obj *TestType) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }

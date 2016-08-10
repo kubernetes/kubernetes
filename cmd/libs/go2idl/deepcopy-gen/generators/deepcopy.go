@@ -375,21 +375,26 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	}
 	glog.V(5).Infof("registering types in pkg %q", g.targetPackage)
 
-	scheme := c.Universe.Variable(types.Name{Package: apiPackagePath, Name: "Scheme"})
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func init() {\n", nil)
-	sw.Do("if err := $.scheme|raw$.AddGeneratedDeepCopyFuncs(\n", generator.Args{
-		"scheme": scheme,
-	})
+	sw.Do("SchemeBuilder.Register(RegisterDeepCopies)\n", nil)
+	sw.Do("}\n\n", nil)
+
+	scheme := c.Universe.Type(types.Name{Package: runtimePackagePath, Name: "Scheme"})
+	schemePtr := &types.Type{
+		Kind: types.Pointer,
+		Elem: scheme,
+	}
+	sw.Do("// RegisterDeepCopies adds deep-copy functions to the given scheme. Public\n", nil)
+	sw.Do("// to allow building arbitrary schemes.\n", nil)
+	sw.Do("func RegisterDeepCopies(scheme $.|raw$) error {\n", schemePtr)
+	sw.Do("return scheme.AddGeneratedDeepCopyFuncs(\n", nil)
 	for _, t := range g.typesForInit {
 		args := argsFromType(t).
 			With("typeof", c.Universe.Package("reflect").Function("TypeOf"))
 		sw.Do("conversion.GeneratedDeepCopyFunc{Fn: $.type|dcFnName$, InType: $.typeof|raw$(&$.type|raw${})},\n", args)
 	}
-	sw.Do("); err != nil {\n", nil)
-	sw.Do("// if one of the deep copy functions is malformed, detect it immediately.\n", nil)
-	sw.Do("panic(err)\n", nil)
-	sw.Do("}\n", nil)
+	sw.Do(")\n", nil)
 	sw.Do("}\n\n", nil)
 	return sw.Error()
 }
