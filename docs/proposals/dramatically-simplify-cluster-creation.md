@@ -1,4 +1,4 @@
-# Draft Proposal: Dramatically Simplify Kubernetes Cluster Creation
+# Proposal: Dramatically Simplify Kubernetes Cluster Creation
 
 Luke Marsden & many others in [SIG-cluster-lifecycle](https://github.com/kubernetes/community/tree/master/sig-cluster-lifecycle).
 
