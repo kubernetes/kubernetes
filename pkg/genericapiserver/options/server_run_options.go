@@ -89,6 +89,7 @@ type ServerRunOptions struct {
 	OIDCUsernameClaim         string
 	OIDCGroupsClaim           string
 	RuntimeConfig             config.ConfigurationMap
+	FeatureConfig             config.ConfigurationMap
 	SecurePort                int
 	ServiceClusterIPRange     net.IPNet // TODO: make this a list
 	ServiceNodePortRange      utilnet.PortRange
@@ -130,6 +131,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		MaxRequestsInFlight:     400,
 		MinRequestTimeout:       1800,
 		RuntimeConfig:           make(config.ConfigurationMap),
+		FeatureConfig:           make(config.ConfigurationMap),
 		SecurePort:              6443,
 		ServiceNodePortRange:    DefaultServiceNodePortRange,
 		StorageVersions:         registered.AllPreferredGroupVersions(),
@@ -382,6 +384,9 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"to apiserver. apis/<groupVersion> key can be used to turn on/off specific api versions. "+
 		"apis/<groupVersion>/<resource> can be used to turn on/off specific resources. api/all and "+
 		"api/legacy are special keys to control all and legacy api versions respectively.")
+
+	fs.Var(&s.FeatureConfig, "feature-config", ""+
+		"A set of key=value pairs that describe feature configuration for apiserver.")
 
 	fs.IntVar(&s.SecurePort, "secure-port", s.SecurePort, ""+
 		"The port on which to serve HTTPS with authentication and authorization. If 0, "+
