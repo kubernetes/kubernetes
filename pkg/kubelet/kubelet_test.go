@@ -3938,8 +3938,6 @@ func simulateVolumeInUseUpdate(
 
 func runVolumeManager(kubelet *Kubelet) chan struct{} {
 	stopCh := make(chan struct{})
-	readyCh := make(chan bool, 1)
-	readyCh <- true
-	go kubelet.volumeManager.Run(readyCh, stopCh)
+	go kubelet.volumeManager.Run(kubelet.sourcesReady, stopCh)
 	return stopCh
 }

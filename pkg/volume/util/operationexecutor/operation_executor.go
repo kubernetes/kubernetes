@@ -21,6 +21,7 @@ limitations under the License.
 package operationexecutor
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -378,7 +379,6 @@ func (oe *operationExecutor) MountVolume(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
 	actualStateOfWorld ActualStateOfWorldMounterUpdater) error {
-
 	mountFunc, err := oe.generateMountVolumeFunc(
 		waitForAttachTimeout, volumeToMount, actualStateOfWorld)
 	if err != nil {
@@ -666,7 +666,6 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 
 			devicePath, err := volumeAttacher.WaitForAttach(
 				volumeToMount.VolumeSpec, volumeToMount.DevicePath, waitForAttachTimeout)
-			glog.Infof("WaitForAttach devicePath %q", devicePath)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
 				return fmt.Errorf(
@@ -687,7 +686,6 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 
 			deviceMountPath, err :=
 				volumeAttacher.GetDeviceMountPath(volumeToMount.VolumeSpec)
-			glog.Infof("WaitForAttach deviceMountPath %q", deviceMountPath)
 			if err != nil {
 				// On failure, return error. Caller will log and retry.
 				return fmt.Errorf(
@@ -736,17 +734,6 @@ func (oe *operationExecutor) generateMountVolumeFunc(
 					markDeviceMountedErr)
 			}
 		}
-
-		glog.Infof(
-			"Entering MountVolume.WaitForAttach for volume %q (spec.Name: %q) pod %q (UID: %q). DevicePath %q VolumeGidValue %q Outer %q, disk %+v\n ",
-			volumeToMount.VolumeName,
-			volumeToMount.VolumeSpec.Name(),
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID,
-			volumeToMount.DevicePath,
-			volumeToMount.VolumeGidValue,
-			volumeToMount.OuterVolumeSpecName,
-			volumeToMount.VolumeSpec)
 
 		// Execute mount
 		mountErr := volumeMounter.SetUp(fsGroup)
@@ -834,7 +821,7 @@ func (oe *operationExecutor) generateUnmountVolumeFunc(
 		}
 
 		glog.Infof(
-			"UnmountVolume.TearDown succeeded for volume %q (volume.spec.Name: %q) pod %q (UID: %q). InnterName %q. Plugin %q, Gir %q",
+			"UnmountVolume.TearDown succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
 			volumeToUnmount.VolumeName,
 			volumeToUnmount.OuterVolumeSpecName,
 			volumeToUnmount.PodName,
@@ -907,8 +894,11 @@ func (oe *operationExecutor) generateUnmountDeviceFunc(
 		}
 		refs, err := attachableVolumePlugin.GetDeviceMountRefs(deviceMountPath)
 		if err != nil || len(refs) > 0 {
+			if err == nil {
+				err = errors.New(fmt.Sprintf("The device mount path %q are still mounted by other references %v", deviceMountPath, refs))
+			}
 			return fmt.Errorf(
-				"GetDeviceMountPath failed for volume %q (spec.Name: %q) with: %v",
+				"GetDeviceMountRefs check failed for volume %q (spec.Name: %q) with: %v",
 				deviceToDetach.VolumeName,
 				deviceToDetach.VolumeSpec.Name(),
 				err)

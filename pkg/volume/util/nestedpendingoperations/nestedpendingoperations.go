@@ -78,7 +78,7 @@ type nestedPendingOperations struct {
 	operations                []operation
 	exponentialBackOffOnError bool
 	cond                      *sync.Cond
-	lock                      sync.Mutex
+	lock                      sync.RWMutex
 }
 
 type operation struct {
@@ -141,8 +141,8 @@ func (grm *nestedPendingOperations) IsOperationPending(
 	volumeName api.UniqueVolumeName,
 	podName types.UniquePodName) bool {
 
-	grm.lock.Lock()
-	defer grm.lock.Unlock()
+	grm.lock.RLock()
+	defer grm.lock.RUnlock()
 
 	exist, previousOpIndex := grm.isOperationExists(volumeName, podName)
 	if exist && grm.operations[previousOpIndex].operationPending {
@@ -155,9 +155,7 @@ func (grm *nestedPendingOperations) isOperationExists(
 	volumeName api.UniqueVolumeName,
 	podName types.UniquePodName) (bool, int) {
 
-	var previousOp operation
-	previousOpIndex := -1
-	for previousOpIndex, previousOp = range grm.operations {
+	for previousOpIndex, previousOp := range grm.operations {
 		if previousOp.volumeName != volumeName {
 			// No match, keep searching
 			continue
@@ -173,7 +171,7 @@ func (grm *nestedPendingOperations) isOperationExists(
 		// Match
 		return true, previousOpIndex
 	}
-	return false, previousOpIndex
+	return false, -1
 }
 
 func (grm *nestedPendingOperations) getOperation(

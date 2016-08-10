@@ -79,7 +79,7 @@ type goRoutineMap struct {
 	operations                map[string]operation
 	exponentialBackOffOnError bool
 	cond                      *sync.Cond
-	lock                      sync.Mutex
+	lock                      sync.RWMutex
 }
 
 type operation struct {
@@ -155,8 +155,8 @@ func (grm *goRoutineMap) operationComplete(
 }
 
 func (grm *goRoutineMap) IsOperationPending(operationName string) bool {
-	grm.lock.Lock()
-	defer grm.lock.Unlock()
+	grm.lock.RLock()
+	defer grm.lock.RUnlock()
 	existingOp, exists := grm.operations[operationName]
 	if exists && existingOp.operationPending {
 		return true

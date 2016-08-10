@@ -18,6 +18,7 @@ package kubelet
 
 import (
 	"fmt"
+	"io/ioutil"
 	"net"
 	"path"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -234,4 +236,33 @@ func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
 // from annotations on persistent volumes that the pod depends on.
 func (kl *Kubelet) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int64 {
 	return kl.volumeManager.GetExtraSupplementalGroupsForPod(pod)
+}
+
+// getPodVolumeNameListFromDisk returns a list of the volume names by reading the
+// volume directories for the given pod from the disk.
+func (kl *Kubelet) getPodVolumeNameListFromDisk(podUID types.UID) ([]string, error) {
+	volumes := []string{}
+	podVolDir := kl.getPodVolumesDir(podUID)
+	volumePluginDirs, err := ioutil.ReadDir(podVolDir)
+	if err != nil {
+		glog.Errorf("Could not read directory %s: %v", podVolDir, err)
+		return volumes, err
+	}
+	for _, volumePluginDir := range volumePluginDirs {
+		volumePluginName := volumePluginDir.Name()
+		volumePluginPath := path.Join(podVolDir, volumePluginName)
+		volumeDirs, volumeDirsStatErrs, err := util.ReadDirNoExit(volumePluginPath)
+		if err != nil {
+			return volumes, fmt.Errorf("Could not read directory %s: %v", volumePluginPath, err)
+		}
+		for i, volumeDir := range volumeDirs {
+			if volumeDir != nil {
+				volumes = append(volumes, volumeDir.Name())
+				continue
+			}
+			glog.Errorf("Could not read directory %s: %v", podVolDir, volumeDirsStatErrs[i])
+
+		}
+	}
+	return volumes, nil
 }

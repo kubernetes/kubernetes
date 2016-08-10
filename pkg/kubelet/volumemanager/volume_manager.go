@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
@@ -44,12 +45,15 @@ import (
 const (
 	// reconcilerLoopSleepPeriod is the amount of time the reconciler loop waits
 	// between successive executions
-	reconcilerLoopSleepPeriod        time.Duration = 100 * time.Millisecond
+	reconcilerLoopSleepPeriod time.Duration = 100 * time.Millisecond
+
+	// reconcilerReconstructSleepPeriod is the amount of time the reconciler reconstruct process
+	// waits between successive executions
 	reconcilerReconstructSleepPeriod time.Duration = 3 * time.Minute
 
 	// desiredStateOfWorldPopulatorLoopSleepPeriod is the amount of time the
 	// DesiredStateOfWorldPopulator loop waits between successive executions
-	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 500 * time.Millisecond
+	desiredStateOfWorldPopulatorLoopSleepPeriod time.Duration = 100 * time.Millisecond
 
 	// desiredStateOfWorldPopulatorGetPodStatusRetryDuration is the amount of
 	// time the DesiredStateOfWorldPopulator loop waits between successive pod
@@ -88,7 +92,7 @@ const (
 // this node and makes it so.
 type VolumeManager interface {
 	// Starts the volume manager and all the asynchronous loops that it controls
-	Run(readyCh <-chan bool, stopCh <-chan struct{})
+	Run(sourcesReady config.SourcesReady, stopCh <-chan struct{})
 
 	// WaitForAttachAndMount processes the volumes referenced in the specified
 	// pod and blocks until they are all attached and mounted (reflected in
@@ -166,6 +170,7 @@ func NewVolumeManager(
 		vm.actualStateOfWorld,
 		vm.operationExecutor,
 		mounter,
+		volumePluginMgr,
 		kubeletPodsDir)
 	vm.desiredStateOfWorldPopulator = populator.NewDesiredStateOfWorldPopulator(
 		kubeClient,
@@ -216,24 +221,14 @@ type volumeManager struct {
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
 }
 
-func (vm *volumeManager) Run(readyCh <-chan bool, stopCh <-chan struct{}) {
+func (vm *volumeManager) Run(sourcesReady config.SourcesReady, stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
 	go vm.desiredStateOfWorldPopulator.Run(stopCh)
 	glog.V(2).Infof("The desired_state_of_world populator starts")
 
-	// Add all sources ready check so that reconciler reconstruct process will start after
-	// desired state of world is populated with pod volume information from apiserver. Otherwise,
-	// reconciler reconstruct process may add incomplete volume information and cause confusion.
-	select {
-	case <-readyCh:
-		glog.V(4).Infof("Volume manager start after all source ready")
-	case <-time.After(reconcilerStartGracePeriod):
-		glog.V(4).Infof("Volume manager start after %d seconds grace period", reconcilerStartGracePeriod)
-
-	}
 	glog.Infof("Starting Kubelet Volume Manager")
-	go vm.reconciler.Run(stopCh)
+	go vm.reconciler.Run(sourcesReady, stopCh)
 
 	<-stopCh
 	glog.Infof("Shutting down Kubelet Volume Manager")

@@ -93,14 +93,10 @@ type DesiredStateOfWorld interface {
 	// current desired state of the world.
 	GetVolumesToMount() []VolumeToMount
 
-	// GetDesiredPodVolumeSpecNames generates and returns a map of pods in which map
-	// is indexed with pod uid and value is a map of the pod's mounted volume spec
-	// names. This map can be used to determine which pod and volume is currently
-	// in desired state of world based on pod uid and volume spec name.
-	GetDesiredPodVolumeSpecNames() map[string]map[string]bool
-
-	// GetVolumePluginMgr returns the volume plugin manager
-	GetVolumePluginMgr() *volume.VolumePluginMgr
+	// GetPodList generates and returns a map of pods in which map is indexed
+	// with pod's unique name. This map can be used to determine which pod is currently
+	// in desired state of world.
+	GetPodList() map[types.UniquePodName]bool
 }
 
 // VolumeToMount represents a volume that is attached to this node and needs to
@@ -174,10 +170,6 @@ type podToMount struct {
 	// volume claim, this contains the volume.Spec.Name() of the persistent
 	// volume claim
 	outerVolumeSpecName string
-}
-
-func (dsw *desiredStateOfWorld) GetVolumePluginMgr() *volume.VolumePluginMgr {
-	return dsw.volumePluginMgr
 }
 
 func (dsw *desiredStateOfWorld) AddPodToVolume(
@@ -310,23 +302,19 @@ func (dsw *desiredStateOfWorld) PodExistsInVolume(
 	return podExists
 }
 
-func (dsw *desiredStateOfWorld) GetDesiredPodVolumeSpecNames() map[string]map[string]bool {
+func (dsw *desiredStateOfWorld) GetPodList() map[types.UniquePodName]bool {
 	dsw.RLock()
 	defer dsw.RUnlock()
 
-	podVolumeNames := make(map[string]map[string]bool)
+	podList := make(map[types.UniquePodName]bool)
 	for _, volumeObj := range dsw.volumesToMount {
-		for podName, podObj := range volumeObj.podsToMount {
-			volumeNames, exist := podVolumeNames[string(podName)]
-			if !exist {
-				volumeNames = make(map[string]bool)
+		for podName := range volumeObj.podsToMount {
+			if !podList[podName] {
+				podList[podName] = true
 			}
-			specName := podObj.spec.Name()
-			volumeNames[specName] = true
-			podVolumeNames[string(podName)] = volumeNames
 		}
 	}
-	return podVolumeNames
+	return podList
 }
 
 func (dsw *desiredStateOfWorld) GetVolumesToMount() []VolumeToMount {

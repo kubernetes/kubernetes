@@ -26,11 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/pod"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
@@ -279,8 +281,9 @@ func simulateVolumeInUseUpdate(
 
 func runVolumeManager(manager VolumeManager) chan struct{} {
 	stopCh := make(chan struct{})
-	readyCh := make(chan bool, 1)
-	readyCh <- true
-	go manager.Run(readyCh, stopCh)
+	//readyCh := make(chan bool, 1)
+	//readyCh <- true
+	sourcesReady := config.NewSourcesReady(func(_ sets.String) bool { return true })
+	go manager.Run(sourcesReady, stopCh)
 	return stopCh
 }
