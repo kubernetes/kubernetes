@@ -29,9 +29,6 @@ import (
 	release_1_4 "k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/client-go/1.4/pkg/util/sets"
 	clientreporestclient "k8s.io/client-go/1.4/rest"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -64,12 +61,7 @@ type Framework struct {
 	Clientset_1_3 *release_1_3.Clientset
 	StagingClient *release_1_4.Clientset
 
-	// TODO(mml): Remove this.  We should generally use the versioned clientset.
-	FederationClientset     *federation_internalclientset.Clientset
-	FederationClientset_1_3 *federation_release_1_3.Clientset
 	FederationClientset_1_4 *federation_release_1_4.Clientset
-	// TODO: remove FederationClient, all the client access must be through FederationClientset
-	FederationClient *unversionedfederation.FederationClient
 
 	Namespace                *api.Namespace   // Every test has at least one namespace
 	namespacesToDelete       []*api.Namespace // Some tests have more than one.
@@ -195,22 +187,10 @@ func (f *Framework) BeforeEach() {
 	}
 
 	if f.federated {
-		if f.FederationClient == nil {
-			By("Creating a federated kubernetes client")
+		if f.FederationClientset_1_4 == nil {
+			By("Creating a release 1.4 federation Clientset")
 			var err error
-			f.FederationClient, err = LoadFederationClient()
-			Expect(err).NotTo(HaveOccurred())
-		}
-		if f.FederationClientset == nil {
-			By("Creating an unversioned federation Clientset")
-			var err error
-			f.FederationClientset, err = LoadFederationClientset()
-			Expect(err).NotTo(HaveOccurred())
-		}
-		if f.FederationClientset_1_3 == nil {
-			By("Creating a release 1.3 federation Clientset")
-			var err error
-			f.FederationClientset_1_3, err = LoadFederationClientset_1_3()
+			f.FederationClientset_1_4, err = LoadFederationClientset_1_4()
 			Expect(err).NotTo(HaveOccurred())
 		}
 		if f.FederationClientset_1_4 == nil {
@@ -220,7 +200,7 @@ func (f *Framework) BeforeEach() {
 			Expect(err).NotTo(HaveOccurred())
 		}
 		By("Waiting for federation-apiserver to be ready")
-		err := WaitForFederationApiserverReady(f.FederationClientset)
+		err := WaitForFederationApiserverReady(f.FederationClientset_1_4)
 		Expect(err).NotTo(HaveOccurred())
 		By("federation-apiserver is ready")
 	}
@@ -300,15 +280,11 @@ func (f *Framework) AfterEach() {
 
 	if f.federated {
 		defer func() {
-			if f.FederationClient == nil {
-				Logf("Warning: framework is marked federated, but has no federation client")
+			if f.FederationClientset_1_4 == nil {
+				Logf("Warning: framework is marked federated, but has no federation 1.4 clientset")
 				return
 			}
-			if f.FederationClientset == nil {
-				Logf("Warning: framework is marked federated, but has no federation clientset")
-				return
-			}
-			if err := f.FederationClient.Clusters().DeleteCollection(nil, api.ListOptions{}); err != nil {
+			if err := f.FederationClientset_1_4.Federation().Clusters().DeleteCollection(nil, api.ListOptions{}); err != nil {
 				Logf("Error: failed to delete Clusters: %+v", err)
 			}
 		}()
