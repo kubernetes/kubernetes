@@ -200,6 +200,18 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Thresholds:               thresholds,
 	}
 
+	if s.ConfigIPTablesUtil {
+		if s.IPTablesMasqueradeBit == nil || *s.IPTablesMasqueradeBit > 31 || *s.IPTablesMasqueradeBit < 0 {
+			return nil, fmt.Errorf("iptables-masquerade-bit is not valid. Must be within [0, 31]")
+		}
+		if s.IPTablesDropBit == nil || *s.IPTablesDropBit > 31 || *s.IPTablesDropBit < 0 {
+			return nil, fmt.Errorf("iptables-drop-bit is not valid. Must be within [0, 31]")
+		}
+		if *s.IPTablesDropBit == *s.IPTablesMasqueradeBit {
+			return nil, fmt.Errorf("iptables-masquerade-bit and iptables-drop-bit must be different")
+		}
+	}
+
 	return &KubeletConfig{
 		Address:                      net.ParseIP(s.Address),
 		AllowPrivileged:              s.AllowPrivileged,
@@ -282,9 +294,12 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		HairpinMode:                    s.HairpinMode,
 		BabysitDaemons:                 s.BabysitDaemons,
 		ExperimentalFlannelOverlay:     s.ExperimentalFlannelOverlay,
-		NodeIP:         net.ParseIP(s.NodeIP),
-		EvictionConfig: evictionConfig,
-		PodsPerCore:    int(s.PodsPerCore),
+		NodeIP:                net.ParseIP(s.NodeIP),
+		EvictionConfig:        evictionConfig,
+		PodsPerCore:           int(s.PodsPerCore),
+		configIPTablesUtil:    s.ConfigIPTablesUtil,
+		iptablesMasqueradeBit: int(*s.IPTablesMasqueradeBit),
+		iptablesDropBit:       int(*s.IPTablesDropBit),
 	}, nil
 }
 
@@ -888,6 +903,9 @@ type KubeletConfig struct {
 	HairpinMode                string
 	BabysitDaemons             bool
 	Options                    []kubelet.Option
+	configIPTablesUtil         bool
+	iptablesMasqueradeBit      int
+	iptablesDropBit            int
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -985,6 +1003,9 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.EvictionConfig,
 		kc.Options,
 		kc.EnableControllerAttachDetach,
+		kc.configIPTablesUtil,
+		kc.iptablesMasqueradeBit,
+		kc.iptablesDropBit,
 	)
 
 	if err != nil {
