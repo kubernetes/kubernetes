@@ -1,10 +1,10 @@
 # Draft Proposal: Dramatically Simplify Kubernetes Cluster Creation
 
-Luke Marsden & many others
+Luke Marsden & many others in [SIG-cluster-lifecycle](https://github.com/kubernetes/community/tree/master/sig-cluster-lifecycle).
 
 10th August 2016
 
-*This proposal aims to capture the latest consensus and proposed plan of action of SIG-cluster-lifecycle. Once it is ready, it can be turned into a proposal, in order to satisfy the first bullet point **[required by the feature description](https://github.com/kubernetes/features/issues/11)**.*
+*This proposal aims to capture the latest consensus and proposed plan of action of SIG-cluster-lifecycle. It should satisfy the first bullet point [required by the feature description](https://github.com/kubernetes/features/issues/11).*
 
 See also: [this presentation to community hangout on 4th August 2016](https://docs.google.com/presentation/d/17xrFxrTwqrK-MJk0f2XCjfUPagljG7togXHcC39p0sM/edit?ts=57a33e24#slide=id.g158d2ee41a_0_76)
 
@@ -157,9 +157,8 @@ laptop# kubectl get pods
 ```
 master# kubectl apply --purge -f \
     https://git.io/kubernetes-addons/<X>.yaml
-```
-
 [normal kubectl apply output]
+```
 
 ### Add-node
 
