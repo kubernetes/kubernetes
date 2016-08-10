@@ -44,7 +44,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 			SelfLink:  "/apis/extensions/v1beta1/namespaces/snazzycats/jobs/myscheduledjob",
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "0 0 * * * * ?",
+			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -256,7 +256,7 @@ func TestGroupJobsByParent(t *testing.T) {
 
 func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	// schedule is hourly on the hour
-	schedule := "0 0 * * * ?"
+	schedule := "0 * * * ?"
 	// T1 is a scheduled start time of that schedule
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
 	if err != nil {
