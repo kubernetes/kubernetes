@@ -17,7 +17,7 @@
 # Copies any built binaries off the Docker machine.
 #
 # This is a no-op on Linux when the Docker daemon is local.  This is only
-# necessary on Mac OS X with boot2docker.
+# necessary on Mac OS X with docker-machine.
 set -o errexit
 set -o nounset
 set -o pipefail
