@@ -26,12 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
 // getContainerLogsPath gets log path for container.
-func getContainerLogsPath(containerName, podUID string) string {
-	return path.Join(podLogsRootDirectory, podUID, fmt.Sprintf("%s.log", containerName))
+func getContainerLogsPath(containerName string, podUID types.UID) string {
+	return path.Join(podLogsRootDirectory, string(podUID), fmt.Sprintf("%s.log", containerName))
 }
 
 // generateContainerConfig generates container config for kubelet runtime api.
@@ -43,7 +44,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 
 	_, containerName, cid := buildContainerName(pod, container)
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
-	containerLogsPath := getContainerLogsPath(containerName, string(pod.UID))
+	containerLogsPath := getContainerLogsPath(containerName, pod.UID)
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	config := &runtimeApi.ContainerConfig{
 		Name:        &containerName,
@@ -133,8 +134,9 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 	}
 
 	envs := make([]*runtimeApi.KeyValue, len(opts.Envs))
-	for index, e := range opts.Envs {
-		envs[index] = &runtimeApi.KeyValue{
+	for idx := range opts.Envs {
+		e := opts.Envs[idx]
+		envs[idx] = &runtimeApi.KeyValue{
 			Key:   &e.Name,
 			Value: &e.Value,
 		}
@@ -148,7 +150,8 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 func makeMounts(cid string, opts *kubecontainer.RunContainerOptions, container *api.Container, podHasSELinuxLabel bool) []*runtimeApi.Mount {
 	volumeMounts := []*runtimeApi.Mount{}
 
-	for _, v := range opts.Mounts {
+	for idx := range opts.Mounts {
+		v := opts.Mounts[idx]
 		m := &runtimeApi.Mount{
 			Name:          &v.Name,
 			HostPath:      &v.HostPath,

@@ -56,7 +56,8 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP
 			return nil, err
 		}
 
-		for _, port := range opts.PortMappings {
+		for idx := range opts.PortMappings {
+			port := opts.PortMappings[idx]
 			hostPort := int32(port.HostPort)
 			containerPort := int32(port.ContainerPort)
 			protocol := toRuntimeProtocol(port.Protocol)
@@ -69,6 +70,7 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP
 			})
 		}
 
+		// TODO: refactor kubelet to get cgroup parent for pod instead of containers
 		cgroupParent = opts.CgroupParent
 	}
 
