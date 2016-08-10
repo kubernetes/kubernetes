@@ -518,6 +518,10 @@ function prepare-etcd-manifest {
   mv "${temp_file}" /etc/kubernetes/manifests
 }
 
+function start-etcd-empty-dir-cleanup-pod {
+  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/etcd-empty-dir-cleanup/etcd-empty-dir-cleanup.yaml" "/etc/kubernetes/manifests"
+}
+
 # Starts etcd server pod (and etcd-events pod if needed).
 # More specifically, it prepares dirs and files, sets the variable value
 # in the manifests, and copies them to /etc/kubernetes/manifests.
@@ -998,6 +1002,7 @@ start-kubelet
 if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   compute-master-manifest-variables
   start-etcd-servers
+  start-etcd-empty-dir-cleanup-pod
   start-kube-apiserver
   start-kube-controller-manager
   start-kube-scheduler
