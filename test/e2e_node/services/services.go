@@ -78,16 +78,18 @@ func NewE2EServices(monitorParent bool) *E2EServices {
 // standard kubelet launcher)
 func (e *E2EServices) Start() error {
 	var err error
-	// Start kubelet
-	// Create the manifest path for kubelet.
-	// TODO(random-liu): Remove related logic when we move kubelet starting logic out of the test.
-	framework.TestContext.ManifestPath, err = ioutil.TempDir("", "node-e2e-pod")
-	if err != nil {
-		return fmt.Errorf("failed to create static pod manifest directory: %v", err)
-	}
-	e.kubelet, err = e.startKubelet()
-	if err != nil {
-		return fmt.Errorf("failed to start kubelet: %v", err)
+	if !framework.TestContext.NodeConformance {
+		// Start kubelet
+		// Create the manifest path for kubelet.
+		// TODO(random-liu): Remove related logic when we move kubelet starting logic out of the test.
+		framework.TestContext.ManifestPath, err = ioutil.TempDir("", "node-e2e-pod")
+		if err != nil {
+			return fmt.Errorf("failed to create static pod manifest directory: %v", err)
+		}
+		e.kubelet, err = e.startKubelet()
+		if err != nil {
+			return fmt.Errorf("failed to start kubelet: %v", err)
+		}
 	}
 	e.services, err = e.startInternalServices()
 	return err
@@ -96,14 +98,16 @@ func (e *E2EServices) Start() error {
 // Stop stops the e2e services.
 func (e *E2EServices) Stop() {
 	defer func() {
-		// Collect log files.
-		e.getLogFiles()
-		// Cleanup the manifest path for kubelet.
-		manifestPath := framework.TestContext.ManifestPath
-		if manifestPath != "" {
-			err := os.RemoveAll(manifestPath)
-			if err != nil {
-				glog.Errorf("Failed to delete static pod manifest directory %s: %v", manifestPath, err)
+		if !framework.TestContext.NodeConformance {
+			// Collect log files.
+			e.getLogFiles()
+			// Cleanup the manifest path for kubelet.
+			manifestPath := framework.TestContext.ManifestPath
+			if manifestPath != "" {
+				err := os.RemoveAll(manifestPath)
+				if err != nil {
+					glog.Errorf("Failed to delete static pod manifest directory %s: %v", manifestPath, err)
+				}
 			}
 		}
 	}()
