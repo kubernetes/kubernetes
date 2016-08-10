@@ -488,7 +488,7 @@ alpha.kubernetes.io/sysctls: kernel.shmmax,kernel.msgmax`
 
 The same annotation keys are used for pods and `PodSecurityPolicy` objects.
 
-#### Sketch of Alternative 2: SysctlPolicy
+#### Alternative 2: SysctlPolicy
 
 ```go
 // SysctlPolicy defines how a sysctl may be set. If neither Values,
@@ -526,6 +526,8 @@ alpha.kubernetes.io/sysctls: kernel.shmmax,kernel.msgmax:max:10:min:1,kernel:msg
 ```
 
 This extended syntax is a natural extension of that of alternative 1 and therefore can be implemented any time during alpha.
+
+Alternative 1 or 2 has to be chosen for the external API once the feature is promoted to beta.
 
 ### Application of the given Sysctls
 
