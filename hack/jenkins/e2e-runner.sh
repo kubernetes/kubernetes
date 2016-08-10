@@ -376,7 +376,10 @@ if [[ "${E2E_DOWN,,}" == "true" ]]; then
 fi
 
 if [[ "${E2E_TEST,,}" == "true" ]]; then
-  e2e_go_args+=(--test --test_args="${GINKGO_TEST_ARGS}")
+  e2e_go_args+=(--test)
+  if [[ -n "${GINKGO_TEST_ARGS:-}" ]]; then
+    e2e_go_args+=(--test_args="${GINKGO_TEST_ARGS}")
+  fi
 fi
 
 # Optionally run tests from the version in  kubernetes_skew
