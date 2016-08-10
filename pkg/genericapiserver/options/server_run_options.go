@@ -451,4 +451,6 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"List of watch cache sizes for every resource (pods, nodes, etc.), comma separated. "+
 		"The individual override format: resource#size, where size is a number. It takes effect "+
 		"when watch-cache is enabled.")
+
+	config.DefaultFeatureGate.AddFlag(fs)
 }

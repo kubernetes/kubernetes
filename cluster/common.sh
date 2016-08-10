@@ -684,6 +684,11 @@ EOF
 INITIAL_ETCD_CLUSTER: $(yaml-quote ${INITIAL_ETCD_CLUSTER})
 EOF
     fi
+    if [ -n "${FEATURE_GATES:-}" ]; then
+      cat >>$file <<EOF
+FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
+EOF
+    fi
   else
     # Node-only env vars.
     cat >>$file <<EOF
