@@ -376,8 +376,6 @@ The value is a comma separated list of key-value pairs separated by colon.
 
 **Note**: none of the whitelisted (and in general none with the exceptions of descriptive plain text ones) sysctls use anything else than numbers, possibly separated with spaces.
 
-The same annotation keys are used for pods and `PodSecurityPolicy` objects.
-
 ### Validation
 
 The name of each sysctl in `PodSecurityContext.Name` is validated against a static list of
@@ -429,7 +427,9 @@ var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
 
 Pods with specified sysctls are either launched with the given sysctl values or fail to launch, creating an event which is verbose enough to tell the user what happened.
 
-### SecurityContext Enforcement - Alternative 1: by name
+### SecurityContext Enforcement
+
+#### Alternative 1: by name
 
 A list of permissible sysctls is to be added to `pkg/apis/extensions/types.go` (compare [security-context-constraints](security-context-constraints.md)):
 
@@ -448,7 +448,15 @@ The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value
 
 The default policy will be `*`, i.e. all whitelisted (and therefore known-to-be-namespaced) sysctls are allowed.
 
-### SecurityContext Enforcement - Sketch of Alternative 2: SysctlPolicy
+In the external API the following annotations will be used:
+
+```
+alpha.kubernetes.io/sysctls: kernel.shmmax,kernel.msgmax`
+```
+
+The same annotation keys are used for pods and `PodSecurityPolicy` objects.
+
+#### Sketch of Alternative 2: SysctlPolicy
 
 ```go
 // SysctlPolicy defines how a sysctl may be set. If neither Values,
@@ -469,10 +477,6 @@ type SysctlPolicy struct {
 
     // Max is the maximum value allowed to be set.
     Max *int64 `json:"max,omitempty"`
-
-    // Resources multiplied with the value. These are taken into account by the
-    // scheduler when calculating the available capacity of a node.
-    Resources ResourceList `json:"resources,omitempty"`
 }
 
 // PodSecurityPolicySpec defines the policy enforced on sysctls.
@@ -482,6 +486,14 @@ type PodSecurityPolicySpec struct {
     Sysctls []SysctlPolicy `json:"sysctls,omitempty"`
 }
 ```
+
+In the external API the following annotations will be used:
+
+```
+alpha.kubernetes.io/sysctls: kernel.shmmax,kernel.msgmax:max:10:min:1,kernel:msgmni:values:1000 2000 3000`
+```
+
+This extended syntax is a natural extension of that of alternative 1 and therefore can be implemented any time during alpha.
 
 ### Application of the given Sysctls
 
