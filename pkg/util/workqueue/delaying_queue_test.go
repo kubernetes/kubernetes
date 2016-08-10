@@ -28,7 +28,7 @@ import (
 
 func TestSimpleQueue(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
-	q := newDelayingQueue(fakeClock)
+	q := newDelayingQueue(fakeClock, "")
 
 	first := "foo"
 
@@ -70,7 +70,7 @@ func TestSimpleQueue(t *testing.T) {
 
 func TestDeduping(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
-	q := newDelayingQueue(fakeClock)
+	q := newDelayingQueue(fakeClock, "")
 
 	first := "foo"
 
@@ -129,7 +129,7 @@ func TestDeduping(t *testing.T) {
 
 func TestAddTwoFireEarly(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
-	q := newDelayingQueue(fakeClock)
+	q := newDelayingQueue(fakeClock, "")
 
 	first := "foo"
 	second := "bar"
@@ -179,7 +179,7 @@ func TestAddTwoFireEarly(t *testing.T) {
 
 func TestCopyShifting(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
-	q := newDelayingQueue(fakeClock)
+	q := newDelayingQueue(fakeClock, "")
 
 	first := "foo"
 	second := "bar"

@@ -79,8 +79,8 @@ func NewResourceQuotaController(options *ResourceQuotaControllerOptions) *Resour
 	// build the resource quota controller
 	rq := &ResourceQuotaController{
 		kubeClient:               options.KubeClient,
-		queue:                    workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		missingUsageQueue:        workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		queue:                    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "controller_resourcequota_primary"),
+		missingUsageQueue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "controller_resourcequota_priority"),
 		resyncPeriod:             options.ResyncPeriod,
 		registry:                 options.Registry,
 		replenishmentControllers: []framework.ControllerInterface{},
