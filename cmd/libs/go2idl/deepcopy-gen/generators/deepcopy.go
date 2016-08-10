@@ -388,7 +388,7 @@ func (g *genDeepCopy) Init(c *generator.Context, w io.Writer) error {
 	reflect := c.Universe.Type(types.Name{Package: "reflect", Name: "TypeOf"})
 	for _, t := range g.typesForInit {
 		g.imports.AddType(reflect)
-		sw.Do(fmt.Sprintf("conversion.GeneratedDeepCopyFunc{Fn: %s, InType: reflect.TypeOf(func() *$.type|raw$ {var x *$.type|raw$; return x}())},\n", g.funcNameTmpl(t)), argsFromType(t))
+		sw.Do(fmt.Sprintf("conversion.GeneratedDeepCopyFunc{Fn: %s, InType: reflect.TypeOf(&$.type|raw${})},\n", g.funcNameTmpl(t)), argsFromType(t))
 	}
 	sw.Do("); err != nil {\n", nil)
 	sw.Do("// if one of the deep copy functions is malformed, detect it immediately.\n", nil)
