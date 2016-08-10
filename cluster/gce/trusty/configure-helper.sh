@@ -519,6 +519,9 @@ start_kube_apiserver() {
   params="${params} --authorization-policy-file=/etc/srv/kubernetes/abac-authz-policy.jsonl"
   params="${params} --etcd-servers-overrides=/events#http://127.0.0.1:4002"
 
+  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+    params="${params} --storage-backend=${STORAGE_BACKEND}"
+  fi
   if [ -n "${NUM_NODES:-}" ]; then
     # Set amount of memory available for apiserver based on number of nodes.
     # TODO: Once we start setting proper requests and limits for apiserver

@@ -135,6 +135,9 @@ ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolume
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 
+# Storage backend. 'etcd2' supported, 'etcd3' experimental.
+STORAGE_BACKEND=${STORAGE_BACKEND:-etcd2}
+
 # Networking plugin specific settings.
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, flannel, kubenet
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
