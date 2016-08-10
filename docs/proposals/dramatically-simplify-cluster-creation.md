@@ -94,7 +94,7 @@ master# kubeadm init master
 Initializing kubernetes master...  [done]
 Cluster token: 73R2SIPM739TNZOA
 Run the following command on machines you want to become nodes:
-  kube join node --token=73R2SIPM739TNZOA <master-ip>
+  kubeadm join node --token=73R2SIPM739TNZOA <master-ip>
 You can now run kubectl here.
 ```
 
@@ -177,7 +177,7 @@ Unable to join mesh network. Check your token.
 
     * Mike & Devan
 
-2. [Cluster bootstrap with gossip](https://docs.google.com/document/d/1IG9zK88C4Omn9XEURRvw98utZfIw7UshrRNg9U5ip40/edit) - so that we can implement the simple UX with no dependencies
+2. [Cluster bootstrap with gossip](https://github.com/kubernetes/kubernetes/pull/30361) - so that we can implement the simple UX with no dependencies
 
     * Luke & Ilya
 
@@ -195,7 +195,7 @@ Unable to join mesh network. Check your token.
 
     * Luke & Ilya
 
-6. [Dynamic Kubelet Settings](https://github.com/kubernetes/kubernetes/issues/27980) - so that kube command can manage kubelet that is already running by rewriting its componentconfig and having it automatically reload its config
+6. [Dynamic Kubelet Settings](https://github.com/kubernetes/kubernetes/issues/27980) - so that kubeadm command can manage kubelet that is already running by rewriting its componentconfig and having it automatically reload its config
 
     * Michael Taufen
 
