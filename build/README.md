@@ -5,8 +5,8 @@ Building Kubernetes is easy if you take advantage of the containerized build env
 ## Requirements
 
 1. Docker, using one of the two following configurations:
-  1. **Mac OS X** You can either use docker-machine or boot2docker. See installation instructions [here](https://docs.docker.com/installation/mac/).  
-     **Note**: You will want to set the boot2docker vm to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)) and do not `make quick-release` from `/tmp/` (See: [#14773]( https://github.com/kubernetes/kubernetes/issues/14773))
+  1. **Mac OS X** You can either use Docker for Mac or docker-machine. See installation instructions [here](https://docs.docker.com/installation/mac/).
+     **Note**: You will want to set the Docker VM to have at least 3GB of initial memory or building will likely fail. (See: [#11852]( http://issue.k8s.io/11852)) and do not `make quick-release` from `/tmp/` (See: [#14773]( https://github.com/kubernetes/kubernetes/issues/14773))
   2. **Linux with local Docker**  Install Docker according to the [instructions](https://docs.docker.com/installation/#installation) for your OS.  The scripts here assume that they are using a local Docker server and that they can "reach around" docker and grab results directly from the file system.
 2. [Python](https://www.python.org)
 3. **Optional** [Google Cloud SDK](https://developers.google.com/cloud/sdk/)
@@ -29,8 +29,8 @@ The following scripts are found in the `build/` directory. Note that all scripts
   *  `build/run.sh make test`: Run all unit tests
   *  `build/run.sh make test-integration`: Run integration test
   *  `build/run.sh make test-cmd`: Run CLI tests
-* `build/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from any remote Docker container to the local `_output/dockerized/bin`.  Right now this is only necessary on Mac OS X with `boot2docker` when your git repo isn't under `/Users`.
-* `build/make-clean.sh`: Clean out the contents of `_output/dockerized` and remove any local built container images.
+* `build/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from any the Docker container to the local `_output/dockerized/bin`.
+* `build/make-clean.sh`: Clean out the contents of `_output/dockerized`, remove any container images and the data container
 * `build/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
 * `build/release.sh`: Build everything, test it, and (optionally) upload the results to a GCS bucket.
 
