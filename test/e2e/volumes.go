@@ -68,6 +68,8 @@ type VolumeTestConfig struct {
 	serverImage string
 	// Ports to export from the server pod. TCP only.
 	serverPorts []int
+	// Arguments to pass to the container image.
+	serverArgs []string
 	// Volumes needed to be mounted to the server container from the host
 	// map <host (source) path> -> <container (dst.) path>
 	volumes map[string]string
@@ -134,6 +136,7 @@ func startVolumeServer(client *client.Client, config VolumeTestConfig) *api.Pod 
 					SecurityContext: &api.SecurityContext{
 						Privileged: privileged,
 					},
+					Args:         config.serverArgs,
 					Ports:        serverPodPorts,
 					VolumeMounts: mounts,
 				},
