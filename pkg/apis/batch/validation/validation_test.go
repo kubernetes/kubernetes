@@ -317,7 +317,23 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule:          "* * * * * ?",
+				Schedule:          "* * * * ?",
+				ConcurrencyPolicy: batch.AllowConcurrent,
+				JobTemplate: batch.JobTemplateSpec{
+					Spec: batch.JobSpec{
+						Template: validPodTemplateSpec,
+					},
+				},
+			},
+		},
+		"non-standard scheduled": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "myscheduledjob",
+				Namespace: api.NamespaceDefault,
+				UID:       types.UID("1a2b3c"),
+			},
+			Spec: batch.ScheduledJobSpec{
+				Schedule:          "@hourly",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -376,7 +392,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule:                "* * * * * ?",
+				Schedule:                "* * * * ?",
 				ConcurrencyPolicy:       batch.AllowConcurrent,
 				StartingDeadlineSeconds: &negative64,
 				JobTemplate: batch.JobTemplateSpec{
@@ -393,7 +409,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule: "* * * * * ?",
+				Schedule: "* * * * ?",
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
 						Template: validPodTemplateSpec,
@@ -408,7 +424,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule:          "* * * * * ?",
+				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -425,7 +441,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule:          "* * * * * ?",
+				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 
@@ -443,7 +459,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule:          "* * * * * ?",
+				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -460,7 +476,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule:          "* * * * * ?",
+				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -477,7 +493,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule:          "* * * * * ?",
+				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
@@ -494,7 +510,7 @@ func TestValidateScheduledJob(t *testing.T) {
 				UID:       types.UID("1a2b3c"),
 			},
 			Spec: batch.ScheduledJobSpec{
-				Schedule:          "* * * * * ?",
+				Schedule:          "* * * * ?",
 				ConcurrencyPolicy: batch.AllowConcurrent,
 				JobTemplate: batch.JobTemplateSpec{
 					Spec: batch.JobSpec{
