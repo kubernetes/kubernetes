@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
+	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -142,6 +143,11 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
 	servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ZoneName)
 	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
+		glog.Errorf("Failed to start service controller: %v", err)
+	}
+	icClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, ingresscontroller.UserAgentName))
+	ingresscontroller := ingresscontroller.New(icClientset, dns, s.FederationName, s.ZoneName)
+	if err := ingresscontroller.Run(s.ConcurrentIngressSyncs, wait.NeverStop); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}
 	select {}

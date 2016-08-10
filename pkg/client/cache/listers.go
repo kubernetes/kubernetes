@@ -453,6 +453,19 @@ func (s *StoreToDaemonSetLister) GetPodDaemonSets(pod *api.Pod) (daemonSets []ex
 	return
 }
 
+// StoreToIngressLister makes a Store that has the List method of the client.ServiceInterface
+// The Store must contain (only) Services.
+type StoreToIngressLister struct {
+	Store
+}
+
+func (s *StoreToIngressLister) List() (ingress extensions.IngressList, err error) {
+	for _, m := range s.Store.List() {
+		ingress.Items = append(ingress.Items, *(m.(*extensions.Ingress)))
+	}
+	return ingress, nil
+}
+
 // StoreToServiceLister makes a Store that has the List method of the client.ServiceInterface
 // The Store must contain (only) Services.
 type StoreToServiceLister struct {
