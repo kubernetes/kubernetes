@@ -17,13 +17,19 @@ limitations under the License.
 package core
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/api/validation"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
 // NewPersistentVolumeClaimEvaluator returns an evaluator that can evaluate persistent volume claims
@@ -37,7 +43,7 @@ func NewPersistentVolumeClaimEvaluator(kubeClient clientset.Interface) quota.Eva
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourcePersistentVolumeClaims),
+		ConstraintsFunc:      PersistentVolumeClaimConstraintsFunc,
 		UsageFunc:            PersistentVolumeClaimUsageFunc,
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
 			return kubeClient.Core().PersistentVolumeClaims(namespace).List(options)
@@ -57,4 +63,36 @@ func PersistentVolumeClaimUsageFunc(object runtime.Object) api.ResourceList {
 		result[api.ResourceRequestsStorage] = request
 	}
 	return result
+}
+
+// PersistentVolumeClaimConstraintsFunc verifies that all required resources are present on the claim
+// In addition, it validates that the resources are valid (i.e. requests < limits)
+func PersistentVolumeClaimConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
+	pvc, ok := object.(*api.PersistentVolumeClaim)
+	if !ok {
+		return fmt.Errorf("unexpected input object %v", object)
+	}
+
+	// pvc level resources are often set during admission control
+	// As a consequence, we want to verify that resources are valid prior
+	// to ever charging quota prematurely in case they are not.
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validation.ValidatePersistentVolumeClaimSpec(&pvc.Spec, field.NewPath("spec"))...)
+	if len(allErrs) > 0 {
+		return allErrs.ToAggregate()
+	}
+
+	requiredSet := quota.ToSet(required)
+	missingSet := sets.NewString()
+	pvcUsage := PersistentVolumeClaimUsageFunc(pvc)
+	pvcSet := quota.ToSet(quota.ResourceNames(pvcUsage))
+	if !pvcSet.Equal(requiredSet) {
+		difference := requiredSet.Difference(pvcSet)
+		missingSet.Insert(difference.List()...)
+	}
+
+	if len(missingSet) == 0 {
+		return nil
+	}
+	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
 }
