@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
 	"k8s.io/kubernetes/pkg/master/ports"
+	"k8s.io/kubernetes/pkg/util/config"
 
 	"github.com/spf13/pflag"
 )
@@ -35,8 +36,9 @@ import (
 type CMServer struct {
 	componentconfig.KubeControllerManagerConfiguration
 
-	Master     string
-	Kubeconfig string
+	Master        string
+	Kubeconfig    string
+	FeatureConfig config.ConfigurationMap
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -97,6 +99,7 @@ func NewCMServer() *CMServer {
 			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
 			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
 		},
+		FeatureConfig: make(config.ConfigurationMap),
 	}
 	s.LeaderElection.LeaderElect = true
 	return &s
@@ -166,6 +169,7 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.Var(&s.FeatureConfig, "feature-config", "A set of key=value pairs that describe feature configuration for controller-manager.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 	fs.StringVar(&s.ContentType, "kube-api-content-type", s.ContentType, "Content type of requests sent to apiserver.")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
