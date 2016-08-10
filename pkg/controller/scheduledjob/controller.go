@@ -37,9 +37,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -50,20 +49,20 @@ import (
 // Utilities for dealing with Jobs and ScheduledJobs and time.
 
 type ScheduledJobController struct {
-	kubeClient clientset.Interface
+	kubeClient *client.Client
 	jobControl jobControlInterface
 	sjControl  sjControlInterface
 	recorder   record.EventRecorder
 }
 
-func NewScheduledJobController(kubeClient clientset.Interface) *ScheduledJobController {
+func NewScheduledJobController(kubeClient *client.Client) *ScheduledJobController {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(glog.Infof)
 	// TODO: remove the wrapper when every clients have moved to use the clientset.
-	eventBroadcaster.StartRecordingToSink(&unversionedcore.EventSinkImpl{Interface: kubeClient.Core().Events("")})
+	eventBroadcaster.StartRecordingToSink(kubeClient.Events(""))
 
-	if kubeClient != nil && kubeClient.Batch().GetRESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("scheduledjob_controller", kubeClient.Batch().GetRESTClient().GetRateLimiter())
+	if kubeClient != nil && kubeClient.GetRateLimiter() != nil {
+		metrics.RegisterMetricAndTrackRateLimiterUsage("scheduledjob_controller", kubeClient.GetRateLimiter())
 	}
 
 	jm := &ScheduledJobController{
@@ -76,7 +75,7 @@ func NewScheduledJobController(kubeClient clientset.Interface) *ScheduledJobCont
 	return jm
 }
 
-func NewScheduledJobControllerFromClient(kubeClient clientset.Interface) *ScheduledJobController {
+func NewScheduledJobControllerFromClient(kubeClient *client.Client) *ScheduledJobController {
 	jm := NewScheduledJobController(kubeClient)
 	return jm
 }
