@@ -26,7 +26,8 @@ import (
 func TestDelayingDeliverer(t *testing.T) {
 	targetChannel := make(chan *DelayingDelivererItem)
 	now := time.Now()
-	d := NewDelayingDeliverer(targetChannel)
+	d := NewDelayingDelivererWithChannel(targetChannel)
+	d.Start()
 	defer d.Stop()
 	startupDelay := time.Second
 	d.DeliverAt("a", "aaa", now.Add(startupDelay+2*time.Millisecond))
