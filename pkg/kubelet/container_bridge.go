@@ -24,11 +24,13 @@ import (
 	"os/exec"
 	"regexp"
 
+	"syscall"
+
 	"github.com/golang/glog"
+	"github.com/vishvananda/netlink"
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/procfs"
-	"syscall"
 )
 
 var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
@@ -103,7 +105,12 @@ func ensureCbr0(wantCIDR *net.IPNet, promiscuous, babysitDaemons bool) error {
 	if promiscuous {
 		// Checking if the bridge is in promiscuous mode is as expensive and more brittle than
 		// simply setting the flag every time.
-		if err := exec.Command("ip", "link", "set", "cbr0", "promisc", "on").Run(); err != nil {
+		link, err := netlink.LinkByName("cbr0")
+		if err != nil {
+			glog.Error(err)
+			return err
+		}
+		if err := netlink.SetPromiscOn(link); err != nil {
 			glog.Error(err)
 			return err
 		}
