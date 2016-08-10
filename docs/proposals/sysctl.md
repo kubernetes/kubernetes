@@ -38,7 +38,7 @@ for namespaced kernel parameters (sysctls) set for each pod.
 - kernel upstream patches to fix ipc accounting for 4.5+
   + [ ] submitted to mainline
   + [ ] merged into mainline
-- [ ] pod cgroups merged
+- [ ] pod cgroups active by default (compare [Pod Resource Management](pod-resource-management.md#implementation-status))
 - [ ] kmem accounting active by default
 
 ## Table of Contents
