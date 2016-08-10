@@ -130,6 +130,45 @@ func TestValidateValidHost(t *testing.T) {
 			assert.Error(t, err, "Pod with profile %q should trigger a validation error", test.profile)
 		}
 	}
+
+	// Test multi-container pod.
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Annotations: map[string]string{
+				"container.apparmor.security.alpha.kubernetes.io/init":  "localhost/foo-container",
+				"container.apparmor.security.alpha.kubernetes.io/test1": "runtime/default",
+				"container.apparmor.security.alpha.kubernetes.io/test2": "localhost/docker-default",
+			},
+		},
+		Spec: api.PodSpec{
+			InitContainers: []api.Container{
+				{Name: "init"},
+			},
+			Containers: []api.Container{
+				{Name: "test1"},
+				{Name: "test2"},
+				{Name: "no-profile"},
+			},
+		},
+	}
+	assert.NoError(t, v.Validate(pod), "Multi-container pod should validate")
+	for k, val := range pod.Annotations {
+		pod.Annotations[k] = val + "-bad"
+		assert.Error(t, v.Validate(pod), "Multi-container pod with invalid profile %s:%s", k, pod.Annotations[k])
+		pod.Annotations[k] = val // Restore.
+	}
+}
+
+func TestParseProfileName(t *testing.T) {
+	tests := []struct{ line, expected string }{
+		{"foo://bar/baz (kill)", "foo://bar/baz"},
+		{"foo-bar (enforce)", "foo-bar"},
+		{"/usr/foo/bar/baz (complain)", "/usr/foo/bar/baz"},
+	}
+	for _, test := range tests {
+		name := parseProfileName(test.line)
+		assert.Equal(t, test.expected, name, "Parsing %s", test.line)
+	}
 }
 
 func getPodWithProfile(profile string) *api.Pod {

@@ -72,6 +72,11 @@ func (v *validator) Validate(pod *api.Pod) error {
 		return fmt.Errorf("could not read loaded profiles: %v", err)
 	}
 
+	for _, container := range pod.Spec.InitContainers {
+		if err := validateProfile(GetProfileName(pod, container.Name), loadedProfiles); err != nil {
+			return err
+		}
+	}
 	for _, container := range pod.Spec.Containers {
 		if err := validateProfile(GetProfileName(pod, container.Name), loadedProfiles); err != nil {
 			return err
@@ -129,14 +134,27 @@ func (v *validator) getLoadedProfiles() (map[string]bool, error) {
 	profiles := map[string]bool{}
 	scanner := bufio.NewScanner(profilesFile)
 	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
-		if len(fields) < 2 {
+		profileName := parseProfileName(scanner.Text())
+		if profileName == "" {
 			// Unknown line format; skip it.
 			continue
 		}
-		profiles[fields[0]] = true
+		profiles[profileName] = true
 	}
 	return profiles, nil
+}
+
+// The profiles file is formatted with one profile per line, matching a form:
+//   namespace://profile-name (mode)
+//   profile-name (mode)
+// Where mode is {enforce, complain, kill}. The "namespace://" is only included for namespaced
+// profiles. For the purposes of Kubernetes, we consider the namespace part of the profile name.
+func parseProfileName(profileLine string) string {
+	modeIndex := strings.IndexRune(profileLine, '(')
+	if modeIndex < 0 {
+		return ""
+	}
+	return strings.TrimSpace(profileLine[:modeIndex])
 }
 
 func getAppArmorFS() (string, error) {
