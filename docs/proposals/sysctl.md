@@ -252,6 +252,10 @@ Issues:
   portability of workloads it is helpful to have a common baseline of sysctls settings one can expect on every node. The
   kernel defaults (which are active if the kubelet does not change defaults) are such a (natural) baseline.
 
+- One could imagine to offer certain non-namespaced sysctls as well which
+  taint a host such that only containers with compatible sysctls settings are
+  scheduled there. This is considered *out of scope* to schedule pods with certain sysctls onto certain hosts according to some given rules. This must be done manually by the admin, e.g. by using taints and tolerations.
+
 ## Analysis of Sysctls on the initial Whitelist
 
 **Note:** The kmem accounting has fundamentally changed in kernel 4.5 (compare https://github.com/torvalds/linux/commit/a9bb7e620efdfd29b6d1c238041173e411670996): older kernels (e.g. 4.4 from Ubuntu 16.04, 3.10 from CentOS 7.2) use a blacklist (`__GFP_NOACCOUNT`), newer kernels (e.g. 4.6.x from Fedora 24) use a whitelist (`__GFP_ACCOUNT`). **In the following the analysis is done for kernel >= 4.5:**
@@ -405,12 +409,6 @@ var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
 ### Error behaviour
 
 Pods with specified sysctls are either launched with the given sysctl values or fail to launch, creating an event which is verbose enough to tell the user what happened.
-
-### Scheduling
-
-For the first step of sysctl support it is considered *out of scope* to schedule pods with certain sysctls onto certain hosts according to some given rules.
-
-One could imagine to offer certain non-namespaced sysctls as well which taint a host such that only containers with compatible sysctls settings are scheduled there. Moreover, there is no accounting of sysctl values if that makes any sense for a given sysctl.
 
 ### SecurityContext Enforcement - Alternative 1: by name
 
