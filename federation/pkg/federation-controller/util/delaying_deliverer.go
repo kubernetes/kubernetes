@@ -81,8 +81,12 @@ type DelayingDeliverer struct {
 	stopChannel chan struct{}
 }
 
-func NewDelayingDeliverer(targetChannel chan *DelayingDelivererItem) *DelayingDeliverer {
-	d := &DelayingDeliverer{
+func NewDelayingDeliverer() *DelayingDeliverer {
+	return NewDelayingDelivererWithChannel(make(chan *DelayingDelivererItem, 100))
+}
+
+func NewDelayingDelivererWithChannel(targetChannel chan *DelayingDelivererItem) *DelayingDeliverer {
+	return &DelayingDeliverer{
 		targetChannel: targetChannel,
 		heap: &delivererHeap{
 			keyPosition: make(map[string]int),
@@ -91,8 +95,6 @@ func NewDelayingDeliverer(targetChannel chan *DelayingDelivererItem) *DelayingDe
 		updateChannel: make(chan *DelayingDelivererItem, delayingDelivererUpdateChanCapacity),
 		stopChannel:   make(chan struct{}),
 	}
-	go d.run()
-	return d
 }
 
 // Deliver all items due before or equal to timestamp.
@@ -136,6 +138,12 @@ func (d *DelayingDeliverer) run() {
 	}
 }
 
+// Starts the DelayingDeliverer.
+func (d *DelayingDeliverer) Start() {
+	go d.run()
+}
+
+// Stops the DelayingDeliverer. Undelivered items are discarded.
 func (d *DelayingDeliverer) Stop() {
 	close(d.stopChannel)
 }
@@ -157,4 +165,19 @@ func (d *DelayingDeliverer) DeliverAfter(key string, value interface{}, delay ti
 // Gets target chanel of the deliverer.
 func (d *DelayingDeliverer) GetTargetChannel() chan *DelayingDelivererItem {
 	return d.targetChannel
+}
+
+// Starts Delaying deliverer with a handler listening on the target channel.
+func (d *DelayingDeliverer) StartWithHandler(handler func(*DelayingDelivererItem)) {
+	go func() {
+		for {
+			select {
+			case item := <-d.targetChannel:
+				handler(item)
+			case <-d.stopChannel:
+				return
+			}
+		}
+	}()
+	d.Start()
 }
