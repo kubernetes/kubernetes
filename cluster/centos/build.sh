@@ -53,7 +53,7 @@ function download-releases() {
   curl -L ${K8S_DOWNLOAD_URL} -o ${RELEASES_DIR}/kubernetes.tar.gz
 
   echo "Download docker-latest ..."
-  curl -L https://get.docker.com/builds/Linux/x86_64/docker-latest -o ${RELEASES_DIR}/docker
+  curl -L https://get.docker.com/builds/Linux/x86_64/docker-latest.tgz -o ${RELEASES_DIR}/docker.tar.gz
 }
 
 function unpack-releases() {
@@ -95,8 +95,10 @@ function unpack-releases() {
     cp ${RELEASES_DIR}/kubernetes/server/kubernetes/server/bin/kubectl ${BINARY_DIR}
   fi
 
-  if [[ -f ${RELEASES_DIR}/docker ]]; then
-    cp ${RELEASES_DIR}/docker ${BINARY_DIR}/node/bin
+  if [[ -f ${RELEASES_DIR}/docker.tar.gz ]]; then
+    tar xzf ${RELEASES_DIR}/docker.tar.gz -C ${RELEASES_DIR}
+
+    cp ${RELEASES_DIR}/docker/docker* ${BINARY_DIR}/node/bin
   fi
 
   chmod -R +x ${BINARY_DIR}
