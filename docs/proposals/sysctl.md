@@ -502,7 +502,7 @@ type SysctlPolicy struct {
 
     // Values are allowed values to be set. Either Values is
     // set or Min and Max.
-    Values []int64 `json:"values,omitempty"`
+    Values []string `json:"values,omitempty"`
 
     // Min is the minimal value allowed to be set.
     Min *int64 `json:"min,omitempty"`
