@@ -32,7 +32,7 @@ Documentation for other releases can be found at
 This proposal aims at extending the current pod specification with support
 for namespaced kernel parameters (sysctls) set for each pod.
 
-### Progress
+## Progress
 
 - [ ] initial implementation https://github.com/kubernetes/kubernetes/pull/27180
 - kernel upstream patches to fix ipc accounting for 4.5+
@@ -41,9 +41,13 @@ for namespaced kernel parameters (sysctls) set for each pod.
 - [ ] pod cgroups merged
 - [ ] kmem accounting active by default
 
+## Table of Contents
+
 <!-- BEGIN MUNGE: GENERATED_TOC -->
 
 - [Setting Sysctls on the Pod Level](#setting-sysctls-on-the-pod-level)
+  - [Progress](#progress)
+  - [Table of Contents](#table-of-contents)
   - [Abstract](#abstract)
   - [Motivation](#motivation)
   - [Abstract Use Cases](#abstract-use-cases)
@@ -63,7 +67,7 @@ for namespaced kernel parameters (sysctls) set for each pod.
     - [Error behavior](#error-behavior)
     - [SecurityContext Enforcement](#securitycontext-enforcement)
       - [Alternative 1: by name](#alternative-1-by-name)
-      - [Sketch of Alternative 2: SysctlPolicy](#sketch-of-alternative-2-sysctlpolicy)
+      - [Alternative 2: SysctlPolicy](#alternative-2-sysctlpolicy)
     - [Application of the given Sysctls](#application-of-the-given-sysctls)
   - [Examples](#examples)
     - [Use in a pod](#use-in-a-pod)
