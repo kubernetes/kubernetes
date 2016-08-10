@@ -166,7 +166,7 @@ func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.Hai
 	// Ensure the netfilter module is loaded on kernel >= 3.18; previously
 	// it was built-in.
 	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
-	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
+	if err := utilsysctl.New().SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}
 
