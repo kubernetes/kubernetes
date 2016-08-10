@@ -520,6 +520,11 @@ EOF
 kubeproxy_test_log_level: '$(echo "$KUBEPROXY_TEST_LOG_LEVEL" | sed -e "s/'/''/g")'
 EOF
     fi
+    if [ -n "${KUBEPROXY_FEATURE_CONFIG:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+kubeproxy_feature_config: '$(echo "$KUBEPROXY_FEATURE_CONFIG" | sed -e "s/'/''/g")'
+EOF
+    fi
     # TODO: Replace this  with a persistent volume (and create it).
     if [[ "${ENABLE_CLUSTER_REGISTRY}" == true && -n "${CLUSTER_REGISTRY_DISK}" ]]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
@@ -906,6 +911,9 @@ EOF
   fi
 
   env-to-grains "runtime_config"
+  env-to-grains "apiserver_feature_config"
+  env-to-grains "controller_manager_feature_config"
+  env-to-grains "scheduler_feature_config"
   env-to-grains "kube_user"
 }
 

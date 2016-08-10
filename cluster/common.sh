@@ -682,6 +682,21 @@ EOF
 INITIAL_ETCD_CLUSTER: $(yaml-quote ${INITIAL_ETCD_CLUSTER})
 EOF
     fi
+    if [ -n "${APISERVER_FEATURE_CONFIG:-}" ]; then
+      cat >>$file <<EOF
+APISERVER_FEATURE_CONFIG: $(yaml-quote ${APISERVER_FEATURE_CONFIG})
+EOF
+    fi
+    if [ -n "${CONTROLLER_MANAGER_FEATURE_CONFIG:-}" ]; then
+      cat >>$file <<EOF
+CONTROLLER_MANAGER_FEATURE_CONFIG: $(yaml-quote ${CONTROLLER_MANAGER_FEATURE_CONFIG})
+EOF
+    fi
+    if [ -n "${SCHEDULER_FEATURE_CONFIG:-}" ]; then
+      cat >>$file <<EOF
+SCHEDULER_FEATURE_CONFIG: $(yaml-quote ${SCHEDULER_FEATURE_CONFIG})
+EOF
+    fi
   else
     # Node-only env vars.
     cat >>$file <<EOF
@@ -697,6 +712,11 @@ EOF
     if [ -n "${KUBEPROXY_TEST_LOG_LEVEL:-}" ]; then
       cat >>$file <<EOF
 KUBEPROXY_TEST_LOG_LEVEL: $(yaml-quote ${KUBEPROXY_TEST_LOG_LEVEL})
+EOF
+    fi
+    if [ -n "${KUBEPROXY_FEATURE_CONFIG:-}" ]; then
+      cat >>$file <<EOF
+KUBEPROXY_FEATURE_CONFIG: $(yaml-quote ${KUBEPROXY_FEATURE_CONFIG})
 EOF
     fi
   fi

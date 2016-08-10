@@ -17,6 +17,10 @@
 # This script is for configuring kubernetes master and node instances. It is
 # uploaded in the manifests tar ball.
 
+# TODO: this script duplicates templating logic from cluster/saltbase/salt
+# using sed. It should use an actual template parser on the manifest
+# files.
+
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -409,6 +413,7 @@ function load-docker-images {
 # systemd service.
 function start-kubelet {
   echo "Start kubelet"
+  # templating logic from cluster/saltbase/salt/kube-proxy/kube-proxy.manifest
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
   flags+=" --babysit-daemons=true"
@@ -502,12 +507,18 @@ function start-kube-proxy {
   fi
   local -r kube_proxy_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-proxy.docker_tag)
   local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
+  local params="${KUBEPROXY_TEST_LOG_LEVEL:-"--v=2"}"
+  if [[ -n "${KUBEPROXY_FEATURE_CONFIG:-}" ]]; then
+    params+=" --feature-config=${KUBEPROXY_FEATURE_CONFIG}"
+  fi
+  if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
+    params+=" ${KUBE_PROXY_TEST_ARGS}"
+  fi
   sed -i -e "s@{{kubeconfig}}@${kubeconfig}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube_docker_registry'\]}}@${kube_docker_registry}@g" ${src_file}
   sed -i -e "s@{{pillar\['kube-proxy_docker_tag'\]}}@${kube_proxy_docker_tag}@g" ${src_file}
-  sed -i -e "s@{{test_args}}@${KUBEPROXY_TEST_ARGS:-}@g" ${src_file}
+  sed -i -e "s@{{params}}@${params}@g" ${src_file}
   sed -i -e "s@{{ cpurequest }}@100m@g" ${src_file}
-  sed -i -e "s@{{log_level}}@${KUBEPROXY_TEST_LOG_LEVEL:-"--v=2"}@g" ${src_file}
   sed -i -e "s@{{api_servers_with_port}}@${api_servers}@g" ${src_file}
   if [[ -n "${CLUSTER_IP_RANGE:-}" ]]; then
     sed -i -e "s@{{cluster_cidr}}@--cluster-cidr=${CLUSTER_IP_RANGE}@g" ${src_file}
@@ -660,6 +671,9 @@ function start-kube-apiserver {
   if [[ -n "${RUNTIME_CONFIG:-}" ]]; then
     params+=" --runtime-config=${RUNTIME_CONFIG}"
   fi
+  if [[ -n "${APISERVER_FEATURE_CONFIG:-}" ]]; then
+    params+=" --feature-config=${APISERVER_FEATURE_CONFIG}"
+  fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
     params+=" --advertise-address=${vm_external_ip}"
@@ -753,6 +767,9 @@ function start-kube-controller-manager {
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
     params+=" --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
   fi
+  if [[ -n "${CONTROLLER_MANAGER_FEATURE_CONFIG:-}" ]]; then
+    params+=" --feature-config=${CONTROLLER_MANAGER_FEATURE_CONFIG}"
+  fi
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
 
   local -r src_file="${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/kube-controller-manager.manifest"
@@ -781,6 +798,9 @@ function start-kube-scheduler {
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
+  if [[ -n "${SCHEDULER_FEATURE_CONFIG:-}" ]]; then
+    params+=" --feature-config=${SCHEDULER_FEATURE_CONFIG}"
+  fi
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values.
