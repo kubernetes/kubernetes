@@ -27,7 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Scaler provides an interface for resources that can be scaled.
@@ -171,15 +173,23 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
-		rc, err := scaler.c.ReplicationControllers(namespace).Get(name)
+		watchOptions := api.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", name), ResourceVersion: "0"}
+		watcher, err := scaler.c.ReplicationControllers(namespace).Watch(watchOptions)
 		if err != nil {
 			return err
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ControllerHasDesiredReplicas(scaler.c, rc))
+		_, err = watch.Until(waitForReplicas.Timeout, watcher, func(event watch.Event) (bool, error) {
+			if event.Type != watch.Added && event.Type != watch.Modified {
+				return false, nil
+			}
+
+			rc := event.Object.(*api.ReplicationController)
+			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == rc.Spec.Replicas, nil
+		})
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestReplicationControllerStop(t *testing.T) {
@@ -69,7 +70,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
+			ExpectedActions: []string{"get", "list", "get", "update", "watch", "delete"},
 		},
 		{
 			Name: "NoOverlapping",
@@ -107,7 +108,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
+			ExpectedActions: []string{"get", "list", "get", "update", "watch", "delete"},
 		},
 		{
 			Name: "OverlappingError",
@@ -243,6 +244,13 @@ func TestReplicationControllerStop(t *testing.T) {
 
 	for _, test := range tests {
 		fake := testclient.NewSimpleFake(test.Objs...)
+		fakeWatch := watch.NewFake()
+		fake.PrependWatchReactor("replicationcontrollers", testclient.DefaultWatchReactor(fakeWatch, nil))
+
+		go func() {
+			fakeWatch.Add(test.Objs[0])
+		}()
+
 		reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}
 		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
