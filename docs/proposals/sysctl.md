@@ -538,7 +538,7 @@ In a later implementation of a container runtime interface (compare https://gith
 
 ### Use in a pod
 
-Here is an example of a pod that has `net.ipv4.ip_forward` set to `2`:
+Here is an example of a pod that has `net.core.somaxconn` set to `512`:
 
 ```yaml
 apiVersion: v1
@@ -555,8 +555,8 @@ spec:
     - containerPort: 80
   securityContext:
     sysctls:
-    - name: net.ipv4.ip_forward
-      value: "2"
+    - name: net.core.somaxconn
+      value: "512"
 ```
 
 ### Allowing only certain sysctls
