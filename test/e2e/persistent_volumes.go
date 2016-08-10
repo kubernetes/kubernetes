@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -343,8 +344,9 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	NFSconfig = VolumeTestConfig{
 		namespace:   api.NamespaceDefault,
 		prefix:      "nfs",
-		serverImage: "gcr.io/google_containers/volume-nfs:0.6",
+		serverImage: "gcr.io/google_containers/volume-nfs:0.7",
 		serverPorts: []int{2049},
+		serverArgs:  []string{"-G", "777", "/exports"},
 	}
 
 	BeforeEach(func() {
@@ -486,6 +488,9 @@ func makePersistentVolume(serverIP string, pvc *api.PersistentVolumeClaim) *api.
 	return &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "nfs-",
+			Annotations: map[string]string{
+				volumehelper.VolumeGidAnnotationKey: "777",
+			},
 		},
 		Spec: api.PersistentVolumeSpec{
 			PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
@@ -555,7 +560,7 @@ func makeWritePod(ns string, pvcName string) *api.Pod {
 					Name:    "write-pod",
 					Image:   "gcr.io/google_containers/busybox:1.24",
 					Command: []string{"/bin/sh"},
-					Args:    []string{"-c", "touch /mnt/SUCCESS && exit 0 || exit 1"},
+					Args:    []string{"-c", "touch /mnt/SUCCESS && (id -G | grep -E '\\b777\\b')"},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "nfs-pvc",
