@@ -54,10 +54,9 @@ elif [[ -f "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" ]]; then
   # Running from an extracted release tarball (kubernetes.tar.gz)
   SERVER_TARBALL="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
   echo "Using server tarball: ${SERVER_TARBALL}"
-  echo "Currently in $(pwd)"
   tar \
     --strip-components=3 \
-    -xzf kubernetes-server-linux-amd64.tar.gz \
+    -xzf "${SERVER_TARBALL}" \
     -C "${MAKE_DIR}" 'kubernetes/server/bin/kubemark' || exit 1
 else
   echo 'Cannot find kubernetes/server/bin/kubemark binary'
