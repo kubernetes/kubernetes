@@ -117,3 +117,68 @@ func PrintPerfData(p *perftype.PerfData) {
 		Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }
+
+// Use additional labels to pass in test information for benchmark
+func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels map[string]string) *perftype.PerfData {
+	items := []perftype.DataItem{}
+	for node, usages := range usagePerNode {
+		for c, usage := range usages {
+			newLabels := map[string]string{
+				"node":      node,
+				"container": c,
+				"resource":  "memory",
+			}
+			for k, v := range labels {
+				newLabels[k] = v
+			}
+
+			item := perftype.DataItem{
+				Data: map[string]float64{
+					"memory":     float64(usage.MemoryUsageInBytes) / (1024 * 1024),
+					"workingset": float64(usage.MemoryWorkingSetInBytes) / (1024 * 1024),
+					"rss":        float64(usage.MemoryRSSInBytes) / (1024 * 1024),
+				},
+				Unit:   "MB",
+				Labels: newLabels,
+			}
+			items = append(items, item)
+		}
+	}
+	return &perftype.PerfData{
+		Version:   currentKubeletPerfMetricsVersion,
+		DataItems: items,
+	}
+}
+
+// Use additional labels to pass in test information for benchmark
+func CPUUsageToPerfDataWithLabels(usagePerNode NodesCPUSummary, labels map[string]string) *perftype.PerfData {
+	items := []perftype.DataItem{}
+	for node, usages := range usagePerNode {
+		for c, usage := range usages {
+			newLabels := map[string]string{
+				"node":      node,
+				"container": c,
+				"resource":  "cpu",
+			}
+			for k, v := range labels {
+				newLabels[k] = v
+			}
+
+			data := map[string]float64{}
+			for perc, value := range usage {
+				data[fmt.Sprintf("Perc%02.0f", perc*100)] = value * 1000
+			}
+
+			item := perftype.DataItem{
+				Data:   data,
+				Unit:   "mCPU",
+				Labels: newLabels,
+			}
+			items = append(items, item)
+		}
+	}
+	return &perftype.PerfData{
+		Version:   currentKubeletPerfMetricsVersion,
+		DataItems: items,
+	}
+}

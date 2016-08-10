@@ -88,8 +88,6 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 			name := fmt.Sprintf("resource tracking for %d pods per node", podsPerNode)
 
 			It(name, func() {
-				expectedCPU, expectedMemory := itArg.cpuLimits, itArg.memLimits
-
 				// The test collects resource usage from a standalone Cadvisor pod.
 				// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
 				// show the resource usage spikes. But changing its interval increases the overhead
@@ -134,28 +132,8 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 				By("Reporting overall resource usage")
 				logPodsOnNode(f.Client)
 
-				usagePerContainer, err := rc.GetLatest()
-				Expect(err).NotTo(HaveOccurred())
-
-				// TODO(random-liu): Remove the original log when we migrate to new perfdash
-				nodeName := framework.TestContext.NodeName
-				framework.Logf("%s", formatResourceUsageStats(usagePerContainer))
-
-				// Log perf result
-				usagePerNode := make(framework.ResourceUsagePerNode)
-				usagePerNode[nodeName] = usagePerContainer
-
-				framework.PrintPerfData(framework.ResourceUsageToPerfData(usagePerNode))
-				verifyMemoryLimits(f.Client, expectedMemory, usagePerNode)
-
-				cpuSummary := rc.GetCPUSummary()
-				framework.Logf("%s", formatCPUSummary(cpuSummary))
-
-				// Log perf result
-				cpuSummaryPerNode := make(framework.NodesCPUSummary)
-				cpuSummaryPerNode[nodeName] = cpuSummary
-				framework.PrintPerfData(framework.CPUUsageToPerfData(cpuSummaryPerNode))
-				verifyCPULimits(expectedCPU, cpuSummaryPerNode)
+				// Log and verify resource usage
+				verifyResource(f, itArg.cpuLimits, itArg.memLimits, rc)
 			})
 		}
 	})
@@ -165,6 +143,34 @@ type resourceTest struct {
 	podsPerNode int
 	cpuLimits   framework.ContainersCPUSummary
 	memLimits   framework.ResourceUsagePerContainer
+}
+
+func verifyResource(f *framework.Framework, cpuLimits framework.ContainersCPUSummary,
+	memLimits framework.ResourceUsagePerContainer, rc *ResourceCollector) {
+	nodeName := framework.TestContext.NodeName
+
+	// Obtain memory PerfData
+	usagePerContainer, err := rc.GetLatest()
+	Expect(err).NotTo(HaveOccurred())
+	framework.Logf("%s", formatResourceUsageStats(usagePerContainer))
+
+	usagePerNode := make(framework.ResourceUsagePerNode)
+	usagePerNode[nodeName] = usagePerContainer
+
+	// Obtain cpu PerfData
+	cpuSummary := rc.GetCPUSummary()
+	framework.Logf("%s", formatCPUSummary(cpuSummary))
+
+	cpuSummaryPerNode := make(framework.NodesCPUSummary)
+	cpuSummaryPerNode[nodeName] = cpuSummary
+
+	// Log resource usage
+	framework.PrintPerfData(framework.ResourceUsageToPerfData(usagePerNode))
+	framework.PrintPerfData(framework.CPUUsageToPerfData(cpuSummaryPerNode))
+
+	// Verify resource usage
+	verifyMemoryLimits(f.Client, memLimits, usagePerNode)
+	verifyCPULimits(cpuLimits, cpuSummaryPerNode)
 }
 
 func verifyMemoryLimits(c *client.Client, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {

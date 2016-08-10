@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/perftype"
 
 	. "github.com/onsi/gomega"
 )
@@ -55,7 +54,7 @@ const (
 	// housekeeping interval of Cadvisor (second)
 	houseKeepingInterval = 1
 	// Zhou(ToDo): be consistent with perf_util.go version (not exposed)
-	currentKubeletPerfMetricsVersion = "v1"
+	currentTimeSeriesVersion = "v1"
 )
 
 var (
@@ -439,7 +438,7 @@ func (r *ResourceCollector) GetResourceSeriesWithLabels(labels map[string]string
 		Labels: map[string]string{
 			"node": framework.TestContext.NodeName,
 		},
-		Version: currentKubeletPerfMetricsVersion,
+		Version: currentTimeSeriesVersion,
 	}
 	for key, name := range systemContainers {
 		newSeries := &ResourceSeries{Units: map[string]string{
@@ -457,71 +456,6 @@ func (r *ResourceCollector) GetResourceSeriesWithLabels(labels map[string]string
 		seriesPerContainer.Labels[k] = v
 	}
 	return seriesPerContainer
-}
-
-// Use additional labels to pass in test information for benchmark
-func ResourceUsageToPerfDataWithLabels(usagePerNode framework.ResourceUsagePerNode, labels map[string]string) *perftype.PerfData {
-	items := []perftype.DataItem{}
-	for node, usages := range usagePerNode {
-		for c, usage := range usages {
-			newLabels := map[string]string{
-				"node":      node,
-				"container": c,
-				"resource":  "memory",
-			}
-			for k, v := range labels {
-				newLabels[k] = v
-			}
-
-			item := perftype.DataItem{
-				Data: map[string]float64{
-					"memory":     float64(usage.MemoryUsageInBytes) / (1024 * 1024),
-					"workingset": float64(usage.MemoryWorkingSetInBytes) / (1024 * 1024),
-					"rss":        float64(usage.MemoryRSSInBytes) / (1024 * 1024),
-				},
-				Unit:   "MB",
-				Labels: newLabels,
-			}
-			items = append(items, item)
-		}
-	}
-	return &perftype.PerfData{
-		Version:   currentKubeletPerfMetricsVersion,
-		DataItems: items,
-	}
-}
-
-// Use additional labels to pass in test information for benchmark
-func CPUUsageToPerfDataWithLabels(usagePerNode framework.NodesCPUSummary, labels map[string]string) *perftype.PerfData {
-	items := []perftype.DataItem{}
-	for node, usages := range usagePerNode {
-		for c, usage := range usages {
-			newLabels := map[string]string{
-				"node":      node,
-				"container": c,
-				"resource":  "cpu",
-			}
-			for k, v := range labels {
-				newLabels[k] = v
-			}
-
-			data := map[string]float64{}
-			for perc, value := range usage {
-				data[fmt.Sprintf("Perc%02.0f", perc*100)] = value * 1000
-			}
-
-			item := perftype.DataItem{
-				Data:   data,
-				Unit:   "mCPU",
-				Labels: newLabels,
-			}
-			items = append(items, item)
-		}
-	}
-	return &perftype.PerfData{
-		Version:   currentKubeletPerfMetricsVersion,
-		DataItems: items,
-	}
 }
 
 // Zhou: code for getting container name of docker, copied from pkg/kubelet/cm/container_manager_linux.go
