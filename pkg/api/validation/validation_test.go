@@ -776,7 +776,6 @@ func TestValidatePersistentVolumeClaimUpdate(t *testing.T) {
 	}
 }
 
-<<<<<<< HEAD
 func TestValidateKeyToPath(t *testing.T) {
 	testCases := []struct {
 		kp      api.KeyToPath
@@ -860,133 +859,6 @@ func TestValidateVolumes(t *testing.T) {
 		errtype   field.ErrorType
 		errfield  string
 		errdetail string
-=======
-func TestValidateVolumes(t *testing.T) {
-	lun := int32(1)
-	successCase := []api.Volume{
-		{Name: "abc", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/mnt/path1"}}},
-		{Name: "123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/mnt/path2"}}},
-		{Name: "abc-123", VolumeSource: api.VolumeSource{HostPath: &api.HostPathVolumeSource{Path: "/mnt/path3"}}},
-		{Name: "empty", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
-		{Name: "gcepd", VolumeSource: api.VolumeSource{GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{PDName: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}},
-		{Name: "awsebs", VolumeSource: api.VolumeSource{AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{VolumeID: "my-PD", FSType: "ext4", Partition: 1, ReadOnly: false}}},
-		{Name: "gitrepo", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Revision: "hashstring", Directory: "target"}}},
-		{Name: "gitrepodot", VolumeSource: api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "my-repo", Directory: "."}}},
-		{Name: "iscsidisk", VolumeSource: api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "127.0.0.1", IQN: "iqn.2015-02.example.com:test", Lun: 1, FSType: "ext4", ReadOnly: false}}},
-		{Name: "secret", VolumeSource: api.VolumeSource{Secret: &api.SecretVolumeSource{SecretName: "my-secret"}}},
-		{Name: "glusterfs", VolumeSource: api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host1", Path: "path", ReadOnly: false}}},
-		{Name: "flocker", VolumeSource: api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "datasetName"}}},
-		{Name: "rbd", VolumeSource: api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "bar", FSType: "ext4"}}},
-		{Name: "cinder", VolumeSource: api.VolumeSource{Cinder: &api.CinderVolumeSource{VolumeID: "29ea5088-4f60-4757-962e-dba678767887", FSType: "ext4", ReadOnly: false}}},
-		{Name: "cephfs", VolumeSource: api.VolumeSource{CephFS: &api.CephFSVolumeSource{Monitors: []string{"foo"}}}},
-		{Name: "downwardapi", VolumeSource: api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{
-			{Path: "labels", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "annotations", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.annotations"}},
-			{Path: "namespace", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.namespace"}},
-			{Path: "name", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.name"}},
-			{Path: "path/withslash/andslash", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "path/./withdot", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "path/with..dot", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "second-level-dirent-can-have/..dot", FieldRef: &api.ObjectFieldSelector{
-				APIVersion: "v1",
-				FieldPath:  "metadata.labels"}},
-			{Path: "cpu_limit", ResourceFieldRef: &api.ResourceFieldSelector{
-				ContainerName: "test-container",
-				Resource:      "limits.cpu"}},
-			{Path: "cpu_request", ResourceFieldRef: &api.ResourceFieldSelector{
-				ContainerName: "test-container",
-				Resource:      "requests.cpu"}},
-			{Path: "memory_limit", ResourceFieldRef: &api.ResourceFieldSelector{
-				ContainerName: "test-container",
-				Resource:      "limits.memory"}},
-			{Path: "memory_request", ResourceFieldRef: &api.ResourceFieldSelector{
-				ContainerName: "test-container",
-				Resource:      "requests.memory"}},
-		}}}},
-		{Name: "fc", VolumeSource: api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"some_wwn"}, Lun: &lun, FSType: "ext4", ReadOnly: false}}},
-		{Name: "flexvolume", VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/blue", FSType: "ext4"}}},
-		{Name: "azure", VolumeSource: api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{SecretName: "key", ShareName: "share", ReadOnly: false}}},
-		{Name: "azuredisk", VolumeSource: api.VolumeSource{AzureDisk: &api.AzureDiskVolumeSource{DiskName: "disk", DataDiskURI: "https:/foo/vhs/bar.vhd"}}},
-	}
-	names, errs := validateVolumes(successCase, field.NewPath("field"))
-	if len(errs) != 0 {
-		t.Errorf("expected success: %v", errs)
-	}
-	if len(names) != len(successCase) || !names.HasAll("abc", "123", "abc-123", "empty", "gcepd", "gitrepo", "secret", "iscsidisk", "cinder", "cephfs", "flexvolume", "fc") {
-		t.Errorf("wrong names result: %v", names)
-	}
-	emptyVS := api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}
-	emptyPortal := api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "", IQN: "iqn.2015-02.example.com:test", Lun: 1, FSType: "ext4", ReadOnly: false}}
-	emptyIQN := api.VolumeSource{ISCSI: &api.ISCSIVolumeSource{TargetPortal: "127.0.0.1", IQN: "", Lun: 1, FSType: "ext4", ReadOnly: false}}
-	emptyHosts := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "", Path: "path", ReadOnly: false}}
-	emptyPath := api.VolumeSource{Glusterfs: &api.GlusterfsVolumeSource{EndpointsName: "host", Path: "", ReadOnly: false}}
-	emptyName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: ""}}
-	emptyMon := api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{}, RBDImage: "bar", FSType: "ext4"}}
-	emptyImage := api.VolumeSource{RBD: &api.RBDVolumeSource{CephMonitors: []string{"foo"}, RBDImage: "", FSType: "ext4"}}
-	emptyCephFSMon := api.VolumeSource{CephFS: &api.CephFSVolumeSource{Monitors: []string{}}}
-	startsWithDots := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "..dots/bar"}}
-	containsDots := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "dots/../bar"}}
-	absPath := api.VolumeSource{GitRepo: &api.GitRepoVolumeSource{Repository: "foo", Directory: "/abstarget"}}
-	emptyPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	absolutePathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "/absolutepath",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	dotDotInPath := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "../../passwd",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	dotDotPathName := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "..badFileName",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	dotDotFirstLevelDirent := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "..badDirName/goodFileName",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"}}},
-	}}
-	fieldRefandResourceFieldRef := api.VolumeSource{DownwardAPI: &api.DownwardAPIVolumeSource{Items: []api.DownwardAPIVolumeFile{{Path: "test",
-		FieldRef: &api.ObjectFieldSelector{
-			APIVersion: "v1",
-			FieldPath:  "metadata.labels"},
-		ResourceFieldRef: &api.ResourceFieldSelector{
-			ContainerName: "test-container",
-			Resource:      "requests.memory"}}},
-	}}
-	zeroWWN := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{}, Lun: &lun, FSType: "ext4", ReadOnly: false}}
-	emptyLun := api.VolumeSource{FC: &api.FCVolumeSource{TargetWWNs: []string{"wwn"}, Lun: nil, FSType: "ext4", ReadOnly: false}}
-	slashInName := api.VolumeSource{Flocker: &api.FlockerVolumeSource{DatasetName: "foo/bar"}}
-	emptyAzureSecret := api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{SecretName: "", ShareName: "share", ReadOnly: false}}
-	emptyAzureShare := api.VolumeSource{AzureFile: &api.AzureFileVolumeSource{SecretName: "name", ShareName: "", ReadOnly: false}}
-	emptyAzureDiskName := api.VolumeSource{AzureDisk: &api.AzureDiskVolumeSource{DiskName: "", DataDiskURI: "https://foo/vhds/bar.vhd"}}
-	emptyAzureDiskURI := api.VolumeSource{AzureDisk: &api.AzureDiskVolumeSource{DiskName: "name", DataDiskURI: ""}}
-	errorCases := map[string]struct {
-		V []api.Volume
-		T field.ErrorType
-		F string
-		D string
->>>>>>> add validation test
 	}{
 		// EmptyDir and basic volume names
 		{
@@ -1905,15 +1777,46 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "azureFile.shareName",
 		},
-		"empty disk name": {
-			[]api.Volume{{Name: "emptydisk", VolumeSource: emptyAzureDiskName}},
-			field.ErrorTypeRequired,
-			"azureDisk.diskName", "",
+		// AzureDisk
+		{
+			name: "valid AzureDisk",
+			vol: api.Volume{
+				Name: "azure-disk",
+				VolumeSource: api.VolumeSource{
+					AzureDisk: &api.AzureDiskVolumeSource{
+						DiskName:    "foo",
+						DataDiskURI: "https://blob/vhds/bar.vhd",
+					},
+				},
+			},
 		},
-		"empty disk URI": {
-			[]api.Volume{{Name: "emptyuri", VolumeSource: emptyAzureDiskURI}},
-			field.ErrorTypeRequired,
-			"azureDisk.diskURI", "",
+		{
+			name: "AzureDisk empty disk name",
+			vol: api.Volume{
+				Name: "azure-disk",
+				VolumeSource: api.VolumeSource{
+					AzureDisk: &api.AzureDiskVolumeSource{
+						DiskName:    "",
+						DataDiskURI: "https://blob/vhds/bar.vhd",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "azureDisk.diskName",
+		},
+		{
+			name: "AzureDisk empty disk uri",
+			vol: api.Volume{
+				Name: "azure-disk",
+				VolumeSource: api.VolumeSource{
+					AzureDisk: &api.AzureDiskVolumeSource{
+						DiskName:    "foo",
+						DataDiskURI: "",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "azureDisk.diskURI",
 		},
 	}
 
