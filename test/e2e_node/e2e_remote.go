@@ -36,7 +36,6 @@ var sshOptions = flag.String("ssh-options", "", "Commandline options passed to s
 var sshEnv = flag.String("ssh-env", "", "Use predefined ssh options for environment.  Options: gce")
 var testTimeoutSeconds = flag.Int("test-timeout", 45*60, "How long (in seconds) to wait for ginkgo tests to complete.")
 var resultsDir = flag.String("results-dir", "/tmp/", "Directory to scp test results to.")
-var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 
 var sshOptionsMap map[string]string
 
@@ -148,7 +147,7 @@ func CreateTestArchive() (string, error) {
 }
 
 // Returns the command output, whether the exit was ok, and any errors
-func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string, setupNode bool, testArgs string) (string, bool, error) {
+func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string, setupNode bool, testArgs string, ginkgoFlags string) (string, bool, error) {
 	if setupNode {
 		uname, err := user.Current()
 		if err != nil {
@@ -216,7 +215,8 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	// Run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
-		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --report-prefix=%s %s", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFilePrefix, testArgs),
+		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --report-prefix=%s %s",
+			*testTimeoutSeconds, ginkgoFlags, cleanup, host, tmp, junitFilePrefix, testArgs),
 	)
 	aggErrs := []error{}
 
