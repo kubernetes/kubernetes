@@ -71,6 +71,7 @@ type kubenetNetworkPlugin struct {
 	hairpinMode     componentconfig.HairpinMode
 	hostportHandler hostport.HostportHandler
 	iptables        utiliptables.Interface
+	sysctl          utilsysctl.Interface
 	// vendorDir is passed by kubelet network-plugin-dir parameter.
 	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
 	vendorDir         string
@@ -115,7 +116,7 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode componen
 	// was built-in, we simply ignore the error here. A better thing to do is
 	// to check the kernel version in the future.
 	plugin.execer.Command("modprobe", "br-netfilter").CombinedOutput()
-	err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1)
+	err := plugin.sysctl.SetSysctl(sysctlBridgeCallIptables, 1)
 	if err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}

@@ -270,9 +270,11 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 		utilsysctl.KernelPanicOnOops:  utilsysctl.KernelPanicOnOopsAlways,
 	}
 
+	sysctl := utilsysctl.New()
+
 	errList := []error{}
 	for flag, expectedValue := range desiredState {
-		val, err := utilsysctl.GetSysctl(flag)
+		val, err := sysctl.GetSysctl(flag)
 		if err != nil {
 			errList = append(errList, err)
 			continue
@@ -288,7 +290,7 @@ func setupKernelTunables(option KernelTunableBehavior) error {
 			glog.V(2).Infof("Invalid kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
 		case KernelTunableModify:
 			glog.V(2).Infof("Updating kernel flag: %v, expected value: %v, actual value: %v", flag, expectedValue, val)
-			err = utilsysctl.SetSysctl(flag, expectedValue)
+			err = sysctl.SetSysctl(flag, expectedValue)
 			if err != nil {
 				errList = append(errList, err)
 			}
