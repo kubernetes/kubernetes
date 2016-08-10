@@ -702,7 +702,7 @@ func testInstallThirdPartyAPIListVersion(t *testing.T, version string) {
 
 			if test.items != nil {
 				err := createThirdPartyList(
-					generic.NewRawStorage(master.thirdPartyStorage),
+					generic.NewRawStorage(master.thirdPartyStorageConfig),
 					fmt.Sprintf("/ThirdPartyResourceData/%s/%s/default", group, plural.Resource),
 					test.items)
 				if !assert.NoError(err, test.test) {
@@ -825,7 +825,7 @@ func testInstallThirdPartyAPIGetVersion(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	s := generic.NewRawStorage(master.thirdPartyStorage)
+	s := generic.NewRawStorage(master.thirdPartyStorageConfig)
 	if !assert.NoError(createThirdPartyObject(s, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
@@ -902,7 +902,7 @@ func testInstallThirdPartyAPIPostForVersion(t *testing.T, version string) {
 	}
 
 	thirdPartyObj := extensions.ThirdPartyResourceData{}
-	s := generic.NewRawStorage(master.thirdPartyStorage)
+	s := generic.NewRawStorage(master.thirdPartyStorageConfig)
 	err = s.Get(context.TODO(), etcdtest.AddPrefix("/ThirdPartyResourceData/company.com/foos/default/test"), &thirdPartyObj, false)
 	if !assert.NoError(err) {
 		t.FailNow()
@@ -938,7 +938,7 @@ func testInstallThirdPartyAPIDeleteVersion(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	s := generic.NewRawStorage(master.thirdPartyStorage)
+	s := generic.NewRawStorage(master.thirdPartyStorageConfig)
 	if !assert.NoError(createThirdPartyObject(s, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
@@ -1046,7 +1046,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 		SomeField:  "test field",
 		OtherField: 10,
 	}
-	s := generic.NewRawStorage(master.thirdPartyStorage)
+	s := generic.NewRawStorage(master.thirdPartyStorageConfig)
 	if !assert.NoError(createThirdPartyObject(s, "/ThirdPartyResourceData/company.com/foos/default/test", "test", expectedObj)) {
 		t.FailNow()
 		return
@@ -1098,7 +1098,7 @@ func testInstallThirdPartyResourceRemove(t *testing.T, version string) {
 	}
 	for _, key := range expectedDeletedKeys {
 		thirdPartyObj := extensions.ThirdPartyResourceData{}
-		s := generic.NewRawStorage(master.thirdPartyStorage)
+		s := generic.NewRawStorage(master.thirdPartyStorageConfig)
 		err := s.Get(context.TODO(), key, &thirdPartyObj, false)
 		if !storage.IsNotFound(err) {
 			t.Errorf("expected deletion didn't happen: %v", err)

@@ -63,7 +63,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *RollbackREST) {
 
 	newListFunc := func() runtime.Object { return &extensions.DeploymentList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.Deployments),
 		&extensions.Deployment{},
 		prefix,

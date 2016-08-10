@@ -142,7 +142,7 @@ type Master struct {
 	serviceNodePortAllocator  rangeallocation.RangeRegistry
 
 	// storage for third party objects
-	thirdPartyStorage *storagebackend.Config
+	thirdPartyStorageConfig *storagebackend.Config
 	// map from api path to a tuple of (storage for the objects, APIGroup)
 	thirdPartyResources map[string]thirdPartyEntry
 	// protects the map
@@ -276,7 +276,7 @@ func (m *Master) InstallAPIs(c *Config) {
 	// TODO seems like this bit ought to be unconditional and the REST API is controlled by the config
 	if c.APIResourceConfigSource.ResourceEnabled(extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources")) {
 		var err error
-		m.thirdPartyStorage, err = c.StorageFactory.NewConfig(extensions.Resource("thirdpartyresources"))
+		m.thirdPartyStorageConfig, err = c.StorageFactory.NewConfig(extensions.Resource("thirdpartyresources"))
 		if err != nil {
 			glog.Fatalf("Error getting third party storage: %v", err)
 		}
@@ -648,7 +648,7 @@ func (m *Master) InstallThirdPartyResource(rsrc *extensions.ThirdPartyResource) 
 func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *apiserver.APIGroupVersion {
 	resourceStorage := thirdpartyresourcedataetcd.NewREST(
 		generic.RESTOptions{
-			Storage:                 m.thirdPartyStorage,
+			StorageConfig:           m.thirdPartyStorageConfig,
 			Decorator:               generic.UndecoratedStorage,
 			DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		},
@@ -691,13 +691,13 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 }
 
 func (m *Master) GetRESTOptionsOrDie(c *Config, resource unversioned.GroupResource) generic.RESTOptions {
-	storage, err := c.StorageFactory.NewConfig(resource)
+	storageConfig, err := c.StorageFactory.NewConfig(resource)
 	if err != nil {
 		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
 	}
 
 	return generic.RESTOptions{
-		Storage:                 storage,
+		StorageConfig:           storageConfig,
 		Decorator:               m.StorageDecorator(),
 		DeleteCollectionWorkers: m.deleteCollectionWorkers,
 		ResourcePrefix:          c.StorageFactory.ResourcePrefix(resource),

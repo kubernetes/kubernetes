@@ -169,7 +169,7 @@ func createRESTOptionsOrDie(s *genericoptions.ServerRunOptions, g *genericapiser
 		glog.Fatalf("Unable to find storage config for %v, due to %v", resource, err.Error())
 	}
 	return generic.RESTOptions{
-		Storage:                 config,
+		StorageConfig:           config,
 		Decorator:               g.StorageDecorator(),
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 		ResourcePrefix:          f.ResourcePrefix(resource),

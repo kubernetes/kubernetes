@@ -71,7 +71,7 @@ func (r *registryGetter) GetSecret(namespace, name string) (*api.Secret, error) 
 // uses the specified storage to retrieve service accounts and secrets.
 func NewGetterFromStorageInterface(config *storagebackend.Config, saPrefix, secretPrefix string) serviceaccount.ServiceAccountTokenGetter {
 	return NewGetterFromRegistries(
-		serviceaccountregistry.NewRegistry(serviceaccountetcd.NewREST(generic.RESTOptions{Storage: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: saPrefix})),
-		secret.NewRegistry(secretetcd.NewREST(generic.RESTOptions{Storage: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: secretPrefix})),
+		serviceaccountregistry.NewRegistry(serviceaccountetcd.NewREST(generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: saPrefix})),
+		secret.NewRegistry(secretetcd.NewREST(generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: secretPrefix})),
 	)
 }

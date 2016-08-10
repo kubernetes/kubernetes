@@ -186,11 +186,11 @@ func Run(s *options.APIServer) error {
 	if s.ServiceAccountLookup {
 		// If we need to look up service accounts and tokens,
 		// go directly to etcd to avoid recursive auth insanity
-		storage, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
+		storageConfig, err := storageFactory.NewConfig(api.Resource("serviceaccounts"))
 		if err != nil {
 			glog.Fatalf("Unable to get serviceaccounts storage: %v", err)
 		}
-		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storage, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
+		serviceAccountGetter = serviceaccountcontroller.NewGetterFromStorageInterface(storageConfig, storageFactory.ResourcePrefix(api.Resource("serviceaccounts")), storageFactory.ResourcePrefix(api.Resource("secrets")))
 	}
 
 	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
@@ -227,11 +227,11 @@ func Run(s *options.APIServer) error {
 
 	if modeEnabled(apiserver.ModeRBAC) {
 		mustGetRESTOptions := func(resource string) generic.RESTOptions {
-			s, err := storageFactory.NewConfig(rbac.Resource(resource))
+			config, err := storageFactory.NewConfig(rbac.Resource(resource))
 			if err != nil {
 				glog.Fatalf("Unable to get %s storage: %v", resource, err)
 			}
-			return generic.RESTOptions{Storage: s, Decorator: generic.UndecoratedStorage, ResourcePrefix: storageFactory.ResourcePrefix(rbac.Resource(resource))}
+			return generic.RESTOptions{StorageConfig: config, Decorator: generic.UndecoratedStorage, ResourcePrefix: storageFactory.ResourcePrefix(rbac.Resource(resource))}
 		}
 
 		// For initial bootstrapping go directly to etcd to avoid privillege escalation check.

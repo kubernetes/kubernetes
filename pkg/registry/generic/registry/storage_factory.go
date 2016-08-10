@@ -37,10 +37,9 @@ func StorageWithCacher(
 
 	// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
 	// Currently it has two layers of same storage interface -- cacher and low level kv.
-	s := generic.NewRawStorage(storageConfig)
 	cacherConfig := storage.CacherConfig{
 		CacheCapacity:        capacity,
-		Storage:              s,
+		Storage:              generic.NewRawStorage(storageConfig),
 		Versioner:            etcdstorage.APIObjectVersioner{},
 		Type:                 objectType,
 		ResourcePrefix:       resourcePrefix,
