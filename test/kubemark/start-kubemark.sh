@@ -16,7 +16,9 @@
 
 # Script that creates a Kubemark cluster with Master running on GCE.
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../..
+# Hack to make it work for OS X. Ugh...
+TMP_ROOT="$(dirname "${BASH_SOURCE}")/../.."
+KUBE_ROOT=$(readlink -e ${TMP_ROOT} 2> /dev/null || perl -MCwd -e 'print Cwd::abs_path shift' ${TMP_ROOT})
 
 source "${KUBE_ROOT}/test/kubemark/common.sh"
 
@@ -236,7 +238,7 @@ cat > "${NODE_CONFIGMAP}" << EOF
 }
 EOF
 
-LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.loc"
+LOCAL_KUBECONFIG="${RESOURCE_DIRECTORY}/kubeconfig.kubemark"
 cat > "${LOCAL_KUBECONFIG}" << EOF
 apiVersion: v1
 kind: Config
@@ -259,7 +261,6 @@ contexts:
   name: kubemark-context
 current-context: kubemark-context
 EOF
-
 
 sed "s/##numreplicas##/${NUM_NODES:-10}/g" "${RESOURCE_DIRECTORY}/hollow-node_template.json" > "${RESOURCE_DIRECTORY}/hollow-node.json"
 sed -i'' -e "s/##project##/${PROJECT}/g" "${RESOURCE_DIRECTORY}/hollow-node.json"
@@ -285,7 +286,7 @@ rm "${NODE_CONFIGMAP}"
 
 echo "Waiting for all HollowNodes to become Running..."
 start=$(date +%s)
-nodes=$("${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node) || true
+nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
 ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 
 until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
@@ -297,16 +298,17 @@ until [[ "${ready}" -ge "${NUM_NODES}" ]]; do
     echo ""
     echo "Timeout waiting for all HollowNodes to become Running"
     # Try listing nodes again - if it fails it means that API server is not responding
-    if "${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node &> /dev/null; then
+    if "${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node &> /dev/null; then
       echo "Found only ${ready} ready Nodes while waiting for ${NUM_NODES}."
       exit 1
     fi
     echo "Got error while trying to list Nodes. Probably API server is down."
     exit 1
   fi
-  nodes=$("${KUBECTL}" --kubeconfig="${RESOURCE_DIRECTORY}/kubeconfig.loc" get node) || true
+  nodes=$("${KUBECTL}" --kubeconfig="${LOCAL_KUBECONFIG}" get node) || true
   ready=$(($(echo "${nodes}" | grep -v "NotReady" | wc -l) - 1))
 done
 echo ""
 
 echo "Password to kubemark master: ${password}"
+echo "Kubeconfig for kubemark master is written in ${LOCAL_KUBECONFIG}"
