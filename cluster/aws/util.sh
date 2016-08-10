@@ -1439,7 +1439,9 @@ function kube-down {
     echo "If you are trying to delete a cluster in a shared VPC," >&2
     echo "please consider using one of the methods in the kube-deploy repo." >&2
     echo "See: https://github.com/kubernetes/kube-deploy/blob/master/docs/delete_cluster.md" >&2
-    exit 1
+    echo "" >&2
+    echo "Note: You may be seeing this message may be because the cluster was already deleted, or" >&2
+    echo "has a name other than '${CLUSTER_ID}'." >&2
   fi
 }
 
