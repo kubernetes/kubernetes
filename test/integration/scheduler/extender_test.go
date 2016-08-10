@@ -195,7 +195,7 @@ func TestSchedulerExtender(t *testing.T) {
 	ns := framework.CreateTestingNamespace("scheduler-extender", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
-	restClient := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	restClient := client.NewOrDie(&restclient.Config{Hosts: []string{s.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	extender1 := &Extender{
 		name:         "extender1",
