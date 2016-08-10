@@ -28,7 +28,14 @@ function prepare-package-manager() {
   echo "Prepare package manager"
 
   # Useful if a mirror is broken or slow
-  echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+  if [ -z "$CUSTOM_FEDORA_REPOSITORY_URL" ]; then
+      echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+  else
+      # remove trailing slash from URL if it's present
+      CUSTOM_FEDORA_REPOSITORY_URL="${CUSTOM_FEDORA_REPOSITORY_URL%/}"
+      sed -i -e "/^metalink=/d" /etc/yum.repos.d/*.repo
+      sed -i -e "s@^#baseurl=http://download.fedoraproject.org/pub/fedora@baseurl=$CUSTOM_FEDORA_REPOSITORY_URL@" /etc/yum.repos.d/*.repo
+  fi
 }
 
 
