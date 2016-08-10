@@ -31,6 +31,7 @@ generated_files=($(
       \( \
         -wholename './output' \
         -o -wholename './_output' \
+        -o -wholename './staging' \
         -o -wholename './release' \
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \

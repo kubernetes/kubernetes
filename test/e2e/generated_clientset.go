@@ -20,18 +20,42 @@ import (
 	"strconv"
 	"time"
 
+	clientapi "k8s.io/client-go/1.4/pkg/api"
+	clientv1 "k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+func stagingClientPod(name, value string) clientv1.Pod {
+	return clientv1.Pod{
+		ObjectMeta: clientv1.ObjectMeta{
+			Name: name,
+			Labels: map[string]string{
+				"name": "foo",
+				"time": value,
+			},
+		},
+		Spec: clientv1.PodSpec{
+			Containers: []clientv1.Container{
+				{
+					Name:  "nginx",
+					Image: "gcr.io/google_containers/nginx-slim:0.7",
+					Ports: []clientv1.ContainerPort{{ContainerPort: 80}},
+				},
+			},
+		},
+	}
+}
 
 func testingPod(name, value string) v1.Pod {
 	return v1.Pod{
@@ -240,5 +264,47 @@ var _ = framework.KubeDescribe("Generated release_1_3 clientset", func() {
 			framework.Failf("Failed to list pods to verify deletion: %v", err)
 		}
 		Expect(len(pods.Items)).To(Equal(0))
+	})
+})
+
+var _ = framework.KubeDescribe("Staging client repo client", func() {
+	f := framework.NewDefaultFramework("clientset")
+	It("should create pods, delete pods, watch pods", func() {
+		podClient := f.StagingClient.Core().Pods(f.Namespace.Name)
+		By("constructing the pod")
+		name := "pod" + string(uuid.NewUUID())
+		value := strconv.Itoa(time.Now().Nanosecond())
+		podCopy := stagingClientPod(name, value)
+		pod := &podCopy
+		By("verifying no pod exists before the test")
+		pods, err := podClient.List(clientapi.ListOptions{})
+		if err != nil {
+			framework.Failf("Failed to query for pods: %v", err)
+		}
+		Expect(len(pods.Items)).To(Equal(0))
+		By("creating the pod")
+		pod, err = podClient.Create(pod)
+		if err != nil {
+			framework.Failf("Failed to create pod: %v", err)
+		}
+		// We call defer here in case there is a problem with
+		// the test so we can ensure that we clean up after
+		// ourselves
+		defer podClient.Delete(pod.Name, clientapi.NewDeleteOptions(0))
+
+		By("verifying the pod is in kubernetes")
+		timeout := 1 * time.Minute
+		if err := wait.PollImmediate(time.Second, timeout, func() (bool, error) {
+			pods, err = podClient.List(clientapi.ListOptions{})
+			if err != nil {
+				return false, err
+			}
+			if len(pods.Items) == 1 {
+				return true, nil
+			}
+			return false, nil
+		}); err != nil {
+			framework.Failf("Err : %s\n. Failed to wait for 1 pod to be created", err)
+		}
 	})
 })
