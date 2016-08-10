@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/perftype"
 
 	. "github.com/onsi/gomega"
 )
@@ -54,8 +53,8 @@ const (
 	cadvisorPort      = 8090
 	// housekeeping interval of Cadvisor (second)
 	houseKeepingInterval = 1
-	// Zhou(ToDo): be consistent with perf_util.go version (not exposed)
-	currentKubeletPerfMetricsVersion = "v1"
+	// TODO(coufon): be consistent with perf_util.go version (not exposed)
+	currentTimeSeriesVersion = "v1"
 )
 
 var (
@@ -72,6 +71,8 @@ type ResourceCollector struct {
 	stopCh          chan struct{}
 }
 
+// NewResourceCollector creates a resource collector object which collects
+// resource usage periodically from Cadvisor
 func NewResourceCollector(interval time.Duration) *ResourceCollector {
 	buffers := make(map[string][]*framework.ContainerResourceUsage)
 	return &ResourceCollector{
@@ -80,10 +81,10 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 	}
 }
 
-// Start resource collector
-// It connects to the standalone Cadvisor pod
+// Start starts resource collector and connects to the standalone Cadvisor pod
+// then repeatedly runs collectStats.
 func (r *ResourceCollector) Start() {
-	// Get the cgroup containers for kubelet and docker
+	// Get the cgroup container names for kubelet and docker
 	kubeletContainer, err := getContainerNameForProcess(kubeletProcessName, "")
 	dockerContainer, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
 	if err == nil {
@@ -113,12 +114,12 @@ func (r *ResourceCollector) Start() {
 	go wait.Until(func() { r.collectStats(oldStatsMap) }, r.pollingInterval, r.stopCh)
 }
 
-// Stop resource collector
+// Stop stops resource collector collecting stats. It does not clear the buffer
 func (r *ResourceCollector) Stop() {
 	close(r.stopCh)
 }
 
-// Clear resource collector buffer
+// Reset clears the stats buffer of resource collector.
 func (r *ResourceCollector) Reset() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -127,7 +128,7 @@ func (r *ResourceCollector) Reset() {
 	}
 }
 
-// Get CPU usage in percentile
+// GetCPUSummary gets CPU usage in percentile.
 func (r *ResourceCollector) GetCPUSummary() framework.ContainersCPUSummary {
 	result := make(framework.ContainersCPUSummary)
 	for key, name := range systemContainers {
@@ -137,6 +138,7 @@ func (r *ResourceCollector) GetCPUSummary() framework.ContainersCPUSummary {
 	return result
 }
 
+// LogLatest logs the latest resource usage.
 func (r *ResourceCollector) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
@@ -145,7 +147,7 @@ func (r *ResourceCollector) LogLatest() {
 	framework.Logf("%s", formatResourceUsageStats(summary))
 }
 
-// Collect resource usage from Cadvisor
+// collectStats collects resource usage from Cadvisor.
 func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.ContainerStats) {
 	for _, name := range systemContainers {
 		ret, err := r.client.Stats(name, r.request)
@@ -171,7 +173,7 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 	}
 }
 
-// Compute resource usage based on new data
+// computeContainerResourceUsage computes resource usage based on new data sample.
 func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv2.ContainerStats) *framework.ContainerResourceUsage {
 	return &framework.ContainerResourceUsage{
 		Name:                    name,
@@ -184,7 +186,7 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv
 	}
 }
 
-// Get the latest resource usage
+// GetLatest gets the latest resource usage from stats buffer.
 func (r *ResourceCollector) GetLatest() (framework.ResourceUsagePerContainer, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -214,11 +216,13 @@ func (r *ResourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	result := make(map[float64]float64, len(percentiles))
-	usages := make([]*framework.ContainerResourceUsage, len(r.buffers[containerName]))
-	// must make a copy of array, otherwise the timeseries order is changed
-	for i, usage := range r.buffers[containerName] {
-		usages[i] = usage
+
+	// We must make a copy of array, otherwise the timeseries order is changed.
+	usages := make([]*framework.ContainerResourceUsage, 0)
+	for _, usage := range r.buffers[containerName] {
+		usages = append(usages, usage)
 	}
+
 	sort.Sort(resourceUsageByCPU(usages))
 	for _, q := range percentiles {
 		index := int(float64(len(usages))*q) - 1
@@ -289,8 +293,7 @@ func formatCPUSummary(summary framework.ContainersCPUSummary) string {
 	return strings.Join(summaryStrings, "\n")
 }
 
-// Create a standalone cadvisor pod for fine-grain resource monitoring
-// It uses the host-network port
+// createCadvisorPod creates a standalone cadvisor pod for fine-grain resource monitoring.
 func createCadvisorPod(f *framework.Framework) {
 	f.PodClient().CreateSync(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -365,7 +368,7 @@ func createCadvisorPod(f *framework.Framework) {
 	})
 }
 
-// Delete a batch of pods (synchronous)
+// deleteBatchPod deletes a batch of pods (synchronous).
 func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
 	ns := f.Namespace.Name
 	var wg sync.WaitGroup
@@ -386,7 +389,7 @@ func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
 	return
 }
 
-// Create a list of pods (specification) for test
+// newTestPods creates a list of pods (specification) for test.
 func newTestPods(numPods int, imageName, podType string) []*api.Pod {
 	var pods []*api.Pod
 	for i := 0; i < numPods; i++ {
@@ -402,8 +405,7 @@ func newTestPods(numPods int, imageName, podType string) []*api.Pod {
 					Labels: labels,
 				},
 				Spec: api.PodSpec{
-					// ToDo: restart policy is always
-					// Check whether pods restart at the end of tests
+					// Restart policy is always (default).
 					Containers: []api.Container{
 						{
 							Image: imageName,
@@ -431,15 +433,15 @@ type ResourceSeriesPerContainer struct {
 	Version string                     `json:"version"`
 }
 
-// Get the time series of resource usage of each container
-// Zhou(ToDo): the labels are to be re-defined based on benchmark dashboard
+// GetResourceSeriesWithLabels gets the time series of resource usage of each container.
+// TODO(coufon): the labels are to be re-defined based on benchmark dashboard.
 func (r *ResourceCollector) GetResourceSeriesWithLabels(labels map[string]string) *ResourceSeriesPerContainer {
 	seriesPerContainer := &ResourceSeriesPerContainer{
 		Data: map[string]*ResourceSeries{},
 		Labels: map[string]string{
 			"node": framework.TestContext.NodeName,
 		},
-		Version: currentKubeletPerfMetricsVersion,
+		Version: currentTimeSeriesVersion,
 	}
 	for key, name := range systemContainers {
 		newSeries := &ResourceSeries{Units: map[string]string{
@@ -457,71 +459,6 @@ func (r *ResourceCollector) GetResourceSeriesWithLabels(labels map[string]string
 		seriesPerContainer.Labels[k] = v
 	}
 	return seriesPerContainer
-}
-
-// Use additional labels to pass in test information for benchmark
-func ResourceUsageToPerfDataWithLabels(usagePerNode framework.ResourceUsagePerNode, labels map[string]string) *perftype.PerfData {
-	items := []perftype.DataItem{}
-	for node, usages := range usagePerNode {
-		for c, usage := range usages {
-			newLabels := map[string]string{
-				"node":      node,
-				"container": c,
-				"resource":  "memory",
-			}
-			for k, v := range labels {
-				newLabels[k] = v
-			}
-
-			item := perftype.DataItem{
-				Data: map[string]float64{
-					"memory":     float64(usage.MemoryUsageInBytes) / (1024 * 1024),
-					"workingset": float64(usage.MemoryWorkingSetInBytes) / (1024 * 1024),
-					"rss":        float64(usage.MemoryRSSInBytes) / (1024 * 1024),
-				},
-				Unit:   "MB",
-				Labels: newLabels,
-			}
-			items = append(items, item)
-		}
-	}
-	return &perftype.PerfData{
-		Version:   currentKubeletPerfMetricsVersion,
-		DataItems: items,
-	}
-}
-
-// Use additional labels to pass in test information for benchmark
-func CPUUsageToPerfDataWithLabels(usagePerNode framework.NodesCPUSummary, labels map[string]string) *perftype.PerfData {
-	items := []perftype.DataItem{}
-	for node, usages := range usagePerNode {
-		for c, usage := range usages {
-			newLabels := map[string]string{
-				"node":      node,
-				"container": c,
-				"resource":  "cpu",
-			}
-			for k, v := range labels {
-				newLabels[k] = v
-			}
-
-			data := map[string]float64{}
-			for perc, value := range usage {
-				data[fmt.Sprintf("Perc%02.0f", perc*100)] = value * 1000
-			}
-
-			item := perftype.DataItem{
-				Data:   data,
-				Unit:   "mCPU",
-				Labels: newLabels,
-			}
-			items = append(items, item)
-		}
-	}
-	return &perftype.PerfData{
-		Version:   currentKubeletPerfMetricsVersion,
-		DataItems: items,
-	}
 }
 
 // Zhou: code for getting container name of docker, copied from pkg/kubelet/cm/container_manager_linux.go
