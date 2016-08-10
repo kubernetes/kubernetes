@@ -147,6 +147,8 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 		}, nil
 	}
 
+	glog.V(1).Infof("feature-config: %v", config.FeatureConfig)
+
 	// TODO(vmarmol): Use container config for this.
 	var oomAdjuster *oom.OOMAdjuster
 	if config.OOMScoreAdj != nil {

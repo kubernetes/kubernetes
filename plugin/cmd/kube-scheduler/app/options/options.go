@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/client/leaderelection"
+	"k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
 
 	"github.com/spf13/pflag"
@@ -36,15 +37,19 @@ type SchedulerServer struct {
 	// Kubeconfig is Path to kubeconfig file with authorization and master
 	// location information.
 	Kubeconfig string
+	// A set of key=value pairs describing feature configuration for
+	// scheduler.
+	FeatureConfig config.ConfigurationMap
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
 func NewSchedulerServer() *SchedulerServer {
-	config := componentconfig.KubeSchedulerConfiguration{}
-	api.Scheme.Convert(&v1alpha1.KubeSchedulerConfiguration{}, &config)
-	config.LeaderElection.LeaderElect = true
+	cfg := componentconfig.KubeSchedulerConfiguration{}
+	api.Scheme.Convert(&v1alpha1.KubeSchedulerConfiguration{}, &cfg)
+	cfg.LeaderElection.LeaderElect = true
 	s := SchedulerServer{
-		KubeSchedulerConfiguration: config,
+		KubeSchedulerConfiguration: cfg,
+		FeatureConfig:              make(config.ConfigurationMap),
 	}
 	return &s
 }
@@ -58,6 +63,7 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
+	fs.Var(&s.FeatureConfig, "feature-config", "A set of key=value pairs that describe feature configuration for scheduler.")
 	var unusedBindPodsQPS float32
 	fs.Float32Var(&unusedBindPodsQPS, "bind-pods-qps", 0, "unused, use --kube-api-qps")
 	fs.MarkDeprecated("bind-pods-qps", "flag is unused and will be removed. Use kube-api-qps instead.")
