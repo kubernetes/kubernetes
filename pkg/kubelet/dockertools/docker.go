@@ -150,6 +150,44 @@ func filterHTTPError(err error, image string) error {
 	}
 }
 
+// Check if the inspected image matches what we are looking for
+func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
+
+	// The image string follows the grammar specified here
+	// https://github.com/docker/distribution/blob/master/reference/reference.go#L4
+	named, err := dockerref.ParseNamed(image)
+	if err != nil {
+		glog.V(4).Infof("couldn't parse image reference %q: %v", image, err)
+		return false
+	}
+	_, isTagged := named.(dockerref.Tagged)
+	digest, isDigested := named.(dockerref.Digested)
+	if !isTagged && !isDigested {
+		// No Tag or SHA specified, so just return what we have
+		return true
+	}
+	if isTagged {
+		// Check the RepoTags for an exact match
+		for _, tag := range inspected.RepoTags {
+			if tag == image {
+				// We found a specific tag that we were looking for
+				return true
+			}
+		}
+	}
+	if isDigested {
+		algo := digest.Digest().Algorithm().String()
+		sha := digest.Digest().Hex()
+		// Look specifically for short and long sha(s)
+		if strings.Contains(inspected.ID, algo+":"+sha) {
+			// We found the short or long SHA requested
+			return true
+		}
+	}
+	glog.V(4).Infof("Inspected image (%q) does not match %s", inspected.ID, image)
+	return false
+}
+
 // applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
 // a default tag will be applied.
 func applyDefaultImageTag(image string) (string, error) {
