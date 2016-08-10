@@ -571,7 +571,7 @@ function start-etcd-servers {
     rm -f /etc/init.d/etcd
   fi
   prepare-log-file /var/log/etcd.log
-  prepare-etcd-manifest "" "4001" "2380" "200m" "etcd.manifest"
+  prepare-etcd-manifest "" "2379" "2380" "200m" "etcd.manifest"
 
   prepare-log-file /var/log/etcd-events.log
   prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
@@ -630,7 +630,7 @@ function start-kube-apiserver {
   params+=" --basic-auth-file=/etc/srv/kubernetes/basic_auth.csv"
   params+=" --cloud-provider=gce"
   params+=" --client-ca-file=/etc/srv/kubernetes/ca.crt"
-  params+=" --etcd-servers=http://127.0.0.1:4001"
+  params+=" --etcd-servers=http://127.0.0.1:2379"
   params+=" --etcd-servers-overrides=/events#http://127.0.0.1:4002"
   params+=" --secure-port=443"
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"

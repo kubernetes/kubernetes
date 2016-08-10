@@ -138,7 +138,7 @@ make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 kube::etcd::start
 
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-4001}
+ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8080}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
@@ -1842,7 +1842,7 @@ __EOF__
   kube::test::if_has_string "${output_message}" '\"etcd-server\" exposed'
   # Post-condition: generated service has both ports from the exposed pod
   kube::test::get_object_assert 'service etcd-server' "{{$port_name}} {{$port_field}}" 'port-1 2380'
-  kube::test::get_object_assert 'service etcd-server' "{{$second_port_name}} {{$second_port_field}}" 'port-2 4001'
+  kube::test::get_object_assert 'service etcd-server' "{{$second_port_name}} {{$second_port_field}}" 'port-2 2379'
   # Clean-up
   kubectl delete svc etcd-server "${kube_flags[@]}"
 

@@ -52,8 +52,8 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 	It("should recover from network partition with master", func() {
 		etcdFailTest(
 			f,
-			"sudo iptables -A INPUT -p tcp --destination-port 4001 -j DROP",
-			"sudo iptables -D INPUT -p tcp --destination-port 4001 -j DROP",
+			"sudo iptables -A INPUT -p tcp --destination-port 2379 -j DROP",
+			"sudo iptables -D INPUT -p tcp --destination-port 2379 -j DROP",
 		)
 	})
 

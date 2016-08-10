@@ -31,7 +31,7 @@ export NUM_NODES=${NUM_NODES:-2}
 export NUM_NODES=${NUM_NODES}
 
 # By default, the cluster will use the etcd installed on master.
-export ETCD_SERVERS=${ETCD_SERVERS:-"http://$MASTER_IP:4001"}
+export ETCD_SERVERS=${ETCD_SERVERS:-"http://$MASTER_IP:2379"}
 
 # define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.

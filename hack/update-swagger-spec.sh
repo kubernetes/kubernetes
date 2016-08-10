@@ -52,7 +52,7 @@ apiserver=$(kube::util::find-binary "kube-apiserver")
 
 TMP_DIR=$(mktemp -d /tmp/update-swagger-spec.XXXX)
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-4001}
+ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}

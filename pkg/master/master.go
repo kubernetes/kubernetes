@@ -496,7 +496,7 @@ func (m *Master) getServersToValidate(c *Config) map[string]apiserver.Server {
 			port, _ = strconv.Atoi(portString)
 		} else {
 			addr = etcdUrl.Host
-			port = 4001
+			port = 2379
 		}
 		// TODO: etcd health checking should be abstracted in the storage tier
 		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = apiserver.Server{

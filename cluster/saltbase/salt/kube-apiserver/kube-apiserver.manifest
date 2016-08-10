@@ -58,7 +58,7 @@
 {% if pillar['storage_backend'] is defined -%}
   {% set storage_backend = "--storage-backend=" + pillar['storage_backend'] -%}
 {% endif -%}
-{% set etcd_servers = "--etcd-servers=http://127.0.0.1:4001" -%}
+{% set etcd_servers = "--etcd-servers=http://127.0.0.1:2379" -%}
 {% set etcd_servers_overrides = "--etcd-servers-overrides=/events#http://127.0.0.1:4002" -%}
 
 {% set target_ram_mb = "" -%}
