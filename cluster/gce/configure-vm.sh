@@ -906,6 +906,7 @@ EOF
   fi
 
   env-to-grains "runtime_config"
+  env-to-grains "feature_gates"
   env-to-grains "kube_user"
 }
 
