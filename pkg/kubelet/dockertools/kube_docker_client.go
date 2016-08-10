@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"strings"
 	"sync"
 	"time"
 
@@ -184,7 +185,27 @@ func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect
 		}
 		return nil, err
 	}
-	return &resp, nil
+	parts := strings.SplitN(image, ":", 2)
+	if len(parts) == 1 {
+		// No Tag or SHA specified, so just return what we have
+		return &resp, nil
+	}
+	// Check the RepoTags for an exact match
+	for _, tag := range resp.RepoTags {
+		if tag == image {
+			// We found a specific tag that we were looking for
+			return &resp, nil
+		}
+	}
+	// Look specifically for short and long sha(s)
+	if size := len(parts[1]); size == 12 || size == 64 {
+		if strings.Contains(resp.ID, "sha256:"+parts[1]) {
+			// We found the short or long SHA requested
+			return &resp, nil
+		}
+	}
+	err = imageNotFoundError{ID: image}
+	return nil, err
 }
 
 func (d *kubeDockerClient) ImageHistory(id string) ([]dockertypes.ImageHistory, error) {
