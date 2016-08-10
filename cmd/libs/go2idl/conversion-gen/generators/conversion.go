@@ -396,7 +396,7 @@ func areTypesAliased(in, out *types.Type) bool {
 }
 
 const (
-	apiPackagePath        = "k8s.io/kubernetes/pkg/api"
+	runtimePackagePath    = "k8s.io/kubernetes/pkg/runtime"
 	conversionPackagePath = "k8s.io/kubernetes/pkg/conversion"
 )
 
@@ -541,20 +541,24 @@ func (g *genConversion) preexists(inType, outType *types.Type) (*types.Type, boo
 }
 
 func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
-	scheme := c.Universe.Package(apiPackagePath).Variable("Scheme")
-
 	sw := generator.NewSnippetWriter(w, c, "$", "$")
 	sw.Do("func init() {\n", nil)
-	sw.Do("if err := $.scheme|raw$.AddGeneratedConversionFuncs(\n", generator.Args{
-		"scheme": scheme,
-	})
+	sw.Do("SchemeBuilder.Register(RegisterConversions)\n", nil)
+	sw.Do("}\n", nil)
+
+	scheme := c.Universe.Type(types.Name{Package: runtimePackagePath, Name: "Scheme"})
+	schemePtr := &types.Type{
+		Kind: types.Pointer,
+		Elem: scheme,
+	}
+	sw.Do("// RegisterConversions adds conversion functions to the given scheme.\n", nil)
+	sw.Do("// Public to allow building arbitrary schemes.\n", nil)
+	sw.Do("func RegisterConversions(scheme $.|raw$) error {\n", schemePtr)
+	sw.Do("return scheme.AddGeneratedConversionFuncs(\n", nil)
 	for _, conv := range g.typesForInit {
 		sw.Do(nameTmpl+",\n", argsFromType(conv.inType, conv.outType))
 	}
-	sw.Do("); err != nil {\n", nil)
-	sw.Do("// if one of the conversion functions is malformed, detect it immediately.\n", nil)
-	sw.Do("panic(err)\n", nil)
-	sw.Do("}\n", nil)
+	sw.Do(")\n", nil)
 	sw.Do("}\n\n", nil)
 	return sw.Error()
 }
