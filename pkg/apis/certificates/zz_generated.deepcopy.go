@@ -28,11 +28,11 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequest, InType: reflect.TypeOf(func() *CertificateSigningRequest { var x *CertificateSigningRequest; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestCondition, InType: reflect.TypeOf(func() *CertificateSigningRequestCondition { var x *CertificateSigningRequestCondition; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestList, InType: reflect.TypeOf(func() *CertificateSigningRequestList { var x *CertificateSigningRequestList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestSpec, InType: reflect.TypeOf(func() *CertificateSigningRequestSpec { var x *CertificateSigningRequestSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestStatus, InType: reflect.TypeOf(func() *CertificateSigningRequestStatus { var x *CertificateSigningRequestStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequest, InType: reflect.TypeOf(&CertificateSigningRequest{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestCondition, InType: reflect.TypeOf(&CertificateSigningRequestCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestList, InType: reflect.TypeOf(&CertificateSigningRequestList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestSpec, InType: reflect.TypeOf(&CertificateSigningRequestSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestStatus, InType: reflect.TypeOf(&CertificateSigningRequestStatus{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)

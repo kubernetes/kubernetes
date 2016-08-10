@@ -30,10 +30,10 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSet, InType: reflect.TypeOf(func() *PetSet { var x *PetSet; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetList, InType: reflect.TypeOf(func() *PetSetList { var x *PetSetList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetSpec, InType: reflect.TypeOf(func() *PetSetSpec { var x *PetSetSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetStatus, InType: reflect.TypeOf(func() *PetSetStatus { var x *PetSetStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSet, InType: reflect.TypeOf(&PetSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetList, InType: reflect.TypeOf(&PetSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetSpec, InType: reflect.TypeOf(&PetSetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetStatus, InType: reflect.TypeOf(&PetSetStatus{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)

@@ -30,10 +30,10 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodDisruptionBudget, InType: reflect.TypeOf(func() *PodDisruptionBudget { var x *PodDisruptionBudget; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodDisruptionBudgetList, InType: reflect.TypeOf(func() *PodDisruptionBudgetList { var x *PodDisruptionBudgetList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodDisruptionBudgetSpec, InType: reflect.TypeOf(func() *PodDisruptionBudgetSpec { var x *PodDisruptionBudgetSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodDisruptionBudgetStatus, InType: reflect.TypeOf(func() *PodDisruptionBudgetStatus { var x *PodDisruptionBudgetStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodDisruptionBudget, InType: reflect.TypeOf(&PodDisruptionBudget{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodDisruptionBudgetList, InType: reflect.TypeOf(&PodDisruptionBudgetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodDisruptionBudgetSpec, InType: reflect.TypeOf(&PodDisruptionBudgetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PodDisruptionBudgetStatus, InType: reflect.TypeOf(&PodDisruptionBudgetStatus{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)
