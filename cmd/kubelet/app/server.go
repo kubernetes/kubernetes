@@ -413,6 +413,8 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		}
 	}
 
+	glog.Infof("feature-config: %v", s.FeatureConfig)
+
 	runtime.ReallyCrash = s.ReallyCrashForTesting
 	rand.Seed(time.Now().UTC().UnixNano())
 

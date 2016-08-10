@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/config"
 
 	"github.com/spf13/pflag"
 )
@@ -46,17 +47,19 @@ type ProxyServerConfig struct {
 	NodeRef           *api.ObjectReference
 	Master            string
 	Kubeconfig        string
+	FeatureConfig     config.ConfigurationMap
 }
 
 func NewProxyConfig() *ProxyServerConfig {
-	config := componentconfig.KubeProxyConfiguration{}
-	api.Scheme.Convert(&v1alpha1.KubeProxyConfiguration{}, &config)
+	cfg := componentconfig.KubeProxyConfiguration{}
+	api.Scheme.Convert(&v1alpha1.KubeProxyConfiguration{}, &cfg)
 	return &ProxyServerConfig{
-		KubeProxyConfiguration: config,
+		KubeProxyConfiguration: cfg,
 		ContentType:            "application/vnd.kubernetes.protobuf",
 		KubeAPIQPS:             5.0,
 		KubeAPIBurst:           10,
 		ConfigSyncPeriod:       15 * time.Minute,
+		FeatureConfig:          make(config.ConfigurationMap),
 	}
 }
 
@@ -70,6 +73,7 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
+	fs.Var(&s.FeatureConfig, "feature-config", "A set of key=value pairs that describe feature configuration for proxy server.")
 	fs.Var(componentconfig.PortRangeVar{Val: &s.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.Var(&s.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If blank, look at the Node object on the Kubernetes API and respect the '"+ExperimentalProxyModeAnnotation+"' annotation if provided.  Otherwise use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
