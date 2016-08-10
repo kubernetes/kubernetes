@@ -344,10 +344,10 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	}))
 
 	// Anonymous client config
-	clientConfig := restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+	clientConfig := restclient.Config{Hosts: []string{apiServer.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
 	// Root client
 	// TODO: remove rootClient after we refactor pkg/admission to use the clientset.
-	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Host: apiServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, BearerToken: rootToken})
+	rootClientset := clientset.NewForConfigOrDie(&restclient.Config{Hosts: []string{apiServer.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}, BearerToken: rootToken})
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
