@@ -56,6 +56,7 @@ var deleteInstances = flag.Bool("delete-instances", true, "If true, delete any i
 var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar.gz and exit.")
 var setupNode = flag.Bool("setup-node", false, "When true, current user will be added to docker group on the test machine")
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
+var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 
 var computeService *compute.Service
 
@@ -314,7 +315,7 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode b
 		}
 	}
 
-	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs)
+	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs, *ginkgoFlags)
 	return &TestResult{
 		output: output,
 		err:    err,
