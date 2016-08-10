@@ -18,30 +18,32 @@ package app
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
-
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
 	"k8s.io/kubernetes/federation/apis/core/v1"
+	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/genericapiserver"
+	eventetcd "k8s.io/kubernetes/pkg/registry/event/etcd"
 	namespaceetcd "k8s.io/kubernetes/pkg/registry/namespace/etcd"
 	secretetcd "k8s.io/kubernetes/pkg/registry/secret/etcd"
 	serviceetcd "k8s.io/kubernetes/pkg/registry/service/etcd"
 )
 
-func installCoreAPIs(s *genericoptions.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
+func installCoreAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
 	serviceStore, serviceStatusStore := serviceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("service")))
 	namespaceStore, namespaceStatusStore, _ := namespaceetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("namespaces")))
 	secretStore := secretetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("secrets")))
+	eventStore := eventetcd.NewREST(createRESTOptionsOrDie(s, g, f, api.Resource("events")), uint64(s.EventTTL.Seconds()))
 	coreResources := map[string]rest.Storage{
 		"secrets":           secretStore,
 		"services":          serviceStore,
 		"services/status":   serviceStatusStore,
 		"namespaces":        namespaceStore,
 		"namespaces/status": namespaceStatusStore,
+		"events":            eventStore,
 	}
 	coreGroupMeta := registered.GroupOrDie(core.GroupName)
 	apiGroupInfo := genericapiserver.APIGroupInfo{
@@ -56,6 +58,6 @@ func installCoreAPIs(s *genericoptions.ServerRunOptions, g *genericapiserver.Gen
 		NegotiatedSerializer:   core.Codecs,
 	}
 	if err := g.InstallAPIGroup(&apiGroupInfo); err != nil {
-		glog.Fatalf("Error in registering group version: %v", err)
+		glog.Fatalf("Error in registering group version: %+v.\n Error: %v\n", apiGroupInfo, err)
 	}
 }

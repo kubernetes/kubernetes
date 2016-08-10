@@ -83,4 +83,16 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			panic(err)
 		}
 	}
+	if err := v1.AddFieldLabelConversionsForEvent(scheme); err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
+	if err := v1.AddFieldLabelConversionsForNamespace(scheme); err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
+	if err := v1.AddFieldLabelConversionsForSecret(scheme); err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
 }

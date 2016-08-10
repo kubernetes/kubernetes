@@ -29,14 +29,14 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	ext_v1b1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"k8s.io/kubernetes/pkg/genericapiserver/options"
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(options.NewServerRunOptions().WithEtcdOptions().LongRunningRequestRE)
+	regexp := regexp.MustCompile(options.NewServerRunOptions().LongRunningRequestRE)
 	dontMatch := []string{
 		"/api/v1/watch-namespace/",
 		"/api/v1/namespace-proxy/",
@@ -84,7 +84,7 @@ var groupVersions = []unversioned.GroupVersion{
 }
 
 func TestRun(t *testing.T) {
-	s := options.NewServerRunOptions().WithEtcdOptions()
+	s := options.NewServerRunOptions()
 	s.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet
@@ -281,10 +281,16 @@ func testCoreResourceList(t *testing.T) {
 	assert.Equal(t, "", apiResourceList.APIVersion)
 	assert.Equal(t, v1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
 
+	// Verify services.
 	found := findResource(apiResourceList.APIResources, "services")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 	found = findResource(apiResourceList.APIResources, "services/status")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+
+	// Verify events.
+	found = findResource(apiResourceList.APIResources, "events")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 }

@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-const importPrefix = "k8s.io/kubernetes/federation/api"
+const importPrefix = "k8s.io/kubernetes/pkg/api"
 
 var accessor = meta.NewAccessor()
 
@@ -101,7 +101,7 @@ func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper 
 		"DeleteOptions",
 		"Status")
 
-	mapper := api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
+	mapper := api.NewDefaultRESTMapperFromScheme(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped, core.Scheme)
 	// setup aliases for groups of resources
 	mapper.AddResourceAlias("all", userResources...)
 

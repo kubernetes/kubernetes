@@ -143,63 +143,23 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Event",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "involvedObject.kind",
-				"involvedObject.namespace",
-				"involvedObject.name",
-				"involvedObject.uid",
-				"involvedObject.apiVersion",
-				"involvedObject.resourceVersion",
-				"involvedObject.fieldPath",
-				"reason",
-				"source",
-				"type",
-				"metadata.namespace",
-				"metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		})
-	if err != nil {
+	if err := AddFieldLabelConversionsForEvent(api.Scheme); err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Namespace",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "status.phase",
-				"metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		})
-	if err != nil {
+	if err := AddFieldLabelConversionsForNamespace(api.Scheme); err != nil {
 		// If one of the conversion functions is malformed, detect it immediately.
 		panic(err)
 	}
+	if err := AddFieldLabelConversionsForSecret(api.Scheme); err != nil {
+		// If one of the conversion functions is malformed, detect it immediately.
+		panic(err)
+	}
+
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "PersistentVolume",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name":
-				return label, value, nil
-			default:
-				return "", "", fmt.Errorf("field label not supported: %s", label)
-			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
-	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Secret",
-		func(label, value string) (string, string, error) {
-			switch label {
-			case "type",
-				"metadata.namespace",
-				"metadata.name":
 				return label, value, nil
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
@@ -669,4 +629,54 @@ func Convert_v1_ResourceList_To_api_ResourceList(in *ResourceList, out *api.Reso
 		(*out)[api.ResourceName(key)] = val
 	}
 	return nil
+}
+
+func AddFieldLabelConversionsForEvent(scheme *runtime.Scheme) error {
+	return api.Scheme.AddFieldLabelConversionFunc("v1", "Event",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "involvedObject.kind",
+				"involvedObject.namespace",
+				"involvedObject.name",
+				"involvedObject.uid",
+				"involvedObject.apiVersion",
+				"involvedObject.resourceVersion",
+				"involvedObject.fieldPath",
+				"reason",
+				"source",
+				"type",
+				"metadata.namespace",
+				"metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+}
+
+func AddFieldLabelConversionsForNamespace(scheme *runtime.Scheme) error {
+	return api.Scheme.AddFieldLabelConversionFunc("v1", "Namespace",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "status.phase",
+				"metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
+}
+
+func AddFieldLabelConversionsForSecret(scheme *runtime.Scheme) error {
+	return api.Scheme.AddFieldLabelConversionFunc("v1", "Secret",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "type",
+				"metadata.namespace",
+				"metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		})
 }
