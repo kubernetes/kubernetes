@@ -63,7 +63,7 @@ func (p *streamProtocolV3) createStreams(conn streamCreator) error {
 }
 
 func (p *streamProtocolV3) handleResizes() {
-	if p.resizeStream == nil {
+	if p.resizeStream == nil || p.TerminalSizeQueue == nil {
 		return
 	}
 
