@@ -285,7 +285,7 @@ func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim api.ResourceNa
 				glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
 				continue
 			}
-			value.Add(*reclaimed)
+			value.available.Add(*reclaimed)
 
 			// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
 			if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
