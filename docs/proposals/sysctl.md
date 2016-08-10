@@ -325,13 +325,24 @@ Issues:
 5. b/c no memory is involved, i.e. purely functional difference
 6. to be checked
 
+**Note**: for all sysctls marked as "kmem memcg" kernel memory accounting must be enabled in the container for proper isolation. This will not be the case for 1.4, but is planned for 1.5.
+
+**Note**: in general it is good practice to reserve special nodes for those pods which set sysctls which the kernel does not guarantee proper isolation for.
+
 ## Proposed Design
 
 Sysctls in pods and `PodSecurityPolicy` are first introduced as an alpha feature for Kubernetes 1.4. This means that the following changes apply to the internal unversioned API only. The externally visible v1 API will model these as annotations, with the plan to turn those in first class citizens in a later release.
 
+As a general rule, only sysctls shall be whitelisted
+
+- that are properly namespaced by the container or the pod (e.g. in the ipc or net namespace)
+- that cannot lead to resource consumption outside of the limits of the container or the pod.
+
+This means that sysctls that are not namespaced must be set by the admin on host level on his own risk, e.g. by running a *privileged daemonset*, possibly limited to a restricted, special-purpose set of nodes, if necessary with the host network namespace. This is considered out-of-scope of this proposal and out-of-scope of what the kubelet will do for the admin.
+
 ### (Internal) pod API changes
 
-Container specification must be changed to allow the specification of kernel parameters:
+Pod specification must be changed to allow the specification of kernel parameters:
 
 ```go
 // Sysctl defines a kernel parameter to be set
@@ -353,7 +364,7 @@ type PodSecurityContext struct {
 }
 ```
 
-Note that sysctls must be on the pod level because containers in a pod share IPC and network namespaces (if pod.spec.hostIPC and pod.spec.hostNetwork is false) and therefore cannot have conflicting sysctl values. Moreover, note that all namespaced sysctl supported by Docker/RunC are either in the IPC or network namespace.
+**Note**: sysctls must be on the pod level because containers in a pod share IPC and network namespaces (if pod.spec.hostIPC and pod.spec.hostNetwork is false) and therefore cannot have conflicting sysctl values. Moreover, note that all namespaced sysctl supported by Docker/RunC are either in the IPC or network namespace.
 
 ### Annotations for the (external) versioned API
 
