@@ -105,7 +105,7 @@ func TestFederatedInformer(t *testing.T) {
 		},
 	}
 
-	informer := NewFederatedInformer(fakeClient, targetInformerFactory, lifecycle).(*federatedInformerImpl)
+	informer := NewFederatedInformer(fakeClient, targetInformerFactory, &lifecycle).(*federatedInformerImpl)
 	informer.clientFactory = func(cluster *federation_api.Cluster) (federation_release_1_4.Interface, error) {
 		return fakeClient, nil
 	}
