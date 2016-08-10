@@ -48,10 +48,13 @@ echo "Copying kubemark to ${MAKE_DIR}"
 if [[ -f "${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz" ]]; then
   # Running from distro
   SERVER_TARBALL="${KUBE_ROOT}/_output/release-tars/kubernetes-server-linux-amd64.tar.gz"
+  echo "Using server tarball: ${SERVER_TARBALL}"
   cp "${KUBE_ROOT}/_output/release-stage/server/linux-amd64/kubernetes/server/bin/kubemark" "${MAKE_DIR}"
 elif [[ -f "${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz" ]]; then
   # Running from an extracted release tarball (kubernetes.tar.gz)
   SERVER_TARBALL="${KUBE_ROOT}/server/kubernetes-server-linux-amd64.tar.gz"
+  echo "Using server tarball: ${SERVER_TARBALL}"
+  echo "Currently in $(pwd)"
   tar \
     --strip-components=3 \
     -xzf kubernetes-server-linux-amd64.tar.gz \
