@@ -252,6 +252,10 @@ type KubeletConfiguration struct {
 	// networkPluginName is the name of the network plugin to be invoked for
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
+	// networkPluginMTU is the MTU to be passed to the network plugin,
+	// and overrides the default MTU for cases where it cannot be automatically
+	// computed (such as IPSEC).
+	NetworkPluginMTU int32 `json:"networkPluginMTU"`
 	// networkPluginDir is the full path of the directory in which to search
 	// for network plugins
 	NetworkPluginDir string `json:"networkPluginDir"`

@@ -257,6 +257,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
 		out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 		out.NetworkPluginName = in.NetworkPluginName
+		out.NetworkPluginMTU = in.NetworkPluginMTU
 		out.NetworkPluginDir = in.NetworkPluginDir
 		out.VolumePluginDir = in.VolumePluginDir
 		out.CloudProvider = in.CloudProvider

@@ -105,7 +105,7 @@ func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
 	return execPlugins
 }
 
-func (plugin *execNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
+func (plugin *execNetworkPlugin) Init(host network.Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	err := plugin.validate()
 	if err != nil {
 		return err
