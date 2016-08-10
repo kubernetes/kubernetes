@@ -150,6 +150,31 @@ func filterHTTPError(err error, image string) error {
 	}
 }
 
+// Check if the inspected image matches what we are looking for
+func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
+	parts := strings.SplitN(image, ":", 2)
+	if len(parts) == 1 {
+		// No Tag or SHA specified, so just return what we have
+		return true
+	}
+	// Check the RepoTags for an exact match
+	for _, tag := range inspected.RepoTags {
+		if tag == image {
+			// We found a specific tag that we were looking for
+			return true
+		}
+	}
+	// Look specifically for short and long sha(s)
+	if size := len(parts[1]); size == 12 || size == 64 {
+		if strings.Contains(inspected.ID, "sha256:"+parts[1]) {
+			// We found the short or long SHA requested
+			return true
+		}
+	}
+	glog.V(4).Infof("Inspected image (%q) does not match %s", inspected.ID, image)
+	return false
+}
+
 // applyDefaultImageTag parses a docker image string, if it doesn't contain any tag or digest,
 // a default tag will be applied.
 func applyDefaultImageTag(image string) (string, error) {
