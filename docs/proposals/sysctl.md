@@ -494,11 +494,11 @@ The same annotation keys are used for pods and `PodSecurityPolicy` objects.
 // SysctlPolicy defines how a sysctl may be set. If neither Values,
 // nor Min, Max are set, any value is allowed.
 type SysctlPolicy struct {
-    // Sysctl is the name of a sysctl or a pattern for a name. It consists of
+    // Name is the name of a sysctl or a pattern for a name. It consists of
     // dot separated name segments. A name segment matches [a-z]+[a-z_-0-9]* or
     // equals "*". The later is interpretated as a wildcard for that name
     // segment.
-    Sysctl string `json:"sysctl"`
+    Name string `json:"name"`
 
     // Values are allowed values to be set. Either Values is
     // set or Min and Max.
