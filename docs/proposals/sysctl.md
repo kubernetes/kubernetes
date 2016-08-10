@@ -391,21 +391,27 @@ The initial whitelists will be:
 
 ```go
 var whitelist = map[string]struct{}{
-       "kernel.msgmax":          {},
-       "kernel.msgmnb":          {},
-       "kernel.msgmni":          {},
-       "kernel.sem":             {},
-       "kernel.shmall":          {},
-       "kernel.shmmax":          {},
-       "kernel.shmmni":          {},
-       "kernel.shm_rmid_forced": {},
+       "kernel.msgmax":                {}, # requires kmem accounting
+       "kernel.msgmnb":                {}, # requires kmem accounting
+       "kernel.msgmni":                {}, # requires kmem accounting
+       "kernel.sem":                   {}, # requires kmem accounting
+       "kernel.shmall":                {},
+       "kernel.shmmax":                {},
+       "kernel.shmmni":                {},
+       "kernel.shm_rmid_forced":       {},
+       "net.core.somaxconn":           {},
+       "net.ipv4.ip_local_port_range": {},
+       "net.ipv4.tcp_syncookies":      {},
 }
 
 var whitelistPrefixes = []string{
-       "net.",
-       "fs.mqueue.",
+       "fs.mqueue.", # requires kmem accounting
 }
 ```
+
+**Note**: with the exception of `kernel.shm*` all of the whitelisted sysctls depend on kernel memory accounting to be enabled for proper resource isolation. This will not be the case for 1.4 by default, but is planned in 1.5. Until then using one of those requires the admin to account for the resource consumption himself, e.g. by using `--system-reserved` with the kubelet. This is not any worse though than excluding these sysctls because every pod can use ipc objects already now outside of any isolation or resource limits (e.g. 512MB of message queue data is usually permitted).
+
+**Note**: all the ipc objects persist when the originating containers dies. Their resources (if kmem accounting is enabled) fall back to the parent cgroup. As long as there is no pod level memory cgroup, the parent will be the container runtime, e.g. the docker daemon or the RunC process. It is [planned with 1.4 to introduce a pod level memory cgroup](https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/pod-resource-management.md#implementation-status) which will fix this problem.
 
 In addition to the whitelisting, the general format of the sysctl name will be checked:
 - 253 characters in length
