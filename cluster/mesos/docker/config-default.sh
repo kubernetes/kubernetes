@@ -56,7 +56,7 @@ MESOS_DOCKER_ADDON_TIMEOUT="${MESOS_DOCKER_ADDON_TIMEOUT:-180}"
 # ${MESOS_DOCKER_WORK_DIR}/log - storage of component logs (written on deploy failure)
 # ${MESOS_DOCKER_WORK_DIR}/auth - storage of SSL certs/keys/tokens
 # ${MESOS_DOCKER_WORK_DIR}/<component>/mesos - storage of mesos slave work (e.g. task logs)
-# If using docker-machine or boot2docker, should be under /Users (which is mounted from the host into the docker vm).
+# If using docker-machine or Docker for Mac, should be under /Users (which is mounted from the host into the docker vm).
 # If running in a container, $HOME should be resolved outside of the container.
 MESOS_DOCKER_WORK_DIR="${MESOS_DOCKER_WORK_DIR:-${HOME}/tmp/kubernetes}"
 
