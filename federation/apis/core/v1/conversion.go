@@ -81,5 +81,14 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 			return err
 		}
 	}
+	if err := v1.AddFieldLabelConversionsForEvent(scheme); err != nil {
+		return nil
+	}
+	if err := v1.AddFieldLabelConversionsForNamespace(scheme); err != nil {
+		return nil
+	}
+	if err := v1.AddFieldLabelConversionsForSecret(scheme); err != nil {
+		return nil
+	}
 	return nil
 }
