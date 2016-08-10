@@ -26,7 +26,7 @@ kube::golang::setup_env
 kube::test::find_dirs() {
   (
     cd ${KUBE_ROOT}
-    find . -not \( \
+    find -L . -not \( \
         \( \
           -path './_artifacts/*' \
           -o -path './_output/*' \
@@ -39,10 +39,16 @@ kube::test::find_dirs() {
           -o -path './test/e2e_node/*' \
           -o -path './test/integration/*' \
           -o -path './test/component/scheduler/perf/*' \
-          -o -path './third_party/*'\
-          -o -path './vendor/*'\
+          -o -path './third_party/*' \
+          -o -path './staging/*' \
+          -o -path './vendor/*' \
         \) -prune \
       \) -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
+
+    find -L . \
+        -path './_output' -prune \
+        -o -path './vendor/k8s.io/client-go/*' \
+      -name '*_test.go' -print0 | xargs -0n1 dirname | sed 's|^\./||' | sort -u
   )
 }
 
