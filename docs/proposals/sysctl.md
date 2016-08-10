@@ -303,12 +303,12 @@ Issues:
 
 | sysctl                       | namespaced | acc. for <= 4.4 | >= 4.5        |
 | ---------------------------- | ---------- | --------------- | ------------- |
-| kernel.shm*                  | ipc        | **memcg** 1)    | **memcg** 1)  |
-| kernel.msg*                  | ipc        | **memcg** 3)    | - 3)          |
-| fs.mqueue.*                  | ipc        | **memcg**       | -             |
-| kernel.sem                   | ipc        | **memcg**       | -             |
-| net.core.somaxconn           | net        | memcg? 4)       | memcg? 6) |
-| net.*.tcp_wmem/rmem          | - 2)       | **memcg**       | **memcg**? 6) |
+| kernel.shm*                  | ipc        | user memcg 1)   | user memcg 1) |
+| kernel.msg*                  | ipc        | kmem memcg 3)   | - 3)          |
+| fs.mqueue.*                  | ipc        | kmem memcg      | -             |
+| kernel.sem                   | ipc        | kmem memcg      | -             |
+| net.core.somaxconn           | net        | kmem memcg? 4)  | kmem memcg? 6)|
+| net.*.tcp_wmem/rmem          | - 2)       | kmem memcg      | kmem memcg? 6)|
 | net.core.wmem/rmem_max       | - 2)       | ?               | ?             |
 | net.ipv4.ip_local_port_range | net        | not needed 5)   | not needed 5) |
 | net.ipv4.tcp_syncookies      | net        | not needed 5)   | not needed 5) |
