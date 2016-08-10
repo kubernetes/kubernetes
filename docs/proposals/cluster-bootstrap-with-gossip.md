@@ -64,11 +64,13 @@ In the kubeadm command, in general:
 
 ```
 {
-    "Role": "<role>",
-    "Discovery": {
-        "Kind: "Gossip",
-        "Token": "<token>",
-        "Peers": [],
+    "apiVersion": "v1alpha1",
+    "kind": "Discovery",
+    "role": "<role>",
+    "discovery": {
+        "type": "Gossip",
+        "token": "<token>",
+        "peers": []
     }
 }
 ```
@@ -81,11 +83,13 @@ In the kubeadm command, in general:
 
 ```
 {
-    "Role": "<role>",
-    "Discovery": {
-        "Kind: "OutOfBand",
-        "ApiserverUrls": ["[https://foo/](https://foo/)"],
-        "CacertFile": "/path/to/cacert.pem"
+    "apiVersion": "v1alpha1",
+    "kind": "Discovery",
+    "role": "<role>",
+    "discovery": {
+        "type": "OutOfBand",
+        "apiserverURLs": ["https://foo/"],
+        "cacertFile": "/path/to/cacert.pem"
     }
 }
 ```
@@ -105,7 +109,7 @@ Start should be called every time the kubelet starts up, and it should return im
 
 ### Kubelet awakens
 
-If it starts, and is The kubelet waits in **pending** mode for the bootstrap file to show up. When it does, it unmarshals the Discovery object in JSON depending on the "kind" field, and calls Discover on it.
+The kubelet waits in **pending** mode for the bootstrap file to show up. When it does, it unmarshals the Discovery object from JSON depending on the "kind" field, and calls `Start()` and then `Discover()` on it.
 
 When it does, it's the Discovery implementation's job to move into **bootstrapping**.
 
