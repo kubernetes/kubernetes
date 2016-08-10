@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -62,6 +63,8 @@ type managerImpl struct {
 	resourceToRankFunc map[api.ResourceName]rankFunc
 	// resourceToNodeReclaimFuncs maps a resource to an ordered list of functions that know how to reclaim that resource.
 	resourceToNodeReclaimFuncs map[api.ResourceName]nodeReclaimFuncs
+	// machine info regarding the node
+	machineInfo *cadvisorapi.MachineInfo
 }
 
 // ensure it implements the required interface
@@ -75,6 +78,7 @@ func NewManager(
 	imageGC ImageGC,
 	recorder record.EventRecorder,
 	nodeRef *api.ObjectReference,
+	machineInfo *cadvisorapi.MachineInfo,
 	clock clock.Clock) (Manager, lifecycle.PodAdmitHandler, error) {
 	manager := &managerImpl{
 		clock:           clock,
@@ -86,6 +90,7 @@ func NewManager(
 		nodeRef:         nodeRef,
 		nodeConditionsLastObservedAt: nodeConditionsObservedAt{},
 		thresholdsFirstObservedAt:    thresholdsObservedAt{},
+		machineInfo:                  machineInfo,
 	}
 	return manager, manager, nil
 }
@@ -157,7 +162,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	}
 
 	// make observations and get a function to derive pod usage stats relative to those observations.
-	observations, statsFunc, err := makeSignalObservations(m.summaryProvider)
+	observations, statsFunc, err := makeSignalObservations(m.summaryProvider, m.machineInfo)
 	if err != nil {
 		glog.Errorf("eviction manager: unexpected err: %v", err)
 		return
@@ -285,7 +290,7 @@ func (m *managerImpl) reclaimNodeLevelResources(resourceToReclaim api.ResourceNa
 				glog.Errorf("eviction manager: unable to find value associated with signal %v", signal)
 				continue
 			}
-			value.Add(*reclaimed)
+			value.available.Add(*reclaimed)
 
 			// evaluate all current thresholds to see if with adjusted observations, we think we have met min reclaim goals
 			if len(thresholdsMet(m.thresholdsMet, observations, true)) == 0 {
