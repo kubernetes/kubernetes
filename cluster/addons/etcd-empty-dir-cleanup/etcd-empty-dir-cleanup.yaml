@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd-empty-dir-cleanup
+  namespace: kube-system
+  labels:
+    k8s-app: etcd-empty-dir-cleanup
+spec:
+  hostNetwork: true
+  dnsPolicy: Default
+  containers:
+  - name: etcd-empty-dir-cleanup
+    image: gcr.io/google_containers/etcd-empty-dir-cleanup:0.0.1
