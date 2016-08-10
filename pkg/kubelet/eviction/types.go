@@ -66,14 +66,23 @@ type Config struct {
 	Thresholds []Threshold
 }
 
+type ThresholdValue struct {
+	// The following fields are exclusive. Only the topmost non-zero field is used.
+
+	// Quantity is a quantity associated with the signal that is evaluated against the specified operator.
+	Quantity *resource.Quantity
+	// Percentage represents the usage percentage over the total resource that is evaluated against the specified operator.
+	Percentage float32
+}
+
 // Threshold defines a metric for when eviction should occur.
 type Threshold struct {
 	// Signal defines the entity that was measured.
 	Signal Signal
 	// Operator represents a relationship of a signal to a value.
 	Operator ThresholdOperator
-	// value is a quantity associated with the signal that is evaluated against the specified operator.
-	Value *resource.Quantity
+	// Value is the threshold the resource is evaluated against.
+	Value ThresholdValue
 	// GracePeriod represents the amount of time that a threshold must be met before eviction is triggered.
 	GracePeriod time.Duration
 	// MinReclaim represents the minimum amount of resource to reclaim if the threshold is met.
@@ -122,8 +131,16 @@ type statsFunc func(pod *api.Pod) (statsapi.PodStats, bool)
 // rankFunc sorts the pods in eviction order
 type rankFunc func(pods []*api.Pod, stats statsFunc)
 
+// signalObservation is an observed resoruce usage
+type singleObservation struct {
+	// The resource apacity
+	capacity *resource.Quantity
+	// The available resource
+	available *resource.Quantity
+}
+
 // signalObservations maps a signal to an observed quantity
-type signalObservations map[Signal]*resource.Quantity
+type signalObservations map[Signal]singleObservation
 
 // thresholdsObservedAt maps a threshold to a time that it was observed
 type thresholdsObservedAt map[Threshold]time.Time
