@@ -94,7 +94,7 @@ implementation of Hollow components/mocks will probably be lagging behind ‘rea
 one. For performance tests interesting variables are `NUM_NODES` and
 `MASTER_SIZE`. After start-kubemark script is finished you’ll have a ready
 Kubemark cluster, a kubeconfig file for talking to the Kubemark cluster is
-stored in `test/kubemark/kubeconfig.loc`.
+stored in `test/kubemark/kubeconfig.kubemark`.
 
 Currently we're running HollowNode with limit of 0.05 a CPU core and ~60MB or
 memory, which taking into account default cluster addons and fluentD running on
@@ -115,7 +115,7 @@ to the Docker repository (*GCR for us, using scripts from
 `cluster/gce/util.sh` - it may get tricky outside of GCE*)
 
 - Generates certificates and kubeconfig files, writes a kubeconfig locally to
-`test/kubemark/kubeconfig.loc` and creates a Secret which stores kubeconfig for
+`test/kubemark/kubeconfig.kubemark` and creates a Secret which stores kubeconfig for
 HollowKubelet/HollowProxy use (*used gcloud to transfer files to Master, should
 be easy to do outside of GCE*).
 
@@ -190,7 +190,7 @@ E.g. you want to see the logs of HollowKubelet on which pod `my-pod` is running.
 To do so you can execute:
 
 ```
-$ kubectl kubernetes/test/kubemark/kubeconfig.loc describe pod my-pod
+$ kubectl kubernetes/test/kubemark/kubeconfig.kubemark describe pod my-pod
 ```
 
 Which outputs pod description and among it a line:
