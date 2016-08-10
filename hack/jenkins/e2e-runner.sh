@@ -389,6 +389,10 @@ if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
   e2e_go_args+=(--upgrade_args="${GINKGO_UPGRADE_TEST_ARGS}")
 fi
 
+if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
+  e2e_go_args+=("--kubemark=true")
+fi
+
 go run ./hack/e2e.go \
   ${E2E_OPT:-} \
   "${e2e_go_args[@]}"
