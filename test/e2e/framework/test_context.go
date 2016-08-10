@@ -102,6 +102,8 @@ type TestContextType struct {
 type NodeTestContextType struct {
 	// Name of the node to run tests on (node e2e suite only).
 	NodeName string
+	// NodeConformance indicates whether the test is running in node conformance mode.
+	NodeConformance bool
 	// DisableKubenet disables kubenet when starting kubelet.
 	DisableKubenet bool
 	// Whether to enable the QoS Cgroup Hierarchy or not
@@ -209,6 +211,13 @@ func RegisterClusterFlags() {
 // Register flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on (node e2e suite only).")
+	// TODO(random-liu): Move kubelet start logic out of the test.
+	// TODO(random-liu): Move log fetch logic out of the test.
+	// There are different ways to start kubelet (systemd, initd, docker, rkt, manually started etc.)
+	// and manage logs (journald, upstart etc.).
+	// For different situation we need to mount different things into the container, run different commands.
+	// It is hard and unnecessary to deal with the complexity inside the test suite.
+	flag.BoolVar(&TestContext.NodeConformance, "conformance", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
 	// TODO(random-liu): Remove kubelet related flags when we move the kubelet start logic out of the test.
 	// TODO(random-liu): Find someway to get kubelet configuration, and automatic config and filter test based on the configuration.
 	flag.BoolVar(&TestContext.DisableKubenet, "disable-kubenet", false, "If true, start kubelet without kubenet. (default false)")
