@@ -476,6 +476,11 @@ In general, it should be strongly recommended that `DaemonSet` not
 create `BestEffort` pods to avoid being identified as a candidate pod
 for eviction. Instead `DaemonSet` should ideally include Guaranteed pods only.
 
+## Known issues
+
+The pod eviction may evict more pods than needed due to stats collection timing gap. This can be mitigated by adding
+the ability to get root container stats on an on-demand basis (https://github.com/google/cadvisor/issues/1247) in the future.
+
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/kubelet-eviction.md?pixel)]()
 <!-- END MUNGE: GENERATED_ANALYTICS -->
