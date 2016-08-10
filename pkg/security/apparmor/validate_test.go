@@ -37,7 +37,7 @@ func TestGetAppArmorFS(t *testing.T) {
 	assert.Equal(t, expectedPath, actualPath)
 }
 
-func TestValidateHost(t *testing.T) {
+func TestAdmitHost(t *testing.T) {
 	// This test only passes on systems running AppArmor with the default configuration.
 	// The test should be manually run if modifying the getAppArmorFS function.
 	t.Skip()
@@ -46,7 +46,7 @@ func TestValidateHost(t *testing.T) {
 	assert.Error(t, validateHost("rkt"))
 }
 
-func TestValidateProfile(t *testing.T) {
+func TestAdmitProfile(t *testing.T) {
 	loadedProfiles := map[string]bool{
 		"docker-default":                                true,
 		"foo-bar":                                       true,
@@ -160,10 +160,16 @@ func TestAdmitValidHost(t *testing.T) {
 			},
 		},
 	}
-	assert.NoError(t, v.Validate(pod), "Multi-container pod should validate")
+	assert.True(t, v.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}).Admit,
+		"Multi-container pod should be admitted")
 	for k, val := range pod.Annotations {
 		pod.Annotations[k] = val + "-bad"
-		assert.Error(t, v.Validate(pod), "Multi-container pod with invalid profile %s:%s", k, pod.Annotations[k])
+
+		result := v.Admit(&lifecycle.PodAdmitAttributes{Pod: pod})
+		assert.False(t, result.Admit, "Multi-container pod with invalid profile should be rejected")
+		assert.Equal(t, rejectReason, result.Reason, "Multi-container pod with invalid profile")
+		assert.NotEmpty(t, result.Message, "Multi-container pod with invalid profile")
+
 		pod.Annotations[k] = val // Restore.
 	}
 }
