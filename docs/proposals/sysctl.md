@@ -368,15 +368,15 @@ type PodSecurityContext struct {
 
 ### Annotations for the (external) versioned API
 
-- `sysctls.alpha.kubernetes.io/pod-sysctl-1: kernel.shm_rmid_forced:4`
-- `sysctls.alpha.kubernetes.io/pod-sysctl-2: kernel.msgmax:foo,bar`
-- ...
+```
+alpha.kubernetes.io/sysctls: kernel.shmmax:4,kernel.msgmax:1 2 3`
+```
+
+The value is a comma separated list of key-value pairs separated by colon.
+
+**Note**: none of the whitelisted (and in general none with the exceptions of descriptive plain text ones) sysctls use anything else than numbers, possibly separated with spaces.
 
 The same annotation keys are used for pods and `PodSecurityPolicy` objects.
-
-The value is everything behind the colon.
-
-Note that the use of the enumerations for multiple keys is intentional. An alternative would be to encode a list of key/values pairs in one annotation. But as abritrary values are supposed to work, an encoded list is much harder to use. Another alternative would be encode the sysctl name, e.g. `netIpv6Idgen-delay` for `net.ipv6.idgen_delay` (neither dots nor underscore are valid characters in an annotation key). But that does not make it easier either.
 
 ### Validation
 
