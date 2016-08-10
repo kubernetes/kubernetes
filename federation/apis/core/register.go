@@ -70,6 +70,8 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&api.DeleteOptions{},
 		&api.Secret{},
 		&api.SecretList{},
+		&api.Event{},
+		&api.EventList{},
 	)
 
 	// Register Unversioned types under their own special group
