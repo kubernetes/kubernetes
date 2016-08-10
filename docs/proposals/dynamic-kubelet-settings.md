@@ -57,7 +57,7 @@ The Kubelet is currently configured via command-line flags. This is painful for 
 - `api-default`: The defaults provided for omitted/nil fields by the API server.
 - `on-disk-config`: `KubeletConfiguration` provided on disk, used as a fallback when the Kubelet cannot contact the API server.
 - `minimal-config`: Conceptually, what the Kubelet needs to start up and contact the API server. This probably consists of the location of the API server and credentials to access the API server, and might be provided via flags or via `on-disk-config`.
-- `config-kubelet-<node-name>`: the `KubeletConfiguration` configmap specific to the node named `<node-name>`, set via the API server. **Note**: I changed this from `<node-name>-kubelet-configuration` so that an alphabetical sort groups by purpose (config), then by component (kubelet), then by node. It doesn't seem like we've really established configmap naming conventions, but I think this could be a reasonable strategy. (It could also be reasonable to do `component-purpose-<node-name>`, IMO). 
+- `kubelet-<node-name>`: the `KubeletConfiguration` configmap specific to the node named `<node-name>`, set via the API server. **Note**: I changed this from `<node-name>-kubelet-configuration` so that an alphabetical sort groups by purpose (config), then by component (kubelet), then by node. It doesn't seem like we've really established configmap naming conventions, but I think this could be a reasonable strategy. (It could also be reasonable to do `component-purpose-<node-name>`, IMO). 
 - **Note**: We've decided against using any sort of "global" Kubelet configuration object. Kubelets try to take up config immediately upon seeing new config, which could be very dangerous in the event of a bad config push. It is better to have a configmap for each node, and to have to think about a rollout strategy for updating config for groups of machines.
 
 ### Well-defined configmap type for Kubelet configuration
@@ -96,13 +96,13 @@ The Kubelet is currently configured via command-line flags. This is painful for 
 - Start the Kubelet with `minimal-config`
 - On-disk static pod manifests are used to bring up the API server, scheduler, controller-manager, etc.
 Once the master is ready, the user creates some configs via the API:
-- They might create a `config-kubelet-<node-name>`, e.g. if they want a master-specific configuration.
+- They might create a `kubelet-<node-name>` configmap in the `kube-system` namespace, e.g. if they want a master-specific configuration.
 - Then the Kubelets' configuration sync loops will see the new config, and the Kubelets will restart to take up that new config.
 
 ### Bringing up a Kubelet
 
 - Start the Kubelet with `minimal-config`
-- If `config-kubelet-<node-name>` exists on the API server, download and use the `config-kubelet-<node-name>`
+- If `kubelet-<node-name>` configmap exists in the `kube-system` namespace on the API server, download and use the `kubelet-<node-name>`
 - else if e.g. an `on-disk-config` flag is set, defer to the node's on-disk config.
 - else defer to config from flags
 - Finally, start the configuration sync loop in a background thread
