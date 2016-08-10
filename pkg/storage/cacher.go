@@ -138,6 +138,9 @@ type Cacher struct {
 	// Underlying storage.Interface.
 	storage Interface
 
+	// Expected type of objects in the underlying cache.
+	objectType reflect.Type
+
 	// "sliding window" of recent changes of objects and the current state.
 	watchCache *watchCache
 	reflector  *cache.Reflector
@@ -181,6 +184,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	cacher := &Cacher{
 		ready:       newReady(),
 		storage:     config.Storage,
+		objectType:  reflect.TypeOf(config.Type),
 		watchCache:  watchCache,
 		reflector:   cache.NewReflector(listerWatcher, config.Type, watchCache, 0),
 		versioner:   config.Versioner,
@@ -440,6 +444,7 @@ func (c *Cacher) processEvent(event watchCacheEvent) {
 }
 
 func (c *Cacher) terminateAllWatchers() {
+	glog.Warningf("Terminating all watchers from cacher %v", c.objectType)
 	c.Lock()
 	defer c.Unlock()
 	c.watchers.terminateAll()
