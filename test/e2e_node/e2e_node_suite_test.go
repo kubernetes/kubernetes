@@ -44,22 +44,24 @@ import (
 	"github.com/onsi/ginkgo/config"
 	more_reporters "github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/pflag"
 )
 
 var e2es *E2EServices
 
 var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
-
-// TODO(random-liu): Should we allow user to specify this flag? Maybe add a warning in the description.
 var startServicesOnly = flag.Bool("start-services-only", false, "If true, only start services (etcd, apiserver), and not run test. (default false)")
 
 func init() {
 	framework.RegisterCommonFlags()
 	framework.RegisterNodeFlags()
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	// Mark the start-services-only flag as hidden to avoid user from using it.
+	pflag.CommandLine.MarkHidden("start-services-only")
+	pflag.Parse()
 }
 
 func TestE2eNode(t *testing.T) {
-	flag.Parse()
 	if *startServicesOnly {
 		// If start-services-only is specified, only run all services without running real test.
 		RunE2EServices()
