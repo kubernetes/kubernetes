@@ -633,10 +633,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	}
 
 	if secureLocation != "" {
-		handler := apiserver.TimeoutHandler(s.Handler, longRunningTimeout)
+		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler), longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, apiserver.RecoverPanics(handler)),
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, handler),
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Can't use SSLv3 because of POODLE and BEAST
@@ -696,10 +696,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		}
 	}
 
-	handler := apiserver.TimeoutHandler(s.InsecureHandler, longRunningTimeout)
+	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler), longRunningTimeout)
 	http := &http.Server{
 		Addr:           insecureLocation,
-		Handler:        apiserver.RecoverPanics(handler),
+		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
 	}
 
