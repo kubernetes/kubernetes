@@ -79,10 +79,12 @@ func TestMemoryPressure(t *testing.T) {
 	summaryStatsMaker := func(nodeAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
 		val := resource.MustParse(nodeAvailableBytes)
 		availableBytes := uint64(val.Value())
+		WorkingSetBytes := uint64(val.Value())
 		result := &statsapi.Summary{
 			Node: statsapi.NodeStats{
 				Memory: &statsapi.MemoryStats{
-					AvailableBytes: &availableBytes,
+					AvailableBytes:  &availableBytes,
+					WorkingSetBytes: &WorkingSetBytes,
 				},
 			},
 			Pods: []statsapi.PodStats{},
@@ -129,12 +131,16 @@ func TestMemoryPressure(t *testing.T) {
 			{
 				Signal:   SignalMemoryAvailable,
 				Operator: OpLessThan,
-				Value:    quantityMustParse("1Gi"),
+				Value: ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
 			},
 			{
-				Signal:      SignalMemoryAvailable,
-				Operator:    OpLessThan,
-				Value:       quantityMustParse("2Gi"),
+				Signal:   SignalMemoryAvailable,
+				Operator: OpLessThan,
+				Value: ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
 				GracePeriod: time.Minute * 2,
 			},
 		},
@@ -317,16 +323,20 @@ func TestDiskPressureNodeFs(t *testing.T) {
 	summaryStatsMaker := func(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
 		rootFsVal := resource.MustParse(rootFsAvailableBytes)
 		rootFsBytes := uint64(rootFsVal.Value())
+		rootFsCapacityBytes := uint64(rootFsVal.Value() * 2)
 		imageFsVal := resource.MustParse(imageFsAvailableBytes)
 		imageFsBytes := uint64(imageFsVal.Value())
+		imageFsCapacityBytes := uint64(imageFsVal.Value() * 2)
 		result := &statsapi.Summary{
 			Node: statsapi.NodeStats{
 				Fs: &statsapi.FsStats{
 					AvailableBytes: &rootFsBytes,
+					CapacityBytes:  &rootFsCapacityBytes,
 				},
 				Runtime: &statsapi.RuntimeStats{
 					ImageFs: &statsapi.FsStats{
 						AvailableBytes: &imageFsBytes,
+						CapacityBytes:  &imageFsCapacityBytes,
 					},
 				},
 			},
@@ -376,12 +386,16 @@ func TestDiskPressureNodeFs(t *testing.T) {
 			{
 				Signal:   SignalNodeFsAvailable,
 				Operator: OpLessThan,
-				Value:    quantityMustParse("1Gi"),
+				Value: ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
 			},
 			{
-				Signal:      SignalNodeFsAvailable,
-				Operator:    OpLessThan,
-				Value:       quantityMustParse("2Gi"),
+				Signal:   SignalNodeFsAvailable,
+				Operator: OpLessThan,
+				Value: ThresholdValue{
+					Quantity: quantityMustParse("2Gi"),
+				},
 				GracePeriod: time.Minute * 2,
 			},
 		},
@@ -544,10 +558,12 @@ func TestMinReclaim(t *testing.T) {
 	summaryStatsMaker := func(nodeAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
 		val := resource.MustParse(nodeAvailableBytes)
 		availableBytes := uint64(val.Value())
+		WorkingSetBytes := uint64(val.Value())
 		result := &statsapi.Summary{
 			Node: statsapi.NodeStats{
 				Memory: &statsapi.MemoryStats{
-					AvailableBytes: &availableBytes,
+					AvailableBytes:  &availableBytes,
+					WorkingSetBytes: &WorkingSetBytes,
 				},
 			},
 			Pods: []statsapi.PodStats{},
@@ -592,9 +608,11 @@ func TestMinReclaim(t *testing.T) {
 		PressureTransitionPeriod: time.Minute * 5,
 		Thresholds: []Threshold{
 			{
-				Signal:     SignalMemoryAvailable,
-				Operator:   OpLessThan,
-				Value:      quantityMustParse("1Gi"),
+				Signal:   SignalMemoryAvailable,
+				Operator: OpLessThan,
+				Value: ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
 				MinReclaim: quantityMustParse("500Mi"),
 			},
 		},
@@ -703,16 +721,20 @@ func TestNodeReclaimFuncs(t *testing.T) {
 	summaryStatsMaker := func(rootFsAvailableBytes, imageFsAvailableBytes string, podStats map[*api.Pod]statsapi.PodStats) *statsapi.Summary {
 		rootFsVal := resource.MustParse(rootFsAvailableBytes)
 		rootFsBytes := uint64(rootFsVal.Value())
+		rootFsCapacityBytes := uint64(rootFsVal.Value() * 2)
 		imageFsVal := resource.MustParse(imageFsAvailableBytes)
 		imageFsBytes := uint64(imageFsVal.Value())
+		imageFsCapacityBytes := uint64(imageFsVal.Value() * 2)
 		result := &statsapi.Summary{
 			Node: statsapi.NodeStats{
 				Fs: &statsapi.FsStats{
 					AvailableBytes: &rootFsBytes,
+					CapacityBytes:  &rootFsCapacityBytes,
 				},
 				Runtime: &statsapi.RuntimeStats{
 					ImageFs: &statsapi.FsStats{
 						AvailableBytes: &imageFsBytes,
+						CapacityBytes:  &imageFsCapacityBytes,
 					},
 				},
 			},
@@ -761,9 +783,11 @@ func TestNodeReclaimFuncs(t *testing.T) {
 		PressureTransitionPeriod: time.Minute * 5,
 		Thresholds: []Threshold{
 			{
-				Signal:     SignalNodeFsAvailable,
-				Operator:   OpLessThan,
-				Value:      quantityMustParse("1Gi"),
+				Signal:   SignalNodeFsAvailable,
+				Operator: OpLessThan,
+				Value: ThresholdValue{
+					Quantity: quantityMustParse("1Gi"),
+				},
 				MinReclaim: quantityMustParse("500Mi"),
 			},
 		},
