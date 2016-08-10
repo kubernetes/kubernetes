@@ -27,10 +27,42 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
-## Abstract
+# Setting Sysctls on the Pod Level
 
 This proposal aims at extending the current pod specification with support
-for namespaced kernel parameters set for each pod.
+for namespaced kernel parameters (sysctls) set for each pod.
+
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Setting Sysctls on the Pod Level](#setting-sysctls-on-the-pod-level)
+  - [Abstract](#abstract)
+  - [Motivation](#motivation)
+  - [Abstract Use Cases](#abstract-use-cases)
+  - [Constraints and Assumptions](#constraints-and-assumptions)
+  - [Further work (out of scope for this proposal)](#further-work-out-of-scope-for-this-proposal)
+  - [Community Work](#community-work)
+    - [Docker support for sysctl](#docker-support-for-sysctl)
+    - [Runc support for sysctl](#runc-support-for-sysctl)
+    - [Rkt support for sysctl](#rkt-support-for-sysctl)
+  - [Design Alternatives and Considerations](#design-alternatives-and-considerations)
+  - [Analysis of Sysctls on the initial Whitelist](#analysis-of-sysctls-on-the-initial-whitelist)
+    - [Summary](#summary)
+  - [Proposed Design](#proposed-design)
+    - [(Internal) pod API changes](#internal-pod-api-changes)
+    - [Annotations for the (external) versioned API](#annotations-for-the-external-versioned-api)
+    - [Validation](#validation)
+    - [Error behavior](#error-behavior)
+    - [SecurityContext Enforcement](#securitycontext-enforcement)
+      - [Alternative 1: by name](#alternative-1-by-name)
+      - [Sketch of Alternative 2: SysctlPolicy](#sketch-of-alternative-2-sysctlpolicy)
+    - [Application of the given Sysctls](#application-of-the-given-sysctls)
+  - [Examples](#examples)
+    - [Use in a pod](#use-in-a-pod)
+    - [Allowing only certain sysctls](#allowing-only-certain-sysctls)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
+## Abstract
 
 In Linux, the sysctl interface allows an administrator to modify kernel
 parameters at runtime. Parameters are available via `/proc/sys/` virtual
