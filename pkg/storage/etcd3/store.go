@@ -73,20 +73,6 @@ func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
 	}
 }
 
-// Backends implements storage.Interface.Backends.
-func (s *store) Backends(ctx context.Context) []string {
-	resp, err := s.client.MemberList(ctx)
-	if err != nil {
-		glog.Errorf("Error obtaining etcd members list: %q", err)
-		return nil
-	}
-	var mlist []string
-	for _, member := range resp.Members {
-		mlist = append(mlist, member.ClientURLs...)
-	}
-	return mlist
-}
-
 // Codec implements storage.Interface.Codec.
 func (s *store) Codec() runtime.Codec {
 	return s.codec
