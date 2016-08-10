@@ -23,15 +23,15 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/1.4/pkg/api/v1"
+	ext "k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/1.4/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	ext "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -280,10 +280,7 @@ func newIngress(name string, svc *api.Service) *ext.Ingress {
 		Spec: ext.IngressSpec{
 			Backend: &ext.IngressBackend{
 				svc.Name,
-				intstr.IntOrString{
-					Type:   intstr.Int,
-					IntVal: svc.Spec.Ports[0].Port,
-				},
+				intstr.FromInt(int(svc.Spec.Ports[0].Port)),
 			},
 		},
 	}
@@ -436,7 +433,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 			// Create a test ingress.
 			By("Creating a test ingress")
 			ing := newIngress(dnsTestIngressName, svc)
-			_, err = f.Clientset_1_3.Ingresses(f.Namespace.Name).Create(ing)
+			_, err = f.StagingClient.Ingresses(f.Namespace.Name).Create(ing)
 			Expect(err).NotTo(HaveOccurred())
 
 			// All the names we need to be able to resolve.
