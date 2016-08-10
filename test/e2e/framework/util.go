@@ -1719,12 +1719,12 @@ func LoadConfig() (*restclient.Config, error) {
 	return clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: TestContext.Host}}).ClientConfig()
 }
 
-func LoadFederatedConfig() (*restclient.Config, error) {
+func LoadFederatedConfig(overrides *clientcmd.ConfigOverrides) (*restclient.Config, error) {
 	c, err := restclientConfig(federatedKubeContext)
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation client config: %v", err.Error())
 	}
-	cfg, err := clientcmd.NewDefaultClientConfig(*c, &clientcmd.ConfigOverrides{}).ClientConfig()
+	cfg, err := clientcmd.NewDefaultClientConfig(*c, overrides).ClientConfig()
 	if cfg != nil {
 		//TODO(colhom): this is only here because https://github.com/kubernetes/kubernetes/issues/25422
 		cfg.NegotiatedSerializer = api.Codecs
@@ -1755,7 +1755,7 @@ func setTimeouts(cs ...*http.Client) {
 }
 
 func LoadFederationClientset_1_4() (*federation_release_1_4.Clientset, error) {
-	config, err := LoadFederatedConfig()
+	config, err := LoadFederatedConfig(&clientcmd.ConfigOverrides{})
 	if err != nil {
 		return nil, err
 	}
