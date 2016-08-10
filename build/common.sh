@@ -176,14 +176,12 @@ function kube::build::docker_available_on_osx() {
     fi
 
     kube::log::status "No docker host is set. Checking options for setting one..."
-    if [[ -z "$(which docker-machine)" && -z "$(which boot2docker)" ]]; then
-      kube::log::status "It looks like you're running Mac OS X, yet none of Docker for Mac, docker-machine or boot2docker are on the path."
+    if [[ -z "$(which docker-machine)" ]]; then
+      kube::log::status "It looks like you're running Mac OS X, yet neither Docker for Mac or docker-machine can be found."
       kube::log::status "See: https://docs.docker.com/machine/ for installation instructions."
       return 1
     elif [[ -n "$(which docker-machine)" ]]; then
       kube::build::prepare_docker_machine
-    elif [[ -n "$(which boot2docker)" ]]; then
-      kube::build::prepare_boot2docker
     fi
   fi
 }
@@ -219,29 +217,6 @@ function kube::build::prepare_docker_machine() {
   return 0
 }
 
-function kube::build::prepare_boot2docker() {
-  kube::log::status "boot2docker cli has been deprecated in favor of docker-machine."
-  kube::log::status "See: https://github.com/boot2docker/boot2docker-cli for more details."
-  if [[ $(boot2docker status) != "running" ]]; then
-    kube::log::status "boot2docker isn't running. We'll try to start it."
-    boot2docker up || {
-      kube::log::error "Can't start boot2docker."
-      kube::log::error "You may need to 'boot2docker init' to create your VM."
-      return 1
-    }
-  fi
-
-  # Reach over and set the clock. After sleep/resume the clock will skew.
-  kube::log::status "Setting boot2docker clock"
-  boot2docker ssh sudo date -u -D "%Y%m%d%H%M.%S" --set "$(date -u +%Y%m%d%H%M.%S)" >/dev/null
-
-  kube::log::status "Setting boot2docker env variables"
-  $(boot2docker shellinit)
-  kube::log::status "boot2docker-vm has been successfully started."
-
-  return 0
-}
-
 function kube::build::is_osx() {
   [[ "$(uname)" == "Darwin" ]]
 }
@@ -274,15 +249,15 @@ function kube::build::ensure_docker_daemon_connectivity {
       echo
       echo "Possible causes:"
       echo "  - On Mac OS X, DOCKER_HOST hasn't been set. You may need to: "
-      echo "    - Create and start your VM using docker-machine or boot2docker: "
-      echo "      - docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
-      echo "      - boot2docker init && boot2docker start"
-      echo "    - Set your environment variables using: "
-      echo "      - eval \$(docker-machine env ${DOCKER_MACHINE_NAME})"
-      echo "      - \$(boot2docker shellinit)"
-      echo "    - Update your Docker VM"
-      echo "      - Error Message: 'Error response from daemon: client is newer than server (...)' "
-      echo "      - docker-machine upgrade ${DOCKER_MACHINE_NAME}"
+      echo "    - Set up Docker for Mac (https://docs.docker.com/docker-for-mac/)"
+      echo "    - Or, set up docker-machine"
+      echo "      - Create and start your VM using docker-machine: "
+      echo "        - docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
+      echo "      - Set your environment variables using: "
+      echo "        - eval \$(docker-machine env ${DOCKER_MACHINE_NAME})"
+      echo "      - Update your Docker VM"
+      echo "        - Error Message: 'Error response from daemon: client is newer than server (...)' "
+      echo "        - docker-machine upgrade ${DOCKER_MACHINE_NAME}"
       echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
       echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
       echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
