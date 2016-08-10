@@ -390,24 +390,26 @@ all known to be namespaced by the kernel. These two lists are defined under `pkg
 The initial whitelists will be:
 
 ```go
-var whitelist = map[string]struct{}{
-       "kernel.msgmax":                {}, # requires kmem accounting
-       "kernel.msgmnb":                {}, # requires kmem accounting
-       "kernel.msgmni":                {}, # requires kmem accounting
-       "kernel.sem":                   {}, # requires kmem accounting
-       "kernel.shmall":                {},
-       "kernel.shmmax":                {},
-       "kernel.shmmni":                {},
-       "kernel.shm_rmid_forced":       {},
-       "net.core.somaxconn":           {},
-       "net.ipv4.ip_local_port_range": {},
-       "net.ipv4.tcp_syncookies":      {},
+var whitelist = map[string]string{
+       "kernel.msgmax":                "ipc", # requires kmem accounting
+       "kernel.msgmnb":                "ipc", # requires kmem accounting
+       "kernel.msgmni":                "ipc", # requires kmem accounting
+       "kernel.sem":                   "ipc", # requires kmem accounting
+       "kernel.shmall":                "ipc",
+       "kernel.shmmax":                "ipc",
+       "kernel.shmmni":                "ipc",
+       "kernel.shm_rmid_forced":       "ipc",
+       "net.core.somaxconn":           "net",
+       "net.ipv4.ip_local_port_range": "net",
+       "net.ipv4.tcp_syncookies":      "net",
 }
 
-var whitelistPrefixes = []string{
-       "fs.mqueue.", # requires kmem accounting
+var whitelistPrefixes = map[string]string{
+       "fs.mqueue.": "ipc", # requires kmem accounting
 }
 ```
+
+The value of the whitelist maps is the kernel namespace that must be enabled. If a pod is launched with host ipc or network namespace, the respective sysctls are forbidden.
 
 **Note**: with the exception of `kernel.shm*` all of the whitelisted sysctls depend on kernel memory accounting to be enabled for proper resource isolation. This will not be the case for 1.4 by default, but is planned in 1.5. Until then using one of those requires the admin to account for the resource consumption himself, e.g. by using `--system-reserved` with the kubelet. This is not any worse though than excluding these sysctls because every pod can use ipc objects already now outside of any isolation or resource limits (e.g. 512MB of message queue data is usually permitted).
 
