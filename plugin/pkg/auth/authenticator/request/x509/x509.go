@@ -92,7 +92,10 @@ var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate
 	if len(chain[0].Subject.CommonName) == 0 {
 		return nil, false, nil
 	}
-	return &user.DefaultInfo{Name: chain[0].Subject.CommonName}, true, nil
+	return &user.DefaultInfo{
+		Name:   chain[0].Subject.CommonName,
+		Groups: chain[0].Subject.Organization,
+	}, true, nil
 })
 
 // DNSNameUserConversion builds user info from a certificate chain using the first DNSName on the certificate
