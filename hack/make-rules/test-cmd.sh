@@ -1519,6 +1519,51 @@ __EOF__
   kubectl delete namespace test-configmaps
 
   ####################
+  # ConfigMap Errors #
+  ####################
+
+  ### Test errors due to invalid config flags
+  # Pre-condition: no POD exists
+  # Command
+  output_message=$(! kubectl get pod --context="" --kubeconfig=missing 2>&1)
+  kube::test::if_has_string "${output_message}" "missing: no such file or directory"
+  # Post-condition: busybox0 & busybox1 PODs are retrieved, but because busybox2 is malformed, it should not show up  kube::test::if_has_string "${output_message}" "missing: no such file or directory"
+
+  # test empty flag value with invalid path to config
+  output_message=$(! kubectl get pod --user="" --kubeconfig=missing 2>&1)
+  # Post-condition: Although --user contains a "valid" value, missing config file returns error
+  kube::test::if_has_string "${output_message}" "missing: no such file or directory"
+
+  output_message=$(! kubectl get pod --cluster="" --kubeconfig=missing 2>&1)
+  # Post-condition: Although --cluster contains a "valid" value, missing config file returns error
+  kube::test::if_has_string "${output_message}" "missing: no such file or directory"
+
+  # test missing flag values
+  output_message=$(! kubectl get pod --context="missing-context" 2>&1)
+  kube::test::if_has_string "${output_message}" 'context "missing-context" does not exist'
+
+  output_message=$(! kubectl get pod --cluster="missing-cluster" 2>&1)
+  kube::test::if_has_string "${output_message}" 'cluster "missing-cluster" does not exist'
+
+  output_message=$(! kubectl get pod --user="missing-user" 2>&1)
+  kube::test::if_has_string "${output_message}" 'auth info "missing-user" does not exist'
+
+  # Test unset KUBECONFIG - Should receive error connecting to server
+  (
+    kubectl config view | sed -E "s/cluster: .*/cluster: none/g" | sed -E "s/token: .*/token: missing/g" | sed -E "s/name: .*//g" > /tmp/newconfig.yaml
+    set -x
+    # use "broken" config file to prevent remote calls to server
+    # test missing or invalid config file error 
+    output_message=$(! "${KUBE_OUTPUT_HOSTBIN}/kubectl" get pod --context="" --user="" --kubeconfig=/tmp/newconfig.yaml 2>&1)
+    set +x
+    kube::test::if_has_string "${output_message}" "failed to find client"
+  )
+
+  # test invalid config
+  output_message=$(! kubectl get pod --kubeconfig=missing-config 2>&1)
+  kube::test::if_has_string "${output_message}" 'no such file or directory'
+
+  ####################
   # Service Accounts #
   ####################
 
