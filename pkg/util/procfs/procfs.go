@@ -66,7 +66,8 @@ func PidOf(name string) []int {
 	pids := []int{}
 	filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return err
+			// We should continue processing other directories/files
+			return nil
 		}
 		base := filepath.Base(path)
 		// Traverse only the directories we are interested in
