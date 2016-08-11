@@ -46,7 +46,7 @@ function copy-logs-from-node() {
 
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
         local ip=$(get_ssh_hostname "${node}")
-        scp -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
+        scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
     else
         gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
     fi
