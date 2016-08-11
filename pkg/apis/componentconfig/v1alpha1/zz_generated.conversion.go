@@ -315,6 +315,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	} else {
 		out.KubeReserved = nil
 	}
+	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	return nil
 }
 
@@ -479,6 +480,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	} else {
 		out.KubeReserved = nil
 	}
+	out.ProtectKernelDefaults = in.ProtectKernelDefaults
 	return nil
 }
 
