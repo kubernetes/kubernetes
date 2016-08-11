@@ -59,40 +59,10 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
 		Tty:         &container.TTY,
+		Linux:       m.generateLinuxContainerConfig(container),
 	}
 
-	memoryLimit := container.Resources.Limits.Memory().Value()
-	cpuRequest := container.Resources.Requests.Cpu()
-	cpuLimit := container.Resources.Limits.Cpu()
-	var cpuShares int64
-	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
-		cpuShares = milliCPUToShares(cpuLimit.MilliValue())
-	} else {
-		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
-		// of CPU shares.
-		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
-	}
-	if cpuShares != 0 || memoryLimit != 0 || m.cpuCFSQuota {
-		linuxResource := &runtimeApi.LinuxContainerResources{}
-		if cpuShares != 0 {
-			linuxResource.CpuShares = &cpuShares
-		}
-		if memoryLimit != 0 {
-			linuxResource.MemoryLimitInBytes = &memoryLimit
-		}
-		if m.cpuCFSQuota {
-			// if cpuLimit.Amount is nil, then the appropriate default value is returned
-			// to allow full usage of cpu resource.
-			cpuQuota, cpuPeriod := milliCPUToQuota(cpuLimit.MilliValue())
-			linuxResource.CpuQuota = &cpuQuota
-			linuxResource.CpuPeriod = &cpuPeriod
-		}
-
-		config.Linux = &runtimeApi.LinuxContainerConfig{
-			Resources: linuxResource,
-		}
-	}
-
+	// set priviledged and readonlyRootfs
 	if container.SecurityContext != nil {
 		securityContext := container.SecurityContext
 		if securityContext.Privileged != nil {
@@ -101,38 +71,9 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		if securityContext.ReadOnlyRootFilesystem != nil {
 			config.ReadonlyRootfs = securityContext.ReadOnlyRootFilesystem
 		}
-
-		if securityContext.Capabilities != nil {
-			if config.Linux == nil {
-				config.Linux = &runtimeApi.LinuxContainerConfig{
-					Capabilities: &runtimeApi.Capability{
-						AddCapabilities:  make([]string, 0, len(securityContext.Capabilities.Add)),
-						DropCapabilities: make([]string, 0, len(securityContext.Capabilities.Drop)),
-					},
-				}
-			}
-
-			for index, value := range securityContext.Capabilities.Add {
-				config.Linux.Capabilities.AddCapabilities[index] = string(value)
-			}
-			for index, value := range securityContext.Capabilities.Drop {
-				config.Linux.Capabilities.DropCapabilities[index] = string(value)
-			}
-		}
-
-		if securityContext.SELinuxOptions != nil {
-			if config.Linux == nil {
-				config.Linux = &runtimeApi.LinuxContainerConfig{}
-			}
-			config.Linux.SelinuxOptions = &runtimeApi.SELinuxOption{
-				User:  &securityContext.SELinuxOptions.User,
-				Role:  &securityContext.SELinuxOptions.Role,
-				Type:  &securityContext.SELinuxOptions.Type,
-				Level: &securityContext.SELinuxOptions.Level,
-			}
-		}
 	}
 
+	// set environment variables
 	envs := make([]*runtimeApi.KeyValue, len(opts.Envs))
 	for idx := range opts.Envs {
 		e := opts.Envs[idx]
@@ -144,6 +85,65 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 	config.Envs = envs
 
 	return config, nil
+}
+
+// generateLinuxContainerConfig generates linux container config for kubelet runtime api.
+func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.Container) *runtimeApi.LinuxContainerConfig {
+	linuxConfig := &runtimeApi.LinuxContainerConfig{
+		Resources: &runtimeApi.LinuxContainerResources{},
+	}
+
+	// set linux container resources
+	var cpuShares int64
+	cpuRequest := container.Resources.Requests.Cpu()
+	cpuLimit := container.Resources.Limits.Cpu()
+	memoryLimit := container.Resources.Limits.Memory().Value()
+	if cpuRequest.IsZero() && !cpuLimit.IsZero() {
+		cpuShares = milliCPUToShares(cpuLimit.MilliValue())
+	} else {
+		// if cpuRequest.Amount is nil, then milliCPUToShares will return the minimal number
+		// of CPU shares.
+		cpuShares = milliCPUToShares(cpuRequest.MilliValue())
+	}
+	linuxConfig.Resources.CpuShares = &cpuShares
+	if memoryLimit != 0 {
+		linuxConfig.Resources.MemoryLimitInBytes = &memoryLimit
+	}
+	if m.cpuCFSQuota {
+		// if cpuLimit.Amount is nil, then the appropriate default value is returned
+		// to allow full usage of cpu resource.
+		cpuQuota, cpuPeriod := milliCPUToQuota(cpuLimit.MilliValue())
+		linuxConfig.Resources.CpuQuota = &cpuQuota
+		linuxConfig.Resources.CpuPeriod = &cpuPeriod
+	}
+
+	// set security context options
+	if container.SecurityContext != nil {
+		securityContext := container.SecurityContext
+		if securityContext.Capabilities != nil {
+			linuxConfig.Capabilities = &runtimeApi.Capability{
+				AddCapabilities:  make([]string, 0, len(securityContext.Capabilities.Add)),
+				DropCapabilities: make([]string, 0, len(securityContext.Capabilities.Drop)),
+			}
+			for index, value := range securityContext.Capabilities.Add {
+				linuxConfig.Capabilities.AddCapabilities[index] = string(value)
+			}
+			for index, value := range securityContext.Capabilities.Drop {
+				linuxConfig.Capabilities.DropCapabilities[index] = string(value)
+			}
+		}
+
+		if securityContext.SELinuxOptions != nil {
+			linuxConfig.SelinuxOptions = &runtimeApi.SELinuxOption{
+				User:  &securityContext.SELinuxOptions.User,
+				Role:  &securityContext.SELinuxOptions.Role,
+				Type:  &securityContext.SELinuxOptions.Type,
+				Level: &securityContext.SELinuxOptions.Level,
+			}
+		}
+	}
+
+	return linuxConfig
 }
 
 // makeMounts generates container volume mounts for kubelet runtime api.
