@@ -36,6 +36,7 @@ mkdir -p "${HOST_ARTIFACTS_DIR}"
 # provided must be resolvable on the *HOST*, not the container.
 
 docker run --rm=true \
+  --privileged=true \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "${REPO_DIR}":/go/src/k8s.io/kubernetes \
   -v "${WORKSPACE}/_artifacts":/workspace/artifacts \
