@@ -26,6 +26,7 @@ import (
 	"k8s.io/client-go/1.4/pkg/conversion"
 	"k8s.io/client-go/1.4/pkg/runtime"
 	"k8s.io/client-go/1.4/pkg/util/validation/field"
+	"k8s.io/client-go/1.4/pkg/watch/versioned"
 )
 
 const (
@@ -39,7 +40,106 @@ const (
 	NonConvertibleAnnotationPrefix = "kubernetes.io/non-convertible"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) {
+// This is a "fast-path" that avoids reflection for common types. It focuses on the objects that are
+// converted the most in the cluster.
+// TODO: generate one of these for every external API group - this is to prove the impact
+func addFastPathConversionFuncs(scheme *runtime.Scheme) error {
+	scheme.AddGenericConversionFunc(func(objA, objB interface{}, s conversion.Scope) (bool, error) {
+		switch a := objA.(type) {
+		case *Pod:
+			switch b := objB.(type) {
+			case *api.Pod:
+				return true, Convert_v1_Pod_To_api_Pod(a, b, s)
+			}
+		case *api.Pod:
+			switch b := objB.(type) {
+			case *Pod:
+				return true, Convert_api_Pod_To_v1_Pod(a, b, s)
+			}
+
+		case *Event:
+			switch b := objB.(type) {
+			case *api.Event:
+				return true, Convert_v1_Event_To_api_Event(a, b, s)
+			}
+		case *api.Event:
+			switch b := objB.(type) {
+			case *Event:
+				return true, Convert_api_Event_To_v1_Event(a, b, s)
+			}
+
+		case *ReplicationController:
+			switch b := objB.(type) {
+			case *api.ReplicationController:
+				return true, Convert_v1_ReplicationController_To_api_ReplicationController(a, b, s)
+			}
+		case *api.ReplicationController:
+			switch b := objB.(type) {
+			case *ReplicationController:
+				return true, Convert_api_ReplicationController_To_v1_ReplicationController(a, b, s)
+			}
+
+		case *Node:
+			switch b := objB.(type) {
+			case *api.Node:
+				return true, Convert_v1_Node_To_api_Node(a, b, s)
+			}
+		case *api.Node:
+			switch b := objB.(type) {
+			case *Node:
+				return true, Convert_api_Node_To_v1_Node(a, b, s)
+			}
+
+		case *Namespace:
+			switch b := objB.(type) {
+			case *api.Namespace:
+				return true, Convert_v1_Namespace_To_api_Namespace(a, b, s)
+			}
+		case *api.Namespace:
+			switch b := objB.(type) {
+			case *Namespace:
+				return true, Convert_api_Namespace_To_v1_Namespace(a, b, s)
+			}
+
+		case *Service:
+			switch b := objB.(type) {
+			case *api.Service:
+				return true, Convert_v1_Service_To_api_Service(a, b, s)
+			}
+		case *api.Service:
+			switch b := objB.(type) {
+			case *Service:
+				return true, Convert_api_Service_To_v1_Service(a, b, s)
+			}
+
+		case *Endpoints:
+			switch b := objB.(type) {
+			case *api.Endpoints:
+				return true, Convert_v1_Endpoints_To_api_Endpoints(a, b, s)
+			}
+		case *api.Endpoints:
+			switch b := objB.(type) {
+			case *Endpoints:
+				return true, Convert_api_Endpoints_To_v1_Endpoints(a, b, s)
+			}
+
+		case *versioned.Event:
+			switch b := objB.(type) {
+			case *versioned.InternalEvent:
+				return true, versioned.Convert_versioned_Event_to_versioned_InternalEvent(a, b, s)
+			}
+		case *versioned.InternalEvent:
+			switch b := objB.(type) {
+			case *versioned.Event:
+				return true, versioned.Convert_versioned_InternalEvent_to_versioned_Event(a, b, s)
+			}
+		}
+		return false, nil
+	})
+	return nil
+}
+
+func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
 	err := scheme.AddConversionFuncs(
 		Convert_api_Pod_To_v1_Pod,
@@ -60,8 +160,7 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_extensions_ReplicaSetStatus_to_v1_ReplicationControllerStatus,
 	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
@@ -82,10 +181,10 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 				default:
 					return "", "", fmt.Errorf("field label %q not supported for %q", label, kind)
 				}
-			})
+			},
+		)
 		if err != nil {
-			// If one of the conversion functions is malformed, detect it immediately.
-			panic(err)
+			return err
 		}
 	}
 
@@ -108,10 +207,10 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
+		},
+	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Node",
 		func(label, value string) (string, string, error) {
@@ -123,10 +222,10 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
+		},
+	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "ReplicationController",
 		func(label, value string) (string, string, error) {
@@ -140,8 +239,7 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			}
 		})
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Event",
 		func(label, value string) (string, string, error) {
@@ -162,10 +260,10 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
+		},
+	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Namespace",
 		func(label, value string) (string, string, error) {
@@ -176,10 +274,10 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
+		},
+	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "PersistentVolume",
 		func(label, value string) (string, string, error) {
@@ -189,10 +287,10 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
+		},
+	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 	err = api.Scheme.AddFieldLabelConversionFunc("v1", "Secret",
 		func(label, value string) (string, string, error) {
@@ -204,11 +302,12 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
+		},
+	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
+	return nil
 }
 
 func Convert_v1_ReplicationController_to_extensions_ReplicaSet(in *ReplicationController, out *extensions.ReplicaSet, s conversion.Scope) error {

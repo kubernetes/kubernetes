@@ -28,7 +28,13 @@ import (
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole,
 		Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole,
 		Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding,
@@ -49,10 +55,7 @@ func init() {
 		Convert_rbac_RoleList_To_v1alpha1_RoleList,
 		Convert_v1alpha1_Subject_To_rbac_Subject,
 		Convert_rbac_Subject_To_v1alpha1_Subject,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {

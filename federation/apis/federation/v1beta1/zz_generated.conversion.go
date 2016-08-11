@@ -25,10 +25,17 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v1beta1_Cluster_To_federation_Cluster,
 		Convert_federation_Cluster_To_v1beta1_Cluster,
 		Convert_v1beta1_ClusterCondition_To_federation_ClusterCondition,
@@ -41,10 +48,7 @@ func init() {
 		Convert_federation_ClusterStatus_To_v1beta1_ClusterStatus,
 		Convert_v1beta1_ServerAddressByClientCIDR_To_federation_ServerAddressByClientCIDR,
 		Convert_federation_ServerAddressByClientCIDR_To_v1beta1_ServerAddressByClientCIDR,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v1beta1_Cluster_To_federation_Cluster(in *Cluster, out *federation.Cluster, s conversion.Scope) error {
