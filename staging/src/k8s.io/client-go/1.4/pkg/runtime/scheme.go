@@ -211,6 +211,11 @@ func (s *Scheme) KnownTypes(gv unversioned.GroupVersion) map[string]reflect.Type
 	return types
 }
 
+// AllKnownTypes returns the all known types.
+func (s *Scheme) AllKnownTypes() map[unversioned.GroupVersionKind]reflect.Type {
+	return s.gvkToType
+}
+
 // ObjectKind returns the group,version,kind of the go object and true if this object
 // is considered unversioned, or an error if it's not a pointer or is unregistered.
 func (s *Scheme) ObjectKind(obj Object) (unversioned.GroupVersionKind, bool, error) {

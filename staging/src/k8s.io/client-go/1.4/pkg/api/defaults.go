@@ -14,33 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha1
+package api
 
 import (
-	"k8s.io/client-go/1.4/pkg/api/unversioned"
+	"k8s.io/client-go/1.4/pkg/fields"
+	"k8s.io/client-go/1.4/pkg/labels"
 	"k8s.io/client-go/1.4/pkg/runtime"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return scheme.AddDefaultingFuncs(
-		SetDefaults_PetSet,
-	)
-}
-
-func SetDefaults_PetSet(obj *PetSet) {
-	labels := obj.Spec.Template.Labels
-	if labels != nil {
-		if obj.Spec.Selector == nil {
-			obj.Spec.Selector = &unversioned.LabelSelector{
-				MatchLabels: labels,
+		func(obj *ListOptions) {
+			if obj.LabelSelector == nil {
+				obj.LabelSelector = labels.Everything()
 			}
-		}
-		if len(obj.Labels) == 0 {
-			obj.Labels = labels
-		}
-	}
-	if obj.Spec.Replicas == nil {
-		obj.Spec.Replicas = new(int32)
-		*obj.Spec.Replicas = 1
-	}
+			if obj.FieldSelector == nil {
+				obj.FieldSelector = fields.Everything()
+			}
+		},
+	)
 }
