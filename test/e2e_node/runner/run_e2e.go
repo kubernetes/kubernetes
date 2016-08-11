@@ -29,8 +29,10 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"k8s.io/kubernetes/test/e2e_node"
@@ -40,7 +42,7 @@ import (
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/compute/v1"
+	compute "google.golang.org/api/compute/v1"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
@@ -57,16 +59,19 @@ var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar
 var setupNode = flag.Bool("setup-node", false, "When true, current user will be added to docker group on the test machine")
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
 var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
+var benchmarkConfigFile = flag.String("benchmark-config-file", "", "yaml file describing the benchmark to run")
 
-var computeService *compute.Service
+var (
+	computeService *compute.Service
+	arc            Archive
+	globalID       uint64 = 0
+)
 
 type Archive struct {
 	sync.Once
 	path string
 	err  error
 }
-
-var arc Archive
 
 type TestResult struct {
 	output string
@@ -108,7 +113,24 @@ type internalGCEImage struct {
 	metadata *compute.Metadata
 }
 
+// e2e node benchmark configuration
+type BenchmarkConfigList struct {
+	Configs []BenchmarkConfig `json:"configs"`
+}
+
+type BenchmarkConfig struct {
+	Machine string   `json:"machine"`
+	Host    string   `json:"host"` // used for non-gce, not implemented yet
+	Image   GCEImage `json:"image"`
+	Tests   []string `json:"tests"`
+}
+
 func main() {
+	var (
+		gceImages           *internalImageConfig
+		benchmarkConfigList *BenchmarkConfigList
+	)
+
 	flag.Parse()
 	rand.Seed(time.Now().UTC().UnixNano())
 	if *buildOnly {
@@ -117,80 +139,119 @@ func main() {
 		return
 	}
 
-	if *hosts == "" && *imageConfigFile == "" && *images == "" {
-		glog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
-	}
 	var err error
 	computeService, err = getComputeClient()
 	if err != nil {
 		glog.Fatalf("Unable to create gcloud compute service using defaults.  Make sure you are authenticated. %v", err)
 	}
 
-	gceImages := &internalImageConfig{
-		images: make(map[string]internalGCEImage),
-	}
-	if *imageConfigFile != "" {
-		// parse images
-		imageConfigData, err := ioutil.ReadFile(*imageConfigFile)
-		if err != nil {
-			glog.Fatalf("Could not read image config file provided: %v", err)
-		}
-		externalImageConfig := ImageConfig{Images: make(map[string]GCEImage)}
-		err = yaml.Unmarshal(imageConfigData, &externalImageConfig)
-		if err != nil {
-			glog.Fatalf("Could not parse image config file: %v", err)
-		}
-		for _, imageConfig := range externalImageConfig.Images {
-			var images []string
-			if imageConfig.ImageRegex != "" && imageConfig.Image == "" {
-				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.Project, imageConfig.PreviousImages)
-				if err != nil {
-					glog.Fatalf("Could not retrieve list of images based on image prefix %q: %v", imageConfig.ImageRegex, err)
-				}
-			} else {
-				images = []string{imageConfig.Image}
+	// If 'benchmarkConfigFile' is set, run benchmark instead of test
+	runBenchmark := (*benchmarkConfigFile != "")
+
+	// Run benchmark instead of test
+	if runBenchmark {
+		benchmarkConfigList = &BenchmarkConfigList{}
+		if *benchmarkConfigFile != "" {
+			benchmarkConfigData, err := ioutil.ReadFile(*benchmarkConfigFile)
+			if err != nil {
+				glog.Fatalf("Could not read benchmark config file provided: %v", err)
 			}
-			for _, image := range images {
+			err = yaml.Unmarshal(benchmarkConfigData, benchmarkConfigList)
+			fmt.Printf("%+v", *benchmarkConfigList)
+			if err != nil {
+				glog.Fatalf("Could not parse benchmark config file: %v", err)
+			}
+		} else {
+			glog.Fatalf("Must provide benchmark config file.\n")
+		}
+
+		noZone := (*zone == "")
+		noProject := (*project == "")
+		for _, config := range benchmarkConfigList.Configs {
+			if config.Host == "" {
+				if config.Machine == "" || config.Image.Image == "" || config.Image.Project == "" {
+					glog.Fatalf("Must specify machine/image/project for config \n%v\n", config)
+				}
+				if noZone {
+					glog.Fatal("Must specify --zone flag")
+				}
+				if noProject {
+					glog.Fatal("Must specify --project flag to launch images into")
+				}
+			}
+		}
+	} else {
+		if *hosts == "" && *imageConfigFile == "" && *images == "" {
+			glog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
+		}
+
+		gceImages := &internalImageConfig{
+			images: make(map[string]internalGCEImage),
+		}
+		if *imageConfigFile != "" {
+			// parse images
+			imageConfigData, err := ioutil.ReadFile(*imageConfigFile)
+			if err != nil {
+				glog.Fatalf("Could not read image config file provided: %v", err)
+			}
+			externalImageConfig := ImageConfig{Images: make(map[string]GCEImage)}
+			err = yaml.Unmarshal(imageConfigData, &externalImageConfig)
+			if err != nil {
+				glog.Fatalf("Could not parse image config file: %v", err)
+			}
+			for _, imageConfig := range externalImageConfig.Images {
+				var images []string
+				if imageConfig.ImageRegex != "" && imageConfig.Image == "" {
+					images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.Project, imageConfig.PreviousImages)
+					if err != nil {
+						glog.Fatalf("Could not retrieve list of images based on image prefix %q: %v", imageConfig.ImageRegex, err)
+					}
+				} else {
+					images = []string{imageConfig.Image}
+				}
+				for _, image := range images {
+					gceImage := internalGCEImage{
+						image:    image,
+						project:  imageConfig.Project,
+						metadata: getImageMetadata(imageConfig.Metadata),
+					}
+					gceImages.images[image] = gceImage
+				}
+			}
+		}
+
+		// Allow users to specify additional images via cli flags for local testing
+		// convenience; merge in with config file
+		if *images != "" {
+			if *imageProject == "" {
+				glog.Fatal("Must specify --image-project if you specify --images")
+			}
+			cliImages := strings.Split(*images, ",")
+			for _, img := range cliImages {
 				gceImage := internalGCEImage{
-					image:    image,
-					project:  imageConfig.Project,
-					metadata: getImageMetadata(imageConfig.Metadata),
+					image:    img,
+					project:  *imageProject,
+					metadata: getImageMetadata(*instanceMetadata),
 				}
-				gceImages.images[image] = gceImage
+				gceImages.images[img] = gceImage
+			}
+		}
+
+		if len(gceImages.images) != 0 && *zone == "" {
+			glog.Fatal("Must specify --zone flag")
+		}
+		for shortName, image := range gceImages.images {
+			if image.project == "" {
+				glog.Fatalf("Invalid config for %v; must specify a project", shortName)
+			}
+		}
+		if len(gceImages.images) != 0 {
+			if *project == "" {
+				glog.Fatal("Must specify --project flag to launch images into")
 			}
 		}
 	}
 
-	// Allow users to specify additional images via cli flags for local testing
-	// convenience; merge in with config file
-	if *images != "" {
-		if *imageProject == "" {
-			glog.Fatal("Must specify --image-project if you specify --images")
-		}
-		cliImages := strings.Split(*images, ",")
-		for _, img := range cliImages {
-			gceImage := internalGCEImage{
-				image:    img,
-				project:  *imageProject,
-				metadata: getImageMetadata(*instanceMetadata),
-			}
-			gceImages.images[img] = gceImage
-		}
-	}
-
-	if len(gceImages.images) != 0 && *zone == "" {
-		glog.Fatal("Must specify --zone flag")
-	}
-	for shortName, image := range gceImages.images {
-		if image.project == "" {
-			glog.Fatalf("Invalid config for %v; must specify a project", shortName)
-		}
-	}
-	if len(gceImages.images) != 0 {
-		if *project == "" {
-			glog.Fatal("Must specify --project flag to launch images into")
-		}
-	}
 	if *instanceNamePrefix == "" {
 		*instanceNamePrefix = "tmp-node-e2e-" + uuid.NewUUID().String()[:8]
 	}
@@ -210,21 +271,42 @@ func main() {
 
 	results := make(chan *TestResult)
 	running := 0
-	for shortName := range gceImages.images {
-		imageConfig := gceImages.images[shortName]
-		fmt.Printf("Initializing e2e tests using image %s.\n", shortName)
-		running++
-		go func(image *internalGCEImage, junitFilePrefix string) {
-			results <- testImage(image, junitFilePrefix)
-		}(&imageConfig, shortName)
-	}
-	if *hosts != "" {
-		for _, host := range strings.Split(*hosts, ",") {
-			fmt.Printf("Initializing e2e tests using host %s.\n", host)
+
+	if runBenchmark {
+		for _, config := range benchmarkConfigList.Configs {
+			if config.Host == "" {
+				running++
+				fmt.Printf("Initializing e2e tests using image %s machine type %s.\n", config.Image.Image, config.Machine)
+				go func(config BenchmarkConfig, junitFilePrefix string) {
+					// convert external config to internal config
+					image := &internalGCEImage{
+						image:    config.Image.Image,
+						project:  config.Image.Project,
+						metadata: getImageMetadata(config.Image.Metadata),
+					}
+					results <- testNode(image, config.Machine, junitFilePrefix, testsToGinkgoFocus(config.Tests))
+				}(config, config.Image.Image)
+			} else {
+				glog.Fatal("Benchmark does not support specified host yet.")
+			}
+		}
+	} else {
+		for shortName := range gceImages.images {
+			imageConfig := gceImages.images[shortName]
+			fmt.Printf("Initializing e2e tests using image %s.\n", shortName)
 			running++
-			go func(host string, junitFilePrefix string) {
-				results <- testHost(host, *cleanup, junitFilePrefix, *setupNode)
-			}(host, host)
+			go func(image *internalGCEImage, junitFilePrefix string) {
+				results <- testImage(image, junitFilePrefix)
+			}(&imageConfig, shortName)
+		}
+		if *hosts != "" {
+			for _, host := range strings.Split(*hosts, ",") {
+				fmt.Printf("Initializing e2e tests using host %s.\n", host)
+				running++
+				go func(host string, junitFilePrefix string) {
+					results <- testHost(host, *cleanup, junitFilePrefix, *setupNode, *ginkgoFlags)
+				}(host, host)
+			}
 		}
 	}
 
@@ -284,8 +366,30 @@ func getImageMetadata(input string) *compute.Metadata {
 	return &ret
 }
 
+// testNode runs tests on specific machine type and image, for benchmark only.
+func testNode(image *internalGCEImage, machine string, junitFilePrefix string, ginkgoFocus string) *TestResult {
+	host, err := createInstance(image, machine)
+	if *deleteInstances {
+		defer deleteInstance(host)
+	}
+	if err != nil {
+		return &TestResult{
+			err: fmt.Errorf("unable to create gce instance with running docker daemon for image %s.  %v", image, err),
+		}
+	}
+
+	// Only delete the files if we are keeping the instance and want it cleaned up.
+	// If we are going to delete the instance, don't bother with cleaning up the files
+	deleteFiles := !*deleteInstances && *cleanup
+
+	// Zhou: pass in the Ginkgo focus for the machine type
+	*ginkgoFlags += (" " + ginkgoFocus)
+
+	return testHost(host, deleteFiles, junitFilePrefix, *setupNode, *ginkgoFlags)
+}
+
 // Run tests in archive against host
-func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode bool) *TestResult {
+func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode bool, ginkgoFlagsStr string) *TestResult {
 	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
 	if err != nil {
 		return &TestResult{
@@ -315,7 +419,7 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode b
 		}
 	}
 
-	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs, *ginkgoFlags)
+	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs, ginkgoFlagsStr)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -376,7 +480,7 @@ func getGCEImages(imageRegex, project string, previousImages int) ([]string, err
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
 func testImage(image *internalGCEImage, junitFilePrefix string) *TestResult {
-	host, err := createInstance(image)
+	host, err := createInstance(image, "")
 	if *deleteInstances {
 		defer deleteInstance(image.image)
 	}
@@ -389,16 +493,16 @@ func testImage(image *internalGCEImage, junitFilePrefix string) *TestResult {
 	// Only delete the files if we are keeping the instance and want it cleaned up.
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
-	return testHost(host, deleteFiles, junitFilePrefix, *setupNode)
+	return testHost(host, deleteFiles, junitFilePrefix, *setupNode, *ginkgoFlags)
 }
 
 // Provision a gce instance using image
-func createInstance(image *internalGCEImage) (string, error) {
+func createInstance(image *internalGCEImage, machine string) (string, error) {
 	glog.V(1).Infof("Creating instance %+v", *image)
-	name := imageToInstanceName(image.image)
+	name := imageToInstanceName(image.image, machine)
 	i := &compute.Instance{
 		Name:        name,
-		MachineType: machineType(),
+		MachineType: machineType(machine),
 		NetworkInterfaces: []*compute.NetworkInterface{
 			{
 				AccessConfigs: []*compute.AccessConfig{
@@ -534,13 +638,32 @@ func parseInstanceMetadata(str string) map[string]string {
 }
 
 func imageToInstanceName(image string) string {
-	return *instanceNamePrefix + "-" + image
+	if machine == "" {
+		return *instanceNamePrefix + "-" + image
+	}
+	atomic.AddUint64(&globalID, 1)
+	return machine + "-" + image + "-" + strconv.Itoa(int(atomic.LoadUint64(&globalID)))
 }
 
 func sourceImage(image, imageProject string) string {
 	return fmt.Sprintf("projects/%s/global/images/%s", imageProject, image)
 }
 
-func machineType() string {
-	return fmt.Sprintf("zones/%s/machineTypes/n1-standard-1", *zone)
+func machineType(machine string) string {
+	if machine == "" {
+		return fmt.Sprintf("zones/%s/machineTypes/n1-standard-1", *zone)
+	}
+	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, machine)
+}
+
+func testsToGinkgoFocus(tests []string) string {
+	focus := "--focus=\""
+	for i, test := range tests {
+		if i == 0 {
+			focus += test
+		} else {
+			focus += ("|" + test)
+		}
+	}
+	return focus + "\""
 }
