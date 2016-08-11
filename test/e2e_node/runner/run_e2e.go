@@ -185,7 +185,7 @@ func main() {
 			glog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
 		}
 
-		gceImages := &internalImageConfig{
+		gceImages = &internalImageConfig{
 			images: make(map[string]internalGCEImage),
 		}
 		if *imageConfigFile != "" {
@@ -639,7 +639,7 @@ func parseInstanceMetadata(str string) map[string]string {
 	return metadata
 }
 
-func imageToInstanceName(image string) string {
+func imageToInstanceName(image, machine string) string {
 	if machine == "" {
 		return *instanceNamePrefix + "-" + image
 	}
