@@ -18,14 +18,14 @@
 FROM golang:1.6.3
 MAINTAINER  Jeff Lowdermilk <jeffml@google.com>
 
-ENV WORKSPACE               /workspace
-ENV TERM                    xterm
-# Note: 1.11+ changes the format of the tarball, so that line likely will need to be
-# changed.
-ENV DOCKER_VERSION          1.9.1
-
+# Setup workspace and symlink to gopath
 WORKDIR /workspace
+RUN mkdir -p /go/src/k8s.io/kubernetes /workspace \
+    && ln -s /go/src/k8s.io/kubernetes /workspace/kubernetes
+ENV WORKSPACE=/workspace \
+    TERM=xterm
 
+# Install packages
 # dnsutils is needed by federation cluster scripts.
 # file is used when uploading test artifacts to GCS.
 # jq is used by hack/verify-godep-licenses.sh
@@ -41,10 +41,7 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y \
 	--no-install-recommends \
 	&& rm -rf /var/lib/apt/lists/*
 
-RUN curl -L "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz" |\
-  tar -C /usr/bin -xvzf- --strip-components=3 usr/local/bin/docker
-
-RUN mkdir -p /go/src/k8s.io/kubernetes \
-	&& ln -s /go/src/k8s.io/kubernetes /workspace/kubernetes
-
-RUN /bin/bash
+# Install docker
+# Note: 1.11+ changes the tarball format
+RUN curl -L "https://get.docker.com/builds/Linux/x86_64/docker-1.9.1.tgz" \
+    | tar -C /usr/bin -xvzf- --strip-components=3 usr/local/bin/docker
