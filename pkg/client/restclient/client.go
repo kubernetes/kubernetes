@@ -46,7 +46,7 @@ const (
 //
 // Most consumers should use client.New() to get a Kubernetes API client.
 type RESTClient struct {
-	urlProvider func() *url.URL
+	urlProvider *URLProvider
 	// versionedAPIPath is a path segment connecting the base URL to the resource root
 	versionedAPIPath string
 
@@ -104,7 +104,7 @@ func NewRESTClient(hosts []*url.URL, versionedAPIPath string, config ContentConf
 		throttle = rateLimiter
 	}
 	return &RESTClient{
-		urlProvider:      newSlightlyStickyProvider(hosts).get,
+		urlProvider:      &RoundRobinProvider{urls: hosts},
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
@@ -188,9 +188,9 @@ func (c *RESTClient) Verb(verb string) *Request {
 	backoff := c.createBackoffMgr()
 
 	if c.Client == nil {
-		return NewRequest(nil, verb, c.urlProvider(), c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+		return NewRequest(nil, verb, c.urlProvider, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 	}
-	return NewRequest(c.Client, verb, c.urlProvider(), c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
+	return NewRequest(c.Client, verb, c.urlProvider, c.versionedAPIPath, c.contentConfig, c.serializers, backoff, c.Throttle)
 }
 
 // Post begins a POST request. Short for c.Verb("POST").
