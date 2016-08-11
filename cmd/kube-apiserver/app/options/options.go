@@ -124,7 +124,7 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 		"e.g., setting empty UID in update request to its existing value. This flag can be turned off "+
 		"after we fix all the clients that send malformed updates.")
 
-	fs.BoolVar(&registry.EnableGarbageCollector, "enable-garbage-collector", false, ""+
+	fs.BoolVar(&registry.EnableGarbageCollector, "enable-garbage-collector", true, ""+
 		"Enables the generic garbage collector. MUST be synced with the corresponding flag "+
 		"of the kube-controller-manager.")
 }
