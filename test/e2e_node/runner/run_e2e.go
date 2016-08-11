@@ -374,7 +374,7 @@ func testNode(image *internalGCEImage, machine string, junitFilePrefix string, g
 	}
 	if err != nil {
 		return &TestResult{
-			err: fmt.Errorf("unable to create gce instance with running docker daemon for image %s.  %v", image, err),
+			err: fmt.Errorf("unable to create gce instance with running docker daemon for image %s.  %v", image.image, err),
 		}
 	}
 
@@ -382,7 +382,7 @@ func testNode(image *internalGCEImage, machine string, junitFilePrefix string, g
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
 
-	// Zhou: pass in the Ginkgo focus for the machine type
+	// Pass in the Ginkgo focus for the machine type
 	*ginkgoFlags += (" " + ginkgoFocus)
 
 	return testHost(host, deleteFiles, junitFilePrefix, *setupNode, *ginkgoFlags)
@@ -482,7 +482,7 @@ func getGCEImages(imageRegex, project string, previousImages int) ([]string, err
 func testImage(image *internalGCEImage, junitFilePrefix string) *TestResult {
 	host, err := createInstance(image, "")
 	if *deleteInstances {
-		defer deleteInstance(image.image)
+		defer deleteInstance(host)
 	}
 	if err != nil {
 		return &TestResult{
@@ -606,8 +606,7 @@ func getComputeClient() (*compute.Service, error) {
 	return nil, err
 }
 
-func deleteInstance(image string) {
-	instanceName := imageToInstanceName(image)
+func deleteInstance(instanceName string) {
 	glog.Infof("Deleting instance %q", instanceName)
 	_, err := computeService.Instances.Delete(*project, *zone, instanceName).Do()
 	if err != nil {
