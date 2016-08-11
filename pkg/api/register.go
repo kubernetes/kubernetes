@@ -61,11 +61,13 @@ var (
 )
 
 func init() {
-	// TODO(lavalamp): move this call to scheme builder above.
-	// Can't fix this without doing proper dependency tracking-- otherwise
-	// this will get double registered. (Consequence of not fixing this is
-	// that it only ever gets registered in the main api.Scheme, even
-	// though everyone needs these.)
+	// TODO(lavalamp): move this call to scheme builder above.  Can't
+	// remove it from here because lots of people inapropriately rely on it
+	// (specifically the unversioned time conversion). Can't have it in
+	// both places because then it gets double registered.  Consequence of
+	// current state is that it only ever gets registered in the main
+	// api.Scheme, even though everyone that uses anything from unversioned
+	// needs these.
 	if err := addConversionFuncs(Scheme); err != nil {
 		// Programmer error.
 		panic(err)
