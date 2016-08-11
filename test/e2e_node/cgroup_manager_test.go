@@ -31,21 +31,93 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
 			It("Top level QoS containers should have been created", func() {
-				if framework.TestContext.CgroupsPerQOS {
+				// return fast
+				if !framework.TestContext.CgroupsPerQOS {
+					return
+				}
+				podName := "qos-pod" + string(uuid.NewUUID())
+				contName := "qos-container" + string(uuid.NewUUID())
+				pod := &api.Pod{
+					ObjectMeta: api.ObjectMeta{
+						Name: podName,
+					},
+					Spec: api.PodSpec{
+						// Don't restart the Pod since it is expected to exit
+						RestartPolicy: api.RestartPolicyNever,
+						Containers: []api.Container{
+							{
+								Image:   ImageRegistry[busyBoxImage],
+								Name:    contName,
+								Command: []string{"sh", "-c", "if [ -d /tmp/memory/Burstable ] && [ -d /tmp/memory/BestEffort ]; then exit 0; else exit 1; fi"},
+								VolumeMounts: []api.VolumeMount{
+									{
+										Name:      "sysfscgroup",
+										MountPath: "/tmp",
+									},
+								},
+							},
+						},
+						Volumes: []api.Volume{
+							{
+								Name: "sysfscgroup",
+								VolumeSource: api.VolumeSource{
+									HostPath: &api.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+								},
+							},
+						},
+					},
+				}
+				podClient := f.PodClient()
+				podClient.Create(pod)
+				err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+				Expect(err).NotTo(HaveOccurred())
+			})
+		})
+	})
+
+	Describe("Pod containers", func() {
+		Context("On scheduling a Guaranteed Pod", func() {
+			It("Pod containers should have been created under the cgroup-root", func() {
+				if !framework.TestContext.CgroupsPerQOS {
+					return
+				}
+				var podUID string
+				By("Creating a Guaranteed pod in Namespace", func() {
 					podName := "qos-pod" + string(uuid.NewUUID())
 					contName := "qos-container" + string(uuid.NewUUID())
 					pod := &api.Pod{
 						ObjectMeta: api.ObjectMeta{
-							Name: podName,
+							Name:      podName,
+							Namespace: f.Namespace.Name,
 						},
 						Spec: api.PodSpec{
-							// Don't restart the Pod since it is expected to exit
-							RestartPolicy: api.RestartPolicyNever,
 							Containers: []api.Container{
 								{
-									Image:   ImageRegistry[busyBoxImage],
+									Image:     framework.GetPauseImageName(f.Client),
+									Name:      contName,
+									Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
+								},
+							},
+						},
+					}
+					podClient := f.PodClient()
+					apiPod := podClient.Create(pod)
+					podUID = string(apiPod.UID)
+				})
+				By("Checking if the pod cgroup was created", func() {
+					podName := "qos-pod" + string(uuid.NewUUID())
+					contName := "qos-container" + string(uuid.NewUUID())
+					pod := &api.Pod{
+						ObjectMeta: api.ObjectMeta{
+							Name:      podName,
+							Namespace: f.Namespace.Name,
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Image:   "gcr.io/google_containers/busybox:1.24",
 									Name:    contName,
-									Command: []string{"sh", "-c", "if [ -d /tmp/memory/Burstable ] && [ -d /tmp/memory/BestEffort ]; then exit 0; else exit 1; fi"},
+									Command: []string{"sh", "-c", "if [ -d /tmp/memory/pod#" + podUID + " ] && [ -d /tmp/cpu/pod#" + podUID + " ]; then exit 0; else exit 1; fi"},
 									VolumeMounts: []api.VolumeMount{
 										{
 											Name:      "sysfscgroup",
@@ -68,146 +140,78 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 					podClient.Create(pod)
 					err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
 					Expect(err).NotTo(HaveOccurred())
-				}
-			})
-		})
-	})
-
-	Describe("Pod containers", func() {
-		Context("On scheduling a Guaranteed Pod", func() {
-			It("Pod containers should have been created under the cgroup-root", func() {
-				if framework.TestContext.CgroupsPerQOS {
-					var podUID string
-					By("Creating a Guaranteed pod in Namespace", func() {
-						podName := "qos-pod" + string(uuid.NewUUID())
-						contName := "qos-container" + string(uuid.NewUUID())
-						pod := &api.Pod{
-							ObjectMeta: api.ObjectMeta{
-								Name:      podName,
-								Namespace: f.Namespace.Name,
-							},
-							Spec: api.PodSpec{
-								Containers: []api.Container{
-									{
-										Image:     framework.GetPauseImageName(f.Client),
-										Name:      contName,
-										Resources: getResourceRequirements(getResourceList("100m", "100Mi"), getResourceList("100m", "100Mi")),
-									},
-								},
-							},
-						}
-						podClient := f.PodClient()
-						apiPod := podClient.Create(pod)
-						podUID = string(apiPod.UID)
-					})
-					By("Checking if the pod cgroup was created", func() {
-						podName := "qos-pod" + string(uuid.NewUUID())
-						contName := "qos-container" + string(uuid.NewUUID())
-						pod := &api.Pod{
-							ObjectMeta: api.ObjectMeta{
-								Name:      podName,
-								Namespace: f.Namespace.Name,
-							},
-							Spec: api.PodSpec{
-								Containers: []api.Container{
-									{
-										Image:   "gcr.io/google_containers/busybox:1.24",
-										Name:    contName,
-										Command: []string{"sh", "-c", "if [ -d /tmp/memory/pod#" + podUID + " ] && [ -d /tmp/cpu/pod#" + podUID + " ]; then exit 0; else exit 1; fi"},
-										VolumeMounts: []api.VolumeMount{
-											{
-												Name:      "sysfscgroup",
-												MountPath: "/tmp",
-											},
-										},
-									},
-								},
-								Volumes: []api.Volume{
-									{
-										Name: "sysfscgroup",
-										VolumeSource: api.VolumeSource{
-											HostPath: &api.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
-										},
-									},
-								},
-							},
-						}
-						podClient := f.PodClient()
-						podClient.Create(pod)
-						err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
-						Expect(err).NotTo(HaveOccurred())
-					})
-				}
+				})
 			})
 		})
 		Context("On scheduling a BestEffort Pod", func() {
 			It("Pod containers should have been created under the BestEffort cgroup", func() {
-				if framework.TestContext.CgroupsPerQOS {
-					var podUID string
-					By("Creating a BestEffort pod in Namespace", func() {
-						podName := "qos-pod" + string(uuid.NewUUID())
-						contName := "qos-container" + string(uuid.NewUUID())
-						pod := &api.Pod{
-							ObjectMeta: api.ObjectMeta{
-								Name:      podName,
-								Namespace: f.Namespace.Name,
-							},
-							Spec: api.PodSpec{
-								// Don't restart the Pod since it is expected to exit
-								RestartPolicy: api.RestartPolicyNever,
-								Containers: []api.Container{
-									{
-										Image:     framework.GetPauseImageName(f.Client),
-										Name:      contName,
-										Resources: getResourceRequirements(getResourceList("", ""), getResourceList("", "")),
-									},
-								},
-							},
-						}
-						podClient := f.PodClient()
-						apiPod := podClient.Create(pod)
-						podUID = string(apiPod.UID)
-					})
-					By("Checking if the pod cgroup was created", func() {
-						podName := "qos-pod" + string(uuid.NewUUID())
-						contName := "qos-container" + string(uuid.NewUUID())
-						pod := &api.Pod{
-							ObjectMeta: api.ObjectMeta{
-								Name:      podName,
-								Namespace: f.Namespace.Name,
-							},
-							Spec: api.PodSpec{
-								// Don't restart the Pod since it is expected to exit
-								RestartPolicy: api.RestartPolicyNever,
-								Containers: []api.Container{
-									{
-										Image:   "gcr.io/google_containers/busybox:1.24",
-										Name:    contName,
-										Command: []string{"sh", "-c", "if [ -d /tmp/memory/BestEffort/pod#" + podUID + " ] && [ -d /tmp/cpu/BestEffort/pod#" + podUID + " ]; then exit 0; else exit 1; fi"},
-										VolumeMounts: []api.VolumeMount{
-											{
-												Name:      "sysfscgroup",
-												MountPath: "/tmp",
-											},
-										},
-									},
-								},
-								Volumes: []api.Volume{
-									{
-										Name: "sysfscgroup",
-										VolumeSource: api.VolumeSource{
-											HostPath: &api.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
-										},
-									},
-								},
-							},
-						}
-						podClient := f.PodClient()
-						podClient.Create(pod)
-						err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
-						Expect(err).NotTo(HaveOccurred())
-					})
+				if !framework.TestContext.CgroupsPerQOS {
+					return
 				}
+				var podUID string
+				By("Creating a BestEffort pod in Namespace", func() {
+					podName := "qos-pod" + string(uuid.NewUUID())
+					contName := "qos-container" + string(uuid.NewUUID())
+					pod := &api.Pod{
+						ObjectMeta: api.ObjectMeta{
+							Name:      podName,
+							Namespace: f.Namespace.Name,
+						},
+						Spec: api.PodSpec{
+							// Don't restart the Pod since it is expected to exit
+							RestartPolicy: api.RestartPolicyNever,
+							Containers: []api.Container{
+								{
+									Image:     framework.GetPauseImageName(f.Client),
+									Name:      contName,
+									Resources: getResourceRequirements(getResourceList("", ""), getResourceList("", "")),
+								},
+							},
+						},
+					}
+					podClient := f.PodClient()
+					apiPod := podClient.Create(pod)
+					podUID = string(apiPod.UID)
+				})
+				By("Checking if the pod cgroup was created", func() {
+					podName := "qos-pod" + string(uuid.NewUUID())
+					contName := "qos-container" + string(uuid.NewUUID())
+					pod := &api.Pod{
+						ObjectMeta: api.ObjectMeta{
+							Name:      podName,
+							Namespace: f.Namespace.Name,
+						},
+						Spec: api.PodSpec{
+							// Don't restart the Pod since it is expected to exit
+							RestartPolicy: api.RestartPolicyNever,
+							Containers: []api.Container{
+								{
+									Image:   "gcr.io/google_containers/busybox:1.24",
+									Name:    contName,
+									Command: []string{"sh", "-c", "if [ -d /tmp/memory/BestEffort/pod#" + podUID + " ] && [ -d /tmp/cpu/BestEffort/pod#" + podUID + " ]; then exit 0; else exit 1; fi"},
+									VolumeMounts: []api.VolumeMount{
+										{
+											Name:      "sysfscgroup",
+											MountPath: "/tmp",
+										},
+									},
+								},
+							},
+							Volumes: []api.Volume{
+								{
+									Name: "sysfscgroup",
+									VolumeSource: api.VolumeSource{
+										HostPath: &api.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+									},
+								},
+							},
+						},
+					}
+					podClient := f.PodClient()
+					podClient.Create(pod)
+					err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+					Expect(err).NotTo(HaveOccurred())
+				})
 			})
 		})
 	})
