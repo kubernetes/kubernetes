@@ -252,7 +252,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.KubeletDeps) (err error) {
 		glog.Warning(err)
 	}
 
-	if err := RunKubelet(&s.KubeletConfiguration, kubeDeps); err != nil {
+	if err := RunKubelet(&s.KubeletConfiguration, kubeDeps, s.RunOnce); err != nil {
 		return err
 	}
 
@@ -399,7 +399,7 @@ func addChaosToClientConfig(s *options.KubeletServer, config *restclient.Config)
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps) error {
+func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet.KubeletDeps, runOnce bool) error {
 	hostname := nodeutil.GetHostname(kubeCfg.HostnameOverride)
 	// Query the cloud provider for our node name, default to hostname if kcfg.Cloud == nil
 	nodeName := hostname
@@ -510,7 +510,7 @@ func RunKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *kubelet
 	}
 
 	// process pods and exit.
-	if kubeCfg.RunOnce {
+	if runOnce {
 		if _, err := k.RunOnce(podCfg.Updates()); err != nil {
 			return fmt.Errorf("runonce failed: %v", err)
 		}

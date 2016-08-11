@@ -381,7 +381,6 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.APIServerList = nil
 		}
-		out.RunOnce = in.RunOnce
 		return nil
 	}
 }

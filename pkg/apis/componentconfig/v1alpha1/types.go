@@ -455,7 +455,4 @@ type KubeletConfiguration struct {
 	// apiServerList is a list of Kubernetes API servers for publishing events
 	// and reading pods and services. (ip:port), comma separated.
 	APIServerList []string `json:"apiServerList"`
-	// If runOnce is true, the Kubelet will check the API server once for pods,
-	// run those in addition to the pods specified by the local manifest, and exit.
-	RunOnce bool
 }

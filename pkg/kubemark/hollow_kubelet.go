@@ -83,7 +83,7 @@ func NewHollowKubelet(
 
 // Starts this HollowKubelet and blocks.
 func (hk *HollowKubelet) Run() {
-	kubeletapp.RunKubelet(hk.KubeletConfiguration, hk.KubeletDeps)
+	kubeletapp.RunKubelet(hk.KubeletConfiguration, hk.KubeletDeps, false)
 	select {}
 }
 
