@@ -20,14 +20,16 @@ EVENT_STORE_IP=$1
 EVENT_STORE_URL="http://${EVENT_STORE_IP}:4002"
 NUM_NODES=$2
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
-	sudo docker run --net=host -d gcr.io/google_containers/etcd:3.0.3 /usr/local/bin/etcd \
+	sudo docker run --net=host -v /var/etcd/data-events:/var/etcd/data -d \
+		gcr.io/google_containers/etcd:3.0.3 /usr/local/bin/etcd \
 		--listen-peer-urls http://127.0.0.1:2381 \
 		--advertise-client-urls=http://127.0.0.1:4002 \
 		--listen-client-urls=http://0.0.0.0:4002 \
 		--data-dir=/var/etcd/data
 fi
 
-sudo docker run --net=host -d gcr.io/google_containers/etcd:3.0.3 /usr/local/bin/etcd \
+sudo docker run --net=host -v /var/etcd/data:/var/etcd/data -d \
+	gcr.io/google_containers/etcd:3.0.3 /usr/local/bin/etcd \
 	--listen-peer-urls http://127.0.0.1:2380 \
 	--advertise-client-urls=http://127.0.0.1:4001 \
 	--listen-client-urls=http://0.0.0.0:4001 \
