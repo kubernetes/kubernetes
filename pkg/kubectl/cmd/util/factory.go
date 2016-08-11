@@ -1080,7 +1080,7 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	}
 	if gvk.Group == apps.GroupName {
 		if c.c.AppsClient == nil {
-			return errors.New("unable to validate: no autoscaling client")
+			return errors.New("unable to validate: no apps client")
 		}
 		return getSchemaAndValidate(c.c.AppsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
 	}
