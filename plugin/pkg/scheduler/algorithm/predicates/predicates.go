@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -420,19 +421,53 @@ func (c *VolumeZoneChecker) predicate(pod *api.Pod, meta interface{}, nodeInfo *
 func getResourceRequest(pod *api.Pod) *schedulercache.Resource {
 	result := schedulercache.Resource{}
 	for _, container := range pod.Spec.Containers {
-		requests := container.Resources.Requests
-		result.Memory += requests.Memory().Value()
-		result.MilliCPU += requests.Cpu().MilliValue()
-		result.NvidiaGPU += requests.NvidiaGPU().Value()
+		for rName, rQuantity := range container.Resources.Requests {
+			switch rName {
+			case api.ResourceMemory:
+				result.Memory += rQuantity.Value()
+			case api.ResourceCPU:
+				result.MilliCPU += rQuantity.MilliValue()
+			case api.ResourceNvidiaGPU:
+				result.NvidiaGPU += rQuantity.Value()
+			default:
+				if strings.HasPrefix(string(rName), api.ResourceOpaqueIntPrefix) {
+					// Lazily allocate this map only if required.
+					if result.OpaqueIntResources == nil {
+						result.OpaqueIntResources = map[api.ResourceName]int64{}
+					}
+					result.OpaqueIntResources[rName] = rQuantity.Value()
+				}
+			}
+		}
 	}
 	// take max_resource(sum_pod, any_init_container)
 	for _, container := range pod.Spec.InitContainers {
-		requests := container.Resources.Requests
-		if mem := requests.Memory().Value(); mem > result.Memory {
-			result.Memory = mem
-		}
-		if cpu := requests.Cpu().MilliValue(); cpu > result.MilliCPU {
-			result.MilliCPU = cpu
+		for rName, rQuantity := range container.Resources.Requests {
+			switch rName {
+			case api.ResourceMemory:
+				if mem := rQuantity.Value(); mem > result.Memory {
+					result.Memory = mem
+				}
+			case api.ResourceCPU:
+				if cpu := rQuantity.MilliValue(); cpu > result.MilliCPU {
+					result.MilliCPU = cpu
+				}
+			case api.ResourceNvidiaGPU:
+				if gpu := rQuantity.Value(); gpu > result.NvidiaGPU {
+					result.NvidiaGPU = gpu
+				}
+			default:
+				if strings.HasPrefix(string(rName), api.ResourceOpaqueIntPrefix) {
+					// Lazily allocate this map only if required.
+					if result.OpaqueIntResources == nil {
+						result.OpaqueIntResources = map[api.ResourceName]int64{}
+					}
+					value := rQuantity.Value()
+					if value > result.OpaqueIntResources[rName] {
+						result.OpaqueIntResources[rName] = value
+					}
+				}
+			}
 		}
 	}
 	return &result
@@ -475,6 +510,12 @@ func PodFitsResources(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.N
 	if allocatable.NvidiaGPU < podRequest.NvidiaGPU+nodeInfo.RequestedResource().NvidiaGPU {
 		predicateFails = append(predicateFails, NewInsufficientResourceError(api.ResourceNvidiaGPU, podRequest.NvidiaGPU, nodeInfo.RequestedResource().NvidiaGPU, allocatable.NvidiaGPU))
 	}
+	for rName, rQuant := range podRequest.OpaqueIntResources {
+		if allocatable.OpaqueIntResources[rName] < rQuant+nodeInfo.RequestedResource().OpaqueIntResources[rName] {
+			predicateFails = append(predicateFails, NewInsufficientResourceError(rName, podRequest.OpaqueIntResources[rName], nodeInfo.RequestedResource().OpaqueIntResources[rName], allocatable.OpaqueIntResources[rName]))
+		}
+	}
+
 	if glog.V(10) {
 		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
 		// not logged. There is visible performance gain from it.
