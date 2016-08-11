@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
+	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
@@ -136,20 +137,19 @@ func Run(s *options.CMServer) error {
 }
 
 func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) error {
+	glog.Infof("Loading client config for cluster controller %q", "cluster-controller")
 	ccClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "cluster-controller"))
+	glog.Infof("Running cluster controller")
 	go clustercontroller.NewclusterController(ccClientset, s.ClusterMonitorPeriod.Duration).Run()
 	dns, err := dnsprovider.InitDnsProvider(s.DnsProvider, s.DnsConfigFile)
 	if err != nil {
 		glog.Fatalf("Cloud provider could not be initialized: %v", err)
 	}
-	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
-	servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ZoneName)
-	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
-		glog.Errorf("Failed to start service controller: %v", err)
-	}
 
+	glog.Infof("Loading client config for namespace controller %q", "namespace-controller")
 	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
 	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
+	glog.Infof("Running namespace controller")
 	namespaceController.Run(wait.NeverStop)
 
 	secretcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "secret-controller"))
@@ -159,6 +159,20 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
 	replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
 	go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
+
+	glog.Infof("Loading client config for ingress controller %q", "ingress-controller")
+	ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
+	ingressController := ingresscontroller.NewIngressController(ingClientset)
+	glog.Infof("Running ingress controller")
+	ingressController.Run(wait.NeverStop)
+
+	glog.Infof("Loading client config for service controller %q", servicecontroller.UserAgentName)
+	scClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, servicecontroller.UserAgentName))
+	servicecontroller := servicecontroller.New(scClientset, dns, s.FederationName, s.ZoneName)
+	glog.Infof("Running service controller")
+	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
+		glog.Errorf("Failed to start service controller: %v", err)
+	}
 
 	select {}
 }
