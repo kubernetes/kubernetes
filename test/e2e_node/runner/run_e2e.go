@@ -185,7 +185,7 @@ func main() {
 			glog.Fatalf("Must specify one of --image-config-file, --hosts, --images.")
 		}
 
-		gceImages := &internalImageConfig{
+		gceImages = &internalImageConfig{
 			images: make(map[string]internalGCEImage),
 		}
 		if *imageConfigFile != "" {
@@ -607,9 +607,9 @@ func getComputeClient() (*compute.Service, error) {
 }
 
 func deleteInstance(image string) {
-	_, err := computeService.Instances.Delete(*project, *zone, imageToInstanceName(image)).Do()
+	_, err := computeService.Instances.Delete(*project, *zone, imageToInstanceName(image, "")).Do()
 	if err != nil {
-		glog.Infof("Error deleting instance %s", imageToInstanceName(image))
+		glog.Infof("Error deleting instance %s", imageToInstanceName(image, ""))
 	}
 }
 
@@ -637,7 +637,7 @@ func parseInstanceMetadata(str string) map[string]string {
 	return metadata
 }
 
-func imageToInstanceName(image string) string {
+func imageToInstanceName(image, machine string) string {
 	if machine == "" {
 		return *instanceNamePrefix + "-" + image
 	}
