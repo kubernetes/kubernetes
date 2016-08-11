@@ -92,7 +92,7 @@ type Request struct {
 	client HTTPClient
 	verb   string
 
-	baseURL     *url.URL
+	urlProvider *URLProvider
 	content     ContentConfig
 	serializers Serializers
 
@@ -124,12 +124,12 @@ type Request struct {
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
+func NewRequest(client HTTPClient, verb string, urlProvider *URLProvider, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
 	if backoff == nil {
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
 	}
-
+	baseUrl := urlProvider.Get()
 	pathPrefix := "/"
 	if baseURL != nil {
 		pathPrefix = path.Join(pathPrefix, baseURL.Path)
@@ -137,7 +137,7 @@ func NewRequest(client HTTPClient, verb string, baseURL *url.URL, versionedAPIPa
 	r := &Request{
 		client:      client,
 		verb:        verb,
-		baseURL:     baseURL,
+		urlProvider: urlProvider,
 		pathPrefix:  path.Join(pathPrefix, versionedAPIPath),
 		content:     content,
 		serializers: serializers,
@@ -265,8 +265,8 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.pathPrefix = path.Join(r.baseURL.Path, path.Join(segments...))
-	if len(segments) == 1 && (len(r.baseURL.Path) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
+	r.pathPrefix = path.Join(r.urlProvider.Get().Path, path.Join(segments...))
+	if len(segments) == 1 && (len(r.urlProvider.Get().Path) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
 		// preserve any trailing slashes for legacy behavior
 		r.pathPrefix += "/"
 	}
@@ -583,8 +583,8 @@ func (r *Request) URL() *url.URL {
 	}
 
 	finalURL := &url.URL{}
-	if r.baseURL != nil {
-		*finalURL = *r.baseURL
+	if r.urlProvider.Get() != nil {
+		*finalURL = *r.urlProvider.Get()
 	}
 	finalURL.Path = p
 
@@ -660,11 +660,11 @@ func (r *Request) Watch() (watch.Interface, error) {
 	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
-	if r.baseURL != nil {
+	if r.urlProvider.Get() != nil {
 		if err != nil {
-			r.backoffMgr.UpdateBackoff(r.baseURL, err, 0)
+			r.backoffMgr.UpdateBackoff(r.urlProvider.Get(), err, 0)
 		} else {
-			r.backoffMgr.UpdateBackoff(r.baseURL, err, resp.StatusCode)
+			r.backoffMgr.UpdateBackoff(r.urlProvider.Get(), err, resp.StatusCode)
 		}
 	}
 	if err != nil {
@@ -691,8 +691,8 @@ func (r *Request) Watch() (watch.Interface, error) {
 // It also handles corner cases for incomplete/invalid request data.
 func updateURLMetrics(req *Request, resp *http.Response, err error) {
 	url := "none"
-	if req.baseURL != nil {
-		url = req.baseURL.Host
+	if req.urlProvider.Get() != nil {
+		url = req.urlProvider.Get().Host
 	}
 
 	// If we have an error (i.e. apiserver down) we report that as a metric label.
@@ -728,7 +728,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
-	if r.baseURL != nil {
+	if r.urlProvider.Get() != nil {
 		if err != nil {
 			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
 		} else {
@@ -736,6 +736,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		}
 	}
 	if err != nil {
+		r.urlProvider.Next()
 		return nil, err
 	}
 
@@ -800,6 +801,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	// TODO: Change to a timeout based approach.
 	maxRetries := 10
 	retries := 0
+	initialUrl := r.URL()
 	for {
 		url := r.URL().String()
 		req, err := http.NewRequest(r.verb, url, r.body)
@@ -817,7 +819,11 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
 		}
 		if err != nil {
-			return err
+			if r.urlProvider.Next() == initialUrl {
+				return err
+			} else {
+				continue
+			}
 		}
 
 		done := func() bool {
