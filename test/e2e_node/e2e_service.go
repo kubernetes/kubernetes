@@ -312,12 +312,12 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 		cmd.Cmd.Stdout = outfile
 		cmd.Cmd.Stderr = outfile
 
-		// Killing the sudo command should kill the server as well.
+		// Death of this test process should kill the server as well.
 		attrs := &syscall.SysProcAttr{}
 		// Hack to set linux-only field without build tags.
 		deathSigField := reflect.ValueOf(attrs).Elem().FieldByName("Pdeathsig")
 		if deathSigField.IsValid() {
-			deathSigField.Set(reflect.ValueOf(syscall.SIGKILL))
+			deathSigField.Set(reflect.ValueOf(syscall.SIGTERM))
 		} else {
 			cmdErrorChan <- fmt.Errorf("Failed to set Pdeathsig field (non-linux build)")
 			return
@@ -389,7 +389,20 @@ func (k *killCmd) Kill() error {
 	const timeout = 10 * time.Second
 	for _, signal := range []string{"-TERM", "-KILL"} {
 		glog.V(2).Infof("Killing process %d (%s) with %s", pid, name, signal)
-		_, err := exec.Command("sudo", "kill", signal, strconv.Itoa(pid)).Output()
+		cmd := exec.Command("sudo", "kill", signal, strconv.Itoa(pid))
+
+		// Run the 'kill' command in a separate process group so sudo doesn't ignore it
+		attrs := &syscall.SysProcAttr{}
+		// Hack to set unix-only field without build tags.
+		setpgidField := reflect.ValueOf(attrs).Elem().FieldByName("Setpgid")
+		if setpgidField.IsValid() {
+			setpgidField.Set(reflect.ValueOf(true))
+		} else {
+			return fmt.Errorf("Failed to set Setpgid field (non-unix build)")
+		}
+		cmd.SysProcAttr = attrs
+
+		_, err := cmd.Output()
 		if err != nil {
 			glog.Errorf("Error signaling process %d (%s) with %s: %v", pid, name, signal, err)
 			continue
