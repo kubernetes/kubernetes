@@ -269,35 +269,42 @@ func parseObject(data []byte) (map[string]interface{}, error) {
 	return mapObj, nil
 }
 
-func (t *thirdPartyResourceDataDecoder) populate(data []byte) (runtime.Object, error) {
+func (t *thirdPartyResourceDataDecoder) populate(data []byte) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	mapObj, err := parseObject(data)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return t.populateFromObject(mapObj, data)
 }
 
-func (t *thirdPartyResourceDataDecoder) populateFromObject(mapObj map[string]interface{}, data []byte) (runtime.Object, error) {
+func (t *thirdPartyResourceDataDecoder) populateFromObject(mapObj map[string]interface{}, data []byte) (runtime.Object, *unversioned.GroupVersionKind, error) {
 	typeMeta := unversioned.TypeMeta{}
 	if err := json.Unmarshal(data, &typeMeta); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	gv, err := unversioned.ParseGroupVersion(typeMeta.APIVersion)
+	if err != nil {
+		return nil, nil, err
+	}
+	gvk := gv.WithKind(typeMeta.Kind)
+
 	isList := strings.HasSuffix(typeMeta.Kind, "List")
 	switch {
 	case !isList && (len(t.kind) == 0 || typeMeta.Kind == t.kind):
 		result := &extensions.ThirdPartyResourceData{}
 		if err := t.populateResource(result, mapObj, data); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return result, nil
+		return result, &gvk, nil
 	case isList && (len(t.kind) == 0 || typeMeta.Kind == t.kind+"List"):
 		list := &extensions.ThirdPartyResourceDataList{}
 		if err := t.populateListResource(list, mapObj); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return list, nil
+		return list, &gvk, nil
 	default:
-		return nil, fmt.Errorf("unexpected kind: %s, expected %s", typeMeta.Kind, t.kind)
+		return nil, nil, fmt.Errorf("unexpected kind: %s, expected %s", typeMeta.Kind, t.kind)
 	}
 }
 
@@ -359,11 +366,7 @@ func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *unversioned.Gro
 				return t.delegate.Decode(data, gvk, into)
 			}
 		}
-		obj, err := t.populate(data)
-		if err != nil {
-			return nil, nil, err
-		}
-		return obj, gvk, nil
+		return t.populate(data)
 	}
 	switch o := into.(type) {
 	case *extensions.ThirdPartyResourceData:
@@ -377,14 +380,14 @@ func (t *thirdPartyResourceDataDecoder) Decode(data []byte, gvk *unversioned.Gro
 				return t.delegate.Decode(data, gvk, into)
 			}
 		}
-		obj, err := t.populate(data)
+		obj, outGVK, err := t.populate(data)
 		if err != nil {
 			return nil, nil, err
 		}
 		o.Objects = []runtime.Object{
 			obj,
 		}
-		return o, gvk, nil
+		return o, outGVK, nil
 	default:
 		return t.delegate.Decode(data, gvk, into)
 	}
