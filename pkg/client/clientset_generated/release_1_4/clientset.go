@@ -18,6 +18,7 @@ package release_1_4
 
 import (
 	"github.com/golang/glog"
+	v1beta1authorization "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/authorization/v1beta1"
 	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/autoscaling/v1"
 	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/batch/v1"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/core/v1"
@@ -30,9 +31,10 @@ import (
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
 	Core() v1core.CoreInterface
-	Extensions() v1beta1extensions.ExtensionsInterface
+	Authorization() v1beta1authorization.AuthorizationInterface
 	Autoscaling() v1autoscaling.AutoscalingInterface
 	Batch() v1batch.BatchInterface
+	Extensions() v1beta1extensions.ExtensionsInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -40,9 +42,10 @@ type Interface interface {
 type Clientset struct {
 	*discovery.DiscoveryClient
 	*v1core.CoreClient
-	*v1beta1extensions.ExtensionsClient
+	*v1beta1authorization.AuthorizationClient
 	*v1autoscaling.AutoscalingClient
 	*v1batch.BatchClient
+	*v1beta1extensions.ExtensionsClient
 }
 
 // Core retrieves the CoreClient
@@ -53,12 +56,12 @@ func (c *Clientset) Core() v1core.CoreInterface {
 	return c.CoreClient
 }
 
-// Extensions retrieves the ExtensionsClient
-func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
+// Authorization retrieves the AuthorizationClient
+func (c *Clientset) Authorization() v1beta1authorization.AuthorizationInterface {
 	if c == nil {
 		return nil
 	}
-	return c.ExtensionsClient
+	return c.AuthorizationClient
 }
 
 // Autoscaling retrieves the AutoscalingClient
@@ -75,6 +78,14 @@ func (c *Clientset) Batch() v1batch.BatchInterface {
 		return nil
 	}
 	return c.BatchClient
+}
+
+// Extensions retrieves the ExtensionsClient
+func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
+	if c == nil {
+		return nil
+	}
+	return c.ExtensionsClient
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -94,7 +105,7 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
-	clientset.ExtensionsClient, err = v1beta1extensions.NewForConfig(&configShallowCopy)
+	clientset.AuthorizationClient, err = v1beta1authorization.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -103,6 +114,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 		return nil, err
 	}
 	clientset.BatchClient, err = v1batch.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
+	clientset.ExtensionsClient, err = v1beta1extensions.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -120,9 +135,10 @@ func NewForConfig(c *restclient.Config) (*Clientset, error) {
 func NewForConfigOrDie(c *restclient.Config) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.NewForConfigOrDie(c)
-	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
+	clientset.AuthorizationClient = v1beta1authorization.NewForConfigOrDie(c)
 	clientset.AutoscalingClient = v1autoscaling.NewForConfigOrDie(c)
 	clientset.BatchClient = v1batch.NewForConfigOrDie(c)
+	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -132,9 +148,10 @@ func NewForConfigOrDie(c *restclient.Config) *Clientset {
 func New(c *restclient.RESTClient) *Clientset {
 	var clientset Clientset
 	clientset.CoreClient = v1core.New(c)
-	clientset.ExtensionsClient = v1beta1extensions.New(c)
+	clientset.AuthorizationClient = v1beta1authorization.New(c)
 	clientset.AutoscalingClient = v1autoscaling.New(c)
 	clientset.BatchClient = v1batch.New(c)
+	clientset.ExtensionsClient = v1beta1extensions.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

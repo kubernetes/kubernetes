@@ -33,6 +33,7 @@ type ExtensionsInterface interface {
 	PodSecurityPoliciesGetter
 	ReplicaSetsGetter
 	ScalesGetter
+	StorageClassesGetter
 	ThirdPartyResourcesGetter
 }
 
@@ -71,6 +72,10 @@ func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
 
 func (c *ExtensionsClient) Scales(namespace string) ScaleInterface {
 	return newScales(c, namespace)
+}
+
+func (c *ExtensionsClient) StorageClasses() StorageClassInterface {
+	return newStorageClasses(c)
 }
 
 func (c *ExtensionsClient) ThirdPartyResources() ThirdPartyResourceInterface {

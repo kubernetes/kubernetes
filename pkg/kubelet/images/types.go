@@ -50,10 +50,3 @@ type ImageManager interface {
 
 	// TODO(ronl): consolidating image managing and deleting operation in this interface
 }
-
-// ImagePuller wraps Runtime.PullImage() to pull a container image.
-// It will check the presence of the image, and report the 'image pulling',
-// 'image pulled' events correspondingly.
-type imagePuller interface {
-	pullImage(pod *api.Pod, container *api.Container, pullSecrets []api.Secret) (error, string)
-}

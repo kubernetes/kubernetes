@@ -247,6 +247,14 @@ func MaxUnavailable(deployment extensions.Deployment) int32 {
 	return maxUnavailable
 }
 
+// MinAvailable returns the minimum vailable pods of a given deployment
+func MinAvailable(deployment *extensions.Deployment) int32 {
+	if !IsRollingUpdate(deployment) {
+		return int32(0)
+	}
+	return deployment.Spec.Replicas - MaxUnavailable(*deployment)
+}
+
 // MaxSurge returns the maximum surge pods a rolling deployment can take.
 func MaxSurge(deployment extensions.Deployment) int32 {
 	if !IsRollingUpdate(&deployment) {
@@ -402,17 +410,26 @@ func ListPods(deployment *extensions.Deployment, getPodList podListFunc) (*api.P
 // (e.g. the addition of a new field will cause the hash code to change)
 // Note that we assume input podTemplateSpecs contain non-empty labels
 func equalIgnoreHash(template1, template2 api.PodTemplateSpec) (bool, error) {
+	// First, compare template.Labels (ignoring hash)
+	labels1, labels2 := template1.Labels, template2.Labels
 	// The podTemplateSpec must have a non-empty label so that label selectors can find them.
 	// This is checked by validation (of resources contain a podTemplateSpec).
-	if len(template1.Labels) == 0 || len(template2.Labels) == 0 {
+	if len(labels1) == 0 || len(labels2) == 0 {
 		return false, fmt.Errorf("Unexpected empty labels found in given template")
 	}
-	hash1 := template1.Labels[extensions.DefaultDeploymentUniqueLabelKey]
-	hash2 := template2.Labels[extensions.DefaultDeploymentUniqueLabelKey]
-	// compare equality ignoring pod-template-hash
-	template1.Labels[extensions.DefaultDeploymentUniqueLabelKey] = hash2
+	if len(labels1) > len(labels2) {
+		labels1, labels2 = labels2, labels1
+	}
+	// We make sure len(labels2) >= len(labels1)
+	for k, v := range labels2 {
+		if labels1[k] != v && k != extensions.DefaultDeploymentUniqueLabelKey {
+			return false, nil
+		}
+	}
+
+	// Then, compare the templates without comparing their labels
+	template1.Labels, template2.Labels = nil, nil
 	result := api.Semantic.DeepEqual(template1, template2)
-	template1.Labels[extensions.DefaultDeploymentUniqueLabelKey] = hash1
 	return result, nil
 }
 
@@ -585,7 +602,7 @@ func GetAvailablePodsForReplicaSets(c clientset.Interface, deployment *extension
 // CountAvailablePodsForReplicaSets returns the number of available pods corresponding to the given pod list and replica sets.
 // Note that the input pod list should be the pods targeted by the deployment of input replica sets.
 func CountAvailablePodsForReplicaSets(podList *api.PodList, rss []*extensions.ReplicaSet, minReadySeconds int32) (int32, error) {
-	rsPods, err := filterPodsMatchingReplicaSets(rss, podList)
+	rsPods, err := filterPodsMatchingReplicaSets(rss, podList, minReadySeconds)
 	if err != nil {
 		return 0, err
 	}
@@ -593,12 +610,12 @@ func CountAvailablePodsForReplicaSets(podList *api.PodList, rss []*extensions.Re
 }
 
 // GetAvailablePodsForDeployment returns the number of available pods (listed from clientset) corresponding to the given deployment.
-func GetAvailablePodsForDeployment(c clientset.Interface, deployment *extensions.Deployment, minReadySeconds int32) (int32, error) {
+func GetAvailablePodsForDeployment(c clientset.Interface, deployment *extensions.Deployment) (int32, error) {
 	podList, err := listPods(deployment, c)
 	if err != nil {
 		return 0, err
 	}
-	return countAvailablePods(podList.Items, minReadySeconds), nil
+	return countAvailablePods(podList.Items, deployment.Spec.MinReadySeconds), nil
 }
 
 func countAvailablePods(pods []api.Pod, minReadySeconds int32) int32 {
@@ -638,8 +655,8 @@ func IsPodAvailable(pod *api.Pod, minReadySeconds int32, now time.Time) bool {
 }
 
 // filterPodsMatchingReplicaSets filters the given pod list and only return the ones targeted by the input replicasets
-func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList *api.PodList) ([]api.Pod, error) {
-	rsPods := []api.Pod{}
+func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList *api.PodList, minReadySeconds int32) ([]api.Pod, error) {
+	allRSPods := []api.Pod{}
 	for _, rs := range replicaSets {
 		matchingFunc, err := rsutil.MatchingPodsFunc(rs)
 		if err != nil {
@@ -648,9 +665,16 @@ func filterPodsMatchingReplicaSets(replicaSets []*extensions.ReplicaSet, podList
 		if matchingFunc == nil {
 			continue
 		}
-		rsPods = append(rsPods, podutil.Filter(podList, matchingFunc)...)
+		rsPods := podutil.Filter(podList, matchingFunc)
+		avaPodsCount := countAvailablePods(rsPods, minReadySeconds)
+		if avaPodsCount > rs.Spec.Replicas {
+			msg := fmt.Sprintf("Found %s/%s with %d available pods, more than its spec replicas %d", rs.Namespace, rs.Name, avaPodsCount, rs.Spec.Replicas)
+			glog.Errorf("ERROR: %s", msg)
+			return nil, fmt.Errorf(msg)
+		}
+		allRSPods = append(allRSPods, podutil.Filter(podList, matchingFunc)...)
 	}
-	return rsPods, nil
+	return allRSPods, nil
 }
 
 // Revision returns the revision number of the input replica set

@@ -53,6 +53,19 @@ def configure_easrsa():
     # Setting this state before easyrsa is configured ensures the tls layer is
     # configured to generate certificates with client authentication.
     set_state('tls.client.authorization.required')
+    domain = hookenv.config().get('dns_domain')
+    cidr = hookenv.config().get('cidr')
+    sdn_ip = get_sdn_ip(cidr)
+    # Create extra sans that the tls layer will add to the server cert.
+    extra_sans = [
+        sdn_ip,
+        'kubernetes',
+        'kubernetes.{0}'.format(domain),
+        'kubernetes.default',
+        'kubernetes.default.svc',
+        'kubernetes.default.svc.{0}'.format(domain)
+    ]
+    unitdata.kv().set('extra_sans', extra_sans)
 
 
 @hook('config-changed')
@@ -68,6 +81,8 @@ def config_changed():
             # Stop and remove the Kubernetes kubelet container.
             compose.kill('master')
             compose.rm('master')
+            compose.kill('proxy')
+            compose.rm('proxy')
             # Remove the state so the code can react to restarting kubelet.
             remove_state('kubelet.available')
         else:
@@ -131,36 +146,47 @@ def ca():
 
 
 @when('kubelet.available', 'leadership.is_leader')
-@when_not('skydns.available')
-def launch_skydns():
-    '''Create the "kube-system" namespace, the skydns resource controller, and
-    the skydns service. '''
-    hookenv.log('Creating kubernetes skydns on the master node.')
+@when_not('kubedns.available', 'skydns.available')
+def launch_dns():
+    '''Create the "kube-system" namespace, the kubedns resource controller,
+    and the kubedns service. '''
+    hookenv.log('Creating kubernetes kubedns on the master node.')
     # Only launch and track this state on the leader.
-    # Launching duplicate SkyDNS rc will raise an error
+    # Launching duplicate kubeDNS rc will raise an error
     # Run a command to check if the apiserver is responding.
     return_code = call(split('kubectl cluster-info'))
     if return_code != 0:
         hookenv.log('kubectl command failed, waiting for apiserver to start.')
-        remove_state('skydns.available')
-        # Return without setting skydns.available so this method will retry.
+        remove_state('kubedns.available')
+        # Return without setting kubedns.available so this method will retry.
         return
     # Check for the "kube-system" namespace.
     return_code = call(split('kubectl get namespace kube-system'))
     if return_code != 0:
-        # Create the kube-system namespace that is used by the skydns files.
+        # Create the kube-system namespace that is used by the kubedns files.
         check_call(split('kubectl create namespace kube-system'))
-    # Check for the skydns replication controller.
-    return_code = call(split('kubectl get -f files/manifests/skydns-rc.yml'))
+    # Check for the kubedns replication controller.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-rc.yaml'))
     if return_code != 0:
-        # Create the skydns replication controller from the rendered file.
-        check_call(split('kubectl create -f files/manifests/skydns-rc.yml'))
-    # Check for the skydns service.
-    return_code = call(split('kubectl get -f files/manifests/skydns-svc.yml'))
+        # Create the kubedns replication controller from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-rc.yaml'))
+    # Check for the kubedns service.
+    return_code = call(split('kubectl get -f files/manifests/kubedns-svc.yaml'))
     if return_code != 0:
-        # Create the skydns service from the rendered file.
-        check_call(split('kubectl create -f files/manifests/skydns-svc.yml'))
-    set_state('skydns.available')
+        # Create the kubedns service from the rendered file.
+        check_call(split('kubectl create -f files/manifests/kubedns-svc.yaml'))
+    set_state('kubedns.available')
+
+
+@when('skydns.available', 'leadership.is_leader')
+def convert_to_kubedns():
+    '''Delete the skydns containers to make way for the kubedns containers.'''
+    hookenv.log('Deleteing the old skydns deployment.')
+    # Delete the skydns replication controller.
+    return_code = call(split('kubectl delete rc kube-dns-v11'))
+    # Delete the skydns service.
+    return_code = call(split('kubectl delete svc kube-dns'))
+    remove_state('skydns.available')
 
 
 @when('docker.available')
@@ -171,11 +197,13 @@ def relation_message():
     status_set('waiting', 'Waiting for relation to ETCD')
 
 
-@when('etcd.available', 'kubeconfig.created')
+@when('kubeconfig.created')
+@when('etcd.available')
 @when_not('kubelet.available', 'proxy.available')
 def start_kubelet(etcd):
     '''Run the hyperkube container that starts the kubernetes services.
-    When the leader, run the master services (apiserver, controller, scheduler)
+    When the leader, run the master services (apiserver, controller, scheduler,
+    proxy)
     using the master.json from the rendered manifest directory.
     When a follower, start the node services (kubelet, and proxy). '''
     render_files(etcd)
@@ -184,6 +212,7 @@ def start_kubelet(etcd):
     status_set('maintenance', 'Starting the Kubernetes services.')
     if is_leader():
         compose.up('master')
+        compose.up('proxy')
         set_state('kubelet.available')
         # Open the secure port for api-server.
         hookenv.open_port(6443)
@@ -234,8 +263,12 @@ def master_kubeconfig():
     # Use a context manager to run the tar command in a specific directory.
     with chdir(directory):
         # Create a package with kubectl and the files to use it externally.
-        cmd = 'tar -cvzf /home/ubuntu/kubectl_package.tar.gz ca.crt client.crt client.key kubeconfig kubectl'  # noqa
+        cmd = 'tar -cvzf /home/ubuntu/kubectl_package.tar.gz ca.crt ' \
+              'client.key client.crt kubectl kubeconfig'
         check_call(split(cmd))
+
+    # This sets up the client workspace consistently on the leader and nodes.
+    node_kubeconfig()
     set_state('kubeconfig.created')
 
 
@@ -297,11 +330,11 @@ def gather_sdn_data():
     else:
         # There is no SDN cider fall back to the kubernetes config cidr option.
         pillar['dns_server'] = get_dns_ip(hookenv.config().get('cidr'))
-    # The pillar['dns_server'] value is used the skydns-svc.yml file.
+    # The pillar['dns_server'] value is used the kubedns-svc.yaml file.
     pillar['dns_replicas'] = 1
-    # The pillar['dns_domain'] value is ued in the skydns-rc.yml
+    # The pillar['dns_domain'] value is used in the kubedns-rc.yaml
     pillar['dns_domain'] = hookenv.config().get('dns_domain')
-    # Use a 'pillar' dictionary so we can reuse the upstream skydns templates.
+    # Use a 'pillar' dictionary so we can reuse the upstream kubedns templates.
     sdn_data['pillar'] = pillar
     return sdn_data
 
@@ -362,6 +395,14 @@ def get_dns_ip(cidr):
     return '.'.join(ip.split('.')[0:-1]) + '.10'
 
 
+def get_sdn_ip(cidr):
+    '''Get the IP address for the SDN gateway based on the provided cidr.'''
+    # Remove the range from the cidr.
+    ip = cidr.split('/')[0]
+    # Remove the last octet and replace it with 1.
+    return '.'.join(ip.split('.')[0:-1]) + '.1'
+
+
 def render_files(reldata=None):
     '''Use jinja templating to render the docker-compose.yml and master.json
     file to contain the dynamic data for the configuration files.'''
@@ -371,8 +412,22 @@ def render_files(reldata=None):
     # Add the charm configuration data to the context.
     context.update(hookenv.config())
     if reldata:
-        # Add the etcd relation data to the context.
-        context.update({'connection_string': reldata.connection_string()})
+        connection_string = reldata.get_connection_string()
+        # Define where the etcd tls files will be kept.
+        etcd_dir = '/etc/ssl/etcd'
+        # Create paths to the etcd client ca, key, and cert file locations.
+        ca = os.path.join(etcd_dir, 'client-ca.pem')
+        key = os.path.join(etcd_dir, 'client-key.pem')
+        cert = os.path.join(etcd_dir, 'client-cert.pem')
+        # Save the client credentials (in relation data) to the paths provided.
+        reldata.save_client_credentials(key, cert, ca)
+        # Update the context so the template has the etcd information.
+        context.update({'etcd_dir': etcd_dir,
+                        'connection_string': connection_string,
+                        'etcd_ca': ca,
+                        'etcd_key': key,
+                        'etcd_cert': cert})
+
     charm_dir = hookenv.charm_dir()
     rendered_kube_dir = os.path.join(charm_dir, 'files/kubernetes')
     if not os.path.exists(rendered_kube_dir):
@@ -400,14 +455,14 @@ def render_files(reldata=None):
         # Render the files/manifests/master.json that contains parameters for
         # the apiserver, controller, and controller-manager
         render('master.json', target, context)
-        # Source: ...master/cluster/addons/dns/skydns-svc.yaml.in
-        target = os.path.join(rendered_manifest_dir, 'skydns-svc.yml')
-        # Render files/kubernetes/skydns-svc.yaml for SkyDNS service.
-        render('skydns-svc.yml', target, context)
-        # Source: ...master/cluster/addons/dns/skydns-rc.yaml.in
-        target = os.path.join(rendered_manifest_dir, 'skydns-rc.yml')
-        # Render files/kubernetes/skydns-rc.yaml for SkyDNS pod.
-        render('skydns-rc.yml', target, context)
+        # Source: ...cluster/addons/dns/skydns-svc.yaml.in
+        target = os.path.join(rendered_manifest_dir, 'kubedns-svc.yaml')
+        # Render files/kubernetes/kubedns-svc.yaml for the DNS service.
+        render('kubedns-svc.yaml', target, context)
+        # Source: ...cluster/addons/dns/skydns-rc.yaml.in
+        target = os.path.join(rendered_manifest_dir, 'kubedns-rc.yaml')
+        # Render files/kubernetes/kubedns-rc.yaml for the DNS pod.
+        render('kubedns-rc.yaml', target, context)
 
 
 def status_set(level, message):

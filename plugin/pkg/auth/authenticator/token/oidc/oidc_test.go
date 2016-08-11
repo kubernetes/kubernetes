@@ -110,14 +110,13 @@ func TestTLSConfig(t *testing.T) {
 
 	for _, tc := range tests {
 		func() {
-			op := oidctesting.NewOIDCProvider(t)
+			op := oidctesting.NewOIDCProvider(t, "")
 			srv, err := op.ServeTLSWithKeyPair(tc.serverCertFile, tc.serverKeyFile)
 			if err != nil {
 				t.Errorf("%s: %v", tc.testCase, err)
 				return
 			}
 			defer srv.Close()
-			op.AddMinimalProviderConfig(srv)
 
 			issuer := srv.URL
 			clientID := "client-foo"
@@ -178,8 +177,6 @@ func TestTLSConfig(t *testing.T) {
 }
 
 func TestOIDCAuthentication(t *testing.T) {
-	var err error
-
 	cert := path.Join(os.TempDir(), "oidc-cert")
 	key := path.Join(os.TempDir(), "oidc-key")
 
@@ -188,119 +185,120 @@ func TestOIDCAuthentication(t *testing.T) {
 
 	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert, key)
 
-	// Create a TLS server and a client.
-	op := oidctesting.NewOIDCProvider(t)
-	srv, err := op.ServeTLSWithKeyPair(cert, key)
-	if err != nil {
-		t.Fatalf("Cannot start server: %v", err)
-	}
-	defer srv.Close()
+	// Ensure all tests pass when the issuer is not at a base URL.
+	for _, path := range []string{"", "/path/with/trailing/slash/"} {
 
-	// A provider config with all required fields.
-	op.AddMinimalProviderConfig(srv)
-
-	tests := []struct {
-		userClaim   string
-		groupsClaim string
-		token       string
-		userInfo    user.Info
-		verified    bool
-		err         string
-	}{
-		{
-			"sub",
-			"",
-			generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			&user.DefaultInfo{Name: fmt.Sprintf("%s#%s", srv.URL, "user-foo")},
-			true,
-			"",
-		},
-		{
-			// Use user defined claim (email here).
-			"email",
-			"",
-			generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "", nil),
-			&user.DefaultInfo{Name: "foo@example.com"},
-			true,
-			"",
-		},
-		{
-			// Use user defined claim (email here).
-			"email",
-			"",
-			generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
-			&user.DefaultInfo{Name: "foo@example.com"},
-			true,
-			"",
-		},
-		{
-			// Use user defined claim (email here).
-			"email",
-			"groups",
-			generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
-			&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
-			true,
-			"",
-		},
-		{
-			"sub",
-			"",
-			generateMalformedToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: unable to verify JWT signature: no matching keys",
-		},
-		{
-			// Invalid 'aud'.
-			"sub",
-			"",
-			generateGoodToken(t, op, srv.URL, "client-foo", "client-bar", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
-		},
-		{
-			// Invalid issuer.
-			"sub",
-			"",
-			generateGoodToken(t, op, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: invalid claim value: 'iss'.",
-		},
-		{
-			"sub",
-			"",
-			generateExpiredToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
-			nil,
-			false,
-			"oidc: JWT claims invalid: token is expired",
-		},
-	}
-
-	for i, tt := range tests {
-		client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim})
+		// Create a TLS server and a client.
+		op := oidctesting.NewOIDCProvider(t, path)
+		srv, err := op.ServeTLSWithKeyPair(cert, key)
 		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			continue
+			t.Fatalf("Cannot start server: %v", err)
+		}
+		defer srv.Close()
+
+		tests := []struct {
+			userClaim   string
+			groupsClaim string
+			token       string
+			userInfo    user.Info
+			verified    bool
+			err         string
+		}{
+			{
+				"sub",
+				"",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+				&user.DefaultInfo{Name: fmt.Sprintf("%s#%s", srv.URL, "user-foo")},
+				true,
+				"",
+			},
+			{
+				// Use user defined claim (email here).
+				"email",
+				"",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "", nil),
+				&user.DefaultInfo{Name: "foo@example.com"},
+				true,
+				"",
+			},
+			{
+				// Use user defined claim (email here).
+				"email",
+				"",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
+				&user.DefaultInfo{Name: "foo@example.com"},
+				true,
+				"",
+			},
+			{
+				// Use user defined claim (email here).
+				"email",
+				"groups",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-foo", "email", "foo@example.com", "groups", []string{"group1", "group2"}),
+				&user.DefaultInfo{Name: "foo@example.com", Groups: []string{"group1", "group2"}},
+				true,
+				"",
+			},
+			{
+				"sub",
+				"",
+				generateMalformedToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+				nil,
+				false,
+				"oidc: unable to verify JWT signature: no matching keys",
+			},
+			{
+				// Invalid 'aud'.
+				"sub",
+				"",
+				generateGoodToken(t, op, srv.URL, "client-foo", "client-bar", "sub", "user-foo", "", nil),
+				nil,
+				false,
+				"oidc: JWT claims invalid: invalid claims, 'aud' claim and 'client_id' do not match",
+			},
+			{
+				// Invalid issuer.
+				"sub",
+				"",
+				generateGoodToken(t, op, "http://foo-bar.com", "client-foo", "client-foo", "sub", "user-foo", "", nil),
+				nil,
+				false,
+				"oidc: JWT claims invalid: invalid claim value: 'iss'.",
+			},
+			{
+				"sub",
+				"",
+				generateExpiredToken(t, op, srv.URL, "client-foo", "client-foo", "sub", "user-foo", "", nil),
+				nil,
+				false,
+				"oidc: JWT claims invalid: token is expired",
+			},
 		}
 
-		user, result, err := client.AuthenticateToken(tt.token)
-		if tt.err != "" {
-			if !strings.HasPrefix(err.Error(), tt.err) {
-				t.Errorf("#%d: Expecting: %v..., but got: %v", i, tt.err, err)
-			}
-		} else {
+		for i, tt := range tests {
+			client, err := New(OIDCOptions{srv.URL, "client-foo", cert, tt.userClaim, tt.groupsClaim})
 			if err != nil {
-				t.Errorf("#%d: Unexpected error: %v", i, err)
+				t.Errorf("Unexpected error: %v", err)
+				continue
 			}
+
+			user, result, err := client.AuthenticateToken(tt.token)
+			if tt.err != "" {
+				if !strings.HasPrefix(err.Error(), tt.err) {
+					t.Errorf("#%d: Expecting: %v..., but got: %v", i, tt.err, err)
+				}
+			} else {
+				if err != nil {
+					t.Errorf("#%d: Unexpected error: %v", i, err)
+				}
+			}
+			if !reflect.DeepEqual(tt.verified, result) {
+				t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.verified, result)
+			}
+			if !reflect.DeepEqual(tt.userInfo, user) {
+				t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.userInfo, user)
+			}
+			client.Close()
 		}
-		if !reflect.DeepEqual(tt.verified, result) {
-			t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.verified, result)
-		}
-		if !reflect.DeepEqual(tt.userInfo, user) {
-			t.Errorf("#%d: Expecting: %v, but got: %v", i, tt.userInfo, user)
-		}
-		client.Close()
 	}
 }

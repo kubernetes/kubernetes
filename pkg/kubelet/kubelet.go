@@ -75,10 +75,13 @@ import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"k8s.io/kubernetes/pkg/util/clock"
+	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/integer"
 	kubeio "k8s.io/kubernetes/pkg/util/io"
+	utilipt "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/procfs"
@@ -151,6 +154,9 @@ const (
 
 	// maxImagesInStatus is the number of max images we store in image status.
 	maxImagesInNodeStatus = 50
+
+	// Minimum number of dead containers to keep in a pod
+	minDeadContainerInPod = 1
 )
 
 // SyncHandler is an interface implemented by Kubelet, for testability
@@ -195,7 +201,7 @@ func NewMainKubelet(
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
-	imageGCPolicy ImageGCPolicy,
+	imageGCPolicy images.ImageGCPolicy,
 	diskSpacePolicy DiskSpacePolicy,
 	cloud cloudprovider.Interface,
 	autoDetectCloudProvider bool,
@@ -360,6 +366,7 @@ func NewMainKubelet(
 		enableCustomMetrics:          enableCustomMetrics,
 		babysitDaemons:               babysitDaemons,
 		enableControllerAttachDetach: enableControllerAttachDetach,
+		iptClient:                    utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
 	}
 
 	if klet.flannelExperimentalOverlay {
@@ -427,7 +434,13 @@ func NewMainKubelet(
 			imageBackOff,
 			serializeImagePulls,
 			enableCustomMetrics,
-			klet.hairpinMode == componentconfig.HairpinVeth,
+			// If using "kubenet", the Kubernetes network plugin that wraps
+			// CNI's bridge plugin, it knows how to set the hairpin veth flag
+			// so we tell the container runtime to back away from setting it.
+			// If the kubelet is started with any other plugin we can't be
+			// sure it handles the hairpin case so we instruct the docker
+			// runtime to set the flag instead.
+			klet.hairpinMode == componentconfig.HairpinVeth && networkPluginName != "kubenet",
 			seccompProfileRoot,
 			containerRuntimeOptions...,
 		)
@@ -476,9 +489,10 @@ func NewMainKubelet(
 		return nil, err
 	}
 	klet.containerGC = containerGC
+	klet.containerDeletor = newPodContainerDeletor(klet.containerRuntime, integer.IntMax(containerGCPolicy.MaxPerPodContainer, minDeadContainerInPod))
 
 	// setup imageManager
-	imageManager, err := newImageManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
+	imageManager, err := images.NewImageGCManager(klet.containerRuntime, cadvisorInterface, recorder, nodeRef, imageGCPolicy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize image manager: %v", err)
 	}
@@ -523,7 +537,7 @@ func NewMainKubelet(
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
 
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers), recorder, nodeRef, klet.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(klet.resourceAnalyzer, evictionConfig, killPodNow(klet.podWorkers), klet.imageManager, recorder, nodeRef, klet.clock)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize eviction manager: %v", err)
 	}
@@ -560,6 +574,7 @@ type Kubelet struct {
 	dockerClient  dockertools.DockerInterface
 	runtimeCache  kubecontainer.RuntimeCache
 	kubeClient    clientset.Interface
+	iptClient     utilipt.Interface
 	rootDirectory string
 
 	// podWorkers handle syncing Pods in response to events.
@@ -646,8 +661,8 @@ type Kubelet struct {
 	// Policy for handling garbage collection of dead containers.
 	containerGC kubecontainer.ContainerGC
 
-	// Manager for images.
-	imageManager imageManager
+	// Manager for image garbage collection.
+	imageManager images.ImageGCManager
 
 	// Diskspace manager.
 	diskSpaceManager diskSpaceManager
@@ -822,6 +837,9 @@ type Kubelet struct {
 	// should manage attachment/detachment of volumes scheduled to this node,
 	// and disable kubelet from executing any attach/detach operations
 	enableControllerAttachDetach bool
+
+	// trigger deleting containers in a pod
+	containerDeletor *podContainerDeletor
 }
 
 // setupDataDirs creates:
@@ -994,7 +1012,11 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 	for _, vol := range volumes {
 		if vol.Mounter.GetAttributes().Managed && vol.Mounter.GetAttributes().SupportsSELinux {
 			// Relabel the volume and its content to match the 'Level' of the pod
-			err := filepath.Walk(vol.Mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
+			path, err := volume.GetPath(vol.Mounter)
+			if err != nil {
+				return err
+			}
+			err = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
 				if err != nil {
 					return err
 				}
@@ -1013,7 +1035,7 @@ func (kl *Kubelet) relabelVolumes(pod *api.Pod, volumes kubecontainer.VolumeMap)
 func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName, hostDomain, podIP string, podVolumes kubecontainer.VolumeMap) ([]kubecontainer.Mount, error) {
 	// Kubernetes only mounts on /etc/hosts if :
 	// - container does not use hostNetwork and
-	// - container is not a infrastructure(pause) container
+	// - container is not an infrastructure(pause) container
 	// - container is not already mounting on /etc/hosts
 	// When the pause container is being created, its IP is still unknown. Hence, PodIP will not have been set.
 	mountEtcHostsFile := (pod.Spec.SecurityContext == nil || !pod.Spec.SecurityContext.HostNetwork) && len(podIP) > 0
@@ -1023,7 +1045,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName,
 		mountEtcHostsFile = mountEtcHostsFile && (mount.MountPath != etcHostsPath)
 		vol, ok := podVolumes[mount.Name]
 		if !ok {
-			glog.Warningf("Mount cannot be satisified for container %q, because the volume is missing: %q", container.Name, mount)
+			glog.Warningf("Mount cannot be satisfied for container %q, because the volume is missing: %q", container.Name, mount)
 			continue
 		}
 
@@ -1035,7 +1057,10 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName,
 			vol.SELinuxLabeled = true
 			relabelVolume = true
 		}
-		hostPath := vol.Mounter.GetPath()
+		hostPath, err := volume.GetPath(vol.Mounter)
+		if err != nil {
+			return nil, err
+		}
 		if mount.SubPath != "" {
 			hostPath = filepath.Join(hostPath, mount.SubPath)
 		}
@@ -1431,7 +1456,7 @@ func (kl *Kubelet) GetClusterDNS(pod *api.Pod) ([]string, []string, error) {
 	if !useClusterFirstPolicy {
 		// When the kubelet --resolv-conf flag is set to the empty string, use
 		// DNS settings that override the docker default (which is to use
-		// /etc/resolv.conf) and effectivly disable DNS lookups. According to
+		// /etc/resolv.conf) and effectively disable DNS lookups. According to
 		// the bind documentation, the behavior of the DNS client library when
 		// "nameservers" are not specified is to "use the nameserver on the
 		// local machine". A nameserver setting of localhost is equivalent to
@@ -1916,11 +1941,13 @@ func (kl *Kubelet) podKiller() {
 	for {
 		select {
 		case podPair, ok := <-kl.podKillingCh:
-			runningPod := podPair.RunningPod
-			apiPod := podPair.APIPod
 			if !ok {
 				return
 			}
+
+			runningPod := podPair.RunningPod
+			apiPod := podPair.APIPod
+
 			if killing.Has(string(runningPod.ID)) {
 				// The pod is already being killed.
 				break
@@ -2032,29 +2059,46 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	}
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
-	fit, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
-	if !fit {
-		if re, ok := err.(*predicates.PredicateFailureError); ok {
-			reason := re.PredicateName
-			message := re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
-			return fit, reason, message
-		}
-		if re, ok := err.(*predicates.InsufficientResourceError); ok {
-			reason := fmt.Sprintf("OutOf%s", re.ResourceName)
-			message := re.Error()
-			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
-			return fit, reason, message
-		}
-		reason := "UnexpectedPredicateFailureType"
+	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
+	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		return fit, "UnexpectedError", message
+	}
+	if !fit {
+		var reason string
+		var message string
+		if len(reasons) == 0 {
+			message = fmt.Sprint("GeneralPredicates failed due to unknown reason, which is unexpected.")
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			return fit, "UnknownReason", message
+		}
+		// If there are failed predicates, we only return the first one as a reason.
+		r := reasons[0]
+		switch re := r.(type) {
+		case *predicates.PredicateFailureError:
+			reason = re.PredicateName
+			message = re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		case *predicates.InsufficientResourceError:
+			reason = fmt.Sprintf("OutOf%s", re.ResourceName)
+			message := re.Error()
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		case *predicates.FailureReason:
+			reason = re.GetReason()
+			message = fmt.Sprintf("Failure: %s", re.GetReason())
+			glog.V(2).Infof("Predicate failed on Pod: %v, for reason: %v", format.Pod(pod), message)
+		default:
+			reason = "UnexpectedPredicateFailureType"
+			message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", r)
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		}
 		return fit, reason, message
 	}
 	// TODO: When disk space scheduling is implemented (#11976), remove the out-of-disk check here and
 	// add the disk space predicate to predicates.GeneralPredicates.
 	if kl.isOutOfDisk() {
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to isOutOfDisk")
+		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), "predicate fails due to OutOfDisk")
 		return false, "OutOfDisk", "cannot be started due to lack of disk space."
 	}
 
@@ -2072,7 +2116,9 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	// that need to be sync'd. A one-second period is sufficient because the
 	// sync interval is defaulted to 10s.
 	syncTicker := time.NewTicker(time.Second)
+	defer syncTicker.Stop()
 	housekeepingTicker := time.NewTicker(housekeepingPeriod)
+	defer housekeepingTicker.Stop()
 	plegCh := kl.pleg.Watch()
 	for {
 		if rs := kl.runtimeState.errors(); len(rs) != 0 {
@@ -2155,19 +2201,23 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
-
 		}
 	case e := <-plegCh:
 		if isSyncPodWorthy(e) {
 			// PLEG event for a pod; sync it.
-			pod, ok := kl.podManager.GetPodByUID(e.ID)
-			if !ok {
+			if pod, ok := kl.podManager.GetPodByUID(e.ID); ok {
+				glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
+				handler.HandlePodSyncs([]*api.Pod{pod})
+			} else {
 				// If the pod no longer exists, ignore the event.
 				glog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
-				break
 			}
-			glog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
-			handler.HandlePodSyncs([]*api.Pod{pod})
+		}
+
+		if e.Type == pleg.ContainerDied {
+			if containerID, ok := e.Data.(string); ok {
+				kl.cleanUpContainersInPod(e.ID, containerID)
+			}
 		}
 	case <-syncCh:
 		// Sync pods waiting for sync
@@ -2347,7 +2397,7 @@ func (kl *Kubelet) PLEGHealthCheck() (bool, error) {
 }
 
 // validateContainerLogStatus returns the container ID for the desired container to retrieve logs for, based on the state
-// of the container. The previous flag will only return the logs for the the last terminated container, otherwise, the current
+// of the container. The previous flag will only return the logs for the last terminated container, otherwise, the current
 // running container is preferred over a previous termination. If info about the container is not available then a specific
 // error is returned to the end user.
 func (kl *Kubelet) validateContainerLogStatus(podName string, podStatus *api.PodStatus, containerName string, previous bool) (containerID kubecontainer.ContainerID, err error) {
@@ -2896,7 +2946,17 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 	server.ListenAndServeKubeletReadOnlyServer(kl, kl.resourceAnalyzer, address, port, kl.containerRuntime)
 }
 
-// Filter out events that are not worthy of pod syncing
+// Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
+func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID string) {
+	if podStatus, err := kl.podCache.Get(podId); err == nil {
+		if status, ok := kl.statusManager.GetPodStatus(podId); ok {
+			// If a pod is evicted, we can delete all the dead containers.
+			kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, eviction.PodIsEvicted(status))
+		}
+	}
+}
+
+// isSyncPodWorthy filters out events that are not worthy of pod syncing
 func isSyncPodWorthy(event *pleg.PodLifecycleEvent) bool {
 	// ContatnerRemoved doesn't affect pod state
 	return event.Type != pleg.ContainerRemoved

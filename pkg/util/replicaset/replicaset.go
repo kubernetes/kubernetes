@@ -66,7 +66,7 @@ func UpdateRSWithRetries(rsClient unversionedextensions.ReplicaSetInterface, rs 
 
 	// Handle returned error from wait poll
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("timed out trying to update RS: %+v", oldRs)
+		err = fmt.Errorf("timed out trying to update RS: %#v", oldRs)
 	}
 	// Ignore the RS not found error, but the RS isn't updated.
 	if errors.IsNotFound(err) {

@@ -29,17 +29,17 @@ import (
 
 func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_Job, InType: reflect.TypeOf(func() *Job { var x *Job; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobCondition, InType: reflect.TypeOf(func() *JobCondition { var x *JobCondition; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobList, InType: reflect.TypeOf(func() *JobList { var x *JobList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobSpec, InType: reflect.TypeOf(func() *JobSpec { var x *JobSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobStatus, InType: reflect.TypeOf(func() *JobStatus { var x *JobStatus; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobTemplate, InType: reflect.TypeOf(func() *JobTemplate { var x *JobTemplate; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobTemplateSpec, InType: reflect.TypeOf(func() *JobTemplateSpec { var x *JobTemplateSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_ScheduledJob, InType: reflect.TypeOf(func() *ScheduledJob { var x *ScheduledJob; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_ScheduledJobList, InType: reflect.TypeOf(func() *ScheduledJobList { var x *ScheduledJobList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_ScheduledJobSpec, InType: reflect.TypeOf(func() *ScheduledJobSpec { var x *ScheduledJobSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_ScheduledJobStatus, InType: reflect.TypeOf(func() *ScheduledJobStatus { var x *ScheduledJobStatus; return x }())},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_Job, InType: reflect.TypeOf(&Job{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobCondition, InType: reflect.TypeOf(&JobCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobList, InType: reflect.TypeOf(&JobList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobSpec, InType: reflect.TypeOf(&JobSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobStatus, InType: reflect.TypeOf(&JobStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobTemplate, InType: reflect.TypeOf(&JobTemplate{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_JobTemplateSpec, InType: reflect.TypeOf(&JobTemplateSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_ScheduledJob, InType: reflect.TypeOf(&ScheduledJob{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_ScheduledJobList, InType: reflect.TypeOf(&ScheduledJobList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_ScheduledJobSpec, InType: reflect.TypeOf(&ScheduledJobSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_batch_ScheduledJobStatus, InType: reflect.TypeOf(&ScheduledJobStatus{})},
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
 		panic(err)

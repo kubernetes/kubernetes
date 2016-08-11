@@ -18,15 +18,16 @@
 
 EVENT_STORE_IP=$1
 EVENT_STORE_URL="http://${EVENT_STORE_IP}:4002"
+NUM_NODES=$2
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
-	sudo docker run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd \
+	sudo docker run --net=host -d gcr.io/google_containers/etcd:3.0.3 /usr/local/bin/etcd \
 		--listen-peer-urls http://127.0.0.1:2381 \
 		--advertise-client-urls=http://127.0.0.1:4002 \
 		--listen-client-urls=http://0.0.0.0:4002 \
 		--data-dir=/var/etcd/data
 fi
 
-sudo docker run --net=host -d gcr.io/google_containers/etcd:2.2.1 /usr/local/bin/etcd \
+sudo docker run --net=host -d gcr.io/google_containers/etcd:3.0.3 /usr/local/bin/etcd \
 	--listen-peer-urls http://127.0.0.1:2380 \
 	--advertise-client-urls=http://127.0.0.1:4001 \
 	--listen-client-urls=http://0.0.0.0:4001 \
@@ -49,6 +50,7 @@ kubernetes/server/bin/kube-apiserver \
 	--token-auth-file=/srv/kubernetes/known_tokens.csv \
 	--secure-port=443 \
 	--basic-auth-file=/srv/kubernetes/basic_auth.csv \
+	--target-ram-mb=$((${NUM_NODES} * 60)) \
 	$(cat apiserver_flags) &> /var/log/kube-apiserver.log &
 
 # kube-contoller-manager now needs running kube-api server to actually start

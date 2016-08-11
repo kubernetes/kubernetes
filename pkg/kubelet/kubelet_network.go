@@ -168,7 +168,7 @@ func parseResolvConf(reader io.Reader, dnsScrubber dnsScrubber) (nameservers []s
 }
 
 // cleanupBandwidthLimits updates the status of bandwidth-limited containers
-// and ensures that only the the appropriate CIDRs are active on the node.
+// and ensures that only the appropriate CIDRs are active on the node.
 func (kl *Kubelet) cleanupBandwidthLimits(allPods []*api.Pod) error {
 	if kl.shaper == nil {
 		return nil
@@ -255,7 +255,7 @@ func (kl *Kubelet) syncNetworkStatus() {
 			}
 			kl.updatePodCIDR(podCIDR)
 		}
-		if err := ensureIPTablesMasqRule(kl.nonMasqueradeCIDR); err != nil {
+		if err := ensureIPTablesMasqRule(kl.iptClient, kl.nonMasqueradeCIDR); err != nil {
 			err = fmt.Errorf("Error on adding ip table rules: %v", err)
 			glog.Error(err)
 			kl.runtimeState.setNetworkState(err)

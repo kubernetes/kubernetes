@@ -415,6 +415,12 @@ type FsStats struct {
 	// Number of bytes available for non-root user.
 	Available uint64 `json:"available"`
 
+	// HasInodes when true, indicates that Inodes info will be available.
+	HasInodes bool `json:"has_inodes"`
+
+	// Number of Inodes
+	Inodes uint64 `json:"inodes"`
+
 	// Number of available Inodes
 	InodesFree uint64 `json:"inodes_free"`
 

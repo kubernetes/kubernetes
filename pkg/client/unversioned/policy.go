@@ -17,8 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -38,7 +36,7 @@ func (c *PolicyClient) PodDisruptionBudgets(namespace string) PodDisruptionBudge
 
 func NewPolicy(c *restclient.Config) (*PolicyClient, error) {
 	config := *c
-	if err := setPolicyDefaults(&config); err != nil {
+	if err := setGroupDefaults(policy.GroupName, &config); err != nil {
 		return nil, err
 	}
 	client, err := restclient.RESTClientFor(&config)
@@ -54,23 +52,4 @@ func NewPolicyOrDie(c *restclient.Config) *PolicyClient {
 		panic(err)
 	}
 	return client
-}
-
-func setPolicyDefaults(config *restclient.Config) error {
-	g, err := registered.Group(policy.GroupName)
-	if err != nil {
-		return err
-	}
-	config.APIPath = defaultAPIPath
-	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
-	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
-	config.GroupVersion = &copyGroupVersion
-	//}
-
-	config.NegotiatedSerializer = api.Codecs
-	return nil
 }

@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -113,6 +113,10 @@ func (wh *watcherHub) watch(key string, recursive, stream bool, index, storeInde
 	reportWatcherAdded()
 
 	return w, nil
+}
+
+func (wh *watcherHub) add(e *Event) {
+	e = wh.EventHistory.addEvent(e)
 }
 
 // notify function accepts an event and notify to the watchers.

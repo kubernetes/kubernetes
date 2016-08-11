@@ -33,15 +33,16 @@ type TestContextType struct {
 	KubeVolumeDir      string
 	CertDir            string
 	Host               string
-	RepoRoot           string
-	Provider           string
-	CloudConfig        CloudConfig
-	KubectlPath        string
-	OutputDir          string
-	ReportDir          string
-	ReportPrefix       string
-	Prefix             string
-	MinStartupPods     int
+	// TODO: Deprecating this over time... instead just use gobindata_util.go , see #23987.
+	RepoRoot       string
+	Provider       string
+	CloudConfig    CloudConfig
+	KubectlPath    string
+	OutputDir      string
+	ReportDir      string
+	ReportPrefix   string
+	Prefix         string
+	MinStartupPods int
 	// Timeout for waiting for system pods to be running
 	SystemPodsStartupTimeout time.Duration
 	UpgradeTarget            string
@@ -70,6 +71,8 @@ type TestContextType struct {
 	NodeName string
 	// Whether to enable the QoS Cgroup Hierarchy or not
 	CgroupsPerQOS bool
+	// The hard eviction thresholds
+	EvictionHard string
 }
 
 type CloudConfig struct {
@@ -80,7 +83,6 @@ type CloudConfig struct {
 	NodeInstanceGroup string
 	NumNodes          int
 	ClusterTag        string
-	ServiceAccount    string
 
 	Provider cloudprovider.Interface
 }
@@ -106,6 +108,8 @@ func RegisterCommonFlags() {
 	flag.BoolVar(&TestContext.DumpLogsOnFailure, "dump-logs-on-failure", true, "If set to true test will dump data about the namespace in which test was running.")
 	flag.BoolVar(&TestContext.DeleteNamespace, "delete-namespace", true, "If true tests will delete namespace after completion. It is only designed to make debugging easier, DO NOT turn it off by default.")
 	flag.StringVar(&TestContext.Host, "host", "http://127.0.0.1:8080", "The host, or apiserver, to connect to")
+	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
+	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 }
 
 // Register flags specific to the cluster e2e test suite.
@@ -122,8 +126,6 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, vagrant, etc.)")
 	flag.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 	flag.StringVar(&TestContext.OutputDir, "e2e-output-dir", "/tmp", "Output directory for interesting/useful test data, like performance data, benchmarks, and other metrics.")
-	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
-	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.Prefix, "prefix", "e2e", "A prefix to be added to cloud resources created during testing.")
 	flag.StringVar(&TestContext.ContainerRuntime, "container-runtime", "docker", "The container runtime of cluster VM instances (docker or rkt).")
 	flag.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, trusty, or coreos).")
@@ -134,7 +136,6 @@ func RegisterClusterFlags() {
 	flag.StringVar(&cloudConfig.MasterName, "kube-master", "", "Name of the kubernetes master. Only required if provider is gce or gke")
 	flag.StringVar(&cloudConfig.ProjectID, "gce-project", "", "The GCE project being used, if applicable")
 	flag.StringVar(&cloudConfig.Zone, "gce-zone", "", "GCE zone being used, if applicable")
-	flag.StringVar(&cloudConfig.ServiceAccount, "gce-service-account", "", "GCE service account to use for GCE API calls, if applicable")
 	flag.StringVar(&cloudConfig.Cluster, "gke-cluster", "", "GKE name of cluster being used, if applicable")
 	flag.StringVar(&cloudConfig.NodeInstanceGroup, "node-instance-group", "", "Name of the managed instance group for nodes. Valid only for gce, gke or aws. If there is more than one group: comma separated list of groups.")
 	flag.IntVar(&cloudConfig.NumNodes, "num-nodes", -1, "Number of nodes in the cluster")
@@ -151,4 +152,5 @@ func RegisterClusterFlags() {
 func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on (node e2e suite only).")
 	flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
+	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
 }

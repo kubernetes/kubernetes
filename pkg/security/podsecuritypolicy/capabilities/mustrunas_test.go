@@ -17,9 +17,10 @@ limitations under the License.
 package capabilities
 
 import (
-	"k8s.io/kubernetes/pkg/api"
 	"reflect"
 	"testing"
+
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestGenerateAdds(t *testing.T) {

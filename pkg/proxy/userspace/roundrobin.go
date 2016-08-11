@@ -153,7 +153,7 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 				// Affinity wins.
 				endpoint := sessionAffinity.endpoint
 				sessionAffinity.lastUsed = time.Now()
-				glog.V(4).Infof("NextEndpoint for service %q from IP %s with sessionAffinity %+v: %s", svcPort, ipaddr, sessionAffinity, endpoint)
+				glog.V(4).Infof("NextEndpoint for service %q from IP %s with sessionAffinity %#v: %s", svcPort, ipaddr, sessionAffinity, endpoint)
 				return endpoint, nil
 			}
 		}
@@ -172,7 +172,7 @@ func (lb *LoadBalancerRR) NextEndpoint(svcPort proxy.ServicePortName, srcAddr ne
 		affinity.lastUsed = time.Now()
 		affinity.endpoint = endpoint
 		affinity.clientIP = ipaddr
-		glog.V(4).Infof("Updated affinity key %s: %+v", ipaddr, state.affinity.affinityMap[ipaddr])
+		glog.V(4).Infof("Updated affinity key %s: %#v", ipaddr, state.affinity.affinityMap[ipaddr])
 	}
 
 	return endpoint, nil

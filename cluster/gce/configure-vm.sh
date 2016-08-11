@@ -442,6 +442,7 @@ dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+storage_backend: '$(echo "$STORAGE_BACKEND" | sed -e "s/'/''/g")'
 network_provider: '$(echo "$NETWORK_PROVIDER" | sed -e "s/'/''/g")'
 prepull_e2e_images: '$(echo "$PREPULL_E2E_IMAGES" | sed -e "s/'/''/g")'
 hairpin_mode: '$(echo "$HAIRPIN_MODE" | sed -e "s/'/''/g")'
@@ -452,10 +453,11 @@ network_policy_provider: '$(echo "$NETWORK_POLICY_PROVIDER" | sed -e "s/'/''/g")
 enable_manifest_url: '$(echo "${ENABLE_MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "${MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "${MANIFEST_URL_HEADER:-}" | sed -e "s/'/''/g")'
-master_name: '$(echo "${MASTER_NAME:-}" | sed -e "s/'/''/g")'
 num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
+initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
+hostname: $(hostname -s)
 EOF
     if [ -n "${KUBELET_PORT:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls

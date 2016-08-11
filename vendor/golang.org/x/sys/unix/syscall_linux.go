@@ -886,7 +886,6 @@ func Getpgrp() (pid int) {
 //sys	Pause() (err error)
 //sys	PivotRoot(newroot string, putold string) (err error) = SYS_PIVOT_ROOT
 //sysnb prlimit(pid int, resource int, old *Rlimit, newlimit *Rlimit) (err error) = SYS_PRLIMIT64
-//sys   Prctl(option int, arg2 uintptr, arg3 uintptr, arg4 uintptr, arg5 uintptr) (err error)
 //sys	read(fd int, p []byte) (n int, err error)
 //sys	Removexattr(path string, attr string) (err error)
 //sys	Renameat(olddirfd int, oldpath string, newdirfd int, newpath string) (err error)
@@ -1023,6 +1022,7 @@ func Munmap(b []byte) (err error) {
 // Personality
 // Poll
 // Ppoll
+// Prctl
 // Pselect6
 // Ptrace
 // Putpmsg

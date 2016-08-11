@@ -25,7 +25,7 @@ cluster/juju/layers/kubernetes/reactive/k8s.py:    client_key = '/srv/kubernetes
 cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
 cluster/juju/layers/kubernetes/reactive/k8s.py:    tlslib.client_key(None, client_key, user='ubuntu', group='ubuntu')
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
-cluster/lib/logging.sh:  local source_file=${BASH_SOURCE[$stack_skip]}
+cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
 cluster/log-dump.sh:    for node_name in "${NODE_NAMES[@]}"; do
 cluster/log-dump.sh:    local -r node_name="${1}"
 cluster/log-dump.sh:readonly report_dir="${1:-_artifacts}"
@@ -38,8 +38,10 @@ cluster/photon-controller/util.sh:  node_name=${1}
 cluster/rackspace/util.sh:    local node_ip=$(nova show --minimal ${NODE_NAMES[$i]} \
 cluster/saltbase/salt/cluster-autoscaler/cluster-autoscaler.manifest:{% set params = pillar['autoscaler_mig_config'] + " " + cloud_config -%}
 cluster/saltbase/salt/kube-admission-controls/init.sls:{% if 'LimitRanger' in pillar.get('admission_control', '') %}
-cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout -%}
-cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set enable_garbage_collector = pillar['enable_garbage_collector'] -%}
+cluster/saltbase/salt/kube-apiserver/kube-apiserver.manifest:{% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + admission_control + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set enable_garbage_collector = pillar['enable_garbage_collector'] -%}
+cluster/saltbase/salt/kube-controller-manager/kube-controller-manager.manifest:{% set params = "--master=127.0.0.1:8080" + " " + cluster_name + " " + cluster_cidr + " " + allocate_node_cidrs + " " + service_cluster_ip_range + " " + terminated_pod_gc + " " + enable_garbage_collector + " " + cloud_provider  + " " + cloud_config + " " + service_account_key + " " + log_level + " " + root_ca_file -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
@@ -59,19 +61,9 @@ cluster/vagrant/provision-utils.sh:  api_servers: '$(echo "$MASTER_IP" | sed -e 
 cluster/vagrant/provision-utils.sh:  node_ip: '$(echo "$MASTER_IP" | sed -e "s/'/''/g")'
 cluster/vagrant/provision-utils.sh:  runtime_config: '$(echo "$RUNTIME_CONFIG" | sed -e "s/'/''/g")'
 cluster/vsphere/templates/salt-minion.sh:  hostname_override: $(ip route get 1.1.1.1 | awk '{print $7}')
-docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config;
-docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:      host.cloud_config_file = cloud_config[n];
-docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:    if (cloud_config instanceof Array) {
-docs/getting-started-guides/coreos/azure/lib/azure_wrapper.js:  var cloud_config = cloud_config_creator(x, conf);
-docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:    return cloud_config.generate_environment_file_entry_from_object(util.hostname(n, 'kube'), {
-docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
-docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  return cloud_config.process_template(input_file, output_file, function(data) {
-docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:  var write_files_extra = cloud_config.write_files_from('addons', '/etc/kubernetes/addons');
-docs/getting-started-guides/coreos/azure/lib/deployment_logic/kubernetes.js:var cloud_config = require('../cloud_config.js');
 examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethostbyname(hostname)
 examples/storage/cassandra/image/run.sh:	cluster_name \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
-hack/jenkins/e2e-runner.sh:    local -r image_project="$1"
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    advertise_address=""
@@ -80,8 +72,8 @@ hack/test-update-storage-objects.sh:  local storage_media_type=${2:-""}
 hack/test-update-storage-objects.sh:  local storage_versions=${1:-""}
 hack/test-update-storage-objects.sh:  source_file=${test_data[0]}
 hack/test-update-storage-objects.sh:# source_file,resource,namespace,name,old_version,new_version
-pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort *int32 `protobuf:"varint,3,opt,name=container_port" json:"container_port,omitempty"`
-pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	OomScoreAdj      *int64 `protobuf:"varint,5,opt,name=oom_score_adj" json:"oom_score_adj,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	ContainerPort *int32 `protobuf:"varint,3,opt,name=container_port,json=containerPort" json:"container_port,omitempty"`
+pkg/kubelet/api/v1alpha1/runtime/api.pb.go:	OomScoreAdj      *int64 `protobuf:"varint,5,opt,name=oom_score_adj,json=oomScoreAdj" json:"oom_score_adj,omitempty"`
 pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int32 container_port = 3;
 pkg/kubelet/api/v1alpha1/runtime/api.proto:    optional int64 oom_score_adj = 5;
 pkg/kubelet/network/hairpin/hairpin.go:	hairpinModeRelativePath = "hairpin_mode"
@@ -92,15 +84,15 @@ pkg/util/oom/oom_linux.go:		return fmt.Errorf("invalid PID %d specified for oom_
 pkg/util/oom/oom_linux.go:	oomScoreAdjPath := path.Join("/proc", pidStr, "oom_score_adj")
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj for all processes in cgroup cgroupName.
 pkg/util/oom/oom_linux.go:// Writes 'value' to /proc/<pid>/oom_score_adj. PID = 0 means self
-test/e2e/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
-test/e2e/downwardapi_volume.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
+test/e2e/common/configmap.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
+test/e2e/common/downwardapi_volume.go:			Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=" + filePath},
 test/e2e/es_cluster_logging.go:		framework.Failf("No cluster_name field in Elasticsearch response: %v", esResponse)
 test/e2e/es_cluster_logging.go:	// Check to see if have a cluster_name field.
 test/e2e/es_cluster_logging.go:	clusterName, ok := esResponse["cluster_name"]
-test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
-test/e2e/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
-test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
-test/e2e/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
+test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePath),
+test/e2e/common/host_path.go:			fmt.Sprintf("--file_content_in_loop=%v", filePathInReader),
+test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
+test/e2e/common/host_path.go:			fmt.Sprintf("--retry_time=%d", retryDuration),
 test/e2e_node/configmap_test.go:						Command: []string{"/mt", "--break_on_expected_content=false", "--retry_time=120", "--file_content_in_loop=/etc/configmap-volume/data-1"},
 test/images/mount-tester/mt.go:	flag.BoolVar(&breakOnExpectedContent, "break_on_expected_content", true, "Break out of loop on expected content, (use with --file_content_in_loop flag only)")
 test/images/mount-tester/mt.go:	flag.IntVar(&retryDuration, "retry_time", 180, "Retry time during the loop")

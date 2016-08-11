@@ -19,6 +19,7 @@ package stubs
 
 import (
 	"fmt"
+
 	"github.com/aws/aws-sdk-go/service/route53"
 )
 

@@ -219,6 +219,7 @@ func TestPetSetControllerBlocksScaling(t *testing.T) {
 	for _, p := range fc.getPodList() {
 		if p.Name == deletedPod.Name {
 			found = true
+			break
 		}
 	}
 	if !found {

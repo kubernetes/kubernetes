@@ -56,13 +56,13 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	kubetypes "k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/term"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	utilwait "k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -306,7 +306,7 @@ func (r *Runtime) RunCommand(config *Config, args ...string) ([]string, error) {
 	if config == nil {
 		config = r.config
 	}
-	glog.V(4).Infof("rkt: Run command: %q with config: %+v", args, config)
+	glog.V(4).Infof("rkt: Run command: %q with config: %#v", args, config)
 
 	var stdout, stderr bytes.Buffer
 
@@ -724,9 +724,9 @@ func (r *Runtime) makeContainerLogMount(opts *kubecontainer.RunContainerOptions,
 	// In docker runtime, the container log path contains the container ID.
 	// However, for rkt runtime, we cannot get the container ID before the
 	// the container is launched, so here we generate a random uuid to enable
-	// us to map a container's termination message path to an unique log file
+	// us to map a container's termination message path to a unique log file
 	// on the disk.
-	randomUID := util.NewUUID()
+	randomUID := uuid.NewUUID()
 	containerLogPath := path.Join(opts.PodContainerDir, string(randomUID))
 	fs, err := r.os.Create(containerLogPath)
 	if err != nil {

@@ -55,6 +55,7 @@ NETWORK=${KUBE_GCE_NETWORK:-e2e}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-e2e-test-${USER}}"
 CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
+INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.180.0.0/14}"
@@ -159,6 +160,9 @@ KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
 # is only supported in trusty or GCI.
 TEST_CLUSTER="${TEST_CLUSTER:-true}"
 
+# Storage backend. 'etcd2' supported, 'etcd3' experimental.
+STORAGE_BACKEND=${STORAGE_BACKEND:-etcd2}
+
 # OpenContrail networking plugin specific settings
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, flannel, kubenet
 OPENCONTRAIL_TAG="${OPENCONTRAIL_TAG:-R2.20}"
@@ -179,4 +183,4 @@ E2E_STORAGE_TEST_ENVIRONMENT=${KUBE_E2E_STORAGE_TEST_ENVIRONMENT:-false}
 PREPULL_E2E_IMAGES="${PREPULL_E2E_IMAGES:-true}"
 
 # Evict pods whenever compute resource availability on the nodes gets below a threshold.
-EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi}"
+EVICTION_HARD="${EVICTION_HARD:-memory.available<100Mi,nodefs.available<256Mi}"

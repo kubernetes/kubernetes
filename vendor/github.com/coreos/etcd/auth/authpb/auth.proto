@@ -13,10 +13,25 @@ option (gogoproto.goproto_enum_prefix_all) = false;
 message User {
   bytes name = 1;
   bytes password = 2;
-  int64 tombstone = 3;
+  repeated string roles = 3;
+}
+
+// Permission is a single entity
+message Permission {
+  enum Type {
+    READ = 0;
+    WRITE = 1;
+    READWRITE = 2;
+  }
+  Type permType = 1;
+
+  bytes key = 2;
+  bytes range_end = 3;
 }
 
 // Role is a single entry in the bucket authRoles
 message Role {
-  bytes name = 2;
+  bytes name = 1;
+
+  repeated Permission keyPermission = 2;
 }

@@ -18,7 +18,6 @@ package e2e
 
 import (
 	"fmt"
-	"path/filepath"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -26,9 +25,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/util/system"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -36,8 +34,84 @@ import (
 	_ "github.com/stretchr/testify/assert"
 )
 
+const maxNumberOfPods int64 = 10
+const minPodCPURequest int64 = 500
+
 // variable set in BeforeEach, never modified afterwards
 var masterNodes sets.String
+
+var podWithNodeAffinity = api.Pod{
+	ObjectMeta: api.ObjectMeta{
+		Name: "with-labels",
+		Annotations: map[string]string{
+			"scheduler.alpha.kubernetes.io/affinity": `{
+        		"nodeAffinity": {
+          			"requiredDuringSchedulingIgnoredDuringExecution": {
+            			"nodeSelectorTerms": [{
+                			"matchExpressions": [{
+                    			"key": "kubernetes.io/e2e-az-name",
+                    			"operator": "In",
+                    			"values": ["e2e-az1", "e2e-az2"]
+                  			}]
+              			}]
+          			}
+        		}
+      		}`,
+			"another-annotation-key": "another-annotation-value",
+		},
+	},
+	Spec: api.PodSpec{
+		Containers: []api.Container{
+			{
+				Name:  "with-labels",
+				Image: "gcr.io/google_containers/pause:2.0",
+			},
+		},
+	},
+}
+
+var podWithPodAffinity = api.Pod{
+	ObjectMeta: api.ObjectMeta{
+		Name: "with-newlabels",
+		Annotations: map[string]string{
+			"scheduler.alpha.kubernetes.io/affinity": `{
+        		"podAffinity": {
+          			"requiredDuringSchedulingIgnoredDuringExecution": [{
+            			"labelSelector": {
+              				"matchExpressions": [{
+                				"key": "security",
+                				"operator": "In",
+                				"values":["S1"]
+              				}]
+            			},
+            			"topologyKey": "kubernetes.io/hostname"
+          			}]
+        		},
+        		"podAntiAffinity": {
+          			"requiredDuringSchedulingIgnoredDuringExecution": [{
+            			"labelSelector": {
+              				"matchExpressions": [{
+                				"key": "security",
+                				"operator": "In",
+                				"values":["S2"]
+              				}]
+            			},
+            			"topologyKey": "kubernetes.io/hostname"
+          			}]
+        		}
+      		}`,
+			"another-annotation-key": "another-annotation-value",
+		},
+	},
+	Spec: api.PodSpec{
+		Containers: []api.Container{
+			{
+				Name:  "with-newlabels",
+				Image: "gcr.io/google_containers/pause:2.0",
+			},
+		},
+	},
+}
 
 // Returns a number of currently scheduled and not scheduled Pods.
 func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.Pod) {
@@ -73,7 +147,7 @@ func getRequestedCPU(pod api.Pod) int64 {
 func verifyResult(c *client.Client, podName string, expectedScheduled int, expectedNotScheduled int, ns string) {
 	allPods, err := c.Pods(ns).List(api.ListOptions{})
 	framework.ExpectNoError(err)
-	scheduledPods, notScheduledPods := getPodsScheduled(allPods)
+	scheduledPods, notScheduledPods := framework.GetPodsScheduled(masterNodes, allPods)
 
 	printed := false
 	printOnce := func(msg string) string {
@@ -97,37 +171,6 @@ func cleanupPods(c *client.Client, ns string) {
 	for _, p := range pods.Items {
 		framework.ExpectNoError(c.Pods(ns).Delete(p.ObjectMeta.Name, opt))
 	}
-}
-
-// Waits until all existing pods are scheduled and returns their amount.
-func waitForStableCluster(c *client.Client) int {
-	timeout := 10 * time.Minute
-	startTime := time.Now()
-
-	allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-	framework.ExpectNoError(err)
-	// API server returns also Pods that succeeded. We need to filter them out.
-	currentPods := make([]api.Pod, 0, len(allPods.Items))
-	for _, pod := range allPods.Items {
-		if pod.Status.Phase != api.PodSucceeded && pod.Status.Phase != api.PodFailed {
-			currentPods = append(currentPods, pod)
-		}
-	}
-	allPods.Items = currentPods
-	scheduledPods, currentlyNotScheduledPods := getPodsScheduled(allPods)
-	for len(currentlyNotScheduledPods) != 0 {
-		time.Sleep(2 * time.Second)
-
-		allPods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
-		framework.ExpectNoError(err)
-		scheduledPods, currentlyNotScheduledPods = getPodsScheduled(allPods)
-
-		if startTime.Add(timeout).Before(time.Now()) {
-			framework.Failf("Timed out after %v waiting for stable cluster.", timeout)
-			break
-		}
-	}
-	return len(scheduledPods)
 }
 
 var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
@@ -154,17 +197,10 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		c = f.Client
 		ns = f.Namespace.Name
 		nodeList = &api.NodeList{}
-		nodes, err := c.Nodes().List(api.ListOptions{})
-		masterNodes = sets.NewString()
-		for _, node := range nodes.Items {
-			if system.IsMasterNode(&node) {
-				masterNodes.Insert(node.Name)
-			} else {
-				nodeList.Items = append(nodeList.Items, node)
-			}
-		}
 
-		err = framework.CheckTestingNSDeletedExcept(c, ns)
+		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(c)
+
+		err := framework.CheckTestingNSDeletedExcept(c, ns)
 		framework.ExpectNoError(err)
 
 		// Every test case in this suite assumes that cluster add-on pods stay stable and
@@ -204,7 +240,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			totalPodCapacity += podCapacity.Value()
 		}
 
-		currentlyScheduledPods := waitForStableCluster(c)
+		currentlyScheduledPods := framework.WaitForStableCluster(c, masterNodes)
 		podsNeededForSaturation := int(totalPodCapacity) - currentlyScheduledPods
 
 		By(fmt.Sprintf("Starting additional %v Pods to fully saturate the cluster max pods and trying to start another one", podsNeededForSaturation))
@@ -257,20 +293,24 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, podsNeededForSaturation, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// This test verifies we don't allow scheduling of pods in a way that sum of limits of pods is greater than machines capacity.
 	// It assumes that cluster add-on pods stay stable and cannot be run in parallel with any other test that touches Nodes or Pods.
 	// It is so because we need to have precise control on what's running in the cluster.
 	It("validates resource limits of pods that are allowed to run [Conformance]", func() {
+		nodeMaxCapacity := int64(0)
+
 		nodeToCapacityMap := make(map[string]int64)
 		for _, node := range nodeList.Items {
 			capacity, found := node.Status.Capacity["cpu"]
 			Expect(found).To(Equal(true))
 			nodeToCapacityMap[node.Name] = capacity.MilliValue()
+			if nodeMaxCapacity < capacity.MilliValue() {
+				nodeMaxCapacity = capacity.MilliValue()
+			}
 		}
-		waitForStableCluster(c)
+		framework.WaitForStableCluster(c, masterNodes)
 
 		pods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{})
 		framework.ExpectNoError(err)
@@ -283,7 +323,12 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		}
 
 		var podsNeededForSaturation int
-		milliCpuPerPod := int64(500)
+
+		milliCpuPerPod := nodeMaxCapacity / maxNumberOfPods
+		if milliCpuPerPod < minPodCPURequest {
+			milliCpuPerPod = minPodCPURequest
+		}
+		framework.Logf("Using pod capacity: %vm", milliCpuPerPod)
 		for name, leftCapacity := range nodeToCapacityMap {
 			framework.Logf("Node: %v has cpu capacity: %vm", name, leftCapacity)
 			podsNeededForSaturation += (int)(leftCapacity / milliCpuPerPod)
@@ -352,7 +397,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, podsNeededForSaturation, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// Test Nodes does not have any label, hence it should be impossible to schedule Pod with
@@ -361,7 +405,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		waitForStableCluster(c)
+		framework.WaitForStableCluster(c, masterNodes)
 
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -390,7 +434,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, 0, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	It("validates that a pod with an invalid NodeAffinity is rejected", func() {
@@ -431,8 +474,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
-
-		cleanupPods(c, ns)
 	})
 
 	It("validates that NodeSelector is respected if matching [Conformance]", func() {
@@ -464,11 +505,13 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		By("Trying to apply a random label on the found node.")
-		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
+		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
 		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
 		framework.ExpectNodeHasLabel(c, nodeName, k, v)
@@ -497,7 +540,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -516,7 +558,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		By("Trying to schedule Pod with nonempty NodeSelector.")
 		podName := "restricted-pod"
 
-		waitForStableCluster(c)
+		framework.WaitForStableCluster(c, masterNodes)
 
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -563,7 +605,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, 0, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// Keep the same steps with the test on NodeSelector,
@@ -597,11 +638,13 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		By("Trying to apply a random label on the found node.")
-		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(util.NewUUID()))
+		k := fmt.Sprintf("kubernetes.io/e2e-%s", string(uuid.NewUUID()))
 		v := "42"
 		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
 		framework.ExpectNodeHasLabel(c, nodeName, k, v)
@@ -644,7 +687,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -655,7 +697,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		labelPod, err := c.Pods(ns).Get(labelPodName)
 		framework.ExpectNoError(err)
 		Expect(labelPod.Spec.NodeName).To(Equal(nodeName))
-
 	})
 
 	// Verify that an escaped JSON string of NodeAffinity in a YAML PodSpec works.
@@ -688,6 +729,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
@@ -699,11 +742,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with NodeAffinity setting as embedded JSON string in the annotation value.")
-		labelPodName := "with-labels"
-		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/node-selection")
-		testPodPath := filepath.Join(nodeSelectionRoot, "pod-with-node-affinity.yaml")
-		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
+		labelPodName := podWithNodeAffinity.Name
+		pod, err = c.Pods(ns).Create(&podWithNodeAffinity)
+		framework.ExpectNoError(err)
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -720,7 +761,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	// part of podAffinity,so validation fails.
 	It("validates that a pod with an invalid podAffinity is rejected because of the LabelSelectorRequirement is invalid", func() {
 		By("Trying to launch a pod with an invalid pod Affinity data.")
-		podName := "without-label-" + string(util.NewUUID())
+		podName := "without-label-" + string(uuid.NewUUID())
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -766,16 +807,14 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
-
-		cleanupPods(c, ns)
 	})
 
 	// Test Nodes does not have any pod, hence it should be impossible to schedule a Pod with pod affinity.
-	It("validates that Inter-pod-Affinity is respected if not matching [Feature:PodAffinity]", func() {
+	It("validates that Inter-pod-Affinity is respected if not matching", func() {
 		By("Trying to schedule Pod with nonempty Pod Affinity.")
-		podName := "without-label-" + string(util.NewUUID())
+		podName := "without-label-" + string(uuid.NewUUID())
 
-		waitForStableCluster(c)
+		framework.WaitForStableCluster(c, masterNodes)
 
 		_, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
@@ -815,17 +854,16 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		time.Sleep(10 * time.Second)
 
 		verifyResult(c, podName, 0, 1, ns)
-		cleanupPods(c, ns)
 	})
 
 	// test the pod affinity successful matching scenario.
-	It("validates that InterPodAffinity is respected if matching [Feature:PodAffinity]", func() {
+	It("validates that InterPodAffinity is respected if matching", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -849,7 +887,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
-		defer c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -859,7 +896,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with podAffinity.")
-		labelPodName := "with-podaffinity-" + string(util.NewUUID())
+		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
 		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -893,7 +930,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -907,13 +943,31 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// test when the pod anti affinity rule is not satisfied, the pod would stay pending.
-	It("validates that InterPodAntiAffinity is respected if matching 2 [Feature:PodAffinity]", func() {
-		// launch a pod to find a node which can launch a pod. We intentionally do
-		// not just take the node list and choose the first of them. Depending on the
-		// cluster and the scheduler it might be that a "normal" pod cannot be
-		// scheduled onto it.
-		By("Trying to launch a pod with a label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+	It("validates that InterPodAntiAffinity is respected if matching 2", func() {
+		// launch pods to find nodes which can launch a pod. We intentionally do
+		// not just take the node list and choose the first and the second of them.
+		// Depending on the cluster and the scheduler it might be that a "normal" pod
+		// cannot be scheduled onto it.
+		By("Launching two pods on two distinct nodes to get two node names")
+		CreateHostPortPods(f, "host-port", 2, true)
+		defer framework.DeleteRC(f.Client, f.Namespace.Name, "host-port")
+		podList, err := c.Pods(ns).List(api.ListOptions{})
+		ExpectNoError(err)
+		Expect(len(podList.Items)).To(Equal(2))
+		nodeNames := []string{podList.Items[0].Spec.NodeName, podList.Items[1].Spec.NodeName}
+		Expect(nodeNames[0]).ToNot(Equal(nodeNames[1]))
+
+		By("Applying a random label to both nodes.")
+		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
+		v := "china-e2etest"
+		for _, nodeName := range nodeNames {
+			framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
+			framework.ExpectNodeHasLabel(c, nodeName, k, v)
+			defer framework.RemoveLabelOffNode(c, nodeName, k)
+		}
+
+		By("Trying to launch another pod on the first node with the service label.")
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -929,6 +983,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
+				NodeSelector: map[string]string{k: v}, // only launch on our two nodes
 			},
 		})
 		framework.ExpectNoError(err)
@@ -936,17 +991,8 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		pod, err = c.Pods(ns).Get(podName)
 		framework.ExpectNoError(err)
 
-		nodeName := pod.Spec.NodeName
-
-		By("Trying to apply a random label on the found node.")
-		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
-		v := "china-e2etest"
-		framework.AddOrUpdateLabelOnNode(c, nodeName, k, v)
-		framework.ExpectNodeHasLabel(c, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(c, nodeName, k)
-
-		By("Trying to launch the pod, now with podAffinity with same Labels.")
-		labelPodName := "with-podaffinity-" + string(util.NewUUID())
+		By("Trying to launch another pod, now with podAntiAffinity with same Labels.")
+		labelPodName := "with-podantiaffinity-" + string(uuid.NewUUID())
 		_, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -978,26 +1024,27 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 						Image: framework.GetPauseImageName(f.Client),
 					},
 				},
+				NodeSelector: map[string]string{k: v}, // only launch on our two nodes, contradicting the podAntiAffinity
 			},
 		})
 		framework.ExpectNoError(err)
+
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
 
-		verifyResult(c, labelPodName, 1, 1, ns)
-		cleanupPods(c, ns)
+		verifyResult(c, labelPodName, 3, 1, ns)
 	})
 
 	// test the pod affinity successful matching scenario with multiple Label Operators.
-	It("validates that InterPodAffinity is respected if matching with multiple Affinities [Feature:PodAffinity]", func() {
+	It("validates that InterPodAffinity is respected if matching with multiple Affinities", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1021,7 +1068,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
-		defer c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -1031,7 +1077,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with multiple pod affinities with diff LabelOperators.")
-		labelPodName := "with-podaffinity-" + string(util.NewUUID())
+		labelPodName := "with-podaffinity-" + string(uuid.NewUUID())
 		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1073,7 +1119,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -1087,13 +1132,13 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// test the pod affinity and anti affinity successful matching scenario.
-	It("validates that InterPod Affinity and AntiAffinity is respected if matching [Feature:PodAffinity]", func() {
+	It("validates that InterPod Affinity and AntiAffinity is respected if matching", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with a label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1117,7 +1162,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
-		defer c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 
 		By("Trying to apply a random label on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -1127,7 +1171,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch the pod, now with Pod affinity and anti affinity.")
-		labelPodName := "with-podantiaffinity-" + string(util.NewUUID())
+		labelPodName := "with-podantiaffinity-" + string(uuid.NewUUID())
 		pod, err = c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1172,7 +1216,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -1186,13 +1229,13 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 	})
 
 	// Verify that an escaped JSON string of pod affinity and pod anti affinity in a YAML PodSpec works.
-	It("validates that embedding the JSON PodAffinity and PodAntiAffinity setting as a string in the annotation value work [Feature:PodAffinity]", func() {
+	It("validates that embedding the JSON PodAffinity and PodAntiAffinity setting as a string in the annotation value work", func() {
 		// launch a pod to find a node which can launch a pod. We intentionally do
 		// not just take the node list and choose the first of them. Depending on the
 		// cluster and the scheduler it might be that a "normal" pod cannot be
 		// scheduled onto it.
 		By("Trying to launch a pod with label to get a node which can launch it.")
-		podName := "with-label-" + string(util.NewUUID())
+		podName := "with-label-" + string(uuid.NewUUID())
 		pod, err := c.Pods(ns).Create(&api.Pod{
 			TypeMeta: unversioned.TypeMeta{
 				Kind: "Pod",
@@ -1216,7 +1259,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
-		defer c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 
 		By("Trying to apply a label with fake az info on the found node.")
 		k := "e2e.inter-pod-affinity.kubernetes.io/zone"
@@ -1226,12 +1268,9 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveLabelOffNode(c, nodeName, k)
 
 		By("Trying to launch a pod that with PodAffinity & PodAntiAffinity setting as embedded JSON string in the annotation value.")
-		labelPodName := "with-newlabels"
-		nodeSelectionRoot := filepath.Join(framework.TestContext.RepoRoot, "test/e2e/testing-manifests/node-selection")
-		testPodPath := filepath.Join(nodeSelectionRoot, "pod-with-pod-affinity.yaml")
-		framework.RunKubectlOrDie("create", "-f", testPodPath, fmt.Sprintf("--namespace=%v", ns))
-		defer c.Pods(ns).Delete(labelPodName, api.NewDeleteOptions(0))
-
+		labelPodName := podWithPodAffinity.Name
+		pod, err = c.Pods(ns).Create(&podWithPodAffinity)
+		framework.ExpectNoError(err)
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
 		// kubelet and the scheduler: the scheduler might have scheduled a pod
@@ -1276,11 +1315,13 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		By("Trying to apply a random taint on the found node.")
-		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(util.NewUUID()))
+		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID()))
 		taintValue := "testing-taint-value"
 		taintEffect := api.TaintEffectNoSchedule
 		framework.AddOrUpdateTaintOnNode(c, nodeName, api.Taint{Key: taintName, Value: taintValue, Effect: taintEffect})
@@ -1288,7 +1329,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveTaintOffNode(c, nodeName, taintName)
 
 		By("Trying to apply a random label on the found node.")
-		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(util.NewUUID()))
+		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
 		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
 		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
@@ -1324,7 +1365,6 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 			},
 		})
 		framework.ExpectNoError(err)
-		defer c.Pods(ns).Delete(tolerationPodName, api.NewDeleteOptions(0))
 
 		// check that pod got scheduled. We intentionally DO NOT check that the
 		// pod is running because this will create a race condition with the
@@ -1370,11 +1410,13 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		nodeName := pod.Spec.NodeName
+
+		By("Explicitly delete pod here to free the resource it takes.")
 		err = c.Pods(ns).Delete(podName, api.NewDeleteOptions(0))
 		framework.ExpectNoError(err)
 
 		By("Trying to apply a random taint on the found node.")
-		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(util.NewUUID()))
+		taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID()))
 		taintValue := "testing-taint-value"
 		taintEffect := api.TaintEffectNoSchedule
 		framework.AddOrUpdateTaintOnNode(c, nodeName, api.Taint{Key: taintName, Value: taintValue, Effect: taintEffect})
@@ -1382,7 +1424,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		defer framework.RemoveTaintOffNode(c, nodeName, taintName)
 
 		By("Trying to apply a random label on the found node.")
-		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(util.NewUUID()))
+		labelKey := fmt.Sprintf("kubernetes.io/e2e-label-key-%s", string(uuid.NewUUID()))
 		labelValue := "testing-label-value"
 		framework.AddOrUpdateLabelOnNode(c, nodeName, labelKey, labelValue)
 		framework.ExpectNodeHasLabel(c, nodeName, labelKey, labelValue)
@@ -1409,28 +1451,20 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		}
 		_, err = c.Pods(ns).Create(podNoTolerations)
 		framework.ExpectNoError(err)
+
 		// Wait a bit to allow scheduler to do its thing
 		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
 		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
 		time.Sleep(10 * time.Second)
-
 		verifyResult(c, podNameNoTolerations, 0, 1, ns)
-		cleanupPods(c, ns)
 
-		// TODO(@kevin-wangzefeng) Figure out how to do it correctly
-		// By("Trying to relaunch the same.")
-		// podNoTolerations, err = c.Pods(ns).Create(&podNoTolerations)
-		// framework.ExpectNoError(err)
-		// defer c.Pods(ns).Delete(podNameNoTolerations, api.NewDeleteOptions(0))
-
-		// // check that pod got scheduled. We intentionally DO NOT check that the
-		// // pod is running because this will create a race condition with the
-		// // kubelet and the scheduler: the scheduler might have scheduled a pod
-		// // already when the kubelet does not know about its new taint yet. The
-		// // kubelet will then refuse to launch the pod.
-		// framework.ExpectNoError(framework.WaitForPodNotPending(c, ns, podNameNoTolerations, podNoTolerations.ResourceVersion))
-		// deployedPod, err := c.Pods(ns).Get(podNameNoTolerations)
-		// framework.ExpectNoError(err)
-		// Expect(deployedPod.Spec.NodeName).To(Equal(nodeName))
+		By("Removing taint off the node")
+		framework.RemoveTaintOffNode(c, nodeName, taintName)
+		// Wait a bit to allow scheduler to do its thing
+		// TODO: this is brittle; there's no guarantee the scheduler will have run in 10 seconds.
+		framework.Logf("Sleeping 10 seconds and crossing our fingers that scheduler will run in that time.")
+		time.Sleep(10 * time.Second)
+		// as taint removed off the node, expect the pod can be successfully scheduled
+		verifyResult(c, podNameNoTolerations, 1, 0, ns)
 	})
 })

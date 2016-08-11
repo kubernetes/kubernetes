@@ -69,7 +69,7 @@ func NewCmdConfigGetContexts(out io.Writer, configAccess clientcmd.ConfigAccess)
 				cmdutil.CheckErr(fmt.Errorf("output must be one of '' or 'name': %v", outputFormat))
 			}
 			if !supportedOutputTypes.Has(outputFormat) {
-				fmt.Fprintf(out, "--output %v is not available in kubectl config get-contexts; reseting to default output format", outputFormat)
+				fmt.Fprintf(out, "--output %v is not available in kubectl config get-contexts; resetting to default output format\n", outputFormat)
 				cmd.Flags().Set("output", "")
 			}
 			cmdutil.CheckErr(options.Complete(cmd, args, out))

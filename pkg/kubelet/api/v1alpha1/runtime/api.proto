@@ -1,4 +1,4 @@
-// api.pb.go could be generate by hack/update-generate-runtime.sh
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
 syntax = 'proto2';
 
 package runtime;
@@ -11,13 +11,14 @@ service RuntimeService {
     // CreatePodSandbox creates a pod-level sandbox.
     // The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
     rpc CreatePodSandbox(CreatePodSandboxRequest) returns (CreatePodSandboxResponse) {}
-    // StopPodSandbox stops the sandbox. If there are any running containers in the
-    // sandbox, they should be force terminated.
+    // StopPodSandbox stops the running sandbox. If there are any running
+    // containers in the sandbox, they should be forcibly terminated.
     rpc StopPodSandbox(StopPodSandboxRequest) returns (StopPodSandboxResponse) {}
-    // DeletePodSandbox deletes the sandbox. If there are any running containers in the
-    // sandbox, they should be force deleted.
-    rpc DeletePodSandbox(DeletePodSandboxRequest) returns (DeletePodSandboxResponse) {}
-    // PodSandboxStatus returns the Status of the PodSandbox.
+    // RemovePodSandbox removes the sandbox. If there are any running containers in the
+    // sandbox, they should be forcibly removed.
+    // It should return success if the sandbox has already been removed.
+    rpc RemovePodSandbox(RemovePodSandboxRequest) returns (RemovePodSandboxResponse) {}
+    // PodSandboxStatus returns the status of the PodSandbox.
     rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
     // ListPodSandbox returns a list of SandBox.
     rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
@@ -28,8 +29,9 @@ service RuntimeService {
     rpc StartContainer(StartContainerRequest) returns (StartContainerResponse) {}
     // StopContainer stops a running container with a grace period (i.e., timeout).
     rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
-    // RemoveContainer removes the container. If the container is running, the container
-    // should be force removed.
+    // RemoveContainer removes the container. If the container is running, the
+    // container should be forcibly removed.
+    // It should return success if the container has already been removed.
     rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
     // ListContainers lists all containers by filters.
     rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
@@ -46,9 +48,10 @@ service ImageService {
     rpc ListImages(ListImagesRequest) returns (ListImagesResponse) {}
     // ImageStatus returns the status of the image.
     rpc ImageStatus(ImageStatusRequest) returns (ImageStatusResponse) {}
-    // PullImage pulls a image with authentication config.
+    // PullImage pulls an image with authentication config.
     rpc PullImage(PullImageRequest) returns (PullImageResponse) {}
     // RemoveImage removes the image.
+    // It should return success if the image has already been removed.
     rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse) {}
 }
 
@@ -163,13 +166,13 @@ message PodSandboxConfig {
     // By default the log of a container going into the LogDirectory will be
     // hooked up to STDOUT and STDERR. However, the LogDirectory may contain
     // binary log files with structured logging data from the individual
-    // containers. For example the files might be newline seperated JSON
+    // containers. For example, the files might be newline separated JSON
     // structured logs, systemd-journald journal files, gRPC trace files, etc.
     // E.g.,
     //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
     //     ContainerConfig.LogPath = `containerName_Instance#.log`
     //
-    // WARNING: Log managment and how kubelet should interface with the
+    // WARNING: Log management and how kubelet should interface with the
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
@@ -182,7 +185,7 @@ message PodSandboxConfig {
     // aggregate cpu/memory resources limits of all containers).
     // Note: On a Linux host, kubelet will create a pod-level cgroup and pass
     // it as the cgroup parent for the PodSandbox. For some runtimes, this is
-    // sufficent. For others, e.g., hypervisor-based runtimes, explicit
+    // sufficient. For others, e.g., hypervisor-based runtimes, explicit
     // resource limits for the sandbox are needed at creation time.
     optional PodSandboxResources resources  = 6;
     // Labels are key value pairs that may be used to scope and select individual resources.
@@ -211,12 +214,12 @@ message StopPodSandboxRequest {
 
 message StopPodSandboxResponse {}
 
-message DeletePodSandboxRequest {
+message RemovePodSandboxRequest {
     // The id of the PodSandBox
     optional string pod_sandbox_id = 1;
 }
 
-message DeletePodSandboxResponse {}
+message RemovePodSandboxResponse {}
 
 message PodSandboxStatusRequest {
     // The id of the PodSandBox
@@ -315,8 +318,8 @@ message ListPodSandboxResponse {
 }
 
 // ImageSpec is an internal representation of an image.  Currently, it wraps the
-// value of a Container's Image field (e.g. imageName, imageName:tag, or 
-// imageName:digest), but in the future it will include more detailed 
+// value of a Container's Image field (e.g. imageName, imageName:tag, or
+// imageName:digest), but in the future it will include more detailed
 // information about the different image types.
 message ImageSpec {
     optional string image = 1;
@@ -418,7 +421,7 @@ message ContainerConfig {
     //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
     //     ContainerConfig.LogPath = `containerName_Instance#.log`
     //
-    // WARNING: Log managment and how kubelet should interface with the
+    // WARNING: Log management and how kubelet should interface with the
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.

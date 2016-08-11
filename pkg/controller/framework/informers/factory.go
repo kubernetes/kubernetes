@@ -46,15 +46,20 @@ type sharedInformerFactory struct {
 	client        clientset.Interface
 	lock          sync.Mutex
 	defaultResync time.Duration
-	informers     map[reflect.Type]framework.SharedIndexInformer
+
+	informers map[reflect.Type]framework.SharedIndexInformer
+	// startedInformers is used for tracking which informers have been started
+	// this allows calling of Start method multiple times
+	startedInformers map[reflect.Type]bool
 }
 
 // NewSharedInformerFactory constructs a new instance of sharedInformerFactory
 func NewSharedInformerFactory(client clientset.Interface, defaultResync time.Duration) SharedInformerFactory {
 	return &sharedInformerFactory{
-		client:        client,
-		defaultResync: defaultResync,
-		informers:     make(map[reflect.Type]framework.SharedIndexInformer),
+		client:           client,
+		defaultResync:    defaultResync,
+		informers:        make(map[reflect.Type]framework.SharedIndexInformer),
+		startedInformers: make(map[reflect.Type]bool),
 	}
 }
 
@@ -63,8 +68,11 @@ func (s *sharedInformerFactory) Start(stopCh <-chan struct{}) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	for _, informer := range s.informers {
-		go informer.Run(stopCh)
+	for informerType, informer := range s.informers {
+		if !s.startedInformers[informerType] {
+			go informer.Run(stopCh)
+			s.startedInformers[informerType] = true
+		}
 	}
 }
 
@@ -93,27 +101,8 @@ func (f *sharedInformerFactory) PersistentVolumes() PVInformer {
 	return &pvInformer{sharedInformerFactory: f}
 }
 
-// CreateSharedPodInformer returns a SharedIndexInformer that lists and watches all pods
-func CreateSharedPodInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
-	sharedInformer := framework.NewSharedIndexInformer(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return client.Core().Pods(api.NamespaceAll).List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Core().Pods(api.NamespaceAll).Watch(options)
-			},
-		},
-		&api.Pod{},
-		resyncPeriod,
-		cache.Indexers{},
-	)
-
-	return sharedInformer
-}
-
-// CreateSharedPodIndexInformer returns a SharedIndexInformer that lists and watches all pods
-func CreateSharedPodIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+// NewPodInformer returns a SharedIndexInformer that lists and watches all pods
+func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
 	sharedIndexInformer := framework.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -131,8 +120,8 @@ func CreateSharedPodIndexInformer(client clientset.Interface, resyncPeriod time.
 	return sharedIndexInformer
 }
 
-// CreateSharedNodeIndexInformer returns a SharedIndexInformer that lists and watches all nodes
-func CreateSharedNodeIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+// NewNodeInformer returns a SharedIndexInformer that lists and watches all nodes
+func NewNodeInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
 	sharedIndexInformer := framework.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -149,8 +138,8 @@ func CreateSharedNodeIndexInformer(client clientset.Interface, resyncPeriod time
 	return sharedIndexInformer
 }
 
-// CreateSharedPVCIndexInformer returns a SharedIndexInformer that lists and watches all PVCs
-func CreateSharedPVCIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+// NewPVCInformer returns a SharedIndexInformer that lists and watches all PVCs
+func NewPVCInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
 	sharedIndexInformer := framework.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -167,8 +156,8 @@ func CreateSharedPVCIndexInformer(client clientset.Interface, resyncPeriod time.
 	return sharedIndexInformer
 }
 
-// CreateSharedPVIndexInformer returns a SharedIndexInformer that lists and watches all PVs
-func CreateSharedPVIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+// NewPVInformer returns a SharedIndexInformer that lists and watches all PVs
+func NewPVInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
 	sharedIndexInformer := framework.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -185,8 +174,8 @@ func CreateSharedPVIndexInformer(client clientset.Interface, resyncPeriod time.D
 	return sharedIndexInformer
 }
 
-// CreateSharedNamespaceIndexInformer returns a SharedIndexInformer that lists and watches namespaces
-func CreateSharedNamespaceIndexInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
+// NewNamespaceInformer returns a SharedIndexInformer that lists and watches namespaces
+func NewNamespaceInformer(client clientset.Interface, resyncPeriod time.Duration) framework.SharedIndexInformer {
 	sharedIndexInformer := framework.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {

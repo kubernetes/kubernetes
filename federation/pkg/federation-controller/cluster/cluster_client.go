@@ -60,7 +60,7 @@ func NewClusterClientSet(c *federation_v1beta1.Cluster) (*ClusterClient, error) 
 			return nil, nil
 		}
 	}
-	return &clusterClientSet, err
+	return &clusterClientSet, nil
 }
 
 // GetClusterHealthStatus gets the kubernetes cluster health status by requesting "/healthz"

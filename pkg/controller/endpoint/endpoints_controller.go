@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"encoding/json"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
@@ -113,7 +114,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 
 // NewEndpointControllerFromClient returns a new *EndpointController that runs its own informer.
 func NewEndpointControllerFromClient(client *clientset.Clientset, resyncPeriod controller.ResyncPeriodFunc) *EndpointController {
-	podInformer := informers.CreateSharedPodIndexInformer(client, resyncPeriod())
+	podInformer := informers.NewPodInformer(client, resyncPeriod())
 	e := NewEndpointController(podInformer, client)
 	e.internalPodInformer = podInformer
 
@@ -272,7 +273,7 @@ func (e *EndpointController) deletePod(obj interface{}) {
 	}
 	podKey, err := keyFunc(obj)
 	if err != nil {
-		glog.Errorf("Couldn't get key for object %+v: %v", obj, err)
+		glog.Errorf("Couldn't get key for object %#v: %v", obj, err)
 		return
 	}
 	glog.Infof("Pod %q was deleted but we don't have a record of its final state, so it will take up to %v before it will be removed from all endpoint records.", podKey, FullServiceResyncPeriod)

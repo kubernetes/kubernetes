@@ -425,7 +425,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.nodePort = int(servicePort.NodePort)
 			info.sessionAffinityType = service.Spec.SessionAffinity
-			glog.V(4).Infof("info: %+v", info)
+			glog.V(4).Infof("info: %#v", info)
 
 			err = proxier.openPortal(serviceName, info)
 			if err != nil {

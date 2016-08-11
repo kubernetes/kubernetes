@@ -22,9 +22,11 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
 	"fmt"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
@@ -39,8 +41,8 @@ func init() {
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
 	*admission.Handler
-	client          clientset.Interface
-	informerFactory informers.SharedInformerFactory
+	client            clientset.Interface
+	namespaceInformer framework.SharedIndexInformer
 }
 
 var _ = admission.WantsInformerFactory(&exists{})
@@ -53,6 +55,10 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
+	// we need to wait for our caches to warm
+	if !e.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:      a.GetNamespace(),
@@ -60,7 +66,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, exists, err := e.informerFactory.Namespaces().Informer().GetStore().Get(namespace)
+	_, exists, err := e.namespaceInformer.GetStore().Get(namespace)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
@@ -89,12 +95,13 @@ func NewExists(c clientset.Interface) admission.Interface {
 }
 
 func (e *exists) SetInformerFactory(f informers.SharedInformerFactory) {
-	e.informerFactory = f
+	e.namespaceInformer = f.Namespaces().Informer()
+	e.SetReadyFunc(e.namespaceInformer.HasSynced)
 }
 
 func (e *exists) Validate() error {
-	if e.informerFactory == nil {
-		return fmt.Errorf("namespace exists plugin needs a namespace informer")
+	if e.namespaceInformer == nil {
+		return fmt.Errorf("missing namespaceInformer")
 	}
 	return nil
 }

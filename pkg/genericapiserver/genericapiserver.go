@@ -35,18 +35,21 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
+	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/crypto"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -220,7 +223,7 @@ type GenericAPIServer struct {
 	PublicReadWritePort  int
 	ServiceReadWriteIP   net.IP
 	ServiceReadWritePort int
-	masterServices       *util.Runner
+	masterServices       *async.Runner
 	ExtraServicePorts    []api.ServicePort
 	ExtraEndpointPorts   []api.EndpointPort
 
@@ -283,8 +286,7 @@ func setDefaults(c *Config) {
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
-		defaultServiceNodePortRange := utilnet.PortRange{Base: 30000, Size: 2768}
-		c.ServiceNodePortRange = defaultServiceNodePortRange
+		c.ServiceNodePortRange = options.DefaultServiceNodePortRange
 		glog.Infof("Node port range unspecified. Defaulting to %v.", c.ServiceNodePortRange)
 	}
 	if c.MasterCount == 0 {
@@ -535,17 +537,6 @@ func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
 	})
 }
 
-// TODO: Longer term we should read this from some config store, rather than a flag.
-func verifyClusterIPFlags(options *options.ServerRunOptions) {
-	if options.ServiceClusterIPRange.IP == nil {
-		glog.Fatal("No --service-cluster-ip-range specified")
-	}
-	var ones, bits = options.ServiceClusterIPRange.Mask.Size()
-	if bits-ones > 20 {
-		glog.Fatal("Specified --service-cluster-ip-range is too large")
-	}
-}
-
 func NewConfig(options *options.ServerRunOptions) *Config {
 	return &Config{
 		APIGroupPrefix:            options.APIGroupPrefix,
@@ -569,45 +560,8 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 	}
 }
 
-func verifyServiceNodePort(options *options.ServerRunOptions) {
-	if options.KubernetesServiceNodePort < 0 || options.KubernetesServiceNodePort > 65535 {
-		glog.Fatalf("--kubernetes-service-node-port %v must be between 0 and 65535, inclusive. If 0, the Kubernetes master service will be of type ClusterIP.", options.KubernetesServiceNodePort)
-	}
-
-	if options.KubernetesServiceNodePort > 0 && !options.ServiceNodePortRange.Contains(options.KubernetesServiceNodePort) {
-		glog.Fatalf("Kubernetes service port range %v doesn't contain %v", options.ServiceNodePortRange, (options.KubernetesServiceNodePort))
-	}
-}
-
-func verifyEtcdServersList(options *options.ServerRunOptions) {
-	if len(options.StorageConfig.ServerList) == 0 {
-		glog.Fatalf("--etcd-servers must be specified")
-	}
-}
-
-func verifySecurePort(options *options.ServerRunOptions) {
-	if options.SecurePort < 0 || options.SecurePort > 65535 {
-		glog.Fatalf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", options.SecurePort)
-	}
-}
-
-// TODO: Allow 0 to turn off insecure port.
-func verifyInsecurePort(options *options.ServerRunOptions) {
-	if options.InsecurePort < 1 || options.InsecurePort > 65535 {
-		glog.Fatalf("--insecure-port %v must be between 1 and 65535, inclusive.", options.InsecurePort)
-	}
-}
-
-func ValidateRunOptions(options *options.ServerRunOptions) {
-	verifyClusterIPFlags(options)
-	verifyServiceNodePort(options)
-	verifyEtcdServersList(options)
-	verifySecurePort(options)
-	verifyInsecurePort(options)
-}
-
 func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
-	ValidateRunOptions(options)
+	genericvalidation.ValidateRunOptions(options)
 
 	// If advertise-address is not specified, use bind-address. If bind-address
 	// is not usable (unset, 0.0.0.0, or loopback), we will use the host's default
@@ -679,10 +633,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	}
 
 	if secureLocation != "" {
-		handler := apiserver.TimeoutHandler(s.Handler, longRunningTimeout)
+		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler), longRunningTimeout)
 		secureServer := &http.Server{
 			Addr:           secureLocation,
-			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, apiserver.RecoverPanics(handler)),
+			Handler:        apiserver.MaxInFlightLimit(sem, longRunningRequestCheck, handler),
 			MaxHeaderBytes: 1 << 20,
 			TLSConfig: &tls.Config{
 				// Can't use SSLv3 because of POODLE and BEAST
@@ -742,10 +696,10 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		}
 	}
 
-	handler := apiserver.TimeoutHandler(s.InsecureHandler, longRunningTimeout)
+	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler), longRunningTimeout)
 	http := &http.Server{
 		Addr:           insecureLocation,
-		Handler:        apiserver.RecoverPanics(handler),
+		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
 	}
 
@@ -917,4 +871,19 @@ func (s *GenericAPIServer) InstallSwaggerAPI() {
 		},
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, s.HandlerContainer)
+}
+
+// NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
+// exposed for easier composition from other packages
+func NewDefaultAPIGroupInfo(group string) APIGroupInfo {
+	groupMeta := registered.GroupOrDie(group)
+
+	return APIGroupInfo{
+		GroupMeta:                    *groupMeta,
+		VersionedResourcesStorageMap: map[string]map[string]rest.Storage{},
+		OptionsExternalVersion:       &registered.GroupOrDie(api.GroupName).GroupVersion,
+		Scheme:                       api.Scheme,
+		ParameterCodec:               api.ParameterCodec,
+		NegotiatedSerializer:         api.Codecs,
+	}
 }

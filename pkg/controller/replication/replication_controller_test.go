@@ -37,9 +37,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -59,7 +59,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
-			UID:             util.NewUUID(),
+			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "18",
@@ -343,7 +343,7 @@ func TestSyncReplicationControllerDormancy(t *testing.T) {
 	// Get the key for the controller
 	rcKey, err := controller.KeyFunc(controllerSpec)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
+		t.Errorf("Couldn't get key for object %#v: %v", controllerSpec, err)
 	}
 
 	// Lowering expectations should lead to a sync that creates a replica, however the
@@ -686,7 +686,7 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 
 	rcKey, err := controller.KeyFunc(controllerSpec)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
+		t.Errorf("Couldn't get key for object %#v: %v", controllerSpec, err)
 	}
 
 	// Size up the controller, then size it down, and confirm the expected create/delete pattern
@@ -865,7 +865,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	// Get the RC key
 	rcKey, err := controller.KeyFunc(rc)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", rc, err)
+		t.Errorf("Couldn't get key for object %#v: %v", rc, err)
 	}
 
 	// This is to simulate a concurrent addPod, that has a handle on the expectations
@@ -937,7 +937,7 @@ func TestOverlappingRCs(t *testing.T) {
 		for j := 1; j < 10; j++ {
 			controllerSpec := newReplicationController(1)
 			controllerSpec.CreationTimestamp = unversioned.Date(2014, time.December, j, 0, 0, 0, 0, time.Local)
-			controllerSpec.Name = string(util.NewUUID())
+			controllerSpec.Name = string(uuid.NewUUID())
 			controllers = append(controllers, controllerSpec)
 		}
 		shuffledControllers := shuffle(controllers)
@@ -965,7 +965,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	manager.rcStore.Indexer.Add(controllerSpec)
 	rcKey, err := controller.KeyFunc(controllerSpec)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", controllerSpec, err)
+		t.Errorf("Couldn't get key for object %#v: %v", controllerSpec, err)
 	}
 	pod := newPodList(nil, 1, api.PodPending, controllerSpec, "pod").Items[0]
 	pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
@@ -982,7 +982,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	podExp, exists, err := manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// An update from no deletion timestamp to having one should be treated
@@ -999,7 +999,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// An update to the pod (including an update to the deletion timestamp)
@@ -1017,7 +1017,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// A pod with a non-nil deletion timestamp should also be ignored by the
@@ -1025,7 +1025,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	manager.deletePod(&pod)
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 
 	// Deleting the second pod should clear expectations.
@@ -1039,7 +1039,7 @@ func TestDeletionTimestamp(t *testing.T) {
 
 	podExp, exists, err = manager.expectations.GetExpectations(rcKey)
 	if !exists || err != nil || !podExp.Fulfilled() {
-		t.Fatalf("Wrong expectations %+v", podExp)
+		t.Fatalf("Wrong expectations %#v", podExp)
 	}
 }
 
@@ -1145,7 +1145,7 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 	rc := newReplicationController(2)
 	manager.rcStore.Indexer.Add(rc)
 	var trueVar = true
-	otherControllerReference := api.OwnerReference{UID: util.NewUUID(), APIVersion: "v1", Kind: "ReplicationController", Name: "AnotherRC", Controller: &trueVar}
+	otherControllerReference := api.OwnerReference{UID: uuid.NewUUID(), APIVersion: "v1", Kind: "ReplicationController", Name: "AnotherRC", Controller: &trueVar}
 	// add to podStore a matching Pod controlled by another controller. Expect no patch.
 	pod := newPod("pod", rc, api.PodRunning)
 	pod.OwnerReferences = []api.OwnerReference{otherControllerReference}
@@ -1165,7 +1165,7 @@ func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 	// add to podStore one more matching pod that doesn't have a controller
 	// ref, but has an owner ref pointing to other object. Expect a patch to
 	// take control of it.
-	unrelatedOwnerReference := api.OwnerReference{UID: util.NewUUID(), APIVersion: "batch/v1", Kind: "Job", Name: "Job"}
+	unrelatedOwnerReference := api.OwnerReference{UID: uuid.NewUUID(), APIVersion: "batch/v1", Kind: "Job", Name: "Job"}
 	pod := newPod("pod", rc, api.PodRunning)
 	pod.OwnerReferences = []api.OwnerReference{unrelatedOwnerReference}
 	manager.podStore.Indexer.Add(pod)

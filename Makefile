@@ -46,12 +46,15 @@ GENERATED_FILE_PREFIX := zz_generated.
 # Metadata for driving the build lives here.
 META_DIR := .make
 
+# Our build flags.
+# TODO(thockin): it would be nice to just use the native flags.  Can we EOL
+#                these "wrapper" flags?
 KUBE_GOFLAGS := $(GOFLAGS)
 KUBE_GOLDFLAGS := $(GOLDFLAGS)
-
-GOGCFLAGS ?=
 KUBE_GOGCFLAGS = $(GOGCFLAGS)
-export KUBE_GOGCFLAGS GOGCFLAGS
+
+# This controls the verbosity of the build.  Higher numbers mean more output.
+KUBE_VERBOSE ?= 1
 
 # Build code.
 #
@@ -79,9 +82,9 @@ all: generated_files
 #
 # Example:
 # make ginkgo
+.PHONY: ginkgo
 ginkgo:
 	hack/make-rules/build.sh vendor/github.com/onsi/ginkgo/ginkgo
-.PHONY: ginkgo
 
 # Runs all the presubmission verifications.
 #
@@ -94,6 +97,7 @@ ginkgo:
 .PHONY: verify
 verify:
 	KUBE_VERIFY_GIT_BRANCH=$(BRANCH) hack/make-rules/verify.sh -v
+	hack/make-rules/vet.sh
 
 # Build and run tests.
 #
@@ -172,9 +176,9 @@ test-e2e-node: ginkgo generated_files
 #
 # Example:
 #   make test-cmd
-test-cmd: generated_files
-	@hack/make-rules/test-cmd.sh
 .PHONY: test-cmd
+test-cmd: generated_files
+	hack/make-rules/test-cmd.sh
 
 # Remove all build artifacts.
 #
@@ -249,6 +253,14 @@ cross:
 .PHONY: $(notdir $(abspath $(wildcard cmd/*/)))
 $(notdir $(abspath $(wildcard cmd/*/))): generated_files
 	hack/make-rules/build.sh cmd/$@
+
+# Add rules for all directories in plugin/cmd/
+#
+# Example:
+#   make kube-scheduler
+.PHONY: $(notdir $(abspath $(wildcard plugin/cmd/*/)))
+$(notdir $(abspath $(wildcard plugin/cmd/*/))): generated_files
+	hack/make-rules/build.sh plugin/cmd/$@
 
 # Add rules for all directories in federation/cmd/
 #

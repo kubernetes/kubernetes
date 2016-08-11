@@ -50,8 +50,23 @@ func TestLabels(t *testing.T) {
 			},
 		},
 	}
+	containerPorts := []api.ContainerPort{
+		{
+			Name:          "http",
+			HostPort:      80,
+			ContainerPort: 8080,
+			Protocol:      api.ProtocolTCP,
+		},
+		{
+			Name:          "https",
+			HostPort:      443,
+			ContainerPort: 6443,
+			Protocol:      api.ProtocolTCP,
+		},
+	}
 	container := &api.Container{
-		Name: "test_container",
+		Name:  "test_container",
+		Ports: containerPorts,
 		TerminationMessagePath: "/somepath",
 		Lifecycle:              lifecycle,
 	}
@@ -78,6 +93,7 @@ func TestLabels(t *testing.T) {
 		RestartCount:           restartCount,
 		TerminationMessagePath: container.TerminationMessagePath,
 		PreStopHandler:         container.Lifecycle.PreStop,
+		Ports:                  containerPorts,
 	}
 
 	// Test whether we can get right information from label

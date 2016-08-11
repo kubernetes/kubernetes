@@ -29,12 +29,10 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 
 	"k8s.io/kubernetes/pkg/api"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -61,20 +59,13 @@ func setupProviderConfig() error {
 	case "gce", "gke":
 		var err error
 		framework.Logf("Fetching cloud provider for %q\r\n", framework.TestContext.Provider)
-		var tokenSource oauth2.TokenSource
-		tokenSource = nil
-		if cloudConfig.ServiceAccount != "" {
-			// Use specified service account for auth
-			framework.Logf("Using service account %q as token source.", cloudConfig.ServiceAccount)
-			tokenSource = google.ComputeTokenSource(cloudConfig.ServiceAccount)
-		}
 		zone := framework.TestContext.CloudConfig.Zone
 		region, err := gcecloud.GetGCERegion(zone)
 		if err != nil {
 			return fmt.Errorf("error parsing GCE/GKE region from zone %q: %v", zone, err)
 		}
 		managedZones := []string{zone} // Only single-zone for now
-		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, tokenSource, false /* useMetadataServer */)
+		cloudConfig.Provider, err = gcecloud.CreateGCECloud(framework.TestContext.CloudConfig.ProjectID, region, zone, managedZones, "" /* networkUrl */, nil /* nodeTags */, "" /* nodeInstancePerfix */, nil /* tokenSource */, false /* useMetadataServer */)
 		if err != nil {
 			return fmt.Errorf("Error building GCE/GKE provider: %v", err)
 		}
@@ -129,7 +120,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	if err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, int32(framework.TestContext.MinStartupPods), podStartupTimeout, framework.ImagePullerLabels); err != nil {
 		framework.DumpAllNamespaceInfo(c, api.NamespaceSystem)
 		framework.LogFailedContainers(c, api.NamespaceSystem)
-		framework.RunKubernetesServiceTestContainer(c, framework.TestContext.RepoRoot, api.NamespaceDefault)
+		framework.RunKubernetesServiceTestContainer(c, api.NamespaceDefault)
 		framework.Failf("Error waiting for all pods to be running and ready: %v", err)
 	}
 
@@ -224,8 +215,8 @@ var _ = ginkgo.SynchronizedAfterSuite(func() {
 // This function is called on each Ginkgo node in parallel mode.
 func RunE2ETests(t *testing.T) {
 	runtime.ReallyCrash = true
-	util.InitLogs()
-	defer util.FlushLogs()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	gomega.RegisterFailHandler(ginkgo.Fail)
 	// Disable skipped tests unless they are explicitly requested.

@@ -18,8 +18,8 @@ package e2e
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"strconv"
@@ -33,7 +33,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
 	It("should becomes running", func() {
-		name := "emptydir-wrapper-test-" + string(util.NewUUID())
+		name := "emptydir-wrapper-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
 
@@ -52,7 +52,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
-		gitServerPodName := "git-server-" + string(util.NewUUID())
+		gitServerPodName := "git-server-" + string(uuid.NewUUID())
 		containerPort := 8000
 
 		labels := map[string]string{"name": gitServerPodName}
@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-secrets-" + string(util.NewUUID()),
+				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{

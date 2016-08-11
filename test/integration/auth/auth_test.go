@@ -38,7 +38,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication.k8s.io/v1beta1"
+	authenticationv1beta1 "k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"

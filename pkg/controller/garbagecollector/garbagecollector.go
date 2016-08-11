@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -67,7 +68,7 @@ func (s objectReference) String() string {
 type node struct {
 	identity objectReference
 	// dependents will be read by the orphan() routine, we need to protect it with a lock.
-	dependentsLock *sync.RWMutex
+	dependentsLock sync.RWMutex
 	dependents     map[*node]struct{}
 	// When processing an Update event, we need to compare the updated
 	// ownerReferences with the owners recorded in the graph.
@@ -151,9 +152,9 @@ func (p *Propagator) addDependentToOwners(n *node, owners []metatypes.OwnerRefer
 					OwnerReference: owner,
 					Namespace:      n.identity.Namespace,
 				},
-				dependentsLock: &sync.RWMutex{},
-				dependents:     make(map[*node]struct{}),
+				dependents: make(map[*node]struct{}),
 			}
+			glog.V(6).Infof("add virtual node.identity: %s\n\n", ownerNode.identity)
 			p.uidToNode.Write(ownerNode)
 			p.gc.dirtyQueue.Add(ownerNode)
 		}
@@ -378,9 +379,8 @@ func (p *Propagator) processEvent() {
 				},
 				Namespace: accessor.GetNamespace(),
 			},
-			dependentsLock: &sync.RWMutex{},
-			dependents:     make(map[*node]struct{}),
-			owners:         accessor.GetOwnerReferences(),
+			dependents: make(map[*node]struct{}),
+			owners:     accessor.GetOwnerReferences(),
 		}
 		p.insertNode(newNode)
 		// the underlying delta_fifo may combine a creation and deletion into one event
@@ -426,7 +426,12 @@ func (p *Propagator) processEvent() {
 // removing ownerReferences from the dependents if the owner is deleted with
 // DeleteOptions.OrphanDependents=true.
 type GarbageCollector struct {
-	restMapper  meta.RESTMapper
+	restMapper meta.RESTMapper
+	// metaOnlyClientPool uses a special codec, which removes fields except for
+	// apiVersion, kind, and metadata during decoding.
+	metaOnlyClientPool dynamic.ClientPool
+	// clientPool uses the regular dynamicCodec. We need it to update
+	// finalizers. It can be removed if we support patching finalizers.
 	clientPool  dynamic.ClientPool
 	dirtyQueue  *workqueue.Type
 	orphanQueue *workqueue.Type
@@ -434,8 +439,6 @@ type GarbageCollector struct {
 	propagator  *Propagator
 }
 
-// TODO: make special List and Watch function that removes fields other than
-// ObjectMeta.
 func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
 	return &cache.ListWatch{
 		ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -461,13 +464,20 @@ func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionReso
 	}
 }
 
-func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource) (monitor, error) {
+func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversioned.GroupVersionResource, kind unversioned.GroupVersionKind) (monitor, error) {
 	// TODO: consider store in one storage.
 	glog.V(6).Infof("create storage for resource %s", resource)
 	var monitor monitor
-	client, err := clientPool.ClientForGroupVersion(resource.GroupVersion())
+	client, err := p.gc.metaOnlyClientPool.ClientForGroupVersion(resource.GroupVersion())
 	if err != nil {
 		return monitor, err
+	}
+	setObjectTypeMeta := func(obj interface{}) {
+		runtimeObject, ok := obj.(runtime.Object)
+		if !ok {
+			utilruntime.HandleError(fmt.Errorf("expected runtime.Object, got %#v", obj))
+		}
+		runtimeObject.GetObjectKind().SetGroupVersionKind(kind)
 	}
 	monitor.store, monitor.controller = framework.NewInformer(
 		gcListWatcher(client, resource),
@@ -476,6 +486,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 		framework.ResourceEventHandlerFuncs{
 			// add the event to the propagator's eventQueue.
 			AddFunc: func(obj interface{}) {
+				setObjectTypeMeta(obj)
 				event := event{
 					eventType: addEvent,
 					obj:       obj,
@@ -483,6 +494,8 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 				p.eventQueue.Add(event)
 			},
 			UpdateFunc: func(oldObj, newObj interface{}) {
+				setObjectTypeMeta(newObj)
+				setObjectTypeMeta(oldObj)
 				event := event{updateEvent, newObj, oldObj}
 				p.eventQueue.Add(event)
 			},
@@ -491,6 +504,7 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 				if deletedFinalStateUnknown, ok := obj.(cache.DeletedFinalStateUnknown); ok {
 					obj = deletedFinalStateUnknown.Obj
 				}
+				setObjectTypeMeta(obj)
 				event := event{
 					eventType: deleteEvent,
 					obj:       obj,
@@ -503,17 +517,20 @@ func monitorFor(p *Propagator, clientPool dynamic.ClientPool, resource unversion
 }
 
 var ignoredResources = map[unversioned.GroupVersionResource]struct{}{
-	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}: {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                              {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                     {},
-	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                {},
+	unversioned.GroupVersionResource{Group: "extensions", Version: "v1beta1", Resource: "replicationcontrollers"}:         {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "bindings"}:                                      {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "componentstatuses"}:                             {},
+	unversioned.GroupVersionResource{Group: "", Version: "v1", Resource: "events"}:                                        {},
+	unversioned.GroupVersionResource{Group: "authentication.k8s.io", Version: "v1beta1", Resource: "tokenreviews"}:        {},
+	unversioned.GroupVersionResource{Group: "authorization.k8s.io", Version: "v1beta1", Resource: "subjectaccessreviews"}: {},
 }
 
-func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
+func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynamic.ClientPool, resources []unversioned.GroupVersionResource) (*GarbageCollector, error) {
 	gc := &GarbageCollector{
-		clientPool:  clientPool,
-		dirtyQueue:  workqueue.New(),
-		orphanQueue: workqueue.New(),
+		metaOnlyClientPool: metaOnlyClientPool,
+		clientPool:         clientPool,
+		dirtyQueue:         workqueue.New(),
+		orphanQueue:        workqueue.New(),
 		// TODO: should use a dynamic RESTMapper built from the discovery results.
 		restMapper: registered.RESTMapper(),
 	}
@@ -530,7 +547,11 @@ func NewGarbageCollector(clientPool dynamic.ClientPool, resources []unversioned.
 			glog.V(6).Infof("ignore resource %#v", resource)
 			continue
 		}
-		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource)
+		kind, err := gc.restMapper.KindFor(resource)
+		if err != nil {
+			return nil, err
+		}
+		monitor, err := monitorFor(gc.propagator, gc.clientPool, resource, kind)
 		if err != nil {
 			return nil, err
 		}
@@ -547,7 +568,7 @@ func (gc *GarbageCollector) worker() {
 	defer gc.dirtyQueue.Done(key)
 	err := gc.processItem(key.(*node))
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Error syncing item %v: %v", key, err))
+		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", key, err))
 	}
 }
 
@@ -621,6 +642,20 @@ func objectReferenceToUnstructured(ref objectReference) *runtime.Unstructured {
 	return ret
 }
 
+func objectReferenceToMetadataOnlyObject(ref objectReference) *metaonly.MetadataOnlyObject {
+	return &metaonly.MetadataOnlyObject{
+		TypeMeta: unversioned.TypeMeta{
+			APIVersion: ref.APIVersion,
+			Kind:       ref.Kind,
+		},
+		ObjectMeta: v1.ObjectMeta{
+			Namespace: ref.Namespace,
+			UID:       ref.UID,
+			Name:      ref.Name,
+		},
+	}
+}
+
 func (gc *GarbageCollector) processItem(item *node) error {
 	// Get the latest item from the API server
 	latest, err := gc.getObject(item.identity)
@@ -632,15 +667,22 @@ func (gc *GarbageCollector) processItem(item *node) error {
 			glog.V(6).Infof("item %v not found, generating a virtual delete event", item.identity)
 			event := event{
 				eventType: deleteEvent,
-				obj:       objectReferenceToUnstructured(item.identity),
+				obj:       objectReferenceToMetadataOnlyObject(item.identity),
 			}
+			glog.V(6).Infof("generating virtual delete event for %s\n\n", event.obj)
 			gc.propagator.eventQueue.Add(event)
 			return nil
 		}
 		return err
 	}
 	if latest.GetUID() != item.identity.UID {
-		glog.V(6).Infof("UID doesn't match, item %v not found, ignore it", item.identity)
+		glog.V(6).Infof("UID doesn't match, item %v not found, generating a virtual delete event", item.identity)
+		event := event{
+			eventType: deleteEvent,
+			obj:       objectReferenceToMetadataOnlyObject(item.identity),
+		}
+		glog.V(6).Infof("generating virtual delete event for %s\n\n", event.obj)
+		gc.propagator.eventQueue.Add(event)
 		return nil
 	}
 	ownerReferences := latest.GetOwnerReferences()
@@ -685,9 +727,21 @@ func (gc *GarbageCollector) processItem(item *node) error {
 }
 
 func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
+	glog.Infof("Garbage Collector: Initializing")
 	for _, monitor := range gc.monitors {
 		go monitor.controller.Run(stopCh)
 	}
+
+	wait.PollInfinite(10*time.Second, func() (bool, error) {
+		for _, monitor := range gc.monitors {
+			if !monitor.controller.HasSynced() {
+				glog.Infof("Garbage Collector: Waiting for resource monitors to be synced...")
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	glog.Infof("Garbage Collector: All monitored resources synced. Proceeding to collect garbage")
 
 	// worker
 	go wait.Until(gc.propagator.processEvent, 0, stopCh)
@@ -697,7 +751,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 		go wait.Until(gc.orphanFinalizer, 0, stopCh)
 	}
 	<-stopCh
-	glog.Infof("Shutting down garbage collector")
+	glog.Infof("Garbage Collector: Shutting down")
 	gc.dirtyQueue.ShutDown()
 	gc.orphanQueue.ShutDown()
 	gc.propagator.eventQueue.ShutDown()

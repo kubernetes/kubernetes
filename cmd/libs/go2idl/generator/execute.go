@@ -64,7 +64,7 @@ type DefaultFileType struct {
 }
 
 func (ft DefaultFileType) AssembleFile(f *File, pathname string) error {
-	glog.V(0).Infof("Assembling file %q", pathname)
+	glog.V(2).Infof("Assembling file %q", pathname)
 	destFile, err := os.Create(pathname)
 	if err != nil {
 		return err
@@ -91,7 +91,7 @@ func (ft DefaultFileType) AssembleFile(f *File, pathname string) error {
 }
 
 func (ft DefaultFileType) VerifyFile(f *File, pathname string) error {
-	glog.V(0).Infof("Verifying file %q", pathname)
+	glog.V(2).Infof("Verifying file %q", pathname)
 	friendlyName := filepath.Join(f.PackageName, f.Name)
 	b := &bytes.Buffer{}
 	et := NewErrorTracker(b)
@@ -211,7 +211,7 @@ func (c *Context) addNameSystems(namers namer.NameSystems) *Context {
 // import path already, this will be appended to 'outDir'.
 func (c *Context) ExecutePackage(outDir string, p Package) error {
 	path := filepath.Join(outDir, p.Path())
-	glog.V(0).Infof("Processing package %q, disk location %q", p.Name(), path)
+	glog.V(2).Infof("Processing package %q, disk location %q", p.Name(), path)
 	// Filter out any types the *package* doesn't care about.
 	packageContext := c.filteredBy(p.Filter)
 	os.MkdirAll(path, 0755)

@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -93,6 +93,7 @@ func waitTillNPodsRunningOnNodes(c *client.Client, nodeNames sets.String, podNam
 // updates labels of nodes given by nodeNames.
 // In case a given label already exists, it overwrites it. If label to remove doesn't exist
 // it silently ignores it.
+// TODO: migrate to use framework.AddOrUpdateLabelOnNode/framework.RemoveLabelOffNode
 func updateNodeLabels(c *client.Client, nodeNames sets.String, toAdd, toRemove map[string]string) {
 	const maxRetries = 5
 	for nodeName := range nodeNames {
@@ -183,7 +184,7 @@ var _ = framework.KubeDescribe("kubelet", func() {
 			It(name, func() {
 				totalPods := itArg.podsPerNode * numNodes
 				By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
-				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(util.NewUUID()))
+				rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
 
 				Expect(framework.RunRC(framework.RCConfig{
 					Client:       f.Client,

@@ -2069,6 +2069,8 @@ const (
 	NodeOutOfDisk NodeConditionType = "OutOfDisk"
 	// NodeMemoryPressure means the kubelet is under pressure due to insufficient available memory.
 	NodeMemoryPressure NodeConditionType = "MemoryPressure"
+	// NodeDiskPressure means the kubelet is under pressure due to insufficient available disk.
+	NodeDiskPressure NodeConditionType = "DiskPressure"
 	// NodeNetworkUnavailable means that network for the node is not correctly configured.
 	NodeNetworkUnavailable NodeConditionType = "NetworkUnavailable"
 )
@@ -2568,6 +2570,8 @@ const (
 	ResourceRequestsCPU ResourceName = "requests.cpu"
 	// Memory request, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
 	ResourceRequestsMemory ResourceName = "requests.memory"
+	// Storage request, in bytes
+	ResourceRequestsStorage ResourceName = "requests.storage"
 	// CPU limit, in cores. (500m = .5 cores)
 	ResourceLimitsCPU ResourceName = "limits.cpu"
 	// Memory limit, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)

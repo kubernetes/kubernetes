@@ -332,7 +332,7 @@ function detect-node-names {
   detect-project
   INSTANCE_GROUPS=()
   INSTANCE_GROUPS+=($(gcloud compute instance-groups managed list \
-    --zone "${ZONE}" --project "${PROJECT}" \
+    --zones "${ZONE}" --project "${PROJECT}" \
     --regexp "${NODE_INSTANCE_PREFIX}-.+" \
     --format='value(instanceGroup)' || true))
   NODE_NAMES=()
@@ -709,14 +709,6 @@ function create-master() {
       --zone "${ZONE}" \
       --type "${CLUSTER_REGISTRY_DISK_TYPE_GCE}" \
       --size "${CLUSTER_REGISTRY_DISK_SIZE}" &
-  fi
-
-  # Create disk for influxdb if enabled
-  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]]; then
-    gcloud compute disks create "${INSTANCE_PREFIX}-influxdb-pd" \
-      --project "${PROJECT}" \
-      --zone "${ZONE}" \
-      --size "10GiB" &
   fi
 
   # Generate a bearer token for this cluster. We push this separately
@@ -1162,7 +1154,7 @@ function kube-down {
   # Find out what minions are running.
   local -a minions
   minions=( $(gcloud compute instances list \
-                --project "${PROJECT}" --zone "${ZONE}" \
+                --project "${PROJECT}" --zones "${ZONE}" \
                 --regexp "${NODE_INSTANCE_PREFIX}-.+" \
                 --format='value(name)') )
   # If any minions are running, delete them in batches.
@@ -1266,15 +1258,10 @@ function check-resources {
     return 1
   fi
 
-  if gcloud compute disks describe --project "${PROJECT}" "${INSTANCE_PREFIX}-influxdb-pd" --zone "${ZONE}" &>/dev/null; then
-    KUBE_RESOURCE_FOUND="Persistent disk ${INSTANCE_PREFIX}-influxdb-pd"
-    return 1
-  fi
-
   # Find out what minions are running.
   local -a minions
   minions=( $(gcloud compute instances list \
-                --project "${PROJECT}" --zone "${ZONE}" \
+                --project "${PROJECT}" --zones "${ZONE}" \
                 --regexp "${NODE_INSTANCE_PREFIX}-.+" \
                 --format='value(name)') )
   if (( "${#minions[@]}" > 0 )); then
@@ -1545,7 +1532,7 @@ function ssh-to-node {
   local node="$1"
   local cmd="$2"
   # Loop until we can successfully ssh into the box
-  for try in $(seq 1 5); do
+  for try in {1..5}; do
     if gcloud compute ssh --ssh-flag="-o LogLevel=quiet" --ssh-flag="-o ConnectTimeout=30" --project "${PROJECT}" --zone="${ZONE}" "${node}" --command "echo test > /dev/null"; then
       break
     fi

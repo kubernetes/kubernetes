@@ -45,7 +45,7 @@ readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
-readonly KUBE_BUILD_IMAGE_CROSS_TAG="v1.6.3-0"
+readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat build/build-image/cross/VERSION)"
 # KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>"
 
 # Here we map the output directories across both the local and remote _output
@@ -485,11 +485,6 @@ function kube::build::source_targets() {
           \( -path ./_\* -o -path ./.git\* \) -prune  \
         \))
   )
-  if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
-    for contrib in "${KUBERNETES_CONTRIB}"; do
-      targets+=($(eval "kube::contrib::${contrib}::source_targets"))
-    done
-  fi
   echo "${targets[@]}"
 }
 
@@ -1086,7 +1081,7 @@ function kube::release::gcs::verify_prereqs() {
   fi
 
   if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
-    GCLOUD_ACCOUNT=$(gcloud auth list 2>/dev/null | awk '/(active)/ { print $2 }')
+    GCLOUD_ACCOUNT=$(gcloud config list --format='value(core.account)' 2>/dev/null)
   fi
   if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
     echo "No account authorized through gcloud.  Please fix with:"
@@ -1096,7 +1091,7 @@ function kube::release::gcs::verify_prereqs() {
   fi
 
   if [[ -z "${GCLOUD_PROJECT-}" ]]; then
-    GCLOUD_PROJECT=$(gcloud config list project | awk '{project = $3} END {print project}')
+    GCLOUD_PROJECT=$(gcloud config list --format='value(core.project)' 2>/dev/null)
   fi
   if [[ -z "${GCLOUD_PROJECT-}" ]]; then
     echo "No account authorized through gcloud.  Please fix with:"
@@ -1594,7 +1589,7 @@ function kube::release::docker::release() {
 
 function kube::release::gcloud_account_is_active() {
   local -r account="${1-}"
-  if [[ -n $(gcloud auth list --filter-account $account 2>/dev/null | grep "active") ]]; then
+  if [[ "$(gcloud config list --format='value(core.account)')" == "${account}" ]]; then
     return 0
   else
     return 1

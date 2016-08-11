@@ -363,7 +363,7 @@ func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	}
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf(`Read from %s but no data found`, source)
+		return nil, fmt.Errorf("Read from %s but no data found", source)
 	}
 
 	return data, nil

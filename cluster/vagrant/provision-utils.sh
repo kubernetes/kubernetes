@@ -28,7 +28,14 @@ function prepare-package-manager() {
   echo "Prepare package manager"
 
   # Useful if a mirror is broken or slow
-  echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+  if [ -z "$CUSTOM_FEDORA_REPOSITORY_URL" ]; then
+      echo "fastestmirror=True" >> /etc/dnf/dnf.conf
+  else
+      # remove trailing slash from URL if it's present
+      CUSTOM_FEDORA_REPOSITORY_URL="${CUSTOM_FEDORA_REPOSITORY_URL%/}"
+      sed -i -e "/^metalink=/d" /etc/yum.repos.d/*.repo
+      sed -i -e "s@^#baseurl=http://download.fedoraproject.org/pub/fedora@baseurl=$CUSTOM_FEDORA_REPOSITORY_URL@" /etc/yum.repos.d/*.repo
+  fi
 }
 
 
@@ -92,6 +99,15 @@ grains:
   keep_host_etcd: true
   kube_user: '$(echo "$KUBE_USER" | sed -e "s/'/''/g")'
 EOF
+}
+
+function release_not_found() {
+  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
+  echo "are running from a clone of the git repo, please run 'make quick-release'." >&2
+  echo "Note that this requires having Docker installed.  If you are running " >&2
+  echo "from a release tarball, something is wrong.  Look at " >&2
+  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
+  exit 1
 }
 
 function install-salt() {

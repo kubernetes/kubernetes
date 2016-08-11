@@ -134,6 +134,7 @@ var standardQuotaResources = sets.NewString(
 	string(ResourceMemory),
 	string(ResourceRequestsCPU),
 	string(ResourceRequestsMemory),
+	string(ResourceRequestsStorage),
 	string(ResourceLimitsCPU),
 	string(ResourceLimitsMemory),
 	string(ResourcePods),
@@ -436,15 +437,16 @@ const (
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
 // and converts it to the Affinity type in api.
-func GetAffinityFromPodAnnotations(annotations map[string]string) (Affinity, error) {
-	var affinity Affinity
+func GetAffinityFromPodAnnotations(annotations map[string]string) (*Affinity, error) {
 	if len(annotations) > 0 && annotations[AffinityAnnotationKey] != "" {
+		var affinity Affinity
 		err := json.Unmarshal([]byte(annotations[AffinityAnnotationKey]), &affinity)
 		if err != nil {
-			return affinity, err
+			return nil, err
 		}
+		return &affinity, nil
 	}
-	return affinity, nil
+	return nil, nil
 }
 
 // GetTolerationsFromPodAnnotations gets the json serialized tolerations data from Pod.Annotations

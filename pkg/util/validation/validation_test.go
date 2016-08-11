@@ -86,13 +86,13 @@ func TestIsDNS1123Subdomain(t *testing.T) {
 	}
 }
 
-func TestIsDNS952Label(t *testing.T) {
+func TestIsDNS1035Label(t *testing.T) {
 	goodValues := []string{
 		"a", "ab", "abc", "a1", "a-1", "a--1--2--b",
-		strings.Repeat("a", 24),
+		strings.Repeat("a", 63),
 	}
 	for _, val := range goodValues {
-		if msgs := IsDNS952Label(val); len(msgs) != 0 {
+		if msgs := IsDNS1035Label(val); len(msgs) != 0 {
 			t.Errorf("expected true for '%s': %v", val, msgs)
 		}
 	}
@@ -104,10 +104,10 @@ func TestIsDNS952Label(t *testing.T) {
 		"_", "a_", "_a", "a_b", "1_", "_1", "1_2",
 		".", "a.", ".a", "a.b", "1.", ".1", "1.2",
 		" ", "a ", " a", "a b", "1 ", " 1", "1 2",
-		strings.Repeat("a", 25),
+		strings.Repeat("a", 64),
 	}
 	for _, val := range badValues {
-		if msgs := IsDNS952Label(val); len(msgs) == 0 {
+		if msgs := IsDNS1035Label(val); len(msgs) == 0 {
 			t.Errorf("expected false for '%s'", val)
 		}
 	}
@@ -377,11 +377,14 @@ func TestIsValidPercent(t *testing.T) {
 
 func TestIsConfigMapKey(t *testing.T) {
 	successCases := []string{
+		"a",
 		"good",
 		"good-good",
 		"still.good",
 		"this.is.also.good",
 		".so.is.this",
+		"THIS_IS_GOOD",
+		"so_is_this_17",
 	}
 
 	for i := range successCases {
@@ -391,14 +394,42 @@ func TestIsConfigMapKey(t *testing.T) {
 	}
 
 	failureCases := []string{
-		"bad_bad",
+		".",
+		"..",
 		"..bad",
-		"bad.",
+		"b*d",
+		"bad!&bad",
 	}
 
 	for i := range failureCases {
 		if errs := IsConfigMapKey(failureCases[i]); len(errs) == 0 {
-			t.Errorf("[%d] expected success", i)
+			t.Errorf("[%d] expected failure", i)
+		}
+	}
+}
+
+func TestIsWildcardDNS1123Subdomain(t *testing.T) {
+	goodValues := []string{
+		"*.example.com",
+		"*.bar.com",
+		"*.foo.bar.com",
+	}
+	for _, val := range goodValues {
+		if errs := IsWildcardDNS1123Subdomain(val); len(errs) != 0 {
+			t.Errorf("expected no errors for %q: %v", val, errs)
+		}
+	}
+
+	badValues := []string{
+		"*.*.bar.com",
+		"*.foo.*.com",
+		"*bar.com",
+		"f*.bar.com",
+		"*",
+	}
+	for _, val := range badValues {
+		if errs := IsWildcardDNS1123Subdomain(val); len(errs) == 0 {
+			t.Errorf("expected errors for %q", val)
 		}
 	}
 }

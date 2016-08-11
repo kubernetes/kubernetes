@@ -48,6 +48,7 @@ kube::golang::server_targets() {
   fi
   echo "${targets[@]}"
 }
+
 readonly KUBE_SERVER_TARGETS=($(kube::golang::server_targets))
 readonly KUBE_SERVER_BINARIES=("${KUBE_SERVER_TARGETS[@]##*/}")
 
@@ -366,7 +367,7 @@ kube::golang::place_bins() {
   local host_platform
   host_platform=$(kube::golang::host_platform)
 
-  kube::log::status "Placing binaries"
+  V=2 kube::log::status "Placing binaries"
 
   local platform
   for platform in "${KUBE_CLIENT_PLATFORMS[@]}"; do
@@ -454,6 +455,7 @@ kube::golang::build_binaries_for_platform() {
   local -a statics=()
   local -a nonstatics=()
   local -a tests=()
+
   for binary in "${binaries[@]}"; do
 
     # TODO(IBM): Enable hyperkube builds for ppc64le again
@@ -596,7 +598,7 @@ kube::golang::build_binaries() {
   (
     # Check for `go` binary and set ${GOPATH}.
     kube::golang::setup_env
-    echo "Go version: $(go version)"
+    V=2 kube::log::info "Go version: $(go version)"
 
     local host_platform
     host_platform=$(kube::golang::host_platform)
@@ -610,6 +612,18 @@ kube::golang::build_binaries() {
     local use_go_build
     local -a targets=()
     local arg
+    
+    # Add any files with those //generate annotations in the array below.
+    readonly BINDATAS=( "${KUBE_ROOT}/test/e2e/framework/gobindata_util.go" )
+    kube::log::status "Generating bindata:" "${BINDATAS[@]}"
+    for bindata in ${BINDATAS[@]}; do
+	  # Only try to generate bindata if the file exists, since in some cases
+	  # one-off builds of individual directories may exclude some files.
+      if [[ -f $bindata ]]; then
+          go generate "${bindata}"
+      fi
+    done
+    
     for arg; do
       if [[ "${arg}" == "--use_go_build" ]]; then
         use_go_build=true

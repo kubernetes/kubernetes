@@ -32,11 +32,11 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	. "k8s.io/kubernetes/pkg/volume"
 )
 
@@ -474,7 +474,7 @@ type FakeProvisioner struct {
 }
 
 func (fc *FakeProvisioner) Provision() (*api.PersistentVolume, error) {
-	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", util.NewUUID())
+	fullpath := fmt.Sprintf("/tmp/hostpath_pv/%s", uuid.NewUUID())
 
 	pv := &api.PersistentVolume{
 		ObjectMeta: api.ObjectMeta{

@@ -189,7 +189,7 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer frame
 
 // NewReplicationManagerFromClientForIntegration creates a new ReplicationManager that runs its own informer.  It disables event recording for use in integration tests.
 func NewReplicationManagerFromClientForIntegration(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
-	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, resyncPeriod())
+	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod())
 	garbageCollectorEnabled := false
 	rm := newReplicationManager(&record.FakeRecorder{}, podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize, garbageCollectorEnabled)
 	rm.internalPodInformer = podInformer
@@ -198,7 +198,7 @@ func NewReplicationManagerFromClientForIntegration(kubeClient clientset.Interfac
 
 // NewReplicationManagerFromClient creates a new ReplicationManager that runs its own informer.
 func NewReplicationManagerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicationManager {
-	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, resyncPeriod())
+	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod())
 	garbageCollectorEnabled := false
 	rm := NewReplicationManager(podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize, garbageCollectorEnabled)
 	rm.internalPodInformer = podInformer
@@ -416,12 +416,12 @@ func (rm *ReplicationManager) deletePod(obj interface{}) {
 	if !ok {
 		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
 		if !ok {
-			glog.Errorf("Couldn't get object from tombstone %+v", obj)
+			glog.Errorf("Couldn't get object from tombstone %#v", obj)
 			return
 		}
 		pod, ok = tombstone.Obj.(*api.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
+			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
 			return
 		}
 	}

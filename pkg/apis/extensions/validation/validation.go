@@ -323,6 +323,20 @@ func validateIngressTLS(spec *extensions.IngressSpec, fldPath *field.Path) field
 	allErrs := field.ErrorList{}
 	// TODO: Perform a more thorough validation of spec.TLS.Hosts that takes
 	// the wildcard spec from RFC 6125 into account.
+	for _, itls := range spec.TLS {
+		for i, host := range itls.Hosts {
+			if strings.Contains(host, "*") {
+				for _, msg := range validation.IsWildcardDNS1123Subdomain(host) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("hosts"), host, msg))
+				}
+				continue
+			}
+			for _, msg := range validation.IsDNS1123Subdomain(host) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("hosts"), host, msg))
+			}
+		}
+	}
+
 	return allErrs
 }
 
@@ -358,20 +372,26 @@ func ValidateIngressStatusUpdate(ingress, oldIngress *extensions.Ingress) field.
 	return allErrs
 }
 
-func validateIngressRules(IngressRules []extensions.IngressRule, fldPath *field.Path) field.ErrorList {
+func validateIngressRules(ingressRules []extensions.IngressRule, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	if len(IngressRules) == 0 {
+	if len(ingressRules) == 0 {
 		return append(allErrs, field.Required(fldPath, ""))
 	}
-	for i, ih := range IngressRules {
+	for i, ih := range ingressRules {
 		if len(ih.Host) > 0 {
-			// TODO: Ports and ips are allowed in the host part of a url
-			// according to RFC 3986, consider allowing them.
-			for _, msg := range validation.IsDNS1123Subdomain(ih.Host) {
-				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
-			}
 			if isIP := (net.ParseIP(ih.Host) != nil); isIP {
 				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, "must be a DNS name, not an IP address"))
+			}
+			// TODO: Ports and ips are allowed in the host part of a url
+			// according to RFC 3986, consider allowing them.
+			if strings.Contains(ih.Host, "*") {
+				for _, msg := range validation.IsWildcardDNS1123Subdomain(ih.Host) {
+					allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
+				}
+				continue
+			}
+			for _, msg := range validation.IsDNS1123Subdomain(ih.Host) {
+				allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("host"), ih.Host, msg))
 			}
 		}
 		allErrs = append(allErrs, validateIngressRuleValue(&ih.IngressRuleValue, fldPath.Index(0))...)
@@ -738,6 +758,68 @@ func ValidateNetworkPolicyUpdate(update, old *extensions.NetworkPolicy) field.Er
 	allErrs = append(allErrs, apivalidation.ValidateObjectMetaUpdate(&update.ObjectMeta, &old.ObjectMeta, field.NewPath("metadata"))...)
 	if !reflect.DeepEqual(update.Spec, old.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to networkpolicy spec are forbidden."))
+	}
+	return allErrs
+}
+
+// ValidateStorageClass validates a StorageClass.
+func ValidateStorageClass(storageClass *extensions.StorageClass) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMeta(&storageClass.ObjectMeta, false, apivalidation.NameIsDNSSubdomain, field.NewPath("metadata"))
+	allErrs = append(allErrs, validateProvisioner(storageClass.Provisioner, field.NewPath("provisioner"))...)
+	allErrs = append(allErrs, validateParameters(storageClass.Parameters, field.NewPath("parameters"))...)
+
+	return allErrs
+}
+
+// ValidateStorageClassUpdate tests if an update to StorageClass is valid.
+func ValidateStorageClassUpdate(storageClass, oldStorageClass *extensions.StorageClass) field.ErrorList {
+	allErrs := apivalidation.ValidateObjectMetaUpdate(&storageClass.ObjectMeta, &oldStorageClass.ObjectMeta, field.NewPath("metadata"))
+	if !reflect.DeepEqual(oldStorageClass.Parameters, storageClass.Parameters) {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("parameters"), "updates to parameters are forbidden."))
+	}
+
+	if strings.Compare(storageClass.Provisioner, oldStorageClass.Provisioner) != 0 {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("provisioner"), "updates to provisioner are forbidden."))
+	}
+	return allErrs
+}
+
+// validateProvisioner tests if provisioner is a valid qualified name.
+func validateProvisioner(provisioner string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(provisioner) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath, provisioner))
+	}
+	if len(provisioner) > 0 {
+		for _, msg := range validation.IsQualifiedName(strings.ToLower(provisioner)) {
+			allErrs = append(allErrs, field.Invalid(fldPath, provisioner, msg))
+		}
+	}
+	return allErrs
+}
+
+const maxProvisionerParameterSize = 256 * (1 << 10) // 256 kB
+const maxProvisionerParameterLen = 512
+
+// validateParameters tests that keys are qualified names and that provisionerParameter are < 256kB.
+func validateParameters(params map[string]string, fldPath *field.Path) field.ErrorList {
+	var totalSize int64
+	allErrs := field.ErrorList{}
+
+	if len(params) > maxProvisionerParameterLen {
+		allErrs = append(allErrs, field.TooLong(fldPath, "Provisioner Parameters exceeded max allowed", maxProvisionerParameterLen))
+		return allErrs
+	}
+
+	for k, v := range params {
+		if len(k) < 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath, k, "field can not be empty."))
+		}
+		totalSize += (int64)(len(k)) + (int64)(len(v))
+	}
+
+	if totalSize > maxProvisionerParameterSize {
+		allErrs = append(allErrs, field.TooLong(fldPath, "", maxProvisionerParameterSize))
 	}
 	return allErrs
 }

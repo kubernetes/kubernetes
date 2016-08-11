@@ -41,7 +41,7 @@ Create a resourcequota with the specified name, hard limits and optional scopes`
 func NewCmdCreateQuota(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
-		Aliases: []string{"q"},
+		Aliases: []string{"resourcequota"},
 		Short:   "Create a quota with the specified name.",
 		Long:    quotaLong,
 		Example: quotaExample,

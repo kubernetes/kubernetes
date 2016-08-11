@@ -35,10 +35,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/securitycontext"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // NewFakeControllerExpectationsLookup creates a fake store for PodExpectations.
@@ -55,7 +55,7 @@ func newReplicationController(replicas int) *api.ReplicationController {
 	rc := &api.ReplicationController{
 		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
 		ObjectMeta: api.ObjectMeta{
-			UID:             util.NewUUID(),
+			UID:             uuid.NewUUID(),
 			Name:            "foobar",
 			Namespace:       api.NamespaceDefault,
 			ResourceVersion: "18",
@@ -125,7 +125,7 @@ func TestControllerExpectations(t *testing.T) {
 	// RC fires off adds and deletes at apiserver, then sets expectations
 	rcKey, err := KeyFunc(rc)
 	if err != nil {
-		t.Errorf("Couldn't get key for object %+v: %v", rc, err)
+		t.Errorf("Couldn't get key for object %#v: %v", rc, err)
 	}
 	e.SetExpectations(rcKey, adds, dels)
 	var wg sync.WaitGroup
@@ -202,7 +202,7 @@ func TestUIDExpectations(t *testing.T) {
 		podList := newPodList(nil, 5, api.PodRunning, rc)
 		rcKey, err := KeyFunc(rc)
 		if err != nil {
-			t.Fatalf("Couldn't get key for object %+v: %v", rc, err)
+			t.Fatalf("Couldn't get key for object %#v: %v", rc, err)
 		}
 		rcKeys = append(rcKeys, rcKey)
 		rcPodNames := []string{}

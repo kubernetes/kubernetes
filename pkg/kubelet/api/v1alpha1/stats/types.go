@@ -175,6 +175,8 @@ type FsStats struct {
 	UsedBytes *uint64 `json:"usedBytes,omitempty"`
 	// InodesFree represents the free inodes in the filesystem.
 	InodesFree *uint64 `json:"inodesFree,omitempty"`
+	// Inodes represents the total inodes in the filesystem.
+	Inodes *uint64 `json:"inodes,omitempty"`
 }
 
 // UserDefinedMetricType defines how the metric should be interpreted by the user.
@@ -212,6 +214,6 @@ type UserDefinedMetric struct {
 	// The time at which these stats were updated.
 	Time unversioned.Time `json:"time"`
 	// Value of the metric. Float64s have 53 bit precision.
-	// We do not forsee any metrics exceeding that value.
+	// We do not foresee any metrics exceeding that value.
 	Value float64 `json:"value"`
 }

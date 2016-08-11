@@ -184,7 +184,7 @@ func newReplicaSetController(eventRecorder record.EventRecorder, podInformer fra
 
 // NewReplicationManagerFromClient creates a new ReplicationManager that runs its own informer.
 func NewReplicaSetControllerFromClient(kubeClient clientset.Interface, resyncPeriod controller.ResyncPeriodFunc, burstReplicas int, lookupCacheSize int) *ReplicaSetController {
-	podInformer := informers.CreateSharedPodIndexInformer(kubeClient, resyncPeriod())
+	podInformer := informers.NewPodInformer(kubeClient, resyncPeriod())
 	garbageCollectorEnabled := false
 	rsc := NewReplicaSetController(podInformer, kubeClient, resyncPeriod, burstReplicas, lookupCacheSize, garbageCollectorEnabled)
 	rsc.internalPodInformer = podInformer
@@ -327,7 +327,7 @@ func isReplicaSetMatch(pod *api.Pod, rs *extensions.ReplicaSet) bool {
 // When a pod is created, enqueue the replica set that manages it and update it's expectations.
 func (rsc *ReplicaSetController) addPod(obj interface{}) {
 	pod := obj.(*api.Pod)
-	glog.V(4).Infof("Pod %s created: %+v.", pod.Name, pod)
+	glog.V(4).Infof("Pod %s created: %#v.", pod.Name, pod)
 
 	rs := rsc.getPodReplicaSet(pod)
 	if rs == nil {
@@ -405,11 +405,11 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 		}
 		pod, ok = tombstone.Obj.(*api.Pod)
 		if !ok {
-			glog.Errorf("Tombstone contained object that is not a pod %+v", obj)
+			glog.Errorf("Tombstone contained object that is not a pod %#v", obj)
 			return
 		}
 	}
-	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %+v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
+	glog.V(4).Infof("Pod %s/%s deleted through %v, timestamp %+v: %#v.", pod.Namespace, pod.Name, utilruntime.GetCaller(), pod.DeletionTimestamp, pod)
 	if rs := rsc.getPodReplicaSet(pod); rs != nil {
 		rsKey, err := controller.KeyFunc(rs)
 		if err != nil {

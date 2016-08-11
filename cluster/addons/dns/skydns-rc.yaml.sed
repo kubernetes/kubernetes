@@ -96,7 +96,7 @@ spec:
           name: dns-tcp
           protocol: TCP
       - name: healthz
-        image: gcr.io/google_containers/exechealthz-amd64:1.0
+        image: gcr.io/google_containers/exechealthz-amd64:1.1
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:

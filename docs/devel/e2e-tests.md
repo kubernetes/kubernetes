@@ -56,6 +56,7 @@ Updated: 5/3/2016
     - [Debugging clusters](#debugging-clusters)
     - [Local clusters](#local-clusters)
       - [Testing against local clusters](#testing-against-local-clusters)
+    - [Version-skewed and upgrade testing](#version-skewed-and-upgrade-testing)
   - [Kinds of tests](#kinds-of-tests)
     - [Conformance tests](#conformance-tests)
     - [Defining Conformance Subset](#defining-conformance-subset)
@@ -404,6 +405,70 @@ To control the tests that are run:
 
 ```sh
 go run hack/e2e.go -v --test --check_node_count=false --test_args="--host=http://127.0.0.1:8080" --ginkgo.focus="Secrets"
+```
+
+### Version-skewed and upgrade testing
+
+We run version-skewed tests to check that newer versions of Kubernetes work
+similarly enough to older versions.  The general strategy is to cover the following cases:
+
+1. One version of `kubectl` with another version of the cluster and tests (e.g.
+   that v1.2 and v1.4 `kubectl` doesn't break v1.3 tests running against a v1.3
+   cluster).
+1. A newer version of the Kubernetes master with older nodes and tests (e.g.
+   that upgrading a master to v1.3 with nodes at v1.2 still passes v1.2 tests).
+1. A newer version of the whole cluster with older tests (e.g. that a cluster
+   upgraded---master and nodes---to v1.3 still passes v1.2 tests).
+1. That an upgraded cluster functions the same as a brand-new cluster of the
+   same version (e.g. a cluster upgraded to v1.3 passes the same v1.3 tests as
+   a newly-created v1.3 cluster).
+
+[hack/e2e-runner.sh](http://releases.k8s.io/HEAD/hack/jenkins/e2e-runner.sh) is
+the authoritative source on how to run version-skewed tests, but below is a
+quick-and-dirty tutorial.
+
+```sh
+# Assume you have two copies of the Kubernetes repository checked out, at
+# ./kubernetes and ./kubernetes_old
+
+# If using GKE:
+export KUBERNETES_PROVIDER=gke
+export CLUSTER_API_VERSION=${OLD_VERSION}
+
+# Deploy a cluster at the old version; see above for more details
+cd ./kubernetes_old
+go run ./hack/e2e.go -v --up
+
+# Upgrade the cluster to the new version
+#
+# If using GKE, add --upgrade-target=${NEW_VERSION}
+#
+# You can target Feature:MasterUpgrade or Feature:ClusterUpgrade
+cd ../kubernetes
+go run ./hack/e2e.go -v --test --check_version_skew=false --test_args="--ginkgo.focus=\[Feature:MasterUpgrade\]"
+
+# Run old tests with new kubectl
+cd ../kubernetes_old
+go run ./hack/e2e.go -v --test --test_args="--kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
+```
+
+If you are just testing version-skew, you may want to just deploy at one
+version and then test at another version, instead of going through the whole
+upgrade process:
+
+```sh
+# With the same setup as above
+
+# Deploy a cluster at the new version
+cd ./kubernetes
+go run ./hack/e2e.go -v --up
+
+# Run new tests with old kubectl
+go run ./hack/e2e.go -v --test --test_args="--kubectl-path=$(pwd)/../kubernetes_old/cluster/kubectl.sh"
+
+# Run old tests with new kubectl
+cd ../kubernetes_old
+go run ./hack/e2e.go -v --test --test_args="--kubectl-path=$(pwd)/../kubernetes/cluster/kubectl.sh"
 ```
 
 ## Kinds of tests

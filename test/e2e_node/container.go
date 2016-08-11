@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -39,7 +39,7 @@ type ConformanceContainer struct {
 }
 
 func (cc *ConformanceContainer) Create() {
-	cc.podName = cc.Container.Name + string(util.NewUUID())
+	cc.podName = cc.Container.Name + string(uuid.NewUUID())
 	imagePullSecrets := []api.LocalObjectReference{}
 	for _, s := range cc.ImagePullSecrets {
 		imagePullSecrets = append(imagePullSecrets, api.LocalObjectReference{Name: s})

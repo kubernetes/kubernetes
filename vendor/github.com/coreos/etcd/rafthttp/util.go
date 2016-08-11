@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -197,9 +197,9 @@ func setPeerURLsHeader(req *http.Request, urls types.URLs) {
 		// often not set in unit tests
 		return
 	}
-	var peerURLs []string
-	for _, url := range urls {
-		peerURLs = append(peerURLs, url.String())
+	peerURLs := make([]string, urls.Len())
+	for i := range urls {
+		peerURLs[i] = urls[i].String()
 	}
 	req.Header.Set("X-PeerURLs", strings.Join(peerURLs, ","))
 }

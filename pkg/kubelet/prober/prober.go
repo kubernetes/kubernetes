@@ -19,6 +19,7 @@ package prober
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -131,7 +132,7 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 }
 
 // buildHeaderMap takes a list of HTTPHeader <name, value> string
-// pairs and returns a a populated string->[]string http.Header map.
+// pairs and returns a populated string->[]string http.Header map.
 func buildHeader(headerList []api.HTTPHeader) http.Header {
 	headers := make(http.Header)
 	for _, header := range headerList {
@@ -247,5 +248,13 @@ func (eic execInContainer) Output() ([]byte, error) {
 }
 
 func (eic execInContainer) SetDir(dir string) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStdin(in io.Reader) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStdout(out io.Writer) {
 	//unimplemented
 }

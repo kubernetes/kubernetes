@@ -16,4 +16,4 @@ requires:
    etcd:
      interface: etcd
 series: 
-  - 'trusty'
+  - xenial

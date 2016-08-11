@@ -190,7 +190,7 @@ func (r *ControllerExpectations) LowerExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(-add), int64(-del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Lowered expectations %+v", exp)
+		glog.V(4).Infof("Lowered expectations %#v", exp)
 	}
 }
 
@@ -199,7 +199,7 @@ func (r *ControllerExpectations) RaiseExpectations(controllerKey string, add, de
 	if exp, exists, err := r.GetExpectations(controllerKey); err == nil && exists {
 		exp.Add(int64(add), int64(del))
 		// The expectations might've been modified since the update on the previous line.
-		glog.V(4).Infof("Raised expectations %+v", exp)
+		glog.V(4).Infof("Raised expectations %#v", exp)
 	}
 }
 

@@ -28,7 +28,8 @@ func main() {
 	serverRunOptions := apiserver.NewServerRunOptions()
 
 	// Parse command line flags.
-	serverRunOptions.AddFlags(pflag.CommandLine)
+	serverRunOptions.AddUniversalFlags(pflag.CommandLine)
+	serverRunOptions.AddEtcdStorageFlags(pflag.CommandLine)
 	flag.InitFlags()
 
 	if err := apiserver.Run(serverRunOptions); err != nil {

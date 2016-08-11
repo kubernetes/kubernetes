@@ -46,7 +46,43 @@ func ValidateClusterRoleUpdate(policy *rbac.ClusterRole, oldRole *rbac.ClusterRo
 }
 
 func validateRole(role *rbac.Role, isNamespaced bool) field.ErrorList {
-	return validation.ValidateObjectMeta(&role.ObjectMeta, isNamespaced, minimalNameRequirements, field.NewPath("metadata"))
+	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, validation.ValidateObjectMeta(&role.ObjectMeta, isNamespaced, minimalNameRequirements, field.NewPath("metadata"))...)
+
+	for i, rule := range role.Rules {
+		if err := validatePolicyRule(rule, isNamespaced, field.NewPath("rules").Index(i)); err != nil {
+			allErrs = append(allErrs, err...)
+		}
+	}
+	if len(allErrs) != 0 {
+		return allErrs
+	}
+	return nil
+}
+
+func validatePolicyRule(rule rbac.PolicyRule, isNamespaced bool, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(rule.Verbs) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("verbs"), "verbs must contain at least one value"))
+	}
+
+	if len(rule.NonResourceURLs) > 0 {
+		if isNamespaced {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceURLs"), rule.NonResourceURLs, "namespaced rules cannot apply to non-resource URLs"))
+		}
+		if len(rule.APIGroups) > 0 || len(rule.Resources) > 0 || len(rule.ResourceNames) > 0 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceURLs"), rule.NonResourceURLs, "rules cannot apply to both regular resources and non-resource URLs"))
+		}
+		return allErrs
+	}
+
+	if len(rule.APIGroups) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("apiGroups"), "resource rules must supply at least one api group"))
+	}
+	if len(rule.Resources) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("resources"), "resource rules must supply at least one resource"))
+	}
+	return allErrs
 }
 
 func validateRoleUpdate(role *rbac.Role, oldRole *rbac.Role, isNamespaced bool) field.ErrorList {

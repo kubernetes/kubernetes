@@ -46,6 +46,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
@@ -193,11 +194,11 @@ func newTestKubeletWithImageList(
 		UID:       types.UID(testKubeletHostname),
 		Namespace: "",
 	}
-	fakeImageGCPolicy := ImageGCPolicy{
+	fakeImageGCPolicy := images.ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
-	kubelet.imageManager, err = newImageManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
+	kubelet.imageManager, err = images.NewImageGCManager(fakeRuntime, mockCadvisor, fakeRecorder, fakeNodeRef, fakeImageGCPolicy)
 	fakeClock := clock.NewFakeClock(time.Now())
 	kubelet.backOff = flowcontrol.NewBackOff(time.Second, time.Minute)
 	kubelet.backOff.Clock = fakeClock
@@ -225,7 +226,7 @@ func newTestKubeletWithImageList(
 		Namespace: "",
 	}
 	// setup eviction manager
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers), fakeRecorder, nodeRef, kubelet.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kubelet.resourceAnalyzer, eviction.Config{}, killPodNow(kubelet.podWorkers), kubelet.imageManager, fakeRecorder, nodeRef, kubelet.clock)
 	if err != nil {
 		t.Fatalf("failed to initialize eviction manager: %v", err)
 	}
@@ -3221,7 +3222,7 @@ func TestGetPodsToSync(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Errorf("expected pod not found: %+v", expect)
+				t.Errorf("expected pod not found: %#v", expect)
 			}
 		}
 	} else {
@@ -3785,7 +3786,7 @@ type testPodSyncHandler struct {
 	podsToEvict []*api.Pod
 	// the reason for the eviction
 	reason string
-	// the mesage for the eviction
+	// the message for the eviction
 	message string
 }
 

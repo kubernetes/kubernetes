@@ -24,9 +24,11 @@ func (l *linuxSetnsInit) getSessionRingName() string {
 }
 
 func (l *linuxSetnsInit) Init() error {
-	// do not inherit the parent's session keyring
-	if _, err := keyctl.JoinSessionKeyring(l.getSessionRingName()); err != nil {
-		return err
+	if !l.config.Config.NoNewKeyring {
+		// do not inherit the parent's session keyring
+		if _, err := keys.JoinSessionKeyring(l.getSessionRingName()); err != nil {
+			return err
+		}
 	}
 	if l.config.NoNewPrivileges {
 		if err := system.Prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0); err != nil {
@@ -44,10 +46,8 @@ func (l *linuxSetnsInit) Init() error {
 	if err := apparmor.ApplyProfile(l.config.AppArmorProfile); err != nil {
 		return err
 	}
-	if l.config.ProcessLabel != "" {
-		if err := label.SetProcessLabel(l.config.ProcessLabel); err != nil {
-			return err
-		}
+	if err := label.SetProcessLabel(l.config.ProcessLabel); err != nil {
+		return err
 	}
 	return system.Execv(l.config.Args[0], l.config.Args[0:], os.Environ())
 }

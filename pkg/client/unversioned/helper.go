@@ -23,6 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/kubernetes/pkg/apis/authorization"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/certificates"
@@ -62,10 +64,28 @@ func New(c *restclient.Config) (*Client, error) {
 		return nil, err
 	}
 
+	var authorizationClient *AuthorizationClient
+	if registered.IsRegistered(authorization.GroupName) {
+		authorizationConfig := *c
+		authorizationClient, err = NewAuthorization(&authorizationConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	var autoscalingClient *AutoscalingClient
 	if registered.IsRegistered(autoscaling.GroupName) {
 		autoscalingConfig := *c
 		autoscalingClient, err = NewAutoscaling(&autoscalingConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var authenticationClient *AuthenticationClient
+	if registered.IsRegistered(authentication.GroupName) {
+		authenticationConfig := *c
+		authenticationClient, err = NewAuthentication(&authenticationConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +143,19 @@ func New(c *restclient.Config) (*Client, error) {
 		}
 	}
 
-	return &Client{RESTClient: client, AutoscalingClient: autoscalingClient, BatchClient: batchClient, CertificatesClient: certsClient, ExtensionsClient: extensionsClient, DiscoveryClient: discoveryClient, AppsClient: appsClient, PolicyClient: policyClient, RbacClient: rbacClient}, nil
+	return &Client{
+		RESTClient:           client,
+		AppsClient:           appsClient,
+		AuthenticationClient: authenticationClient,
+		AuthorizationClient:  authorizationClient,
+		AutoscalingClient:    autoscalingClient,
+		BatchClient:          batchClient,
+		CertificatesClient:   certsClient,
+		DiscoveryClient:      discoveryClient,
+		ExtensionsClient:     extensionsClient,
+		PolicyClient:         policyClient,
+		RbacClient:           rbacClient,
+	}, nil
 }
 
 // MatchesServerVersion queries the server to compares the build version
@@ -258,16 +290,35 @@ func SetKubernetesDefaults(config *restclient.Config) error {
 	if config.APIPath == "" {
 		config.APIPath = legacyAPIPath
 	}
-	g, err := registered.Group(api.GroupName)
-	if err != nil {
-		return err
+	if config.GroupVersion == nil || config.GroupVersion.Group != api.GroupName {
+		g, err := registered.Group(api.GroupName)
+		if err != nil {
+			return err
+		}
+		copyGroupVersion := g.GroupVersion
+		config.GroupVersion = &copyGroupVersion
 	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	copyGroupVersion := g.GroupVersion
-	config.GroupVersion = &copyGroupVersion
 	if config.NegotiatedSerializer == nil {
 		config.NegotiatedSerializer = api.Codecs
 	}
-
 	return restclient.SetKubernetesDefaults(config)
+}
+
+func setGroupDefaults(groupName string, config *restclient.Config) error {
+	config.APIPath = defaultAPIPath
+	if config.UserAgent == "" {
+		config.UserAgent = restclient.DefaultKubernetesUserAgent()
+	}
+	if config.GroupVersion == nil || config.GroupVersion.Group != groupName {
+		g, err := registered.Group(groupName)
+		if err != nil {
+			return err
+		}
+		copyGroupVersion := g.GroupVersion
+		config.GroupVersion = &copyGroupVersion
+	}
+	if config.NegotiatedSerializer == nil {
+		config.NegotiatedSerializer = api.Codecs
+	}
+	return nil
 }

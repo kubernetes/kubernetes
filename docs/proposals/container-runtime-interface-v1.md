@@ -175,11 +175,26 @@ To delete a pod:
   stop container C --> remove container C --> delete sandbox Foo
 ```
 
-The restart policy in the Pod Spec defines how indiviual containers should
-be handled when they terminated. Kubelet is responsible to ensure that the
-restart policy is enforced. In other words, once Kubelet discovers that a
-container terminates (e.g., through `List()`), it will create and start a new
-container if needed.
+The container runtime must not apply any transition (such as starting a new
+container) unless explicitly instructed by Kubelet. It is Kubelet's
+responsibility to enforce garbage collection, restart policy, and otherwise
+react to changes in lifecycle.
+
+The only transitions that are possible for a container are described below:
+
+```
+() -> Created        // A container can only transition to created from the
+                     // empty, nonexistent state. The ContainerRuntime.Create
+                     // method causes this transition.
+Created -> Running   // The ContainerRuntime.Start method may be applied to a
+                     // Created container to move it to Running
+Running -> Exited    // The ContainerRuntime.Stop method may be applied to a running 
+                     // container to move it to Exited.
+                     // A container may also make this transition under its own volition 
+Exited -> ()         // An exited container can be moved to the terminal empty
+                     // state via a ContainerRuntime.Remove call.
+```
+
 
 Kubelet is also responsible for gracefully terminating all the containers
 in the sandbox before deleting the sandbox. If Kubelet chooses to delete

@@ -59,10 +59,10 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
+	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/crypto"
@@ -71,6 +71,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/rlimit"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
@@ -162,7 +163,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
-	imageGCPolicy := kubelet.ImageGCPolicy{
+	imageGCPolicy := images.ImageGCPolicy{
 		MinAge:               s.ImageMinimumGCAge.Duration,
 		HighThresholdPercent: int(s.ImageGCHighThresholdPercent),
 		LowThresholdPercent:  int(s.ImageGCLowThresholdPercent),
@@ -304,9 +305,9 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 
 	done := make(chan struct{})
 	if s.LockFilePath != "" {
-		glog.Infof("aquiring lock on %q", s.LockFilePath)
+		glog.Infof("acquiring lock on %q", s.LockFilePath)
 		if err := flock.Acquire(s.LockFilePath); err != nil {
-			return fmt.Errorf("unable to aquire file lock on %q: %v", s.LockFilePath, err)
+			return fmt.Errorf("unable to acquire file lock on %q: %v", s.LockFilePath, err)
 		}
 		if s.ExitOnLockContention {
 			glog.Infof("watching for inotify events for: %v", s.LockFilePath)
@@ -442,12 +443,12 @@ func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 
 func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclient.Config, error) {
 	authInfo, err := clientauth.LoadFromFile(s.AuthPath.Value())
-	if err != nil && !useDefaults {
-		return nil, err
-	}
 	// If loading the default auth path, for backwards compatibility keep going
 	// with the default auth.
 	if err != nil {
+		if !useDefaults {
+			return nil, err
+		}
 		glog.Warningf("Could not load kubernetes auth path %s: %v. Continuing with defaults.", s.AuthPath, err)
 	}
 	if authInfo == nil {
@@ -549,7 +550,7 @@ func SimpleKubelet(client *clientset.Clientset,
 	fileCheckFrequency, httpCheckFrequency, minimumGCAge, nodeStatusUpdateFrequency, syncFrequency, outOfDiskTransitionFrequency, evictionPressureTransitionPeriod time.Duration,
 	maxPods int, podsPerCore int,
 	containerManager cm.ContainerManager, clusterDNS net.IP) *KubeletConfig {
-	imageGCPolicy := kubelet.ImageGCPolicy{
+	imageGCPolicy := images.ImageGCPolicy{
 		HighThresholdPercent: 90,
 		LowThresholdPercent:  80,
 	}
@@ -688,7 +689,7 @@ func RunKubelet(kcfg *KubeletConfig) error {
 		return fmt.Errorf("failed to create kubelet: %v", err)
 	}
 
-	util.ApplyRLimitForSelf(kcfg.MaxOpenFiles)
+	rlimit.RlimitNumFiles(kcfg.MaxOpenFiles)
 
 	// TODO(dawnchen): remove this once we deprecated old debian containervm images.
 	// This is a workaround for issue: https://github.com/opencontainers/runc/issues/726
@@ -817,7 +818,7 @@ type KubeletConfig struct {
 	HostPIDSources                 []string
 	HostIPCSources                 []string
 	HTTPCheckFrequency             time.Duration
-	ImageGCPolicy                  kubelet.ImageGCPolicy
+	ImageGCPolicy                  images.ImageGCPolicy
 	KubeClient                     *clientset.Clientset
 	ManifestURL                    string
 	ManifestURLHeader              http.Header
@@ -987,16 +988,18 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 
 func parseReservation(kubeReserved, systemReserved utilconfig.ConfigurationMap) (*kubetypes.Reservation, error) {
 	reservation := new(kubetypes.Reservation)
-	if rl, err := parseResourceList(kubeReserved); err != nil {
+	rl, err := parseResourceList(kubeReserved)
+	if err != nil {
 		return nil, err
-	} else {
-		reservation.Kubernetes = rl
 	}
-	if rl, err := parseResourceList(systemReserved); err != nil {
+	reservation.Kubernetes = rl
+
+	rl, err = parseResourceList(systemReserved)
+	if err != nil {
 		return nil, err
-	} else {
-		reservation.System = rl
 	}
+	reservation.System = rl
+
 	return reservation, nil
 }
 

@@ -31,8 +31,8 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/parser"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
-	"k8s.io/kubernetes/pkg/util"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/logs"
 
 	"github.com/spf13/pflag"
 )
@@ -146,7 +146,7 @@ func DefaultSourceTree() string {
 // args.Default().Execute(...)
 func (g *GeneratorArgs) Execute(nameSystems namer.NameSystems, defaultSystem string, pkgs func(*generator.Context, *GeneratorArgs) generator.Packages) error {
 	utilflag.InitFlags()
-	util.InitLogs()
+	logs.InitLogs()
 
 	b, err := g.NewBuilder()
 	if err != nil {

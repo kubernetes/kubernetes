@@ -240,7 +240,7 @@ func (c *Cloud) ensureLoadBalancer(namespacedName types.NamespacedName, loadBala
 
 				if currentState, ok := proxyProtocolBackends[instancePort]; !ok {
 					// This is a new ELB backend so we only need to worry about
-					// potentientally adding a policy and not removing an
+					// potentially adding a policy and not removing an
 					// existing one
 					setPolicy = proxyProtocol
 				} else {

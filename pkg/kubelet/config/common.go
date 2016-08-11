@@ -100,7 +100,7 @@ func tryDecodeSinglePod(data []byte, defaultFn defaultFunc) (parsed bool, pod *a
 	}
 	// Check whether the object could be converted to single pod.
 	if _, ok := obj.(*api.Pod); !ok {
-		err = fmt.Errorf("invalid pod: %+v", obj)
+		err = fmt.Errorf("invalid pod: %#v", obj)
 		return false, pod, err
 	}
 	newPod := obj.(*api.Pod)

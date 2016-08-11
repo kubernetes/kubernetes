@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -201,7 +202,7 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 			return err
 		}
 	}
-	return rc.Delete(name)
+	return rc.Delete(name, nil)
 }
 
 // TODO(madhusudancs): Implement it when controllerRef is implemented - https://github.com/kubernetes/kubernetes/issues/2210
@@ -290,7 +291,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	// daemon pods. Once it's done deleting the daemon pods, it's safe to delete
 	// the DaemonSet.
 	ds.Spec.Template.Spec.NodeSelector = map[string]string{
-		string(util.NewUUID()): string(util.NewUUID()),
+		string(uuid.NewUUID()): string(uuid.NewUUID()),
 	}
 	// force update to avoid version conflict
 	ds.ResourceVersion = ""
@@ -397,9 +398,10 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	for _, rc := range rsList.Items {
 		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
 			scaleGetErr, ok := err.(*ScaleError)
-			if !errors.IsNotFound(err) || ok && !errors.IsNotFound(scaleGetErr.ActualError) {
-				errList = append(errList, err)
+			if errors.IsNotFound(err) || (ok && errors.IsNotFound(scaleGetErr.ActualError)) {
+				continue
 			}
+			errList = append(errList, err)
 		}
 	}
 	if len(errList) > 0 {
@@ -407,7 +409,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	}
 
 	// Delete deployment at the end.
-	// Note: We delete deployment at the end so that if removing RSs fails, we atleast have the deployment to retry.
+	// Note: We delete deployment at the end so that if removing RSs fails, we at least have the deployment to retry.
 	return deployments.Delete(name, nil)
 }
 

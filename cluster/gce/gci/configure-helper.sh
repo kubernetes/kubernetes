@@ -48,16 +48,32 @@ function create-dirs {
   fi
 }
 
+# Formats the given device ($1) if needed and mounts it at given mount point
+# ($2).
+function safe-format-and-mount() {
+  device=$1
+  mountpoint=$2
+
+  # Format only if the disk is not already formatted.
+  if ! tune2fs -l "${device}" ; then
+    echo "Formatting '${device}'"
+    mkfs.ext4 -F -E lazy_itable_init=0,lazy_journal_init=0,discard "${device}"
+  fi
+
+  mkdir -p "${mountpoint}"
+  echo "Mounting '${device}' at '${mountpoint}'"
+  mount -o discard,defaults "${device}" "${mountpoint}"
+}
+
 # Local ssds, if present, are mounted at /mnt/disks/ssdN.
 function ensure-local-ssds() {
   for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "${ssd}" ]; then
       ssdnum=`echo ${ssd} | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
       ssdmount="/mnt/disks/ssd${ssdnum}/"
-      echo "Formatting and mounting local SSD $ssd to ${ssdmount}"
       mkdir -p ${ssdmount}
-      /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${ssd}" ${ssdmount} || \
-      { echo "Local SSD $ssdnum mount failed"; return 1; }
+      safe-format-and-mount "${ssd}" ${ssdmount}
+      echo "Mounted local SSD $ssd at ${ssdmount}"
       chmod a+w ${ssdmount}
     else
       echo "No local SSD disks found."
@@ -124,7 +140,7 @@ function find-master-pd {
 
 # Mounts a persistent disk (formatting if needed) to store the persistent data
 # on the master -- etcd's data, a few settings, and security certs/keys/tokens.
-# safe_format_and_mount only formats an unformatted disk, and mkdir -p will
+# safe-format-and-mount only formats an unformatted disk, and mkdir -p will
 # leave a directory be if it already exists.
 function mount-master-pd {
   find-master-pd
@@ -138,8 +154,8 @@ function mount-master-pd {
   # Format and mount the disk, create directories on it for all of the master's
   # persistent data, and link them to where they're used.
   mkdir -p "${mount_point}"
-  /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${pd_path}" "${mount_point}" &>/var/log/master-pd-mount.log || \
-    { echo "!!! master-pd mount failed, review /var/log/master-pd-mount.log !!!"; return 1; }
+  safe-format-and-mount "${pd_path}" "${mount_point}"
+  echo "Mounted master-pd '${pd_path}' at '${mount_point}'"
 
   # NOTE: These locations on the PD store persistent data, so to maintain
   # upgradeability, these locations should not change.  If they do, take care
@@ -507,12 +523,27 @@ function start-kube-proxy {
 # $4: value for variable 'cpulimit'
 # $5: pod name, which should be either etcd or etcd-events
 function prepare-etcd-manifest {
+  local host_name=$(hostname)
+  local etcd_cluster=""
+  local cluster_state="new"
+  for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
+    etcd_host="etcd-${host}=http://${host}:$3"
+    if [[ -n "${etcd_cluster}" ]]; then
+      etcd_cluster+=","
+      cluster_state="existing"
+    fi
+    etcd_cluster+="${etcd_host}"
+  done
   local -r temp_file="/tmp/$5"
   cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/etcd.manifest" "${temp_file}"
+  remove-salt-config-comments "${temp_file}"
   sed -i -e "s@{{ *suffix *}}@$1@g" "${temp_file}"
   sed -i -e "s@{{ *port *}}@$2@g" "${temp_file}"
   sed -i -e "s@{{ *server_port *}}@$3@g" "${temp_file}"
   sed -i -e "s@{{ *cpulimit *}}@\"$4\"@g" "${temp_file}"
+  sed -i -e "s@{{ *hostname *}}@$host_name@g" "${temp_file}"
+  sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${temp_file}"
+  sed -i -e "s@{{ *cluster_state *}}@$cluster_state@g" "${temp_file}"
   # Replace the volume host path.
   sed -i -e "s@/mnt/master-pd/var/etcd@/mnt/disks/master-pd/var/etcd@g" "${temp_file}"
   mv "${temp_file}" /etc/kubernetes/manifests
@@ -605,6 +636,18 @@ function start-kube-apiserver {
   params+=" --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params+=" --tls-private-key-file=/etc/srv/kubernetes/server.key"
   params+=" --token-auth-file=/etc/srv/kubernetes/known_tokens.csv"
+  if [[ -n "${STORAGE_BACKEND:-}" ]]; then
+    params+=" --storage-backend=${STORAGE_BACKEND}"
+  fi
+  if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
+    params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
+  fi
+  if [[ -n "${NUM_NODES:-}" ]]; then
+    # Set amount of memory available for apiserver based on number of nodes.
+    # TODO: Once we start setting proper requests and limits for apiserver
+    # we should reuse the same logic here instead of current heuristic.
+    params+=" --target-ram-mb=$((${NUM_NODES} * 60))"
+  fi
   if [[ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]]; then
     params+=" --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
@@ -690,6 +733,9 @@ function start-kube-controller-manager {
   params+=" --master=127.0.0.1:8080"
   params+=" --root-ca-file=/etc/srv/kubernetes/ca.crt"
   params+=" --service-account-private-key-file=/etc/srv/kubernetes/server.key"
+  if [[ -n "${ENABLE_GARBAGE_COLLECTOR:-}" ]]; then
+    params+=" --enable-garbage-collector=${ENABLE_GARBAGE_COLLECTOR}"
+  fi
   if [[ -n "${INSTANCE_PREFIX:-}" ]]; then
     params+=" --cluster-name=${INSTANCE_PREFIX}"
   fi
@@ -847,12 +893,6 @@ function start-kube-addons {
     sed -i -e "s@{{ *eventer_memory_per_node *}}@${eventer_memory_per_node}@g" "${controller_yaml}"
     sed -i -e "s@{{ *nanny_memory *}}@${nanny_memory}@g" "${controller_yaml}"
     sed -i -e "s@{{ *metrics_cpu_per_node *}}@${metrics_cpu_per_node}@g" "${controller_yaml}"
-  fi
-  if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]]; then
-    pv_yaml="${dst_dir}/${file_dir}/influxdb-pv.yaml"
-    pd_name="${INSTANCE_PREFIX}-influxdb-pd"
-    remove-salt-config-comments "${pv_yaml}"
-    sed -i -e "s@{{ *pd_name *}}@${pd_name}@g" "${pv_yaml}"
   fi
   if [[ "${ENABLE_CLUSTER_DNS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dns"

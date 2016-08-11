@@ -158,7 +158,7 @@ func (s *CMServer) Run(_ []string) error {
 	}
 	_, clusterCIDR, _ := net.ParseCIDR(s.ClusterCIDR)
 	_, serviceCIDR, _ := net.ParseCIDR(s.ServiceCIDR)
-	nodeController, err := nodecontroller.NewNodeController(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-controller")),
+	nodeController, err := nodecontroller.NewNodeControllerFromClient(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-controller")),
 		s.PodEvictionTimeout.Duration, s.DeletingPodsQps,
 		s.NodeMonitorGracePeriod.Duration, s.NodeStartupGracePeriod.Duration, s.NodeMonitorPeriod.Duration, clusterCIDR, serviceCIDR, int(s.NodeCIDRMaskSize), s.AllocateNodeCIDRs)
 	if err != nil {
@@ -171,9 +171,11 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("Failed to start node status update controller: %v", err)
 	}
 
-	serviceController := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
-	if err := serviceController.Run(s.ServiceSyncPeriod.Duration, s.NodeSyncPeriod.Duration); err != nil {
+	serviceController, err := servicecontroller.New(cloud, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "service-controller")), s.ClusterName)
+	if err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
+	} else {
+		serviceController.Run(int(s.ConcurrentServiceSyncs))
 	}
 
 	if s.AllocateNodeCIDRs && s.ConfigureCloudRoutes {

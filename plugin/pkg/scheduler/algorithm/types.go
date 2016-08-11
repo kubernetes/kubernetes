@@ -24,11 +24,15 @@ import (
 
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
-type FitPredicate func(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, error)
+type FitPredicate func(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []PredicateFailureReason, error)
 
 type PriorityFunction func(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error)
 
 type PriorityConfig struct {
 	Function PriorityFunction
 	Weight   int
+}
+
+type PredicateFailureReason interface {
+	GetReason() string
 }

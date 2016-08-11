@@ -142,7 +142,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 	}
 	volumeList, ok := volumeListObj.(*api.PersistentVolumeList)
 	if !ok {
-		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of volumes, got: %+v", volumeListObj)
+		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of volumes, got: %#v", volumeListObj)
 		return
 	}
 	for _, volume := range volumeList.Items {
@@ -166,7 +166,7 @@ func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSour
 	}
 	claimList, ok := claimListObj.(*api.PersistentVolumeClaimList)
 	if !ok {
-		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of claims, got: %+v", claimListObj)
+		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of claims, got: %#v", claimListObj)
 		return
 	}
 	for _, claim := range claimList.Items {
@@ -194,7 +194,7 @@ func (ctrl *PersistentVolumeController) storeClaimUpdate(claim *api.PersistentVo
 func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
 	pv, ok := obj.(*api.PersistentVolume)
 	if !ok {
-		glog.Errorf("expected PersistentVolume but handler received %+v", obj)
+		glog.Errorf("expected PersistentVolume but handler received %#v", obj)
 		return
 	}
 
@@ -229,7 +229,7 @@ func (ctrl *PersistentVolumeController) addVolume(obj interface{}) {
 func (ctrl *PersistentVolumeController) updateVolume(oldObj, newObj interface{}) {
 	newVolume, ok := newObj.(*api.PersistentVolume)
 	if !ok {
-		glog.Errorf("Expected PersistentVolume but handler received %+v", newObj)
+		glog.Errorf("Expected PersistentVolume but handler received %#v", newObj)
 		return
 	}
 
@@ -271,7 +271,7 @@ func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 		if unknown, ok := obj.(cache.DeletedFinalStateUnknown); ok && unknown.Obj != nil {
 			volume, ok = unknown.Obj.(*api.PersistentVolume)
 			if !ok {
-				glog.Errorf("Expected PersistentVolume but deleteVolume received %+v", unknown.Obj)
+				glog.Errorf("Expected PersistentVolume but deleteVolume received %#v", unknown.Obj)
 				return
 			}
 		} else {
@@ -302,7 +302,7 @@ func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 				}
 			}
 		} else {
-			glog.Errorf("Cannot convert object from claim cache to claim %q!?: %+v", claimrefToClaimKey(volume.Spec.ClaimRef), claimObj)
+			glog.Errorf("Cannot convert object from claim cache to claim %q!?: %#v", claimrefToClaimKey(volume.Spec.ClaimRef), claimObj)
 		}
 	}
 }
@@ -381,11 +381,11 @@ func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 		if unknown, ok := obj.(cache.DeletedFinalStateUnknown); ok && unknown.Obj != nil {
 			claim, ok = unknown.Obj.(*api.PersistentVolumeClaim)
 			if !ok {
-				glog.Errorf("Expected PersistentVolumeClaim but deleteClaim received %+v", unknown.Obj)
+				glog.Errorf("Expected PersistentVolumeClaim but deleteClaim received %#v", unknown.Obj)
 				return
 			}
 		} else {
-			glog.Errorf("Expected PersistentVolumeClaim but deleteClaim received %+v", obj)
+			glog.Errorf("Expected PersistentVolumeClaim but deleteClaim received %#v", obj)
 			return
 		}
 	}
@@ -413,7 +413,7 @@ func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 				}
 			}
 		} else {
-			glog.Errorf("Cannot convert object from volume cache to volume %q!?: %+v", claim.Spec.VolumeName, pvObj)
+			glog.Errorf("Cannot convert object from volume cache to volume %q!?: %#v", claim.Spec.VolumeName, pvObj)
 		}
 	}
 }

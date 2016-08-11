@@ -52,7 +52,7 @@ var (
 		for that resource as the selector for a new service on the specified port. A deployment or replica set
 		will be exposed as a service only if its selector is convertible to a selector that service supports,
 		i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
-		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no 
+		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no
 		labels are specified, the new service will re-use the labels from the resource it exposes.
 
 		Possible resources include (case insensitive): `) + expose_resources
@@ -110,7 +110,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	// TODO: remove create-external-load-balancer in code on or after Aug 25, 2016.
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.")
 	cmd.Flags().MarkDeprecated("create-external-load-balancer", "use --type=\"LoadBalancer\" instead")
-	cmd.Flags().String("load-balancer-ip", "", "IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
+	cmd.Flags().String("load-balancer-ip", "", "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
 	cmd.Flags().String("selector", "", "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().String("container-port", "", "Synonym for --target-port")
@@ -120,6 +120,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("name", "", "The name for the newly created object.")
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
+	cmd.Flags().String("cluster-ip", "", "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.")
 
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
@@ -170,8 +171,8 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 		params := kubectl.MakeParams(cmd, names)
 		name := info.Name
-		if len(name) > validation.DNS952LabelMaxLength {
-			name = name[:validation.DNS952LabelMaxLength]
+		if len(name) > validation.DNS1035LabelMaxLength {
+			name = name[:validation.DNS1035LabelMaxLength]
 		}
 		params["default-name"] = name
 

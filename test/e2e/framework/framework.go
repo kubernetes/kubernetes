@@ -18,6 +18,7 @@ package framework
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"reflect"
@@ -25,9 +26,13 @@ import (
 	"sync"
 	"time"
 
+	release_1_4 "k8s.io/client-go/1.4/kubernetes"
+	"k8s.io/client-go/1.4/pkg/util/sets"
+	clientreporestclient "k8s.io/client-go/1.4/rest"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
 	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
+	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
@@ -57,10 +62,12 @@ type Framework struct {
 	Client        *client.Client
 	Clientset_1_2 *release_1_2.Clientset
 	Clientset_1_3 *release_1_3.Clientset
+	StagingClient *release_1_4.Clientset
 
 	// TODO(mml): Remove this.  We should generally use the versioned clientset.
 	FederationClientset     *federation_internalclientset.Clientset
 	FederationClientset_1_3 *federation_release_1_3.Clientset
+	FederationClientset_1_4 *federation_release_1_4.Clientset
 	// TODO: remove FederationClient, all the client access must be through FederationClientset
 	FederationClient *unversionedfederation.FederationClient
 
@@ -130,6 +137,38 @@ func NewFramework(baseName string, options FrameworkOptions, client *client.Clie
 	return f
 }
 
+// getClientRepoConfig copies k8s.io/kubernetes/pkg/client/restclient.Config to
+// a k8s.io/client-go/pkg/client/restclient.Config. It's not a deep copy. Two
+// configs may share some common struct.
+func getClientRepoConfig(src *restclient.Config) (dst *clientreporestclient.Config) {
+	skippedFields := sets.NewString("Transport", "WrapTransport", "RateLimiter", "AuthConfigPersister")
+	dst = &clientreporestclient.Config{}
+	dst.Transport = src.Transport
+	dst.WrapTransport = src.WrapTransport
+	dst.RateLimiter = src.RateLimiter
+	dst.AuthConfigPersister = src.AuthConfigPersister
+	sv := reflect.ValueOf(src).Elem()
+	dv := reflect.ValueOf(dst).Elem()
+	for i := 0; i < sv.NumField(); i++ {
+		if skippedFields.Has(sv.Type().Field(i).Name) {
+			continue
+		}
+		sf := sv.Field(i).Interface()
+		data, err := json.Marshal(sf)
+		if err != nil {
+			Expect(err).NotTo(HaveOccurred())
+		}
+		if !dv.Field(i).CanAddr() {
+			Failf("unaddressable field: %v", dv.Type().Field(i).Name)
+		} else {
+			if err := json.Unmarshal(data, dv.Field(i).Addr().Interface()); err != nil {
+				Expect(err).NotTo(HaveOccurred())
+			}
+		}
+	}
+	return dst
+}
+
 // BeforeEach gets a client and makes a namespace.
 func (f *Framework) BeforeEach() {
 	// The fact that we need this feels like a bug in ginkgo.
@@ -137,21 +176,10 @@ func (f *Framework) BeforeEach() {
 	f.cleanupHandle = AddCleanupAction(f.AfterEach)
 	if f.Client == nil {
 		By("Creating a kubernetes client")
-		var config *restclient.Config
-		if TestContext.NodeName != "" {
-			// This is a node e2e test, apply the node e2e configuration
-			config = &restclient.Config{
-				Host:  TestContext.Host,
-				QPS:   100,
-				Burst: 100,
-			}
-		} else {
-			var err error
-			config, err = LoadConfig()
-			Expect(err).NotTo(HaveOccurred())
-			config.QPS = f.options.ClientQPS
-			config.Burst = f.options.ClientBurst
-		}
+		config, err := LoadConfig()
+		Expect(err).NotTo(HaveOccurred())
+		config.QPS = f.options.ClientQPS
+		config.Burst = f.options.ClientBurst
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
@@ -159,8 +187,10 @@ func (f *Framework) BeforeEach() {
 		Expect(err).NotTo(HaveOccurred())
 		f.Client = c
 		f.Clientset_1_2, err = release_1_2.NewForConfig(config)
-		Expect(err).NotTo(HaveOccurred())
 		f.Clientset_1_3, err = release_1_3.NewForConfig(config)
+		Expect(err).NotTo(HaveOccurred())
+		clientRepoConfig := getClientRepoConfig(config)
+		f.StagingClient, err = release_1_4.NewForConfig(clientRepoConfig)
 		Expect(err).NotTo(HaveOccurred())
 	}
 
@@ -181,6 +211,12 @@ func (f *Framework) BeforeEach() {
 			By("Creating a release 1.3 federation Clientset")
 			var err error
 			f.FederationClientset_1_3, err = LoadFederationClientset_1_3()
+			Expect(err).NotTo(HaveOccurred())
+		}
+		if f.FederationClientset_1_4 == nil {
+			By("Creating a release 1.4 federation Clientset")
+			var err error
+			f.FederationClientset_1_4, err = LoadFederationClientset_1_4()
 			Expect(err).NotTo(HaveOccurred())
 		}
 		By("Waiting for federation-apiserver to be ready")
@@ -385,14 +421,18 @@ func (f *Framework) WaitForPodNoLongerRunning(podName string) error {
 	return WaitForPodNoLongerRunningInNamespace(f.Client, podName, f.Namespace.Name, "")
 }
 
-// Runs the given pod and verifies that the output of exact container matches the desired output.
+// TestContainerOutput runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a substring matcher.
 func (f *Framework) TestContainerOutput(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	TestContainerOutput(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
+	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, ContainSubstring)
 }
 
-// Runs the given pod and verifies that the output of exact container matches the desired regexps.
+// TestContainerOutputRegexp runs the given pod in the given namespace and waits
+// for all of the containers in the podSpec to move into the 'Success' status, and tests
+// the specified container log against the given expected output using a regexp matcher.
 func (f *Framework) TestContainerOutputRegexp(scenarioName string, pod *api.Pod, containerIndex int, expectedOutput []string) {
-	testContainerOutputRegexp(scenarioName, f.Client, pod, containerIndex, expectedOutput, f.Namespace.Name)
+	f.testContainerOutputMatcher(scenarioName, pod, containerIndex, expectedOutput, MatchRegexp)
 }
 
 // WaitForAnEndpoint waits for at least one endpoint to become available in the

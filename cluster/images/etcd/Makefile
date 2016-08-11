@@ -17,7 +17,7 @@
 # Usage:
 # 	[TAG=2.2.1] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
-TAG?=3.0.3
+TAG?=3.0.4
 ARCH?=amd64
 REGISTRY?=gcr.io/google_containers
 GOLANG_VERSION?=1.6.3
@@ -63,7 +63,7 @@ else
 endif
 
 	# Replace BASEIMAGE with the real base image
-	cd $(TEMP_DIR) && sed -i "s|BASEIMAGE|$(BASEIMAGE)|g" Dockerfile
+	cd $(TEMP_DIR) && sed -i.bak 's|BASEIMAGE|$(BASEIMAGE)|g' Dockerfile
 
 	# And build the image
 	docker build -t $(REGISTRY)/etcd-$(ARCH):$(TAG) $(TEMP_DIR)
@@ -73,7 +73,7 @@ push: build
 
 ifeq ($(ARCH),amd64)
 	# Backward compatibility. TODO: deprecate this image tag
-	docker tag -f $(REGISTRY)/etcd-$(ARCH):$(TAG) $(REGISTRY)/etcd:$(TAG)
+	docker tag $(REGISTRY)/etcd-$(ARCH):$(TAG) $(REGISTRY)/etcd:$(TAG)
 	gcloud docker push $(REGISTRY)/etcd:$(TAG)
 endif
 

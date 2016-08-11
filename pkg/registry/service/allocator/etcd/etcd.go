@@ -25,7 +25,7 @@ import (
 	k8serr "k8s.io/kubernetes/pkg/api/errors"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/registry/service"
+	"k8s.io/kubernetes/pkg/registry/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -52,9 +52,9 @@ type Etcd struct {
 	resource unversioned.GroupResource
 }
 
-// Etcd implements allocator.Interface and service.RangeRegistry
+// Etcd implements allocator.Interface and rangeallocation.RangeRegistry
 var _ allocator.Interface = &Etcd{}
-var _ service.RangeRegistry = &Etcd{}
+var _ rangeallocation.RangeRegistry = &Etcd{}
 
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.

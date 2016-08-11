@@ -102,7 +102,7 @@ func newHttpTransport(t *testing.T, certFile, keyFile, caFile string) etcd.Cance
 }
 
 // configureTestCluster will set the params to start an etcd server
-func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
+func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer {
 	var err error
 	m := &EtcdTestServer{}
 
@@ -119,28 +119,37 @@ func configureTestCluster(t *testing.T, name string) *EtcdTestServer {
 		baseDir = os.TempDir()
 	}
 
-	m.CertificatesDir, err = ioutil.TempDir(baseDir, "etcd_certificates")
-	if err != nil {
-		t.Fatal(err)
-	}
-	m.CertFile = path.Join(m.CertificatesDir, "etcdcert.pem")
-	if err = ioutil.WriteFile(m.CertFile, []byte(CertFileContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-	m.KeyFile = path.Join(m.CertificatesDir, "etcdkey.pem")
-	if err = ioutil.WriteFile(m.KeyFile, []byte(KeyFileContent), 0644); err != nil {
-		t.Fatal(err)
-	}
-	m.CAFile = path.Join(m.CertificatesDir, "ca.pem")
-	if err = ioutil.WriteFile(m.CAFile, []byte(CAFileContent), 0644); err != nil {
-		t.Fatal(err)
-	}
+	if https {
+		m.CertificatesDir, err = ioutil.TempDir(baseDir, "etcd_certificates")
+		if err != nil {
+			t.Fatal(err)
+		}
+		m.CertFile = path.Join(m.CertificatesDir, "etcdcert.pem")
+		if err = ioutil.WriteFile(m.CertFile, []byte(CertFileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+		m.KeyFile = path.Join(m.CertificatesDir, "etcdkey.pem")
+		if err = ioutil.WriteFile(m.KeyFile, []byte(KeyFileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
+		m.CAFile = path.Join(m.CertificatesDir, "ca.pem")
+		if err = ioutil.WriteFile(m.CAFile, []byte(CAFileContent), 0644); err != nil {
+			t.Fatal(err)
+		}
 
-	cln := newSecuredLocalListener(t, m.CertFile, m.KeyFile, m.CAFile)
-	m.ClientListeners = []net.Listener{cln}
-	m.ClientURLs, err = types.NewURLs([]string{"https://" + cln.Addr().String()})
-	if err != nil {
-		t.Fatal(err)
+		cln := newSecuredLocalListener(t, m.CertFile, m.KeyFile, m.CAFile)
+		m.ClientListeners = []net.Listener{cln}
+		m.ClientURLs, err = types.NewURLs([]string{"https://" + cln.Addr().String()})
+		if err != nil {
+			t.Fatal(err)
+		}
+	} else {
+		cln := newLocalListener(t)
+		m.ClientListeners = []net.Listener{cln}
+		m.ClientURLs, err = types.NewURLs([]string{"http://" + cln.Addr().String()})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	m.Name = name
@@ -225,14 +234,16 @@ func (m *EtcdTestServer) Terminate(t *testing.T) {
 	if err := os.RemoveAll(m.ServerConfig.DataDir); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.RemoveAll(m.CertificatesDir); err != nil {
-		t.Fatal(err)
+	if len(m.CertificatesDir) > 0 {
+		if err := os.RemoveAll(m.CertificatesDir); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
 // NewEtcdTestClientServer creates a new client and server for testing
 func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
-	server := configureTestCluster(t, "foo")
+	server := configureTestCluster(t, "foo", true)
 	err := server.launch(t)
 	if err != nil {
 		t.Fatalf("Failed to start etcd server error=%v", err)
@@ -252,6 +263,32 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 	if err := server.waitUntilUp(); err != nil {
 		server.Terminate(t)
 		t.Fatalf("Unexpected error in waitUntilUp (%v)", err)
+		return nil
+	}
+	return server
+}
+
+// NewUnsecuredEtcdTestClientServer creates a new client and server for testing
+func NewUnsecuredEtcdTestClientServer(t *testing.T) *EtcdTestServer {
+	server := configureTestCluster(t, "foo", false)
+	err := server.launch(t)
+	if err != nil {
+		t.Fatalf("Failed to start etcd server error=%v", err)
+		return nil
+	}
+	cfg := etcd.Config{
+		Endpoints: server.ClientURLs.StringSlice(),
+		Transport: newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile),
+	}
+	server.Client, err = etcd.New(cfg)
+	if err != nil {
+		t.Errorf("Unexpected error in NewUnsecuredEtcdTestClientServer (%v)", err)
+		server.Terminate(t)
+		return nil
+	}
+	if err := server.waitUntilUp(); err != nil {
+		t.Errorf("Unexpected error in waitUntilUp (%v)", err)
+		server.Terminate(t)
 		return nil
 	}
 	return server

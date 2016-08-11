@@ -1,5 +1,9 @@
 language: go
 
+go:
+  - 1.5.3
+  - 1.6
+
 before_install:
   - go get github.com/axw/gocov/gocov
   - go get github.com/mattn/goveralls
@@ -11,4 +15,3 @@ install:
 
 script:
   - make test testrace
-  - make coverage

@@ -33,20 +33,22 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
-var reportDir = flag.String("report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
 
 type e2eService struct {
 	killCmds []*killCmd
 	rmDirs   []string
 
-	etcdDataDir         string
-	kubeletStaticPodDir string
-	nodeName            string
-	logFiles            map[string]logFileData
-	cgroupsPerQOS       bool
+	context       *SharedContext
+	etcdDataDir   string
+	nodeName      string
+	logFiles      map[string]logFileData
+	cgroupsPerQOS bool
+	evictionHard  string
 }
 
 type logFileData struct {
@@ -61,7 +63,7 @@ const (
 	defaultEtcdPath = "/tmp/etcd"
 )
 
-func newE2eService(nodeName string, cgroupsPerQOS bool) *e2eService {
+func newE2eService(nodeName string, cgroupsPerQOS bool, evictionHard string, context *SharedContext) *e2eService {
 	// Special log files that need to be collected for additional debugging.
 	var logFiles = map[string]logFileData{
 		"kern.log":   {[]string{"/var/log/kern.log"}, []string{"-k"}},
@@ -69,9 +71,11 @@ func newE2eService(nodeName string, cgroupsPerQOS bool) *e2eService {
 	}
 
 	return &e2eService{
+		context:       context,
 		nodeName:      nodeName,
 		logFiles:      logFiles,
 		cgroupsPerQOS: cgroupsPerQOS,
+		evictionHard:  evictionHard,
 	}
 }
 
@@ -101,7 +105,7 @@ func (es *e2eService) start() error {
 		return err
 	}
 	es.killCmds = append(es.killCmds, cmd)
-	es.rmDirs = append(es.rmDirs, es.kubeletStaticPodDir)
+	es.rmDirs = append(es.rmDirs, es.context.PodConfigPath)
 
 	return nil
 }
@@ -110,12 +114,12 @@ func (es *e2eService) start() error {
 // Since we scp files from the remote directory, symlinks will be treated as normal files and file contents will be copied over.
 func (es *e2eService) getLogFiles() {
 	// Nothing to do if report dir is not specified.
-	if *reportDir == "" {
+	if framework.TestContext.ReportDir == "" {
 		return
 	}
 	journaldFound := isJournaldAvailable()
 	for targetFileName, logFileData := range es.logFiles {
-		targetLink := path.Join(*reportDir, targetFileName)
+		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
 		if journaldFound {
 			// Skip log files that do not have an equivalent in journald based machines.
 			if len(logFileData.journalctlCommand) == 0 {
@@ -181,7 +185,12 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 		return nil, err
 	}
 	es.etcdDataDir = dataDir
-	etcdPath, err := exec.LookPath("etcd")
+	var etcdPath string
+	// CoreOS ships a binary named 'etcd' which is really old, so prefer 'etcd2' if it exists
+	etcdPath, err = exec.LookPath("etcd2")
+	if err != nil {
+		etcdPath, err = exec.LookPath("etcd")
+	}
 	if err != nil {
 		glog.Infof("etcd not found in PATH. Defaulting to %s...", defaultEtcdPath)
 		_, err = os.Stat(defaultEtcdPath)
@@ -190,7 +199,9 @@ func (es *e2eService) startEtcd() (*killCmd, error) {
 		}
 		etcdPath = defaultEtcdPath
 	}
-	cmd := exec.Command(etcdPath)
+	cmd := exec.Command(etcdPath,
+		"--listen-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001",
+		"--advertise-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001")
 	// Execute etcd in the data directory instead of using --data-dir because the flag sometimes requires additional
 	// configuration (e.g. --name in version 0.4.9)
 	cmd.Dir = es.etcdDataDir
@@ -222,7 +233,7 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 	if err != nil {
 		return nil, err
 	}
-	es.kubeletStaticPodDir = dataDir
+	es.context.PodConfigPath = dataDir
 	var killOverride *exec.Cmd
 	cmdArgs := []string{}
 	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
@@ -238,6 +249,10 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		}
 	} else {
 		cmdArgs = append(cmdArgs, getKubeletServerBin())
+		cmdArgs = append(cmdArgs,
+			"--runtime-cgroups=/docker-daemon",
+			"--kubelet-cgroups=/kubelet",
+		)
 	}
 	cmdArgs = append(cmdArgs,
 		"--api-servers", "http://127.0.0.1:8080",
@@ -247,10 +262,12 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		"--volume-stats-agg-period", "10s", // Aggregate volumes frequently so tests don't need to wait as long
 		"--allow-privileged", "true",
 		"--serialize-image-pulls", "false",
-		"--config", es.kubeletStaticPodDir,
+		"--config", es.context.PodConfigPath,
 		"--file-check-frequency", "10s", // Check file frequently so tests won't wait too long
 		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
+		"--eviction-hard", es.evictionHard,
+		"--eviction-pressure-transition-period", "30s",
 	)
 	if es.cgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
@@ -282,7 +299,7 @@ func (es *e2eService) startServer(cmd *healthCheckCommand) error {
 		defer close(cmdErrorChan)
 
 		// Create the output filename
-		outPath := path.Join(*reportDir, cmd.outputFilename)
+		outPath := path.Join(framework.TestContext.ReportDir, cmd.outputFilename)
 		outfile, err := os.Create(outPath)
 		if err != nil {
 			cmdErrorChan <- fmt.Errorf("Failed to create file %s for `%s` %v.", outPath, cmd, err)

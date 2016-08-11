@@ -28,6 +28,10 @@ type Process struct {
 	// local to the container's user and group configuration.
 	User string
 
+	// AdditionalGroups specifies the gids that should be added to supplementary groups
+	// in addition to those that the user belongs to.
+	AdditionalGroups []string
+
 	// Cwd will change the processes current working directory inside the container's rootfs.
 	Cwd string
 
@@ -102,8 +106,8 @@ type IO struct {
 }
 
 // NewConsole creates new console for process and returns it
-func (p *Process) NewConsole(rootuid int) (Console, error) {
-	console, err := NewConsole(rootuid, rootuid)
+func (p *Process) NewConsole(rootuid, rootgid int) (Console, error) {
+	console, err := NewConsole(rootuid, rootgid)
 	if err != nil {
 		return nil, err
 	}

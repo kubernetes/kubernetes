@@ -304,6 +304,66 @@ func TestGenerateService(t *testing.T) {
 			},
 		},
 		{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
+				"selector":       "foo=bar,baz=blah",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "TCP",
+				"container-port": "1234",
+				"cluster-ip":     "10.10.10.10",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Port:       80,
+							Protocol:   "TCP",
+							TargetPort: intstr.FromInt(1234),
+						},
+					},
+					ClusterIP: "10.10.10.10",
+				},
+			},
+		},
+		{
+			generator: ServiceGeneratorV2{},
+			params: map[string]interface{}{
+				"selector":       "foo=bar,baz=blah",
+				"name":           "test",
+				"port":           "80",
+				"protocol":       "TCP",
+				"container-port": "1234",
+				"cluster-ip":     "None",
+			},
+			expected: api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name: "test",
+				},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{
+						"foo": "bar",
+						"baz": "blah",
+					},
+					Ports: []api.ServicePort{
+						{
+							Port:       80,
+							Protocol:   "TCP",
+							TargetPort: intstr.FromInt(1234),
+						},
+					},
+					ClusterIP: api.ClusterIPNone,
+				},
+			},
+		},
+		{
 			generator: ServiceGeneratorV1{},
 			params: map[string]interface{}{
 				"selector":       "foo=bar",

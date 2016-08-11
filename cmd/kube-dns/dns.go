@@ -20,8 +20,8 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/kube-dns/app"
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
@@ -30,8 +30,8 @@ func main() {
 	config.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
-	util.InitLogs()
-	defer util.FlushLogs()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
 	server := app.NewKubeDNSServerDefault(config)

@@ -247,3 +247,7 @@ func getZones(nodeHandler *FakeNodeHandler) []string {
 	}
 	return zones.List()
 }
+
+func createZoneID(region, zone string) string {
+	return region + ":\x00:" + zone
+}

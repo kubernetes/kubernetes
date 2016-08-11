@@ -36,7 +36,7 @@ import (
 )
 
 func TestLongRunningRequestRegexp(t *testing.T) {
-	regexp := regexp.MustCompile(options.NewServerRunOptions().LongRunningRequestRE)
+	regexp := regexp.MustCompile(options.NewServerRunOptions().WithEtcdOptions().LongRunningRequestRE)
 	dontMatch := []string{
 		"/api/v1/watch-namespace/",
 		"/api/v1/namespace-proxy/",
@@ -84,7 +84,7 @@ var groupVersions = []unversioned.GroupVersion{
 }
 
 func TestRun(t *testing.T) {
-	s := options.NewServerRunOptions()
+	s := options.NewServerRunOptions().WithEtcdOptions()
 	s.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet
@@ -304,6 +304,7 @@ func testExtensionsResourceList(t *testing.T) {
 	assert.Equal(t, "", apiResourceList.APIVersion)
 	assert.Equal(t, ext_v1b1.SchemeGroupVersion.String(), apiResourceList.GroupVersion)
 
+	// Verify replicasets.
 	found := findResource(apiResourceList.APIResources, "replicasets")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
@@ -311,6 +312,14 @@ func testExtensionsResourceList(t *testing.T) {
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 	found = findResource(apiResourceList.APIResources, "replicasets/scale")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+
+	// Verify ingress.
+	found = findResource(apiResourceList.APIResources, "ingresses")
+	assert.NotNil(t, found)
+	assert.True(t, found.Namespaced)
+	found = findResource(apiResourceList.APIResources, "ingresses/status")
 	assert.NotNil(t, found)
 	assert.True(t, found.Namespaced)
 }

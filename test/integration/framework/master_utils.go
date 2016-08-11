@@ -351,7 +351,7 @@ func StartPods(namespace string, numPods int, host string, restClient *client.Cl
 	} else {
 		// Delete the rc, otherwise when we restart master components for the next benchmark
 		// the rc controller will race with the pods controller in the rc manager.
-		return restClient.ReplicationControllers(namespace).Delete(rc.Name)
+		return restClient.ReplicationControllers(namespace).Delete(rc.Name, nil)
 	}
 }
 

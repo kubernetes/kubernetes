@@ -18,7 +18,7 @@ package e2e_node
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -31,8 +31,8 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {
 			It("Top level QoS containers should have been created", func() {
 				if framework.TestContext.CgroupsPerQOS {
-					podName := "qos-pod" + string(util.NewUUID())
-					contName := "qos-container" + string(util.NewUUID())
+					podName := "qos-pod" + string(uuid.NewUUID())
+					contName := "qos-container" + string(uuid.NewUUID())
 					pod := &api.Pod{
 						ObjectMeta: api.ObjectMeta{
 							Name: podName,

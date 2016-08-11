@@ -88,6 +88,21 @@ To build binaries for all platforms:
         make cross
 ```
 
+### How to update the Go version used to test & build k8s
+
+The kubernetes project tries to stay on the latest version of Go so it can
+benefit from the improvements to the language over time and can easily
+bump to a minor release version for security updates.
+
+Since kubernetes is mostly built and tested in containers, there are a few
+unique places you need to update the go version.
+
+- The image for cross compiling in [build/build-image/cross/](../../build/build-image/cross/). The `VERSION` file and `Dockerfile`.
+- The jenkins test-image in
+  [hack/jenkins/test-image/](../../hack/jenkins/test-image/). The `Dockerfile` and `Makefile`.
+- The docker image being run in [hack/jenkins/dockerized-e2e-runner.sh](../../hack/jenkins/dockerized-e2e-runner.sh) and [hack/jenkins/gotest-dockerized.sh](../../hack/jenkins/gotest-dockerized.sh).
+- The cross tag `KUBE_BUILD_IMAGE_CROSS_TAG` in [build/common.sh](../../build/common.sh)
+
 ## Workflow
 
 Below, we outline one of the more common git workflows that core developers use.
@@ -164,7 +179,7 @@ git push -f origin myfeature
 ### Creating a pull request
 
 1. Visit https://github.com/$YOUR_GITHUB_USERNAME/kubernetes
-2. Click the "Compare and pull request" button next to your "myfeature" branch.
+2. Click the "Compare & pull request" button next to your "myfeature" branch.
 3. Check out the pull request [process](pull-requests.md) for more details
 
 ### When to retain commits and when to squash
@@ -243,7 +258,7 @@ separate dependency updates from other changes._
 export KPATH=$HOME/code/kubernetes
 mkdir -p $KPATH/src/k8s.io
 cd $KPATH/src/k8s.io
-git clone https://path/to/your/kubernetes/fork # assumes your fork is 'kubernetes'
+git clone https://github.com/$YOUR_GITHUB_USERNAME/kubernetes.git # assumes your fork is 'kubernetes'
 # Or copy your existing local repo here. IMPORTANT: making a symlink doesn't work.
 ```
 
@@ -325,18 +340,21 @@ Three basic commands let you run unit, integration and/or e2e tests:
 
 ```sh
 cd kubernetes
-make test  # Run unit tests
-make test-integration  # Run integration tests, requires etcd
-go run hack/e2e.go -v --build --up --test --down  # Run e2e tests
+make test # Run every unit test
+make test WHAT=pkg/util/cache GOFLAGS=-v # Run tests of a package verbosely
+make test-integration # Run integration tests, requires etcd
+make test-e2e # Run e2e tests
 ```
 
-See the [testing guide](testing.md) for additional information and scenarios.
+See the [testing guide](testing.md) and [end-to-end tests](e2e-tests.md) for additional information and scenarios.
 
 ## Regenerating the CLI documentation
 
 ```sh
 hack/update-generated-docs.sh
 ```
+
+
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

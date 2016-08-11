@@ -63,21 +63,46 @@ readonly gcs_acl="public-read"
 readonly results_url=${gcs_build_path//"gs:/"/"https://console.cloud.google.com/storage/browser"}
 readonly timestamp=$(date +%s)
 
-function upload_version() {
-  echo -n 'Run starting at '; date -d "@${timestamp}"
+#########################################################################
+# $0 is called from different contexts so figure out where kubernetes is.
+# Sets non-exported global kubernetes_base_path and defaults to "."
+function set_kubernetes_base_path () {
+  for kubernetes_base_path in kubernetes go/src/k8s.io/kubernetes .; do
+    # Pick a canonical item to find in a kubernetes tree which could be a
+    # raw source tree or an expanded tarball.
 
-  # Try to discover the kubernetes version.
-  local version=""
+    [[ -f ${kubernetes_base_path}/cluster/common.sh ]] && break
+  done
+}
+
+#########################################################################
+# Try to discover the kubernetes version.
+# prints version
+function find_version() {
+  (
+  # Where are we?
+  # This could be set in the global scope at some point if we need to 
+  # discover the kubernetes path elsewhere.
+  set_kubernetes_base_path
+
+  cd ${kubernetes_base_path}
+
   if [[ -e "version" ]]; then
-    version=$(cat "version")
+    cat version
   elif [[ -e "hack/lib/version.sh" ]]; then
-    version=$(
-      export KUBE_ROOT="."
-      source "hack/lib/version.sh"
-      kube::version::get_version_vars
-      echo "${KUBE_GIT_VERSION-}"
-    )
+    export KUBE_ROOT="."
+    source "hack/lib/version.sh"
+    kube::version::get_version_vars
+    echo "${KUBE_GIT_VERSION-}"
   fi
+  )
+}
+
+function upload_version() {
+  local -r version=$(find_version)
+  local upload_attempt
+
+  echo -n 'Run starting at '; date -d "@${timestamp}"
 
   if [[ -n "${version}" ]]; then
     echo "Found Kubernetes version: ${version}"
@@ -86,7 +111,7 @@ function upload_version() {
   fi
 
   local -r json_file="${gcs_build_path}/started.json"
-  for upload_attempt in $(seq 3); do
+  for upload_attempt in {1..3}; do
     echo "Uploading version to: ${json_file} (attempt ${upload_attempt})"
     gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" <(
       echo "{"
@@ -99,11 +124,55 @@ function upload_version() {
   done
 }
 
-function upload_artifacts_and_build_result() {
+#########################################################################
+# Maintain a single file storing the full build version, Jenkins' job number
+# build state.  Limit its size so it does not grow unbounded.
+# This is primarily used for and by the
+# github.com/kubernetes/release/find_green_build tool.
+# @param build_result - the state of the build
+#
+function update_job_result_cache() {
   local -r build_result=$1
-  echo -n 'Run finished at '; date -d "@${timestamp}"
+  local -r version=$(find_version)
+  local -r job_results=${gcs_job_path}/jobResultsCache.json
+  local -r tmp_results="${WORKSPACE}/_tmp/jobResultsCache.tmp"
+  local -r cache_size=200
+  local upload_attempt
+
+  if [[ -n "${version}" ]]; then
+    echo "Found Kubernetes version: ${version}"
+  else
+    echo "Could not find Kubernetes version"
+  fi
+
+  mkdir -p ${tmp_results%/*}
 
   for upload_attempt in $(seq 3); do
+    echo "Copying ${job_results} to ${tmp_results} (attempt ${upload_attempt})"
+    gsutil -q cp ${job_results} ${tmp_results} 2>&- || continue
+    break
+  done
+
+  echo "{\"version\": \"${version}\", \"buildnumber\": \"${BUILD_NUMBER}\"," \
+       "\"result\": \"${build_result}\"}" >> ${tmp_results}
+
+  for upload_attempt in $(seq 3); do
+    echo "Copying ${tmp_results} to ${job_results} (attempt ${upload_attempt})"
+    gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" \
+           <(tail -${cache_size} ${tmp_results}) ${job_results} || continue
+    break
+  done
+
+  rm -f ${tmp_results}
+}
+
+function upload_artifacts_and_build_result() {
+  local -r build_result=$1
+  local upload_attempt
+
+  echo -n 'Run finished at '; date -d "@${timestamp}"
+
+  for upload_attempt in {1..3}; do
     echo "Uploading to ${gcs_build_path} (attempt ${upload_attempt})"
     echo "Uploading build result: ${build_result}"
     gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" <(
@@ -150,6 +219,7 @@ if [[ -n "${JENKINS_BUILD_STARTED:-}" ]]; then
   upload_version
 elif [[ -n "${JENKINS_BUILD_FINISHED:-}" ]]; then
   upload_artifacts_and_build_result ${JENKINS_BUILD_FINISHED}
+  update_job_result_cache ${JENKINS_BUILD_FINISHED}
 else
   echo "Called without JENKINS_BUILD_STARTED or JENKINS_BUILD_FINISHED set."
   echo "Assuming a legacy invocation."

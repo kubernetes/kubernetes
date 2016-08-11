@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/ginkgo"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -31,8 +31,8 @@ import (
 // This test requires that --terminated-pod-gc-threshold=100 be set on the controller manager
 //
 // Slow by design (7 min)
-var _ = framework.KubeDescribe("Garbage collector [Feature:GarbageCollector] [Slow]", func() {
-	f := framework.NewDefaultFramework("garbage-collector")
+var _ = framework.KubeDescribe("Pod garbage collector [Feature:PodGarbageCollector] [Slow]", func() {
+	f := framework.NewDefaultFramework("pod-garbage-collector")
 	It("should handle the creation of 1000 pods", func() {
 		var count int
 		for count < 1000 {
@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("Garbage collector [Feature:GarbageCollector] [Sl
 })
 
 func createTerminatingPod(f *framework.Framework) (*api.Pod, error) {
-	uuid := util.NewUUID()
+	uuid := uuid.NewUUID()
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: string(uuid),

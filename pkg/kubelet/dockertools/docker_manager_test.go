@@ -624,6 +624,7 @@ func TestSyncPodCreateNetAndContainer(t *testing.T) {
 	for _, c := range fakeDocker.RunningContainerList {
 		if c.Image == "pod_infra_image" && strings.HasPrefix(c.Names[0], "/k8s_POD") {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -1716,7 +1717,7 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 	if len(expectedResults) != len(realResult.SyncResults) {
 		t.Errorf("expected sync result number %d, got %d", len(expectedResults), len(realResult.SyncResults))
 		for _, r := range expectedResults {
-			t.Errorf("expected result: %+v", r)
+			t.Errorf("expected result: %#v", r)
 		}
 		for _, r := range realResult.SyncResults {
 			t.Errorf("real result: %+v", r)
@@ -1733,16 +1734,16 @@ func verifySyncResults(t *testing.T, expectedResults []*kubecontainer.SyncResult
 				// We use Contains() here because the message format may be changed, but at least we should
 				// make sure that the expected message is contained.
 				if realR.Error != expectR.Error || !strings.Contains(realR.Message, expectR.Message) {
-					t.Errorf("expected sync result %+v, got %+v", expectR, realR)
+					t.Errorf("expected sync result %#v, got %+v", expectR, realR)
 				}
 				found++
 			}
 		}
 		if found == 0 {
-			t.Errorf("not found expected result %+v", expectR)
+			t.Errorf("not found expected result %#v", expectR)
 		}
 		if found > 1 {
-			t.Errorf("got %d duplicate expected result %+v", found, expectR)
+			t.Errorf("got %d duplicate expected result %#v", found, expectR)
 		}
 	}
 }

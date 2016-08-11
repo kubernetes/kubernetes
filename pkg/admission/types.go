@@ -26,7 +26,7 @@ type Validator interface {
 	Validate() error
 }
 
-// WantsNamespaceInformer defines a function which sets NamespaceInformer for admission plugins that need it
+// WantsInformerFactory defines a function which sets InformerFactory for admission plugins that need it
 type WantsInformerFactory interface {
 	SetInformerFactory(informers.SharedInformerFactory)
 	Validator

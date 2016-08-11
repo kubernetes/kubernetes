@@ -28,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"gopkg.in/gcfg.v1"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -39,7 +41,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/golang/glog"
-	"gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/service"
@@ -733,7 +734,7 @@ func newAWSCloud(config io.Reader, awsServices Services) (*Cloud, error) {
 	}
 
 	if filterTags[TagNameKubernetesCluster] == "" {
-		glog.Errorf("Tag %q not found; Kuberentes may behave unexpectedly.", TagNameKubernetesCluster)
+		glog.Errorf("Tag %q not found; Kubernetes may behave unexpectedly.", TagNameKubernetesCluster)
 	}
 
 	awsCloud.filterTags = filterTags

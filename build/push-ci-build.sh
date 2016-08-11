@@ -33,13 +33,18 @@ KUBE_GCS_DELETE_EXISTING='n'
 : ${KUBE_GCS_RELEASE_BUCKET:='kubernetes-release-dev'}
 KUBE_GCS_RELEASE_PREFIX="ci/${LATEST}"
 KUBE_GCS_PUBLISH_VERSION="${LATEST}"
+: ${KUBE_GCS_UPDATE_LATEST:='y'}
 
 source "${KUBE_ROOT}/build/common.sh"
 
 MAX_ATTEMPTS=3
 attempt=0
 while [[ ${attempt} -lt ${MAX_ATTEMPTS} ]]; do
-  kube::release::gcs::release && kube::release::gcs::publish_ci && break || true
+  if [[ "${KUBE_GCS_UPDATE_LATEST}" =~ ^[yY]$ ]]; then
+    kube::release::gcs::release && kube::release::gcs::publish_ci && break || true
+  else
+    kube::release::gcs::release && break || true
+  fi
   attempt=$((attempt + 1))
   sleep 5
 done

@@ -53,6 +53,7 @@ NETWORK=${KUBE_GCE_NETWORK:-default}
 INSTANCE_PREFIX="${KUBE_GCE_INSTANCE_PREFIX:-kubernetes}"
 CLUSTER_NAME="${CLUSTER_NAME:-${INSTANCE_PREFIX}}"
 MASTER_NAME="${INSTANCE_PREFIX}-master"
+INITIAL_ETCD_CLUSTER="${MASTER_NAME}"
 MASTER_TAG="${INSTANCE_PREFIX}-master"
 NODE_TAG="${INSTANCE_PREFIX}-minion"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
@@ -133,6 +134,9 @@ ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolume
 
 # Optional: if set to true kube-up will automatically check for existing resources and clean them up.
 KUBE_UP_AUTOMATIC_CLEANUP=${KUBE_UP_AUTOMATIC_CLEANUP:-false}
+
+# Storage backend. 'etcd2' supported, 'etcd3' experimental.
+STORAGE_BACKEND=${STORAGE_BACKEND:-etcd2}
 
 # Networking plugin specific settings.
 NETWORK_PROVIDER="${NETWORK_PROVIDER:-kubenet}" # none, opencontrail, flannel, kubenet

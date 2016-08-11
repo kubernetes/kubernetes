@@ -207,10 +207,6 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 	if schema == nil {
 		return nil
 	}
-	data, err := yaml.ToJSON(data)
-	if err != nil {
-		return fmt.Errorf("error converting to YAML: %v", err)
-	}
 	if err := schema.ValidateBytes(data); err != nil {
 		return fmt.Errorf("error validating data: %v; %s", err, stopValidateMessage)
 	}
@@ -431,7 +427,7 @@ func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
 }
 
 // ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
-// After FileVisitors open the files, they will pass a io.Reader to a StreamVisitor to do the reading. (stdin
+// After FileVisitors open the files, they will pass an io.Reader to a StreamVisitor to do the reading. (stdin
 // is also taken care of). Paths argument also accepts a single file, and will return a single visitor
 func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
 	var visitors []Visitor

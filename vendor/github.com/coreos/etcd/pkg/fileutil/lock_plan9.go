@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 )
 
 func TryLockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
-	if err := os.Chmod(path, syscall.DMEXCL|0600); err != nil {
+	if err := os.Chmod(path, syscall.DMEXCL|PrivateFileMode); err != nil {
 		return nil, err
 	}
 	f, err := os.Open(path, flag, perm)
@@ -32,7 +32,7 @@ func TryLockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
 }
 
 func LockFile(path string, flag int, perm os.FileMode) (*LockedFile, error) {
-	if err := os.Chmod(path, syscall.DMEXCL|0600); err != nil {
+	if err := os.Chmod(path, syscall.DMEXCL|PrivateFileMode); err != nil {
 		return nil, err
 	}
 	for {

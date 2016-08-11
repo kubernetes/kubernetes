@@ -123,6 +123,13 @@ spec:
         resources:
           limits:
             cpu: 100m
+        livenessProbe:
+          httpGet:
+            # Path to probe; should be cheap, but representative of typical behavior
+            path: /
+            port: 5672
+          initialDelaySeconds: 30
+          timeoutSeconds: 1
 ```
 
 [Download example](rabbitmq-controller.yaml?raw=true)
@@ -269,6 +276,8 @@ spec:
       containers:
       - image: endocode/flower
         name: flower
+        ports:
+        - containerPort: 5555
         resources:
           limits:
             cpu: 100m
@@ -276,7 +285,7 @@ spec:
           httpGet:
             # Path to probe; should be cheap, but representative of typical behavior
             path: /
-            port: 80
+            port: 5555
           initialDelaySeconds: 30
           timeoutSeconds: 1
 ```

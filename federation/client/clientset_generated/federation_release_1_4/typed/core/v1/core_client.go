@@ -26,6 +26,7 @@ import (
 type CoreInterface interface {
 	GetRESTClient() *restclient.RESTClient
 	NamespacesGetter
+	SecretsGetter
 	ServicesGetter
 }
 
@@ -36,6 +37,10 @@ type CoreClient struct {
 
 func (c *CoreClient) Namespaces() NamespaceInterface {
 	return newNamespaces(c)
+}
+
+func (c *CoreClient) Secrets(namespace string) SecretInterface {
+	return newSecrets(c, namespace)
 }
 
 func (c *CoreClient) Services(namespace string) ServiceInterface {

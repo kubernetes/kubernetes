@@ -18,19 +18,27 @@
     "description": "get available API versions"
    },
    {
-    "path": "/apis/extensions/v1beta1",
-    "description": "API at /apis/extensions/v1beta1"
-   },
-   {
-    "path": "/apis/extensions",
-    "description": "get information of a group"
-   },
-   {
     "path": "/apis/apps/v1alpha1",
     "description": "API at /apis/apps/v1alpha1"
    },
    {
     "path": "/apis/apps",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/apis/authentication.k8s.io/v1beta1",
+    "description": "API at /apis/authentication.k8s.io/v1beta1"
+   },
+   {
+    "path": "/apis/authentication.k8s.io",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/apis/authorization.k8s.io/v1beta1",
+    "description": "API at /apis/authorization.k8s.io/v1beta1"
+   },
+   {
+    "path": "/apis/authorization.k8s.io",
     "description": "get information of a group"
    },
    {
@@ -59,6 +67,14 @@
    },
    {
     "path": "/apis/certificates",
+    "description": "get information of a group"
+   },
+   {
+    "path": "/apis/extensions/v1beta1",
+    "description": "API at /apis/extensions/v1beta1"
+   },
+   {
+    "path": "/apis/extensions",
     "description": "get information of a group"
    },
    {

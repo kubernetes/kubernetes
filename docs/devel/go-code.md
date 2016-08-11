@@ -36,6 +36,8 @@ and tips that our developers have found useful.
 ## Recommended Reading
 
 - [Kubernetes Go development environment](development.md#go-development-environment)
+- [The Go Spec](https://golang.org/ref/spec) - The Go Programming Language
+  Specification.
 - [Go Tour](https://tour.golang.org/welcome/2) - Official Go tutorial.
 - [Effective Go](https://golang.org/doc/effective_go.html) - A good collection of Go advice.
 - [Kubernetes Code conventions](coding-conventions.md) - Style guide for Kubernetes code.

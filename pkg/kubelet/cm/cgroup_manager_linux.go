@@ -105,7 +105,7 @@ var supportedSubsystems []subsystem = []subsystem{
 
 // setSupportedSubsytems sets cgroup resource limits only on the supported
 // subsytems. ie. cpu and memory. We don't use libcontainer's cgroup/fs/Set()
-// method as it dosn't allow us to skip updates on the devices cgroup
+// method as it doesn't allow us to skip updates on the devices cgroup
 // Allowing or denying all devices by writing 'a' to devices.allow or devices.deny is
 // not possible once the device cgroups has children. Once the pod level cgroup are
 // created under the QOS level cgroup we cannot update the QOS level device cgroup.

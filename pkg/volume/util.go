@@ -18,6 +18,7 @@ package volume
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -27,14 +28,15 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
-	"github.com/golang/glog"
 	"hash/fnv"
-	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"math/rand"
 	"strconv"
 	"strings"
+
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // RecycleVolumeByWatchingPodUntilCompletion is intended for use with volume
@@ -191,6 +193,15 @@ func GenerateVolumeName(clusterName, pvName string, maxLength int) string {
 		prefix = prefix[:maxLength-pvLen-1]
 	}
 	return prefix + "-" + pvName
+}
+
+// Check if the path from the mounter is empty.
+func GetPath(mounter Mounter) (string, error) {
+	path := mounter.GetPath()
+	if path == "" {
+		return "", fmt.Errorf("Path is empty %s", reflect.TypeOf(mounter).String())
+	}
+	return path, nil
 }
 
 // ChooseZone implements our heuristics for choosing a zone for volume creation based on the volume name

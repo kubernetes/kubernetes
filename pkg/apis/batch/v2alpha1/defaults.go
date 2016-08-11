@@ -46,4 +46,7 @@ func SetDefaults_ScheduledJob(obj *ScheduledJob) {
 	if obj.Spec.ConcurrencyPolicy == "" {
 		obj.Spec.ConcurrencyPolicy = AllowConcurrent
 	}
+	if obj.Spec.Suspend == nil {
+		obj.Spec.Suspend = new(bool)
+	}
 }

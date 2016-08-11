@@ -186,6 +186,7 @@ const NET_CONFIG_TEMPLATE = `{
   "addIf": "%s",
   "isGateway": true,
   "ipMasq": false,
+  "hairpin": "%t",
   "ipam": {
     "type": "host-local",
     "subnet": "%s",
@@ -218,10 +219,11 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	glog.V(5).Infof("PodCIDR is set to %q", podCIDR)
 	_, cidr, err := net.ParseCIDR(podCIDR)
 	if err == nil {
+		setHairpin := plugin.hairpinMode == componentconfig.HairpinVeth
 		// Set bridge address to first address in IPNet
 		cidr.IP.To4()[3] += 1
 
-		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.MTU, network.DefaultInterfaceName, podCIDR, cidr.IP.String())
+		json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.MTU, network.DefaultInterfaceName, setHairpin, podCIDR, cidr.IP.String())
 		glog.V(2).Infof("CNI network config set to %v", json)
 		plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 		if err == nil {
