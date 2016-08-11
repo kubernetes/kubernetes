@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/slice"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
+	utilkubelet "k8s.io/kubernetes/pkg/kubelet"
 )
 
 // iptablesMinVersion is the minimum version of iptables for which we will use the Proxier
@@ -136,6 +137,7 @@ type serviceInfo struct {
 	sessionAffinityType api.ServiceAffinity
 	stickyMaxAgeSeconds int
 	externalIPs         []string
+	loadBalancerSourceRanges []string
 }
 
 // returns a new serviceInfo struct
@@ -164,6 +166,7 @@ type Proxier struct {
 	exec           utilexec.Interface
 	clusterCIDR    string
 	hostname       string
+	nodeIP         net.IP
 }
 
 type localPort struct {
@@ -189,7 +192,7 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string,  hostname string, nodeIP net.IP) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := utilsysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
@@ -209,6 +212,10 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
 
+	if nodeIP == nil {
+		glog.Warningf("invalid nodeIP, initialize kube-proxy with 127.0.0.1 as nodeIP")
+		nodeIP = net.ParseIP("127.0.0.1")
+	}
 	return &Proxier{
 		serviceMap:     make(map[proxy.ServicePortName]*serviceInfo),
 		endpointsMap:   make(map[proxy.ServicePortName][]string),
@@ -220,6 +227,7 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 		exec:           exec,
 		clusterCIDR:    clusterCIDR,
 		hostname:       hostname,
+		nodeIP:		nodeIP,
 	}, nil
 }
 
@@ -428,6 +436,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			// Deep-copy in case the service instance changes
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.sessionAffinityType = service.Spec.SessionAffinity
+			info.loadBalancerSourceRanges = service.Spec.LoadBalancerSourceRanges
 			proxier.serviceMap[serviceName] = info
 
 			glog.V(4).Infof("added serviceInfo(%s): %s", serviceName, spew.Sdump(info))
@@ -561,6 +570,11 @@ func servicePortChainName(s proxy.ServicePortName, protocol string) utiliptables
 	hash := sha256.Sum256([]byte(s.String() + protocol))
 	encoded := base32.StdEncoding.EncodeToString(hash[:])
 	return utiliptables.Chain("KUBE-SVC-" + encoded[:16])
+}
+
+// serviceFirewallChainName takes the servicePortChainName and substitue "KUBE-SVC" with "KUBE-FW"
+func serviceFirewallChainName(svcChain utiliptables.Chain) utiliptables.Chain {
+	return utiliptables.Chain(strings.Replace(string(svcChain), "KUBE-SVC", "KUBE-FW", 1))
 }
 
 // This is the same as servicePortChainName but with the endpoint included.
@@ -856,7 +870,44 @@ func (proxier *Proxier) syncProxyRules() {
 				}
 				// We have to SNAT packets from external IPs.
 				writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-				writeLine(natRules, append(args, "-j", string(svcChain))...)
+				// allow all sources
+				if len(svcInfo.loadBalancerSourceRanges) == 0 {
+					writeLine(natRules, append(args, "-j", string(svcChain))...)
+				} else {
+					// create firewall chain
+					fwChain := serviceFirewallChainName(svcChain)
+					if chain, ok := existingNATChains[fwChain]; ok {
+						writeLine(natChains, chain)
+					} else {
+						writeLine(natChains, utiliptables.MakeChainLine(fwChain))
+					}
+					writeLine(natRules, append(args, "-j", string(fwChain))...)
+
+					args = []string{
+						"-A", string(fwChain),
+						"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcName.String()),
+						"-m", protocol, "-p", protocol,
+						"-d", fmt.Sprintf("%s/32", ingress.IP),
+						"--dport", fmt.Sprintf("%d", svcInfo.port),
+					}
+					// firewall filter based on each source range
+					allowFromNode := false
+					for _, src := range svcInfo.loadBalancerSourceRanges {
+						writeLine(natRules, append(args, "-s", src, "-j", string(svcChain))...)
+						// ignore error because it has been validated
+						_, cidr, _ := net.ParseCIDR(src)
+						if cidr.Contains(proxier.nodeIP) {
+							allowFromNode = true
+						}
+					}
+					// gce injects ip route rule to intercept request to loadbalancer from the loadbalancer's backend hosts
+					// in this case, request will not hit the loadbalancer but loop back directly
+					// need to add the following rule to allow request on host
+					if allowFromNode {
+						writeLine(natRules, append(args, "-s", fmt.Sprintf("%s/32", ingress.IP), "-j", string(svcChain))...)
+					}
+					writeLine(natRules, append(args, "-j", string(utilkubelet.KubeMarkDropChain))...)
+				}
 			}
 		}
 
