@@ -32,15 +32,21 @@ type VirtualMachineScaleSetVMsClient struct {
 // NewVirtualMachineScaleSetVMsClient creates an instance of the
 // VirtualMachineScaleSetVMsClient client.
 func NewVirtualMachineScaleSetVMsClient(subscriptionID string) VirtualMachineScaleSetVMsClient {
-	return VirtualMachineScaleSetVMsClient{New(subscriptionID)}
+	return NewVirtualMachineScaleSetVMsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// Deallocate allows you to deallocate a virtual machine virtual machine scale
-// set.Shuts down the virtual machine and releases the compute resources. You
-// are not billed for the compute resources that this virtual machine uses.
-// This method may poll for completion. Polling can be canceled by passing
-// the cancel channel argument. The channel will be used to cancel polling
-// and any outstanding HTTP requests.
+// NewVirtualMachineScaleSetVMsClientWithBaseURI creates an instance of the
+// VirtualMachineScaleSetVMsClient client.
+func NewVirtualMachineScaleSetVMsClientWithBaseURI(baseURI string, subscriptionID string) VirtualMachineScaleSetVMsClient {
+	return VirtualMachineScaleSetVMsClient{NewWithBaseURI(baseURI, subscriptionID)}
+}
+
+// Deallocate allows you to deallocate a virtual machine scale set virtual
+// machine. Shuts down the virtual machine and releases the compute
+// resources. You are not billed for the compute resources that this virtual
+// machine uses. This method may poll for completion. Polling can be canceled
+// by passing the cancel channel argument. The channel will be used to cancel
+// polling and any outstanding HTTP requests.
 //
 // resourceGroupName is the name of the resource group. vmScaleSetName is the
 // name of the virtual machine scale set. instanceID is the instance id of

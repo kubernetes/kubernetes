@@ -32,7 +32,13 @@ type VirtualMachineScaleSetsClient struct {
 // NewVirtualMachineScaleSetsClient creates an instance of the
 // VirtualMachineScaleSetsClient client.
 func NewVirtualMachineScaleSetsClient(subscriptionID string) VirtualMachineScaleSetsClient {
-	return VirtualMachineScaleSetsClient{New(subscriptionID)}
+	return NewVirtualMachineScaleSetsClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewVirtualMachineScaleSetsClientWithBaseURI creates an instance of the
+// VirtualMachineScaleSetsClient client.
+func NewVirtualMachineScaleSetsClientWithBaseURI(baseURI string, subscriptionID string) VirtualMachineScaleSetsClient {
+	return VirtualMachineScaleSetsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate allows you to create or update a virtual machine scale set

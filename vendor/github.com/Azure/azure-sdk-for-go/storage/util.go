@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"reflect"
 	"time"
 )
 
@@ -68,4 +69,17 @@ func xmlMarshal(v interface{}) (io.Reader, int, error) {
 		return nil, 0, err
 	}
 	return bytes.NewReader(b), len(b), nil
+}
+
+func headersFromStruct(v interface{}) map[string]string {
+	headers := make(map[string]string)
+	value := reflect.ValueOf(v)
+	for i := 0; i < value.NumField(); i++ {
+		key := value.Type().Field(i).Tag.Get("header")
+		val := value.Field(i).String()
+		if val != "" {
+			headers[key] = val
+		}
+	}
+	return headers
 }

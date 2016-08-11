@@ -111,6 +111,8 @@ type BlobProperties struct {
 	ContentLength         int64    `xml:"Content-Length"`
 	ContentType           string   `xml:"Content-Type"`
 	ContentEncoding       string   `xml:"Content-Encoding"`
+	CacheControl          string   `xml:"Cache-Control"`
+	ContentLanguage       string   `xml:"Cache-Language"`
 	BlobType              BlobType `xml:"x-ms-blob-blob-type"`
 	SequenceNumber        int64    `xml:"x-ms-blob-sequence-number"`
 	CopyID                string   `xml:"CopyId"`
@@ -120,6 +122,16 @@ type BlobProperties struct {
 	CopyCompletionTime    string   `xml:"CopyCompletionTime"`
 	CopyStatusDescription string   `xml:"CopyStatusDescription"`
 	LeaseStatus           string   `xml:"LeaseStatus"`
+}
+
+// BlobHeaders contains various properties of a blob and is an entry
+// in SetBlobProperties
+type BlobHeaders struct {
+	ContentMD5      string `header:"x-ms-blob-content-md5"`
+	ContentLanguage string `header:"x-ms-blob-content-language"`
+	ContentEncoding string `header:"x-ms-blob-content-encoding"`
+	ContentType     string `header:"x-ms-blob-content-type"`
+	CacheControl    string `header:"x-ms-blob-cache-control"`
 }
 
 // BlobListResponse contains the response fields from ListBlobs call.
@@ -590,6 +602,8 @@ func (b BlobStorageClient) GetBlobProperties(container, name string) (*BlobPrope
 		ContentLength:         contentLength,
 		ContentEncoding:       resp.headers.Get("Content-Encoding"),
 		ContentType:           resp.headers.Get("Content-Type"),
+		CacheControl:          resp.headers.Get("Cache-Control"),
+		ContentLanguage:       resp.headers.Get("Content-Language"),
 		SequenceNumber:        sequenceNum,
 		CopyCompletionTime:    resp.headers.Get("x-ms-copy-completion-time"),
 		CopyStatusDescription: resp.headers.Get("x-ms-copy-status-description"),
@@ -600,6 +614,34 @@ func (b BlobStorageClient) GetBlobProperties(container, name string) (*BlobPrope
 		BlobType:              BlobType(resp.headers.Get("x-ms-blob-type")),
 		LeaseStatus:           resp.headers.Get("x-ms-lease-status"),
 	}, nil
+}
+
+// SetBlobProperties replaces the BlobHeaders for the specified blob.
+//
+// Some keys may be converted to Camel-Case before sending. All keys
+// are returned in lower case by GetBlobProperties. HTTP header names
+// are case-insensitive so case munging should not matter to other
+// applications either.
+//
+// See https://msdn.microsoft.com/en-us/library/azure/ee691966.aspx
+func (b BlobStorageClient) SetBlobProperties(container, name string, blobHeaders BlobHeaders) error {
+	params := url.Values{"comp": {"properties"}}
+	uri := b.client.getEndpoint(blobServiceName, pathForBlob(container, name), params)
+	headers := b.client.getStandardHeaders()
+
+	extraHeaders := headersFromStruct(blobHeaders)
+
+	for k, v := range extraHeaders {
+		headers[k] = v
+	}
+
+	resp, err := b.client.exec("PUT", uri, headers, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.body.Close()
+
+	return checkRespCode(resp.statusCode, []int{http.StatusOK})
 }
 
 // SetBlobMetadata replaces the metadata for the specified blob.

@@ -25,25 +25,35 @@ import (
 
 const (
 	vhdContainerName = "vhds"
-	useHttps         = true
+	useHTTPS         = true
 	blobServiceName  = "blob"
 )
-
-// switch to asm mode for blob service
 
 // create page blob
 func (az *Cloud) createVhdBlob(accountName, accountKey, name string, sizeGB int64, tags map[string]string) (string, string, error) {
 	blobClient, err := az.getBlobClient(accountName, accountKey)
 	if err == nil {
 		size := 1024 * 1024 * 1024 * sizeGB
+		vhdSize := size + vhdHeaderSize /* header size */
 		// Blob name in URL must end with '.vhd' extension.
 		name = name + ".vhd"
-		err = blobClient.PutPageBlob(vhdContainerName, name, size, tags)
+		err = blobClient.PutPageBlob(vhdContainerName, name, vhdSize, tags)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to put page blob: %v", err)
 		}
+		// add VHD signature to the blob
+		h, err := createVHDHeader(uint64(size))
+		if err != nil {
+			az.deleteVhdBlob(accountName, accountKey, name)
+			return "", "", fmt.Errorf("failed to create vhd header, err: %v", err)
+		}
+		if err = blobClient.PutPage(vhdContainerName, name, size, vhdSize-1, azs.PageWriteTypeUpdate, h[:vhdHeaderSize], nil); err != nil {
+			az.deleteVhdBlob(accountName, accountKey, name)
+			return "", "", fmt.Errorf("failed to update vhd header, err: %v", err)
+		}
+
 		scheme := "http"
-		if useHttps {
+		if useHTTPS {
 			scheme = "https"
 		}
 		host := fmt.Sprintf("%s://%s.%s.%s", scheme, accountName, blobServiceName, az.Environment.StorageEndpointSuffix)
@@ -64,7 +74,7 @@ func (az *Cloud) deleteVhdBlob(accountName, accountKey, blobName string) error {
 }
 
 func (az *Cloud) getBlobClient(accountName, accountKey string) (*azs.BlobStorageClient, error) {
-	client, err := azs.NewClient(accountName, accountKey, az.Environment.StorageEndpointSuffix, azs.DefaultAPIVersion, useHttps)
+	client, err := azs.NewClient(accountName, accountKey, az.Environment.StorageEndpointSuffix, azs.DefaultAPIVersion, useHTTPS)
 	if err != nil {
 		return nil, fmt.Errorf("error creating azure client: %v", err)
 	}
@@ -75,7 +85,7 @@ func (az *Cloud) getBlobClient(accountName, accountKey string) (*azs.BlobStorage
 // get uri https://foo.blob.core.windows.net/vhds/bar.vhd and return foo (account) and bar.vhd (blob name)
 func (az *Cloud) getBlobNameAndAccountFromURI(uri string) (string, string, error) {
 	scheme := "http"
-	if useHttps {
+	if useHTTPS {
 		scheme = "https"
 	}
 	host := fmt.Sprintf("%s://(.*).%s.%s", scheme, blobServiceName, az.Environment.StorageEndpointSuffix)

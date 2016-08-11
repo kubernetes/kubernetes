@@ -235,7 +235,7 @@ func (c Client) GetFileService() FileServiceClient {
 
 func (c Client) createAuthorizationHeader(canonicalizedString string) string {
 	signature := c.computeHmac256(canonicalizedString)
-	return fmt.Sprintf("%s %s:%s", "SharedKey", c.accountName, signature)
+	return fmt.Sprintf("%s %s:%s", "SharedKey", c.getCanonicalizedAccountName(), signature)
 }
 
 func (c Client) getAuthorizationHeader(verb, url string, headers map[string]string) (string, error) {
@@ -253,6 +253,12 @@ func (c Client) getStandardHeaders() map[string]string {
 		"x-ms-version": c.apiVersion,
 		"x-ms-date":    currentTimeRfc1123Formatted(),
 	}
+}
+
+func (c Client) getCanonicalizedAccountName() string {
+	// since we may be trying to access a secondary storage account, we need to
+	// remove the -secondary part of the storage name
+	return strings.TrimSuffix(c.accountName, "-secondary")
 }
 
 func (c Client) buildCanonicalizedHeader(headers map[string]string) string {
@@ -296,7 +302,7 @@ func (c Client) buildCanonicalizedResourceTable(uri string) (string, error) {
 		return "", fmt.Errorf(errMsg, err.Error())
 	}
 
-	cr := "/" + c.accountName
+	cr := "/" + c.getCanonicalizedAccountName()
 
 	if len(u.Path) > 0 {
 		cr += u.Path
@@ -312,7 +318,7 @@ func (c Client) buildCanonicalizedResource(uri string) (string, error) {
 		return "", fmt.Errorf(errMsg, err.Error())
 	}
 
-	cr := "/" + c.accountName
+	cr := "/" + c.getCanonicalizedAccountName()
 
 	if len(u.Path) > 0 {
 		// Any portion of the CanonicalizedResource string that is derived from

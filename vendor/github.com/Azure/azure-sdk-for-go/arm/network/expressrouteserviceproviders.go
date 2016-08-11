@@ -36,10 +36,16 @@ type ExpressRouteServiceProvidersClient struct {
 // NewExpressRouteServiceProvidersClient creates an instance of the
 // ExpressRouteServiceProvidersClient client.
 func NewExpressRouteServiceProvidersClient(subscriptionID string) ExpressRouteServiceProvidersClient {
-	return ExpressRouteServiceProvidersClient{New(subscriptionID)}
+	return NewExpressRouteServiceProvidersClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// List the List ExpressRouteServiceProvider opertion retrieves all the
+// NewExpressRouteServiceProvidersClientWithBaseURI creates an instance of the
+// ExpressRouteServiceProvidersClient client.
+func NewExpressRouteServiceProvidersClientWithBaseURI(baseURI string, subscriptionID string) ExpressRouteServiceProvidersClient {
+	return ExpressRouteServiceProvidersClient{NewWithBaseURI(baseURI, subscriptionID)}
+}
+
+// List the List ExpressRouteServiceProvider operation retrieves all the
 // available ExpressRouteServiceProviders.
 func (client ExpressRouteServiceProvidersClient) List() (result ExpressRouteServiceProviderListResult, err error) {
 	req, err := client.ListPreparer()

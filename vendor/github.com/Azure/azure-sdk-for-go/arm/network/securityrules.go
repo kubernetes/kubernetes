@@ -36,7 +36,13 @@ type SecurityRulesClient struct {
 // NewSecurityRulesClient creates an instance of the SecurityRulesClient
 // client.
 func NewSecurityRulesClient(subscriptionID string) SecurityRulesClient {
-	return SecurityRulesClient{New(subscriptionID)}
+	return NewSecurityRulesClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewSecurityRulesClientWithBaseURI creates an instance of the
+// SecurityRulesClient client.
+func NewSecurityRulesClientWithBaseURI(baseURI string, subscriptionID string) SecurityRulesClient {
+	return SecurityRulesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put network security rule operation creates/updates a
@@ -248,7 +254,7 @@ func (client SecurityRulesClient) GetResponder(resp *http.Response) (result Secu
 	return
 }
 
-// List the List network security rule opertion retrieves all the security
+// List the List network security rule operation retrieves all the security
 // rules in a network security group.
 //
 // resourceGroupName is the name of the resource group.

@@ -35,7 +35,13 @@ type RouteTablesClient struct {
 
 // NewRouteTablesClient creates an instance of the RouteTablesClient client.
 func NewRouteTablesClient(subscriptionID string) RouteTablesClient {
-	return RouteTablesClient{New(subscriptionID)}
+	return NewRouteTablesClientWithBaseURI(DefaultBaseURI, subscriptionID)
+}
+
+// NewRouteTablesClientWithBaseURI creates an instance of the
+// RouteTablesClient client.
+func NewRouteTablesClientWithBaseURI(baseURI string, subscriptionID string) RouteTablesClient {
+	return RouteTablesClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
 
 // CreateOrUpdate the Put RouteTable operation creates/updates a route tablein

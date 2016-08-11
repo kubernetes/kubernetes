@@ -333,10 +333,10 @@ const (
 	StandardGS5 VirtualMachineSizeTypes = "Standard_GS5"
 )
 
-// AdditionalUnattendContent is gets or sets additional XML formatted
-// information that can be included in the Unattend.xml file, which is used
-// by Windows Setup. Contents are defined by setting name, component name,
-// and the pass in which the content is a applied.
+// AdditionalUnattendContent is additional XML formatted information that can
+// be included in the Unattend.xml file, which is used by Windows Setup.
+// Contents are defined by setting name, component name, and the pass in
+// which the content is a applied.
 type AdditionalUnattendContent struct {
 	PassName      PassNames      `json:"passName,omitempty"`
 	ComponentName ComponentNames `json:"componentName,omitempty"`
@@ -487,7 +487,7 @@ type LinuxConfiguration struct {
 type ListUsagesResult struct {
 	autorest.Response `json:"-"`
 	Value             *[]Usage `json:"value,omitempty"`
-	NextLink          *string  `json:",omitempty"`
+	NextLink          *string  `json:"nextLink,omitempty"`
 }
 
 // ListUsagesResultPreparer prepares a request to retrieve the next set of results. It returns
@@ -910,7 +910,7 @@ type VirtualMachineScaleSetIPConfigurationProperties struct {
 type VirtualMachineScaleSetListResult struct {
 	autorest.Response `json:"-"`
 	Value             *[]VirtualMachineScaleSet `json:"value,omitempty"`
-	NextLink          *string                   `json:",omitempty"`
+	NextLink          *string                   `json:"nextLink,omitempty"`
 }
 
 // VirtualMachineScaleSetListResultPreparer prepares a request to retrieve the next set of results. It returns
@@ -930,7 +930,7 @@ func (client VirtualMachineScaleSetListResult) VirtualMachineScaleSetListResultP
 type VirtualMachineScaleSetListSkusResult struct {
 	autorest.Response `json:"-"`
 	Value             *[]VirtualMachineScaleSetSku `json:"value,omitempty"`
-	NextLink          *string                      `json:",omitempty"`
+	NextLink          *string                      `json:"nextLink,omitempty"`
 }
 
 // VirtualMachineScaleSetListSkusResultPreparer prepares a request to retrieve the next set of results. It returns
@@ -1095,7 +1095,7 @@ type VirtualMachineScaleSetVMInstanceView struct {
 type VirtualMachineScaleSetVMListResult struct {
 	autorest.Response `json:"-"`
 	Value             *[]VirtualMachineScaleSetVM `json:"value,omitempty"`
-	NextLink          *string                     `json:",omitempty"`
+	NextLink          *string                     `json:"nextLink,omitempty"`
 }
 
 // VirtualMachineScaleSetVMListResultPreparer prepares a request to retrieve the next set of results. It returns
