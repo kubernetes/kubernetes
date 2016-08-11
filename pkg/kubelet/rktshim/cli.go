@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 )
 
 var (
@@ -79,4 +81,72 @@ func getArgumentFormOfStruct(strt interface{}) (flags []string) {
 
 func getFlagFormOfStruct(strt interface{}) (flags []string) {
 	return getArgumentFormOfStruct(strt)
+}
+
+type CLIConfig struct {
+	Debug bool `flag:"debug"`
+
+	Dir             string `flag:"dir"`
+	LocalConfigDir  string `flag:"local-config"`
+	UserConfigDir   string `flag:"user-config"`
+	SystemConfigDir string `flag:"system-config"`
+
+	InsecureOptions string `flag:"insecure-options"`
+}
+
+func (cfg *CLIConfig) Merge(newCfg CLIConfig) {
+	newCfgVal := reflect.ValueOf(newCfg)
+	newCfgType := reflect.TypeOf(newCfg)
+
+	numberOfFields := newCfgVal.NumField()
+
+	for i := 0; i < numberOfFields; i++ {
+		fieldValue := newCfgVal.Field(i)
+		fieldType := newCfgType.Field(i)
+
+		if !fieldValue.IsValid() {
+			continue
+		}
+
+		newCfgVal.FieldByName(fieldType.Name).Set(fieldValue)
+	}
+}
+
+type CLI interface {
+	With(CLIConfig) CLI
+	RunCommand(string, ...string) ([]string, error)
+}
+
+type cli struct {
+	rktPath string
+	config  CLIConfig
+	execer  utilexec.Interface
+}
+
+func (c *cli) With(cfg CLIConfig) CLI {
+	copyCfg := c.config
+
+	copyCfg.Merge(cfg)
+
+	return NewRktCLI(c.rktPath, c.execer, copyCfg)
+}
+
+func (c *cli) RunCommand(subcmd string, args ...string) ([]string, error) {
+	globalFlags := getFlagFormOfStruct(c.config)
+
+	args = append(globalFlags, args...)
+
+	cmd := c.execer.Command(c.rktPath, append([]string{subcmd}, args...)...)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("failed to run %v: %v\noutput: %v", args, err, out)
+	}
+
+	return strings.Split(strings.TrimSpace(string(out)), "\n"), nil
+}
+
+// TODO(tmrts): implement CLI with timeout
+func NewRktCLI(rktPath string, exec utilexec.Interface, cfg CLIConfig) CLI {
+	return &cli{rktPath: rktPath, config: cfg, execer: exec}
 }
