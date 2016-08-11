@@ -1086,7 +1086,7 @@ function kube::release::gcs::verify_prereqs() {
   fi
 
   if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
-    GCLOUD_ACCOUNT=$(gcloud auth list 2>/dev/null | awk '/(active)/ { print $2 }')
+    GCLOUD_ACCOUNT=$(gcloud auth list 2>/dev/null | awk '/(active)|(ACTIVE)/ { print $2 }')
   fi
   if [[ -z "${GCLOUD_ACCOUNT-}" ]]; then
     echo "No account authorized through gcloud.  Please fix with:"
