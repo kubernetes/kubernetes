@@ -906,7 +906,7 @@ type KubeletConfig struct {
 	HairpinMode                string
 	BabysitDaemons             bool
 	Options                    []kubelet.Option
-	ProtectKernelDefaults 	   bool
+	ProtectKernelDefaults      bool
 	configIPTablesUtil         bool
 	iptablesMasqueradeBit      int
 	iptablesDropBit            int
