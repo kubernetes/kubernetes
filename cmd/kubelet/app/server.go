@@ -35,7 +35,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/syndtr/gocapability/capability"
 
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
@@ -300,9 +299,21 @@ func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
 	return err
 }
 
+func checkPermissions() error {
+	if uid := os.Getuid(); uid != 0 {
+		return fmt.Errorf("Kubelet needs to run as uid `0`. It is being run as %d", uid)
+	}
+	// TODO: Check if kubelet is running in the `initial` user namespace.
+	// http://man7.org/linux/man-pages/man7/user_namespaces.7.html
+	return nil
+}
+
 func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	if s.ExitOnLockContention && s.LockFilePath == "" {
 		return errors.New("cannot exit on lock file contention: no lock file specified")
+	}
+	if err := checkPermissions(); err != nil {
+		glog.Error(err)
 	}
 
 	done := make(chan struct{})
@@ -322,15 +333,6 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		c.Set(s.KubeletConfiguration)
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
-	}
-
-	// check if we have CAP_SYS_ADMIN to setgroup properly
-	pid, err := capability.NewPid(os.Getpid())
-	if err != nil {
-		return err
-	}
-	if !pid.Get(capability.EFFECTIVE, capability.CAP_SYS_ADMIN) {
-		return fmt.Errorf("Kubelet needs the CAP_SYS_ADMIN capability. Please run kubelet as root or in a privileged container")
 	}
 
 	if kcfg == nil {
