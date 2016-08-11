@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/metrics"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -97,6 +98,23 @@ func verifyRemainingObjects(f *framework.Framework, clientSet clientset.Interfac
 	return ret, nil
 }
 
+func gatherMetrics(f *framework.Framework) {
+	By("Gathering metrics")
+	var summary framework.TestDataSummary
+	grabber, err := metrics.NewMetricsGrabber(f.Client, false, false, true, false)
+	if err != nil {
+		framework.Logf("Failed to create MetricsGrabber. Skipping metrics gathering.")
+	} else {
+		received, err := grabber.Grab()
+		if err != nil {
+			framework.Logf("MetricsGrabber failed grab metrics. Skipping metrics gathering.")
+		} else {
+			summary = (*framework.MetricsForE2E)(&received)
+			framework.Logf(summary.PrintHumanReadable())
+		}
+	}
+}
+
 var _ = framework.KubeDescribe("Garbage collector", func() {
 	f := framework.NewDefaultFramework("gc")
 	It("[Feature:GarbageCollector] should delete pods created by rc when not orphaning", func() {
@@ -147,6 +165,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 				framework.Failf("remaining pods are: %#v", remainingPods)
 			}
 		}
+		gatherMetrics(f)
 	})
 
 	It("[Feature:GarbageCollector] should orphan pods created by rc", func() {
@@ -193,5 +212,6 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}); err != nil && err != wait.ErrWaitTimeout {
 			framework.Failf("%v", err)
 		}
+		gatherMetrics(f)
 	})
 })
