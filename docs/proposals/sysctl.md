@@ -337,7 +337,8 @@ Issues:
     * [x] **namespaced** in net ns
     * [ ] **might have application influence** for high values as it limits the socket queue length
     * [?] **No real evidence found until now for accounting**. The limit is checked by `sk_acceptq_is_full` at http://lxr.free-electrons.com/source/net/ipv4/tcp_ipv4.c#L1276. After that a new socket is created. Probably, the tcp socket buffer sysctls apply then, with their accounting, see below.
-  - `net.ipv4.tcp_wmem`/`net.ipv4.tcp_wmem`/`net.core.rmem_max`/`net.core.wmem_max`: socket buffer sizes
+    * [ ] **very unreliable** tcp memory accounting. There have a been a number of attemps to drop that from the kernel completely, e.g. https://lkml.org/lkml/2014/9/12/401. On Fedora 24 (4.6.3) tcp accounting did not work at all, on Ubuntu 16.06 (4.4) it kind of worked in the root-cg, but in containers only values copied from the root-cg appeared.
+e  - `net.ipv4.tcp_wmem`/`net.ipv4.tcp_wmem`/`net.core.rmem_max`/`net.core.wmem_max`: socket buffer sizes
     * [ ] **not namespaced in net ns**, and they are not even available under `/sys/net`
   - `net.ipv4.ip_local_port_range`: local tcp/udp port range
     * [x] **namespaced** in net ns
@@ -356,9 +357,9 @@ Issues:
 | kernel.msg*                  | ipc        | kmem memcg 3)   | - 3)          |
 | fs.mqueue.*                  | ipc        | kmem memcg      | -             |
 | kernel.sem                   | ipc        | kmem memcg      | -             |
-| net.core.somaxconn           | net        | kmem memcg? 4)  | kmem memcg? 6)|
-| net.*.tcp_wmem/rmem          | - 2)       | kmem memcg      | kmem memcg? 6)|
-| net.core.wmem/rmem_max       | - 2)       | ?               | ?             |
+| net.core.somaxconn           | net        | unreliable 4)   | unreliable 4) |
+| net.*.tcp_wmem/rmem          | - 2)       | unreliable 4)   | unreliable 4) |
+| net.core.wmem/rmem_max       | - 2)       | unreliable 4)   | unreliable 4) |
 | net.ipv4.ip_local_port_range | net        | not needed 5)   | not needed 5) |
 | net.ipv4.tcp_syncookies      | net        | not needed 5)   | not needed 5) |
 | net.ipv4.tcp_max_syn_backlog | - 2)       | ?               | ?             |
@@ -366,9 +367,9 @@ Issues:
 1. a pod memory cgroup is necessary to catch segments from a dying process.
 2. only available in root-ns, not even visible in a container
 3. compare https://github.com/sttts/kmem-ipc-msg-queues as a test-case
-4. b/c sockets are accounted for?
+4. in theory socket buffers should be accounted for by the kmem.tcp memcg counters. In practice this only worked very unreliably and not reproducibly, on some kernel not at all. kmem.tcp acconuting seems to be deprecated and on lkml patches has been posted to drop this broken feature.
 5. b/c no memory is involved, i.e. purely functional difference
-6. to be checked
+
 
 **Note**: for all sysctls marked as "kmem memcg" kernel memory accounting must be enabled in the container for proper isolation. This will not be the case for 1.4, but is planned for 1.5.
 
@@ -442,7 +443,6 @@ var whitelist = map[string]string{
        "kernel.shmmax":                "ipc",
        "kernel.shmmni":                "ipc",
        "kernel.shm_rmid_forced":       "ipc",
-       "net.core.somaxconn":           "net",
        "net.ipv4.ip_local_port_range": "net",
        "net.ipv4.tcp_syncookies":      "net",
 }
@@ -553,7 +553,7 @@ In a later implementation of a container runtime interface (compare https://gith
 
 ### Use in a pod
 
-Here is an example of a pod that has `net.core.somaxconn` set to `512`:
+Here is an example of a pod that has `net.ipv4.ip_local_port_range` set to `512`:
 
 ```yaml
 apiVersion: v1
@@ -570,8 +570,8 @@ spec:
     - containerPort: 80
   securityContext:
     sysctls:
-    - name: net.core.somaxconn
-      value: "512"
+    - name: net.ipv4.ip_local_port_range
+      value: "1024 65535"
 ```
 
 ### Allowing only certain sysctls
