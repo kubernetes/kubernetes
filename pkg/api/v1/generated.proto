@@ -171,6 +171,13 @@ message CinderVolumeSource {
   optional bool readOnly = 3;
 }
 
+// ClusterReference contains information to identify a cluster
+message ClusterReference {
+  // The name of the cluster
+  // Cannot be updated.
+  optional string clusterName = 1;
+}
+
 // Information about the condition of a component.
 message ComponentCondition {
   // Type of condition for a component.
@@ -1495,6 +1502,12 @@ message ObjectMeta {
   // from the list. If the deletionTimestamp of the object is non-nil, entries
   // in this list can only be removed.
   repeated string finalizers = 14;
+
+  // A referece to the cluster which the object belongs to.
+  // This is used to distinguish resources with same name and namespace in different clusters.
+  // An empty value means the object belongs to the local cluster (the one the client connects to).
+  // Cannot be updated.
+  optional ClusterReference cluser = 15;
 }
 
 // ObjectReference contains enough information to let you inspect or modify the referred object.
