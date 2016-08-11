@@ -324,6 +324,7 @@ kind: NetworkPolicy
 apiVersion: extensions/v1beta1
 metadata:
   name: allow-all
+  namespace: myns
 spec:
   podSelector:
   ingress:
