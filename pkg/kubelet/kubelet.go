@@ -2529,7 +2529,6 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			glog.Errorf("Update channel is closed. Exiting the sync loop.")
 			return false
 		}
-		kl.sourcesReady.AddSource(u.Source)
 
 		switch u.Op {
 		case kubetypes.ADD:
@@ -2552,6 +2551,14 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			// TODO: Do we want to support this?
 			glog.Errorf("Kubelet does not support snapshot update")
 		}
+
+		// Mark the source ready after receiving at least one update from the
+		// source. Once all the sources are marked ready, various cleanup
+		// routines will start reclaiming resources. It is important that this
+		// takes place only after kubelet calls the update handler to process
+		// the update to ensure the internal pod cache is up-to-date.
+		kl.sourcesReady.AddSource(u.Source)
+
 	case e := <-plegCh:
 		// PLEG event for a pod; sync it.
 		pod, ok := kl.podManager.GetPodByUID(e.ID)
