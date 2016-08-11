@@ -18,6 +18,7 @@
 # was already enforced by salt, and /etc/kubernetes/addons is the
 # managed result is of that. Start everything below that directory.
 KUBECTL=${KUBECTL_BIN:-/usr/local/bin/kubectl}
+KUBECTL_OPTS=${KUBECTL_OPTS:-}
 
 ADDON_CHECK_INTERVAL_SEC=${TEST_ADDON_CHECK_INTERVAL_SEC:-60}
 
@@ -49,7 +50,7 @@ function create-resource-from-string() {
   local -r config_name=$4;
   local -r namespace=$5;
   while [ ${tries} -gt 0 ]; do
-    echo "${config_string}" | ${KUBECTL} --namespace="${namespace}" apply -f - && \
+    echo "${config_string}" | ${KUBECTL} ${KUBECTL_OPTS} --namespace="${namespace}" apply -f - && \
         echo "== Successfully started ${config_name} in namespace ${namespace} at $(date -Is)" && \
         return 0;
     let tries=tries-1;
@@ -71,7 +72,7 @@ start_addon /opt/namespace.yaml 100 10 "" &
 token_found=""
 while [ -z "${token_found}" ]; do
   sleep .5
-  token_found=$(${KUBECTL} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}" || true)
+  token_found=$(${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}" || true)
 done
 
 echo "== default service account in the ${SYSTEM_NAMESPACE} namespace has token ${token_found} =="
