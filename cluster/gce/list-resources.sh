@@ -82,12 +82,12 @@ gcloud-compute-list disks ${ZONE:+"--zone=${ZONE}"} --regexp="${INSTANCE_PREFIX}
 
 # List network resources. We include names starting with "a", corresponding to
 # those that Kubernetes creates.
-gcloud-compute-list addresses ${REGION:+"--region=${REGION}"} --regexp="a.*|${INSTANCE_PREFIX}.*"
+gcloud-compute-list addresses ${REGION:+"--regions=${REGION}"} --regexp="a.*|${INSTANCE_PREFIX}.*"
 # Match either the header or a line with the specified e2e network.
 # This assumes that the network name is the second field in the output.
 GREP_REGEX="^NAME\|^[^ ]\+[ ]\+\(default\|${NETWORK}\) "
 gcloud-compute-list routes --regexp="default.*|${INSTANCE_PREFIX}.*"
 gcloud-compute-list firewall-rules --regexp="default.*|k8s-fw.*|${INSTANCE_PREFIX}.*"
 GREP_REGEX=""
-gcloud-compute-list forwarding-rules ${REGION:+"--region=${REGION}"}
-gcloud-compute-list target-pools ${REGION:+"--region=${REGION}"}
+gcloud-compute-list forwarding-rules ${REGION:+"--regions=${REGION}"}
+gcloud-compute-list target-pools ${REGION:+"--regions=${REGION}"}
