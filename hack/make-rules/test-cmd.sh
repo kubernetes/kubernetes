@@ -393,6 +393,8 @@ runTests() {
   rm "${RESTMAPPER_ERROR_FILE}"
   # Post-condition: None
 
+  kubectl get "${kube_flags[@]}" --raw /version
+
   ###########################
   # POD creation / deletion #
   ###########################
