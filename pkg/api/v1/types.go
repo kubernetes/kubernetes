@@ -2279,6 +2279,8 @@ type EndpointAddress struct {
 	IP string `json:"ip" protobuf:"bytes,1,opt,name=ip"`
 	// The Hostname of this endpoint
 	Hostname string `json:"hostname,omitempty" protobuf:"bytes,3,opt,name=hostname"`
+	// Optional: Node hosting this endpoint
+	NodeName string `json:"nodeName,omitempty" protobuf:"bytes,4,opt,name=nodeName"`
 	// Reference to object providing the endpoint.
 	TargetRef *ObjectReference `json:"targetRef,omitempty" protobuf:"bytes,2,opt,name=targetRef"`
 }
