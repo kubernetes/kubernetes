@@ -88,6 +88,7 @@ network_closure.sh
 
 # Juju Stuff
 /cluster/juju/charms/*
+/cluster/juju/bundles/local.yaml
 
 # Downloaded Kubernetes binary release
 /kubernetes/
