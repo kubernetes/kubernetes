@@ -112,8 +112,9 @@ const (
 type KubeletConfiguration struct {
 	unversioned.TypeMeta
 
-	// config is the path to the config file or directory of files
-	Config string `json:"config"`
+	// podManifestPath is the path to the directory containing pod manifests to
+	// run, or the path to a single manifest file
+	PodManifestPath string `json:"podManifestPath"`
 	// syncFrequency is the max period between synchronizing running
 	// containers and config
 	SyncFrequency unversioned.Duration `json:"syncFrequency"`

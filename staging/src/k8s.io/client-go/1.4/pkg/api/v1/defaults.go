@@ -23,8 +23,8 @@ import (
 	"k8s.io/client-go/1.4/pkg/util/parsers"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddDefaultingFuncs(
 		SetDefaults_PodExecOptions,
 		SetDefaults_PodAttachOptions,
 		SetDefaults_ReplicationController,

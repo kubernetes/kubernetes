@@ -24,10 +24,17 @@ import (
 	api "k8s.io/client-go/1.4/pkg/api"
 	policy "k8s.io/client-go/1.4/pkg/apis/policy"
 	conversion "k8s.io/client-go/1.4/pkg/conversion"
+	runtime "k8s.io/client-go/1.4/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget,
 		Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget,
 		Convert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList,
@@ -36,10 +43,7 @@ func init() {
 		Convert_policy_PodDisruptionBudgetSpec_To_v1alpha1_PodDisruptionBudgetSpec,
 		Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus,
 		Convert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodDisruptionBudget, out *policy.PodDisruptionBudget, s conversion.Scope) error {
