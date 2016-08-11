@@ -191,12 +191,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	thresholds = thresholdsMetGracePeriod(thresholdsFirstObservedAt, now)
 
 	// update internal state
-	m.Lock()
-	m.nodeConditions = nodeConditions
-	m.thresholdsFirstObservedAt = thresholdsFirstObservedAt
-	m.nodeConditionsLastObservedAt = nodeConditionsLastObservedAt
-	m.thresholdsMet = thresholds
-	m.Unlock()
+	m.updateInternalState(nodeConditions, thresholdsFirstObservedAt, nodeConditionsLastObservedAt, thresholds)
 
 	// determine the set of resources under starvation
 	starvedResources := getStarvedResources(thresholds)
@@ -268,6 +263,20 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 		return
 	}
 	glog.Infof("eviction manager: unable to evict any pods from the node")
+}
+
+// update manager internal state
+func (m *managerImpl) updateInternalState(nodeConditions []api.NodeConditionType,
+	thresholdsFirstObservedAt thresholdsObservedAt,
+	nodeConditionsLastObservedAt nodeConditionsObservedAt,
+	thresholds []Threshold) {
+	m.Lock()
+	defer m.Unlock()
+	m.nodeConditions = nodeConditions
+	m.thresholdsFirstObservedAt = thresholdsFirstObservedAt
+	m.nodeConditionsLastObservedAt = nodeConditionsLastObservedAt
+	m.thresholdsMet = thresholds
+
 }
 
 // reclaimNodeLevelResources attempts to reclaim node level resources.  returns true if thresholds were satisfied and no pod eviction is required.
