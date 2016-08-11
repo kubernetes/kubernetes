@@ -24,18 +24,18 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-// defaultCapabilities implements the CapabilitiesStrategy interface
+// defaultCapabilities implements the Strategy interface
 type defaultCapabilities struct {
 	defaultAddCapabilities   []api.Capability
 	requiredDropCapabilities []api.Capability
 	allowedCaps              []api.Capability
 }
 
-var _ CapabilitiesStrategy = &defaultCapabilities{}
+var _ Strategy = &defaultCapabilities{}
 
 // NewDefaultCapabilities creates a new defaultCapabilities strategy that will provide defaults and validation
 // based on the configured initial caps and allowed caps.
-func NewDefaultCapabilities(defaultAddCapabilities, requiredDropCapabilities, allowedCaps []api.Capability) (CapabilitiesStrategy, error) {
+func NewDefaultCapabilities(defaultAddCapabilities, requiredDropCapabilities, allowedCaps []api.Capability) (Strategy, error) {
 	return &defaultCapabilities{
 		defaultAddCapabilities:   defaultAddCapabilities,
 		requiredDropCapabilities: requiredDropCapabilities,
