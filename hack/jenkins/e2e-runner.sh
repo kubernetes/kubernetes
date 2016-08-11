@@ -21,8 +21,19 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+if [[ -z "${PROJECT:-}" ]]; then
+  echo "ERROR: unset PROJECT" >&2
+  exit 1
+fi
+
 # include shell2junit library
-source <(curl -fsS --retry 3 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/third_party/forked/shell2junit/sh2ju.sh')
+sh2ju="$(dirname "${0}")/sh2ju.sh"
+if [[ -f "${sh2ju}" ]]; then
+  source "${sh2ju}"
+else
+  echo "TODO(fejta): stop pulling sh2ju.sh"
+  source <(curl -fsS --retry 3 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/third_party/forked/shell2junit/sh2ju.sh')
+fi
 
 # Have cmd/e2e run by goe2e.sh generate JUnit report in ${WORKSPACE}/junit*.xml
 ARTIFACTS=${WORKSPACE}/_artifacts
@@ -347,7 +358,13 @@ cd kubernetes
 # Upload build start time and k8s version to GCS, but not on PR Jenkins.
 # On PR Jenkins this is done before the build.
 if [[ ! "${JOB_NAME}" =~ -pull- ]]; then
+  upload_to_gcs="$(dirname "${0}")/upload-to-gcs.sh"
+  if [[ -f "${upload_to_gcs}" ]]; then
+    JENKINS_BUILD_STARTED=true "${upload_to_gcs}"
+  else
+    echo "TODO(fejta): stop pulling upload-to-gcs.sh"
     JENKINS_BUILD_STARTED=true bash <(curl -fsS --retry 3 --keepalive-time 2 "https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/upload-to-gcs.sh")
+  fi
 fi
 
 # When run inside Docker, we need to make sure all files are world-readable
@@ -396,9 +413,12 @@ if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
   e2e_go_args+=("--kubemark=true")
 fi
 
-go run ./hack/e2e.go \
-  ${E2E_OPT:-} \
-  "${e2e_go_args[@]}"
+e2e_go="$(dirname "${0}")/e2e.go"
+if [[ ! -f "${e2e_go}" ]]; then
+  echo "TODO(fejta): stop using head version of e2e.go"
+  e2e_go="./hack/e2e.go"
+fi
+go run "${e2e_go}" ${E2E_OPT:-} "${e2e_go_args[@]}"
 
 if [[ "${E2E_PUBLISH_GREEN_VERSION:-}" == "true" ]]; then
   # Use plaintext version file packaged with kubernetes.tar.gz
