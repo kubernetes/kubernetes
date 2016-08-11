@@ -66,8 +66,9 @@ const (
 func newE2eService(nodeName string, cgroupsPerQOS bool, evictionHard string, context *SharedContext) *e2eService {
 	// Special log files that need to be collected for additional debugging.
 	var logFiles = map[string]logFileData{
-		"kern.log":   {[]string{"/var/log/kern.log"}, []string{"-k"}},
-		"docker.log": {[]string{"/var/log/docker.log", "/var/log/upstart/docker.log"}, []string{"-u", "docker"}},
+		"kern.log":       {[]string{"/var/log/kern.log"}, []string{"-k"}},
+		"docker.log":     {[]string{"/var/log/docker.log", "/var/log/upstart/docker.log"}, []string{"-u", "docker"}},
+		"cloud-init.log": {[]string{}, []string{"-u", "cloud*"}},
 	}
 
 	return &e2eService{
