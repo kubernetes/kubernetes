@@ -234,8 +234,8 @@ func (m *manager) removeWorker(podUID types.UID, containerName string, probeType
 
 // workerCount returns the total number of probe workers. For testing.
 func (m *manager) workerCount() int {
-	m.workerLock.Lock()
-	defer m.workerLock.Unlock()
+	m.workerLock.RLock()
+	defer m.workerLock.RUnlock()
 	return len(m.workers)
 }
 
