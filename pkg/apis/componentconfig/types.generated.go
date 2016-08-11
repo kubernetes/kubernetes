@@ -1311,17 +1311,17 @@ func (x *KubeletConfiguration) CodecEncodeSelf(e *codec1978.Encoder) {
 				_ = yym138
 				if false {
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.Config))
+					r.EncodeString(codecSelferC_UTF81234, string(x.PodManifestPath))
 				}
 			} else {
 				z.EncSendContainerState(codecSelfer_containerMapKey1234)
-				r.EncodeString(codecSelferC_UTF81234, string("config"))
+				r.EncodeString(codecSelferC_UTF81234, string("podManifestPath"))
 				z.EncSendContainerState(codecSelfer_containerMapValue1234)
 				yym139 := z.EncBinary()
 				_ = yym139
 				if false {
 				} else {
-					r.EncodeString(codecSelferC_UTF81234, string(x.Config))
+					r.EncodeString(codecSelferC_UTF81234, string(x.PodManifestPath))
 				}
 			}
 			if yyr130 || yy2arr130 {
@@ -3437,11 +3437,11 @@ func (x *KubeletConfiguration) codecDecodeSelfFromMap(l int, d *codec1978.Decode
 			} else {
 				x.APIVersion = string(r.DecodeString())
 			}
-		case "config":
+		case "podManifestPath":
 			if r.TryDecodeAsNil() {
-				x.Config = ""
+				x.PodManifestPath = ""
 			} else {
-				x.Config = string(r.DecodeString())
+				x.PodManifestPath = string(r.DecodeString())
 			}
 		case "syncFrequency":
 			if r.TryDecodeAsNil() {
@@ -4202,9 +4202,9 @@ func (x *KubeletConfiguration) codecDecodeSelfFromArray(l int, d *codec1978.Deco
 	}
 	z.DecSendContainerState(codecSelfer_containerArrayElem1234)
 	if r.TryDecodeAsNil() {
-		x.Config = ""
+		x.PodManifestPath = ""
 	} else {
-		x.Config = string(r.DecodeString())
+		x.PodManifestPath = string(r.DecodeString())
 	}
 	yyj561++
 	if yyhl561 {

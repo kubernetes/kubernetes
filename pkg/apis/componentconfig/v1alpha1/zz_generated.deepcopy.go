@@ -111,7 +111,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		in := in.(*KubeletConfiguration)
 		out := out.(*KubeletConfiguration)
 		out.TypeMeta = in.TypeMeta
-		out.Config = in.Config
+		out.PodManifestPath = in.PodManifestPath
 		out.SyncFrequency = in.SyncFrequency
 		out.FileCheckFrequency = in.FileCheckFrequency
 		out.HTTPCheckFrequency = in.HTTPCheckFrequency
