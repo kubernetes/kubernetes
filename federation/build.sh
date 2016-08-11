@@ -71,122 +71,122 @@ KUBE_VERSION="${KUBE_VERSION:-}"
 
 
 function cleanup {
-	rm -rf "${TMP_DIR}"
-	cd "${CUR_ROOT}"
+  rm -rf "${TMP_DIR}"
+  cd "${CUR_ROOT}"
 }
 trap cleanup EXIT
 
 function dirty_sha() {
-	local -r index="${KUBE_ROOT}/.git/index"
-	local -r objects_dir="${KUBE_ROOT}/.git/objects"
+  local -r index="${KUBE_ROOT}/.git/index"
+  local -r objects_dir="${KUBE_ROOT}/.git/objects"
 
-	local -r tmp_dir="${TMP_DIR}/.git"
-	local -r tmp_index="${tmp_dir}/index"
-	local -r tmp_objects_dir="${tmp_dir}/objects"
+  local -r tmp_dir="${TMP_DIR}/.git"
+  local -r tmp_index="${tmp_dir}/index"
+  local -r tmp_objects_dir="${tmp_dir}/objects"
 
-	mkdir -p "${tmp_objects_dir}"
-	cp "${index}" "${tmp_index}"
+  mkdir -p "${tmp_objects_dir}"
+  cp "${index}" "${tmp_index}"
 
-	local -r files=$(git ls-files -m -o -d --exclude-standard)
-	GIT_INDEX_FILE="${tmp_index}" git add ${files}
-	GIT_ALTERNATE_OBJECT_DIRECTORIES="${objects_dir}" GIT_OBJECT_DIRECTORY="${tmp_objects_dir}" GIT_INDEX_FILE="${tmp_index}" git write-tree
+  local -r files=$(git ls-files -m -o -d --exclude-standard)
+  GIT_INDEX_FILE="${tmp_index}" git add ${files}
+  GIT_ALTERNATE_OBJECT_DIRECTORIES="${objects_dir}" GIT_OBJECT_DIRECTORY="${tmp_objects_dir}" GIT_INDEX_FILE="${tmp_index}" git write-tree
 }
 
 function update_config() {
-	local -r q="${1:-}"
-	local -r cfile="${2:-}"
-	local -r bname="$(basename ${cfile})"
+  local -r q="${1:-}"
+  local -r cfile="${2:-}"
+  local -r bname="$(basename ${cfile})"
 
-	jq "${q}" "${cfile}" > "${TMP_DIR}/${bname}"
-	mv "${TMP_DIR}/${bname}" "${cfile}"
+  jq "${q}" "${cfile}" > "${TMP_DIR}/${bname}"
+  mv "${TMP_DIR}/${bname}" "${cfile}"
 }
 
 function build() {
-	kube::build::verify_prereqs
-	kube::build::build_image
-	kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube"
+  kube::build::verify_prereqs
+  kube::build::build_image
+  kube::build::run_build_command make WHAT="cmd/kubectl cmd/hyperkube"
 
-	# Recompute KUBE_VERSION because it might have changed after rebuild.
-	KUBE_VERSION="${KUBE_VERSION:-$(kube::release::semantic_image_tag_version)}"
+  # Recompute KUBE_VERSION because it might have changed after rebuild.
+  KUBE_VERSION="${KUBE_VERSION:-$(kube::release::semantic_image_tag_version)}"
 
-	# Also append the dirty tree SHA to keep the versions unique across
-	# builds.
-	if [[ "${KUBE_VERSION}" == *-dirty ]]; then
-		KUBE_VERSION+=".$(dirty_sha)"
-	fi
+  # Also append the dirty tree SHA to keep the versions unique across
+  # builds.
+  if [[ "${KUBE_VERSION}" == *-dirty ]]; then
+    KUBE_VERSION+=".$(dirty_sha)"
+  fi
 
-	BASEIMAGE="ubuntu:16.04" \
-		REGISTRY="${KUBE_REGISTRY}" \
-		VERSION="${KUBE_VERSION}" \
-		make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
+  BASEIMAGE="ubuntu:16.04" \
+    REGISTRY="${KUBE_REGISTRY}" \
+    VERSION="${KUBE_VERSION}" \
+    make -C "${KUBE_ROOT}/cluster/images/hyperkube" build
 }
 
 function push() {
-	kube::log::status "Pushing hyperkube image to the registry"
-	gcloud docker push "${KUBE_REGISTRY}/hyperkube-amd64:${KUBE_VERSION}"
+  kube::log::status "Pushing hyperkube image to the registry"
+  gcloud docker push "${KUBE_REGISTRY}/hyperkube-amd64:${KUBE_VERSION}"
 }
 
 function pull_installer() {
-	kube::log::status "Pulling installer images"
-	docker pull "${KUBE_ANYWHERE_FEDERATION_IMAGE}:${KUBE_ANYWHERE_FEDERATION_VERSION}"
-	docker pull "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}"
+  kube::log::status "Pulling installer images"
+  docker pull "${KUBE_ANYWHERE_FEDERATION_IMAGE}:${KUBE_ANYWHERE_FEDERATION_VERSION}"
+  docker pull "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}"
 }
 
 function ensure_files() {
-	kube::log::status "Ensure provider is supported..."
-	if [[ "${KUBERNETES_PROVIDER:-}" != "gce" ]]; then
-		echo "Supported providers: \"gce\""
-		exit 1
-	fi
+  kube::log::status "Ensure provider is supported..."
+  if [[ "${KUBERNETES_PROVIDER:-}" != "gce" ]]; then
+    echo "Supported providers: \"gce\""
+    exit 1
+  fi
 
-	kube::log::status "Ensure credential files exist..."
-	if [[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
-		echo "Please ensure Google credentials file \""${GOOGLE_APPLICATION_CREDENTIALS}"\" exists."
-		exit 1
-	fi
+  kube::log::status "Ensure credential files exist..."
+  if [[ ! -f "${GOOGLE_APPLICATION_CREDENTIALS}" ]]; then
+    echo "Please ensure Google credentials file \""${GOOGLE_APPLICATION_CREDENTIALS}"\" exists."
+    exit 1
+  fi
 
-	if [[ ! -f "${KUBE_CONFIG}" ]]; then
-		echo "Please ensure kubeconfig file \""${KUBE_CONFIG}"\" exists."
-		exit 1
-	fi
+  if [[ ! -f "${KUBE_CONFIG}" ]]; then
+    echo "Please ensure kubeconfig file \""${KUBE_CONFIG}"\" exists."
+    exit 1
+  fi
 }
 
 function kube_action() {
-	kube::log::status "${ACTION} clusters"
-	docker run \
-		--user="$(id -u):$(id -g)" \
-		-m 12G \
-		-v "${GOOGLE_APPLICATION_CREDENTIALS}:/.config/gcloud/application_default_credentials.json:ro" \
-		-v "${KUBE_CONFIG_DIR}:/.kube" \
-		-v "${FEDERATION_OUTPUT_ROOT}:/_output" \
-		"${KUBE_ANYWHERE_FEDERATION_IMAGE}:${KUBE_ANYWHERE_FEDERATION_VERSION}" \
-		"${ACTION}"
+  kube::log::status "${ACTION} clusters"
+  docker run \
+    --user="$(id -u):$(id -g)" \
+    -m 12G \
+    -v "${GOOGLE_APPLICATION_CREDENTIALS}:/.config/gcloud/application_default_credentials.json:ro" \
+    -v "${KUBE_CONFIG_DIR}:/.kube" \
+    -v "${FEDERATION_OUTPUT_ROOT}:/_output" \
+    "${KUBE_ANYWHERE_FEDERATION_IMAGE}:${KUBE_ANYWHERE_FEDERATION_VERSION}" \
+    "${ACTION}"
 }
 
 function federation_action() {
-	kube::log::status "${ACTION} federation components"
-	docker run \
-		-m 12G \
-		-v "${KUBE_CONFIG}:/root/.kube/config:ro" \
-		-v "${FEDERATION_OUTPUT_ROOT}:/_output" \
-		"${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}" \
-		"${ACTION}"
+  kube::log::status "${ACTION} federation components"
+  docker run \
+    -m 12G \
+    -v "${KUBE_CONFIG}:/root/.kube/config:ro" \
+    -v "${FEDERATION_OUTPUT_ROOT}:/_output" \
+    "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}" \
+    "${ACTION}"
 }
 
 function gen_or_update_config() {
-	mkdir -p "${FEDERATION_OUTPUT_ROOT}"
-	cp "federation/config.default.json" "${FEDERATION_OUTPUT_ROOT}/config.json"
+  mkdir -p "${FEDERATION_OUTPUT_ROOT}"
+  cp "federation/config.default.json" "${FEDERATION_OUTPUT_ROOT}/config.json"
 
-	update_config \
-		'[.[] | .phase1.gce.project |= "'"${KUBE_PROJECT}"'"]' \
+  update_config \
+    '[.[] | .phase1.gce.project |= "'"${KUBE_PROJECT}"'"]' \
         "${FEDERATION_OUTPUT_ROOT}/config.json"
 
-	# Not chaining for readability
-	update_config \
-		'[.[] | .phase2 = { docker_registry: "'"${KUBE_REGISTRY}"'", kubernetes_version: "'"${KUBE_VERSION}"'" } ]' \
-		"${FEDERATION_OUTPUT_ROOT}/config.json"
+  # Not chaining for readability
+  update_config \
+    '[.[] | .phase2 = { docker_registry: "'"${KUBE_REGISTRY}"'", kubernetes_version: "'"${KUBE_VERSION}"'" } ]' \
+    "${FEDERATION_OUTPUT_ROOT}/config.json"
 
-	cat <<EOF> "${FEDERATION_OUTPUT_ROOT}/values.yaml"
+  cat <<EOF> "${FEDERATION_OUTPUT_ROOT}/values.yaml"
 apiserverRegistry: "${KUBE_REGISTRY}"
 apiserverVersion: "${KUBE_VERSION}"
 controllerManagerRegistry: "${KUBE_REGISTRY}"
@@ -195,23 +195,23 @@ EOF
 }
 
 if [[ "${ACTION}" == "gen" || "${ACTION}" == "deploy" ]]; then
-	ensure_files
+  ensure_files
 
-	cd "${KUBE_ROOT}"
-	build
-	push
+  cd "${KUBE_ROOT}"
+  build
+  push
 
-	pull_installer
+  pull_installer
 
-	# Update config after build and push, but before turning up the clusters
-	# to ensure the config has the right image version tags.
-	gen_or_update_config
+  # Update config after build and push, but before turning up the clusters
+  # to ensure the config has the right image version tags.
+  gen_or_update_config
 
-	kube_action
-	federation_action
+  kube_action
+  federation_action
 else
-	federation_action
-	kube_action
+  federation_action
+  kube_action
 fi
 
 kube::log::status "Successfully completed!"
