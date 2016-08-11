@@ -24,12 +24,19 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	intstr "k8s.io/kubernetes/pkg/util/intstr"
 	reflect "reflect"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_APIVersion, InType: reflect.TypeOf(&APIVersion{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_CustomMetricCurrentStatus, InType: reflect.TypeOf(&CustomMetricCurrentStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_CustomMetricCurrentStatusList, InType: reflect.TypeOf(&CustomMetricCurrentStatusList{})},
@@ -86,10 +93,7 @@ func init() {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceData, InType: reflect.TypeOf(&ThirdPartyResourceData{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceDataList, InType: reflect.TypeOf(&ThirdPartyResourceDataList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_extensions_ThirdPartyResourceList, InType: reflect.TypeOf(&ThirdPartyResourceList{})},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func DeepCopy_extensions_APIVersion(in interface{}, out interface{}, c *conversion.Cloner) error {

@@ -24,10 +24,17 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	authentication "k8s.io/kubernetes/pkg/apis/authentication"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v1beta1_TokenReview_To_authentication_TokenReview,
 		Convert_authentication_TokenReview_To_v1beta1_TokenReview,
 		Convert_v1beta1_TokenReviewSpec_To_authentication_TokenReviewSpec,
@@ -36,10 +43,7 @@ func init() {
 		Convert_authentication_TokenReviewStatus_To_v1beta1_TokenReviewStatus,
 		Convert_v1beta1_UserInfo_To_authentication_UserInfo,
 		Convert_authentication_UserInfo_To_v1beta1_UserInfo,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v1beta1_TokenReview_To_authentication_TokenReview(in *TokenReview, out *authentication.TokenReview, s conversion.Scope) error {

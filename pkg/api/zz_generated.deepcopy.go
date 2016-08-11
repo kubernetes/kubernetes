@@ -31,7 +31,13 @@ import (
 )
 
 func init() {
-	if err := Scheme.AddGeneratedDeepCopyFuncs(
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_AWSElasticBlockStoreVolumeSource, InType: reflect.TypeOf(&AWSElasticBlockStoreVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Affinity, InType: reflect.TypeOf(&Affinity{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_AttachedVolume, InType: reflect.TypeOf(&AttachedVolume{})},
@@ -186,10 +192,7 @@ func init() {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_VolumeSource, InType: reflect.TypeOf(&VolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_VsphereVirtualDiskVolumeSource, InType: reflect.TypeOf(&VsphereVirtualDiskVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_WeightedPodAffinityTerm, InType: reflect.TypeOf(&WeightedPodAffinityTerm{})},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func DeepCopy_api_AWSElasticBlockStoreVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
