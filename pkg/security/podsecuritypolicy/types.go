@@ -58,5 +58,5 @@ type ProviderStrategies struct {
 	SELinuxStrategy           selinux.SELinuxStrategy
 	FSGroupStrategy           group.GroupStrategy
 	SupplementalGroupStrategy group.GroupStrategy
-	CapabilitiesStrategy      capabilities.CapabilitiesStrategy
+	CapabilitiesStrategy      capabilities.Strategy
 }

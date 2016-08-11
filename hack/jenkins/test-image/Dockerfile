@@ -44,6 +44,8 @@ RUN apt-get -o Acquire::Check-Valid-Until=false update && apt-get install -y \
 RUN curl -L "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz" |\
   tar -C /usr/bin -xvzf- --strip-components=3 usr/local/bin/docker
 
+RUN go get github.com/golang/lint/golint
+
 RUN mkdir -p /go/src/k8s.io/kubernetes \
 	&& ln -s /go/src/k8s.io/kubernetes /workspace/kubernetes
 
