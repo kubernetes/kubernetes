@@ -816,6 +816,7 @@ func DeepCopy_api_EndpointAddress(in interface{}, out interface{}, c *conversion
 		out := out.(*EndpointAddress)
 		out.IP = in.IP
 		out.Hostname = in.Hostname
+		out.NodeName = in.NodeName
 		if in.TargetRef != nil {
 			in, out := &in.TargetRef, &out.TargetRef
 			*out = new(ObjectReference)
