@@ -493,7 +493,7 @@ hack/update-generated-protobuf.sh
 
 The vast majority of objects will not need any consideration when converting
 to protobuf, but be aware that if you depend on a Golang type in the standard
-library there may be additional work requried, although in practice we typically
+library there may be additional work required, although in practice we typically
 use our own equivalents for JSON serialization. The `pkg/api/serialization_test.go`
 will verify that your protobuf serialization preserves all fields - be sure to
 run it several times to ensure there are no incompletely calculated fields.
@@ -752,7 +752,7 @@ The latter requires that all objects in the same API group as `Frobber` to be
 replicated in the new version, `v6alpha2`. This also requires user to use a new
 client which uses the other version. Therefore, this is not a preferred option.
 
-A releated issue is how a cluster manager can roll back from a new version
+A related issue is how a cluster manager can roll back from a new version
 with a new feature, that is already being used by users. See
 https://github.com/kubernetes/kubernetes/issues/4855.
 
