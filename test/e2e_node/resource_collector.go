@@ -53,6 +53,8 @@ const (
 	cadvisorPort      = 8090
 	// housekeeping interval of Cadvisor (second)
 	houseKeepingInterval = 1
+	// TODO(coufon): be consistent with perf_util.go version (not exposed)
+	currentTimeSeriesVersion = "v1"
 )
 
 var (
@@ -69,6 +71,8 @@ type ResourceCollector struct {
 	stopCh          chan struct{}
 }
 
+// NewResourceCollector creates a resource collector object which collects
+// resource usage periodically from Cadvisor
 func NewResourceCollector(interval time.Duration) *ResourceCollector {
 	buffers := make(map[string][]*framework.ContainerResourceUsage)
 	return &ResourceCollector{
@@ -77,8 +81,10 @@ func NewResourceCollector(interval time.Duration) *ResourceCollector {
 	}
 }
 
+// Start starts resource collector and connects to the standalone Cadvisor pod
+// then repeatedly runs collectStats.
 func (r *ResourceCollector) Start() {
-	// Get the cgroup containers for kubelet and docker
+	// Get the cgroup container names for kubelet and docker
 	kubeletContainer, err := getContainerNameForProcess(kubeletProcessName, "")
 	dockerContainer, err := getContainerNameForProcess(dockerProcessName, dockerPidFile)
 	if err == nil {
@@ -108,10 +114,12 @@ func (r *ResourceCollector) Start() {
 	go wait.Until(func() { r.collectStats(oldStatsMap) }, r.pollingInterval, r.stopCh)
 }
 
+// Stop stops resource collector collecting stats. It does not clear the buffer
 func (r *ResourceCollector) Stop() {
 	close(r.stopCh)
 }
 
+// Reset clears the stats buffer of resource collector.
 func (r *ResourceCollector) Reset() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
@@ -120,6 +128,7 @@ func (r *ResourceCollector) Reset() {
 	}
 }
 
+// GetCPUSummary gets CPU usage in percentile.
 func (r *ResourceCollector) GetCPUSummary() framework.ContainersCPUSummary {
 	result := make(framework.ContainersCPUSummary)
 	for key, name := range systemContainers {
@@ -129,6 +138,7 @@ func (r *ResourceCollector) GetCPUSummary() framework.ContainersCPUSummary {
 	return result
 }
 
+// LogLatest logs the latest resource usage.
 func (r *ResourceCollector) LogLatest() {
 	summary, err := r.GetLatest()
 	if err != nil {
@@ -137,6 +147,7 @@ func (r *ResourceCollector) LogLatest() {
 	framework.Logf("%s", formatResourceUsageStats(summary))
 }
 
+// collectStats collects resource usage from Cadvisor.
 func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.ContainerStats) {
 	for _, name := range systemContainers {
 		ret, err := r.client.Stats(name, r.request)
@@ -162,6 +173,7 @@ func (r *ResourceCollector) collectStats(oldStatsMap map[string]*cadvisorapiv2.C
 	}
 }
 
+// computeContainerResourceUsage computes resource usage based on new data sample.
 func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv2.ContainerStats) *framework.ContainerResourceUsage {
 	return &framework.ContainerResourceUsage{
 		Name:                    name,
@@ -174,6 +186,7 @@ func computeContainerResourceUsage(name string, oldStats, newStats *cadvisorapiv
 	}
 }
 
+// GetLatest gets the latest resource usage from stats buffer.
 func (r *ResourceCollector) GetLatest() (framework.ResourceUsagePerContainer, error) {
 	r.lock.RLock()
 	defer r.lock.RUnlock()
@@ -203,7 +216,13 @@ func (r *ResourceCollector) GetBasicCPUStats(containerName string) map[float64]f
 	r.lock.RLock()
 	defer r.lock.RUnlock()
 	result := make(map[float64]float64, len(percentiles))
-	usages := r.buffers[containerName]
+
+	// We must make a copy of array, otherwise the timeseries order is changed.
+	usages := make([]*framework.ContainerResourceUsage, 0)
+	for _, usage := range r.buffers[containerName] {
+		usages = append(usages, usage)
+	}
+
 	sort.Sort(resourceUsageByCPU(usages))
 	for _, q := range percentiles {
 		index := int(float64(len(usages))*q) - 1
@@ -274,6 +293,7 @@ func formatCPUSummary(summary framework.ContainersCPUSummary) string {
 	return strings.Join(summaryStrings, "\n")
 }
 
+// createCadvisorPod creates a standalone cadvisor pod for fine-grain resource monitoring.
 func createCadvisorPod(f *framework.Framework) {
 	f.PodClient().CreateSync(&api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -348,6 +368,7 @@ func createCadvisorPod(f *framework.Framework) {
 	})
 }
 
+// deleteBatchPod deletes a batch of pods (synchronous).
 func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
 	ns := f.Namespace.Name
 	var wg sync.WaitGroup
@@ -368,6 +389,7 @@ func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
 	return
 }
 
+// newTestPods creates a list of pods (specification) for test.
 func newTestPods(numPods int, imageName, podType string) []*api.Pod {
 	var pods []*api.Pod
 	for i := 0; i < numPods; i++ {
@@ -383,8 +405,7 @@ func newTestPods(numPods int, imageName, podType string) []*api.Pod {
 					Labels: labels,
 				},
 				Spec: api.PodSpec{
-					// ToDo: restart policy is always
-					// check whether pods restart at the end of tests
+					// Restart policy is always (default).
 					Containers: []api.Container{
 						{
 							Image: imageName,
@@ -397,7 +418,51 @@ func newTestPods(numPods int, imageName, podType string) []*api.Pod {
 	return pods
 }
 
-// code for getting container name of docker
+// Time series of resource usage
+type ResourceSeries struct {
+	Timestamp            []int64           `json:"ts"`
+	CPUUsageInMilliCores []int64           `json:"cpu"`
+	MemoryRSSInMegaBytes []int64           `json:"memory"`
+	Units                map[string]string `json:"unit"`
+}
+
+// Time series of resource usage per container
+type ResourceSeriesPerContainer struct {
+	Data    map[string]*ResourceSeries `json:"data"`
+	Labels  map[string]string          `json:"labels"`
+	Version string                     `json:"version"`
+}
+
+// GetResourceSeriesWithLabels gets the time series of resource usage of each container.
+// TODO(coufon): the labels are to be re-defined based on benchmark dashboard.
+func (r *ResourceCollector) GetResourceSeriesWithLabels(labels map[string]string) *ResourceSeriesPerContainer {
+	seriesPerContainer := &ResourceSeriesPerContainer{
+		Data: map[string]*ResourceSeries{},
+		Labels: map[string]string{
+			"node": framework.TestContext.NodeName,
+		},
+		Version: currentTimeSeriesVersion,
+	}
+	for key, name := range systemContainers {
+		newSeries := &ResourceSeries{Units: map[string]string{
+			"cpu":    "mCPU",
+			"memory": "MB",
+		}}
+		seriesPerContainer.Data[key] = newSeries
+		for _, usage := range r.buffers[name] {
+			newSeries.Timestamp = append(newSeries.Timestamp, usage.Timestamp.UnixNano())
+			newSeries.CPUUsageInMilliCores = append(newSeries.CPUUsageInMilliCores, int64(usage.CPUUsageInCores*1000))
+			newSeries.MemoryRSSInMegaBytes = append(newSeries.MemoryRSSInMegaBytes, int64(float64(usage.MemoryUsageInBytes)/(1024*1024)))
+		}
+	}
+	for k, v := range labels {
+		seriesPerContainer.Labels[k] = v
+	}
+	return seriesPerContainer
+}
+
+// Zhou: code for getting container name of docker, copied from pkg/kubelet/cm/container_manager_linux.go
+// since they are not exposed
 const (
 	kubeletProcessName    = "kubelet"
 	dockerProcessName     = "docker"
