@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,30 +26,53 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/cache"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 )
 
+type podEventType int
+
+const (
+	podAdd podEventType = iota
+	podModify
+	podDelete
+)
+
 type sourceFile struct {
 	path     string
 	nodeName string
+	store    cache.Store
 	updates  chan<- interface{}
 }
 
 func NewSourceFile(path string, nodeName string, period time.Duration, updates chan<- interface{}) {
-	config := &sourceFile{
+	config := new(path, nodeName, period, updates)
+	glog.V(1).Infof("Watching path %q", path)
+	go wait.Forever(config.run, period)
+}
+
+func new(path string, nodeName string, period time.Duration, updates chan<- interface{}) *sourceFile {
+	send := func(objs []interface{}) {
+		var pods []*api.Pod
+		for _, o := range objs {
+			pods = append(pods, o.(*api.Pod))
+		}
+		updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
+	}
+	store := cache.NewUndeltaStore(send, cache.MetaNamespaceKeyFunc)
+	return &sourceFile{
 		path:     path,
 		nodeName: nodeName,
+		store:    store,
 		updates:  updates,
 	}
-	glog.V(1).Infof("Watching path %q", path)
-	go wait.Until(config.run, period, wait.NeverStop)
 }
 
 func (s *sourceFile) run() {
-	if err := s.extractFromPath(); err != nil {
+	if err := s.watch(); err != nil {
 		glog.Errorf("Unable to read config path %q: %v", s.path, err)
 	}
 }
@@ -58,7 +81,7 @@ func (s *sourceFile) applyDefaults(pod *api.Pod, source string) error {
 	return applyDefaults(pod, source, true, s.nodeName)
 }
 
-func (s *sourceFile) extractFromPath() error {
+func (s *sourceFile) resetStoreFromPath() error {
 	path := s.path
 	statInfo, err := os.Stat(path)
 	if err != nil {
@@ -76,20 +99,23 @@ func (s *sourceFile) extractFromPath() error {
 		if err != nil {
 			return err
 		}
-		s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
+		if len(pods) == 0 {
+			// Emit an update with an empty PodList to allow FileSource to be marked as seen
+			s.updates <- kubetypes.PodUpdate{Pods: pods, Op: kubetypes.SET, Source: kubetypes.FileSource}
+			return nil
+		}
+		return s.replaceStore(pods...)
 
 	case statInfo.Mode().IsRegular():
 		pod, err := s.extractFromFile(path)
 		if err != nil {
 			return err
 		}
-		s.updates <- kubetypes.PodUpdate{Pods: []*api.Pod{pod}, Op: kubetypes.SET, Source: kubetypes.FileSource}
+		return s.replaceStore(pod)
 
 	default:
 		return fmt.Errorf("path is not a directory or file")
 	}
-
-	return nil
 }
 
 // Get as many pod configs as we can from a directory. Return an error if and only if something
@@ -158,4 +184,12 @@ func (s *sourceFile) extractFromFile(filename string) (pod *api.Pod, err error) 
 
 	return pod, fmt.Errorf("%v: read '%v', but couldn't parse as pod(%v).\n",
 		filename, string(data), podErr)
+}
+
+func (s *sourceFile) replaceStore(pods ...*api.Pod) (err error) {
+	objs := []interface{}{}
+	for _, pod := range pods {
+		objs = append(objs, pod)
+	}
+	return s.store.Replace(objs, "")
 }
