@@ -942,7 +942,6 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${salt_dir}/kube-registry-proxy/kube-registry-proxy.yaml" "${release_stage}/"
   cp "${salt_dir}/kube-proxy/kube-proxy.manifest" "${release_stage}/"
   cp "${salt_dir}/etcd/etcd.manifest" "${dst_dir}"
-  cp "${salt_dir}/calico/calico-policy-controller.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-scheduler/kube-scheduler.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-apiserver/kube-apiserver.manifest" "${dst_dir}"
   cp "${salt_dir}/kube-apiserver/abac-authz-policy.jsonl" "${dst_dir}"

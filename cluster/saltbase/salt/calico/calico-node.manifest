@@ -13,7 +13,7 @@ spec:
       image: quay.io/calico/node:v0.20.0
       env:
         - name: ETCD_ENDPOINTS
-          value: "http://{{ grains.api_servers }}:6666"
+          value: "http://10.0.0.17:6666"
         - name: CALICO_NETWORKING
           value: "false"
       resources:

@@ -520,21 +520,10 @@ function start-etcd-servers {
     rm -f /etc/init.d/etcd
   fi
   prepare-log-file /var/log/etcd.log
-  prepare-etcd-manifest "" "4001" "2380" "150m" "etcd.manifest"
+  prepare-etcd-manifest "" "4001" "2380" "200m" "etcd.manifest"
 
   prepare-log-file /var/log/etcd-events.log
-  prepare-etcd-manifest "-events" "4002" "2381" "50m" "etcd-events.manifest"
-}
-
-# Starts Calico policy controller pod.
-# Specifically, replaces the variable values in the manifest, and copies it to
-# /etc/kubernetes/manifests.
-function start-calico-policy-controller {
-  local -r temp_file="/tmp/calico-policy-controller.manifest"
-  cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/calico-policy-controller.manifest" "${temp_file}"
-  PUBLIC_IP=$(ifconfig eth0 | grep 'inet ' | awk '{print $2}')
-  sed -i -e "s@{{ *grains\.id *}}@$PUBLIC_IP@g" "${temp_file}"
-  mv "${temp_file}" /etc/kubernetes/manifests
+  prepare-etcd-manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
 }
 
 # Calculates the following variables based on env variables, which will be used
@@ -889,6 +878,9 @@ function start-kube-addons {
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range"
   fi
+  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
+    setup-addon-manifests "addons" "calico-policy-controller"
+  fi
 
   # Place addon manager pod manifest.
   cp "${src_dir}/kube-addon-manager.yaml" /etc/kubernetes/manifests
@@ -992,9 +984,6 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-kube-addons
   start-cluster-autoscaler
   start-lb-controller
-  if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
-    start-calico-policy-controller
-  fi
 else
   start-kube-proxy
   # Kube-registry-proxy.
