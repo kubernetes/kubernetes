@@ -167,7 +167,8 @@ func RegisterNodeFlags() {
 	// TODO(random-liu): Remove kubelet related flags when we move the kubelet start logic out of the test.
 	// TODO(random-liu): Find someway to get kubelet configuration, and automatic config and filter test based on the configuration.
 	flag.BoolVar(&TestContext.DisableKubenet, "disable-kubenet", false, "If true, start kubelet without kubenet. (default false)")
-	flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
+	// TODO: uncomment this when the flag is re-enabled in kubelet
+	//flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
 	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
 }
