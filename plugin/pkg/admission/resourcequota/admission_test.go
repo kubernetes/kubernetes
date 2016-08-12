@@ -73,6 +73,15 @@ func validPod(name string, numContainers int, resources api.ResourceRequirements
 	return pod
 }
 
+func validPersistentVolumeClaim(name string, resources api.ResourceRequirements) *api.PersistentVolumeClaim {
+	return &api.PersistentVolumeClaim{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: "test"},
+		Spec: api.PersistentVolumeClaimSpec{
+			Resources: resources,
+		},
+	}
+}
+
 func TestPrettyPrint(t *testing.T) {
 	toResourceList := func(resources map[api.ResourceName]string) api.ResourceList {
 		resourceList := api.ResourceList{}
@@ -869,5 +878,51 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	}
 	if newPod.Namespace != namespace {
 		t.Errorf("Got unexpected pod namespace: %q != %q", newPod.Namespace, namespace)
+	}
+}
+
+// TestAdmitRejectsNegativeUsage verifies that usage for any measured resource cannot be negative.
+func TestAdmitRejectsNegativeUsage(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("3"),
+				api.ResourceRequestsStorage:        resource.MustParse("100Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourcePersistentVolumeClaims: resource.MustParse("1"),
+				api.ResourceRequestsStorage:        resource.MustParse("10Gi"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
+
+	defer utilruntime.HandleCrash()
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota)
+	// verify quota rejects negative pvc storage requests
+	newPvc := validPersistentVolumeClaim("not-allowed-pvc", getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("-1Gi")}, api.ResourceList{}))
+	err := handler.Admit(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, nil))
+	if err == nil {
+		t.Errorf("Expected an error because the pvc has negative storage usage")
+	}
+
+	// verify quota accepts non-negative pvc storage requests
+	newPvc = validPersistentVolumeClaim("not-allowed-pvc", getResourceRequirements(api.ResourceList{api.ResourceStorage: resource.MustParse("1Gi")}, api.ResourceList{}))
+	err = handler.Admit(admission.NewAttributesRecord(newPvc, nil, api.Kind("PersistentVolumeClaim").WithVersion("version"), newPvc.Namespace, newPvc.Name, api.Resource("persistentvolumeclaims").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
