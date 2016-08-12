@@ -18,6 +18,7 @@ package scheduledjob
 
 import (
 	//"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -72,12 +73,12 @@ func TestGetJobFromTemplate(t *testing.T) {
 	}
 
 	var job *batch.Job
-	job, err := getJobFromTemplate(&sj)
+	job, err := getJobFromTemplate(&sj, time.Time{})
 	if err != nil {
 		t.Errorf("Did not expect error: %s", err)
 	}
-	if job.ObjectMeta.GenerateName != "myscheduledjob-" {
-		t.Errorf("Wrong GenerateName")
+	if !strings.HasPrefix(job.ObjectMeta.Name, "myscheduledjob-") {
+		t.Errorf("Wrong Name")
 	}
 	if len(job.ObjectMeta.Labels) != 1 {
 		t.Errorf("Wrong number of labels")
