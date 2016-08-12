@@ -94,7 +94,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"Event",
-		labels.Set(fset),
+		fset,
 		nil,
 	)
 }

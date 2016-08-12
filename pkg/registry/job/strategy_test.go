@@ -25,7 +25,6 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
 )
 
@@ -226,7 +225,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Extensions.GroupVersion().String(),
 		"Job",
-		labels.Set(JobToSelectableFields(&batch.Job{})),
+		JobToSelectableFields(&batch.Job{}),
 		nil,
 	)
 }

@@ -17,6 +17,8 @@ limitations under the License.
 package rest
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fields"
@@ -60,7 +62,17 @@ func NewREST(config *storagebackend.Config, storageDecorator generic.StorageDeco
 		},
 		// Used to match objects based on labels/fields for list.
 		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return generic.MatcherFunc(nil)
+			return &generic.SelectionPredicate{
+				Label: label,
+				Field: field,
+				GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+					testType, ok := obj.(*testgroup.TestType)
+					if !ok {
+						return nil, nil, fmt.Errorf("unexpected type of given object")
+					}
+					return labels.Set(testType.ObjectMeta.Labels), fields.Set{}, nil
+				},
+			}
 		},
 		Storage: storageInterface,
 	}
