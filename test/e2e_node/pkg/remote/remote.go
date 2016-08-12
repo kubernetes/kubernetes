@@ -30,7 +30,7 @@ import (
 
 	"github.com/golang/glog"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
-	"k8s.io/kubernetes/test/e2e_node"
+	"k8s.io/kubernetes/test/e2e_node/pkg/build"
 )
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
@@ -83,10 +83,10 @@ func GetHostnameOrIp(hostname string) string {
 // the binaries k8s required for node e2e tests
 func CreateTestArchive() (string, error) {
 	// Build the executables
-	e2e_node.BuildGo()
+	build.BuildGo()
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := e2e_node.GetK8sBuildOutputDir()
+	buildOutputDir, err := build.GetK8sBuildOutputDir()
 	if err != nil {
 		glog.Fatalf("Failed to locate kubernetes build output directory %v", err)
 	}
@@ -207,7 +207,7 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	// Run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
-		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --build-services=false --stop-services=%t --node-name=%s --report-dir=%s/results --report-prefix=%s %s", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFilePrefix, testArgs),
+		fmt.Sprintf("timeout -k 30s %ds ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --stop-services=%t --node-name=%s --report-dir=%s/results --report-prefix=%s %s", *testTimeoutSeconds, *ginkgoFlags, cleanup, host, tmp, junitFilePrefix, testArgs),
 	)
 	aggErrs := []error{}
 
