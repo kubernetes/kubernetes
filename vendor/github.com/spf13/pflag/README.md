@@ -85,7 +85,7 @@ fmt.Println("flagvar has value ", flagvar)
 ```
 
 There are helpers function to get values later if you have the FlagSet but
-it was difficult to keep up with all of the the flag pointers in your code.
+it was difficult to keep up with all of the flag pointers in your code.
 If you have a pflag.FlagSet with a flag called 'flagname' of type int you
 can use GetInt() to get the int value. But notice that 'flagname' must exist
 and it must be an int. GetString("flagname") will fail.
@@ -242,6 +242,25 @@ It is possible to mark a flag as hidden, meaning it will still function as norma
 ```go
 // hide a flag by specifying its name
 flags.MarkHidden("secretFlag")
+```
+
+## Supporting Go flags when using pflag
+In order to support flags defined using Go's `flag` package, they must be added to the `pflag` flagset. This is usually necessary
+to support flags defined by third-party dependencies (e.g. `golang/glog`).
+
+**Example**: You want to add the Go flags to the `CommandLine` flagset
+```go
+import (
+	goflag "flag"
+	flag "github.com/spf13/pflag"
+)
+
+var ip *int = flag.Int("flagname", 1234, "help message for flagname")
+
+func main() {
+	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
+	flag.Parse()
+}
 ```
 
 ## More info
