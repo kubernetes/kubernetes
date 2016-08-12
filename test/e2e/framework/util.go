@@ -38,9 +38,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset"
-	unversionedfederation "k8s.io/kubernetes/federation/client/clientset_generated/federation_internalclientset/typed/federation/unversioned"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_3"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
@@ -875,7 +872,7 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 
 // WaitForFederationApiserverReady waits for the federation apiserver to be ready.
 // It tests the readiness by sending a GET request and expecting a non error response.
-func WaitForFederationApiserverReady(c *federation_internalclientset.Clientset) error {
+func WaitForFederationApiserverReady(c *federation_release_1_4.Clientset) error {
 	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
 		_, err := c.Federation().Clusters().List(api.ListOptions{})
 		if err != nil {
@@ -1757,36 +1754,6 @@ func setTimeouts(cs ...*http.Client) {
 	}
 }
 
-func LoadFederationClientset() (*federation_internalclientset.Clientset, error) {
-	config, err := LoadFederatedConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := federation_internalclientset.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
-	}
-	// Set timeout for each client in the set.
-	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
-	return c, nil
-}
-
-func LoadFederationClientset_1_3() (*federation_release_1_3.Clientset, error) {
-	config, err := LoadFederatedConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := federation_release_1_3.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
-	}
-	// Set timeout for each client in the set.
-	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
-	return c, nil
-}
-
 func LoadFederationClientset_1_4() (*federation_release_1_4.Clientset, error) {
 	config, err := LoadFederatedConfig()
 	if err != nil {
@@ -1800,25 +1767,6 @@ func LoadFederationClientset_1_4() (*federation_release_1_4.Clientset, error) {
 	// Set timeout for each client in the set.
 	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
 	return c, nil
-}
-
-func loadFederationClientFromConfig(config *restclient.Config) (*unversionedfederation.FederationClient, error) {
-	c, err := unversionedfederation.NewForConfig(config)
-	if err != nil {
-		return nil, fmt.Errorf("error creating client: %v", err.Error())
-	}
-	if c.Client.Timeout == 0 {
-		c.Client.Timeout = SingleCallTimeout
-	}
-	return c, nil
-}
-
-func LoadFederationClient() (*unversionedfederation.FederationClient, error) {
-	config, err := LoadFederatedConfig()
-	if err != nil {
-		return nil, err
-	}
-	return loadFederationClientFromConfig(config)
 }
 
 func LoadClient() (*client.Client, error) {
