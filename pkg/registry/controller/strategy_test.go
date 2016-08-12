@@ -22,7 +22,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestControllerStrategy(t *testing.T) {
@@ -146,7 +145,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"ReplicationController",
-		labels.Set(ControllerToSelectableFields(&api.ReplicationController{})),
+		ControllerToSelectableFields(&api.ReplicationController{}),
 		nil,
 	)
 }

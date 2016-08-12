@@ -115,50 +115,7 @@ type Matcher interface {
 	MatcherIndex() []storage.MatchValue
 }
 
-// MatcherFunc makes a matcher from the provided function. For easy definition
-// of matchers for testing. Note: use SelectionPredicate above for real code!
-func MatcherFunc(f func(obj runtime.Object) (bool, error)) Matcher {
-	return matcherFunc(f)
-}
-
-type matcherFunc func(obj runtime.Object) (bool, error)
-
-// Matches calls the embedded function.
-func (m matcherFunc) Matches(obj runtime.Object) (bool, error) {
-	return m(obj)
-}
-
-// MatchesSingle always returns "", false-- because this is a predicate
-// implementation of Matcher.
-func (m matcherFunc) MatchesSingle() (string, bool) {
-	return "", false
-}
-
-// MatcherIndex always returns empty list.
-func (m matcherFunc) MatcherIndex() []storage.MatchValue {
-	return nil
-}
-
-// MatchOnKey returns a matcher that will send only the object matching key
-// through the matching function f. For testing!
-// Note: use SelectionPredicate above for real code!
-func MatchOnKey(key string, f func(obj runtime.Object) (bool, error)) Matcher {
-	return matchKey{key, f}
-}
-
-type matchKey struct {
-	key string
-	matcherFunc
-}
-
-// MatchesSingle always returns its key, true.
-func (m matchKey) MatchesSingle() (string, bool) {
-	return m.key, true
-}
-
 var (
 	// Assert implementations match the interface.
-	_ = Matcher(matchKey{})
 	_ = Matcher(&SelectionPredicate{})
-	_ = Matcher(matcherFunc(nil))
 )

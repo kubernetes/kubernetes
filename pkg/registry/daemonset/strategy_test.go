@@ -23,14 +23,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/labels"
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Extensions.GroupVersion().String(),
 		"DaemonSet",
-		labels.Set(DaemonSetToSelectableFields(&extensions.DaemonSet{})),
+		DaemonSetToSelectableFields(&extensions.DaemonSet{}),
 		nil,
 	)
 }

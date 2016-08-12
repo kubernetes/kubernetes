@@ -157,7 +157,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Federation.GroupVersion().String(),
 		"Cluster",
-		labels.Set(ClusterToSelectableFields(&federation.Cluster{})),
+		ClusterToSelectableFields(&federation.Cluster{}),
 		nil,
 	)
 }
