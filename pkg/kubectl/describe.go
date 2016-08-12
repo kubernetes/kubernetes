@@ -542,6 +542,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 		}
 		describeVolumes(pod.Spec.Volumes, out, "")
 		fmt.Fprintf(out, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
+		printTolerationsInAnnotationMultiline(out, "Tolerations", pod.Annotations)
 		if events != nil {
 			DescribeEvents(events, out)
 		}
@@ -2469,6 +2470,52 @@ func printTaintsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 					fmt.Fprint(out, innerIndent)
 				}
 				fmt.Fprintf(out, "%s=%s:%s\n", taint.Key, taint.Value, taint.Effect)
+				i++
+			}
+		}
+	}
+}
+
+// printTolerationsMultiline prints multiple tolerations with a proper alignment.
+func printTolerationsInAnnotationMultiline(out io.Writer, title string, annotations map[string]string) {
+	tolerations, err := api.GetTolerationsFromPodAnnotations(annotations)
+	if err != nil {
+		tolerations = []api.Toleration{}
+	}
+	printTolerationsMultilineWithIndent(out, "", title, "\t", tolerations)
+}
+
+// printTolerationsMultilineWithIndent prints multiple tolerations with a user-defined alignment.
+func printTolerationsMultilineWithIndent(out io.Writer, initialIndent, title, innerIndent string, tolerations []api.Toleration) {
+	fmt.Fprintf(out, "%s%s:%s", initialIndent, title, innerIndent)
+
+	if tolerations == nil || len(tolerations) == 0 {
+		fmt.Fprintln(out, "<none>")
+		return
+	}
+
+	// to print tolerations in the sorted order
+	keys := make([]string, 0, len(tolerations))
+	for _, toleration := range tolerations {
+		keys = append(keys, toleration.Key)
+	}
+	sort.Strings(keys)
+
+	for i, key := range keys {
+		for _, toleration := range tolerations {
+			if toleration.Key == key {
+				if i != 0 {
+					fmt.Fprint(out, initialIndent)
+					fmt.Fprint(out, innerIndent)
+				}
+				fmt.Fprintf(out, "%s=%s", toleration.Key, toleration.Value)
+				if len(toleration.Operator) != 0 {
+					fmt.Fprintf(out, ":%s", toleration.Operator)
+				}
+				if len(toleration.Effect) != 0 {
+					fmt.Fprintf(out, ":%s", toleration.Effect)
+				}
+				fmt.Fprintf(out, "\n")
 				i++
 			}
 		}
