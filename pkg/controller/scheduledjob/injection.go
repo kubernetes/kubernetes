@@ -20,8 +20,8 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/apis/batch"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 )
 
@@ -33,7 +33,7 @@ type sjControlInterface interface {
 
 // realSJControl is the default implementation of sjControlInterface.
 type realSJControl struct {
-	KubeClient *client.Client
+	KubeClient clientset.Interface
 }
 
 var _ sjControlInterface = &realSJControl{}
@@ -69,7 +69,7 @@ type jobControlInterface interface {
 
 // realJobControl is the default implementation of jobControlInterface.
 type realJobControl struct {
-	KubeClient *client.Client
+	KubeClient clientset.Interface
 	Recorder   record.EventRecorder
 }
 
