@@ -48,9 +48,11 @@ type cniNetworkPlugin struct {
 	sync.RWMutex
 	defaultNetwork *cniNetwork
 
-	host        network.Host
-	execer      utilexec.Interface
-	nsenterPath string
+	host               network.Host
+	execer             utilexec.Interface
+	nsenterPath        string
+	pluginDir          string
+	vendorCNIDirPrefix string
 }
 
 type cniNetwork struct {
@@ -61,17 +63,15 @@ type cniNetwork struct {
 
 func probeNetworkPluginsWithVendorCNIDirPrefix(pluginDir, vendorCNIDirPrefix string) []network.NetworkPlugin {
 	plugin := &cniNetworkPlugin{
-		defaultNetwork: nil,
-		loNetwork:      getLoNetwork(vendorCNIDirPrefix),
-		execer:         utilexec.New(),
+		defaultNetwork:     nil,
+		loNetwork:          getLoNetwork(vendorCNIDirPrefix),
+		execer:             utilexec.New(),
+		pluginDir:          pluginDir,
+		vendorCNIDirPrefix: vendorCNIDirPrefix,
 	}
 
-	plugin.syncNetworkConfig(pluginDir, vendorCNIDirPrefix)
-	// sync network config from pluginDir periodically to detect network config updates
-	go wait.Forever(func() {
-		plugin.syncNetworkConfig(pluginDir, vendorCNIDirPrefix)
-	}, 10*time.Second)
-
+	// sync NetworkConfig in best effort during probing.
+	plugin.syncNetworkConfig()
 	return []network.NetworkPlugin{plugin}
 }
 
@@ -144,11 +144,16 @@ func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode componentcon
 	}
 
 	plugin.host = host
+
+	// sync network config from pluginDir periodically to detect network config updates
+	go wait.Forever(func() {
+		plugin.syncNetworkConfig()
+	}, 10*time.Second)
 	return nil
 }
 
-func (plugin *cniNetworkPlugin) syncNetworkConfig(pluginDir, vendorCNIDirPrefix string) {
-	network, err := getDefaultCNINetwork(pluginDir, vendorCNIDirPrefix)
+func (plugin *cniNetworkPlugin) syncNetworkConfig() {
+	network, err := getDefaultCNINetwork(plugin.pluginDir, plugin.vendorCNIDirPrefix)
 	if err != nil {
 		glog.Errorf("error updating cni config: %s", err)
 		return
