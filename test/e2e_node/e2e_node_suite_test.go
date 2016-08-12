@@ -33,6 +33,7 @@ import (
 
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_node/pkg/services"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -42,7 +43,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var e2es *E2EServices
+var e2es *services.E2EServices
 
 var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
@@ -59,7 +60,7 @@ func TestE2eNode(t *testing.T) {
 	pflag.Parse()
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
-		RunE2EServices()
+		services.RunE2EServices()
 		return
 	}
 	// If run-services-mode is not specified, run test.
@@ -105,7 +106,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	maskLocksmithdOnCoreos()
 
 	if *startServices {
-		e2es = NewE2eServices()
+		e2es = services.NewE2eServices()
 		if err := e2es.Start(); err != nil {
 			glog.Fatalf("Unable to start node services: %v", err)
 		}
