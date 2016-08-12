@@ -19,7 +19,7 @@
 
 TAG?=3.0.4
 ARCH?=amd64
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=gcr.io/groovy-sentry-504
 GOLANG_VERSION?=1.6.3
 GOARM=6
 TEMP_DIR:=$(shell mktemp -d)
