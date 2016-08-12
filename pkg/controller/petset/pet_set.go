@@ -166,11 +166,13 @@ func (psc *PetSetController) addPod(obj interface{}) {
 // updatePod adds the petset for the current and old pods to the sync queue.
 // If the labels of the pod didn't change, this method enqueues a single petset.
 func (psc *PetSetController) updatePod(old, cur interface{}) {
-	if api.Semantic.DeepEqual(old, cur) {
-		return
-	}
 	curPod := cur.(*api.Pod)
 	oldPod := old.(*api.Pod)
+	if curPod.ResourceVersion == oldPod.ResourceVersion {
+		// Periodic resync will send update events for all known pods.
+		// Two different versions of the same pod will always have different RVs.
+		return
+	}
 	ps := psc.getPetSetForPod(curPod)
 	if ps == nil {
 		return
