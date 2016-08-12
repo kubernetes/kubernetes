@@ -84,7 +84,7 @@ func TestE2eNode(t *testing.T) {
 // Setup the kubelet on the node
 var _ = SynchronizedBeforeSuite(func() []byte {
 	if *buildServices {
-		buildGo()
+		BuildGo()
 	}
 
 	// Initialize node name here, so that the following code can get right node name.

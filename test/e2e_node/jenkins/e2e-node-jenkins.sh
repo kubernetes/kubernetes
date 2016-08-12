@@ -51,7 +51,7 @@ elif [[ -n "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
   echo "ERROR: cannot access service account file at: ${KUBEKINS_SERVICE_ACCOUNT_FILE}"
 fi
 
-go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
+go run test/e2e_node/runner/e2e/run_e2e.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
   --zone="$GCE_ZONE" --project="$GCE_PROJECT" --hosts="$GCE_HOSTS" \
   --images="$GCE_IMAGES" --image-project="$GCE_IMAGE_PROJECT" \
   --image-config-file="$GCE_IMAGE_CONFIG_PATH" --cleanup="$CLEANUP" \

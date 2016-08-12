@@ -20,6 +20,7 @@ import (
 	"flag"
 )
 
+// TODO(random-liu): Get this automatically from kubelet flag.
 var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
 
 var buildServices = flag.Bool("build-services", true, "If true, build local executables")
