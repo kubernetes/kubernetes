@@ -31,8 +31,8 @@ import (
 )
 
 // getContainerLogsPath gets log path for container.
-func getContainerLogsPath(containerName string, podUID types.UID) string {
-	return path.Join(podLogsRootDirectory, string(podUID), fmt.Sprintf("%s.log", containerName))
+func getContainerLogsPath(name, id string, podUID types.UID) string {
+	return path.Join(podLogsRootDirectory, string(podUID), fmt.Sprintf("%s_%s.log", name, id))
 }
 
 // generateContainerConfig generates container config for kubelet runtime api.
@@ -42,12 +42,16 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		return nil, err
 	}
 
-	_, containerName, cid := buildContainerName(pod, container)
+	name := buildContainerName(pod, container.Name)
+	// Create a randomly generated ID for the container in order to uniquely
+	// identify each container instance. Note that this ID is different from
+	// the container ID runtime returns *after* creation.
+	cid := makeUID()
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
-	containerLogsPath := getContainerLogsPath(containerName, pod.UID)
+	containerLogsPath := getContainerLogsPath(name, cid, pod.UID)
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	config := &runtimeApi.ContainerConfig{
-		Name:        &containerName,
+		Name:        &name,
 		Image:       &runtimeApi.ImageSpec{Image: &container.Image},
 		Command:     command,
 		Args:        args,
