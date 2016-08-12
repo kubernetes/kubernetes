@@ -226,6 +226,9 @@ if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
   setup_gci_vars
 fi
 
+echo "XXXXX gcloud auth before activation XXXXX"
+gcloud auth list || true
+
 if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
   echo 'Activating service account...'  # No harm in doing this multiple times.
   gcloud auth activate-service-account --key-file="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
@@ -235,6 +238,9 @@ if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
 elif [[ -n "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
   echo "ERROR: cannot access service account file at: ${KUBEKINS_SERVICE_ACCOUNT_FILE}"
 fi
+
+echo "XXXXX gcloud auth after activation XXXXX"
+gcloud auth list || true
 
 echo "--------------------------------------------------------------------------------"
 echo "Test Environment:"
