@@ -487,7 +487,9 @@ func (e *EndpointController) syncService(key string) {
 	} else {
 		newEndpoints.Annotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	}
-	if len(currentEndpoints.ResourceVersion) == 0 {
+
+	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
+	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 	} else {
@@ -495,7 +497,13 @@ func (e *EndpointController) syncService(key string) {
 		_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
 	}
 	if err != nil {
-		glog.Errorf("Error updating endpoints: %v", err)
+		if createEndpoints && errors.IsForbidden(err) {
+			// if a namespace is terminating, endpoint creation is not allowed by default.
+			// rather than flood the logs with errors for what is normal system behavior, log at a lower level.
+			glog.V(5).Infof("Forbidden from creating endpoints: %v", err)
+		} else {
+			glog.Errorf("Error updating endpoints: %v", err)
+		}
 		e.queue.Add(key) // Retry
 	}
 }
