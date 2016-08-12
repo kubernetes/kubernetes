@@ -57,13 +57,6 @@ type PodSandboxConfig struct {
 	DNSOptions DNSOptions
 	// PortMappings lists the port mappings for the sandbox.
 	PortMappings []PortMapping
-	// Resources specifies the resource limits for the sandbox (i.e., the
-	// aggregate cpu/memory resources limits of all containers).
-	// Note: On a Linux host, kubelet will create a pod-level cgroup and pass
-	// it as the cgroup parent for the PodSandbox. For some runtimes, this is
-	// sufficient. For others, e.g., hypervisor-based runtimes, explicit
-	// resource limits for the sandbox are needed at creation time.
-	Resources PodSandboxResources
 	// Path to the directory on the host in which container log files are
 	// stored.
 	// By default the Log of a container going into the LogDirectory will be
@@ -194,14 +187,6 @@ type LinuxPodSandboxStatus struct {
 	Namespaces *Namespaces
 }
 
-// PodSandboxResources contains the CPU/memory resource requirements.
-type PodSandboxResources struct {
-	// CPU resource requirement.
-	CPU resource.Quantity
-	// Memory resource requirement.
-	Memory resource.Quantity
-}
-
 // This is to distinguish with existing ContainerID type, which includes a
 // runtime type prefix (e.g., docker://). We may rename this later.
 type RawContainerID string
@@ -326,30 +311,11 @@ type RawContainerStatus struct {
 // LinuxContainerConfig contains platform-specific configuration for
 // Linux-based containers.
 type LinuxContainerConfig struct {
-	// Resources specification for the container.
-	Resources *LinuxContainerResources
 	// Capabilities to add or drop.
 	Capabilities *api.Capabilities
 	// SELinux is the SELinux context to be applied.
 	SELinux *api.SELinuxOptions
 	// TODO: Add support for seccomp.
-}
-
-// LinuxContainerResources specifies Linux specific configuration for
-// resources.
-// TODO: Consider using Resources from opencontainers/runtime-spec/specs-go
-// directly.
-type LinuxContainerResources struct {
-	// CPU CFS (Completely Fair Scheduler) period
-	CPUPeriod *int64
-	// CPU CFS (Completely Fair Scheduler) quota
-	CPUQuota *int64
-	// CPU shares (relative weight vs. other containers)
-	CPUShares *int64
-	// Memory limit in bytes
-	MemoryLimitInBytes *int64
-	// OOMScoreAdj adjusts the oom-killer score.
-	OOMScoreAdj *int64
 }
 
 // ContainerFilter is used to filter containers.
