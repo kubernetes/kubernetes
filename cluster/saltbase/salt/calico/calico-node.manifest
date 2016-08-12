@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: calico-node
+  namespace: kube-system
+  labels:
+    kubernetes.io/cluster-service: "true"
+    k8s-app: calico-node
+spec:
+  hostNetwork: true
+  containers:
+    - name: calico-node
+      image: quay.io/calico/node:v0.20.0
+      env:
+        - name: ETCD_ENDPOINTS
+          value: "http://10.0.0.17:6666"
+        - name: CALICO_NETWORKING
+          value: "false"
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - mountPath: /lib/modules
+          name: lib-modules
+          readOnly: true
+        - mountPath: /var/log/calico
+          name: var-log-calico
+          readOnly: false
+        - mountPath: /var/run/calico
+          name: var-run-calico
+          readOnly: false
+  volumes:
+    - name: lib-modules
+      hostPath:
+        path: /lib/modules
+    - name: var-run-calico
+      hostPath:
+        path: /var/run/calico
+    - name: var-log-calico
+      hostPath:
+        path: /var/log/calico
