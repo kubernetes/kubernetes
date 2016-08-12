@@ -47,21 +47,21 @@ const (
 
 type IngressController struct {
 	// For triggering single ingress reconcilation. This is used when there is an
-	// add/update/delete operation on a ingress in either federated API server or
+	// add/update/delete operation on an ingress in either federated API server or
 	// in some member of the federation.
 	ingressDeliverer *util.DelayingDeliverer
 
-	// For triggering all ingresss reconcilation. This is used when
+	// For triggering reconcilation of all ingresses. This is used when
 	// a new cluster becomes available.
 	clusterDeliverer *util.DelayingDeliverer
 
-	// Contains ingresss present in members of federation.
+	// Contains ingresses present in members of federation.
 	ingressFederatedInformer util.FederatedInformer
 	// For updating members of federation.
 	federatedUpdater util.FederatedUpdater
-	// Definitions of ingresss that should be federated.
+	// Definitions of ingresses that should be federated.
 	ingressInformerStore cache.Store
-	// Informer controller for ingresss that should be federated.
+	// Informer controller for ingresses that should be federated.
 	ingressInformerController framework.ControllerInterface
 
 	// Client to federated api server.
@@ -70,12 +70,12 @@ type IngressController struct {
 	stopChan chan struct{}
 }
 
-// A structure passed by delying deliver. It contains a ingress that should be reconciled and
-// the number of trials that were made previously and ended up in some kind of ingress-related
+// A structure passed by delaying deliverer. It contains an ingress that should be reconciled and
+// the number of previous attempts that ended up in some kind of ingress-related
 // error (like failure to create).
 type ingressItem struct {
-	ingress string
-	trial   int64
+	ingress      string
+	prevAttempts int64
 }
 
 // NewIngressController returns a new ingress controller
@@ -85,41 +85,41 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 		stopChan:           make(chan struct{}),
 	}
 
-	// Build delivereres for triggering reconcilations.
+	// Build deliverers for triggering reconcilations.
 	ic.ingressDeliverer = util.NewDelayingDeliverer()
 	ic.clusterDeliverer = util.NewDelayingDeliverer()
 
-	// Start informer in federated API servers on ingresss that should be federated.
+	// Start informer in federated API servers on ingresses that should be federated.
 	ic.ingressInformerStore, ic.ingressInformerController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return client.Extensions().Ingresses("<all-namespaces>").List(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Extensions().Ingresses("<all-namespaces>").Watch(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
 			},
 		},
 		&extensions.Ingress{},
 		controller.NoResyncPeriodFunc(),
 		util.NewTriggerOnAllChanges(func(obj pkg_runtime.Object) { ic.deliverIngressObj(obj, 0, 0) }))
 
-	// Federated informer on ingresss in members of federation.
+	// Federated informer on ingresses in members of federation.
 	ic.ingressFederatedInformer = util.NewFederatedInformer(
 		client,
 		func(cluster *federation_api.Cluster, targetClient federation_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
 			return framework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Extensions().Ingresses("<all-namespaces>").List(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Extensions().Ingresses("<all-namespaces>").Watch(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
 					},
 				},
 				&extensions.Ingress{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconcilation whenever something in federated cluster is changed. In most cases it
-				// would be just confirmation that some ingress opration suceeded.
+				// would be just confirmation that some ingress operation suceeded.
 				util.NewTriggerOnMetaAndSpecChangesPreproc(
 					func(obj pkg_runtime.Object) { ic.deliverIngressObj(obj, IngressReviewDelay, 0) },
 					func(obj pkg_runtime.Object) { util.SetClusterName(obj, cluster.Name) },
@@ -128,27 +128,27 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 
 		&util.ClusterLifecycleHandlerFuncs{
 			ClusterAvailable: func(cluster *federation_api.Cluster) {
-				// When new cluster becomes available process all the ingresss again.
+				// When new cluster becomes available process all the ingresses again.
 				ic.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(ClusterAvailableDelay))
 			},
 		},
 	)
 
-	// Federated updeater along with Create/Update/Delete operations.
+	// Federated updater along with Create/Update/Delete operations.
 	ic.federatedUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer,
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
-			_, err := client.Extensions().Ingresses("<all-namespaces>").Create(ingress)
+			_, err := client.Extensions().Ingresses(api.NamespaceAll).Create(ingress)
 			return err
 		},
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
-			_, err := client.Extensions().Ingresses("<all-namespaces>").Update(ingress)
+			_, err := client.Extensions().Ingresses(api.NamespaceAll).Update(ingress)
 			return err
 		},
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
-			err := client.Extensions().Ingresses("<all-namespaces>").Delete(ingress.Name, &api.DeleteOptions{})
+			err := client.Extensions().Ingresses(api.NamespaceAll).Delete(ingress.Name, &api.DeleteOptions{})
 			return err
 		})
 	return ic
@@ -158,11 +158,11 @@ func (ic *IngressController) Start() {
 	ic.ingressInformerController.Run(ic.stopChan)
 	ic.ingressFederatedInformer.Start()
 	ic.ingressDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
-		ni := item.Value.(*ingressItem)
-		ic.reconcileIngress(ni.ingress, ni.trial)
+		i := item.Value.(*ingressItem)
+		ic.reconcileIngress(i.ingress, i.prevAttempts)
 	})
 	ic.clusterDeliverer.StartWithHandler(func(_ *util.DelayingDelivererItem) {
-		ic.reconcileIngresssOnClusterChange()
+		ic.reconcileIngressesOnClusterChange()
 	})
 }
 
@@ -176,8 +176,8 @@ func (ic *IngressController) deliverIngressObj(obj interface{}, delay time.Durat
 	ic.deliverIngress(ingress.Name, delay, trial)
 }
 
-func (ic *IngressController) deliverIngress(ingress string, delay time.Duration, trial int64) {
-	ic.ingressDeliverer.DeliverAfter(ingress, &ingressItem{ingress: ingress, trial: trial}, delay)
+func (ic *IngressController) deliverIngress(ingress string, delay time.Duration, prevAttempts int64) {
+	ic.ingressDeliverer.DeliverAfter(ingress, &ingressItem{ingress: ingress, prevAttempts: prevAttempts}, delay)
 }
 
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
@@ -198,8 +198,8 @@ func (ic *IngressController) isSynced() bool {
 	return true
 }
 
-// The function triggers reconcilation of all federated ingresss.
-func (ic *IngressController) reconcileIngresssOnClusterChange() {
+// The function triggers reconcilation of all federated ingresses.
+func (ic *IngressController) reconcileIngressesOnClusterChange() {
 	if !ic.isSynced() {
 		ic.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(ClusterAvailableDelay))
 	}
@@ -235,8 +235,8 @@ func (ic *IngressController) reconcileIngress(ingress string, trial int64) {
 
 	/* TODO:  What to do for Ingresses? - this applied to namespaces.
 	if baseIngress.Status.Phase == extensions.IngressTerminating {
-		// TODO: What about ingresss in subclusters ???
-		err = ic.federatedApiClient.Extensions().Ingresses("<all-namespaces>").Delete(baseIngress.Name, &api.DeleteOptions{})
+		// TODO: What about ingresses in subclusters ???
+		err = ic.federatedApiClient.Extensions().Ingresses(api.NamespaceAll).Delete(baseIngress.Name, &api.DeleteOptions{})
 		if err != nil {
 			glog.Errorf("Failed to delete ingress %s: %v", baseIngress.Name, err)
 			ic.deliverIngress(ingress, backoff(trial+1), trial+1)
