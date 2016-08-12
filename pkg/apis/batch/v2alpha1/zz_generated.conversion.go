@@ -26,10 +26,17 @@ import (
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	batch "k8s.io/kubernetes/pkg/apis/batch"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v2alpha1_Job_To_batch_Job,
 		Convert_batch_Job_To_v2alpha1_Job,
 		Convert_v2alpha1_JobCondition_To_batch_JobCondition,
@@ -56,10 +63,7 @@ func init() {
 		Convert_batch_ScheduledJobSpec_To_v2alpha1_ScheduledJobSpec,
 		Convert_v2alpha1_ScheduledJobStatus_To_batch_ScheduledJobStatus,
 		Convert_batch_ScheduledJobStatus_To_v2alpha1_ScheduledJobStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v2alpha1_Job_To_batch_Job(in *Job, out *batch.Job, s conversion.Scope) error {

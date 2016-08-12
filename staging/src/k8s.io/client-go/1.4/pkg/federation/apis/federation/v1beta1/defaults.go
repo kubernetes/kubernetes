@@ -20,5 +20,6 @@ import (
 	"k8s.io/client-go/1.4/pkg/runtime"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	return nil
 }

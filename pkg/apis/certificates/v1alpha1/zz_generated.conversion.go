@@ -24,10 +24,17 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	certificates "k8s.io/kubernetes/pkg/apis/certificates"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v1alpha1_CertificateSigningRequest_To_certificates_CertificateSigningRequest,
 		Convert_certificates_CertificateSigningRequest_To_v1alpha1_CertificateSigningRequest,
 		Convert_v1alpha1_CertificateSigningRequestCondition_To_certificates_CertificateSigningRequestCondition,
@@ -38,10 +45,7 @@ func init() {
 		Convert_certificates_CertificateSigningRequestSpec_To_v1alpha1_CertificateSigningRequestSpec,
 		Convert_v1alpha1_CertificateSigningRequestStatus_To_certificates_CertificateSigningRequestStatus,
 		Convert_certificates_CertificateSigningRequestStatus_To_v1alpha1_CertificateSigningRequestStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v1alpha1_CertificateSigningRequest_To_certificates_CertificateSigningRequest(in *CertificateSigningRequest, out *certificates.CertificateSigningRequest, s conversion.Scope) error {

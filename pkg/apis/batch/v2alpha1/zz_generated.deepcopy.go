@@ -21,15 +21,21 @@ limitations under the License.
 package v2alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_Job, InType: reflect.TypeOf(&Job{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobCondition, InType: reflect.TypeOf(&JobCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobList, InType: reflect.TypeOf(&JobList{})},
@@ -43,10 +49,7 @@ func init() {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobList, InType: reflect.TypeOf(&ScheduledJobList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobSpec, InType: reflect.TypeOf(&ScheduledJobSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobStatus, InType: reflect.TypeOf(&ScheduledJobStatus{})},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func DeepCopy_v2alpha1_Job(in interface{}, out interface{}, c *conversion.Cloner) error {

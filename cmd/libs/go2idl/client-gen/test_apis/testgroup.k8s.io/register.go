@@ -24,20 +24,22 @@ import (
 
 var SchemeGroupVersion = unversioned.GroupVersion{Group: "testgroup.k8s.io", Version: runtime.APIVersionInternal}
 
-func AddToScheme(scheme *runtime.Scheme) {
-	// Add the API to Scheme.
-	addKnownTypes(scheme)
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&TestType{},
 		&TestTypeList{},
 	)
 
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&api.ListOptions{})
+		&api.ListOptions{},
+	)
+	return nil
 }
 
 func (obj *TestType) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }

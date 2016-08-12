@@ -24,19 +24,23 @@ import (
 	api "k8s.io/client-go/1.4/pkg/api"
 	unversioned "k8s.io/client-go/1.4/pkg/api/unversioned"
 	conversion "k8s.io/client-go/1.4/pkg/conversion"
+	runtime "k8s.io/client-go/1.4/pkg/runtime"
 	reflect "reflect"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudget, InType: reflect.TypeOf(func() *PodDisruptionBudget { var x *PodDisruptionBudget; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetList, InType: reflect.TypeOf(func() *PodDisruptionBudgetList { var x *PodDisruptionBudgetList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetSpec, InType: reflect.TypeOf(func() *PodDisruptionBudgetSpec { var x *PodDisruptionBudgetSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetStatus, InType: reflect.TypeOf(func() *PodDisruptionBudgetStatus { var x *PodDisruptionBudgetStatus; return x }())},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudget, InType: reflect.TypeOf(&PodDisruptionBudget{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetList, InType: reflect.TypeOf(&PodDisruptionBudgetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetSpec, InType: reflect.TypeOf(&PodDisruptionBudgetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetStatus, InType: reflect.TypeOf(&PodDisruptionBudgetStatus{})},
+	)
 }
 
 func DeepCopy_policy_PodDisruptionBudget(in interface{}, out interface{}, c *conversion.Cloner) error {

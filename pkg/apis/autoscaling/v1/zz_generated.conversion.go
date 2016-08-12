@@ -24,10 +24,17 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference,
 		Convert_autoscaling_CrossVersionObjectReference_To_v1_CrossVersionObjectReference,
 		Convert_v1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler,
@@ -44,10 +51,7 @@ func init() {
 		Convert_autoscaling_ScaleSpec_To_v1_ScaleSpec,
 		Convert_v1_ScaleStatus_To_autoscaling_ScaleStatus,
 		Convert_autoscaling_ScaleStatus_To_v1_ScaleStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v1_CrossVersionObjectReference_To_autoscaling_CrossVersionObjectReference(in *CrossVersionObjectReference, out *autoscaling.CrossVersionObjectReference, s conversion.Scope) error {

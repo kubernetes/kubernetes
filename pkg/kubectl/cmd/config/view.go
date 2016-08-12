@@ -79,7 +79,7 @@ func NewCmdConfigView(out io.Writer, ConfigAccess clientcmd.ConfigAccess) *cobra
 			cmdutil.CheckErr(err)
 			version, err := cmdutil.OutputVersion(cmd, &latest.ExternalVersion)
 			cmdutil.CheckErr(err)
-			printer = kubectl.NewVersionedPrinter(printer, clientcmdapi.Scheme, version)
+			printer = kubectl.NewVersionedPrinter(printer, latest.Scheme, version)
 
 			cmdutil.CheckErr(options.Run(out, printer))
 		},

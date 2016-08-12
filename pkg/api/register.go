@@ -23,6 +23,10 @@ import (
 )
 
 // Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
+// NOTE: If you are copying this file to start a new api group, STOP! Copy the
+// extensions group instead. This Scheme is special and should appear ONLY in
+// the api group, unless you really know what you're doing.
+// TODO(lavalamp): make the above error impossible.
 var Scheme = runtime.NewScheme()
 
 // Codecs provides access to encoding and decoding for the scheme
@@ -51,9 +55,28 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func AddToScheme(scheme *runtime.Scheme) {
-	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func init() {
+	// TODO(lavalamp): move this call to scheme builder above.  Can't
+	// remove it from here because lots of people inapropriately rely on it
+	// (specifically the unversioned time conversion). Can't have it in
+	// both places because then it gets double registered.  Consequence of
+	// current state is that it only ever gets registered in the main
+	// api.Scheme, even though everyone that uses anything from unversioned
+	// needs these.
+	if err := addConversionFuncs(Scheme); err != nil {
+		// Programmer error.
 		panic(err)
+	}
+}
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	if err := scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+		return err
 	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Pod{},
@@ -104,7 +127,7 @@ func AddToScheme(scheme *runtime.Scheme) {
 	)
 
 	// Register Unversioned types under their own special group
-	Scheme.AddUnversionedTypes(Unversioned,
+	scheme.AddUnversionedTypes(Unversioned,
 		&unversioned.ExportOptions{},
 		&unversioned.Status{},
 		&unversioned.APIVersions{},
@@ -112,4 +135,5 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&unversioned.APIGroup{},
 		&unversioned.APIResourceList{},
 	)
+	return nil
 }

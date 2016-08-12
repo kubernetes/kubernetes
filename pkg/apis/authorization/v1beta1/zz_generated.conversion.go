@@ -24,10 +24,17 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	authorization "k8s.io/kubernetes/pkg/apis/authorization"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview,
 		Convert_authorization_LocalSubjectAccessReview_To_v1beta1_LocalSubjectAccessReview,
 		Convert_v1beta1_NonResourceAttributes_To_authorization_NonResourceAttributes,
@@ -44,10 +51,7 @@ func init() {
 		Convert_authorization_SubjectAccessReviewSpec_To_v1beta1_SubjectAccessReviewSpec,
 		Convert_v1beta1_SubjectAccessReviewStatus_To_authorization_SubjectAccessReviewStatus,
 		Convert_authorization_SubjectAccessReviewStatus_To_v1beta1_SubjectAccessReviewStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v1beta1_LocalSubjectAccessReview_To_authorization_LocalSubjectAccessReview(in *LocalSubjectAccessReview, out *authorization.LocalSubjectAccessReview, s conversion.Scope) error {
