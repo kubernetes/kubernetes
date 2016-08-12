@@ -558,6 +558,12 @@ function kube::build::ensure_data_container() {
     kube::build::destroy_container "${KUBE_BUILD_DATA_CONTAINER_NAME}"
     ret=1
   fi
+  # This is a hack to force things like jenkins to rebuild their data
+  # containers.
+  if [[ "${ret}" == 0 ]]; then
+    kube::build::destroy_container "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+    ret=1
+  fi
   if [[ "${ret}" != 0 ]]; then
     kube::log::status "Creating data container ${KUBE_BUILD_DATA_CONTAINER_NAME}"
     # We have to ensure the directory exists, or else the docker run will
