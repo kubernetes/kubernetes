@@ -5329,7 +5329,6 @@ func TestValidateNode(t *testing.T) {
 			},
 		},
 		"missing-taint-key": {
-
 			ObjectMeta: api.ObjectMeta{
 				Name: "dedicated-node1",
 				// Add a taint with an empty key to a node
@@ -5435,6 +5434,27 @@ func TestValidateNode(t *testing.T) {
 				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
 					api.ResourceName(api.ResourceMemory): resource.MustParse("0"),
+				},
+			},
+			Spec: api.NodeSpec{
+				ExternalID: "external",
+			},
+		},
+		"duplicated-taints-with-same-key-effect": {
+			ObjectMeta: api.ObjectMeta{
+				Name: "dedicated-node1",
+				// Add a taint with an empty key to a node
+				Annotations: map[string]string{
+					api.TaintsAnnotationKey: `
+					[{
+						"key": "dedicated",
+						"value": "special-user-1",
+						"effect": "NoSchedule"
+					}, {
+						"key": "dedicated",
+						"value": "special-user-2",
+						"effect": "NoSchedule"
+					}]`,
 				},
 			},
 			Spec: api.NodeSpec{
