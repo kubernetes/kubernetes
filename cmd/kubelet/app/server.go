@@ -282,9 +282,10 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		HairpinMode:                    s.HairpinMode,
 		BabysitDaemons:                 s.BabysitDaemons,
 		ExperimentalFlannelOverlay:     s.ExperimentalFlannelOverlay,
-		NodeIP:         net.ParseIP(s.NodeIP),
-		EvictionConfig: evictionConfig,
-		PodsPerCore:    int(s.PodsPerCore),
+		NodeIP:                net.ParseIP(s.NodeIP),
+		EvictionConfig:        evictionConfig,
+		PodsPerCore:           int(s.PodsPerCore),
+		ProtectKernelDefaults: s.ProtectKernelDefaults,
 	}, nil
 }
 
@@ -382,12 +383,13 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 			return fmt.Errorf("invalid configuration: system container was specified and cgroup root was not specified")
 		}
 		kcfg.ContainerManager, err = cm.NewContainerManager(kcfg.Mounter, kcfg.CAdvisorInterface, cm.NodeConfig{
-			RuntimeCgroupsName: kcfg.RuntimeCgroups,
-			SystemCgroupsName:  kcfg.SystemCgroups,
-			KubeletCgroupsName: kcfg.KubeletCgroups,
-			ContainerRuntime:   kcfg.ContainerRuntime,
-			CgroupsPerQOS:      kcfg.CgroupsPerQOS,
-			CgroupRoot:         kcfg.CgroupRoot,
+			RuntimeCgroupsName:    kcfg.RuntimeCgroups,
+			SystemCgroupsName:     kcfg.SystemCgroups,
+			KubeletCgroupsName:    kcfg.KubeletCgroups,
+			ContainerRuntime:      kcfg.ContainerRuntime,
+			CgroupsPerQOS:         kcfg.CgroupsPerQOS,
+			CgroupRoot:            kcfg.CgroupRoot,
+			ProtectKernelDefaults: kcfg.ProtectKernelDefaults,
 		})
 		if err != nil {
 			return err
@@ -636,6 +638,7 @@ func SimpleKubelet(client *clientset.Clientset,
 		OutOfDiskTransitionFrequency: outOfDiskTransitionFrequency,
 		EvictionConfig:               evictionConfig,
 		PodsPerCore:                  podsPerCore,
+		ProtectKernelDefaults:        false,
 	}
 	return &kcfg
 }
@@ -888,6 +891,8 @@ type KubeletConfig struct {
 	HairpinMode                string
 	BabysitDaemons             bool
 	Options                    []kubelet.Option
+
+	ProtectKernelDefaults bool
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
