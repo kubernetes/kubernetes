@@ -73,7 +73,8 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 	})
 
 	Context("create a batch of pods", func() {
-		densityTests := []DensityTest{
+		// TODO(coufon): add more tests and the values are generous, set more precise limits after benchmark
+		dTests := []densityTest{
 			{
 				podsNr:   10,
 				interval: 0 * time.Millisecond,
@@ -87,8 +88,8 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				},
 				// percentile limit of single pod startup latency
 				podStartupLimits: framework.LatencyMetric{
-					Perc50: 10 * time.Second,
-					Perc90: 15 * time.Second,
+					Perc50: 16 * time.Second,
+					Perc90: 18 * time.Second,
 					Perc99: 20 * time.Second,
 				},
 				// upbound of startup latency of a batch of pods
@@ -96,7 +97,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 			},
 		}
 
-		for _, testArg := range densityTests {
+		for _, testArg := range dTests {
 			itArg := testArg
 			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval",
 				itArg.podsNr, itArg.interval), func() {
@@ -185,13 +186,14 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 				// verify resource
 				By("Verifying resource")
-				verifyResource(f, testArg, rc)
+				verifyResource(f, itArg.cpuLimits, itArg.memLimits, rc)
 			})
 		}
 	})
 
 	Context("create a sequence of pods", func() {
-		densityTests := []DensityTest{
+		// TODO(coufon): add more tests and the values are generous, set more precise limits after benchmark
+		dTests := []densityTest{
 			{
 				podsNr:   10,
 				bgPodsNr: 10,
@@ -211,7 +213,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 			},
 		}
 
-		for _, testArg := range densityTests {
+		for _, testArg := range dTests {
 			itArg := testArg
 			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods",
 				itArg.podsNr, itArg.bgPodsNr), func() {
@@ -242,13 +244,13 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 				// verify resource
 				By("Verifying resource")
-				verifyResource(f, testArg, rc)
+				verifyResource(f, itArg.cpuLimits, itArg.memLimits, rc)
 			})
 		}
 	})
 })
 
-type DensityTest struct {
+type densityTest struct {
 	// number of pods
 	podsNr int
 	// number of background pods
@@ -274,6 +276,7 @@ func createBatchPodWithRateControl(f *framework.Framework, pods []*api.Pod, inte
 	return createTimes
 }
 
+// checkPodDeleted checks whether a pod has been successfully deleted
 func checkPodDeleted(f *framework.Framework, podName string) error {
 	ns := f.Namespace.Name
 	_, err := f.Client.Pods(ns).Get(podName)
@@ -304,7 +307,7 @@ func getPodStartLatency(node string) (framework.KubeletLatencyMetrics, error) {
 	return latencyMetrics, nil
 }
 
-// Verifies whether 50, 90 and 99th percentiles of PodStartupLatency are
+// verifyPodStartupLatency verifies whether 50, 90 and 99th percentiles of PodStartupLatency are
 // within the threshold.
 func verifyPodStartupLatency(expect, actual framework.LatencyMetric) error {
 	if actual.Perc50 > expect.Perc50 {
@@ -319,6 +322,7 @@ func verifyPodStartupLatency(expect, actual framework.LatencyMetric) error {
 	return nil
 }
 
+// newInformerWatchPod creates an informer to check whether all pods are running.
 func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes map[string]unversioned.Time,
 	podType string) *controllerframework.Controller {
 	ns := f.Namespace.Name
@@ -363,7 +367,8 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 	return controller
 }
 
-func verifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyData, testArg DensityTest) {
+// verifyLatency verifies that whether pod creation latency satisfies the limit.
+func verifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyData, testArg densityTest) {
 	framework.PrintLatencies(e2eLags, "worst client e2e total latencies")
 
 	// Zhou: do not trust `kubelet' metrics since they are not reset!
@@ -388,35 +393,7 @@ func verifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyData, t
 	framework.Logf("Sequential creation throughput is %.1f pods/min", throughputSequential)
 }
 
-func verifyResource(f *framework.Framework, testArg DensityTest, rc *ResourceCollector) {
-	nodeName := framework.TestContext.NodeName
-
-	// verify and log memory
-	usagePerContainer, err := rc.GetLatest()
-	Expect(err).NotTo(HaveOccurred())
-	framework.Logf("%s", formatResourceUsageStats(usagePerContainer))
-
-	usagePerNode := make(framework.ResourceUsagePerNode)
-	usagePerNode[nodeName] = usagePerContainer
-
-	memPerfData := framework.ResourceUsageToPerfData(usagePerNode)
-	framework.PrintPerfData(memPerfData)
-
-	verifyMemoryLimits(f.Client, testArg.memLimits, usagePerNode)
-
-	// verify and log cpu
-	cpuSummary := rc.GetCPUSummary()
-	framework.Logf("%s", formatCPUSummary(cpuSummary))
-
-	cpuSummaryPerNode := make(framework.NodesCPUSummary)
-	cpuSummaryPerNode[nodeName] = cpuSummary
-
-	cpuPerfData := framework.CPUUsageToPerfData(cpuSummaryPerNode)
-	framework.PrintPerfData(cpuPerfData)
-
-	verifyCPULimits(testArg.cpuLimits, cpuSummaryPerNode)
-}
-
+// createBatchPodSequential creats pods back-to-back in sequence.
 func createBatchPodSequential(f *framework.Framework, pods []*api.Pod) (time.Duration, []framework.PodLatencyData) {
 	batchStartTime := unversioned.Now()
 	e2eLags := make([]framework.PodLatencyData, 0)

@@ -23,20 +23,24 @@ package certificates
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequest, InType: reflect.TypeOf(func() *CertificateSigningRequest { var x *CertificateSigningRequest; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestCondition, InType: reflect.TypeOf(func() *CertificateSigningRequestCondition { var x *CertificateSigningRequestCondition; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestList, InType: reflect.TypeOf(func() *CertificateSigningRequestList { var x *CertificateSigningRequestList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestSpec, InType: reflect.TypeOf(func() *CertificateSigningRequestSpec { var x *CertificateSigningRequestSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestStatus, InType: reflect.TypeOf(func() *CertificateSigningRequestStatus { var x *CertificateSigningRequestStatus; return x }())},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequest, InType: reflect.TypeOf(&CertificateSigningRequest{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestCondition, InType: reflect.TypeOf(&CertificateSigningRequestCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestList, InType: reflect.TypeOf(&CertificateSigningRequestList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestSpec, InType: reflect.TypeOf(&CertificateSigningRequestSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_certificates_CertificateSigningRequestStatus, InType: reflect.TypeOf(&CertificateSigningRequestStatus{})},
+	)
 }
 
 func DeepCopy_certificates_CertificateSigningRequest(in interface{}, out interface{}, c *conversion.Cloner) error {

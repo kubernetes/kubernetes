@@ -19,15 +19,15 @@ package e2e
 import (
 	"fmt"
 
-	federationapi "k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/pkg/api"
+	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func createClusterObjectOrFail(f *framework.Framework, context *framework.E2EContext) {
 	framework.Logf("Creating cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 	cluster := federationapi.Cluster{
-		ObjectMeta: api.ObjectMeta{
+		ObjectMeta: v1.ObjectMeta{
 			Name: context.Name,
 		},
 		Spec: federationapi.ClusterSpec{
@@ -37,7 +37,7 @@ func createClusterObjectOrFail(f *framework.Framework, context *framework.E2ECon
 					ServerAddress: context.Cluster.Cluster.Server,
 				},
 			},
-			SecretRef: &api.LocalObjectReference{
+			SecretRef: &v1.LocalObjectReference{
 				// Note: Name must correlate with federation build script secret name,
 				//       which currently matches the cluster name.
 				//       See federation/cluster/common.sh:132
@@ -45,18 +45,18 @@ func createClusterObjectOrFail(f *framework.Framework, context *framework.E2ECon
 			},
 		},
 	}
-	_, err := f.FederationClientset.Federation().Clusters().Create(&cluster)
+	_, err := f.FederationClientset_1_4.Federation().Clusters().Create(&cluster)
 	framework.ExpectNoError(err, fmt.Sprintf("creating cluster: %+v", err))
 	framework.Logf("Successfully created cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 }
 
 func clusterIsReadyOrFail(f *framework.Framework, context *framework.E2EContext) {
-	c, err := f.FederationClientset.Federation().Clusters().Get(context.Name)
+	c, err := f.FederationClientset_1_4.Federation().Clusters().Get(context.Name)
 	framework.ExpectNoError(err, fmt.Sprintf("get cluster: %+v", err))
 	if c.ObjectMeta.Name != context.Name {
 		framework.Failf("cluster name does not match input context: actual=%+v, expected=%+v", c, context)
 	}
-	err = isReady(context.Name, f.FederationClientset)
+	err = isReady(context.Name, f.FederationClientset_1_4)
 	framework.ExpectNoError(err, fmt.Sprintf("unexpected error in verifying if cluster %s is ready: %+v", context.Name, err))
 	framework.Logf("Cluster %s is Ready", context.Name)
 }

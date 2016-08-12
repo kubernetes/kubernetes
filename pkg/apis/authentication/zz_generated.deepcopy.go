@@ -23,19 +23,23 @@ package authentication
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authentication_TokenReview, InType: reflect.TypeOf(func() *TokenReview { var x *TokenReview; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authentication_TokenReviewSpec, InType: reflect.TypeOf(func() *TokenReviewSpec { var x *TokenReviewSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authentication_TokenReviewStatus, InType: reflect.TypeOf(func() *TokenReviewStatus { var x *TokenReviewStatus; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authentication_UserInfo, InType: reflect.TypeOf(func() *UserInfo { var x *UserInfo; return x }())},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authentication_TokenReview, InType: reflect.TypeOf(&TokenReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authentication_TokenReviewSpec, InType: reflect.TypeOf(&TokenReviewSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authentication_TokenReviewStatus, InType: reflect.TypeOf(&TokenReviewStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authentication_UserInfo, InType: reflect.TypeOf(&UserInfo{})},
+	)
 }
 
 func DeepCopy_authentication_TokenReview(in interface{}, out interface{}, c *conversion.Cloner) error {

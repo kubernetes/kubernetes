@@ -18,27 +18,12 @@ package core
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
-		func(obj *api.ListOptions) {
-			if obj.LabelSelector == nil {
-				obj.LabelSelector = labels.Everything()
-			}
-			if obj.FieldSelector == nil {
-				obj.FieldSelector = fields.Everything()
-			}
-		},
-	)
-}
-
-func addConversionFuncs(scheme *runtime.Scheme) {
+func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
+	return scheme.AddConversionFuncs(
 		api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
 		api.Convert_unversioned_ListMeta_To_unversioned_ListMeta,
 		api.Convert_intstr_IntOrString_To_intstr_IntOrString,
@@ -54,8 +39,4 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		api.Convert_fields_Selector_To_string,
 		api.Convert_resource_Quantity_To_resource_Quantity,
 	)
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
 }

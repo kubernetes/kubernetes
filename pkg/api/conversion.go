@@ -24,23 +24,14 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utillabels "k8s.io/kubernetes/pkg/util/labels"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-func init() {
-	Scheme.AddDefaultingFuncs(
-		func(obj *ListOptions) {
-			if obj.LabelSelector == nil {
-				obj.LabelSelector = labels.Everything()
-			}
-			if obj.FieldSelector == nil {
-				obj.FieldSelector = fields.Everything()
-			}
-		},
-	)
-	Scheme.AddConversionFuncs(
+func addConversionFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddConversionFuncs(
 		Convert_unversioned_TypeMeta_To_unversioned_TypeMeta,
 
 		Convert_unversioned_ListMeta_To_unversioned_ListMeta,
@@ -234,6 +225,9 @@ func Convert_resource_Quantity_To_resource_Quantity(in *resource.Quantity, out *
 }
 
 func Convert_map_to_unversioned_LabelSelector(in *map[string]string, out *unversioned.LabelSelector, s conversion.Scope) error {
+	if in == nil {
+		return nil
+	}
 	out = new(unversioned.LabelSelector)
 	for labelKey, labelValue := range *in {
 		utillabels.AddLabelToSelector(out, labelKey, labelValue)

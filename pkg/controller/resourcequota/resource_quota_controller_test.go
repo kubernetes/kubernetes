@@ -242,6 +242,106 @@ func TestSyncResourceQuotaSpecChange(t *testing.T) {
 	}
 
 }
+func TestSyncResourceQuotaSpecHardChange(t *testing.T) {
+	resourceQuota := api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{
+			Namespace: "default",
+			Name:      "rq",
+		},
+		Spec: api.ResourceQuotaSpec{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("4"),
+			},
+		},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("3"),
+				api.ResourceMemory: resource.MustParse("1Gi"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU:    resource.MustParse("0"),
+				api.ResourceMemory: resource.MustParse("0"),
+			},
+		},
+	}
+
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("4"),
+			},
+			Used: api.ResourceList{
+				api.ResourceCPU: resource.MustParse("0"),
+			},
+		},
+	}
+
+	kubeClient := fake.NewSimpleClientset(&resourceQuota)
+	resourceQuotaControllerOptions := &ResourceQuotaControllerOptions{
+		KubeClient:   kubeClient,
+		ResyncPeriod: controller.NoResyncPeriodFunc,
+		Registry:     install.NewRegistry(kubeClient),
+		GroupKindsToReplenish: []unversioned.GroupKind{
+			api.Kind("Pod"),
+			api.Kind("Service"),
+			api.Kind("ReplicationController"),
+			api.Kind("PersistentVolumeClaim"),
+		},
+		ControllerFactory:         NewReplenishmentControllerFactoryFromClient(kubeClient),
+		ReplenishmentResyncPeriod: controller.NoResyncPeriodFunc,
+	}
+	quotaController := NewResourceQuotaController(resourceQuotaControllerOptions)
+	err := quotaController.syncResourceQuota(resourceQuota)
+	if err != nil {
+		t.Fatalf("Unexpected error %v", err)
+	}
+
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"list", "pods", ""}, "-"),
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	lastActionIndex := len(kubeClient.Actions()) - 1
+	usage := kubeClient.Actions()[lastActionIndex].(core.UpdateAction).GetObject().(*api.ResourceQuota)
+
+	// ensure hard and used limits are what we expected
+	for k, v := range expectedUsage.Status.Hard {
+		actual := usage.Status.Hard[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Hard: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+
+	// ensure usage hard and used are are synced with spec hard, not have dirty resource
+	for k, v := range usage.Status.Hard {
+		if k == api.ResourceMemory {
+			t.Errorf("Unexpected Usage Hard: Key: %v, Value: %v", k, v.String())
+		}
+	}
+
+	for k, v := range usage.Status.Used {
+		if k == api.ResourceMemory {
+			t.Errorf("Unexpected Usage Used: Key: %v, Value: %v", k, v.String())
+		}
+	}
+}
 
 func TestSyncResourceQuotaNoChange(t *testing.T) {
 	resourceQuota := api.ResourceQuota{

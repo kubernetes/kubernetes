@@ -361,6 +361,7 @@ path-override
 pod-cidr
 pod-eviction-timeout
 pod-infra-container-image
+pod-manifest-path
 pod-running
 pods-per-core
 policy-config-file

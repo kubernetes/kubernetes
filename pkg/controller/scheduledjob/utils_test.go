@@ -18,6 +18,7 @@ package scheduledjob
 
 import (
 	//"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,7 +45,7 @@ func TestGetJobFromTemplate(t *testing.T) {
 			SelfLink:  "/apis/extensions/v1beta1/namespaces/snazzycats/jobs/myscheduledjob",
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "0 0 * * * * ?",
+			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				ObjectMeta: api.ObjectMeta{
@@ -72,12 +73,12 @@ func TestGetJobFromTemplate(t *testing.T) {
 	}
 
 	var job *batch.Job
-	job, err := getJobFromTemplate(&sj)
+	job, err := getJobFromTemplate(&sj, time.Time{})
 	if err != nil {
 		t.Errorf("Did not expect error: %s", err)
 	}
-	if job.ObjectMeta.GenerateName != "myscheduledjob-" {
-		t.Errorf("Wrong GenerateName")
+	if !strings.HasPrefix(job.ObjectMeta.Name, "myscheduledjob-") {
+		t.Errorf("Wrong Name")
 	}
 	if len(job.ObjectMeta.Labels) != 1 {
 		t.Errorf("Wrong number of labels")
@@ -256,7 +257,7 @@ func TestGroupJobsByParent(t *testing.T) {
 
 func TestGetRecentUnmetScheduleTimes(t *testing.T) {
 	// schedule is hourly on the hour
-	schedule := "0 0 * * * ?"
+	schedule := "0 * * * ?"
 	// T1 is a scheduled start time of that schedule
 	T1, err := time.Parse(time.RFC3339, "2016-05-19T10:00:00Z")
 	if err != nil {

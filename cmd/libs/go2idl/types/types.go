@@ -16,6 +16,15 @@ limitations under the License.
 
 package types
 
+// Ref makes a reference to the given type. It can only be used for e.g.
+// passing to namers.
+func Ref(packageName, typeName string) *Type {
+	return &Type{Name: Name{
+		Name:    typeName,
+		Package: packageName,
+	}}
+}
+
 // A type name may have a package qualifier.
 type Name struct {
 	// Empty if embedded or builtin. This is the package path unless Path is specified.

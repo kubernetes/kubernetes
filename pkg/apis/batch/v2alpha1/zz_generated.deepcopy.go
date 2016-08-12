@@ -21,32 +21,35 @@ limitations under the License.
 package v2alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_Job, InType: reflect.TypeOf(func() *Job { var x *Job; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobCondition, InType: reflect.TypeOf(func() *JobCondition { var x *JobCondition; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobList, InType: reflect.TypeOf(func() *JobList { var x *JobList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobSpec, InType: reflect.TypeOf(func() *JobSpec { var x *JobSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobStatus, InType: reflect.TypeOf(func() *JobStatus { var x *JobStatus; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobTemplate, InType: reflect.TypeOf(func() *JobTemplate { var x *JobTemplate; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobTemplateSpec, InType: reflect.TypeOf(func() *JobTemplateSpec { var x *JobTemplateSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_LabelSelector, InType: reflect.TypeOf(func() *LabelSelector { var x *LabelSelector; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_LabelSelectorRequirement, InType: reflect.TypeOf(func() *LabelSelectorRequirement { var x *LabelSelectorRequirement; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJob, InType: reflect.TypeOf(func() *ScheduledJob { var x *ScheduledJob; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobList, InType: reflect.TypeOf(func() *ScheduledJobList { var x *ScheduledJobList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobSpec, InType: reflect.TypeOf(func() *ScheduledJobSpec { var x *ScheduledJobSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobStatus, InType: reflect.TypeOf(func() *ScheduledJobStatus { var x *ScheduledJobStatus; return x }())},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_Job, InType: reflect.TypeOf(&Job{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobCondition, InType: reflect.TypeOf(&JobCondition{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobList, InType: reflect.TypeOf(&JobList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobSpec, InType: reflect.TypeOf(&JobSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobStatus, InType: reflect.TypeOf(&JobStatus{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobTemplate, InType: reflect.TypeOf(&JobTemplate{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_JobTemplateSpec, InType: reflect.TypeOf(&JobTemplateSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_LabelSelector, InType: reflect.TypeOf(&LabelSelector{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_LabelSelectorRequirement, InType: reflect.TypeOf(&LabelSelectorRequirement{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJob, InType: reflect.TypeOf(&ScheduledJob{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobList, InType: reflect.TypeOf(&ScheduledJobList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobSpec, InType: reflect.TypeOf(&ScheduledJobSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v2alpha1_ScheduledJobStatus, InType: reflect.TypeOf(&ScheduledJobStatus{})},
+	)
 }
 
 func DeepCopy_v2alpha1_Job(in interface{}, out interface{}, c *conversion.Cloner) error {

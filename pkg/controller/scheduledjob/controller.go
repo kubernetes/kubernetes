@@ -99,7 +99,7 @@ func (jm *ScheduledJobController) SyncAll() {
 		return
 	}
 	sjs := sjl.Items
-	glog.Info("Found %d scheduledjobs", len(sjs))
+	glog.Infof("Found %d scheduledjobs", len(sjs))
 
 	jl, err := jm.kubeClient.Batch().Jobs(api.NamespaceAll).List(api.ListOptions{})
 	if err != nil {
@@ -107,10 +107,10 @@ func (jm *ScheduledJobController) SyncAll() {
 		return
 	}
 	js := jl.Items
-	glog.Info("Found %d jobs", len(js))
+	glog.Infof("Found %d jobs", len(js))
 
 	jobsBySj := groupJobsByParent(sjs, js)
-	glog.Info("Found %d groups", len(jobsBySj))
+	glog.Infof("Found %d groups", len(jobsBySj))
 
 	for _, sj := range sjs {
 		SyncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.recorder)
@@ -209,7 +209,7 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		}
 	}
 
-	jobReq, err := getJobFromTemplate(&sj)
+	jobReq, err := getJobFromTemplate(&sj, scheduledTime)
 	if err != nil {
 		glog.Errorf("Unable to make Job from template in %s: %v", nameForLog, err)
 		return
@@ -228,8 +228,8 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 	// the next time.  Actually, if we relist the SJs and Jobs on the next
 	// iteration of SyncAll, we might not see our own status update, and
 	// then post one again.  So, we need to use the job name as a lock to
-	// prevent us from making the job twice.  TODO: name the job
-	// deterministically (via hash of its scheduled time).
+	// prevent us from making the job twice (name the job with hash of its
+	// scheduled time).
 
 	// Add the just-started job to the status list.
 	ref, err := getRef(jobResp)

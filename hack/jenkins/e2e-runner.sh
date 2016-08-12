@@ -376,7 +376,10 @@ if [[ "${E2E_DOWN,,}" == "true" ]]; then
 fi
 
 if [[ "${E2E_TEST,,}" == "true" ]]; then
-  e2e_go_args+=(--test --test_args="${GINKGO_TEST_ARGS}")
+  e2e_go_args+=(--test)
+  if [[ -n "${GINKGO_TEST_ARGS:-}" ]]; then
+    e2e_go_args+=(--test_args="${GINKGO_TEST_ARGS}")
+  fi
 fi
 
 # Optionally run tests from the version in  kubernetes_skew
@@ -387,6 +390,10 @@ fi
 # Optionally run upgrade tests before other tests.
 if [[ "${E2E_UPGRADE_TEST:-}" == "true" ]]; then
   e2e_go_args+=(--upgrade_args="${GINKGO_UPGRADE_TEST_ARGS}")
+fi
+
+if [[ "${USE_KUBEMARK:-}" == "true" ]]; then
+  e2e_go_args+=("--kubemark=true")
 fi
 
 go run ./hack/e2e.go \

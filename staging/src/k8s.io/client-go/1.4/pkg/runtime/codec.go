@@ -80,12 +80,14 @@ func EncodeOrDie(e Encoder, obj Object) string {
 // invokes the ObjectCreator to instantiate a new gvk. Returns an error if the typer cannot find the object.
 func UseOrCreateObject(t ObjectTyper, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {
 	if obj != nil {
-		into, _, err := t.ObjectKinds(obj)
+		kinds, _, err := t.ObjectKinds(obj)
 		if err != nil {
 			return nil, err
 		}
-		if gvk == into[0] {
-			return obj, nil
+		for _, kind := range kinds {
+			if gvk == kind {
+				return obj, nil
+			}
 		}
 	}
 	return c.New(gvk)

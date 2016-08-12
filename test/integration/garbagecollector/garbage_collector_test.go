@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -424,6 +425,19 @@ func TestStressingCascadingDeletion(t *testing.T) {
 	if gc.GraphHasUID(uids) {
 		t.Errorf("Expect all nodes representing replication controllers are removed from the Propagator's graph")
 	}
+	metric := &dto.Metric{}
+	garbagecollector.EventProcessingLatency.Write(metric)
+	count := float64(metric.Summary.GetSampleCount())
+	sum := metric.Summary.GetSampleSum()
+	t.Logf("Average time spent in GC's eventQueue is %.1f microseconds", sum/count)
+	garbagecollector.DirtyProcessingLatency.Write(metric)
+	count = float64(metric.Summary.GetSampleCount())
+	sum = metric.Summary.GetSampleSum()
+	t.Logf("Average time spent in GC's dirtyQueue is %.1f microseconds", sum/count)
+	garbagecollector.OrphanProcessingLatency.Write(metric)
+	count = float64(metric.Summary.GetSampleCount())
+	sum = metric.Summary.GetSampleSum()
+	t.Logf("Average time spent in GC's orphanQueue is %.1f microseconds", sum/count)
 }
 
 func TestOrphaning(t *testing.T) {

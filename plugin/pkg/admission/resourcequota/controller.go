@@ -358,6 +358,12 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 	// on updates, we need to subtract the previous measured usage
 	// if usage shows no change, just return since it has no impact on quota
 	deltaUsage := evaluator.Usage(inputObject)
+
+	// ensure that usage for input object is never negative (this would mean a resource made a negative resource requirement)
+	if negativeUsage := quota.IsNegative(deltaUsage); len(negativeUsage) > 0 {
+		return nil, admission.NewForbidden(a, fmt.Errorf("quota usage is negative for resource(s): %s", prettyPrintResourceNames(negativeUsage)))
+	}
+
 	if admission.Update == op {
 		prevItem := a.GetOldObject()
 		if prevItem == nil {
@@ -497,6 +503,15 @@ func prettyPrint(item api.ResourceList) string {
 		parts = append(parts, constraint)
 	}
 	return strings.Join(parts, ",")
+}
+
+func prettyPrintResourceNames(a []api.ResourceName) string {
+	values := []string{}
+	for _, value := range a {
+		values = append(values, string(value))
+	}
+	sort.Strings(values)
+	return strings.Join(values, ",")
 }
 
 // hasUsageStats returns true if for each hard constraint there is a value for its current usage

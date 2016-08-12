@@ -26,6 +26,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
 	"path"
 	"strconv"
 	"strings"
@@ -34,6 +35,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"github.com/syndtr/gocapability/capability"
 
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
@@ -208,7 +210,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		Cloud:                        nil, // cloud provider might start background processes
 		ClusterDNS:                   net.ParseIP(s.ClusterDNS),
 		ClusterDomain:                s.ClusterDomain,
-		ConfigFile:                   s.Config,
+		ConfigFile:                   s.PodManifestPath,
 		ConfigureCBR0:                s.ConfigureCBR0,
 		ContainerManager:             nil,
 		ContainerRuntime:             s.ContainerRuntime,
@@ -321,6 +323,16 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
 	}
+
+	// check if we have CAP_SYS_ADMIN to setgroup properly
+	pid, err := capability.NewPid(os.Getpid())
+	if err != nil {
+		return err
+	}
+	if !pid.Get(capability.EFFECTIVE, capability.CAP_SYS_ADMIN) {
+		return fmt.Errorf("Kubelet needs the CAP_SYS_ADMIN capability. Please run kubelet as root or in a privileged container")
+	}
+
 	if kcfg == nil {
 		cfg, err := UnsecuredKubeletConfig(s)
 		if err != nil {

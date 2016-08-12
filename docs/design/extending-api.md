@@ -132,6 +132,8 @@ versions:
 Then the API server will program in the new RESTful resource path:
    * `/apis/stable.example.com/v1/namespaces/<namespace>/crontabs/...`
 
+**Note: This may take a while before RESTful resource path registration happen, please
+always check this before you create resource instances.**
 
 Now that this schema has been created, a user can `POST`:
 

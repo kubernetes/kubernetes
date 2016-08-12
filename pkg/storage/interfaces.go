@@ -112,11 +112,6 @@ func NewUIDPreconditions(uid string) *Preconditions {
 // Interface offers a common interface for object marshaling/unmarshaling operations and
 // hides all the storage-related operations behind it.
 type Interface interface {
-	// Returns list of servers addresses of the underyling database.
-	// TODO: This method is used only in a single place. Consider refactoring and getting rid
-	// of this method from the interface.
-	Backends(ctx context.Context) []string
-
 	// Returns Versioner associated with this interface.
 	Versioner() Versioner
 

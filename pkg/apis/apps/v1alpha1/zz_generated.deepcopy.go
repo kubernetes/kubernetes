@@ -21,23 +21,26 @@ limitations under the License.
 package v1alpha1
 
 import (
-	api "k8s.io/kubernetes/pkg/api"
 	unversioned "k8s.io/kubernetes/pkg/api/unversioned"
 	v1 "k8s.io/kubernetes/pkg/api/v1"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSet, InType: reflect.TypeOf(func() *PetSet { var x *PetSet; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetList, InType: reflect.TypeOf(func() *PetSetList { var x *PetSetList; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetSpec, InType: reflect.TypeOf(func() *PetSetSpec { var x *PetSetSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetStatus, InType: reflect.TypeOf(func() *PetSetStatus { var x *PetSetStatus; return x }())},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSet, InType: reflect.TypeOf(&PetSet{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetList, InType: reflect.TypeOf(&PetSetList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetSpec, InType: reflect.TypeOf(&PetSetSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_PetSetStatus, InType: reflect.TypeOf(&PetSetStatus{})},
+	)
 }
 
 func DeepCopy_v1alpha1_PetSet(in interface{}, out interface{}, c *conversion.Cloner) error {

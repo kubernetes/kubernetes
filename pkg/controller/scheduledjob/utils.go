@@ -19,6 +19,7 @@ package scheduledjob
 import (
 	"encoding/json"
 	"fmt"
+	"hash/adler32"
 	"time"
 
 	"github.com/golang/glog"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
+	hashutil "k8s.io/kubernetes/pkg/util/hash"
 )
 
 // Utilities for dealing with Jobs and ScheduledJobs and time.
@@ -111,8 +113,8 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 	// How to handle concurrency control.
 	// How to detect changes to schedules or deleted schedules and then
 	// update the jobs?
-
-	sched, err := cron.Parse(schedule)
+	tmpSched := addSeconds(schedule)
+	sched, err := cron.Parse(tmpSched)
 	if err != nil {
 		return time.Unix(0, 0), fmt.Errorf("Unparseable schedule: %s : %s", schedule, err)
 	}
@@ -125,7 +127,8 @@ func getNextStartTimeAfter(schedule string, now time.Time) (time.Time, error) {
 // If there were missed times prior to the last known start time, then those are not returned.
 func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.Time, error) {
 	starts := []time.Time{}
-	sched, err := cron.Parse(sj.Spec.Schedule)
+	tmpSched := addSeconds(sj.Spec.Schedule)
+	sched, err := cron.Parse(tmpSched)
 	if err != nil {
 		return starts, fmt.Errorf("Unparseable schedule: %s : %s", sj.Spec.Schedule, err)
 	}
@@ -173,10 +176,19 @@ func getRecentUnmetScheduleTimes(sj batch.ScheduledJob, now time.Time) ([]time.T
 	return starts, nil
 }
 
+// TODO soltysh: this should be removed when https://github.com/robfig/cron/issues/58 is fixed
+func addSeconds(schedule string) string {
+	tmpSched := schedule
+	if len(schedule) > 0 && schedule[0] != '@' {
+		tmpSched = "0 " + schedule
+	}
+	return tmpSched
+}
+
 // XXX unit test this
 
 // getJobFromTemplate makes a Job from a ScheduledJob
-func getJobFromTemplate(sj *batch.ScheduledJob) (*batch.Job, error) {
+func getJobFromTemplate(sj *batch.ScheduledJob, scheduledTime time.Time) (*batch.Job, error) {
 	// TODO: consider adding the following labels:
 	// nominal-start-time=$RFC_3339_DATE_OF_INTENDED_START -- for user convenience
 	// scheduled-job-name=$SJ_NAME -- for user convenience
@@ -187,22 +199,26 @@ func getJobFromTemplate(sj *batch.ScheduledJob) (*batch.Job, error) {
 		return nil, err
 	}
 	annotations[CreatedByAnnotation] = string(createdByRefJson)
-	// TODO: instead of using generateName, use a deterministic hash of the nominal
-	// start time, to prevent same job being created twice.
-	// We want job names for a given nominal start time to have a predictable name to avoid
-	prefix := fmt.Sprintf("%s-", sj.Name)
+	// We want job names for a given nominal start time to have a deterministic name to avoid the same job being created twice
+	name := fmt.Sprintf("%s-%d", sj.Name, getTimeHash(scheduledTime))
 
 	job := &batch.Job{
 		ObjectMeta: api.ObjectMeta{
-			Labels:       labels,
-			Annotations:  annotations,
-			GenerateName: prefix,
+			Labels:      labels,
+			Annotations: annotations,
+			Name:        name,
 		},
 	}
 	if err := api.Scheme.Convert(&sj.Spec.JobTemplate.Spec, &job.Spec); err != nil {
 		return nil, fmt.Errorf("unable to convert job template: %v", err)
 	}
 	return job, nil
+}
+
+func getTimeHash(scheduledTime time.Time) uint32 {
+	timeHasher := adler32.New()
+	hashutil.DeepHashObject(timeHasher, scheduledTime)
+	return timeHasher.Sum32()
 }
 
 // makeCreatedByRefJson makes a json string with an object reference for use in "created-by" annotation value

@@ -23,23 +23,27 @@ package authorization
 import (
 	api "k8s.io/kubernetes/pkg/api"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 	reflect "reflect"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_LocalSubjectAccessReview, InType: reflect.TypeOf(func() *LocalSubjectAccessReview { var x *LocalSubjectAccessReview; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_NonResourceAttributes, InType: reflect.TypeOf(func() *NonResourceAttributes { var x *NonResourceAttributes; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_ResourceAttributes, InType: reflect.TypeOf(func() *ResourceAttributes { var x *ResourceAttributes; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SelfSubjectAccessReview, InType: reflect.TypeOf(func() *SelfSubjectAccessReview { var x *SelfSubjectAccessReview; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SelfSubjectAccessReviewSpec, InType: reflect.TypeOf(func() *SelfSubjectAccessReviewSpec { var x *SelfSubjectAccessReviewSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReview, InType: reflect.TypeOf(func() *SubjectAccessReview { var x *SubjectAccessReview; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReviewSpec, InType: reflect.TypeOf(func() *SubjectAccessReviewSpec { var x *SubjectAccessReviewSpec; return x }())},
-		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReviewStatus, InType: reflect.TypeOf(func() *SubjectAccessReviewStatus { var x *SubjectAccessReviewStatus; return x }())},
-	); err != nil {
-		// if one of the deep copy functions is malformed, detect it immediately.
-		panic(err)
-	}
+	SchemeBuilder.Register(RegisterDeepCopies)
+}
+
+// RegisterDeepCopies adds deep-copy functions to the given scheme. Public
+// to allow building arbitrary schemes.
+func RegisterDeepCopies(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_LocalSubjectAccessReview, InType: reflect.TypeOf(&LocalSubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_NonResourceAttributes, InType: reflect.TypeOf(&NonResourceAttributes{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_ResourceAttributes, InType: reflect.TypeOf(&ResourceAttributes{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SelfSubjectAccessReview, InType: reflect.TypeOf(&SelfSubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SelfSubjectAccessReviewSpec, InType: reflect.TypeOf(&SelfSubjectAccessReviewSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReview, InType: reflect.TypeOf(&SubjectAccessReview{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReviewSpec, InType: reflect.TypeOf(&SubjectAccessReviewSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_authorization_SubjectAccessReviewStatus, InType: reflect.TypeOf(&SubjectAccessReviewStatus{})},
+	)
 }
 
 func DeepCopy_authorization_LocalSubjectAccessReview(in interface{}, out interface{}, c *conversion.Cloner) error {

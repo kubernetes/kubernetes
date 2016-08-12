@@ -65,6 +65,9 @@ func (pfs *ProcFS) GetFullContainerName(pid int) (string, error) {
 func PidOf(name string) []int {
 	pids := []int{}
 	filepath.Walk("/proc", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 		base := filepath.Base(path)
 		// Traverse only the directories we are interested in
 		if info.IsDir() && path != "/proc" {

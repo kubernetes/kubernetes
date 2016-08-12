@@ -40,7 +40,18 @@ WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts
 
 mkdir -p ${ARTIFACTS}
-go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
+
+if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
+  echo 'Activating service account...'  # No harm in doing this multiple times.
+  gcloud auth activate-service-account --key-file="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
+  # https://developers.google.com/identity/protocols/application-default-credentials
+  export GOOGLE_APPLICATION_CREDENTIALS="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
+  unset KUBEKINS_SERVICE_ACCOUNT_FILE
+elif [[ -n "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
+  echo "ERROR: cannot access service account file at: ${KUBEKINS_SERVICE_ACCOUNT_FILE}"
+fi
+
+go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
   --zone="$GCE_ZONE" --project="$GCE_PROJECT" --hosts="$GCE_HOSTS" \
   --images="$GCE_IMAGES" --image-project="$GCE_IMAGE_PROJECT" \
   --image-config-file="$GCE_IMAGE_CONFIG_PATH" --cleanup="$CLEANUP" \

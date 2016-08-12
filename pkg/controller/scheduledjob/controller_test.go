@@ -29,7 +29,7 @@ import (
 
 // schedule is hourly on the hour
 var (
-	onTheHour string = "0 0 * * * ?"
+	onTheHour string = "0 * * * ?"
 )
 
 func justBeforeTheHour() time.Time {
@@ -83,7 +83,7 @@ func scheduledJob() batch.ScheduledJob {
 			CreationTimestamp: unversioned.Time{Time: justBeforeTheHour()},
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "0 0 * * * * ?",
+			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				ObjectMeta: api.ObjectMeta{

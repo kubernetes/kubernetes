@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/conversion/queryparams"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
+	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -76,6 +77,11 @@ func NewClient(conf *restclient.Config) (*Client, error) {
 	}
 
 	return &Client{cl: cl}, nil
+}
+
+// GetRateLimiter returns rate limier.
+func (c *Client) GetRateLimiter() flowcontrol.RateLimiter {
+	return c.cl.GetRateLimiter()
 }
 
 // Resource returns an API interface to the specified resource for this client's
