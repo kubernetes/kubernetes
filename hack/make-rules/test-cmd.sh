@@ -80,7 +80,7 @@ function cleanup()
 {
   [[ -n "${APISERVER_PID-}" ]] && kill "${APISERVER_PID}" 1>&2 2>/dev/null
   [[ -n "${CTLRMGR_PID-}" ]] && kill "${CTLRMGR_PID}" 1>&2 2>/dev/null
-  [[ -n "${KUBELET_PID-}" ]] && kill "${KUBELET_PID}" 1>&2 2>/dev/null
+  [[ -n "${KUBELET_PID-}" ]] && sudo kill "${KUBELET_PID}" 1>&2 2>/dev/null
   stop-proxy
 
   kube::etcd::cleanup
@@ -177,7 +177,7 @@ BINS=(
 make -C "${KUBE_ROOT}" WHAT="${BINS[*]}"
 
 kube::log::status "Starting kubelet in masterless mode"
-"${KUBE_OUTPUT_HOSTBIN}/kubelet" \
+sudo "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
   --really-crash-for-testing=true \
   --root-dir=/tmp/kubelet.$$ \
   --cert-dir="${TMPDIR:-/tmp/}" \
@@ -188,10 +188,10 @@ kube::log::status "Starting kubelet in masterless mode"
   --healthz-port="${KUBELET_HEALTHZ_PORT}" 1>&2 &
 KUBELET_PID=$!
 kube::util::wait_for_url "http://127.0.0.1:${KUBELET_HEALTHZ_PORT}/healthz" "kubelet(masterless)"
-kill ${KUBELET_PID} 1>&2 2>/dev/null
+sudo kill ${KUBELET_PID} 1>&2 2>/dev/null
 
 kube::log::status "Starting kubelet in masterful mode"
-"${KUBE_OUTPUT_HOSTBIN}/kubelet" \
+sudo "${KUBE_OUTPUT_HOSTBIN}/kubelet" \
   --really-crash-for-testing=true \
   --root-dir=/tmp/kubelet.$$ \
   --cert-dir="${TMPDIR:-/tmp/}" \
