@@ -22,7 +22,7 @@ import (
 	"k8s.io/client-go/1.4/pkg/runtime/serializer/json"
 	"k8s.io/client-go/1.4/pkg/runtime/serializer/versioning"
 	"k8s.io/client-go/1.4/tools/clientcmd/api"
-	_ "k8s.io/client-go/1.4/tools/clientcmd/api/v1"
+	"k8s.io/client-go/1.4/tools/clientcmd/api/v1"
 )
 
 // Version is the string that represents the current external default version.
@@ -40,12 +40,24 @@ const OldestVersion = "v1"
 // with a set of versions to choose.
 var Versions = []string{"v1"}
 
-var Codec runtime.Codec
+var (
+	Codec  runtime.Codec
+	Scheme *runtime.Scheme
+)
 
 func init() {
-	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, api.Scheme, api.Scheme)
+	Scheme = runtime.NewScheme()
+	if err := api.AddToScheme(Scheme); err != nil {
+		// Programmer error, detect immediately
+		panic(err)
+	}
+	if err := v1.AddToScheme(Scheme); err != nil {
+		// Programmer error, detect immediately
+		panic(err)
+	}
+	yamlSerializer := json.NewYAMLSerializer(json.DefaultMetaFactory, Scheme, Scheme)
 	Codec = versioning.NewCodecForScheme(
-		api.Scheme,
+		Scheme,
 		yamlSerializer,
 		yamlSerializer,
 		[]unversioned.GroupVersion{{Version: Version}},

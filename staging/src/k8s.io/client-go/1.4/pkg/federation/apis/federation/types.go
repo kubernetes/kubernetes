@@ -129,7 +129,7 @@ type FederatedReplicaSetPreferences struct {
 // Preferences regarding number of replicas assigned to a cluster replicaset within a federated replicaset.
 type ClusterReplicaSetPreferences struct {
 	// Minimum number of replicas that should be assigned to this Local ReplicaSet. 0 by default.
-	MinReplicas int64 `json:"maxReplicas,omitempty"`
+	MinReplicas int64 `json:"minReplicas,omitempty"`
 
 	// Maximum number of replicas that should be assigned to this Local ReplicaSet. Unbounded if no value provided (default).
 	MaxReplicas *int64 `json:"maxReplicas,omitempty"`

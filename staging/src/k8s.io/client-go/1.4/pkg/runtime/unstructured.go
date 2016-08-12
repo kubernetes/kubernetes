@@ -95,6 +95,7 @@ func (s unstructuredJSONScheme) decode(data []byte) (Object, error) {
 	err := s.decodeToUnstructured(data, unstruct)
 	return unstruct, err
 }
+
 func (s unstructuredJSONScheme) decodeInto(data []byte, obj Object) error {
 	switch x := obj.(type) {
 	case *Unstructured:

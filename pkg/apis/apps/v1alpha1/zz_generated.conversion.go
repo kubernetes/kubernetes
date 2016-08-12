@@ -24,10 +24,17 @@ import (
 	api "k8s.io/kubernetes/pkg/api"
 	apps "k8s.io/kubernetes/pkg/apis/apps"
 	conversion "k8s.io/kubernetes/pkg/conversion"
+	runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
 func init() {
-	if err := api.Scheme.AddGeneratedConversionFuncs(
+	SchemeBuilder.Register(RegisterConversions)
+}
+
+// RegisterConversions adds conversion functions to the given scheme.
+// Public to allow building arbitrary schemes.
+func RegisterConversions(scheme *runtime.Scheme) error {
+	return scheme.AddGeneratedConversionFuncs(
 		Convert_v1alpha1_PetSet_To_apps_PetSet,
 		Convert_apps_PetSet_To_v1alpha1_PetSet,
 		Convert_v1alpha1_PetSetList_To_apps_PetSetList,
@@ -36,10 +43,7 @@ func init() {
 		Convert_apps_PetSetSpec_To_v1alpha1_PetSetSpec,
 		Convert_v1alpha1_PetSetStatus_To_apps_PetSetStatus,
 		Convert_apps_PetSetStatus_To_v1alpha1_PetSetStatus,
-	); err != nil {
-		// if one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+	)
 }
 
 func autoConvert_v1alpha1_PetSet_To_apps_PetSet(in *PetSet, out *apps.PetSet, s conversion.Scope) error {
