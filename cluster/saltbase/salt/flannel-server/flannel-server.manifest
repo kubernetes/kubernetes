@@ -75,7 +75,7 @@
             },
             {
                 "name": "etcd-container",
-                "image": "gcr.io/google_containers/etcd:3.0.3",
+                "image": "gcr.io/google_containers/etcd:3.0.4",
                 "command": [
                     "/bin/sh",
                     "-c",
