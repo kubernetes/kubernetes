@@ -122,12 +122,19 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 		writer = &kubeio.NsenterWriter{}
 	}
 
+	var dockerClient dockertools.DockerInterface
+	if s.ContainerRuntime == "docker" {
+		dockerClient = dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration)
+	} else {
+		dockerClient = nil
+	}
+
 	return &kubelet.KubeletDeps{
 		Auth:              nil, // default does not enforce auth[nz]
 		CAdvisorInterface: nil, // launches background processes, not set here
 		Cloud:             nil, // cloud provider might start background processes
 		ContainerManager:  nil,
-		DockerClient:      dockertools.ConnectToDockerOrDie(s.DockerEndpoint, s.RuntimeRequestTimeout.Duration), // TODO(random-liu): Set RuntimeRequestTimeout for rkt.
+		DockerClient:      dockerClient,
 		KubeClient:        nil,
 		Mounter:           mounter,
 		NetworkPlugins:    ProbeNetworkPlugins(s.NetworkPluginDir),
