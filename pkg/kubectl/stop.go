@@ -202,7 +202,9 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 			return err
 		}
 	}
-	return rc.Delete(name, nil)
+	falseVar := false
+	deleteOptions := &api.DeleteOptions{OrphanDependents: &falseVar}
+	return rc.Delete(name, deleteOptions)
 }
 
 // TODO(madhusudancs): Implement it when controllerRef is implemented - https://github.com/kubernetes/kubernetes/issues/2210
@@ -274,10 +276,9 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 		}
 	}
 
-	if err := rsc.Delete(name, nil); err != nil {
-		return err
-	}
-	return nil
+	falseVar := false
+	deleteOptions := &api.DeleteOptions{OrphanDependents: &falseVar}
+	return rsc.Delete(name, deleteOptions)
 }
 
 func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
