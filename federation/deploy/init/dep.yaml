@@ -1,0 +1,18 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    run: fi
+  name: fi
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        run: fi
+    spec:
+      containers:
+      - image: gcr.io/madhusudancs-containers/federation/init:v0.9.0
+        imagePullPolicy: Always
+        name: fi
+      restartPolicy: Always
