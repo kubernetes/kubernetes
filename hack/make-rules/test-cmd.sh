@@ -1066,6 +1066,18 @@ __EOF__
   # teardown
   kubectl delete thirdpartyresources foo.company.com "${kube_flags[@]}"
 
+  #################
+  # Run cmd w img #
+  #################
+
+  # Test that a valid image reference value is provided as the value of --image in `kubectl run <name> --image`
+  output_message=$(kubectl run test1 --image=validname)
+  kube::test::if_has_string "${output_message}" 'deployment "test1" created'
+  # test invalid image name
+  output_message=$(! kubectl run test2 --image=InvalidImageName 2>&1)
+  kube::test::if_has_string "${output_message}" 'error: Invalid image name "InvalidImageName": invalid reference format'
+
+
   #####################################
   # Recursive Resources via directory #
   #####################################
