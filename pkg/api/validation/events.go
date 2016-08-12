@@ -31,24 +31,27 @@ import (
 // ValidateEvent makes sure that the event makes sense.
 func ValidateEvent(event *api.Event) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// There is no namespace required for root-scoped kind, for example, node.
-	// However, older client code accidentally sets event.Namespace
-	// to api.NamespaceDefault, so we accept that too, but "" is preferred.
-	// Todo: Events may reference 3rd party object, and we can't check whether the object is namespaced.
-	// Suppose them are namespaced. Do check if we can get the piece of information.
-	// This should apply to all groups served by this apiserver.
-	namespacedKindFlag, err := isNamespacedKind(event.InvolvedObject.Kind, event.InvolvedObject.APIVersion)
 
-	// if we don't know whether this type is namespace or not, don't fail the event.  We shouldn't assume that we know about every type in the universe
-	if err == nil {
-		if !namespacedKindFlag &&
-			event.Namespace != api.NamespaceDefault &&
-			event.Namespace != "" {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, fmt.Sprintf("not allowed for %s", event.InvolvedObject.Kind)))
+	// Make sure event.Namespace and the involvedObject.Namespace agree
+	if len(event.InvolvedObject.Namespace) == 0 {
+		// event.Namespace must also be empty (or "default", for compatibility with old clients)
+		if event.Namespace != api.NamespaceNone && event.Namespace != api.NamespaceDefault {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match event.namespace"))
 		}
-		if namespacedKindFlag &&
-			event.Namespace != event.InvolvedObject.Namespace {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match involvedObject"))
+	} else {
+		// event namespace must match
+		if event.Namespace != event.InvolvedObject.Namespace {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, "does not match event.namespace"))
+		}
+	}
+
+	// For kinds we recognize, make sure involvedObject.Namespace is set for namespaced kinds
+	if namespaced, err := isNamespacedKind(event.InvolvedObject.Kind, event.InvolvedObject.APIVersion); err == nil {
+		if namespaced && len(event.InvolvedObject.Namespace) == 0 {
+			allErrs = append(allErrs, field.Required(field.NewPath("involvedObject", "namespace"), fmt.Sprintf("required for kind %s", event.InvolvedObject.Kind)))
+		}
+		if !namespaced && len(event.InvolvedObject.Namespace) > 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("involvedObject", "namespace"), event.InvolvedObject.Namespace, fmt.Sprintf("not allowed for kind %s", event.InvolvedObject.Kind)))
 		}
 	}
 

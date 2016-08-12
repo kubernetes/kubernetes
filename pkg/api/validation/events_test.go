@@ -126,7 +126,7 @@ func TestValidateEvent(t *testing.T) {
 					Namespace:  "foo",
 				},
 			},
-			true,
+			false,
 		}, {
 			&api.Event{
 				ObjectMeta: api.ObjectMeta{
@@ -152,7 +152,7 @@ func TestValidateEvent(t *testing.T) {
 					Namespace:  "foo",
 				},
 			},
-			true,
+			false,
 		}, {
 			&api.Event{
 				ObjectMeta: api.ObjectMeta{
@@ -167,6 +167,48 @@ func TestValidateEvent(t *testing.T) {
 				},
 			},
 			true,
+		},
+		{
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test12",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "other/v1beta1",
+					Kind:       "FooBar",
+					Namespace:  "bar",
+				},
+			},
+			false,
+		},
+		{
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test13",
+					Namespace: "",
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "other/v1beta1",
+					Kind:       "FooBar",
+					Namespace:  "bar",
+				},
+			},
+			false,
+		},
+		{
+			&api.Event{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "test14",
+					Namespace: "foo",
+				},
+				InvolvedObject: api.ObjectReference{
+					APIVersion: "other/v1beta1",
+					Kind:       "FooBar",
+					Namespace:  "",
+				},
+			},
+			false,
 		},
 	}
 
