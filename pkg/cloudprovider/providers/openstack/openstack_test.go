@@ -205,50 +205,29 @@ func TestLoadBalancer(t *testing.T) {
 		t.Skipf("No config found in environment")
 	}
 
-	cfg.LoadBalancer.LBVersion = "v1"
+	versions := []string{"v1", "v2", ""}
 
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
+	for _, v := range versions {
+		t.Logf("Trying LBVersion = '%s'\n", v)
+		cfg.LoadBalancer.LBVersion = v
 
-	lb, ok := os.LoadBalancer()
-	if !ok {
-		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
-	}
+		os, err := newOpenStack(cfg)
+		if err != nil {
+			t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
+		}
 
-	_, exists, err := lb.GetLoadBalancer(testClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
-	if err != nil {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
-	}
-	if exists {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
-	}
-}
+		lb, ok := os.LoadBalancer()
+		if !ok {
+			t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
+		}
 
-func TestLoadBalancerV2(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
-		t.Skipf("No config found in environment")
-	}
-	cfg.LoadBalancer.LBVersion = "v2"
-
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
-
-	lbaas, ok := os.LoadBalancer()
-	if !ok {
-		t.Fatalf("LoadBalancer() returned false - perhaps your stack doesn't support Neutron?")
-	}
-
-	_, exists, err := lbaas.GetLoadBalancer(testClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
-	if err != nil {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
-	}
-	if exists {
-		t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
+		_, exists, err := lb.GetLoadBalancer(testClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "noexist"}})
+		if err != nil {
+			t.Fatalf("GetLoadBalancer(\"noexist\") returned error: %s", err)
+		}
+		if exists {
+			t.Fatalf("GetLoadBalancer(\"noexist\") returned exists")
+		}
 	}
 }
 
