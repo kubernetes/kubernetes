@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/controller/replicaset"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	labelsutil "k8s.io/kubernetes/pkg/util/labels"
 	podutil "k8s.io/kubernetes/pkg/util/pod"
@@ -357,10 +358,10 @@ func (dc *DeploymentController) scale(deployment *extensions.Deployment, newRS *
 		scalingOperation := "up"
 		switch {
 		case deploymentReplicasToAdd > 0:
-			sort.Sort(controller.ReplicaSetsBySizeNewer(allRSs))
+			sort.Sort(replicaset.ReplicaSetsBySizeNewer(allRSs))
 
 		case deploymentReplicasToAdd < 0:
-			sort.Sort(controller.ReplicaSetsBySizeOlder(allRSs))
+			sort.Sort(replicaset.ReplicaSetsBySizeOlder(allRSs))
 			scalingOperation = "down"
 
 		default: /* deploymentReplicasToAdd == 0 */
@@ -441,7 +442,7 @@ func (dc *DeploymentController) cleanupDeployment(oldRSs []*extensions.ReplicaSe
 		return nil
 	}
 
-	sort.Sort(controller.ReplicaSetsByCreationTimestamp(oldRSs))
+	sort.Sort(replicaset.ReplicaSetsByCreationTimestamp(oldRSs))
 
 	var errList []error
 	// TODO: This should be parallelized.

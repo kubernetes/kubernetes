@@ -1271,3 +1271,122 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	}
 	validateSyncReplicaSet(t, fakePodControl, 0, 0, 0)
 }
+
+
+func TestReplicaSetsByActiveness(t *testing.T) {
+
+	// Arrange
+	list := ReplicaSetsByActiveness([]extensions.ReplicaSet{
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 0},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo1",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 10},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo2",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2012, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 0},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo3-1234",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2013, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Labels:            map[string]string{"pod-template-hash": "1234"},
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 2},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo3-3456",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2016, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Labels:            map[string]string{"pod-template-hash": "3456"},
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 0},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo3-5678",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2015, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Labels:            map[string]string{"pod-template-hash": "5678"},
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 0},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo3-7890",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2014, time.January, 15, 0, 0, 0, 0, time.UTC)),
+				Labels:            map[string]string{"pod-template-hash": "7890"},
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 1},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo3-9012",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2016, time.June, 15, 0, 0, 0, 0, time.UTC)),
+				Labels:            map[string]string{"pod-template-hash": "9012"},
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 1},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo4",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2011, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 0},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo5",
+				Namespace:         "default",
+				CreationTimestamp: unversioned.NewTime(time.Date(2015, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 0},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo6",
+				Namespace:         "abc",
+				CreationTimestamp: unversioned.NewTime(time.Date(2010, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			},
+		},
+		{
+			Spec: extensions.ReplicaSetSpec{Replicas: 1},
+			ObjectMeta: api.ObjectMeta{
+				Name:              "foo7",
+				Namespace:         "abc",
+				CreationTimestamp: unversioned.NewTime(time.Date(2013, time.January, 15, 0, 0, 0, 0, time.UTC)),
+			},
+		},
+	})
+
+	// Act
+	sort.Sort(list)
+
+	// Assert
+	if list[0].Name != "foo7" || // namespace: abc
+		list[1].Name != "foo2" ||
+		list[2].Name != "foo3-9012" || // Jun 2016
+		list[3].Name != "foo3-3456" || // Jan 2016
+		list[4].Name != "foo4" ||
+		list[5].Name != "foo6" || // first with 0 replicas, ns: abc
+		list[6].Name != "foo1" ||
+		list[7].Name != "foo3-5678" || // 2015
+		list[8].Name != "foo3-7890" || // 2014
+		list[9].Name != "foo3-1234" || //2013
+		list[10].Name != "foo5" {
+		t.Fatal("Replica sets are not sorted correctly. List: ", fmt.Sprintf("%v\n", list))
+	}
+}
