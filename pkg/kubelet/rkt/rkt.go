@@ -52,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/rktshim"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/securitycontext"
@@ -158,6 +159,8 @@ type Runtime struct {
 	execer              utilexec.Interface
 	os                  kubecontainer.OSInterface
 
+	imageService *rktshim.ImageStore
+
 	// Network plugin.
 	networkPlugin network.NetworkPlugin
 
@@ -246,6 +249,22 @@ func New(
 		requestTimeout = defaultRequestTimeout
 	}
 
+	imgSvc, err := rktshim.NewImageStore(rktshim.ImageStoreConfig{
+		RequestTimeout: requestTimeout,
+		// TODO(tmrts): use the new CLI api throught the rkt pkg
+		CLI: rktshim.NewRktCLI(config.Path, execer, rktshim.CLIConfig{
+			Debug:           config.Debug,
+			Dir:             config.Dir,
+			LocalConfigDir:  config.LocalConfigDir,
+			UserConfigDir:   config.UserConfigDir,
+			SystemConfigDir: config.SystemConfigDir,
+			InsecureOptions: config.InsecureOptions,
+		}),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ImageService: %v", err)
+	}
+
 	rkt := &Runtime{
 		os:                  kubecontainer.RealOS{},
 		systemd:             systemd,
@@ -263,6 +282,7 @@ func New(
 		touchPath:           touchPath,
 		nsenterPath:         nsenterPath,
 		requestTimeout:      requestTimeout,
+		imageService:        imgSvc,
 	}
 
 	rkt.config, err = rkt.getConfig(rkt.config)
