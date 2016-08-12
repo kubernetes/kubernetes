@@ -34,7 +34,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/kubernetes/test/e2e_node"
+	"k8s.io/kubernetes/test/e2e_node/pkg/remote"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/glog"
@@ -131,7 +131,7 @@ func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 	if *buildOnly {
 		// Build the archive and exit
-		e2e_node.CreateTestArchive()
+		remote.CreateTestArchive()
 		return
 	}
 
@@ -295,7 +295,7 @@ func callGubernator(gubernator bool) {
 }
 
 func (a *Archive) getArchive() (string, error) {
-	a.Do(func() { a.path, a.err = e2e_node.CreateTestArchive() })
+	a.Do(func() { a.path, a.err = remote.CreateTestArchive() })
 	return a.path, a.err
 }
 
@@ -346,7 +346,7 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode b
 	}
 	externalIp := getExternalIp(instance)
 	if len(externalIp) > 0 {
-		e2e_node.AddHostnameIp(host, externalIp)
+		remote.AddHostnameIp(host, externalIp)
 	}
 
 	path, err := arc.getArchive()
@@ -357,7 +357,7 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode b
 		}
 	}
 
-	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs, ginkgoFlagsStr)
+	output, exitOk, err := remote.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs, ginkgoFlagsStr)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -497,10 +497,10 @@ func createInstance(imageConfig *internalGCEImage) (string, error) {
 		}
 		externalIp := getExternalIp(instance)
 		if len(externalIp) > 0 {
-			e2e_node.AddHostnameIp(name, externalIp)
+			remote.AddHostnameIp(name, externalIp)
 		}
 		var output string
-		output, err = e2e_node.RunSshCommand("ssh", e2e_node.GetHostnameOrIp(name), "--", "sudo", "docker", "version")
+		output, err = remote.RunSshCommand("ssh", remote.GetHostnameOrIp(name), "--", "sudo", "docker", "version")
 		if err != nil {
 			err = fmt.Errorf("instance %s not running docker daemon - Command failed: %s", name, output)
 			continue

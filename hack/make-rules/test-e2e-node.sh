@@ -135,7 +135,7 @@ if [ $remote = true ] ; then
   echo "Ginkgo Flags: $ginkgoflags"
   echo "Instance Metadata: $metadata"
   # Invoke the runner
-  go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=2 --ssh-env="gce" \
+  go run test/e2e_node/runner/e2e/run_e2e.go  --logtostderr --vmodule=*=4 --ssh-env="gce" \
     --zone="$zone" --project="$project" --gubernator="$gubernator" \
     --hosts="$hosts" --images="$images" --cleanup="$cleanup" \
     --results-dir="$artifacts" --ginkgo-flags="$ginkgoflags" \

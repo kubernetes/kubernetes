@@ -36,7 +36,7 @@ var buildTargets = []string{
 	"vendor/github.com/onsi/ginkgo/ginkgo",
 }
 
-func buildGo() error {
+func BuildGo() error {
 	glog.Infof("Building k8s binaries...")
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
@@ -74,7 +74,7 @@ func getK8sBin(bin string) (string, error) {
 		return filepath.Join(path, bin), nil
 	}
 
-	buildOutputDir, err := getK8sBuildOutputDir()
+	buildOutputDir, err := GetK8sBuildOutputDir()
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +101,7 @@ func getK8sRootDir() (string, error) {
 	return "", fmt.Errorf("Could not find kubernetes source root directory.")
 }
 
-func getK8sBuildOutputDir() (string, error) {
+func GetK8sBuildOutputDir() (string, error) {
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
 		return "", err
