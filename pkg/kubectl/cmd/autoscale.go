@@ -198,9 +198,13 @@ func validateFlags(cmd *cobra.Command) error {
 	errs := []error{}
 	max, min := cmdutil.GetFlagInt(cmd, "max"), cmdutil.GetFlagInt(cmd, "min")
 	if max < 1 {
-		errs = append(errs, fmt.Errorf("--max=MAXPODS is required and must be at least 1"))
-	} else if max < min {
-		errs = append(errs, fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS"))
+		errs = append(errs, fmt.Errorf("--max=MAXPODS is required and must be at least 1, max: %d", max))
+	}
+	if min < 0 {
+		errs = append(errs, fmt.Errorf("--min=MINPODS is required and must be at least 0, min: %d", min))
+	}
+	if max < min {
+		errs = append(errs, fmt.Errorf("--max=MAXPODS must be larger or equal to --min=MINPODS, max: %d, min: %d", max, min))
 	}
 	return utilerrors.NewAggregate(errs)
 }
