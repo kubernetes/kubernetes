@@ -105,6 +105,7 @@ func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_relea
 	c.DiscoveryClient.Client.Timeout = framework.SingleCallTimeout
 	c.FederationClient.Client.Timeout = framework.SingleCallTimeout
 	c.CoreClient.Client.Timeout = framework.SingleCallTimeout
+	c.ExtensionsClient.Client.Timeout = framework.SingleCallTimeout
 
 	return c, nil
 }

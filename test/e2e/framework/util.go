@@ -1765,7 +1765,7 @@ func LoadFederationClientset_1_4() (*federation_release_1_4.Clientset, error) {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err.Error())
 	}
 	// Set timeout for each client in the set.
-	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client)
+	setTimeouts(c.DiscoveryClient.Client, c.FederationClient.Client, c.CoreClient.Client, c.ExtensionsClient.Client)
 	return c, nil
 }
 
