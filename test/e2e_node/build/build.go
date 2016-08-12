@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package build
 
 import (
 	"flag"
@@ -36,7 +36,7 @@ var buildTargets = []string{
 	"vendor/github.com/onsi/ginkgo/ginkgo",
 }
 
-func buildGo() error {
+func BuildGo() error {
 	glog.Infof("Building k8s binaries...")
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
@@ -74,7 +74,7 @@ func getK8sBin(bin string) (string, error) {
 		return filepath.Join(path, bin), nil
 	}
 
-	buildOutputDir, err := getK8sBuildOutputDir()
+	buildOutputDir, err := GetK8sBuildOutputDir()
 	if err != nil {
 		return "", err
 	}
@@ -101,7 +101,7 @@ func getK8sRootDir() (string, error) {
 	return "", fmt.Errorf("Could not find kubernetes source root directory.")
 }
 
-func getK8sBuildOutputDir() (string, error) {
+func GetK8sBuildOutputDir() (string, error) {
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
 		return "", err
@@ -113,7 +113,7 @@ func getK8sBuildOutputDir() (string, error) {
 	return buildOutputDir, nil
 }
 
-func getKubeletServerBin() string {
+func GetKubeletServerBin() string {
 	bin, err := getK8sBin("kubelet")
 	if err != nil {
 		glog.Fatalf("Could not locate kubelet binary %v.", err)

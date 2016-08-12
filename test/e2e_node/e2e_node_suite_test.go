@@ -35,6 +35,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_node/services"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"
@@ -44,7 +45,7 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var e2es *E2EServices
+var e2es *services.E2EServices
 
 var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
 var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
@@ -61,7 +62,7 @@ func TestE2eNode(t *testing.T) {
 	pflag.Parse()
 	if *runServicesMode {
 		// If run-services-mode is specified, only run services in current process.
-		RunE2EServices()
+		services.RunE2EServices()
 		return
 	}
 	// If run-services-mode is not specified, run test.
@@ -85,10 +86,6 @@ func TestE2eNode(t *testing.T) {
 
 // Setup the kubelet on the node
 var _ = SynchronizedBeforeSuite(func() []byte {
-	if *buildServices {
-		Expect(buildGo()).To(Succeed())
-	}
-
 	// Initialize node name here, so that the following code can get right node name.
 	if framework.TestContext.NodeName == "" {
 		hostname, err := os.Hostname()
@@ -109,7 +106,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	maskLocksmithdOnCoreos()
 
 	if *startServices {
-		e2es = NewE2EServices()
+		e2es = services.NewE2EServices()
 		Expect(e2es.Start()).To(Succeed(), "should be able to start node services.")
 		glog.Infof("Node services started.  Running tests...")
 	} else {
