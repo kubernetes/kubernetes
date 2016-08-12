@@ -131,7 +131,7 @@ func UnsecuredKubeletDeps(s *options.KubeletServer) (*kubelet.KubeletDeps, error
 
 	return &kubelet.KubeletDeps{
 		Auth:              nil, // default does not enforce auth[nz]
-		CAdvisorInterface: nil, // launches background processes, not set here
+		CAdvisorInterface: nil, // cadvisor.New launches background processes (bg http.ListenAndServe, and some bg cleaners), not set here
 		Cloud:             nil, // cloud provider might start background processes
 		ContainerManager:  nil,
 		DockerClient:      dockerClient,
