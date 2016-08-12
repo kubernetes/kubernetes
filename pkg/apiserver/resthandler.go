@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/genericapiserver/audit"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -418,6 +419,16 @@ func createHandler(r rest.NamedCreater, scope RequestScope, typer runtime.Object
 		}
 		trace.Step("Self-link added")
 
+		if ev, _ := ctx.Value(audit.EventContextKey).(*audit.Event); ev != nil {
+			if ev.Level >= audit.RequestLogLevel {
+				ev.RequestObject = obj
+			}
+			if ev.Level >= audit.StorageLogLevel {
+				ev.NewObject = result
+			}
+		}
+		trace.Step("Audit information stored")
+
 		write(http.StatusCreated, scope.Kind.GroupVersion(), scope.Serializer, result, w, req.Request)
 	}
 }
@@ -639,9 +650,26 @@ func patchResource(
 		return patchedObject, admit(patchedObject, currentObject)
 	}
 
-	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, copier, applyPatch, applyAdmission)
+	transformers := []rest.TransformFunc{applyPatch, applyAdmission}
 
-	return finishRequest(timeout, func() (runtime.Object, error) {
+	// store auditing information
+	var oldObject runtime.Object
+	ev, _ := ctx.Value(audit.EventContextKey).(*audit.Event)
+	if ev != nil {
+		if ev.Level >= audit.RequestLogLevel {
+			ev.Patch = patchJS
+		}
+		if ev.Level >= audit.StorageLogLevel {
+			transformers = append(transformers, func(ctx api.Context, new runtime.Object, old runtime.Object) (runtime.Object, error) {
+				oldObject = old
+				return new, nil
+			})
+		}
+	}
+
+	updatedObjectInfo := rest.DefaultUpdatedObjectInfo(nil, copier, transformers...)
+
+	result, err := finishRequest(timeout, func() (runtime.Object, error) {
 		updateObject, _, updateErr := patcher.Update(ctx, name, updatedObjectInfo)
 		for i := 0; i < MaxPatchConflicts && (errors.IsConflict(updateErr)); i++ {
 			lastConflictErr = updateErr
@@ -649,6 +677,14 @@ func patchResource(
 		}
 		return updateObject, updateErr
 	})
+
+	// store auditing information
+	if ev != nil && ev.Level >= audit.StorageLogLevel {
+		ev.OldObject = oldObject
+		ev.NewObject = result
+	}
+
+	return result, err
 }
 
 // UpdateResource returns a function that will handle a resource update
@@ -711,6 +747,21 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			})
 		}
 
+		// store auditing information
+		var oldObject runtime.Object
+		ev, _ := ctx.Value(audit.EventContextKey).(*audit.Event)
+		if ev != nil {
+			if ev.Level >= audit.RequestLogLevel {
+				ev.RequestObject = obj
+			}
+			if ev.Level >= audit.StorageLogLevel {
+				transformers = append(transformers, func(ctx api.Context, new runtime.Object, old runtime.Object) (runtime.Object, error) {
+					oldObject = old
+					return new, nil
+				})
+			}
+		}
+
 		trace.Step("About to store object in database")
 		wasCreated := false
 		result, err := finishRequest(timeout, func() (runtime.Object, error) {
@@ -729,6 +780,13 @@ func UpdateResource(r rest.Updater, scope RequestScope, typer runtime.ObjectType
 			return
 		}
 		trace.Step("Self-link added")
+
+		// store auditing information
+		if ev != nil && ev.Level >= audit.StorageLogLevel {
+			ev.OldObject = oldObject
+			ev.NewObject = result
+		}
+		trace.Step("Audit information stored")
 
 		status := http.StatusOK
 		if wasCreated {
