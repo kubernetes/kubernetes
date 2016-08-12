@@ -18,37 +18,25 @@ package restclient
 
 import (
 	"net/url"
-	"sync"
+	"testing"
 )
 
-type URLProvider interface {
-	Get() *url.URL
-	Next() *url.URL
-}
+func TestRoundRobinProvider(t *testing.T) {
+	url1, _ := url.Parse("http://master:8000")
+	url2, _ := url.Parse("http://master:8001")
 
-type RoundRobinProvider struct {
-	sync.RWMutex
-	urls    []*url.URL
-	current int
-}
+	rr := &RoundRobinProvider{urls: []*url.URL{url1, url2}}
 
-func (p *RoundRobinProvider) Get() *url.URL {
-	p.RLock()
-	defer p.RUnlock()
-	return p.urls[p.current]
-}
-
-func (p *RoundRobinProvider) Next() *url.URL {
-	p.RLock()
-	defer p.RUnlock()
-	if p.current >= len(p.urls)-1 {
-		p.current = 0
-	} else {
-		p.current++
+	returned := rr.Get()
+	if url1 != returned {
+		t.Errorf("Expected %v != Returned %v", url1, returned)
 	}
-	return p.Get()
-}
-
-func NewRoundRobinProvider(urls ...*url.URL) *RoundRobinProvider {
-	return &RoundRobinProvider{urls: urls}
+	returned = rr.Next()
+	if url2 != returned {
+		t.Errorf("Expected %v != Returned %v", url2, returned)
+	}
+	returned = rr.Next()
+	if url1 != returned {
+		t.Errorf("Expected %v != Returned %v", url2, returned)
+	}
 }
