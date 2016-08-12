@@ -112,26 +112,6 @@ message Mount {
     optional bool selinux_relabel = 5;
 }
 
-// ResourceRequirements contains a set of resources
-// Valid resources are:
-// - cpu, in cores. (500m = .5 cores)
-// - memory, in bytes. (500Gi = 500GiB = 500 * 1024 * 1024 * 1024)
-message ResourceRequirements {
-    // The maximum amount of compute resources allowed.
-    optional double limits = 1;
-    // The minimum amount of compute resources required.
-    // If Request is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value
-    optional double requests = 2;
-}
-
-// PodSandboxResources contains the CPU/memory resource requirements.
-message PodSandboxResources {
-    // CPU resource requirement.
-    optional ResourceRequirements cpu = 1;
-    // Memory resource requirement.
-    optional ResourceRequirements memory = 2;
-}
-
 // NamespaceOption provides options for Linux namespaces.
 message NamespaceOption {
     // If set, use the host's network namespace.
@@ -181,20 +161,13 @@ message PodSandboxConfig {
     optional DNSOption dns_options = 4;
     // The port mappings for the sandbox.
     repeated PortMapping port_mappings = 5;
-    // Resources specifies the resource limits for the sandbox (i.e., the
-    // aggregate cpu/memory resources limits of all containers).
-    // Note: On a Linux host, kubelet will create a pod-level cgroup and pass
-    // it as the cgroup parent for the PodSandbox. For some runtimes, this is
-    // sufficient. For others, e.g., hypervisor-based runtimes, explicit
-    // resource limits for the sandbox are needed at creation time.
-    optional PodSandboxResources resources  = 6;
     // Labels are key value pairs that may be used to scope and select individual resources.
-    map<string, string> labels = 7;
+    map<string, string> labels = 6;
     // Annotations is an unstructured key value map that may be set by external
     // tools to store and retrieve arbitrary metadata.
-    map<string, string> annotations = 8;
+    map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
-    optional LinuxPodSandboxConfig linux = 9;
+    optional LinuxPodSandboxConfig linux = 8;
 }
 
 message CreatePodSandboxRequest {
