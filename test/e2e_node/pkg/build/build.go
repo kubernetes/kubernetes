@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package build
 
 import (
 	"flag"
@@ -113,7 +113,7 @@ func GetK8sBuildOutputDir() (string, error) {
 	return buildOutputDir, nil
 }
 
-func getKubeletServerBin() string {
+func GetKubeletServerBin() string {
 	bin, err := getK8sBin("kubelet")
 	if err != nil {
 		glog.Fatalf("Could not locate kubelet binary %v.", err)
