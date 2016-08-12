@@ -24,6 +24,13 @@ set -o pipefail
 
 source cluster/lib/logging.sh
 
+read -p "Do you want to run gubernator.sh and upload logs to GCS? [y/n]" yn
+echo
+if [[ ! $yn =~ ^[Yy]$ ]]
+then
+    exit 1
+fi
+
 # Check that user has gsutil
 if [[ $(which gsutil) == "" ]]; then
   echo "Could not find gsutil when running:\which gsutil"
