@@ -52,12 +52,6 @@ if  [[ $list_images == "true" ]]; then
   exit 0
 fi
 
-ginkgo=$(kube::util::find-binary "ginkgo")
-if [[ -z "${ginkgo}" ]]; then
-  echo "You do not appear to have ginkgo built. Try 'make WHAT=vendor/github.com/onsi/ginkgo/ginkgo'"
-  exit 1
-fi
-
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
 if [[ $parallelism > 1 ]]; then
@@ -171,8 +165,8 @@ else
 
   # Test using the host the script was run on
   # Provided for backwards compatibility
-  "${ginkgo}" $ginkgoflags "${KUBE_ROOT}/test/e2e_node/" --report-dir=${report} \
-    -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true \
-    --start-services=true --stop-services=true $test_args
+  go run test/e2e_node/runner/local/run_local.go --ginkgo-flags="$ginkgoflags" \
+    --test-flags="--alsologtostderr --v 2 --report-dir=${report} --node-name $(hostname) \
+    --start-services=true --stop-services=true $test_args" --build-dependencies=true
   exit $?
 fi
