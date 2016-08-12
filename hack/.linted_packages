@@ -64,6 +64,7 @@ pkg/apis/autoscaling/install
 pkg/apis/batch/install
 pkg/apis/certificates/install
 pkg/apis/componentconfig/install
+pkg/apiserver/audit
 pkg/api/service
 pkg/apis/extensions/install
 pkg/apis/extensions/v1beta1

@@ -30,6 +30,12 @@ import (
 	"strings"
 	"time"
 
+	systemd "github.com/coreos/go-systemd/daemon"
+	"github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful/swagger"
+	"github.com/golang/glog"
+	"gopkg.in/natefinch/lumberjack.v2"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -37,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apiserver"
+	"k8s.io/kubernetes/pkg/apiserver/audit"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
@@ -54,11 +61,6 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
-
-	systemd "github.com/coreos/go-systemd/daemon"
-	"github.com/emicklei/go-restful"
-	"github.com/emicklei/go-restful/swagger"
-	"github.com/golang/glog"
 )
 
 const globalTimeout = time.Minute
@@ -96,7 +98,11 @@ type APIGroupInfo struct {
 // Config is a structure used to configure a GenericAPIServer.
 type Config struct {
 	// The storage factory for other objects
-	StorageFactory StorageFactory
+	StorageFactory     StorageFactory
+	AuditLogPath       string
+	AuditLogMaxAge     int
+	AuditLogMaxBackups int
+	AuditLogMaxSize    int
 	// allow downstream consumers to disable the core controller loops
 	EnableLogsSupport bool
 	EnableUISupport   bool
@@ -475,6 +481,17 @@ func (s *GenericAPIServer) init(c *Config) {
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(s.RequestContextMapper, s.NewRequestInfoResolver())
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, s.authorizer)
+	if len(c.AuditLogPath) != 0 {
+		// audit handler must comes before the impersonationFilter to read the original user
+		writer := &lumberjack.Logger{
+			Filename:   c.AuditLogPath,
+			MaxAge:     c.AuditLogMaxAge,
+			MaxBackups: c.AuditLogMaxBackups,
+			MaxSize:    c.AuditLogMaxSize,
+		}
+		handler = audit.WithAudit(handler, s.RequestContextMapper, writer)
+		defer writer.Close()
+	}
 	handler = apiserver.WithImpersonation(handler, s.RequestContextMapper, s.authorizer)
 
 	// Install Authenticator
@@ -542,6 +559,10 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		APIGroupPrefix:            options.APIGroupPrefix,
 		APIPrefix:                 options.APIPrefix,
 		CorsAllowedOriginList:     options.CorsAllowedOriginList,
+		AuditLogPath:              options.AuditLogPath,
+		AuditLogMaxAge:            options.AuditLogMaxAge,
+		AuditLogMaxBackups:        options.AuditLogMaxBackups,
+		AuditLogMaxSize:           options.AuditLogMaxSize,
 		EnableIndex:               true,
 		EnableLogsSupport:         options.EnableLogsSupport,
 		EnableProfiling:           options.EnableProfiling,
