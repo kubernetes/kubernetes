@@ -39,10 +39,6 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const (
-	defaultObservationTimeout = time.Minute * 1
-)
-
 var (
 	buildBackOffDuration = time.Minute
 	syncLoopFrequency    = 10 * time.Second
