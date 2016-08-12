@@ -43,7 +43,7 @@ var (
 	checkLeakedResources = flag.Bool("check_leaked_resources", false, "Ensure project ends with the same resources")
 	ctlCmd               = flag.String("ctl", "", "If nonempty, pass this as an argument, and call kubectl. Implies -v.")
 	down                 = flag.Bool("down", false, "If true, tear down the cluster before exiting.")
-	dump                 = flag.String("dump", "", "If set, dump cluster logs to this location")
+	dump                 = flag.String("dump", "", "If set, dump cluster logs to this location on test or cluster-up failure")
 	kubemark             = flag.Bool("kubemark", false, "If true, run kubemark tests.")
 	isup                 = flag.Bool("isup", false, "Check to see if the e2e cluster is up, then exit.")
 	push                 = flag.Bool("push", false, "If true, push to e2e cluster. Has no effect if -up is true.")
@@ -127,10 +127,12 @@ func main() {
 		}
 		if *up {
 			if !Up() {
+				DumpClusterLogs(*dump)
 				log.Fatal("Error starting e2e cluster. Aborting.")
 			}
 		} else if *push {
 			if !finishRunning("push", exec.Command("./hack/e2e-internal/e2e-push.sh")) {
+				DumpClusterLogs(*dump)
 				log.Fatal("Error pushing e2e cluster. Aborting.")
 			}
 		}
@@ -170,10 +172,11 @@ func main() {
 		success = success && kubeSuccess
 	}
 
+	if !success {
+		DumpClusterLogs(*dump)
+	}
+
 	if *down {
-		if !success && *dump != "" {
-			DumpClusterLogs(*dump)
-		}
 		tearSuccess := TearDown()
 		success = success && tearSuccess
 	}
@@ -293,6 +296,9 @@ func IsUp() bool {
 }
 
 func DumpClusterLogs(location string) {
+	if location == "" {
+		return
+	}
 	log.Printf("Dumping cluster logs to: %v", location)
 	finishRunning("dump cluster logs", exec.Command("./cluster/log-dump.sh", location))
 }
