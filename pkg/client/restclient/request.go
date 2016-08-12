@@ -92,7 +92,7 @@ type Request struct {
 	client HTTPClient
 	verb   string
 
-	urlProvider *URLProvider
+	urlProvider URLProvider
 	content     ContentConfig
 	serializers Serializers
 
@@ -124,15 +124,15 @@ type Request struct {
 }
 
 // NewRequest creates a new request helper object for accessing runtime.Objects on a server.
-func NewRequest(client HTTPClient, verb string, urlProvider *URLProvider, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
+func NewRequest(client HTTPClient, verb string, urlProvider URLProvider, versionedAPIPath string, content ContentConfig, serializers Serializers, backoff BackoffManager, throttle flowcontrol.RateLimiter) *Request {
 	if backoff == nil {
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
 	}
 	baseUrl := urlProvider.Get()
 	pathPrefix := "/"
-	if baseURL != nil {
-		pathPrefix = path.Join(pathPrefix, baseURL.Path)
+	if baseUrl != nil {
+		pathPrefix = path.Join(pathPrefix, baseUrl.Path)
 	}
 	r := &Request{
 		client:      client,
@@ -801,7 +801,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	// TODO: Change to a timeout based approach.
 	maxRetries := 10
 	retries := 0
-	initialUrl := r.URL()
+	initialUrl := r.urlProvider.Get()
 	for {
 		url := r.URL().String()
 		req, err := http.NewRequest(r.verb, url, r.body)

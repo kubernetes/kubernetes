@@ -46,7 +46,7 @@ const (
 //
 // Most consumers should use client.New() to get a Kubernetes API client.
 type RESTClient struct {
-	urlProvider *URLProvider
+	urlProvider URLProvider
 	// versionedAPIPath is a path segment connecting the base URL to the resource root
 	versionedAPIPath string
 
