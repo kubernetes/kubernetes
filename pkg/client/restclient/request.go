@@ -783,12 +783,20 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		return r.err
 	}
 
-	// TODO: added to catch programmer errors (invoking operations with an object with an empty namespace)
-	if (r.verb == "GET" || r.verb == "PUT" || r.verb == "DELETE") && r.namespaceSet && len(r.resourceName) > 0 && len(r.namespace) == 0 {
-		return fmt.Errorf("an empty namespace may not be set when a resource name is provided")
-	}
-	if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
-		return fmt.Errorf("an empty namespace may not be set during creation")
+	//catch programmer errors (invoking operations with an object with an empty namespace)
+	if len(r.namespace) == 0 {
+		if r.namespaceSet {
+			switch r.verb {
+			case "GET", "PUT", "DELETE":
+				if len(r.resourceName) > 0 {
+					return fmt.Errorf("an empty namespace may not be set when a resource name is provided: %s", r.resourceName)
+				}
+			case "POST":
+				return fmt.Errorf("an empty namespace may not be set during creation")
+			}
+		} else {
+			return fmt.Errorf("namespace is empty")
+		}
 	}
 
 	client := r.client
