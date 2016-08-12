@@ -105,7 +105,7 @@ type Labels map[string]string
 type LinuxPodSandboxConfig struct {
 	// CgroupParent is the parent cgroup of the sandbox. The cgroupfs style
 	// syntax will be used, but the container runtime can convert it to systemd
-	// semantices if needed.
+	// semantics if needed.
 	CgroupParent string
 	// NamespaceOptions contains configurations for the sandbox's namespaces.
 	// This will be used only if the PodSandbox uses namespace for isolation.
