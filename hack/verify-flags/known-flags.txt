@@ -374,6 +374,7 @@ portal-net
 prepull-images
 private-mountns
 prom-push-gateway
+protect-kernel-defaults
 proto-import
 proxy-bindall
 proxy-kubeconfig

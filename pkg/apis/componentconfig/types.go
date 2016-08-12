@@ -397,6 +397,8 @@ type KubeletConfiguration struct {
 	// Currently only cpu and memory are supported. [default=none]
 	// See http://releases.k8s.io/HEAD/docs/user-guide/compute-resources.md for more detail.
 	KubeReserved utilconfig.ConfigurationMap `json:"kubeReserved"`
+	// Default behaviour for kernel tuning
+	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
 }
 
 type KubeSchedulerConfiguration struct {
