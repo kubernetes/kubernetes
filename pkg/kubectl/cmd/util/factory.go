@@ -1212,14 +1212,16 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			return nil, err
 		}
-		if version.IsEmpty() {
+		if version.IsEmpty() && mapping != nil {
 			version = mapping.GroupVersionKind.GroupVersion()
 		}
 		if version.IsEmpty() {
 			return nil, fmt.Errorf("you must specify an output-version when using this output format")
 		}
 
-		printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
+		if mapping != nil {
+			printer = kubectl.NewVersionedPrinter(printer, mapping.ObjectConvertor, version, mapping.GroupVersionKind.GroupVersion())
+		}
 
 	} else {
 		// Some callers do not have "label-columns" so we can't use the GetFlagStringSlice() helper
