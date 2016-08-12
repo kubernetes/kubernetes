@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package services
 
 import (
 	"flag"
@@ -37,6 +37,7 @@ import (
 	"github.com/kardianos/osext"
 
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e_node/build"
 )
 
 // TODO(random-liu): Move this file to a separate package.
@@ -194,10 +195,6 @@ func (es *e2eService) run() error {
 }
 
 func (es *e2eService) start() error {
-	if _, err := getK8sBin("kubelet"); err != nil {
-		return err
-	}
-
 	err := es.startEtcd()
 	if err != nil {
 		return err
@@ -341,13 +338,13 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		// Since kubelet will typically be run as a service it also makes more
 		// sense to test it that way
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
-		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, getKubeletServerBin())
+		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, build.GetKubeletServerBin())
 		killCommand = exec.Command("sudo", "systemctl", "kill", unitName)
 		es.logFiles["kubelet.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
 	} else {
-		cmdArgs = append(cmdArgs, getKubeletServerBin())
+		cmdArgs = append(cmdArgs, build.GetKubeletServerBin())
 		cmdArgs = append(cmdArgs,
 			"--runtime-cgroups=/docker-daemon",
 			"--kubelet-cgroups=/kubelet",
@@ -384,7 +381,8 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		}
 		cmdArgs = append(cmdArgs,
 			"--network-plugin=kubenet",
-			"--network-plugin-dir", filepath.Join(cwd, CNIDirectory, "bin")) // Enable kubenet
+			// TODO(random-liu): Make sure the cni directory name is the same with that in remote/remote.go
+			"--network-plugin-dir", filepath.Join(cwd, "cni", "bin")) // Enable kubenet
 	}
 
 	cmd := exec.Command("sudo", cmdArgs...)
