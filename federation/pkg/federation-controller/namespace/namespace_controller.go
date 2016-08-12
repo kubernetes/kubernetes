@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cluster
+package namespace
 
 import (
 	"reflect"
@@ -35,11 +35,6 @@ import (
 )
 
 const (
-	NamespaceReviewDelay  = time.Second * 10
-	ClusterAvailableDelay = time.Second * 20
-	SmallDelay            = time.Second * 3
-	UpdateTimeout         = time.Second * 30
-
 	allClustersKey = "ALL_CLUSTERS"
 )
 
@@ -66,6 +61,11 @@ type NamespaceController struct {
 	federatedApiClient federation_release_1_4.Interface
 
 	stopChan chan struct{}
+
+	namespaceReviewDelay  time.Duration
+	clusterAvailableDelay time.Duration
+	smallDelay            time.Duration
+	updateTimeout         time.Duration
 }
 
 // A structure passed by delying deliver. It contains a namespace that should be reconciled and
@@ -79,8 +79,12 @@ type namespaceItem struct {
 // NewNamespaceController returns a new namespace controller
 func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceController {
 	nc := &NamespaceController{
-		federatedApiClient: client,
-		stopChan:           make(chan struct{}),
+		federatedApiClient:    client,
+		stopChan:              make(chan struct{}),
+		namespaceReviewDelay:  time.Second * 10,
+		clusterAvailableDelay: time.Second * 20,
+		smallDelay:            time.Second * 3,
+		updateTimeout:         time.Second * 30,
 	}
 
 	// Build delivereres for triggering reconcilations.
@@ -97,7 +101,7 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 				return client.Core().Namespaces().Watch(options)
 			},
 		},
-		&api.Namespace{},
+		&api_v1.Namespace{},
 		controller.NoResyncPeriodFunc(),
 		util.NewTriggerOnAllChanges(func(obj pkg_runtime.Object) { nc.deliverNamespaceObj(obj, 0, 0) }))
 
@@ -114,12 +118,12 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 						return targetClient.Core().Namespaces().Watch(options)
 					},
 				},
-				&api.Namespace{},
+				&api_v1.Namespace{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconcilation whenever something in federated cluster is changed. In most cases it
 				// would be just confirmation that some namespace opration suceeded.
 				util.NewTriggerOnMetaAndSpecChangesPreproc(
-					func(obj pkg_runtime.Object) { nc.deliverNamespaceObj(obj, NamespaceReviewDelay, 0) },
+					func(obj pkg_runtime.Object) { nc.deliverNamespaceObj(obj, nc.namespaceReviewDelay, 0) },
 					func(obj pkg_runtime.Object) { util.SetClusterName(obj, cluster.Name) },
 				))
 		},
@@ -127,7 +131,7 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 		&util.ClusterLifecycleHandlerFuncs{
 			ClusterAvailable: func(cluster *federation_api.Cluster) {
 				// When new cluster becomes available process all the namespaces again.
-				nc.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(ClusterAvailableDelay))
+				nc.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(nc.clusterAvailableDelay))
 			},
 		},
 	)
@@ -153,7 +157,7 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 }
 
 func (nc *NamespaceController) Start() {
-	nc.namespaceInformerController.Run(nc.stopChan)
+	go nc.namespaceInformerController.Run(nc.stopChan)
 	nc.namespaceFederatedInformer.Start()
 	nc.namespaceDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
 		ni := item.Value.(*namespaceItem)
@@ -170,7 +174,7 @@ func (nc *NamespaceController) Stop() {
 }
 
 func (nc *NamespaceController) deliverNamespaceObj(obj interface{}, delay time.Duration, trial int64) {
-	namespace := obj.(*api.Namespace)
+	namespace := obj.(*api_v1.Namespace)
 	nc.deliverNamespace(namespace.Name, delay, trial)
 }
 
@@ -199,11 +203,11 @@ func (nc *NamespaceController) isSynced() bool {
 // The function triggers reconcilation of all federated namespaces.
 func (nc *NamespaceController) reconcileNamespacesOnClusterChange() {
 	if !nc.isSynced() {
-		nc.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(ClusterAvailableDelay))
+		nc.clusterDeliverer.DeliverAt(allClustersKey, nil, time.Now().Add(nc.clusterAvailableDelay))
 	}
 	for _, obj := range nc.namespaceInformerStore.List() {
 		namespace := obj.(*api_v1.Namespace)
-		nc.deliverNamespace(namespace.Name, SmallDelay, 0)
+		nc.deliverNamespace(namespace.Name, nc.smallDelay, 0)
 	}
 }
 
@@ -216,7 +220,7 @@ func backoff(trial int64) time.Duration {
 
 func (nc *NamespaceController) reconcileNamespace(namespace string, trial int64) {
 	if !nc.isSynced() {
-		nc.deliverNamespace(namespace, ClusterAvailableDelay, trial)
+		nc.deliverNamespace(namespace, nc.clusterAvailableDelay, trial)
 	}
 
 	baseNamespaceObj, exist, err := nc.namespaceInformerStore.GetByKey(namespace)
@@ -225,12 +229,12 @@ func (nc *NamespaceController) reconcileNamespace(namespace string, trial int64)
 		nc.deliverNamespace(namespace, backoff(trial+1), trial+1)
 		return
 	}
+
 	if !exist {
 		// Not federated namespace, ignoring.
 		return
 	}
 	baseNamespace := baseNamespaceObj.(*api_v1.Namespace)
-
 	if baseNamespace.Status.Phase == api_v1.NamespaceTerminating {
 		// TODO: What about namespaces in subclusters ???
 		err = nc.federatedApiClient.Core().Namespaces().Delete(baseNamespace.Name, &api.DeleteOptions{})
@@ -244,12 +248,11 @@ func (nc *NamespaceController) reconcileNamespace(namespace string, trial int64)
 	clusters, err := nc.namespaceFederatedInformer.GetReadyClusters()
 	if err != nil {
 		glog.Errorf("Failed to get cluster list: %v", err)
-		nc.deliverNamespace(namespace, ClusterAvailableDelay, trial)
+		nc.deliverNamespace(namespace, nc.clusterAvailableDelay, trial)
 		return
 	}
 
 	operations := make([]util.FederatedOperation, 0)
-
 	for _, cluster := range clusters {
 		clusterNamespaceObj, found, err := nc.namespaceFederatedInformer.GetTargetStore().GetByKey(cluster.Name, namespace)
 		if err != nil {
@@ -270,6 +273,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string, trial int64)
 			})
 		} else {
 			clusterNamespace := clusterNamespaceObj.(*api_v1.Namespace)
+
 			// Update existing namespace, if needed.
 			if !reflect.DeepEqual(desiredNamespace.ObjectMeta, clusterNamespace.ObjectMeta) ||
 				!reflect.DeepEqual(desiredNamespace.Spec, clusterNamespace.Spec) {
@@ -285,7 +289,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string, trial int64)
 		// Everything is in order
 		return
 	}
-	err = nc.federatedUpdater.Update(operations, UpdateTimeout)
+	err = nc.federatedUpdater.Update(operations, nc.updateTimeout)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", namespace, err)
 		nc.deliverNamespace(namespace, backoff(trial+1), trial+1)
@@ -293,5 +297,5 @@ func (nc *NamespaceController) reconcileNamespace(namespace string, trial int64)
 	}
 
 	// Evertyhing is in order but lets be double sure
-	nc.deliverNamespace(namespace, NamespaceReviewDelay, 0)
+	nc.deliverNamespace(namespace, nc.namespaceReviewDelay, 0)
 }
