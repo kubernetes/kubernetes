@@ -125,7 +125,7 @@ func TestTaint(t *testing.T) {
 			expectTaint: true,
 		},
 		{
-			description: "update an existing taint on the node, change the effect from NoSchedule to PreferNoSchedule",
+			description: "update an existing taint on the node, change the value from bar to barz",
 			oldTaints: []api.Taint{{
 				Key:    "foo",
 				Value:  "bar",
@@ -133,10 +133,10 @@ func TestTaint(t *testing.T) {
 			}},
 			newTaints: []api.Taint{{
 				Key:    "foo",
-				Value:  "bar",
-				Effect: "PreferNoSchedule",
+				Value:  "barz",
+				Effect: "NoSchedule",
 			}},
-			args:        []string{"node", "node-name", "foo=bar:PreferNoSchedule", "--overwrite"},
+			args:        []string{"node", "node-name", "foo=barz:NoSchedule", "--overwrite"},
 			expectFatal: false,
 			expectTaint: true,
 		},
@@ -156,21 +156,37 @@ func TestTaint(t *testing.T) {
 			expectTaint: true,
 		},
 		{
-			description: "node has two taints, remove one of them",
+			description: "node has two taints with the same key but different effect, remove one of them by indicating exact key and effect",
 			oldTaints: []api.Taint{{
 				Key:    "dedicated",
 				Value:  "namespaceA",
 				Effect: "NoSchedule",
 			}, {
-				Key:    "foo",
-				Value:  "bar",
+				Key:    "dedicated",
+				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
 			}},
 			newTaints: []api.Taint{{
-				Key:    "foo",
-				Value:  "bar",
+				Key:    "dedicated",
+				Value:  "namespaceA",
 				Effect: "PreferNoSchedule",
 			}},
+			args:        []string{"node", "node-name", "dedicated:NoSchedule-"},
+			expectFatal: false,
+			expectTaint: true,
+		},
+		{
+			description: "node has two taints with the same key but different effect, remove all of them with wildcard",
+			oldTaints: []api.Taint{{
+				Key:    "dedicated",
+				Value:  "namespaceA",
+				Effect: "NoSchedule",
+			}, {
+				Key:    "dedicated",
+				Value:  "namespaceA",
+				Effect: "PreferNoSchedule",
+			}},
+			newTaints:   []api.Taint{},
 			args:        []string{"node", "node-name", "dedicated-"},
 			expectFatal: false,
 			expectTaint: true,
@@ -188,10 +204,10 @@ func TestTaint(t *testing.T) {
 			}},
 			newTaints: []api.Taint{{
 				Key:    "foo",
-				Value:  "bar",
-				Effect: "NoSchedule",
+				Value:  "barz",
+				Effect: "PreferNoSchedule",
 			}},
-			args:        []string{"node", "node-name", "dedicated-", "foo=bar:NoSchedule", "--overwrite"},
+			args:        []string{"node", "node-name", "dedicated:NoSchedule-", "foo=barz:PreferNoSchedule", "--overwrite"},
 			expectFatal: false,
 			expectTaint: true,
 		},
@@ -210,6 +226,12 @@ func TestTaint(t *testing.T) {
 			expectTaint: false,
 		},
 		{
+			description: "duplicated taints with the same key and effect should be rejected",
+			args:        []string{"node", "node-name", "foo=bar:NoExcute", "foo=barz:NoExcute"},
+			expectFatal: true,
+			expectTaint: false,
+		},
+		{
 			description: "can't update existing taint on the node, since 'overwrite' flag is not set",
 			oldTaints: []api.Taint{{
 				Key:    "foo",
@@ -221,7 +243,7 @@ func TestTaint(t *testing.T) {
 				Value:  "bar",
 				Effect: "NoSchedule",
 			}},
-			args:        []string{"node", "node-name", "foo=bar:PreferNoSchedule"},
+			args:        []string{"node", "node-name", "foo=bar:NoSchedule"},
 			expectFatal: true,
 			expectTaint: false,
 		},
