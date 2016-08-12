@@ -32,6 +32,26 @@ Documentation for other releases can be found at
 
 <!-- END MUNGE: UNVERSIONED_WARNING -->
 
+## Table of Contents
+
+<!-- BEGIN MUNGE: GENERATED_TOC -->
+
+- [Persistent Installation of MySQL and WordPress on Kubernetes](#persistent-installation-of-mysql-and-wordpress-on-kubernetes)
+  - [tl;dr Quickstart](#tldr-quickstart)
+  - [Table of Contents](#table-of-contents)
+  - [Cluster Requirements](#cluster-requirements)
+  - [Decide where you will store your data](#decide-where-you-will-store-your-data)
+    - [Host Path](#host-path)
+    - [GCE Persistent Disk](#gce-persistent-disk)
+  - [Create the MySQL Password Secret](#create-the-mysql-password-secret)
+  - [Deploy MySQL](#deploy-mysql)
+  - [Deploy WordPress](#deploy-wordpress)
+  - [Visit your new WordPress blog](#visit-your-new-wordpress-blog)
+  - [Take down and restart your blog](#take-down-and-restart-your-blog)
+  - [Next Steps](#next-steps)
+
+<!-- END MUNGE: GENERATED_TOC -->
+
 # Persistent Installation of MySQL and WordPress on Kubernetes
 
 This example describes how to run a persistent installation of
@@ -68,26 +88,6 @@ kubectl create secret generic mysql-pass --from-file=password.txt
 kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/examples/mysql-wordpress-pd/mysql-deployment.yaml
 kubectl create -f https://raw.githubusercontent.com/kubernetes/kubernetes/master/examples/mysql-wordpress-pd/wordpress-deployment.yaml
 ```
-
-## Table of Contents
-
-<!-- BEGIN MUNGE: GENERATED_TOC -->
-
-- [Persistent Installation of MySQL and WordPress on Kubernetes](#persistent-installation-of-mysql-and-wordpress-on-kubernetes)
-  - [tl;dr Quickstart](#tldr-quickstart)
-  - [Table of Contents](#table-of-contents)
-  - [Cluster Requirements](#cluster-requirements)
-  - [Decide where you will store your data](#decide-where-you-will-store-your-data)
-    - [Host Path](#host-path)
-    - [GCE Persistent Disk](#gce-persistent-disk)
-  - [Create the MySQL Password Secret](#create-the-mysql-password-secret)
-  - [Deploy MySQL](#deploy-mysql)
-  - [Deploy WordPress](#deploy-wordpress)
-  - [Visit your new WordPress blog](#visit-your-new-wordpress-blog)
-  - [Take down and restart your blog](#take-down-and-restart-your-blog)
-  - [Next Steps](#next-steps)
-
-<!-- END MUNGE: GENERATED_TOC -->
 
 ## Cluster Requirements
 
