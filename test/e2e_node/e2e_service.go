@@ -384,7 +384,8 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		}
 		cmdArgs = append(cmdArgs,
 			"--network-plugin=kubenet",
-			"--network-plugin-dir", filepath.Join(cwd, CNIDirectory, "bin")) // Enable kubenet
+			// TODO(random-liu): Deal with the cni directory better.
+			"--network-plugin-dir", filepath.Join(cwd, "cni", "bin")) // Enable kubenet
 	}
 
 	cmd := exec.Command("sudo", cmdArgs...)

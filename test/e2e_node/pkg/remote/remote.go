@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package remote
 
 import (
 	"flag"
@@ -30,6 +30,7 @@ import (
 
 	"github.com/golang/glog"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/test/e2e_node"
 )
 
 var sshOptions = flag.String("ssh-options", "", "Commandline options passed to ssh.")
@@ -81,12 +82,12 @@ func GetHostnameOrIp(hostname string) string {
 // the binaries k8s required for node e2e tests
 func CreateTestArchive() (string, error) {
 	// Build the executables
-	if err := buildGo(); err != nil {
+	if err := e2e_node.BuildGo(); err != nil {
 		return "", fmt.Errorf("failed to build the depedencies: %v", err)
 	}
 
 	// Make sure we can find the newly built binaries
-	buildOutputDir, err := getK8sBuildOutputDir()
+	buildOutputDir, err := e2e_node.GetK8sBuildOutputDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}
