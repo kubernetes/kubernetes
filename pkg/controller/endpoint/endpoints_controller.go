@@ -210,17 +210,19 @@ func (e *EndpointController) addPod(obj interface{}) {
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *api.Pod types.
 func (e *EndpointController) updatePod(old, cur interface{}) {
-	if api.Semantic.DeepEqual(old, cur) {
+	newPod := cur.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	if newPod.ResourceVersion == oldPod.ResourceVersion {
+		// Periodic resync will send update events for all known pods.
+		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	newPod := old.(*api.Pod)
 	services, err := e.getPodServiceMemberships(newPod)
 	if err != nil {
 		glog.Errorf("Unable to get pod %v/%v's service memberships: %v", newPod.Namespace, newPod.Name, err)
 		return
 	}
 
-	oldPod := cur.(*api.Pod)
 	// Only need to get the old services if the labels changed.
 	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
 		!hostNameAndDomainAreEqual(newPod, oldPod) {

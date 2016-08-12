@@ -551,8 +551,10 @@ func TestUpdatePods(t *testing.T) {
 	// then update its labels to match testRSSpec2.  We expect to receive a sync
 	// request for both replica sets.
 	pod1 := newPodList(manager.podStore.Indexer, 1, api.PodRunning, labelMap1, testRSSpec1, "pod").Items[0]
+	pod1.ResourceVersion = "1"
 	pod2 := pod1
 	pod2.Labels = labelMap2
+	pod2.ResourceVersion = "2"
 	manager.updatePod(&pod1, &pod2)
 	expected := sets.NewString(testRSSpec1.Name, testRSSpec2.Name)
 	for _, name := range expected.List() {
@@ -571,6 +573,7 @@ func TestUpdatePods(t *testing.T) {
 	// its labels to match no replica set. We expect to receive a sync request
 	// for testRSSpec1.
 	pod2.Labels = make(map[string]string)
+	pod2.ResourceVersion = "2"
 	manager.updatePod(&pod1, &pod2)
 	expected = sets.NewString(testRSSpec1.Name)
 	for _, name := range expected.List() {
@@ -977,6 +980,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	}
 	pod := newPodList(nil, 1, api.PodPending, labelMap, rs, "pod").Items[0]
 	pod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+	pod.ResourceVersion = "1"
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 
 	// A pod added with a deletion timestamp should decrement deletions, not creations.
@@ -996,6 +1000,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	// An update from no deletion timestamp to having one should be treated
 	// as a deletion.
 	oldPod := newPodList(nil, 1, api.PodPending, labelMap, rs, "pod").Items[0]
+	oldPod.ResourceVersion = "2"
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(&pod)})
 	manager.updatePod(&oldPod, &pod)
 
@@ -1021,6 +1026,7 @@ func TestDeletionTimestamp(t *testing.T) {
 	}
 	manager.expectations.ExpectDeletions(rsKey, []string{controller.PodKey(secondPod)})
 	oldPod.DeletionTimestamp = &unversioned.Time{Time: time.Now()}
+	oldPod.ResourceVersion = "2"
 	manager.updatePod(&oldPod, &pod)
 
 	podExp, exists, err = manager.expectations.GetExpectations(rsKey)
