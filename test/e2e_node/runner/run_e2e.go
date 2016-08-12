@@ -249,16 +249,27 @@ func main() {
 	// Set the exit code if there were failures
 	if !exitOk {
 		fmt.Printf("Failure: %d errors encountered.", errCount)
-		if *gubernator{
-			output, err := exec.Command("./test/e2e_node/g8r.sh").Output()
+		if *gubernator {
+			output, err := exec.Command("./test/e2e_node/gubernator.sh").Output()
 			if err != nil {
+				fmt.Println("gubernator.sh Failed")
 		        return
 		    }
 		    fmt.Printf("%s", output)
-		}
+	    }
 		os.Exit(1)
 	}
+	fmt.Printf("Succeeded and calling gubernator")
+	if *gubernator {
+		output, err := exec.Command("./test/e2e_node/gubernator.sh").Output()
+		if err != nil {
+			fmt.Println("gubernator.sh Failed")
+	        return
+	    }
+        fmt.Printf("%s", output)
+    }
 }
+
 
 func (a *Archive) getArchive() (string, error) {
 	a.Do(func() { a.path, a.err = e2e_node.CreateTestArchive() })
