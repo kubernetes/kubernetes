@@ -50,6 +50,8 @@ fi
 docker run --rm=true -i \
   -v "${WORKSPACE}/_artifacts":/workspace/_artifacts \
   -v /etc/localtime:/etc/localtime:ro \
+  -v "${WORKSPACE}/hack/jenkins/e2e-runner.sh":/workspace/e2e-runner.sh:ro \
+  -v "${WORKSPACE}/_output":/workspace/_output:ro \
   ${JENKINS_GCE_SSH_PRIVATE_KEY_FILE:+-v "${JENKINS_GCE_SSH_PRIVATE_KEY_FILE}:/workspace/.ssh/google_compute_engine:ro"} \
   ${JENKINS_GCE_SSH_PUBLIC_KEY_FILE:+-v "${JENKINS_GCE_SSH_PUBLIC_KEY_FILE}:/workspace/.ssh/google_compute_engine.pub:ro"} \
   ${JENKINS_AWS_SSH_PRIVATE_KEY_FILE:+-v "${JENKINS_AWS_SSH_PRIVATE_KEY_FILE}:/workspace/.ssh/kube_aws_rsa:ro"} \
@@ -62,4 +64,4 @@ docker run --rm=true -i \
   ${KUBEKINS_SERVICE_ACCOUNT_FILE:+-e "KUBEKINS_SERVICE_ACCOUNT_FILE=/service-account.json"} \
   "${docker_extra_args[@]:+${docker_extra_args[@]}}" \
   gcr.io/google_containers/kubekins-test:go1.6.3-docker1.9.1-rev3 \
-  bash -c "bash <(curl -fsS --retry 3 --keepalive-time 2 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh')"
+  bash -c "/workspace/e2e-runner.sh"
