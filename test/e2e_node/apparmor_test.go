@@ -53,12 +53,12 @@ func testAppArmorNode() {
 		f := framework.NewDefaultFramework("apparmor-test")
 
 		It("should reject an unloaded profile", func() {
-			status := runAppArmorTest(f, "local/"+"non-existant-profile")
+			status := runAppArmorTest(f, "localhost/"+"non-existant-profile")
 			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
 			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
 		})
 		It("should enforce a profile blocking writes", func() {
-			status := runAppArmorTest(f, "local/"+apparmorProfilePrefix+"deny-write")
+			status := runAppArmorTest(f, "localhost/"+apparmorProfilePrefix+"deny-write")
 			if len(status.ContainerStatuses) == 0 {
 				framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 				return
@@ -68,7 +68,7 @@ func testAppArmorNode() {
 
 		})
 		It("should enforce a permissive profile", func() {
-			status := runAppArmorTest(f, "local/"+apparmorProfilePrefix+"audit-write")
+			status := runAppArmorTest(f, "localhost/"+apparmorProfilePrefix+"audit-write")
 			if len(status.ContainerStatuses) == 0 {
 				framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 				return
