@@ -18,4 +18,6 @@ package v1
 
 type SecretExpansion interface{}
 
+type EventExpansion interface{}
+
 type ServiceExpansion interface{}
