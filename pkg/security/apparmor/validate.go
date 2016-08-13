@@ -58,6 +58,8 @@ type validator struct {
 	appArmorFS      string
 }
 
+// TODO(timstclair): Refactor the PodAdmitInterface to return a (Admit, Reason Message) rather than
+// the PodAdmitResult struct so that the interface can be implemented without importing lifecycle.
 func (v *validator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	err := v.validate(attrs.Pod)
 	if err == nil {
