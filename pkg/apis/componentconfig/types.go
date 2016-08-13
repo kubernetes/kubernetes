@@ -402,6 +402,9 @@ type KubeletConfiguration struct {
 	// apiServerList is a list of Kubernetes API servers for publishing events
 	// and reading pods and services. (ip:port), comma separated.
 	APIServerList []string `json:"apiServerList"`
+	// kubeConfig is a path to a kubeconfig file, specifying how to authenticate
+	// to API server (the address of the API server is in apiServerList).
+	KubeConfig string `json:"kubeConfig"`
 }
 
 type KubeSchedulerConfiguration struct {

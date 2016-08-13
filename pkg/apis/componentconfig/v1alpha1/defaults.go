@@ -340,6 +340,9 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.APIServerList == nil {
 		obj.APIServerList = []string{}
 	}
+	if obj.KubeConfig == "" {
+		obj.KubeConfig = "/var/lib/kubelet/kubeconfig"
+	}
 }
 
 func boolVar(b bool) *bool {

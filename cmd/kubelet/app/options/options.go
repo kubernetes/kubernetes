@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
-	"k8s.io/kubernetes/pkg/util"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 
 	"github.com/spf13/pflag"
@@ -40,8 +39,6 @@ const (
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {
 	componentconfig.KubeletConfiguration
-
-	KubeConfig util.StringFlag
 
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
@@ -61,7 +58,6 @@ func NewKubeletServer() *KubeletServer {
 	config := componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(&v1alpha1.KubeletConfiguration{}, &config)
 	return &KubeletServer{
-		KubeConfig:           util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		KubeletConfiguration: config,
 	}
 }
@@ -108,7 +104,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.MarkDeprecated("maximum-dead-containers-per-container", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
 	fs.Int32Var(&s.MaxContainerCount, "maximum-dead-containers", s.MaxContainerCount, "Maximum number of old instances of containers to retain globally.  Each container takes up some disk space.  Default: 100.")
 	fs.MarkDeprecated("maximum-dead-containers", "Use --eviction-hard or --eviction-soft instead. Will be removed in a future version.")
-	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
+	fs.StringVar(&s.KubeConfig, "kubeconfig", s.KubeConfig, "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
 	fs.Int32Var(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.Int32Var(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.Var(componentconfig.IPVar{Val: &s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")

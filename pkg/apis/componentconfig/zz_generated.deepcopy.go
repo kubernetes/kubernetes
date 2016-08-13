@@ -333,6 +333,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		} else {
 			out.APIServerList = nil
 		}
+		out.KubeConfig = in.KubeConfig
 		return nil
 	}
 }

@@ -314,7 +314,7 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 
 func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
 }
 
@@ -324,11 +324,8 @@ func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error
 // we fall back to the default client with no auth - this fallback does not, in
 // and of itself, constitute an error.
 func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	if s.KubeConfig.Provided() {
-		return kubeconfigClientConfig(s)
-	}
-	// If KubeConfig was not provided, try to load the default file, then fall back
-	// to a default auth config.
+	// Ok to try this, if no s.KubeConfig was provided, the default will have been applied
+	// during the conversion of the KubeletConfiguration from external type to internal type.
 	clientConfig, err := kubeconfigClientConfig(s)
 	if err != nil {
 		glog.Warningf("Could not load kubeconfig file %s: %v. Using default client config instead.", s.KubeConfig, err)
