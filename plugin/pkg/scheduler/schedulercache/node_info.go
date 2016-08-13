@@ -23,6 +23,7 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	clientcache "k8s.io/kubernetes/pkg/client/cache"
 	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 )
@@ -60,6 +61,18 @@ type Resource struct {
 	Memory             int64
 	NvidiaGPU          int64
 	OpaqueIntResources map[api.ResourceName]int64
+}
+
+func (r *Resource) ResourceList() api.ResourceList {
+	result := api.ResourceList{
+		api.ResourceCPU:       *resource.NewMilliQuantity(r.MilliCPU, resource.DecimalSI),
+		api.ResourceMemory:    *resource.NewQuantity(r.Memory, resource.BinarySI),
+		api.ResourceNvidiaGPU: *resource.NewQuantity(r.NvidiaGPU, resource.DecimalSI),
+	}
+	for rName, rQuant := range r.OpaqueIntResources {
+		result[rName] = *resource.NewQuantity(rQuant, resource.DecimalSI)
+	}
+	return result
 }
 
 // NewNodeInfo returns a ready to use empty NodeInfo object.
@@ -227,7 +240,7 @@ func (n *NodeInfo) removePod(pod *api.Pod) error {
 			n.requestedResource.MilliCPU -= res.MilliCPU
 			n.requestedResource.Memory -= res.Memory
 			n.requestedResource.NvidiaGPU -= res.NvidiaGPU
-			if len(res.OpaqueIntResources) == 0 && n.requestedResource.OpaqueIntResources == nil {
+			if len(res.OpaqueIntResources) > 0 && n.requestedResource.OpaqueIntResources == nil {
 				n.requestedResource.OpaqueIntResources = map[api.ResourceName]int64{}
 			}
 			for rName, rQuant := range res.OpaqueIntResources {
