@@ -2124,6 +2124,11 @@
 			"Rev": "b5ee639d7aa4b8dbb48ab4f75dddc19f71b5c514"
 		},
 		{
+			"ImportPath": "github.com/xanzy/go-cloudstack/cloudstack",
+			"Comment": "v2.1.1-1-g1e2cbf6",
+			"Rev": "1e2cbf647e57fa90353612074fdfc42faf5073bf"
+		},
+		{
 			"ImportPath": "github.com/xiang90/probing",
 			"Rev": "6a0cc1ae81b4cc11db5e491e030e4b98fba79c19"
 		},
