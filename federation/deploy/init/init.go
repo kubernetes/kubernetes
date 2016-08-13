@@ -56,6 +56,7 @@ var (
 type certKey struct {
 	cert []byte
 	key  []byte
+	priv *ecdsa.PrivateKey
 }
 
 func main() {
@@ -240,19 +241,17 @@ func certs(svcName string, certValidity time.Duration, ips, hostnames []string) 
 	}
 	caCN = fmt.Sprintf("%s@%d", template.NotBefore.Unix())
 
+	zeroIPs := []net.IP{}
+	zeroHostnames := []string{}
+
 	// CA
-	caCertKey, err := cert(caCN, template, nil)
+	caCertKey, err := cert(caCN, zeroIPs, zeroHostnames, template, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate a CA certificate: %v", err)
 	}
 
-	caCertObj, err := x509.ParseCertificate(caCertKey.cert)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse the CA certificate: %v", err)
-	}
-
 	// Server
-	serverCertKey, err := cert(svcName, template, caCertObj)
+	serverCertKey, err := cert(svcName, ips, hostnames, template, caCertKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate a server certificate: %v", err)
 	}
@@ -267,16 +266,23 @@ func certs(svcName string, certValidity time.Duration, ips, hostnames []string) 
 	// passing it down to the clients.
 
 	// Controller Manager
-	cmCertKey, err := cert(cmName, template, caCertObj)
+	cmCertKey, err := cert(cmName, zeroIPs, zeroHostnames, template, caCertKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate a client certificate for controller manager: %v", err)
 	}
 
 	// Admin kubeconfig
-	kubeconfigCertKey, err := cert(kubeconfigName, template, caCertObj)
+	kubeconfigCertKey, err := cert(kubeconfigName, zeroIPs, zeroHostnames, template, caCertKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate a client certificate for admin kubeconfig: %v", err)
 	}
+
+	log.WithFields(log.Fields{
+		"namespace": namespace,
+		"service":   svcName,
+		"IPs":       ips,
+		"Hostnames": hostnames,
+	}).Info("Certificates generated")
 
 	return map[string]*certKey{
 		"ca":                 caCertKey,
@@ -290,21 +296,39 @@ func certs(svcName string, certValidity time.Duration, ips, hostnames []string) 
 // Args:
 //   name: the common name of the entity for which the certificate/key pair
 //         must be generated.
+//   ips: IP addresses for subject alternative names.
+//   hostnames: DNS names for subject alternative names.
 //   template: a template for which a certificate/key pair must be produced. It
 //             must be passed by-value because it is modified in this function.
-//   caCert: An optional CA certificate. If it is supplied, then that
-//           certificate will be used to sign the generated certificate. If it
-//           is nil, then it will be assumed that this certificate is for a new
-//           CA and a self-signed CA certificate will be generated.
-func cert(name string, template x509.Certificate, caCert *x509.Certificate) (*certKey, error) {
-	var parent *x509.Certificate
-	if caCert == nil {
-		parent = &template
+//   caCertKey: An optional CA certificate/key pair. If it is supplied, then
+//              that certificate will be used to sign the generated
+//              certificate. If it is nil, then it will be assumed that this
+//              certificate is for a new CA and a self-signed CA certificate
+//              will be generated.
+func cert(name string, ips []net.IP, hostnames []string, template x509.Certificate, caCertKey *certKey) (*certKey, error) {
+	privKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate private key: %v", err)
+	}
+
+	var signCert *x509.Certificate
+	var signKey *ecdsa.PrivateKey
+	if caCertKey == nil {
+		signCert = &template
+		signKey = privKey
 		template.IsCA = true
 		template.KeyUsage |= x509.KeyUsageCertSign
 	} else {
-		parent = caCert
+		caCertObj, err := x509.ParseCertificate(caCertKey.cert)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the CA certificate: %v", err)
+		}
+		signCert = caCertObj
+		signKey = caCertKey.priv
 	}
+
+	template.IPAddresses = append(template.IPAddresses, ips...)
+	template.DNSNames = append(template.DNSNames, hostnames...)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
@@ -315,12 +339,7 @@ func cert(name string, template x509.Certificate, caCert *x509.Certificate) (*ce
 
 	template.Subject.CommonName = name
 
-	privKey, err := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate private key: %v", err)
-	}
-
-	cert, err := x509.CreateCertificate(rand.Reader, &template, parent, &privKey.PublicKey, privKey)
+	cert, err := x509.CreateCertificate(rand.Reader, &template, signCert, &privKey.PublicKey, signKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create certificate: %v", err)
 	}
