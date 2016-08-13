@@ -527,7 +527,7 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 			runtime.HandleError(err)
 		}
 	}
-	return procfs.PidOf(name), nil
+	return procfs.PidOf(name)
 }
 
 // Ensures that the Docker daemon is in the desired container.
