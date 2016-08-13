@@ -36,10 +36,6 @@ const (
 	hairpinEnable           = "1"
 )
 
-var (
-	ethtoolOutputRegex = regexp.MustCompile("peer_ifindex: (\\d+)")
-)
-
 func SetUpContainerPid(containerPid int, containerInterfaceName string) error {
 	pidStr := fmt.Sprintf("%d", containerPid)
 	nsenterArgs := []string{"-t", pidStr, "-n"}
@@ -69,24 +65,22 @@ func findPairInterfaceOfContainerInterface(e exec.Interface, containerInterfaceN
 	if err != nil {
 		return "", err
 	}
-	ethtoolPath, err := e.LookPath("ethtool")
-	if err != nil {
-		return "", err
-	}
 
-	nsenterArgs = append(nsenterArgs, "-F", "--", ethtoolPath, "--statistics", containerInterfaceName)
+	ipLinkOutputRegex := regexp.MustCompile(containerInterfaceName + "@if(\\d+)")
+
+	nsenterArgs = append(nsenterArgs, "-F", "--", "ip", "link", "show", containerInterfaceName)
 	output, err := e.Command(nsenterPath, nsenterArgs...).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("Unable to query interface %s of container %s: %v: %s", containerInterfaceName, containerDesc, err, string(output))
 	}
-	// look for peer_ifindex
-	match := ethtoolOutputRegex.FindSubmatch(output)
+	// look for the interface name which is named eth0@if{pair_interface}
+	match := ipLinkOutputRegex.FindSubmatch(output)
 	if match == nil {
-		return "", fmt.Errorf("No peer_ifindex in interface statistics for %s of container %s", containerInterfaceName, containerDesc)
+		return "", fmt.Errorf("No pair interface returned from container output %s. Description: %s", containerInterfaceName, containerDesc)
 	}
 	peerIfIndex, err := strconv.Atoi(string(match[1]))
 	if err != nil { // seems impossible (\d+ not numeric)
-		return "", fmt.Errorf("peer_ifindex wasn't numeric: %s: %v", match[1], err)
+		return "", fmt.Errorf("Pair interface wasn't numeric: %s: %v", match[1], err)
 	}
 	iface, err := net.InterfaceByIndex(peerIfIndex)
 	if err != nil {
