@@ -117,8 +117,8 @@ func secretExists(clientset *release_1_4.Clientset, namespace, secretName string
 	return secret != nil && secret.Name == secretName, nil
 }
 
-func lbTargets(clientset *release_1_4.Clientset, namespace, svcName string, timeout time.Duration) ([]string, []string, error) {
-	ips := []string{}
+func lbTargets(clientset *release_1_4.Clientset, namespace, svcName string, timeout time.Duration) ([]net.IP, []string, error) {
+	ips := []net.IP{}
 	hostnames := []string{}
 
 	listOptions := api.SingleObject(api.ObjectMeta{
@@ -152,7 +152,13 @@ func lbTargets(clientset *release_1_4.Clientset, namespace, svcName string, time
 			if svc.Spec.Type == corev1.ServiceTypeLoadBalancer {
 				for _, ing := range svc.Status.LoadBalancer.Ingress {
 					if len(ing.IP) > 0 {
-						ips = append(ips, ing.IP)
+						ip := net.ParseIP(ing.IP)
+						if ip == nil {
+							log.WithField("IP", ing.IP).
+								Warn("Failed to parse IP")
+						} else {
+							ips = append(ips, ip)
+						}
 					}
 					if len(ing.Hostname) > 0 {
 						hostnames = append(hostnames, ing.Hostname)
@@ -200,10 +206,17 @@ func lbTargets(clientset *release_1_4.Clientset, namespace, svcName string, time
 		return nil, nil, fmt.Errorf("failed to watch federation control plane services")
 	}
 
+	log.WithFields(log.Fields{
+		"namespace": namespace,
+		"service":   svcName,
+		"IPs":       ips,
+		"Hostnames": hostnames,
+	}).Info("Load balancer targets detected")
+
 	return ips, hostnames, nil
 }
 
-func certs(svcName string, certValidity time.Duration, ips, hostnames []string) (map[string]*certKey, error) {
+func certs(svcName string, certValidity time.Duration, ips []net.IP, hostnames []string) (map[string]*certKey, error) {
 	template := x509.Certificate{
 		Subject: pkix.Name{
 			Organization: []string{orgName},
@@ -216,30 +229,17 @@ func certs(svcName string, certValidity time.Duration, ips, hostnames []string) 
 		BasicConstraintsValid: true,
 	}
 
-	for _, ip := range ips {
-		addr := net.ParseIP(ip)
-		if addr == nil {
-			log.WithField("ip", ip).
-				Warn("Failed to parse IP")
-			continue
-		}
-		template.IPAddresses = append(template.IPAddresses, addr)
-	}
-	for _, hn := range hostnames {
-		template.DNSNames = append(template.DNSNames, hn)
-	}
-
 	// Arbitrarily choose the first federation API server IP address or
 	// the hostname as the CA common name.
 	caCN := ""
 	if len(ips) > 0 {
-		caCN = ips[0]
+		caCN = ips[0].String()
 	} else if len(hostnames) > 0 {
 		caCN = hostnames[0]
 	} else {
 		return nil, fmt.Errorf("at least one IP address or hostname must be specified")
 	}
-	caCN = fmt.Sprintf("%s@%d", template.NotBefore.Unix())
+	caCN = fmt.Sprintf("%s@%d", caCN, template.NotBefore.Unix())
 
 	zeroIPs := []net.IP{}
 	zeroHostnames := []string{}
