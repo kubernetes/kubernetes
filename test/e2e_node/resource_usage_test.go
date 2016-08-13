@@ -35,12 +35,6 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 	const (
 		// Interval to poll /stats/container on a node
 		containerStatsPollingPeriod = 10 * time.Second
-		// The monitoring time for one test.
-		monitoringTime = 10 * time.Minute
-		// The periodic reporting period.
-		reportingPeriod = 5 * time.Minute
-
-		sleepAfterCreatePods = 10 * time.Second
 	)
 
 	var (
@@ -54,6 +48,12 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 	BeforeEach(func() {
 		ns = f.Namespace.Name
 		om = framework.NewRuntimeOperationMonitor(f.Client)
+		// The test collects resource usage from a standalone Cadvisor pod.
+		// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
+		// show the resource usage spikes. But changing its interval increases the overhead
+		// of kubelet. Hence we use a Cadvisor pod.
+		createCadvisorPod(f)
+		rc = NewResourceCollector(containerStatsPollingPeriod)
 	})
 
 	AfterEach(func() {
@@ -67,13 +67,11 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 	Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
-				podsPerNode: 10,
+				pods: 10,
 				cpuLimits: framework.ContainersCPUSummary{
 					stats.SystemContainerKubelet: {0.50: 0.25, 0.95: 0.30},
 					stats.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
 				},
-				// We set the memory limits generously because the distribution
-				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
 					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
@@ -84,70 +82,95 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 
-			podsPerNode := itArg.podsPerNode
-			name := fmt.Sprintf("resource tracking for %d pods per node", podsPerNode)
-
-			It(name, func() {
-				// The test collects resource usage from a standalone Cadvisor pod.
-				// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
-				// show the resource usage spikes. But changing its interval increases the overhead
-				// of kubelet. Hence we use a Cadvisor pod.
-				createCadvisorPod(f)
-				rc = NewResourceCollector(containerStatsPollingPeriod)
-				rc.Start()
-
-				By("Creating a batch of Pods")
-				pods := newTestPods(podsPerNode, ImageRegistry[pauseImage], "test_pod")
-				for _, pod := range pods {
-					f.PodClient().CreateSync(pod)
-				}
-
-				// wait for a while to let the node be steady
-				time.Sleep(sleepAfterCreatePods)
-
-				// Log once and flush the stats.
-				rc.LogLatest()
-				rc.Reset()
-
-				By("Start monitoring resource usage")
-				// Periodically dump the cpu summary until the deadline is met.
-				// Note that without calling framework.ResourceMonitor.Reset(), the stats
-				// would occupy increasingly more memory. This should be fine
-				// for the current test duration, but we should reclaim the
-				// entries if we plan to monitor longer (e.g., 8 hours).
-				deadline := time.Now().Add(monitoringTime)
-				for time.Now().Before(deadline) {
-					timeLeft := deadline.Sub(time.Now())
-					framework.Logf("Still running...%v left", timeLeft)
-					if timeLeft < reportingPeriod {
-						time.Sleep(timeLeft)
-					} else {
-						time.Sleep(reportingPeriod)
-					}
-					logPods(f.Client)
-				}
-
-				rc.Stop()
-
-				By("Reporting overall resource usage")
-				logPods(f.Client)
-
+			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.pods), func() {
+				runResourceUsageTest(f, rc, itArg)
 				// Log and verify resource usage
-				verifyResource(f, itArg.cpuLimits, itArg.memLimits, rc)
+				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, true)
+			})
+		}
+	})
+
+	Context("regular resource usage tracking [Benchmark]", func() {
+		rTests := []resourceTest{
+			{
+				pods: 10,
+			},
+			{
+				pods: 35,
+			},
+			{
+				pods: 105,
+			},
+		}
+
+		for _, testArg := range rTests {
+			itArg := testArg
+
+			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.pods), func() {
+				runResourceUsageTest(f, rc, itArg)
+				// Log and verify resource usage
+				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, true)
 			})
 		}
 	})
 })
 
 type resourceTest struct {
-	podsPerNode int
-	cpuLimits   framework.ContainersCPUSummary
-	memLimits   framework.ResourceUsagePerContainer
+	pods      int
+	cpuLimits framework.ContainersCPUSummary
+	memLimits framework.ResourceUsagePerContainer
 }
 
-// verifyResource verifies whether resource usage satisfies the limit.
-func verifyResource(f *framework.Framework, cpuLimits framework.ContainersCPUSummary,
-	memLimits framework.ResourceUsagePerContainer, rc *ResourceCollector) {
+// runResourceUsageTest runs the resource usage test
+func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg resourceTest) {
+	const (
+		// The monitoring time for one test
+		monitoringTime = 10 * time.Minute
+		// The periodic reporting period
+		reportingPeriod = 5 * time.Minute
+		// sleep for an interval here to measure steady data
+		sleepAfterCreatePods = 10 * time.Second
+	)
+
+	rc.Start()
+	defer rc.Stop()
+
+	By("Creating a batch of Pods")
+	pods := newTestPods(testArg.pods, ImageRegistry[pauseImage], "test_pod")
+	f.PodClient().CreateBatch(pods)
+
+	// wait for a while to let the node be steady
+	time.Sleep(sleepAfterCreatePods)
+
+	// Log once and flush the stats.
+	rc.LogLatest()
+	rc.Reset()
+
+	By("Start monitoring resource usage")
+	// Periodically dump the cpu summary until the deadline is met.
+	// Note that without calling framework.ResourceMonitor.Reset(), the stats
+	// would occupy increasingly more memory. This should be fine
+	// for the current test duration, but we should reclaim the
+	// entries if we plan to monitor longer (e.g., 8 hours).
+	deadline := time.Now().Add(monitoringTime)
+	for time.Now().Before(deadline) {
+		timeLeft := deadline.Sub(time.Now())
+		framework.Logf("Still running...%v left", timeLeft)
+		if timeLeft < reportingPeriod {
+			time.Sleep(timeLeft)
+		} else {
+			time.Sleep(reportingPeriod)
+		}
+		logPods(f.Client)
+	}
+
+	By("Reporting overall resource usage")
+	logPods(f.Client)
+}
+
+// printAndVerifyResource prints the resource usage as perf data and verifies whether resource usage satisfies the limit.
+func printAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits framework.ContainersCPUSummary,
+	memLimits framework.ResourceUsagePerContainer, isVerify bool) {
 	nodeName := framework.TestContext.NodeName
 
 	// Obtain memory PerfData
@@ -158,20 +181,22 @@ func verifyResource(f *framework.Framework, cpuLimits framework.ContainersCPUSum
 	usagePerNode := make(framework.ResourceUsagePerNode)
 	usagePerNode[nodeName] = usagePerContainer
 
-	// Obtain cpu PerfData
+	// Obtain CPU PerfData
 	cpuSummary := rc.GetCPUSummary()
 	framework.Logf("%s", formatCPUSummary(cpuSummary))
 
 	cpuSummaryPerNode := make(framework.NodesCPUSummary)
 	cpuSummaryPerNode[nodeName] = cpuSummary
 
-	// Log resource usage
+	// Print resource usage
 	framework.PrintPerfData(framework.ResourceUsageToPerfData(usagePerNode))
 	framework.PrintPerfData(framework.CPUUsageToPerfData(cpuSummaryPerNode))
 
 	// Verify resource usage
-	verifyMemoryLimits(f.Client, memLimits, usagePerNode)
-	verifyCPULimits(cpuLimits, cpuSummaryPerNode)
+	if isVerify {
+		verifyMemoryLimits(f.Client, memLimits, usagePerNode)
+		verifyCPULimits(cpuLimits, cpuSummaryPerNode)
+	}
 }
 
 func verifyMemoryLimits(c *client.Client, expected framework.ResourceUsagePerContainer, actual framework.ResourceUsagePerNode) {
