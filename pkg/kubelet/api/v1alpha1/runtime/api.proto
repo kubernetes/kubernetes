@@ -495,6 +495,9 @@ message Container {
     optional ContainerState state = 5;
     // Labels are key value pairs that may be used to scope and select individual resources.
     map<string, string> labels = 6;
+    // Annotations is an unstructured key value map that may be set by external
+    // tools to store and retrieve arbitrary metadata.
+    map<string, string> annotations = 7;
 }
 
 message ListContainersResponse {

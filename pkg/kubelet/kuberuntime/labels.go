@@ -39,6 +39,9 @@ const (
 	containerTerminationMessagePathLabel = "io.kubernetes.container.terminationMessagePath"
 	containerPreStopHandlerLabel         = "io.kubernetes.container.preStopHandler"
 	containerPortsLabel                  = "io.kubernetes.container.ports"
+
+	// kubernetesManagedLabel is used to distinguish whether a container/sandbox is managed by kubelet or not
+	kubernetesManagedLabel = "io.kubernetes.managed"
 )
 
 type labeledPodSandboxInfo struct {
@@ -83,6 +86,7 @@ func newPodLabels(pod *api.Pod) map[string]string {
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
+	labels[kubernetesManagedLabel] = "true"
 
 	return labels
 }
@@ -99,6 +103,7 @@ func newContainerLabels(container *api.Container, pod *api.Pod) map[string]strin
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
+	labels[kubernetesManagedLabel] = "true"
 
 	return labels
 }
@@ -150,7 +155,7 @@ func getPodSandboxInfoFromLabels(labels map[string]string) *labeledPodSandboxInf
 
 	// Remain only labels from api.Pod
 	for k, v := range labels {
-		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel {
+		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel && k != kubernetesManagedLabel {
 			podSandboxInfo.Labels[k] = v
 		}
 	}
@@ -173,6 +178,15 @@ func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo 
 		PodUID:        kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
 		ContainerName: getStringValueFromLabel(labels, types.KubernetesContainerNameLabel),
 	}
+}
+
+// isManagedByKubelet returns true is the sandbox/container is managed by kubelet.
+func isManagedByKubelet(labels map[string]string) bool {
+	if _, ok := labels[kubernetesManagedLabel]; ok {
+		return true
+	}
+
+	return false
 }
 
 // getContainerInfoFromAnnotations gets annotatedContainerInfo from annotations.
