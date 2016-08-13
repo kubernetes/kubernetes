@@ -36,7 +36,7 @@ func TestCreateSandbox(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	if err := fakeDocker.AssertCreated([]string{name}); err != nil {
+	if err := fakeDocker.AssertCreated([]string{"POD"}); err != nil {
 		t.Errorf("%v", err)
 	}
 	if err := fakeDocker.AssertStarted([]string{id}); err != nil {

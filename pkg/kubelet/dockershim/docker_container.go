@@ -94,7 +94,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		image = iSpec.GetImage()
 	}
 	createConfig := dockertypes.ContainerCreateConfig{
-		Name: config.GetName(),
+		Name: buildContainerName(config.GetName()),
 		Config: &dockercontainer.Config{
 			// TODO: set User.
 			Hostname:   sandboxConfig.GetHostname(),

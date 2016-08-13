@@ -18,6 +18,7 @@ package dockershim
 
 import (
 	"fmt"
+	"math/rand"
 	"strconv"
 	"strings"
 
@@ -174,4 +175,14 @@ func (f *dockerFilter) Add(key, value string) {
 
 func (f *dockerFilter) AddLabel(key, value string) {
 	f.Add("label", fmt.Sprintf("%s=%s", key, value))
+}
+
+// buildSandboxName creates a unique name for the sandbox.
+func buildSandboxName(name string) string {
+	return fmt.Sprintf("%s_%s_%s_%s_%08x", kubeNamePrefix, sandboxNamePrefix, name, rand.Uint32())
+}
+
+// buildContainerName creates a unique name for the container.
+func buildContainerName(name string) string {
+	return fmt.Sprintf("%s_%s_%s_%s_%08x", kubeNamePrefix, name, rand.Uint32())
 }
