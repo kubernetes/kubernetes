@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -41,6 +42,7 @@ import (
 type PodStorage struct {
 	Pod         *REST
 	Binding     *BindingREST
+	Eviction    *EvictionREST
 	Status      *StatusREST
 	Log         *podrest.LogREST
 	Proxy       *podrest.ProxyREST
@@ -100,6 +102,7 @@ func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTr
 	return PodStorage{
 		Pod:         &REST{store, proxyTransport},
 		Binding:     &BindingREST{store: store},
+		Eviction:    &EvictionREST{store: store},
 		Status:      &StatusREST{store: &statusStore},
 		Log:         &podrest.LogREST{Store: store, KubeletConn: k},
 		Proxy:       &podrest.ProxyREST{Store: store, ProxyTransport: proxyTransport},
@@ -115,6 +118,34 @@ var _ = rest.Redirector(&REST{})
 // ResourceLocation returns a pods location from its HostIP
 func (r *REST) ResourceLocation(ctx api.Context, name string) (*url.URL, http.RoundTripper, error) {
 	return pod.ResourceLocation(r, r.proxyTransport, ctx, name)
+}
+
+// EvictionREST implements the REST endpoint for evicting pods from nodes when etcd is in use.
+type EvictionREST struct {
+	store *registry.Store
+}
+
+var _ = rest.Creater(&EvictionREST)
+
+// New creates a new eviction resource
+func (r *EvictionREST) New() runtime.Object {
+	return &policy.Eviction{}
+}
+
+func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
+	eviction := obj.(*policy.Eviction)
+
+	// If no DB is found, allow it
+
+	// If >1 DB is found, return a 5xx explaining the service is misconfigured
+
+	// Try to verify-and-decrement
+	// If it was false already, or if it becomes false during the course of our retries,
+	// raise an error marked as a ... 429 maybe?
+
+	// If we succeed in decrementing, try the eviction via
+	return r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+	// except maybe we shouldn't return exactly what Delete() returns
 }
 
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
