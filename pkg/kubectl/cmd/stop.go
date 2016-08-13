@@ -104,5 +104,5 @@ func RunStop(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Write
 		return r.Err()
 	}
 	shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
-	return ReapResult(r, f, out, false, cmdutil.GetFlagBool(cmd, "ignore-not-found"), cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper)
+	return ReapResult(r, f, out, false, cmdutil.GetFlagBool(cmd, "ignore-not-found"), cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper, false)
 }
