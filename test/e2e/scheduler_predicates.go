@@ -186,7 +186,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		rc, err := c.ReplicationControllers(ns).Get(RCName)
 		if err == nil && rc.Spec.Replicas != 0 {
 			By("Cleaning up the replication controller")
-			err := framework.DeleteRC(c, ns, RCName)
+			err := framework.DeleteRCAndPods(c, ns, RCName)
 			framework.ExpectNoError(err)
 		}
 	})
@@ -950,7 +950,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		// cannot be scheduled onto it.
 		By("Launching two pods on two distinct nodes to get two node names")
 		CreateHostPortPods(f, "host-port", 2, true)
-		defer framework.DeleteRC(f.Client, f.Namespace.Name, "host-port")
+		defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, "host-port")
 		podList, err := c.Pods(ns).List(api.ListOptions{})
 		ExpectNoError(err)
 		Expect(len(podList.Items)).To(Equal(2))

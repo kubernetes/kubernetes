@@ -505,3 +505,4 @@ whitelist-override-label
 windows-line-endings
 www-prefix
 zone-name
+garbage-collector-enabled
