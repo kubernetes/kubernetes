@@ -405,7 +405,7 @@ func (e *EndpointController) syncService(key string) {
 			epp := api.EndpointPort{Name: portName, Port: int32(portNum), Protocol: portProto}
 			epa := api.EndpointAddress{
 				IP:       pod.Status.PodIP,
-				NodeName: pod.Spec.NodeName,
+				NodeName: &pod.Spec.NodeName,
 				TargetRef: &api.ObjectReference{
 					Kind:            "Pod",
 					Namespace:       pod.ObjectMeta.Namespace,
