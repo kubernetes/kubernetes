@@ -67,7 +67,6 @@ func NewKubeletServer() *KubeletServer {
 	config := componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(&v1alpha1.KubeletConfiguration{}, &config, nil)
 	return &KubeletServer{
-		AuthPath:             util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
 		KubeConfig:           util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		RequireKubeConfig:    false, // in 1.5, default to true
 		KubeletConfiguration: config,
