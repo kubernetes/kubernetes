@@ -57,7 +57,7 @@ func (t *testRESTStrategy) NamespaceScoped() bool          { return t.namespaceS
 func (t *testRESTStrategy) AllowCreateOnUpdate() bool      { return t.allowCreateOnUpdate }
 func (t *testRESTStrategy) AllowUnconditionalUpdate() bool { return t.allowUnconditionalUpdate }
 
-func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object) {
+func (t *testRESTStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	metaObj, err := meta.Accessor(obj)
 	if err != nil {
 		panic(err.Error())
@@ -70,7 +70,7 @@ func (t *testRESTStrategy) PrepareForCreate(obj runtime.Object) {
 	metaObj.SetLabels(labels)
 }
 
-func (t *testRESTStrategy) PrepareForUpdate(obj, old runtime.Object) {}
+func (t *testRESTStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {}
 func (t *testRESTStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
 	return nil
 }
@@ -432,7 +432,7 @@ func TestNoOpUpdates(t *testing.T) {
 
 type testPodExport struct{}
 
-func (t testPodExport) Export(obj runtime.Object, exact bool) error {
+func (t testPodExport) Export(ctx api.Context, obj runtime.Object, exact bool) error {
 	pod := obj.(*api.Pod)
 	if pod.Labels == nil {
 		pod.Labels = map[string]string{}

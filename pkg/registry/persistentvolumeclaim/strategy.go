@@ -43,7 +43,7 @@ func (persistentvolumeclaimStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeclaimStrategy) PrepareForCreate(obj runtime.Object) {
+func (persistentvolumeclaimStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolumeClaim)
 	pv.Status = api.PersistentVolumeClaimStatus{}
 }
@@ -62,7 +62,7 @@ func (persistentvolumeclaimStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status field which is not allowed to be set by end users on update
-func (persistentvolumeclaimStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (persistentvolumeclaimStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPvc := obj.(*api.PersistentVolumeClaim)
 	oldPvc := old.(*api.PersistentVolumeClaim)
 	newPvc.Status = oldPvc.Status
@@ -84,7 +84,7 @@ type persistentvolumeclaimStatusStrategy struct {
 var StatusStrategy = persistentvolumeclaimStatusStrategy{Strategy}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
-func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (persistentvolumeclaimStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolumeClaim)
 	oldPv := old.(*api.PersistentVolumeClaim)
 	newPv.Spec = oldPv.Spec

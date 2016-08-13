@@ -44,7 +44,7 @@ func (namespaceStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
+func (namespaceStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	// on create, status is active
 	namespace := obj.(*api.Namespace)
 	namespace.Status = api.NamespaceStatus{
@@ -69,7 +69,7 @@ func (namespaceStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (namespaceStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (namespaceStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec.Finalizers = oldNamespace.Spec.Finalizers
@@ -107,7 +107,7 @@ type namespaceStatusStrategy struct {
 
 var StatusStrategy = namespaceStatusStrategy{Strategy}
 
-func (namespaceStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (namespaceStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Spec = oldNamespace.Spec
@@ -128,7 +128,7 @@ func (namespaceFinalizeStrategy) ValidateUpdate(ctx api.Context, obj, old runtim
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (namespaceFinalizeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (namespaceFinalizeStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newNamespace := obj.(*api.Namespace)
 	oldNamespace := old.(*api.Namespace)
 	newNamespace.Status = oldNamespace.Status

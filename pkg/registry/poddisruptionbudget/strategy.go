@@ -45,7 +45,7 @@ func (podDisruptionBudgetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an PodDisruptionBudget before creation.
-func (podDisruptionBudgetStrategy) PrepareForCreate(obj runtime.Object) {
+func (podDisruptionBudgetStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	podDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	// create cannot set status
 	podDisruptionBudget.Status = policy.PodDisruptionBudgetStatus{}
@@ -54,7 +54,7 @@ func (podDisruptionBudgetStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podDisruptionBudgetStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (podDisruptionBudgetStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPodDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	oldPodDisruptionBudget := old.(*policy.PodDisruptionBudget)
 	// Update is not allowed to set status
@@ -123,7 +123,7 @@ type podDisruptionBudgetStatusStrategy struct {
 var StatusStrategy = podDisruptionBudgetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (podDisruptionBudgetStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPodDisruptionBudget := obj.(*policy.PodDisruptionBudget)
 	oldPodDisruptionBudget := old.(*policy.PodDisruptionBudget)
 	// status changes are not allowed to update spec
