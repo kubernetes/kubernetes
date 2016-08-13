@@ -16,6 +16,8 @@ limitations under the License.
 
 package storagebackend
 
+import "k8s.io/kubernetes/pkg/runtime"
+
 const (
 	StorageTypeUnset = ""
 	StorageTypeETCD2 = "etcd2"
@@ -40,4 +42,6 @@ type Config struct {
 	// Currently this is only supported in etcd2.
 	// We will drop the cache once using protobuf.
 	DeserializationCacheSize int
+
+	Codec runtime.Codec
 }

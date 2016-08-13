@@ -38,7 +38,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 	newListFunc := func() runtime.Object { return &rbac.ClusterRoleBindingList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.ClusterRoleBindings),
 		&rbac.ClusterRoleBinding{},
 		prefix,

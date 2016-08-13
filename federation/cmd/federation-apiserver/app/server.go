@@ -162,12 +162,12 @@ func Run(s *options.ServerRunOptions) error {
 }
 
 func createRESTOptionsOrDie(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
-	storage, err := f.New(resource)
+	config, err := f.NewConfig(resource)
 	if err != nil {
-		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())
+		glog.Fatalf("Unable to find storage config for %v, due to %v", resource, err.Error())
 	}
 	return generic.RESTOptions{
-		Storage:                 storage,
+		StorageConfig:           config,
 		Decorator:               g.StorageDecorator(),
 		DeleteCollectionWorkers: s.DeleteCollectionWorkers,
 		ResourcePrefix:          f.ResourcePrefix(resource),

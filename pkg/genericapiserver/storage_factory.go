@@ -25,9 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/recognizer"
 	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
-	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
-	storagebackendfactory "k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 	"k8s.io/kubernetes/pkg/util/sets"
 
 	"github.com/golang/glog"
@@ -37,7 +35,7 @@ import (
 type StorageFactory interface {
 	// New finds the storage destination for the given group and resource. It will
 	// return an error if the group has no storage destination configured.
-	New(groupResource unversioned.GroupResource) (storage.Interface, error)
+	NewConfig(groupResource unversioned.GroupResource) (*storagebackend.Config, error)
 
 	// ResourcePrefix returns the overridden resource prefix for the GroupResource
 	// This allows for cohabitation of resources with different native types and provides
@@ -76,9 +74,6 @@ type DefaultStorageFactory struct {
 
 	// newStorageCodecFn exists to be overwritten for unit testing.
 	newStorageCodecFn func(storageMediaType string, ns runtime.StorageSerializer, storageVersion, memoryVersion unversioned.GroupVersion, config storagebackend.Config) (codec runtime.Codec, err error)
-
-	// newStorageFn exists to be overwritten for unit testing.
-	newStorageFn func(config storagebackend.Config, codec runtime.Codec) (etcdStorage storage.Interface, err error)
 }
 
 type groupResourceOverrides struct {
@@ -118,7 +113,6 @@ func NewDefaultStorageFactory(config storagebackend.Config, defaultMediaType str
 		APIResourceConfigSource: resourceConfig,
 
 		newStorageCodecFn: NewStorageCodec,
-		newStorageFn:      newStorage,
 	}
 }
 
@@ -173,7 +167,7 @@ func (s *DefaultStorageFactory) getStorageGroupResource(groupResource unversione
 
 // New finds the storage destination for the given group and resource. It will
 // return an error if the group has no storage destination configured.
-func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (storage.Interface, error) {
+func (s *DefaultStorageFactory) NewConfig(groupResource unversioned.GroupResource) (*storagebackend.Config, error) {
 	chosenStorageResource := s.getStorageGroupResource(groupResource)
 
 	groupOverride := s.Overrides[getAllResourcesAlias(chosenStorageResource)]
@@ -232,12 +226,8 @@ func (s *DefaultStorageFactory) New(groupResource unversioned.GroupResource) (st
 	}
 
 	glog.V(3).Infof("storing %v in %v, reading as %v from %v", groupResource, storageEncodingVersion, internalVersion, config)
-	return s.newStorageFn(config, codec)
-}
-
-// newStorage is the default implementation for creating a storage backend.
-func newStorage(config storagebackend.Config, codec runtime.Codec) (etcdStorage storage.Interface, err error) {
-	return storagebackendfactory.Create(config, codec)
+	config.Codec = codec
+	return &config, nil
 }
 
 // Get all backends for all registered storage destinations.
