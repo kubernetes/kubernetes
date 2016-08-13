@@ -24,11 +24,13 @@ set -o pipefail
 
 source cluster/lib/logging.sh
 
-read -p "Do you want to run gubernator.sh and upload logs to GCS? [y/n]" yn
-echo
-if [[ ! $yn =~ ^[Yy]$ ]]
-then
-    exit 1
+
+if [[ $# -eq 0 || ! $1 =~ ^[Yy]$ ]]; then
+  read -p "Do you want to run gubernator.sh and upload logs to GCS? [y/n]" yn
+  echo
+  if [[ ! $yn =~ ^[Yy]$ ]]; then
+      exit 1
+  fi
 fi
 
 # Check that user has gsutil
@@ -65,11 +67,16 @@ fi
 GCS_JOBS_PATH="gs://${bucket_name}/logs/e2e-node"
 
 ARTIFACTS=${ARTIFACTS:-"/tmp/_artifacts"}
-BUILD_LOG_PATH="/tmp/_artifacts/build-log.txt"
+BUILD_LOG_PATH="${ARTIFACTS}/build-log.txt"
 
 if [[ ! -e $BUILD_LOG_PATH ]]; then
   echo "Could not find build-log.txt at ${BUILD_LOG_PATH}"
   exit 1
+fi
+
+results=$(find ${ARTIFACTS} -type d -name "results")
+if [[ $results != "" && $results != "${ARTIFACTS}/results" ]]; then
+  mv $results $ARTIFACTS
 fi
 
 # Get start and end timestamps based on build-log.txt file contents
@@ -103,6 +110,7 @@ if gsutil ls "${GCS_JOBS_PATH}" | grep -q "${BUILD_STAMP}"; then
   exit
 fi
 
+
 # Upload log files
 for upload_attempt in $(seq 3); do
   if [[ -d "${ARTIFACTS}" && -n $(ls -A "${ARTIFACTS}") ]]; then
@@ -114,11 +122,12 @@ for upload_attempt in $(seq 3); do
 done
 for upload_attempt in $(seq 3); do
   if [[ -e "${BUILD_LOG_PATH}" ]]; then
-  	V=2 kube::log::status "Uploading build log"
-  	gsutil -q cp -Z -a "${gcs_acl}" "${BUILD_LOG_PATH}" "${GCS_LOGS_PATH}" || continue
+    V=2 kube::log::status "Uploading build log"
+    gsutil -q cp -Z -a "${gcs_acl}" "${BUILD_LOG_PATH}" "${GCS_LOGS_PATH}" || continue
   fi
   break
 done
+
 
 # Find the k8s version for started.json
 version=""
@@ -136,45 +145,57 @@ else
   V=2 kube::log::status "Could not find Kubernetes version"
 fi
 
-
-# Upload started.json
-V=2 kube::log::status "Making started.json file"
-V=2 kube::log::status "Run started at ${start_time}"
-json_file="${GCS_LOGS_PATH}/started.json"
-
-for upload_attempt in $(seq 3); do
-  V=2 kube::log::status "Uploading version to: ${json_file} (attempt ${upload_attempt})"
-  gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" <(
-    echo "{"
-    echo "    \"version\": \"${version}\","
-    echo "    \"timestamp\": ${start_time_epoch},"
-    echo "    \"jenkins-node\": \"${NODE_NAME:-}\""
-    echo "}"
-  ) "${json_file}" || continue
-  break
-done
-
-# Upload finished.json
-V=2 kube::log::status "Making finished.json file"
+#Find build result from build-log.txt
 if grep -Fxq "Test Suite Passed" "${BUILD_LOG_PATH}"
-	then
-		build_result="SUCCESS"
+  then
+    build_result="SUCCESS"
 else
-		build_result="FAILURE"
+    build_result="FAILURE"
 fi
 
 V=4 kube::log::status "Build result is ${build_result}"
 
+if [[ -e "${ARTIFACTS}/started.json" ]]; then
+  rm "${ARTIFACTS}/started.json"
+fi
+
+if [[ -e "${ARTIFACTS}/finished.json" ]]; then
+  rm "${ARTIFACTS}/finished.json"
+fi
+
+V=2 kube::log::status "Constructing started.json and finished.json files"
+echo "{" >> "${ARTIFACTS}/started.json"
+echo "    \"version\": \"${version}\"," >> "${ARTIFACTS}/started.json"
+echo "    \"timestamp\": ${start_time_epoch}," >> "${ARTIFACTS}/started.json"
+echo "    \"jenkins-node\": \"${NODE_NAME:-}\"" >> "${ARTIFACTS}/started.json"
+echo "}" >> "${ARTIFACTS}/started.json"
+
+echo "{" >> "${ARTIFACTS}/finished.json"
+echo "    \"result\": \"${build_result}\"," >> "${ARTIFACTS}/finished.json"
+echo "    \"timestamp\": ${end_time_epoch}" >> "${ARTIFACTS}/finished.json"
+echo "}" >> "${ARTIFACTS}/finished.json"
+
+
+# Upload started.json
+V=2 kube::log::status "Uploading started.json and finished.json"
+V=2 kube::log::status "Run started at ${start_time}"
+json_file="${GCS_LOGS_PATH}/started.json"
+
 for upload_attempt in $(seq 3); do
-  V=2 kube::log::status "Uploading to ${GCS_LOGS_PATH} (attempt ${upload_attempt})"
-  gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" <(
-    echo "{"
-    echo "    \"result\": \"${build_result}\","
-    echo "    \"timestamp\": ${end_time_epoch}"
-    echo "}"
-  ) "${GCS_LOGS_PATH}/finished.json" || continue
+  V=2 kube::log::status "Uploading started.json to ${json_file} (attempt ${upload_attempt})"
+  gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" "${ARTIFACTS}/started.json" \
+    "${json_file}" || continue
   break
- done
+done
+
+# Upload finished.json
+for upload_attempt in $(seq 3); do
+  V=2 kube::log::status "Uploading finished.json to ${GCS_LOGS_PATH} (attempt ${upload_attempt})"
+  gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" "${ARTIFACTS}/finished.json" \
+    "${GCS_LOGS_PATH}/finished.json" || continue
+  break
+done
+
 
 echo "Gubernator linked below:"
-echo "k8s-gubernator.appspot.com/build/${bucket_name}/logs/e2e-node/${BUILD_STAMP}?local=on"
+echo "k8s-gubernator.appspot.com/build/${bucket_name}/logs/e2e-node/${BUILD_STAMP}"

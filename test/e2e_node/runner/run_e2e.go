@@ -250,9 +250,11 @@ func main() {
 	if !exitOk {
 		fmt.Printf("Failure: %d errors encountered.", errCount)
 		if *gubernator {
-			output, err := exec.Command("./test/e2e_node/gubernator.sh").Output()
+			output, err := exec.Command("./test/e2e_node/gubernator.sh", "y").Output()
+
 			if err != nil {
 				fmt.Println("gubernator.sh Failed")
+				fmt.Println(err)
 		        return
 		    }
 		    fmt.Printf("%s", output)
@@ -261,9 +263,11 @@ func main() {
 	}
 	fmt.Printf("Succeeded and calling gubernator")
 	if *gubernator {
-		output, err := exec.Command("./test/e2e_node/gubernator.sh").Output()
+		output, err := exec.Command("./test/e2e_node/gubernator.sh", "y").Output()
+
 		if err != nil {
 			fmt.Println("gubernator.sh Failed")
+			fmt.Println(err)
 	        return
 	    }
         fmt.Printf("%s", output)
