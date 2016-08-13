@@ -17,6 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -126,10 +127,20 @@ func loadTestProfiles() error {
 	}
 
 	cmd := exec.Command("sudo", "apparmor_parser", "-r", "-W", f.Name())
-	if out, err := cmd.CombinedOutput(); err != nil || len(out) > 0 {
-		return fmt.Errorf("failed to load profiles: %v\noutput: %s", err, out)
+	stderr := &bytes.Buffer{}
+	cmd.Stderr = stderr
+	out, err := cmd.Output()
+	// apparmor_parser does not always return an error code, so consider any stderr output an error.
+	if err != nil || stderr.Len() > 0 {
+		if stderr.Len() > 0 {
+			glog.Warning(stderr.String())
+		}
+		if len(out) > 0 {
+			glog.Infof("apparmor_parser: %s", out)
+		}
+		return fmt.Errorf("failed to load profiles: %v", err)
 	}
-
+	glog.V(2).Infof("Loaded profiles from %s: %v", path, out)
 	return nil
 }
 
