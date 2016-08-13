@@ -17,17 +17,27 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	apitest "k8s.io/kubernetes/pkg/kubelet/api/testing"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 )
 
-func createTestFakeRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
+var (
+	fakeCreatedAt int64 = 1
+)
+
+func createTestRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
 	fakeImageService := apitest.NewFakeImageService()
 	networkPlugin, _ := network.InitNetworkPlugin(
@@ -42,13 +52,113 @@ func createTestFakeRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeI
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 
+func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRuntimeService, pod *api.Pod) (*apitest.FakePodSandbox, []*apitest.FakeContainer, error) {
+	fakePodSandbox, err := makeFakePodSandbox(m, pod)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fakeContainers, err := makeFakeContainers(m, pod, pod.Spec.Containers)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	fakeRuntime.SetFakeSandboxes([]*apitest.FakePodSandbox{fakePodSandbox})
+	fakeRuntime.SetFakeContainers(fakeContainers)
+	return fakePodSandbox, fakeContainers, nil
+}
+
+func makeFakePodSandbox(m *kubeGenericRuntimeManager, pod *api.Pod) (*apitest.FakePodSandbox, error) {
+	config, err := m.generatePodSandboxConfig(pod, "")
+	if err != nil {
+		return nil, err
+	}
+
+	podSandboxID := config.GetName()
+	readyState := runtimeApi.PodSandBoxState_READY
+	return &apitest.FakePodSandbox{
+		PodSandbox: runtimeApi.PodSandbox{
+			Id:        &podSandboxID,
+			Name:      config.Name,
+			State:     &readyState,
+			CreatedAt: &fakeCreatedAt,
+			Labels:    config.Labels,
+		},
+		Annotations: config.Annotations,
+	}, nil
+}
+
+func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api.Container, sandboxConfig *runtimeApi.PodSandboxConfig) (*apitest.FakeContainer, error) {
+	containerConfig, err := m.generateContainerConfig(&container, pod, 0, "")
+	if err != nil {
+		return nil, err
+	}
+
+	containerID := containerConfig.GetName()
+	runningState := runtimeApi.ContainerState_RUNNING
+	imageRef := containerConfig.Image.GetImage()
+	return &apitest.FakeContainer{
+		ContainerStatus: runtimeApi.ContainerStatus{
+			Id:          &containerID,
+			Name:        containerConfig.Name,
+			Image:       containerConfig.Image,
+			ImageRef:    &imageRef,
+			CreatedAt:   &fakeCreatedAt,
+			State:       &runningState,
+			Labels:      containerConfig.Labels,
+			Annotations: containerConfig.Annotations,
+		},
+		SandboxID: sandboxConfig.GetName(),
+	}, nil
+}
+
+func makeFakeContainers(m *kubeGenericRuntimeManager, pod *api.Pod, containers []api.Container) ([]*apitest.FakeContainer, error) {
+	sandboxConfig, err := m.generatePodSandboxConfig(pod, "")
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]*apitest.FakeContainer, len(containers))
+	for idx, c := range containers {
+		containerWithState, err := makeFakeContainer(m, pod, c, sandboxConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		result[idx] = containerWithState
+	}
+
+	return result, nil
+}
+
+// verifyPods returns true if the two pod slices are equal.
+func verifyPods(a, b []*kubecontainer.Pod) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	// Sort the containers within a pod.
+	for i := range a {
+		sort.Sort(containersByID(a[i].Containers))
+	}
+	for i := range b {
+		sort.Sort(containersByID(b[i].Containers))
+	}
+
+	// Sort the pods by UID.
+	sort.Sort(podsByID(a))
+	sort.Sort(podsByID(b))
+
+	return reflect.DeepEqual(a, b)
+}
+
 func TestNewKubeRuntimeManager(t *testing.T) {
-	_, _, _, err := createTestFakeRuntimeManager()
+	_, _, _, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 }
 
 func TestVersion(t *testing.T) {
-	_, _, m, err := createTestFakeRuntimeManager()
+	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	version, err := m.Version()
@@ -57,9 +167,71 @@ func TestVersion(t *testing.T) {
 }
 
 func TestContainerRuntimeType(t *testing.T) {
-	_, _, m, err := createTestFakeRuntimeManager()
+	_, _, m, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	runtimeType := m.Type()
 	assert.Equal(t, "fakeRuntime", runtimeType)
+}
+
+func TestGetPods(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "foo1",
+					Image: "busybox",
+				},
+				{
+					Name:  "foo2",
+					Image: "busybox",
+				},
+			},
+		},
+	}
+
+	// Set fake sandbox and fake containers to fakeRuntime.
+	_, fakeContainers, err := makeAndSetFakePod(m, fakeRuntime, pod)
+	assert.NoError(t, err)
+
+	// Convert the fakeContainers to kubecontainer.Container
+	containers := make([]*kubecontainer.Container, len(fakeContainers))
+	for i := range containers {
+		fakeContainer := fakeContainers[i]
+		c, err := m.toKubeContainer(&runtimeApi.Container{
+			Id:       fakeContainer.Id,
+			Name:     fakeContainer.Name,
+			State:    fakeContainer.State,
+			Image:    fakeContainer.Image,
+			ImageRef: fakeContainer.ImageRef,
+			Labels:   fakeContainer.Labels,
+		})
+		if err != nil {
+			t.Fatalf("unexpected error %v", err)
+		}
+		containers[i] = c
+	}
+	expected := []*kubecontainer.Pod{
+		{
+			ID:         kubetypes.UID("12345678"),
+			Name:       "foo",
+			Namespace:  "new",
+			Containers: []*kubecontainer.Container{containers[0], containers[1]},
+		},
+	}
+
+	actual, err := m.GetPods(false)
+	assert.NoError(t, err)
+
+	if !verifyPods(expected, actual) {
+		t.Errorf("expected %#v, got %#v", expected, actual)
+	}
 }
