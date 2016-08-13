@@ -56,6 +56,19 @@ func (b containersByID) Len() int           { return len(b) }
 func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
 func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 
+// Newest first.
+type podSandboxByCreated []*runtimeApi.PodSandbox
+
+func (p podSandboxByCreated) Len() int           { return len(p) }
+func (p podSandboxByCreated) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p podSandboxByCreated) Less(i, j int) bool { return p[i].GetCreatedAt() > p[j].GetCreatedAt() }
+
+type containerStatusByCreated []*kubecontainer.ContainerStatus
+
+func (c containerStatusByCreated) Len() int           { return len(c) }
+func (c containerStatusByCreated) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
+func (c containerStatusByCreated) Less(i, j int) bool { return c[i].CreatedAt.After(c[j].CreatedAt) }
+
 // buildSandboxName creates a name which can be reversed to identify sandbox full name
 func buildSandboxName(pod *api.Pod) string {
 	_, sandboxName, _ := buildKubeGenericName(pod, kubeSandboxNamePrefix)
