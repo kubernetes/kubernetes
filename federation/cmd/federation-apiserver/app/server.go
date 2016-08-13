@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -43,9 +43,8 @@ import (
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
 func NewAPIServerCommand() *cobra.Command {
-	s := genericoptions.NewServerRunOptions().WithEtcdOptions()
-	s.AddUniversalFlags(pflag.CommandLine)
-	s.AddEtcdStorageFlags(pflag.CommandLine)
+	s := options.NewServerRunOptions()
+	s.AddFlags(pflag.CommandLine)
 	cmd := &cobra.Command{
 		Use: "federation-apiserver",
 		Long: `The Kubernetes federation API server validates and configures data
@@ -55,14 +54,13 @@ cluster's shared state through which all other components interact.`,
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
-
 	return cmd
 }
 
 // Run runs the specified APIServer.  This should never exit.
-func Run(s *genericoptions.ServerRunOptions) error {
-	genericvalidation.VerifyEtcdServersList(s)
-	genericapiserver.DefaultAndValidateRunOptions(s)
+func Run(s *options.ServerRunOptions) error {
+	genericvalidation.VerifyEtcdServersList(s.ServerRunOptions)
+	genericapiserver.DefaultAndValidateRunOptions(s.ServerRunOptions)
 
 	// TODO: register cluster federation resources here.
 	resourceConfig := genericapiserver.NewResourceConfig()
@@ -132,7 +130,7 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	if err != nil {
 		glog.Fatalf("Failed to initialize plugins: %v", err)
 	}
-	genericConfig := genericapiserver.NewConfig(s)
+	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
 	genericConfig.StorageFactory = storageFactory
 	genericConfig.Authenticator = authenticator
@@ -159,11 +157,11 @@ func Run(s *genericoptions.ServerRunOptions) error {
 	installExtensionsAPIs(s, m, storageFactory)
 
 	sharedInformers.Start(wait.NeverStop)
-	m.Run(s)
+	m.Run(s.ServerRunOptions)
 	return nil
 }
 
-func createRESTOptionsOrDie(s *genericoptions.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
+func createRESTOptionsOrDie(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory, resource unversioned.GroupResource) generic.RESTOptions {
 	storage, err := f.New(resource)
 	if err != nil {
 		glog.Fatalf("Unable to find storage destination for %v, due to %v", resource, err.Error())

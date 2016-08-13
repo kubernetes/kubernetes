@@ -18,19 +18,18 @@ package app
 
 import (
 	"github.com/golang/glog"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/genericapiserver"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
-
+	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
+	"k8s.io/kubernetes/pkg/genericapiserver"
 	ingressetcd "k8s.io/kubernetes/pkg/registry/ingress/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
 )
 
-func installExtensionsAPIs(s *genericoptions.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
+func installExtensionsAPIs(s *options.ServerRunOptions, g *genericapiserver.GenericAPIServer, f genericapiserver.StorageFactory) {
 	replicaSetStorage := replicasetetcd.NewStorage(createRESTOptionsOrDie(s, g, f, extensions.Resource("replicasets")))
 	ingressStorage, ingressStatusStorage := ingressetcd.NewREST(createRESTOptionsOrDie(s, g, f, extensions.Resource("ingresses")))
 	extensionsResources := map[string]rest.Storage{
