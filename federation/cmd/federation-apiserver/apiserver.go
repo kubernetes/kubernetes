@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
-	genericoptions "k8s.io/kubernetes/pkg/genericapiserver/options"
+	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
@@ -36,9 +36,8 @@ import (
 func main() {
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	s := genericoptions.NewServerRunOptions().WithEtcdOptions()
-	s.AddUniversalFlags(pflag.CommandLine)
-	s.AddEtcdStorageFlags(pflag.CommandLine)
+	s := options.NewServerRunOptions()
+	s.AddFlags(pflag.CommandLine)
 
 	flag.InitFlags()
 	logs.InitLogs()
