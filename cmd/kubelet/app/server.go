@@ -505,28 +505,6 @@ func InitializeTLS(kc *componentconfig.KubeletConfiguration) (*server.TLSOptions
 	return tlsOptions, nil
 }
 
-func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclient.Config, error) {
-	authInfo, err := clientauth.LoadFromFile(s.AuthPath.Value())
-	// If loading the default auth path, for backwards compatibility keep going
-	// with the default auth.
-	if err != nil {
-		if !useDefaults {
-			return nil, err
-		}
-		glog.Warningf("Could not load kubernetes auth path %s: %v. Continuing with defaults.", s.AuthPath, err)
-	}
-	if authInfo == nil {
-		// authInfo didn't load correctly - continue with defaults.
-		authInfo = &clientauth.Info{}
-	}
-	authConfig, err := authInfo.MergeWithConfig(restclient.Config{})
-	if err != nil {
-		return nil, err
-	}
-	authConfig.Host = s.APIServerList[0]
-	return &authConfig, nil
-}
-
 func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	if s.RequireKubeConfig {
 		// Ignores the values of s.APIServerList
@@ -542,11 +520,10 @@ func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error
 }
 
 // createClientConfig creates a client configuration from the command line
-// arguments. If either --auth-path or --kubeconfig is explicitly set, it
-// will be used (setting both is an error). If neither are set first attempt
-// to load the default kubeconfig file, then the default auth path file, and
-// fall back to the default auth (none) without an error.
-// TODO(roberthbailey): Remove support for --auth-path
+// arguments. If --kubeconfig is explicitly set, it will be used. If it is
+// not set, we attempt to load the default kubeconfig file, and if we cannot,
+// we fall back to the default client with no auth - this fallback does not, in
+// and of itself, constitute an error.
 func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	if s.RequireKubeConfig {
 		return kubeconfigClientConfig(s)
@@ -562,20 +539,22 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 		glog.Infof("Multiple api servers specified.  Picking first one")
 	}
 
-	if s.KubeConfig.Provided() && s.AuthPath.Provided() {
-		return nil, fmt.Errorf("cannot specify both --kubeconfig and --auth-path")
-	}
 	if s.KubeConfig.Provided() {
 		return kubeconfigClientConfig(s)
 	}
-	if s.AuthPath.Provided() {
-		return authPathClientConfig(s, false)
-	}
-	// Try the kubeconfig default first, falling back to the auth path default.
+	// If KubeConfig was not provided, try to load the default file, then fall back
+	// to a default auth config.
 	clientConfig, err := kubeconfigClientConfig(s)
 	if err != nil {
-		glog.Warningf("Could not load kubeconfig file %s: %v. Trying auth path instead.", s.KubeConfig, err)
-		return authPathClientConfig(s, true)
+		glog.Warningf("Could not load kubeconfig file %s: %v. Using default client config instead.", s.KubeConfig, err)
+
+		authInfo := &clientauth.Info{}
+		authConfig, err := authInfo.MergeWithConfig(restclient.Config{})
+		if err != nil {
+			return nil, err
+		}
+		authConfig.Host = s.APIServerList[0]
+		clientConfig = &authConfig
 	}
 	return clientConfig, nil
 }
