@@ -40,9 +40,21 @@ const (
 	milliCPUToCPU = 1000
 
 	// 100000 is equivalent to 100ms
-	quotaPeriod    = 100000
+	quotaPeriod    = 100 * minQuotaPeriod
 	minQuotaPeriod = 1000
 )
+
+type podsByID []*kubecontainer.Pod
+
+func (b podsByID) Len() int           { return len(b) }
+func (b podsByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b podsByID) Less(i, j int) bool { return b[i].ID < b[j].ID }
+
+type containersByID []*kubecontainer.Container
+
+func (b containersByID) Len() int           { return len(b) }
+func (b containersByID) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
+func (b containersByID) Less(i, j int) bool { return b[i].ID.ID < b[j].ID.ID }
 
 // buildSandboxName creates a name which can be reversed to identify sandbox full name
 func buildSandboxName(pod *api.Pod) string {
@@ -107,7 +119,23 @@ func parseContainerName(name string) (podName, podNamespace, podUID, containerNa
 	return parts[2], parts[3], parts[4], containerName, hash, nil
 }
 
-// toRuntimeProtocol converts api.Protocol to runtimeApi.Protocol
+// toKubeContainerState converts runtimeApi.ContainerState to kubecontainer.ContainerState.
+func toKubeContainerState(state runtimeApi.ContainerState) kubecontainer.ContainerState {
+	switch state {
+	case runtimeApi.ContainerState_CREATED:
+		return kubecontainer.ContainerStateCreated
+	case runtimeApi.ContainerState_RUNNING:
+		return kubecontainer.ContainerStateRunning
+	case runtimeApi.ContainerState_EXITED:
+		return kubecontainer.ContainerStateExited
+	case runtimeApi.ContainerState_UNKNOWN:
+		return kubecontainer.ContainerStateUnknown
+	}
+
+	return kubecontainer.ContainerStateUnknown
+}
+
+// toRuntimeProtocol converts api.Protocol to runtimeApi.Protocol.
 func toRuntimeProtocol(protocol api.Protocol) runtimeApi.Protocol {
 	switch protocol {
 	case api.ProtocolTCP:
@@ -118,6 +146,23 @@ func toRuntimeProtocol(protocol api.Protocol) runtimeApi.Protocol {
 
 	glog.Warningf("Unknown protocol %q: defaulting to TCP", protocol)
 	return runtimeApi.Protocol_TCP
+}
+
+// toKubeContainer converts runtimeApi.Container to kubecontainer.Container.
+func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeApi.Container) (*kubecontainer.Container, error) {
+	if c == nil || c.Id == nil || c.Image == nil || c.State == nil {
+		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
+	}
+
+	labeledInfo := getContainerInfoFromLabels(c.Labels)
+	annotatedInfo := getContainerInfoFromAnnotations(c.Annotations)
+	return &kubecontainer.Container{
+		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: c.GetId()},
+		Name:  labeledInfo.ContainerName,
+		Image: c.Image.GetImage(),
+		Hash:  annotatedInfo.Hash,
+		State: toKubeContainerState(c.GetState()),
+	}, nil
 }
 
 // milliCPUToShares converts milliCPU to CPU shares

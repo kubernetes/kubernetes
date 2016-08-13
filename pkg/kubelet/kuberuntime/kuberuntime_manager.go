@@ -223,7 +223,53 @@ func (m *kubeGenericRuntimeManager) Status() error {
 // specifies whether the runtime returns all containers including those already
 // exited and dead containers (used for garbage collection).
 func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, error) {
-	return nil, fmt.Errorf("not implemented")
+	pods := make(map[kubetypes.UID]*kubecontainer.Pod)
+	sandboxes, err := m.getKubeletSandboxes(all)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range sandboxes {
+		name, namespace, uid, _ := parseSandboxName(s.GetName())
+		podUID := kubetypes.UID(uid)
+		pods[podUID] = &kubecontainer.Pod{
+			ID:        podUID,
+			Name:      name,
+			Namespace: namespace,
+		}
+	}
+
+	containers, err := m.getKubeletContainers(all)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range containers {
+		labelledInfo := getContainerInfoFromLabels(c.Labels)
+		pod, found := pods[labelledInfo.PodUID]
+		if !found {
+			pod = &kubecontainer.Pod{
+				ID:        labelledInfo.PodUID,
+				Name:      labelledInfo.PodName,
+				Namespace: labelledInfo.PodNamespace,
+			}
+			pods[labelledInfo.PodUID] = pod
+		}
+
+		converted, err := m.toKubeContainer(c)
+		if err != nil {
+			glog.Warningf("Convert %s container %v of pod %q failed: %v", m.runtimeName, c, labelledInfo.PodUID, err)
+			continue
+		}
+
+		pod.Containers = append(pod.Containers, converted)
+	}
+
+	// Convert map to list.
+	var result []*kubecontainer.Pod
+	for _, pod := range pods {
+		result = append(result, pod)
+	}
+
+	return result, nil
 }
 
 // SyncPod syncs the running pod into the desired pod.
