@@ -44,7 +44,7 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s\n\n", d.Output) {
+	if buf.String() != fmt.Sprintf("%s", d.Output) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -77,7 +77,7 @@ func TestDescribeObject(t *testing.T) {
 		t.Errorf("unexpected describer: %#v", d)
 	}
 
-	if buf.String() != fmt.Sprintf("%s\n\n", d.Output) {
+	if buf.String() != fmt.Sprintf("%s", d.Output) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
@@ -96,7 +96,7 @@ func TestDescribeListObjects(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdDescribe(f, buf)
 	cmd.Run(cmd, []string{"pods"})
-	if buf.String() != fmt.Sprintf("%s\n\n%s\n\n", d.Output, d.Output) {
+	if buf.String() != fmt.Sprintf("%s\n\n%s", d.Output, d.Output) {
 		t.Errorf("unexpected output: %s", buf.String())
 	}
 }
