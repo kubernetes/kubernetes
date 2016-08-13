@@ -171,7 +171,46 @@ func TestContainerRuntimeType(t *testing.T) {
 	assert.NoError(t, err)
 
 	runtimeType := m.Type()
-	assert.Equal(t, "fakeRuntime", runtimeType)
+	assert.Equal(t, apitest.FakeRuntimeName, runtimeType)
+}
+
+func TestGetPodStatus(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	containers := []api.Container{
+		{
+			Name:            "foo1",
+			Image:           "busybox",
+			ImagePullPolicy: api.PullIfNotPresent,
+		},
+		{
+			Name:            "foo2",
+			Image:           "busybox",
+			ImagePullPolicy: api.PullIfNotPresent,
+		},
+	}
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: containers,
+		},
+	}
+
+	// Set fake sandbox and faked containers to fakeRuntime.
+	_, _, err = makeAndSetFakePod(m, fakeRuntime, pod)
+	assert.NoError(t, err)
+
+	podStatus, err := m.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
+	assert.NoError(t, err)
+	assert.Equal(t, pod.UID, podStatus.ID)
+	assert.Equal(t, pod.Name, podStatus.Name)
+	assert.Equal(t, pod.Namespace, podStatus.Namespace)
+	assert.Equal(t, apitest.FakePodSandboxIP, podStatus.IP)
 }
 
 func TestGetPods(t *testing.T) {
