@@ -17,10 +17,14 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"sort"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
@@ -140,4 +144,56 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeApi
 	}
 
 	return result, nil
+}
+
+// determinePodSandboxIP determines the IP address of the given pod sandbox.
+// TODO: remove determinePodSandboxIP after networking is delegated to the container runtime.
+func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName string, podSandbox *runtimeApi.PodSandboxStatus) string {
+	ip := ""
+
+	if podSandbox.Network != nil {
+		ip = podSandbox.Network.GetIp()
+	}
+
+	if m.networkPlugin.Name() != network.DefaultPluginName {
+		// TODO: podInfraContainerID in GetPodNetworkStatus() interface should be renamed to sandboxID
+		netStatus, err := m.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.ContainerID{
+			Type: m.runtimeName,
+			ID:   podSandbox.GetId(),
+		})
+		if err != nil {
+			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", m.networkPlugin.Name(), kubecontainer.BuildPodFullName(podName, podNamespace), err)
+		} else if netStatus != nil {
+			ip = netStatus.IP.String()
+		}
+	}
+
+	return ip
+}
+
+// getPodSandboxID gets the sandbox id by podUID and returns ([]sandboxID, error).
+// Param state could be nil in order to get all sandboxes belonging to same pod.
+func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID string, state *runtimeApi.PodSandBoxState) ([]string, error) {
+	filter := &runtimeApi.PodSandboxFilter{
+		State:         state,
+		LabelSelector: map[string]string{types.KubernetesPodUIDLabel: podUID},
+	}
+	sandboxes, err := m.runtimeService.ListPodSandbox(filter)
+	if err != nil {
+		glog.Errorf("ListPodSandbox with pod UID %q failed: %v", podUID, err)
+		return nil, err
+	}
+
+	if len(sandboxes) == 0 {
+		return nil, nil
+	}
+
+	// Sort with newest first.
+	sandboxIDs := make([]string, len(sandboxes))
+	sort.Sort(podSandboxByCreated(sandboxes))
+	for i, s := range sandboxes {
+		sandboxIDs[i] = s.GetId()
+	}
+
+	return sandboxIDs, nil
 }
