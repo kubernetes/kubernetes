@@ -23,7 +23,6 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -329,20 +328,17 @@ func cert(name string, template x509.Certificate, caCert *x509.Certificate) (*ce
 	if err != nil {
 		return nil, fmt.Errorf("unable to marshal ECDSA private key: %v", err)
 	}
-	return &certKey{cert, priv}, nil
+	return &certKey{cert, priv, privKey}, nil
 }
 
 func createSecret(clientset *release_1_4.Clientset, namespace, secretName string, cks map[string]*certKey) error {
 	buf := &bytes.Buffer{}
 
-	cksPemBase64 := make(map[string][]byte)
+	cksPem := make(map[string][]byte)
 	for name, ck := range cks {
-		ckPemBase64, err := encodeCertKey(buf, ck)
-		if err != nil {
-			return fmt.Errorf("%s pair failed to encode: %v", name, err)
-		}
-		cksPemBase64[fmt.Sprintf("%s.crt", name)] = ckPemBase64.cert
-		cksPemBase64[fmt.Sprintf("%s.key", name)] = ckPemBase64.key
+		ckPem := encodeCertKey(buf, ck)
+		cksPem[fmt.Sprintf("%s.crt", name)] = ckPem.cert
+		cksPem[fmt.Sprintf("%s.key", name)] = ckPem.key
 	}
 
 	// Intentionally using the default secret type - `SecretTypeOpaque` (not
@@ -353,7 +349,7 @@ func createSecret(clientset *release_1_4.Clientset, namespace, secretName string
 		ObjectMeta: corev1.ObjectMeta{
 			Name: secretName,
 		},
-		Data: cksPemBase64,
+		Data: cksPem,
 	}
 
 	_, err := clientset.Core().Secrets(namespace).Create(secret)
@@ -364,31 +360,19 @@ func createSecret(clientset *release_1_4.Clientset, namespace, secretName string
 		}).Info("Secret already exists, shouldn't be overwritten")
 		return nil
 	}
+
+	if err != nil {
+		log.WithFields(log.Fields{
+			"namespace": namespace,
+			"secret":    secretName,
+		}).Info("Secret created")
+	}
+
 	return err
 }
 
-func encodeCertKey(buf *bytes.Buffer, ck *certKey) (*certKey, error) {
-	certPemBase64, err := encodeToPemBase64(buf, ck.cert, "CERTIFICATE")
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode the certificate: %v", err)
-	}
-	keyPemBase64, err := encodeToPemBase64(buf, ck.key, "EC PRIVATE KEY")
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode the key: %v", err)
-	}
-	return &certKey{certPemBase64, keyPemBase64}, nil
-}
-
-func encodeToPemBase64(buf *bytes.Buffer, derBytes []byte, btype string) ([]byte, error) {
-	buf.Reset()
-	enc := base64.NewEncoder(base64.StdEncoding, buf)
-
-	_, err := enc.Write(pem.EncodeToMemory(&pem.Block{Type: btype, Bytes: derBytes}))
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode: %v", err)
-	}
-	if err := enc.Close(); err != nil {
-		return nil, fmt.Errorf("failed to close and flush the base64 encoder: %v", err)
-	}
-	return buf.Bytes(), nil
+func encodeCertKey(buf *bytes.Buffer, ck *certKey) *certKey {
+	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ck.cert})
+	keyPem := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: ck.key})
+	return &certKey{certPem, keyPem, nil}
 }
