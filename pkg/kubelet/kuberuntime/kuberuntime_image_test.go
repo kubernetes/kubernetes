@@ -25,7 +25,7 @@ import (
 )
 
 func TestPullImage(t *testing.T) {
-	_, _, fakeManager, err := createTestFakeRuntimeManager()
+	_, _, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
@@ -38,7 +38,7 @@ func TestPullImage(t *testing.T) {
 }
 
 func TestListImages(t *testing.T) {
-	_, fakeImageService, fakeManager, err := createTestFakeRuntimeManager()
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	images := []string{"1111", "2222", "3333"}
@@ -56,7 +56,7 @@ func TestListImages(t *testing.T) {
 }
 
 func TestIsImagePresent(t *testing.T) {
-	_, fakeImageService, fakeManager, err := createTestFakeRuntimeManager()
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	image := "busybox"
@@ -67,7 +67,7 @@ func TestIsImagePresent(t *testing.T) {
 }
 
 func TestRemoveImage(t *testing.T) {
-	_, fakeImageService, fakeManager, err := createTestFakeRuntimeManager()
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
 	assert.NoError(t, err)
 
 	err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil)
