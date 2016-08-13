@@ -1535,6 +1535,7 @@ func Convert_api_EmptyDirVolumeSource_To_v1_EmptyDirVolumeSource(in *api.EmptyDi
 func autoConvert_v1_EndpointAddress_To_api_EndpointAddress(in *EndpointAddress, out *api.EndpointAddress, s conversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
+	out.NodeName = in.NodeName
 	if in.TargetRef != nil {
 		in, out := &in.TargetRef, &out.TargetRef
 		*out = new(api.ObjectReference)
@@ -1554,6 +1555,7 @@ func Convert_v1_EndpointAddress_To_api_EndpointAddress(in *EndpointAddress, out 
 func autoConvert_api_EndpointAddress_To_v1_EndpointAddress(in *api.EndpointAddress, out *EndpointAddress, s conversion.Scope) error {
 	out.IP = in.IP
 	out.Hostname = in.Hostname
+	out.NodeName = in.NodeName
 	if in.TargetRef != nil {
 		in, out := &in.TargetRef, &out.TargetRef
 		*out = new(ObjectReference)

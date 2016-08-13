@@ -558,6 +558,9 @@ message EndpointAddress {
   // The Hostname of this endpoint
   optional string hostname = 3;
 
+  // Optional: Node hosting this endpoint
+  optional string nodeName = 4;
+
   // Reference to object providing the endpoint.
   optional ObjectReference targetRef = 2;
 }
