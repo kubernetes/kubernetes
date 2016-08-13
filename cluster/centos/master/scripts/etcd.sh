@@ -58,7 +58,7 @@ ETCD_ADVERTISE_CLIENT_URLS="http://localhost:2379,http://localhost:4001"
 #ETCD_PEER_KEY_FILE=""
 EOF
 
-cat <<EOF >//usr/lib/systemd/system/etcd.service
+cat <<EOF >/usr/lib/systemd/system/etcd.service
 [Unit]
 Description=Etcd Server
 After=network.target
