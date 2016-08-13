@@ -54,7 +54,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *FinalizeREST) {
 
 	newListFunc := func() runtime.Object { return &api.NamespaceList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.Namespaces),
 		&api.Namespace{},
 		prefix,

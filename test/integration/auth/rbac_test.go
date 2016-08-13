@@ -77,11 +77,11 @@ func clientForUser(user string) *http.Client {
 
 func newRBACAuthorizer(t *testing.T, superUser string, config *master.Config) authorizer.Authorizer {
 	newRESTOptions := func(resource string) generic.RESTOptions {
-		storageInterface, err := config.StorageFactory.New(rbacapi.Resource(resource))
+		storageConfig, err := config.StorageFactory.NewConfig(rbacapi.Resource(resource))
 		if err != nil {
 			t.Fatalf("failed to get storage: %v", err)
 		}
-		return generic.RESTOptions{Storage: storageInterface, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource}
+		return generic.RESTOptions{StorageConfig: storageConfig, Decorator: generic.UndecoratedStorage, ResourcePrefix: resource}
 	}
 
 	roleRegistry := role.NewRegistry(roleetcd.NewREST(newRESTOptions("roles")))

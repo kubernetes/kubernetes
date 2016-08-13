@@ -61,7 +61,7 @@ func NewStorage(opts generic.RESTOptions, k client.ConnectionInfoGetter, proxyTr
 
 	newListFunc := func() runtime.Object { return &api.PodList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.Pods),
 		&api.Pod{},
 		prefix,
