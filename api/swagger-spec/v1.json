@@ -16342,6 +16342,10 @@
       "type": "string",
       "description": "The Hostname of this endpoint"
      },
+     "nodeName": {
+      "type": "string",
+      "description": "Optional: Node hosting this endpoint"
+     },
      "targetRef": {
       "$ref": "v1.ObjectReference",
       "description": "Reference to object providing the endpoint."
