@@ -79,6 +79,9 @@ const (
 
 func convertState(state kubecontainer.ContainerState) plegContainerState {
 	switch state {
+	case kubecontainer.ContainerStateCreated:
+		// kubelet doesn't use the "created" state yet, hence convert it to "unknown".
+		return plegContainerUnknown
 	case kubecontainer.ContainerStateRunning:
 		return plegContainerRunning
 	case kubecontainer.ContainerStateExited:
