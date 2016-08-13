@@ -122,7 +122,7 @@ func NewFederatedInformer(
 		targetInformerFactory: targetInformerFactory,
 		clientFactory: func(cluster *federation_api.Cluster) (federation_release_1_4.Interface, error) {
 			clusterConfig, err := BuildClusterConfig(cluster)
-			if err != nil && clusterConfig != nil {
+			if err == nil && clusterConfig != nil {
 				clientset := federation_release_1_4.NewForConfigOrDie(restclient.AddUserAgent(clusterConfig, userAgentName))
 				return clientset, nil
 			}
