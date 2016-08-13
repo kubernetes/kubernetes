@@ -49,11 +49,10 @@ const (
 
 var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 	const (
-		// the data collection time of `resource collector' and the standalone cadvisor
-		// is not synchronizated. Therefore `resource collector' may miss data or
+		// The data collection time of resource collector and the standalone cadvisor
+		// is not synchronizated, so resource collector' may miss data or
 		// collect duplicated data
-		monitoringInterval    = 500 * time.Millisecond
-		sleepBeforeCreatePods = 30 * time.Second
+		containerStatsPollingPeriod = 500 * time.Millisecond
 	)
 
 	var (
@@ -62,7 +61,6 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 	)
 
 	f := framework.NewDefaultFramework("density-test")
-	podType := "density_test_pod"
 
 	BeforeEach(func() {
 		ns = f.Namespace.Name
@@ -73,7 +71,8 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 	})
 
 	Context("create a batch of pods", func() {
-		// TODO(coufon): add more tests and the values are generous, set more precise limits after benchmark
+		// TODO(coufon): the values are generous, set more precise limits with benchmark data
+		// and add more tests
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -101,98 +100,61 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 			itArg := testArg
 			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval",
 				itArg.podsNr, itArg.interval), func() {
-				var (
-					mutex      = &sync.Mutex{}
-					watchTimes = make(map[string]unversioned.Time, 0)
-					stopCh     = make(chan struct{})
-				)
 
-				// create specifications of the test pods
-				pods := newTestPods(itArg.podsNr, ImageRegistry[pauseImage], podType)
-
-				// start a standalone cadvisor pod
-				// it uses `createSync', so the pod is running when it returns
+				// Start a standalone cadvisor pod using 'createSync', the pod is running when it returns
 				createCadvisorPod(f)
 
-				// `resource collector' monitoring fine-grain CPU/memory usage by a standalone Cadvisor with
+				// Resource collector monitors fine-grain CPU/memory usage by a standalone Cadvisor with
 				// 1s housingkeeping interval
-				rc := NewResourceCollector(monitoringInterval)
+				rc := NewResourceCollector(containerStatsPollingPeriod)
 
-				// the controller watches the change of pod status
-				controller := newInformerWatchPod(f, mutex, watchTimes, podType)
-				go controller.Run(stopCh)
+				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg)
 
-				// Zhou: In test we see kubelet starts while it is busy on something, as a result `syncLoop'
-				// does not response to pod creation immediately. Creating the first pod has a delay around 5s.
-				// The node status has been `ready' so `wait and check node being ready' does not help here.
-				// Now wait here for a grace period to have `syncLoop' be ready
-				time.Sleep(sleepBeforeCreatePods)
-
-				// the density test only monitors the overhead of creating pod
-				// or start earliest and call `rc.Reset()' here to clear the buffer
-				rc.Start()
-
-				By("Creating a batch of pods")
-				// it returns a map[`pod name']`creation time' as the creation timestamps
-				createTimes := createBatchPodWithRateControl(f, pods, itArg.interval)
-
-				By("Waiting for all Pods to be observed by the watch...")
-				// checks every 10s util all pods are running. it times out ater 10min
-				Eventually(func() bool {
-					return len(watchTimes) == itArg.podsNr
-				}, 10*time.Minute, 10*time.Second).Should(BeTrue())
-
-				if len(watchTimes) < itArg.podsNr {
-					framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
-				}
-
-				// stop the watching controller, and the resource collector
-				close(stopCh)
-				rc.Stop()
-
-				// data analyis
-				var (
-					firstCreate unversioned.Time
-					lastRunning unversioned.Time
-					init        = true
-					e2eLags     = make([]framework.PodLatencyData, 0)
-				)
-
-				for name, create := range createTimes {
-					watch, ok := watchTimes[name]
-					Expect(ok).To(Equal(true))
-
-					e2eLags = append(e2eLags,
-						framework.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
-
-					if !init {
-						if firstCreate.Time.After(create.Time) {
-							firstCreate = create
-						}
-						if lastRunning.Time.Before(watch.Time) {
-							lastRunning = watch
-						}
-					} else {
-						init = false
-						firstCreate, lastRunning = create, watch
-					}
-				}
-
-				sort.Sort(framework.LatencySlice(e2eLags))
-
-				// verify latency
 				By("Verifying latency")
-				verifyLatency(lastRunning.Time.Sub(firstCreate.Time), e2eLags, itArg)
+				printAndVerifyLatency(batchLag, e2eLags, itArg, true)
 
-				// verify resource
 				By("Verifying resource")
-				verifyResource(f, itArg.cpuLimits, itArg.memLimits, rc)
+				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, true)
+			})
+		}
+	})
+
+	Context("create a batch of pods [benchmark]", func() {
+		dTests := []densityTest{
+			{
+				podsNr:   10,
+				interval: 0 * time.Millisecond,
+			},
+			{
+				podsNr:   35,
+				interval: 0 * time.Millisecond,
+			},
+			{
+				podsNr:   105,
+				interval: 0 * time.Millisecond,
+			},
+		}
+
+		for _, testArg := range dTests {
+			itArg := testArg
+			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval",
+				itArg.podsNr, itArg.interval), func() {
+
+				createCadvisorPod(f)
+				rc := NewResourceCollector(containerStatsPollingPeriod)
+
+				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg)
+
+				By("Verifying latency")
+				printAndVerifyLatency(batchLag, e2eLags, itArg, false)
+
+				By("Verifying resource")
+				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, false)
 			})
 		}
 	})
 
 	Context("create a sequence of pods", func() {
-		// TODO(coufon): add more tests and the values are generous, set more precise limits after benchmark
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -217,34 +179,17 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 			itArg := testArg
 			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods",
 				itArg.podsNr, itArg.bgPodsNr), func() {
-				bgPods := newTestPods(itArg.bgPodsNr, ImageRegistry[pauseImage], "background_pod")
-				testPods := newTestPods(itArg.podsNr, ImageRegistry[pauseImage], podType)
 
 				createCadvisorPod(f)
-				rc := NewResourceCollector(monitoringInterval)
+				rc := NewResourceCollector(containerStatsPollingPeriod)
 
-				By("Creating a batch of background pods")
-				// creatBatch is synchronized
-				// all pods are running when it returns
-				f.PodClient().CreateBatch(bgPods)
+				batchlag, e2eLags := runDensitySeqTest(f, rc, itArg)
 
-				time.Sleep(sleepBeforeCreatePods)
-
-				// starting resource monitoring
-				rc.Start()
-
-				// do a sequential creation of pod (back to back)
-				batchlag, e2eLags := createBatchPodSequential(f, testPods)
-
-				rc.Stop()
-
-				// verify latency
 				By("Verifying latency")
-				verifyLatency(batchlag, e2eLags, itArg)
+				printAndVerifyLatency(batchlag, e2eLags, itArg, true)
 
-				// verify resource
 				By("Verifying resource")
-				verifyResource(f, itArg.cpuLimits, itArg.memLimits, rc)
+				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, true)
 			})
 		}
 	})
@@ -257,14 +202,118 @@ type densityTest struct {
 	bgPodsNr int
 	// interval between creating pod (rate control)
 	interval time.Duration
-	// resource bound
+	// performance limits
 	cpuLimits            framework.ContainersCPUSummary
 	memLimits            framework.ResourceUsagePerContainer
 	podStartupLimits     framework.LatencyMetric
 	podBatchStartupLimit time.Duration
 }
 
-// it creates a batch of pods concurrently, uses one goroutine for each creation.
+// runDensityBatchTest runs the density batch pod creation test
+func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg densityTest) (time.Duration, []framework.PodLatencyData) {
+	const (
+		podType               = "density_test_pod"
+		sleepBeforeCreatePods = 30 * time.Second
+	)
+	var (
+		mutex      = &sync.Mutex{}
+		watchTimes = make(map[string]unversioned.Time, 0)
+		stopCh     = make(chan struct{})
+	)
+
+	// create test pod data structure
+	pods := newTestPods(testArg.podsNr, ImageRegistry[pauseImage], podType)
+
+	// the controller watches the change of pod status
+	controller := newInformerWatchPod(f, mutex, watchTimes, podType)
+	go controller.Run(stopCh)
+
+	// TODO(coufon): in the test we found kubelet starts while it is busy on something, as a result 'syncLoop'
+	// does not response to pod creation immediately. Creating the first pod has a delay around 5s.
+	// The node status has already been 'ready' so `wait and check node being ready does not help here.
+	// Now wait here for a grace period to let 'syncLoop' be ready
+	time.Sleep(sleepBeforeCreatePods)
+
+	rc.Start()
+
+	By("Creating a batch of pods")
+	// It returns a map['pod name']'creation time' containing the creation timestamps
+	createTimes := createBatchPodWithRateControl(f, pods, testArg.interval)
+
+	By("Waiting for all Pods to be observed by the watch...")
+
+	Eventually(func() bool {
+		return len(watchTimes) == testArg.podsNr
+	}, 10*time.Minute, 10*time.Second).Should(BeTrue())
+
+	if len(watchTimes) < testArg.podsNr {
+		framework.Failf("Timeout reached waiting for all Pods to be observed by the watch.")
+	}
+
+	close(stopCh)
+	rc.Stop()
+
+	// Analyze results
+	var (
+		firstCreate unversioned.Time
+		lastRunning unversioned.Time
+		init        = true
+		e2eLags     = make([]framework.PodLatencyData, 0)
+	)
+
+	for name, create := range createTimes {
+		watch, ok := watchTimes[name]
+		Expect(ok).To(Equal(true))
+
+		e2eLags = append(e2eLags,
+			framework.PodLatencyData{Name: name, Latency: watch.Time.Sub(create.Time)})
+
+		if !init {
+			if firstCreate.Time.After(create.Time) {
+				firstCreate = create
+			}
+			if lastRunning.Time.Before(watch.Time) {
+				lastRunning = watch
+			}
+		} else {
+			init = false
+			firstCreate, lastRunning = create, watch
+		}
+	}
+
+	sort.Sort(framework.LatencySlice(e2eLags))
+	batchLag := lastRunning.Time.Sub(firstCreate.Time)
+
+	return batchLag, e2eLags
+}
+
+// runDensitySeqTest runs the density sequential pod creation test
+func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg densityTest) (time.Duration, []framework.PodLatencyData) {
+	const (
+		podType               = "density_test_pod"
+		sleepBeforeCreatePods = 30 * time.Second
+	)
+	bgPods := newTestPods(testArg.bgPodsNr, ImageRegistry[pauseImage], "background_pod")
+	testPods := newTestPods(testArg.podsNr, ImageRegistry[pauseImage], podType)
+
+	By("Creating a batch of background pods")
+
+	// CreatBatch is synchronized, all pods are running when it returns
+	f.PodClient().CreateBatch(bgPods)
+
+	time.Sleep(sleepBeforeCreatePods)
+
+	rc.Start()
+
+	// create pods sequentially (back-to-back)
+	batchlag, e2eLags := createBatchPodSequential(f, testPods)
+
+	rc.Stop()
+
+	return batchlag, e2eLags
+}
+
+// createBatchPodWithRateControl creates a batch of pods concurrently, uses one goroutine for each creation.
 // between creations there is an interval for throughput control
 func createBatchPodWithRateControl(f *framework.Framework, pods []*api.Pod, interval time.Duration) map[string]unversioned.Time {
 	createTimes := make(map[string]unversioned.Time)
@@ -286,7 +335,7 @@ func checkPodDeleted(f *framework.Framework, podName string) error {
 	return errors.New("Pod Not Deleted")
 }
 
-// get prometheus metric `pod start latency' from kubelet
+// getPodStartLatency gets prometheus metric `pod start latency' from kubelet
 func getPodStartLatency(node string) (framework.KubeletLatencyMetrics, error) {
 	latencyMetrics := framework.KubeletLatencyMetrics{}
 	ms, err := metrics.GrabKubeletMetricsWithoutProxy(node)
@@ -367,32 +416,6 @@ func newInformerWatchPod(f *framework.Framework, mutex *sync.Mutex, watchTimes m
 	return controller
 }
 
-// verifyLatency verifies that whether pod creation latency satisfies the limit.
-func verifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyData, testArg densityTest) {
-	framework.PrintLatencies(e2eLags, "worst client e2e total latencies")
-
-	// Zhou: do not trust `kubelet' metrics since they are not reset!
-	latencyMetrics, _ := getPodStartLatency(kubeletAddr)
-	framework.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
-
-	// check whether e2e pod startup time is acceptable.
-	podCreateLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLags)}
-	framework.Logf("Pod create latency: %s", framework.PrettyPrintJSON(podCreateLatency))
-	framework.ExpectNoError(verifyPodStartupLatency(testArg.podStartupLimits, podCreateLatency.Latency))
-
-	// check bactch pod creation latency
-	if testArg.podBatchStartupLimit > 0 {
-		Expect(batchLag <= testArg.podBatchStartupLimit).To(Equal(true), "Batch creation startup time %v exceed limit %v",
-			batchLag, testArg.podBatchStartupLimit)
-	}
-
-	// calculate and log throughput
-	throughputBatch := float64(testArg.podsNr) / batchLag.Minutes()
-	framework.Logf("Batch creation throughput is %.1f pods/min", throughputBatch)
-	throughputSequential := 1.0 / e2eLags[len(e2eLags)-1].Latency.Minutes()
-	framework.Logf("Sequential creation throughput is %.1f pods/min", throughputSequential)
-}
-
 // createBatchPodSequential creats pods back-to-back in sequence.
 func createBatchPodSequential(f *framework.Framework, pods []*api.Pod) (time.Duration, []framework.PodLatencyData) {
 	batchStartTime := unversioned.Now()
@@ -406,4 +429,33 @@ func createBatchPodSequential(f *framework.Framework, pods []*api.Pod) (time.Dur
 	batchLag := unversioned.Now().Time.Sub(batchStartTime.Time)
 	sort.Sort(framework.LatencySlice(e2eLags))
 	return batchLag, e2eLags
+}
+
+// printAndVerifyLatency verifies that whether pod creation latency satisfies the limit.
+func printAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyData, testArg densityTest, isVerify bool) {
+	framework.PrintLatencies(e2eLags, "worst client e2e total latencies")
+
+	// ToDo(coufon): do not trust `kubelet' metrics since they are not reset!
+	latencyMetrics, _ := getPodStartLatency(kubeletAddr)
+	framework.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
+
+	// check whether e2e pod startup time is acceptable.
+	podCreateLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLags)}
+	framework.Logf("Pod create latency: %s", framework.PrettyPrintJSON(podCreateLatency))
+
+	// calculate and log throughput
+	throughputBatch := float64(testArg.podsNr) / batchLag.Minutes()
+	framework.Logf("Batch creation throughput is %.1f pods/min", throughputBatch)
+	throughputSequential := 1.0 / e2eLags[len(e2eLags)-1].Latency.Minutes()
+	framework.Logf("Sequential creation throughput is %.1f pods/min", throughputSequential)
+
+	if isVerify {
+		framework.ExpectNoError(verifyPodStartupLatency(testArg.podStartupLimits, podCreateLatency.Latency))
+
+		// check bactch pod creation latency
+		if testArg.podBatchStartupLimit > 0 {
+			Expect(batchLag <= testArg.podBatchStartupLimit).To(Equal(true), "Batch creation startup time %v exceed limit %v",
+				batchLag, testArg.podBatchStartupLimit)
+		}
+	}
 }

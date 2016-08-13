@@ -461,7 +461,7 @@ func (r *ResourceCollector) GetResourceSeriesWithLabels(labels map[string]string
 	return seriesPerContainer
 }
 
-// Zhou: code for getting container name of docker, copied from pkg/kubelet/cm/container_manager_linux.go
+// Code for getting container name of docker, copied from pkg/kubelet/cm/container_manager_linux.go
 // since they are not exposed
 const (
 	kubeletProcessName    = "kubelet"
