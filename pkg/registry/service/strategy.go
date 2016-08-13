@@ -44,13 +44,13 @@ func (svcStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (svcStrategy) PrepareForCreate(obj runtime.Object) {
+func (svcStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	service := obj.(*api.Service)
 	service.Status = api.ServiceStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (svcStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (svcStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	newService.Status = oldService.Status
@@ -78,7 +78,7 @@ func (svcStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (svcStrategy) Export(obj runtime.Object, exact bool) error {
+func (svcStrategy) Export(ctx api.Context, obj runtime.Object, exact bool) error {
 	t, ok := obj.(*api.Service)
 	if !ok {
 		// unexpected programmer error
@@ -126,7 +126,7 @@ type serviceStatusStrategy struct {
 var StatusStrategy = serviceStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (serviceStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (serviceStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
 	oldService := old.(*api.Service)
 	// status changes are not allowed to update spec

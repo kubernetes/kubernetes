@@ -44,7 +44,7 @@ func (storageClassStrategy) NamespaceScoped() bool {
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (storageClassStrategy) PrepareForCreate(obj runtime.Object) {
+func (storageClassStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	_ = obj.(*extensions.StorageClass)
 }
 
@@ -62,7 +62,7 @@ func (storageClassStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
-func (storageClassStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (storageClassStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	_ = obj.(*extensions.StorageClass)
 	_ = old.(*extensions.StorageClass)
 }

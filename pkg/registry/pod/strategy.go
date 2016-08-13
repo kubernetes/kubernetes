@@ -54,7 +54,7 @@ func (podStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) PrepareForCreate(obj runtime.Object) {
+func (podStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	pod := obj.(*api.Pod)
 	pod.Status = api.PodStatus{
 		Phase: api.PodPending,
@@ -62,7 +62,7 @@ func (podStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (podStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Status = oldPod.Status
@@ -96,7 +96,7 @@ func (podStrategy) AllowUnconditionalUpdate() bool {
 
 // CheckGracefulDelete allows a pod to be gracefully deleted. It updates the DeleteOptions to
 // reflect the desired grace value.
-func (podStrategy) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
+func (podStrategy) CheckGracefulDelete(ctx api.Context, obj runtime.Object, options *api.DeleteOptions) bool {
 	if options == nil {
 		return false
 	}
@@ -129,7 +129,7 @@ type podStrategyWithoutGraceful struct {
 }
 
 // CheckGracefulDelete prohibits graceful deletion.
-func (podStrategyWithoutGraceful) CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool {
+func (podStrategyWithoutGraceful) CheckGracefulDelete(ctx api.Context, obj runtime.Object, options *api.DeleteOptions) bool {
 	return false
 }
 
@@ -142,7 +142,7 @@ type podStatusStrategy struct {
 
 var StatusStrategy = podStatusStrategy{Strategy}
 
-func (podStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (podStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPod := obj.(*api.Pod)
 	oldPod := old.(*api.Pod)
 	newPod.Spec = oldPod.Spec

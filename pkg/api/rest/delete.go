@@ -37,7 +37,7 @@ type RESTDeleteStrategy interface {
 type RESTGracefulDeleteStrategy interface {
 	// CheckGracefulDelete should return true if the object can be gracefully deleted and set
 	// any default values on the DeleteOptions.
-	CheckGracefulDelete(obj runtime.Object, options *api.DeleteOptions) bool
+	CheckGracefulDelete(ctx api.Context, obj runtime.Object, options *api.DeleteOptions) bool
 }
 
 // BeforeDelete tests whether the object can be gracefully deleted. If graceful is set the object
@@ -87,7 +87,7 @@ func BeforeDelete(strategy RESTDeleteStrategy, ctx api.Context, obj runtime.Obje
 		return false, true, nil
 	}
 
-	if !gracefulStrategy.CheckGracefulDelete(obj, options) {
+	if !gracefulStrategy.CheckGracefulDelete(ctx, obj, options) {
 		return false, false, nil
 	}
 	now := unversioned.NewTime(unversioned.Now().Add(time.Second * time.Duration(*options.GracePeriodSeconds)))
