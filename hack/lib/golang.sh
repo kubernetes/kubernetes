@@ -348,6 +348,9 @@ kube::golang::setup_env() {
   subdir=$(kube::realpath . | sed "s|$KUBE_ROOT||")
   cd "${KUBE_GOPATH}/src/${KUBE_GO_PACKAGE}/${subdir}"
 
+  # Set GOROOT so binaries that parse code can work properly.
+  export GOROOT=$(go env GOROOT)
+
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
 
