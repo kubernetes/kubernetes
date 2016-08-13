@@ -184,6 +184,9 @@ func (d *kubeDockerClient) InspectImage(image string) (*dockertypes.ImageInspect
 		}
 		return nil, err
 	}
+	if !matchImageTagOrSHA(resp, image) {
+		return nil, imageNotFoundError{ID: image}
+	}
 	return &resp, nil
 }
 

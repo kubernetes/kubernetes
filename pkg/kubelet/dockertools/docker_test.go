@@ -157,6 +157,49 @@ func TestContainerNaming(t *testing.T) {
 	}
 }
 
+func TestMatchImageTagOrSHA(t *testing.T) {
+	for _, testCase := range []struct {
+		Inspected dockertypes.ImageInspect
+		Image     string
+		Output    bool
+	}{
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"ubuntu:latest"}},
+			Image:     "ubuntu",
+			Output:    true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"ubuntu:14.04"}},
+			Image:     "ubuntu:latest",
+			Output:    false,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			Output: true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208f7a29005",
+			Output: false,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{
+				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
+			},
+			Image:  "myimage@sha256:2208",
+			Output: false,
+		},
+	} {
+		match := matchImageTagOrSHA(testCase.Inspected, testCase.Image)
+		assert.Equal(t, testCase.Output, match, testCase.Image+" is not a match")
+	}
+}
+
 func TestApplyDefaultImageTag(t *testing.T) {
 	for _, testCase := range []struct {
 		Input  string
