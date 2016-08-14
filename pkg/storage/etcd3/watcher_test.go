@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -57,19 +57,18 @@ func testWatch(t *testing.T, recursive bool) {
 
 	tests := []struct {
 		key        string
-		filter     func(runtime.Object) bool
-		trigger    func() []storage.MatchValue
+		filter     storage.FilterFunc
 		watchTests []*testWatchStruct
 	}{{ // create a key
 		key:        "/somekey-1",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
-		filter:     storage.EverythingFunc,
-		trigger:    storage.NoTriggerFunc,
+		filter:     storage.Everything,
 	}, { // create a key but obj gets filtered
 		key:        "/somekey-2",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}},
-		filter:     func(runtime.Object) bool { return false },
-		trigger:    storage.NoTriggerFunc,
+		filter: func(runtime.Object) bool {
+			return false
+		},
 	}, { // create a key but obj gets filtered. Then update it with unfiltered obj
 		key:        "/somekey-3",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
@@ -77,12 +76,10 @@ func testWatch(t *testing.T, recursive bool) {
 			pod := obj.(*api.Pod)
 			return pod.Name == "bar"
 		},
-		trigger: storage.NoTriggerFunc,
 	}, { // update
 		key:        "/somekey-4",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
-		filter:     storage.EverythingFunc,
-		trigger:    storage.NoTriggerFunc,
+		filter:     storage.Everything,
 	}, { // delete because of being filtered
 		key:        "/somekey-5",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
@@ -90,11 +87,9 @@ func testWatch(t *testing.T, recursive bool) {
 			pod := obj.(*api.Pod)
 			return pod.Name != "bar"
 		},
-		trigger: storage.NoTriggerFunc,
 	}}
 	for i, tt := range tests {
-		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
-		w, err := store.watch(ctx, tt.key, "0", filter, recursive)
+		w, err := store.watch(ctx, tt.key, "0", tt.filter, recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
@@ -313,5 +308,64 @@ func testCheckStop(t *testing.T, i int, w watch.Interface) {
 		}
 	case <-time.After(wait.ForeverTestTimeout):
 		t.Errorf("#%d: time out after waiting 1s on ResultChan", i)
+	}
+}
+
+// TestWatchSync tests that if Events received from resultChan are in order
+func TestReceiveResultInOrder(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+
+	tests := []struct {
+		key      string
+		eventNum int
+	}{{ // 1 update events
+		key:      "/somekey-1",
+		eventNum: 1,
+	}, { // orderedBufSize update events
+		key:      "/somekey-2",
+		eventNum: orderedBufSize,
+	}, { // 10*orderedBufSize update events
+		key:      "/somekey-3",
+		eventNum: 10 * orderedBufSize,
+	}}
+
+	for i, tt := range tests {
+		w, err := store.Watch(ctx, tt.key, "0", storage.Everything)
+		if err != nil {
+			t.Fatalf("Watch failed: %v", err)
+		}
+
+		prevOut := &api.Pod{}
+		err = store.Create(ctx, tt.key, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Generation: 0}}, prevOut, 0)
+		if err != nil {
+			t.Fatalf("Create key failed: %v", err)
+		}
+
+		outs := make([]*api.Pod, tt.eventNum+1)
+		outs[0] = prevOut
+		for j := 1; j <= tt.eventNum; j++ {
+			outs[j] = &api.Pod{}
+			err := store.GuaranteedUpdate(ctx, tt.key, outs[j], true, nil, storage.SimpleUpdate(
+				func(runtime.Object) (runtime.Object, error) {
+					return &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo", Generation: int64(j)}}, nil
+				}))
+			if err != nil {
+				t.Fatalf("GuaranteedUpdate failed: %v", err)
+			}
+		}
+
+		// Check if update events are in order
+		for j := 0; j <= tt.eventNum; j++ {
+			if j != 0 {
+				testCheckResult(t, i, watch.Modified, w, outs[j])
+			} else {
+				testCheckResult(t, i, watch.Added, w, outs[0])
+
+			}
+		}
+
+		w.Stop()
+		testCheckStop(t, i, w)
 	}
 }

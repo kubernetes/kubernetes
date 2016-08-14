@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors All rights reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,6 +39,7 @@ const (
 	// We have set a buffer in order to reduce times of context switches.
 	incomingBufSize = 100
 	outgoingBufSize = 100
+	orderedBufSize  = 10
 )
 
 type watcher struct {
@@ -47,18 +48,24 @@ type watcher struct {
 	versioner storage.Versioner
 }
 
+type etcdEventChannelBuffer []chan *event
+
+type watchEventChannelBuffer []chan *watch.Event
+
 // watchChan implements watch.Interface.
 type watchChan struct {
 	watcher           *watcher
 	key               string
 	initialRev        int64
 	recursive         bool
-	filter            storage.Filter
+	filter            storage.FilterFunc
 	ctx               context.Context
 	cancel            context.CancelFunc
 	incomingEventChan chan *event
 	resultChan        chan watch.Event
 	errChan           chan error
+	etcdEventChanBuf  etcdEventChannelBuffer
+	watchEventChanBuf watchEventChannelBuffer
 }
 
 func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner) *watcher {
@@ -76,16 +83,17 @@ func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.
 // If recursive is false, it watches on given key.
 // If recursive is true, it watches any children and directories under the key, excluding the root key itself.
 // filter must be non-nil. Only if filter returns true will the changes be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.Filter) (watch.Interface, error) {
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) (watch.Interface, error) {
 	if recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
 	wc := w.createWatchChan(ctx, key, rev, recursive, filter)
+	wc.initEventTransform()
 	go wc.run()
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.Filter) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
@@ -94,7 +102,14 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		filter:            filter,
 		incomingEventChan: make(chan *event, incomingBufSize),
 		resultChan:        make(chan watch.Event, outgoingBufSize),
+		etcdEventChanBuf:  make(etcdEventChannelBuffer, orderedBufSize),
+		watchEventChanBuf: make(watchEventChannelBuffer, orderedBufSize),
 		errChan:           make(chan error, 1),
+	}
+	for i := 0; i < orderedBufSize; i++ {
+		// TODO We can scale channel size if necessary
+		wc.etcdEventChanBuf[i] = make(chan *event, 1)
+		wc.watchEventChanBuf[i] = make(chan *watch.Event, 1)
 	}
 	wc.ctx, wc.cancel = context.WithCancel(ctx)
 	return wc
@@ -180,28 +195,62 @@ func (wc *watchChan) startWatching() {
 }
 
 // processEvent processes events from etcd watcher and sends results to resultChan.
+func (wc *watchChan) initEventTransform() {
+	var res *watch.Event
+	for i := 0; i < orderedBufSize; i++ {
+		go func(i int) {
+			for {
+				select {
+				case e := <-wc.etcdEventChanBuf[i]:
+					res = wc.transform(e)
+					wc.watchEventChanBuf[i] <- res
+				case <-wc.ctx.Done():
+					return
+				}
+			}
+		}(i)
+	}
+}
+
+// processEvent processes events from etcd watcher and sends results to resultChan.
 func (wc *watchChan) processEvent(wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	for {
-		select {
-		case e := <-wc.incomingEventChan:
-			res := wc.transform(e)
-			if res == nil {
-				continue
-			}
-			// If user couldn't receive results fast enough, we also block incoming events from watcher.
-			// Because storing events in local will cause more memory usage.
-			// The worst case would be closing the fast watcher.
+	wg2 := sync.WaitGroup{}
+	wg2.Add(2)
+
+	go func() {
+		defer wg2.Done()
+		etcdEventIndex := 0
+		for {
 			select {
-			case wc.resultChan <- *res:
+			case e := <-wc.incomingEventChan:
+				wc.etcdEventChanBuf[etcdEventIndex] <- e
+				etcdEventIndex = (etcdEventIndex + 1) % orderedBufSize
 			case <-wc.ctx.Done():
 				return
 			}
-		case <-wc.ctx.Done():
-			return
 		}
-	}
+	}()
+
+	go func() {
+		defer wg2.Done()
+		watchEventIndex := 0
+		for {
+			select {
+			case res := <-wc.watchEventChanBuf[watchEventIndex]:
+				watchEventIndex = (watchEventIndex + 1) % orderedBufSize
+				if res == nil {
+					continue
+				}
+				wc.resultChan <- *res
+			case <-wc.ctx.Done():
+				return
+			}
+		}
+	}()
+
+	wg2.Wait()
 }
 
 // transform transforms an event into a result for user if not filtered.
@@ -221,7 +270,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 	switch {
 	case e.isDeleted:
-		if !wc.filter.Filter(oldObj) {
+		if !wc.filter(oldObj) {
 			return nil
 		}
 		res = &watch.Event{
@@ -229,7 +278,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: oldObj,
 		}
 	case e.isCreated:
-		if !wc.filter.Filter(curObj) {
+		if !wc.filter(curObj) {
 			return nil
 		}
 		res = &watch.Event{
@@ -237,8 +286,8 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: curObj,
 		}
 	default:
-		curObjPasses := wc.filter.Filter(curObj)
-		oldObjPasses := wc.filter.Filter(oldObj)
+		curObjPasses := wc.filter(curObj)
+		oldObjPasses := wc.filter(oldObj)
 		switch {
 		case curObjPasses && oldObjPasses:
 			res = &watch.Event{
@@ -301,7 +350,7 @@ func (wc *watchChan) sendError(err error) {
 func (wc *watchChan) sendEvent(e *event) {
 	if len(wc.incomingEventChan) == incomingBufSize {
 		glog.V(2).Infof("Fast watcher, slow processing. Number of buffered events: %d."+
-			"Probably caused by slow decoding, user not receiving fast, or other processing logic",
+		"Probably caused by slow decoding, user not receiving fast, or other processing logic",
 			incomingBufSize)
 	}
 	select {
