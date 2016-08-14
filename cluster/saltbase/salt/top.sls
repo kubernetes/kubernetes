@@ -87,6 +87,3 @@ base:
 {% if pillar.get('enable_rescheduler', '').lower() == 'true' %}
     - rescheduler
 {% endif %}
-{% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
-    - calico.master
-{% endif %}
