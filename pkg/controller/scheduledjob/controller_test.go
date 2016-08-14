@@ -97,7 +97,10 @@ func scheduledJob() batch.ScheduledJob {
 }
 
 func jobSpec() batch.JobSpec {
+	one := int32(1)
 	return batch.JobSpec{
+		Parallelism: &one,
+		Completions: &one,
 		Template: api.PodTemplateSpec{
 			ObjectMeta: api.ObjectMeta{
 				Labels: map[string]string{
@@ -196,11 +199,23 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			sj.Spec.StartingDeadlineSeconds = &tc.deadline
 		}
 
+		var (
+			job *batch.Job
+			err error
+		)
+		js := []batch.Job{}
 		if tc.ranPreviously {
 			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeThePriorHour()}
 			sj.Status.LastScheduleTime = &unversioned.Time{Time: justAfterThePriorHour()}
+			job, err = getJobFromTemplate(&sj, sj.Status.LastScheduleTime.Time)
+			if err != nil {
+				t.Fatalf("Unexpected error creating a job from template: %v", err)
+			}
+			job.UID = "1234"
+			job.Namespace = ""
 			if tc.stillActive {
-				sj.Status.Active = []api.ObjectReference{{}}
+				sj.Status.Active = []api.ObjectReference{{UID: job.UID}}
+				js = append(js, *job)
 			}
 		} else {
 			sj.ObjectMeta.CreationTimestamp = unversioned.Time{Time: justBeforeTheHour()}
@@ -209,11 +224,12 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 			}
 		}
 
-		jc := &fakeJobControl{}
+		jc := &fakeJobControl{Job: job}
 		sjc := &fakeSJControl{}
+		pc := &fakePodControl{}
 		recorder := record.NewFakeRecorder(10)
 
-		SyncOne(sj, []batch.Job{}, tc.now, jc, sjc, recorder)
+		SyncOne(sj, js, tc.now, jc, sjc, pc, recorder)
 		expectedCreates := 0
 		if tc.expectCreate {
 			expectedCreates = 1
@@ -348,10 +364,11 @@ func TestSyncOne_Status(t *testing.T) {
 
 		jc := &fakeJobControl{}
 		sjc := &fakeSJControl{}
+		pc := &fakePodControl{}
 		recorder := record.NewFakeRecorder(10)
 
 		// Run the code
-		SyncOne(sj, jobs, tc.now, jc, sjc, recorder)
+		SyncOne(sj, jobs, tc.now, jc, sjc, pc, recorder)
 
 		// Status update happens once when ranging through job list, and another one if create jobs.
 		expectUpdates := 1

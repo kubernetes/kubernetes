@@ -35,12 +35,14 @@ import (
 	"github.com/golang/glog"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/client/record"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/runtime"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -52,6 +54,7 @@ type ScheduledJobController struct {
 	kubeClient *client.Client
 	jobControl jobControlInterface
 	sjControl  sjControlInterface
+	podControl podControlInterface
 	recorder   record.EventRecorder
 }
 
@@ -69,6 +72,7 @@ func NewScheduledJobController(kubeClient *client.Client) *ScheduledJobControlle
 		kubeClient: kubeClient,
 		jobControl: realJobControl{KubeClient: kubeClient},
 		sjControl:  &realSJControl{KubeClient: kubeClient},
+		podControl: &realPodControl{KubeClient: kubeClient},
 		recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "scheduled-job-controller"}),
 	}
 
@@ -112,7 +116,7 @@ func (jm *ScheduledJobController) SyncAll() {
 	glog.Infof("Found %d groups", len(jobsBySj))
 
 	for _, sj := range sjs {
-		SyncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.recorder)
+		SyncOne(sj, jobsBySj[sj.UID], time.Now(), jm.jobControl, jm.sjControl, jm.podControl, jm.recorder)
 	}
 }
 
@@ -120,7 +124,7 @@ func (jm *ScheduledJobController) SyncAll() {
 // All known jobs created by "sj" should be included in "js".
 // The current time is passed in to facilitate testing.
 // It has no receiver, to facilitate testing.
-func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, recorder record.EventRecorder) {
+func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControlInterface, sjc sjControlInterface, pc podControlInterface, recorder record.EventRecorder) {
 	nameForLog := fmt.Sprintf("%s/%s", sj.Namespace, sj.Name)
 
 	for _, j := range js {
@@ -199,8 +203,46 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 	}
 	if sj.Spec.ConcurrencyPolicy == batch.ReplaceConcurrent {
 		for _, j := range sj.Status.Active {
+			// TODO: this should be replaced with server side job deletion
+			// currently this mimics JobReaper from pkg/kubectl/stop.go
 			glog.V(4).Infof("Deleting job %s of %s s that was still running at next scheduled start time", j.Name, nameForLog)
-			if err := jc.DeleteJob(j.Namespace, j.Name); err != nil {
+			job, err := jc.GetJob(j.Namespace, j.Name)
+			if err != nil {
+				recorder.Eventf(&sj, api.EventTypeWarning, "FailedGet", "Get job: %v", err)
+				return
+			}
+			// scale job down to 0
+			if *job.Spec.Parallelism != 0 {
+				zero := int32(0)
+				job.Spec.Parallelism = &zero
+				job, err = jc.UpdateJob(job.Namespace, job)
+				if err != nil {
+					recorder.Eventf(&sj, api.EventTypeWarning, "FailedUpdate", "Update job: %v", err)
+					return
+				}
+			}
+			// remove all pods...
+			selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
+			options := api.ListOptions{LabelSelector: selector}
+			podList, err := pc.ListPods(job.Namespace, options)
+			if err != nil {
+				recorder.Eventf(&sj, api.EventTypeWarning, "FailedList", "List job-pods: %v", err)
+			}
+			errList := []error{}
+			for _, pod := range podList.Items {
+				if err := pc.DeletePod(pod.Namespace, pod.Name); err != nil {
+					// ignores the error when the pod isn't found
+					if !errors.IsNotFound(err) {
+						errList = append(errList, err)
+					}
+				}
+			}
+			if len(errList) != 0 {
+				recorder.Eventf(&sj, api.EventTypeWarning, "FailedDelete", "Deleted job-pods: %v", utilerrors.NewAggregate(errList))
+				return
+			}
+			// ... and the job itself
+			if err := jc.DeleteJob(job.Namespace, job.Name); err != nil {
 				recorder.Eventf(&sj, api.EventTypeWarning, "FailedDelete", "Deleted job: %v", err)
 				return
 			}
