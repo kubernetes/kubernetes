@@ -701,13 +701,19 @@ function start-kubelet {
     flags+=" --anonymous-auth=false --authorization-mode=Webhook --client-ca-file=${CA_CERT_BUNDLE_PATH}"
   fi
   # Network plugin
-  if [[ -n "${NETWORK_PROVIDER:-}" ]]; then
-    if [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+  if [[ -n "${NETWORK_PROVIDER:-}" || -n "${NETWORK_POLICY_PROVIDER:-}" ]]; then
+    if [[ "${NETWORK_PROVIDER:-}" == "cni" || "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
       flags+=" --cni-bin-dir=/home/kubernetes/bin"
     else
       flags+=" --network-plugin-dir=/home/kubernetes/bin"
     fi
-    flags+=" --network-plugin=${NETWORK_PROVIDER}"
+    if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
+      # Calico uses CNI always.
+      flags+=" --network-plugin=cni"
+    else
+      # Otherwise use the configured value.
+      flags+=" --network-plugin=${NETWORK_PROVIDER}"
+    fi
   fi
   if [[ -n "${NON_MASQUERADE_CIDR:-}" ]]; then
     flags+=" --non-masquerade-cidr=${NON_MASQUERADE_CIDR}"
@@ -1419,6 +1425,10 @@ function start-kube-addons {
   fi
   if [[ "${NETWORK_POLICY_PROVIDER:-}" == "calico" ]]; then
     setup-addon-manifests "addons" "calico-policy-controller"
+
+    # Replace the cluster cidr.
+    local -r calico_file="${dst_dir}/calico-policy-controller/calico-node.yaml"
+    sed -i -e "s@__CLUSTER_CIDR__@${CLUSTER_IP_RANGE}@g" "${calico_file}"
   fi
   if [[ "${ENABLE_DEFAULT_STORAGE_CLASS:-}" == "true" ]]; then
     setup-addon-manifests "addons" "storage-class/gce"
