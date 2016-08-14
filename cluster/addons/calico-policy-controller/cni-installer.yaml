@@ -1,0 +1,42 @@
+kind: DaemonSet
+apiVersion: extensions/v1beta1
+metadata:
+  name: calico-cni-installer
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      kubernetes.io/cluster-service: "true"
+      k8s-app: calico-cni-installer
+  template:
+    metadata:
+      labels:
+        kubernetes.io/cluster-service: "true"
+        k8s-app: calico-cni-installer
+    spec:
+        hostNetwork: true
+        containers:
+          # This container installs the Calico CNI binaries
+          # and CNI network config file on each node.
+          - name: install-cni
+            image: caseydavenport/cni:latest
+            imagePullPolicy: Always
+            command: ["/install-cni.sh"]
+            env:
+              - name: CNI_NETWORK_CONFIG
+                valueFrom:
+                  configMapKeyRef:
+                    name: calico-cni-config 
+                    key: calico.cni.fullconfig
+            volumeMounts:
+              - mountPath: /host/opt/cni/bin
+                name: cni-bin-dir
+              - mountPath: /host/etc/cni/net.d
+                name: cni-net-dir
+        volumes:
+          - name: cni-bin-dir
+            hostPath:
+              path: /opt/cni/bin
+          - name: cni-net-dir
+            hostPath:
+              path: /etc/cni/net.d
