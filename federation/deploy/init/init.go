@@ -119,15 +119,31 @@ func main() {
 		}).Fatal("Failed to retrieve federation API server load balancer IP addresses and/or hostnames")
 	}
 
+	cAddr, err := canonicalAddress(ips, hostnames)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"namespace": *namespace,
+			"ips":       ips,
+			"hostnames": hostnames,
+			"error":     err,
+		}).Fatal("Failed to find the federation API server's canonical address")
+	}
+
 	cks, err := certs(*svcName, *certValidity, ips, hostnames)
 	if err != nil {
 		log.WithField("error", err).
 			Fatal("Failed to generate certificates")
 	}
 
-	if err := createSecret(clientset, *namespace, *secretName, cks); err != nil {
+	cmKubeconfig, err := controllerManagerKubeconfig(*namespace, *svcName, cks["ca"].cert, cks["controller-manager"])
+	if err != nil {
 		log.WithField("error", err).
-			Fatal("Failed to create a secret")
+			Fatal("Failed to controller manager kubeconfig")
+	}
+
+	if err := createSecrets(clientset, *namespace, *svcName, cAddr, *secretName, *cmSecretName, cks, cmKubeconfig); err != nil {
+		log.WithField("error", err).
+			Fatal("Failed to create secrets")
 	}
 
 	// DEBUG: Remove before submission
@@ -242,6 +258,19 @@ func lbTargets(clientset *release_1_4.Clientset, namespace, svcName string, time
 	}).Info("Load balancer targets detected")
 
 	return ips, hostnames, nil
+}
+
+// canonicalAddress returns the authoritative address of the federation API
+// server endpoint.
+// The current implementation arbitrarily chooses either the first IP address
+// if it exists, or the first hostname as the canonical address.
+func canonicalAddress(ips []net.IP, hostnames []string) (string, error) {
+	if len(ips) > 0 {
+		return ips[0].String(), nil
+	} else if len(hostnames) > 0 {
+		return hostnames[0], nil
+	}
+	return "", fmt.Errorf("at least one IP address or hostname must be supplied")
 }
 
 func certs(svcName string, certValidity time.Duration, ips []net.IP, hostnames []string) (map[string]*certKey, error) {
@@ -378,7 +407,7 @@ func cert(name string, ips []net.IP, hostnames []string, template x509.Certifica
 	return &certKey{cert, priv, privKey}, nil
 }
 
-func createSecret(clientset *release_1_4.Clientset, namespace, secretName string, cks map[string]*certKey) error {
+func createSecrets(clientset *release_1_4.Clientset, namespace, svcName, cAddr, secretName, cmSecretName string, cks map[string]*certKey, cmKubeconfig []byte) error {
 	buf := &bytes.Buffer{}
 
 	cksPem := make(map[string][]byte)
@@ -387,6 +416,9 @@ func createSecret(clientset *release_1_4.Clientset, namespace, secretName string
 		cksPem[fmt.Sprintf("%s.crt", name)] = ckPem.cert
 		cksPem[fmt.Sprintf("%s.key", name)] = ckPem.key
 	}
+
+	data := cksPem
+	data[fmt.Sprintf("%s-advertise-address", svcName)] = []byte(cAddr)
 
 	// Intentionally using the default secret type - `SecretTypeOpaque` (not
 	// set, but it will be defaulted) instead of `SecretTypeTLS` or other
