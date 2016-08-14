@@ -14,6 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This program implements the initialization code required to start a
+// federation API server. This code is intended to be run inside an init
+// container in the federation API server pod.
+//
+// Federation API server is deployed as a Kubernetes Deployment resource and
+// hence the number of Deployment pod replicas can be scaled up and down. This
+// means that there can be multiple copies of the federation API server pod
+// running. Since init containers are run by every pod, we need to ensure that
+// only one of these initializers can create the necessary secrets that store
+// the credentials and other configuration. Allowing multiple initializers to
+// create these secrets might mix up values from different initializers
+// leading to invalid credentials. We could elect a leader to decide which of
+// these initializers are allowed to create those credentials, but that isn't
+// sufficient since we also need guards against pod restarts. So instead, we
+// use the secret whose name is provided by the `--secret` flag as a lock to
+// ensure that the credentials are created only once.
+
+// At the very beginning, this code checks if the secret indicated by the flag
+// already exists. If the secret exists, then the init container just
+// successfully exits. Otherwise, it continues to run the initialization code.
+// After creating all the credentials in memory, it attempts to write them to
+// the secret indicated by the flag. If that fails it successfully exits.
+// Otherwise it continues to write all the other secrets. Effectively, the
+// first secret, i.e. the secret indicated by the `--secret` flag acts as
+// lock here.
 package main
 
 import (
