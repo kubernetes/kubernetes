@@ -8,18 +8,7 @@
 // interface that is loosly modeled on the iproute2 cli.
 package netlink
 
-import (
-	"net"
-
-	"github.com/vishvananda/netlink/nl"
-)
-
-const (
-	// Family type definitions
-	FAMILY_ALL = nl.FAMILY_ALL
-	FAMILY_V4  = nl.FAMILY_V4
-	FAMILY_V6  = nl.FAMILY_V6
-)
+import "net"
 
 // ParseIPNet parses a string in ip/net format and returns a net.IPNet.
 // This is valuable because addresses in netlink are often IPNets and
@@ -33,7 +22,10 @@ func ParseIPNet(s string) (*net.IPNet, error) {
 	return &net.IPNet{IP: ip, Mask: ipNet.Mask}, nil
 }
 
-// NewIPNet generates an IPNet from an ip address using a netmask of 32.
+// NewIPNet generates an IPNet from an ip address using a netmask of 32 or 128.
 func NewIPNet(ip net.IP) *net.IPNet {
-	return &net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+	if ip.To4() != nil {
+		return &net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}
+	}
+	return &net.IPNet{IP: ip, Mask: net.CIDRMask(128, 128)}
 }

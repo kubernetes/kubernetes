@@ -78,6 +78,7 @@ const (
 	SizeofXfrmLifetimeCfg = 0x40
 	SizeofXfrmLifetimeCur = 0x20
 	SizeofXfrmId          = 0x18
+	SizeofXfrmMark        = 0x08
 )
 
 // typedef union {
@@ -255,4 +256,21 @@ func DeserializeXfrmId(b []byte) *XfrmId {
 
 func (msg *XfrmId) Serialize() []byte {
 	return (*(*[SizeofXfrmId]byte)(unsafe.Pointer(msg)))[:]
+}
+
+type XfrmMark struct {
+	Value uint32
+	Mask  uint32
+}
+
+func (msg *XfrmMark) Len() int {
+	return SizeofXfrmMark
+}
+
+func DeserializeXfrmMark(b []byte) *XfrmMark {
+	return (*XfrmMark)(unsafe.Pointer(&b[0:SizeofXfrmMark][0]))
+}
+
+func (msg *XfrmMark) Serialize() []byte {
+	return (*(*[SizeofXfrmMark]byte)(unsafe.Pointer(msg)))[:]
 }
