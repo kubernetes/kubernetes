@@ -85,7 +85,7 @@ func (limitrangeStrategy) Export(api.Context, runtime.Object, bool) error {
 	return nil
 }
 
-func MatchLimitRange(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchLimitRange(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

@@ -61,7 +61,7 @@ func NewREST(config *storagebackend.Config, storageDecorator generic.StorageDeco
 			return obj.(*testgroup.TestType).Name, nil
 		},
 		// Used to match objects based on labels/fields for list.
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 			return &generic.SelectionPredicate{
 				Label: label,
 				Field: field,

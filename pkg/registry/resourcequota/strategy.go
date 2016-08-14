@@ -98,7 +98,7 @@ func (resourcequotaStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runt
 }
 
 // MatchResourceQuota returns a generic matcher for a given label and field selector.
-func MatchResourceQuota(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchResourceQuota(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

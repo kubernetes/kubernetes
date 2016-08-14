@@ -95,7 +95,7 @@ func (persistentvolumeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old r
 }
 
 // MatchPersistentVolume returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumes(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchPersistentVolumes(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

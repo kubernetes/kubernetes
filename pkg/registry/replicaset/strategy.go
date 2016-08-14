@@ -114,7 +114,7 @@ func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
 // MatchReplicaSet is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchReplicaSet(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchReplicaSet(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
