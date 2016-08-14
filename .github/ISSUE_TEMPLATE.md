@@ -3,7 +3,7 @@
 **Is this a request for help?** (If yes, you should use our troubleshooting guide and community support channels, see http://kubernetes.io/docs/troubleshooting/.):
 
 
-**What keywords did you search in Kubernetes issues before filing this one?** (If you found any duplicates, you should instead reply there or use the :+1: icon in the upper-right of the issue message):
+**What keywords did you search in Kubernetes issues before filing this one?** (If you have found any duplicates, you should instead reply there.):
 
 ---
 
