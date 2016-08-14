@@ -20,7 +20,7 @@ spec:
       hostNetwork: true
       containers:
         - name: calico-node
-          image: quay.io/calico/node:v0.20.0
+          image: quay.io/calico/node:v0.21.0
           env:
             - name: ETCD_ENDPOINTS
               value: "http://10.0.0.17:6666"
