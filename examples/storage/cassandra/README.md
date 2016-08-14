@@ -489,7 +489,7 @@ spec:
               #- containerPort: 9160
               #  name: thrift
           resources:
-            request:
+            requests:
               cpu: 0.5
           volumeMounts:
             - mountPath: /cassandra_data
