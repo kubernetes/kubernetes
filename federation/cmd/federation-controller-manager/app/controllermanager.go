@@ -50,10 +50,6 @@ import (
 )
 
 const (
-	// TODO(madhusudancs): Consider making this configurable via a flag.
-	// "federation-apiserver-kubeconfig" is a reserved secret name which
-	// stores the kubeconfig for federation-apiserver.
-	KubeconfigSecretName = "federation-apiserver-kubeconfig"
 	// "federation-apiserver-secret" was the old name we used to store
 	// Federation API server kubeconfig secret. Unfortunately, this name
 	// is very close to "federation-apiserver-secrets" and causes a lot
@@ -93,8 +89,7 @@ func Run(s *options.CMServer) error {
 		glog.Errorf("unable to register configz: %s", err)
 	}
 	// Create the config to talk to federation-apiserver.
-	kubeconfigGetter := util.KubeconfigGetterForSecret(KubeconfigSecretName)
-	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
+	restClientCfg, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil || restClientCfg == nil {
 		// Retry with the deprecated name in 1.4.
 		// TODO(madhusudancs): Remove this in 1.5.
