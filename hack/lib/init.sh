@@ -19,7 +19,7 @@ set -o nounset
 set -o pipefail
 
 # The root of the build/dist directory
-KUBE_ROOT=$(cd $(dirname "${BASH_SOURCE}")/../.. && pwd -P)
+KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE}")/../.." && pwd -P)"
 
 KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
