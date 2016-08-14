@@ -16,8 +16,7 @@
 
 # A library of helper functions and constant for the local config.
 
-# Use the config file specified in $KUBE_CONFIG_FILE, or default to
-# config-default.sh.
+# Uses the config file specified in $KUBE_CONFIG_FILE, or defaults to config-default.sh
 
 KUBE_PROMPT_FOR_UPDATE=y
 KUBE_SKIP_UPDATE=${KUBE_SKIP_UPDATE-"n"}
