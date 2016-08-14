@@ -70,7 +70,7 @@ func (eventStrategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func MatchEvent(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchEvent(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: getAttrs}
 }
 

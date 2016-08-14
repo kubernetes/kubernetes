@@ -88,7 +88,7 @@ func AutoscalerToSelectableFields(hpa *autoscaling.HorizontalPodAutoscaler) fiel
 	return fields.Set{}
 }
 
-func MatchAutoscaler(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchAutoscaler(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

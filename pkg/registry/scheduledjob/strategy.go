@@ -104,7 +104,7 @@ func ScheduledJobToSelectableFields(scheduledJob *batch.ScheduledJob) fields.Set
 // MatchScheduledJob is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchScheduledJob(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchScheduledJob(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

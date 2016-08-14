@@ -105,7 +105,7 @@ func IngressToSelectableFields(ingress *extensions.Ingress) fields.Set {
 // MatchIngress is the filter used by the generic etcd backend to ingress
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchIngress(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchIngress(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,
