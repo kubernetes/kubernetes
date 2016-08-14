@@ -386,14 +386,15 @@ func (nc *NodeController) Run(period time.Duration) {
 		defer nc.evictorLock.Unlock()
 		for k := range nc.zonePodEvictor {
 			nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-				remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nc.daemonSetStore)
+				nodeUid, _ := value.UID.(string)
+				remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, nc.daemonSetStore)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
 					return false, 0
 				}
 
 				if remaining {
-					nc.zoneTerminationEvictor[k].Add(value.Value)
+					nc.zoneTerminationEvictor[k].Add(value.Value, value.UID)
 				}
 				return true, 0
 			})
@@ -407,7 +408,8 @@ func (nc *NodeController) Run(period time.Duration) {
 		defer nc.evictorLock.Unlock()
 		for k := range nc.zoneTerminationEvictor {
 			nc.zoneTerminationEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
-				completed, remaining, err := terminatePods(nc.kubeClient, nc.recorder, value.Value, value.AddedAt, nc.maximumGracePeriod)
+				nodeUid, _ := value.UID.(string)
+				completed, remaining, err := terminatePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, value.AddedAt, nc.maximumGracePeriod)
 				if err != nil {
 					utilruntime.HandleError(fmt.Errorf("unable to terminate pods on node %q: %v", value.Value, err))
 					return false, 0
@@ -415,7 +417,7 @@ func (nc *NodeController) Run(period time.Duration) {
 
 				if completed {
 					glog.V(2).Infof("All pods terminated on %s", value.Value)
-					recordNodeEvent(nc.recorder, value.Value, api.EventTypeNormal, "TerminatedAllPods", fmt.Sprintf("Terminated all Pods on Node %s.", value.Value))
+					recordNodeEvent(nc.recorder, value.Value, nodeUid, api.EventTypeNormal, "TerminatedAllPods", fmt.Sprintf("Terminated all Pods on Node %s.", value.Value))
 					return true, 0
 				}
 
@@ -450,7 +452,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 	added, deleted := nc.checkForNodeAddedDeleted(nodes)
 	for i := range added {
 		glog.V(1).Infof("NodeController observed a new Node: %#v", added[i].Name)
-		recordNodeEvent(nc.recorder, added[i].Name, api.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", added[i].Name))
+		recordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), api.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in NodeController", added[i].Name))
 		nc.knownNodeSet[added[i].Name] = added[i]
 		// When adding new Nodes we need to check if new zone appeared, and if so add new evictor.
 		zone := utilnode.GetZoneKey(added[i])
@@ -468,7 +470,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 
 	for i := range deleted {
 		glog.V(1).Infof("NodeController observed a Node deletion: %v", deleted[i].Name)
-		recordNodeEvent(nc.recorder, deleted[i].Name, api.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", deleted[i].Name))
+		recordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), api.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from NodeController", deleted[i].Name))
 		nc.evictPods(deleted[i])
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
@@ -540,7 +542,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 				}
 				if !exists {
 					glog.V(2).Infof("Deleting node (no longer present in cloud provider): %s", node.Name)
-					recordNodeEvent(nc.recorder, node.Name, api.EventTypeNormal, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
+					recordNodeEvent(nc.recorder, node.Name, string(node.UID), api.EventTypeNormal, "DeletingNode", fmt.Sprintf("Deleting Node %v because it's not present according to cloud provider", node.Name))
 					go func(nodeName string) {
 						defer utilruntime.HandleCrash()
 						// Kubelet is not reporting and Cloud Provider says node
@@ -867,5 +869,5 @@ func (nc *NodeController) cancelPodEviction(node *api.Node) bool {
 func (nc *NodeController) evictPods(node *api.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
-	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name)
+	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
 }
