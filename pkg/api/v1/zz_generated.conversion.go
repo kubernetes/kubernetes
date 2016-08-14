@@ -6382,6 +6382,7 @@ func autoConvert_v1_ServiceSpec_To_api_ServiceSpec(in *ServiceSpec, out *api.Ser
 	out.SessionAffinity = api.ServiceAffinity(in.SessionAffinity)
 	out.LoadBalancerIP = in.LoadBalancerIP
 	out.LoadBalancerSourceRanges = in.LoadBalancerSourceRanges
+	out.ExternalName = in.ExternalName
 	return nil
 }
 
@@ -6400,6 +6401,7 @@ func autoConvert_api_ServiceSpec_To_v1_ServiceSpec(in *api.ServiceSpec, out *Ser
 	}
 	out.Selector = in.Selector
 	out.ClusterIP = in.ClusterIP
+	out.ExternalName = in.ExternalName
 	out.ExternalIPs = in.ExternalIPs
 	out.LoadBalancerIP = in.LoadBalancerIP
 	out.SessionAffinity = ServiceAffinity(in.SessionAffinity)

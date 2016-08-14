@@ -1734,23 +1734,38 @@ type LoadBalancerIngress struct {
 
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
-	// Type determines how the service will be exposed.  Valid options: ClusterIP, NodePort, LoadBalancer
+	// Type determines how to expose the service. Defaults to ClusterIP and only
+	// applies if clusterIP != "None". Valid options are ClusterIP, NodePort,
+	// LoadBalancer, ExternalName.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
 	Type ServiceType `json:"type,omitempty"`
 
 	// Required: The list of ports that are exposed by this service.
 	Ports []ServicePort `json:"ports"`
 
-	// This service will route traffic to pods having labels matching this selector. If empty or not present,
-	// the service is assumed to have endpoints set by an external process and Kubernetes will not modify
-	// those endpoints.
+	// Route service traffic to pods with label keys and values matching this
+	// selector. If empty or not present, the service is assumed to have an
+	// external process managing its endpoints, which Kubernetes will not
+	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+	// Ignored if type is ExternalName.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
 	Selector map[string]string `json:"selector"`
 
-	// ClusterIP is usually assigned by the master.  If specified by the user
-	// we will try to respect it or else fail the request.  This field can
-	// not be changed by updates.
-	// Valid values are None, empty string (""), or a valid IP address
-	// None can be specified for headless services when proxying is not required
+	// ClusterIP is the IP address of the service and is usually assigned
+	// randomly by the master. If an address is specified manually and is not in
+	// use by others, it will be allocated to the service; otherwise, creation
+	// of the service will fail. This field can not be changed through updates.
+	// Valid values are "None", empty string (""), or a valid IP address. "None"
+	// can be specified for headless services when proxying is not required.
+	// Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if
+	// type is ExternalName.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty"`
+
+	// ExternalName is the external reference that kubedns or equivalent will
+	// return as a CNAME record for this service. No proxying will be involved.
+	// Must be a valid DNS name and requires Type to be ExternalName.
+	ExternalName string
 
 	// ExternalIPs are used by external load balancers, or can be set by
 	// users to handle external traffic that arrives at a node.
