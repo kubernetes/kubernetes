@@ -62,6 +62,8 @@ import (
 	corev1 "k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/watch"
 	"k8s.io/client-go/1.4/rest"
+	"k8s.io/client-go/1.4/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/1.4/tools/clientcmd/api"
 )
 
 const (
@@ -72,7 +74,8 @@ const (
 
 var (
 	namespace    = flag.String("namespace", "federation", "namespace of the federation control plane components")
-	secretName   = flag.String("secret", "federation-apiserver-secrets", "name of the federation ")
+	secretName   = flag.String("secret", "federation-apiserver-credentials", "name of the secret where the federation API server user credentials are stored")
+	cmSecretName = flag.String("controllermanager-kubeconfig-secret", "federation-controller-manager-kubeconfig", "name of the secret where the federation controller manager kubeconfig is stored")
 	svcName      = flag.String("service", "federation-apiserver", "namespace of the federation control plane components")
 	timeout      = flag.Duration("timeout", 5*time.Minute, "duration to wait to obtain the federation API server's loadbalancer name/address before timing out")
 	certValidity = flag.Duration("cert-validity", 365*24*time.Hour, "Certificate validity duration")
@@ -396,21 +399,76 @@ func createSecret(clientset *release_1_4.Clientset, namespace, secretName string
 		Data: cksPem,
 	}
 
-	_, err := clientset.Core().Secrets(namespace).Create(secret)
+	secret, err := clientset.Core().Secrets(namespace).Create(secret)
 	if errors.IsAlreadyExists(err) {
 		log.WithFields(log.Fields{
 			"namespace": namespace,
 			"secret":    secretName,
-		}).Info("Secret already exists, shouldn't be overwritten")
+		}).Info("Secret already exists, shouldn't be overwritten. Not attempting to write any more secrets")
 		return nil
 	}
-
 	if err != nil {
-		log.WithFields(log.Fields{
-			"namespace": namespace,
-			"secret":    secretName,
-		}).Info("Secret created")
+		return err
 	}
+	log.WithFields(log.Fields{
+		"namespace": namespace,
+		"secret":    secret.Name,
+	}).Info("Secret created")
+
+	cmKubeconfigSecret := &corev1.Secret{
+		ObjectMeta: corev1.ObjectMeta{
+			Name: cmSecretName,
+		},
+		Data: map[string][]byte{
+			"kubeconfig": cmKubeconfig,
+		},
+	}
+
+	// Any form of error at this point is fatal. But it is not just fatal,
+	// we also need to rollback all the secrets we have created so far, so
+	// that the next time this initializer is run, it creates a consistent
+	// set of secrets. See the package doc for more details.
+	cmKubeconfigSecret, err = clientset.Core().Secrets(namespace).Create(cmKubeconfigSecret)
+	if err != nil {
+		gps := int64(0)
+		dOpts := &api.DeleteOptions{
+			GracePeriodSeconds: &gps,
+		}
+
+		dErr := clientset.Core().Secrets(namespace).Delete(secretName, dOpts)
+		if dErr != nil {
+			log.WithFields(log.Fields{
+				"namespace": namespace,
+				"secret":    secretName,
+				"error":     dErr,
+			}).Error("Failed to delete secret during rollback")
+		} else {
+			log.WithFields(log.Fields{
+				"namespace": namespace,
+				"secret":    secretName,
+			}).Info("Secret deleted")
+		}
+
+		dErr = clientset.Core().Secrets(namespace).Delete(cmSecretName, dOpts)
+		if dErr != nil {
+			log.WithFields(log.Fields{
+				"namespace": namespace,
+				"secret":    cmSecretName,
+				"error":     dErr,
+			}).Error("Failed to delete secret during rollback")
+		} else {
+			log.WithFields(log.Fields{
+				"namespace": namespace,
+				"secret":    cmSecretName,
+			}).Info("Secret deleted")
+		}
+
+		return err
+	}
+	log.WithFields(log.Fields{
+		"namespace": namespace,
+		"secret":    cmKubeconfigSecret.Name,
+	}).Info("Secret created")
 
 	return err
 }
@@ -419,4 +477,32 @@ func encodeCertKey(buf *bytes.Buffer, ck *certKey) *certKey {
 	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ck.cert})
 	keyPem := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: ck.key})
 	return &certKey{certPem, keyPem, nil}
+}
+
+func controllerManagerKubeconfig(namespace, svcName string, caCert []byte, cmCertKey *certKey) ([]byte, error) {
+	config := clientcmdapi.Config{
+		Kind:       "Config",
+		APIVersion: "v1",
+		Clusters: map[string]*clientcmdapi.Cluster{
+			svcName: {
+				Server: "https://" + svcName,
+				CertificateAuthorityData: caCert,
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			svcName: {
+				ClientCertificateData: cmCertKey.cert,
+				ClientKeyData:         cmCertKey.key,
+			},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			svcName: {
+				Cluster:   svcName,
+				AuthInfo:  svcName,
+				Namespace: namespace,
+			},
+		},
+		CurrentContext: svcName,
+	}
+	return clientcmd.Write(config)
 }
