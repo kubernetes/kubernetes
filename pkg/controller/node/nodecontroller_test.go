@@ -481,14 +481,16 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		zones := getZones(item.fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+				nodeUid, _ := value.UID.(string)
+				remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
 				if remaining {
-					nodeController.zoneTerminationEvictor[zone].Add(value.Value)
+					nodeController.zoneTerminationEvictor[zone].Add(value.Value, nodeUid)
 				}
 				return true, 0
 			})
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, value.AddedAt, nodeController.maximumGracePeriod)
+				nodeUid, _ := value.UID.(string)
+				terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, value.AddedAt, nodeController.maximumGracePeriod)
 				return true, 0
 			})
 		}
@@ -1014,14 +1016,16 @@ func TestMonitorNodeStatusEvictPodsWithDisruption(t *testing.T) {
 		zones := getZones(fakeNodeHandler)
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				remaining, _ := deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+				uid, _ := value.UID.(string)
+				remaining, _ := deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
 				if remaining {
-					nodeController.zoneTerminationEvictor[zone].Add(value.Value)
+					nodeController.zoneTerminationEvictor[zone].Add(value.Value, value.UID)
 				}
 				return true, 0
 			})
 			nodeController.zonePodEvictor[zone].Try(func(value TimedValue) (bool, time.Duration) {
-				terminatePods(fakeNodeHandler, nodeController.recorder, value.Value, value.AddedAt, nodeController.maximumGracePeriod)
+				uid, _ := value.UID.(string)
+				terminatePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, value.AddedAt, nodeController.maximumGracePeriod)
 				return true, 0
 			})
 		}
@@ -1544,7 +1548,8 @@ func TestNodeDeletion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	nodeController.zonePodEvictor[""].Try(func(value TimedValue) (bool, time.Duration) {
-		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
+		uid, _ := value.UID.(string)
+		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, uid, nodeController.daemonSetStore)
 		return true, 0
 	})
 	podEvicted := false
@@ -1555,6 +1560,72 @@ func TestNodeDeletion(t *testing.T) {
 	}
 	if !podEvicted {
 		t.Error("expected pods to be evicted from the deleted node")
+	}
+}
+
+func TestNodeEventGeneration(t *testing.T) {
+	fakeNow := unversioned.Date(2016, 8, 10, 12, 0, 0, 0, time.UTC)
+	fakeNodeHandler := &FakeNodeHandler{
+		Existing: []*api.Node{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "node0",
+					UID:               "1234567890",
+					CreationTimestamp: unversioned.Date(2016, 8, 10, 0, 0, 0, 0, time.UTC),
+				},
+				Spec: api.NodeSpec{
+					ExternalID: "node0",
+				},
+				Status: api.NodeStatus{
+					Conditions: []api.NodeCondition{
+						{
+							Type:   api.NodeReady,
+							Status: api.ConditionTrue,
+							// Node status has just been updated.
+							LastHeartbeatTime:  fakeNow,
+							LastTransitionTime: fakeNow,
+						},
+					},
+					Capacity: api.ResourceList{
+						api.ResourceName(api.ResourceRequestsCPU): resource.MustParse("10"),
+						api.ResourceName(api.ResourceMemory):      resource.MustParse("20G"),
+					},
+				},
+			},
+		},
+		Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+	}
+
+	nodeController, _ := NewNodeControllerFromClient(nil, fakeNodeHandler, 5*time.Minute, testRateLimiterQPS,
+		testNodeMonitorGracePeriod, testNodeStartupGracePeriod, testNodeMonitorPeriod, nil, nil, 0, false)
+	nodeController.now = func() unversioned.Time { return fakeNow }
+	fakeRecorder := NewFakeRecorder()
+	nodeController.recorder = fakeRecorder
+	if err := nodeController.monitorNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	fakeNodeHandler.Delete("node0", nil)
+	if err := nodeController.monitorNodeStatus(); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	nodeController.zonePodEvictor[""].Try(func(value TimedValue) (bool, time.Duration) {
+		nodeUid, _ := value.UID.(string)
+		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeUid, nodeController.daemonSetStore)
+		return true, 0
+	})
+	if len(fakeRecorder.events) != 3 {
+		t.Fatalf("unexpected events: %v", fakeRecorder.events)
+	}
+	if fakeRecorder.events[0].Reason != "RegisteredNode" || fakeRecorder.events[1].Reason != "RemovingNode" || fakeRecorder.events[2].Reason != "DeletingAllPods" {
+		t.Fatalf("unexpected events generation: %v", fakeRecorder.events)
+	}
+	for _, event := range fakeRecorder.events {
+		involvedObject := event.InvolvedObject
+		actualUID := string(involvedObject.UID)
+		if actualUID != "1234567890" {
+			t.Fatalf("unexpected event uid: %v", actualUID)
+		}
 	}
 }
 
