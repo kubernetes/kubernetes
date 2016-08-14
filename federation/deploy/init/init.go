@@ -129,7 +129,7 @@ func main() {
 		}).Fatal("Failed to find the federation API server's canonical address")
 	}
 
-	cks, err := certs(*svcName, *certValidity, ips, hostnames)
+	cks, err := certs(*svcName, *certValidity, cAddr, ips, hostnames)
 	if err != nil {
 		log.WithField("error", err).
 			Fatal("Failed to generate certificates")
@@ -273,7 +273,7 @@ func canonicalAddress(ips []net.IP, hostnames []string) (string, error) {
 	return "", fmt.Errorf("at least one IP address or hostname must be supplied")
 }
 
-func certs(svcName string, certValidity time.Duration, ips []net.IP, hostnames []string) (map[string]*certKey, error) {
+func certs(svcName string, certValidity time.Duration, cAddr string, ips []net.IP, hostnames []string) (map[string]*certKey, error) {
 	template := x509.Certificate{
 		Subject: pkix.Name{
 			Organization: []string{orgName},
@@ -286,17 +286,7 @@ func certs(svcName string, certValidity time.Duration, ips []net.IP, hostnames [
 		BasicConstraintsValid: true,
 	}
 
-	// Arbitrarily choose the first federation API server IP address or
-	// the hostname as the CA common name.
-	caCN := ""
-	if len(ips) > 0 {
-		caCN = ips[0].String()
-	} else if len(hostnames) > 0 {
-		caCN = hostnames[0]
-	} else {
-		return nil, fmt.Errorf("at least one IP address or hostname must be specified")
-	}
-	caCN = fmt.Sprintf("%s@%d", caCN, template.NotBefore.Unix())
+	caCN := fmt.Sprintf("%s@%d", cAddr, template.NotBefore.Unix())
 
 	zeroIPs := []net.IP{}
 	zeroHostnames := []string{}
@@ -335,10 +325,9 @@ func certs(svcName string, certValidity time.Duration, ips []net.IP, hostnames [
 	}
 
 	log.WithFields(log.Fields{
-		"namespace": namespace,
-		"service":   svcName,
-		"IPs":       ips,
-		"Hostnames": hostnames,
+		"ServerName": svcName,
+		"IPs":        ips,
+		"Hostnames":  hostnames,
 	}).Info("Certificates generated")
 
 	return map[string]*certKey{
