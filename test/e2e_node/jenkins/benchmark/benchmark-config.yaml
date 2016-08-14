@@ -1,14 +1,8 @@
 ---
-configs:
-- machine: n1-standard-1
-  image:
+images:
+  containervm:
     image: e2e-node-containervm-v20160321-image
     project: kubernetes-node-e2e-images
-  tests:
-  - ".*create 10 pods with 0 interval"
-- machine: n1-standard-1
-  image:
-    image: e2e-node-containervm-v20160321-image
-    project: kubernetes-node-e2e-images
-  tests:
-  - ".*create 10 pods with 10 background pods"
+    machine: n1-standard-1
+    tests:
+      - ".*create 10 pods with 0s? interval"
