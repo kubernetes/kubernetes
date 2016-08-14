@@ -2049,6 +2049,10 @@
 			"Rev": "49a735373919c4c9a53aff1f9f63da73a243f32d"
 		},
 		{
+			"ImportPath": "github.com/vishvananda/netns",
+			"Rev": "8ba1072b58e0c2a240eb5f6120165c7776c3e7b8"
+		},
+		{
 			"ImportPath": "github.com/vmware/govmomi",
 			"Comment": "v0.8.0-9-gb5ee639",
 			"Rev": "b5ee639d7aa4b8dbb48ab4f75dddc19f71b5c514"
@@ -2361,10 +2365,6 @@
 			"ImportPath": "k8s.io/heapster/metrics/apis/metrics/v1alpha1",
 			"Comment": "v1.1.0-beta2",
 			"Rev": "9cb18ac0ceb193eb530a1fe339355c94ea454d85"
-		},
-		{
-			"ImportPath": "github.com/vishvananda/netns",
-			"Rev": "8ba1072b58e0c2a240eb5f6120165c7776c3e7b8"
 		}
 	]
 }
