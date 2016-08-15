@@ -168,14 +168,18 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	// Create a Kube Client
 	// define api config source
-	if config.Kubeconfig == "" && config.Master == "" {
-		glog.Warningf("Neither --kubeconfig nor --master was specified.  Using default API client.  This might not work.")
+	if config.Kubeconfig == "" && config.Master == "" && len(config.APIServerList) == 0 {
+		glog.Warningf("Neither --kubeconfig nor --master nor --api-servers was specified.  Using default API client.  This might not work.")
+	}
+	if config.Master != "" && len(config.APIServerList) > 0 {
+		glog.Warningf("Flag --api-servers will be used. Please remove --master or --api-servers to avoid unexpected results.")
 	}
 	// This creates a client, first loading any specified kubeconfig
 	// file, and then overriding the Master flag, if non-empty.
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: config.Master}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{
+			Server: config.Master, Servers: config.APIServerList}}).ClientConfig()
 	if err != nil {
 		return nil, err
 	}

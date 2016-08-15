@@ -515,8 +515,8 @@ func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error
 	}
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}},
-	).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{
+			Server: s.APIServerList[0], Servers: s.APIServerList}}).ClientConfig()
 }
 
 // createClientConfig creates a client configuration from the command line
@@ -564,6 +564,9 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 // the configuration via addChaosToClientConfig. This func is exported to support
 // integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
+	if len(s.APIServerList) < 1 {
+		return nil, fmt.Errorf("no api servers specified")
+	}
 	clientConfig, err := createClientConfig(s)
 	if err != nil {
 		return nil, err
