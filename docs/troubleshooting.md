@@ -69,7 +69,7 @@ The Kubernetes team hangs out on Slack in the `#kubernetes-users` channel.  You 
 
 ## Mailing List
 
-The Google Container Engine mailing list is [google-containers@googlegroups.com](https://groups.google.com/forum/#!forum/google-containers)
+The Google Container Engine mailing list is [kubernetes-users@googlegroups.com](https://groups.google.com/forum/#!forum/kubernetes-users)
 
 ## Bugs and Feature requests
 
