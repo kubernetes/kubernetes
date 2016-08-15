@@ -46,12 +46,12 @@ func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
 }
 
-// claimRefIndexFunc is an indexing function that returns an unbound persistent
-// volume's ClaimRef namespace & name as a string "namespace/name", or "nil" if
-// its ClaimRef is nil or it is already bound
+// claimRefIndexFunc is an indexing function that returns a persistent volume's
+// ClaimRef namespace & name as a string "namespace/name", or "nil" if its
+// ClaimRef is nil
 func claimRefIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*api.PersistentVolume); ok {
-		if pv.Spec.ClaimRef != nil && pv.Spec.ClaimRef.UID == "" {
+		if pv.Spec.ClaimRef != nil {
 			return []string{pv.Spec.ClaimRef.Namespace + "/" + pv.Spec.ClaimRef.Name}, nil
 		}
 		return []string{"nil"}, nil
@@ -81,8 +81,8 @@ func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.Persi
 	return volumes, nil
 }
 
-// listHasClaimRef returns all unbound volumes with a ClaimRef with the given
-// namespace and name. The list is unsorted!
+// listHasClaimRef returns all volumes with a ClaimRef with the given namespace
+// and name. The list is unsorted!
 func (pvIndex *persistentVolumeOrderedIndex) listByClaimRef(namespace, name string) ([]*api.PersistentVolume, error) {
 	pv := &api.PersistentVolume{
 		Spec: api.PersistentVolumeSpec{
@@ -118,18 +118,10 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 	if err != nil {
 		return nil, err
 	}
-	// There shouldn't be more than one volume pre-bound to the claim but
-	// nothing prevents the user from creating them; return the first
 	for _, volume := range volumes {
-		if !isVolumeBoundToClaim(volume, claim) {
-			return nil, fmt.Errorf(
-				"expected to find the PV that's pre-bound to claim %s/%s but got the PV %s/%s instead",
-				claim.Namespace,
-				claim.Name,
-				volume.Namespace,
-				volume.Name)
+		if isVolumeBoundToClaim(volume, claim) {
+			return volume, nil
 		}
-		return volume, nil
 	}
 
 	// PVs are indexed by their access modes to allow easier searching.  Each

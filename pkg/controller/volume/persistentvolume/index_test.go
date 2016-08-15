@@ -624,6 +624,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 
 	// pretend the exact match is pre-bound.  should get the next size up.
 	pv1.Spec.ClaimRef = &api.ObjectReference{Name: "foo", Namespace: "bar"}
+	index.store.Update(pv1)
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != pv5.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv5.Name, volume.Name)
@@ -631,7 +632,9 @@ func TestFindingPreboundVolumes(t *testing.T) {
 
 	// pretend the exact match is available but the largest volume is pre-bound to the claim.
 	pv1.Spec.ClaimRef = nil
+	index.store.Update(pv1)
 	pv8.Spec.ClaimRef = claimRef
+	index.store.Update(pv8)
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != pv8.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
