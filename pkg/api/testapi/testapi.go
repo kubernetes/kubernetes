@@ -227,6 +227,15 @@ func init() {
 			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
 		}
 	}
+	if _, ok := Groups[imagepolicy.GroupName]; !ok {
+		externalGroupVersion := unversioned.GroupVersion{Group: imagepolicy.GroupName, Version: registered.GroupOrDie(imagepolicy.GroupName).GroupVersion.Version}
+		Groups[imagepolicy.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: imagepolicy.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(imagepolicy.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
 
 	if _, ok := Groups[imagepolicy.GroupName]; !ok {
 		externalGroupVersion := unversioned.GroupVersion{Group: imagepolicy.GroupName, Version: registered.GroupOrDie(imagepolicy.GroupName).GroupVersion.Version}
