@@ -74,7 +74,7 @@ else
     linux/amd64
     linux/arm
     linux/arm64
-    linux/ppc64le # note: hyperkube is temporarily disabled due to a linking error
+    linux/ppc64le # note: hyperkube and kubemark are temporarily disabled due to a linking error
   )
 
   # If we update this we should also update the set of golang compilers we build
@@ -461,11 +461,12 @@ kube::golang::build_binaries_for_platform() {
 
   for binary in "${binaries[@]}"; do
 
-    # TODO(IBM): Enable hyperkube builds for ppc64le again
+    # TODO(IBM): Enable hyperkube and kubemark builds for ppc64le again
     # The current workaround creates a text file with help text instead of a binary
     # We're doing it this way so the build system isn't affected so much
-    if [[ "${binary}" == *"hyperkube" && "${platform}" == "linux/ppc64le" ]]; then
-      echo "hyperkube build for ppc64le is disabled. Creating dummy text file instead."
+    if [[ ( "${binary}" == *"hyperkube" || "${binary}" == *"kubemark" )
+         && "${platform}" == "linux/ppc64le" ]]; then
+      echo "hyperkube and kubemark builds for ppc64le are disabled. Creating dummy text file instead."
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       mkdir -p $(dirname ${outfile})
       echo "Not available at the moment. Please see: https://github.com/kubernetes/kubernetes/issues/25886 for more information." > ${outfile}
