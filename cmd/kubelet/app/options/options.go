@@ -29,6 +29,13 @@ import (
 	"github.com/spf13/pflag"
 )
 
+const (
+	DefaultKubeletPodsDirName       = "pods"
+	DefaultKubeletVolumesDirName    = "volumes"
+	DefaultKubeletPluginsDirName    = "plugins"
+	DefaultKubeletContainersDirName = "containers"
+)
+
 // KubeletServer encapsulates all of the parameters necessary for starting up
 // a kubelet. These can either be set via command line or directly.
 type KubeletServer struct {

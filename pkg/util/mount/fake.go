@@ -140,3 +140,7 @@ func (f *FakeMounter) DeviceOpened(pathname string) (bool, error) {
 func (f *FakeMounter) PathIsDevice(pathname string) (bool, error) {
 	return true, nil
 }
+
+func (f *FakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return getDeviceNameFromMount(f, mountPath, pluginDir)
+}

@@ -49,3 +49,7 @@ func (*NsenterMounter) DeviceOpened(pathname string) (bool, error) {
 func (*NsenterMounter) PathIsDevice(pathname string) (bool, error) {
 	return true, nil
 }
+
+func (*NsenterMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
+}
