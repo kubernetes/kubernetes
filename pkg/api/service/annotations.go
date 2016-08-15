@@ -25,4 +25,12 @@ const (
 	//
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
+
+	// An annotation that denotes if this Service desires to only route to local
+	// endpoints. Typically used to preserve source IP in loadbalanced Services.
+	AnnotationExternalTraffic            = "service.alpha.kubernetes.io/external-traffic"
+	AnnotationValueExternalTrafficLocal  = "OnlyLocal"
+	AnnotationValueExternalTrafficGlobal = "Global"
+
+	AnnotationHealthCheckNodePort = "service.alpha.kubernetes.io/healthcheck-nodeport"
 )
