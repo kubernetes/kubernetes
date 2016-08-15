@@ -122,13 +122,13 @@ We propose that:
     a match is found. The claim is `Pending` during this period.
 
 4.  With StorageClass instance, the controller finds volume plugin specified by
-    StorageClass.ProvisionerType.
+    StorageClass.Provisioner.
 
 5.  All provisioners are in-tree; they implement an interface called
     `ProvisionableVolumePlugin`, which has a method called `NewProvisioner`
     that returns a new provisioner.
 
-6.  The controller calls volume plugin `Provision` with ProvisionerParameters from the `StorageClass` configuration object.
+6.  The controller calls volume plugin `Provision` with Parameters from the `StorageClass` configuration object.
 
 7.  If `Provision` returns an error, the controller generates an event on the
     claim and goes back to step 1., i.e. it will retry provisioning periodically
@@ -166,11 +166,11 @@ type StorageClass struct {
   unversioned.TypeMeta `json:",inline"`
   ObjectMeta           `json:"metadata,omitempty"`
 
-  // ProvisionerType indicates the type of the provisioner.
-  ProvisionerType string `json:"provisionerType,omitempty"`
+  // Provisioner indicates the type of the provisioner.
+  Provisioner string `json:"provisioner,omitempty"`
 
   // Parameters for dynamic volume provisioner.
-  ProvisionerParameters map[string]string `json:"provisionerParameters,omitempty"`
+  Parameters map[string]string `json:"parameters,omitempty"`
 }
 
 ```
@@ -207,7 +207,7 @@ With the scheme outlined above the provisioner creates PVs using parameters spec
 ### Provisioner interface changes
 
 `struct volume.VolumeOptions` (containing parameters for a provisioner plugin)
-will be extended to contain StorageClass.ProvisionerParameters.
+will be extended to contain StorageClass.Parameters.
 
 The existing provisioner implementations will be modified to accept the StorageClass configuration object.
 
@@ -229,8 +229,8 @@ apiVersion: v1
 kind: StorageClass
 metadata:
   name: aws-fast
-provisionerType: kubernetes.io/aws-ebs
-provisionerParameters:
+provisioner: kubernetes.io/aws-ebs
+parameters:
    zone: us-east-1b
    type: ssd
 
@@ -239,8 +239,8 @@ apiVersion: v1
 kind: StorageClass
 metadata:
   name: aws-slow
-provisionerType: kubernetes.io/aws-ebs
-provisionerParameters:
+provisioner: kubernetes.io/aws-ebs
+parameters:
    zone: us-east-1b
    type: spinning
 ```
