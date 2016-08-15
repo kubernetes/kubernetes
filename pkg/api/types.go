@@ -1547,6 +1547,9 @@ type PodSecurityContext struct {
 	// Optional: Default to false.
 	// +k8s:conversion-gen=false
 	HostIPC bool `json:"hostIPC,omitempty"`
+	// Use the host's user namespace.
+	// Optional: Default to false.
+	HostUser bool `json:"hostUser,omitempty"`
 	// The SELinux context to be applied to all containers.
 	// If unspecified, the container runtime will allocate a random SELinux context for each
 	// container.  May also be set in SecurityContext.  If set in

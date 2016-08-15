@@ -1848,6 +1848,9 @@ type PodSecurityContext struct {
 	//
 	// If unset, the Kubelet will not modify the ownership and permissions of any volume.
 	FSGroup *int64 `json:"fsGroup,omitempty" protobuf:"varint,5,opt,name=fsGroup"`
+	// Use the host's user namespace.
+	// Optional: Default to false.
+	HostUser bool `json:"hostUser,omitempty" protobuf:"varint,6,opt,name=hostUser"`
 }
 
 // PodStatus represents information about the status of a pod. Status may trail the actual
