@@ -1607,6 +1607,23 @@ func TestGetIPCMode(t *testing.T) {
 	}
 }
 
+func TestGetUserMode(t *testing.T) {
+	// test false
+	pod := &api.Pod{}
+	userMode := getUserMode(pod)
+	if userMode != "" {
+		t.Errorf("expected empty user mode for pod but got %s", userMode)
+	}
+
+	//test true
+	pod.Spec.SecurityContext = &api.PodSecurityContext{}
+	pod.Spec.SecurityContext.HostUser = true
+	userMode = getUserMode(pod)
+	if userMode != "host" {
+		t.Errorf("expected host user mode for pod but got %s", userMode)
+	}
+}
+
 func TestSyncPodWithPullPolicy(t *testing.T) {
 	dm, fakeDocker := newTestDockerManager()
 	puller := dm.dockerPuller.(*FakeDockerPuller)
