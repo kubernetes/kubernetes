@@ -51,3 +51,5 @@ type PriorityConfig struct {
 type PredicateFailureReason interface {
 	GetReason() string
 }
+
+type GetEquivalencePodFunc func(pod *api.Pod) interface{}

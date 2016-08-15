@@ -21,6 +21,7 @@ import (
 	"os"
 	"strconv"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
 )
@@ -99,6 +101,8 @@ func init() {
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction2("MostRequestedPriority", priorities.MostRequestedPriorityMap, nil, 1)
+	// Use equivalence class to speed up predicates & priorities
+	factory.RegisterGetEquivalencePodFunction(GetEquivalencePod)
 }
 
 func replace(set sets.String, replaceWhat, replaceWith string) sets.String {
@@ -195,4 +199,23 @@ func defaultPriorities() sets.String {
 			},
 		),
 	)
+}
+
+func GetEquivalencePod(pod *api.Pod) interface{} {
+	equivalencePod := EquivalencePod{}
+	podSpec := &(pod.Spec)
+	for _, vol := range podSpec.Volumes {
+		equivalencePod.Volumes = append(equivalencePod.Volumes, vol)
+	}
+	equivalencePod.NodeSelector = podSpec.NodeSelector
+	equivalencePod.Request = predicates.GetResourceRequest(pod)
+	equivalencePod.Ports = predicates.GetUsedPorts(pod)
+	return &equivalencePod
+}
+
+type EquivalencePod struct {
+	Volumes      []api.Volume
+	NodeSelector map[string]string
+	Ports        map[int]bool
+	Request      *schedulercache.Resource
 }
