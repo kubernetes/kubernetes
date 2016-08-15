@@ -28,12 +28,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
 	"k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	"k8s.io/kubernetes/pkg/registry/service/portallocator"
 	"k8s.io/kubernetes/pkg/runtime"
+	featuregate "k8s.io/kubernetes/pkg/util/config"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
@@ -130,6 +132,35 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 			}
 			servicePort.NodePort = int32(nodePort)
+		}
+	}
+
+	if featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && shouldCheckOrAssignHealthCheckNodePort(service) {
+		var healthCheckNodePort int
+		var err error
+		if l, ok := service.Annotations[apiservice.AnnotationHealthCheckNodePort]; ok {
+			healthCheckNodePort, err = strconv.Atoi(l)
+			if err != nil || healthCheckNodePort <= 0 {
+				return nil, errors.NewInternalError(fmt.Errorf("Failed to parse annotation %v: %v", apiservice.AnnotationHealthCheckNodePort, err))
+			}
+		}
+		if healthCheckNodePort > 0 {
+			// If the request has a health check nodePort in mind, attempt to reserve it
+			err := nodePortOp.Allocate(int(healthCheckNodePort))
+			if err != nil {
+				return nil, errors.NewInternalError(fmt.Errorf("Failed to allocate requested HealthCheck nodePort %v: %v", healthCheckNodePort, err))
+			}
+		} else {
+			// If the request has no health check nodePort specified, allocate any
+			healthCheckNodePort, err = nodePortOp.AllocateNext()
+			if err != nil {
+				// TODO: what error should be returned here?  It's not a
+				// field-level validation failure (the field is valid), and it's
+				// not really an internal error.
+				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+			}
+			// Insert the newly allocated health check port as an annotation (plan of record for Alpha)
+			service.Annotations[apiservice.AnnotationHealthCheckNodePort] = fmt.Sprintf("%d", healthCheckNodePort)
 		}
 	}
 
@@ -397,4 +428,13 @@ func shouldAssignNodePorts(service *api.Service) bool {
 		glog.Errorf("Unknown service type: %v", service.Spec.Type)
 		return false
 	}
+}
+
+func shouldCheckOrAssignHealthCheckNodePort(service *api.Service) bool {
+	if service.Spec.Type == api.ServiceTypeLoadBalancer {
+		// True if Service-type == LoadBalancer AND annotation AnnotationExternalTraffic present
+		return (featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && apiservice.NeedsHealthCheck(service))
+	}
+	glog.V(4).Infof("Service type: %v does not need health check node port", service.Spec.Type)
+	return false
 }
