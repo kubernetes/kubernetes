@@ -35,10 +35,11 @@ func TestGenerate(t *testing.T) {
 	}{
 		{
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "-1",
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "Always",
+				"replicas":          "1",
+				"port":              "-1",
 			},
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
@@ -55,8 +56,9 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
 								},
 							},
 						},
@@ -88,8 +90,9 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
 									Env: []api.EnvVar{
 										{
 											Name:  "a",
@@ -110,11 +113,12 @@ func TestGenerate(t *testing.T) {
 
 		{
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "-1",
-				"args":     []string{"bar", "baz", "blah"},
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "Never",
+				"replicas":          "1",
+				"port":              "-1",
+				"args":              []string{"bar", "baz", "blah"},
 			},
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
@@ -131,9 +135,10 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
-									Args:  []string{"bar", "baz", "blah"},
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullNever,
+									Args:            []string{"bar", "baz", "blah"},
 								},
 							},
 						},
@@ -165,9 +170,10 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:    "foo",
-									Image:   "someimage",
-									Command: []string{"bar", "baz", "blah"},
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
+									Command:         []string{"bar", "baz", "blah"},
 								},
 							},
 						},
@@ -197,8 +203,9 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 80,
@@ -213,11 +220,12 @@ func TestGenerate(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name":     "foo",
-				"image":    "someimage",
-				"replicas": "1",
-				"port":     "80",
-				"hostport": "80",
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "IfNotPresent",
+				"replicas":          "1",
+				"port":              "80",
+				"hostport":          "80",
 			},
 			expected: &api.ReplicationController{
 				ObjectMeta: api.ObjectMeta{
@@ -234,8 +242,9 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullIfNotPresent,
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 80,
@@ -281,8 +290,9 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
 								},
 							},
 						},
@@ -357,8 +367,9 @@ func TestGenerate(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
 									Resources: api.ResourceRequirements{
 										Requests: api.ResourceList{
 											api.ResourceCPU:    resource.MustParse("100m"),
@@ -435,9 +446,10 @@ func TestGeneratePod(t *testing.T) {
 		},
 		{
 			params: map[string]interface{}{
-				"name":  "foo",
-				"image": "someimage",
-				"env":   []string{"a=b", "c=d"},
+				"name":              "foo",
+				"image":             "someimage",
+				"image-pull-policy": "Always",
+				"env":               []string{"a=b", "c=d"},
 			},
 			expected: &api.Pod{
 				ObjectMeta: api.ObjectMeta{
@@ -448,7 +460,7 @@ func TestGeneratePod(t *testing.T) {
 						{
 							Name:            "foo",
 							Image:           "someimage",
-							ImagePullPolicy: api.PullIfNotPresent,
+							ImagePullPolicy: api.PullAlways,
 							Env: []api.EnvVar{
 								{
 									Name:  "a",
@@ -667,9 +679,10 @@ func TestGenerateDeployment(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Name:  "foo",
-									Image: "someimage",
-									Stdin: true,
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
+									Stdin:           true,
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 80,
@@ -761,10 +774,11 @@ func TestGenerateJob(t *testing.T) {
 							RestartPolicy: api.RestartPolicyOnFailure,
 							Containers: []api.Container{
 								{
-									Name:      "foo",
-									Image:     "someimage",
-									Stdin:     true,
-									StdinOnce: false,
+									Name:            "foo",
+									Image:           "someimage",
+									ImagePullPolicy: api.PullAlways,
+									Stdin:           true,
+									StdinOnce:       false,
 									Ports: []api.ContainerPort{
 										{
 											ContainerPort: 80,

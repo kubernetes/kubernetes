@@ -42,6 +42,7 @@ func (DeploymentV1Beta1) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"replicas", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -217,6 +218,7 @@ func (JobV1Beta1) ParamNames() []GeneratorParam {
 		{"default-name", false},
 		{"name", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -312,6 +314,7 @@ func (JobV1) ParamNames() []GeneratorParam {
 		{"default-name", false},
 		{"name", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -403,6 +406,7 @@ func (ScheduledJobV2Alpha1) ParamNames() []GeneratorParam {
 		{"default-name", false},
 		{"name", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -502,6 +506,7 @@ func (BasicReplicationController) ParamNames() []GeneratorParam {
 		{"name", true},
 		{"replicas", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -610,14 +615,19 @@ func makePodSpec(params map[string]string, name string) (*api.PodSpec, error) {
 		return nil, err
 	}
 
+	imagePullPolicy := api.PullPolicy(params["image-pull-policy"])
+	if len(imagePullPolicy) == 0 {
+		imagePullPolicy = api.PullAlways
+	}
 	spec := api.PodSpec{
 		Containers: []api.Container{
 			{
-				Name:      name,
-				Image:     params["image"],
-				Stdin:     stdin,
-				TTY:       tty,
-				Resources: resourceRequirements,
+				Name:            name,
+				Image:           params["image"],
+				ImagePullPolicy: imagePullPolicy,
+				Stdin:           stdin,
+				TTY:             tty,
+				Resources:       resourceRequirements,
 			},
 		},
 	}
@@ -640,14 +650,19 @@ func makeV1PodSpec(params map[string]string, name string) (*v1.PodSpec, error) {
 		return nil, err
 	}
 
+	imagePullPolicy := v1.PullPolicy(params["image-pull-policy"])
+	if len(imagePullPolicy) == 0 {
+		imagePullPolicy = v1.PullAlways
+	}
 	spec := v1.PodSpec{
 		Containers: []v1.Container{
 			{
-				Name:      name,
-				Image:     params["image"],
-				Stdin:     stdin,
-				TTY:       tty,
-				Resources: resourceRequirements,
+				Name:            name,
+				Image:           params["image"],
+				ImagePullPolicy: imagePullPolicy,
+				Stdin:           stdin,
+				TTY:             tty,
+				Resources:       resourceRequirements,
 			},
 		},
 	}
@@ -831,6 +846,7 @@ func (BasicPod) ParamNames() []GeneratorParam {
 		{"default-name", false},
 		{"name", true},
 		{"image", true},
+		{"image-pull-policy", false},
 		{"port", false},
 		{"hostport", false},
 		{"stdin", false},
@@ -890,6 +906,10 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 		return nil, err
 	}
 
+	imagePullPolicy := api.PullPolicy(params["image-pull-policy"])
+	if len(imagePullPolicy) == 0 {
+		imagePullPolicy = api.PullIfNotPresent
+	}
 	restartPolicy := api.RestartPolicy(params["restart"])
 	if len(restartPolicy) == 0 {
 		restartPolicy = api.RestartPolicyAlways
@@ -904,7 +924,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 				{
 					Name:            name,
 					Image:           params["image"],
-					ImagePullPolicy: api.PullIfNotPresent,
+					ImagePullPolicy: imagePullPolicy,
 					Stdin:           stdin,
 					StdinOnce:       !leaveStdinOpen && stdin,
 					TTY:             tty,
