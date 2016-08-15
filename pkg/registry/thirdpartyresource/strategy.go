@@ -94,5 +94,5 @@ func Matcher(label labels.Selector, field fields.Selector) *generic.SelectionPre
 
 // SelectableFields returns a field set that can be used for filter selection
 func SelectableFields(obj *extensions.ThirdPartyResource) fields.Set {
-	return fields.Set{}
+	return nil
 }

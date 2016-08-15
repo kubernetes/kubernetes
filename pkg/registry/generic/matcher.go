@@ -68,7 +68,11 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return s.Label.Matches(labels) && s.Field.Matches(fields), nil
+	matched := s.Label.Matches(labels)
+	if s.Field != nil {
+		matched = (matched && s.Field.Matches(fields))
+	}
+	return matched, nil
 }
 
 // MatchesSingle will return (name, true) if and only if s.Field matches on the object's

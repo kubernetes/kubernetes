@@ -75,7 +75,7 @@ func (limitrangeStrategy) AllowUnconditionalUpdate() bool {
 }
 
 func LimitRangeToSelectableFields(limitRange *api.LimitRange) fields.Set {
-	return fields.Set{}
+	return nil
 }
 
 func (limitrangeStrategy) Export(api.Context, runtime.Object, bool) error {
