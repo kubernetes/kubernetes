@@ -263,11 +263,11 @@ func callGubernator(gubernator bool) {
 		if err != nil {
 			fmt.Println("gubernator.sh Failed")
 			fmt.Println(err)
-	        return
-	    }
-        fmt.Printf("%s", output)
-    }
-    return 
+			return
+		}
+		fmt.Printf("%s", output)
+	}
+	return
 }
 
 func (a *Archive) getArchive() (string, error) {

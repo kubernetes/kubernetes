@@ -26,7 +26,7 @@ source cluster/lib/logging.sh
 
 
 if [[ $# -eq 0 || ! $1 =~ ^[Yy]$ ]]; then
-  read -p "Do you want to run gubernator.sh and upload logs to GCS? [y/n]" yn
+  read -p "Do you want to run gubernator.sh and upload logs publicly to GCS? [y/n]" yn
   echo
   if [[ ! $yn =~ ^[Yy]$ ]]; then
       exit 1
@@ -74,11 +74,6 @@ if [[ ! -e $BUILD_LOG_PATH ]]; then
   exit 1
 fi
 
-results=$(find ${ARTIFACTS} -type d -name "results")
-if [[ $results != "" && $results != "${ARTIFACTS}/results" ]]; then
-  mv $results $ARTIFACTS
-fi
-
 # Get start and end timestamps based on build-log.txt file contents
 # Line where the actual tests start
 start_line=$(grep -n -m 1 "^=" ${BUILD_LOG_PATH} | sed 's/\([0-9]*\).*/\1/')
@@ -110,6 +105,10 @@ if gsutil ls "${GCS_JOBS_PATH}" | grep -q "${BUILD_STAMP}"; then
   exit
 fi
 
+results=$(find ${ARTIFACTS} -type d -name "results")
+if [[ $results != "" && $results != "${ARTIFACTS}/results" && $results != $ARTIFACTS ]]; then
+  mv $results $ARTIFACTS
+fi
 
 # Upload log files
 for upload_attempt in $(seq 3); do
