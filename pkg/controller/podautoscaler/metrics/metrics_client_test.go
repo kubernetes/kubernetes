@@ -442,9 +442,9 @@ func TestAggregateSum(t *testing.T) {
 		Items: []heapster.MetricResult{
 			{
 				Metrics: []heapster.MetricPoint{
-					{now, 50, nil},
-					{now.Add(-15 * time.Second), 100, nil},
-					{now.Add(-60 * time.Second), 100000, nil}},
+					{Timestamp: now, Value: 50, FloatValue: nil},
+					{Timestamp: now.Add(-15 * time.Second), Value: 100, FloatValue: nil},
+					{Timestamp: now.Add(-60 * time.Second), Value: 100000, FloatValue: nil}},
 				LatestTimestamp: now,
 			},
 		},
@@ -461,8 +461,8 @@ func TestAggregateSumSingle(t *testing.T) {
 		Items: []heapster.MetricResult{
 			{
 				Metrics: []heapster.MetricPoint{
-					{now, 50, nil},
-					{now.Add(-65 * time.Second), 100000, nil}},
+					{Timestamp: now, Value: 50, FloatValue: nil},
+					{Timestamp: now.Add(-65 * time.Second), Value: 100000, FloatValue: nil}},
 				LatestTimestamp: now,
 			},
 		},

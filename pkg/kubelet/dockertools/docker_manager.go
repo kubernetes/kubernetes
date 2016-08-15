@@ -610,9 +610,9 @@ func (dm *DockerManager) runContainer(
 		// Experimental. For now, we hardcode /dev/nvidia0 no matter what the user asks for
 		// (we only support one device per node).
 		devices = []dockercontainer.DeviceMapping{
-			{"/dev/nvidia0", "/dev/nvidia0", "mrw"},
-			{"/dev/nvidiactl", "/dev/nvidiactl", "mrw"},
-			{"/dev/nvidia-uvm", "/dev/nvidia-uvm", "mrw"},
+			{PathOnHost: "/dev/nvidia0", PathInContainer: "/dev/nvidia0", CgroupPermissions: "mrw"},
+			{PathOnHost: "/dev/nvidiactl", PathInContainer: "/dev/nvidiactl", CgroupPermissions: "mrw"},
+			{PathOnHost: "/dev/nvidia-uvm", PathInContainer: "/dev/nvidia-uvm", CgroupPermissions: "mrw"},
 		}
 	}
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
