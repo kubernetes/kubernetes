@@ -65,6 +65,8 @@ type CacherConfig struct {
 	// NewList is a function that creates new empty object storing a list of
 	// objects of type Type.
 	NewListFunc func() runtime.Object
+
+	Codec runtime.Codec
 }
 
 type watchersMap map[int]*cacheWatcher
@@ -176,7 +178,7 @@ func NewCacherFromConfig(config CacherConfig) *Cacher {
 	// Give this error when it is constructed rather than when you get the
 	// first watch item, because it's much easier to track down that way.
 	if obj, ok := config.Type.(runtime.Object); ok {
-		if err := runtime.CheckCodec(config.Storage.Codec(), obj); err != nil {
+		if err := runtime.CheckCodec(config.Codec, obj); err != nil {
 			panic("storage codec doesn't seem to match given type: " + err.Error())
 		}
 	}
@@ -373,11 +375,6 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, f
 // Implements storage.Interface.
 func (c *Cacher) GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, preconditions *Preconditions, tryUpdate UpdateFunc) error {
 	return c.storage.GuaranteedUpdate(ctx, key, ptrToType, ignoreNotFound, preconditions, tryUpdate)
-}
-
-// Implements storage.Interface.
-func (c *Cacher) Codec() runtime.Codec {
-	return c.storage.Codec()
 }
 
 func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
