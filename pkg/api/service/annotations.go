@@ -16,6 +16,14 @@ limitations under the License.
 
 package service
 
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+)
+
 const (
 	// AnnotationLoadBalancerSourceRangesKey is the key of the annotation on a service to set allowed ingress ranges on their LoadBalancers
 	//
@@ -25,4 +33,54 @@ const (
 	//
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
+
+	// An annotation that denotes if this Service desires to route external traffic to local
+	// endpoints only. This preserves Source IP and avoids a second hop.
+	AnnotationExternalTraffic            = "service.alpha.kubernetes.io/external-traffic"
+	AnnotationValueExternalTrafficLocal  = "OnlyLocal"
+	AnnotationValueExternalTrafficGlobal = "Global"
+
+	AnnotationHealthCheckNodePort = "service.alpha.kubernetes.io/healthcheck-nodeport"
 )
+
+func ServiceNeedsHealthCheck(service *api.Service) bool {
+	if l, ok := service.Annotations[AnnotationExternalTraffic]; ok {
+		if l == AnnotationValueExternalTrafficLocal {
+			return true
+		} else if l == AnnotationValueExternalTrafficGlobal {
+			return false
+		} else {
+			glog.Errorf("Invalid value for annotation %v", AnnotationExternalTraffic)
+			return false
+		}
+	}
+	return false
+}
+
+func GetServiceHealthCheckNodePort(service *api.Service) (int32, error) {
+	if ServiceNeedsHealthCheck(service) {
+		if l, ok := service.Annotations[AnnotationHealthCheckNodePort]; ok {
+			p, err := strconv.Atoi(l)
+			if err != nil {
+				glog.Errorf("Failed to parse annotation %v: %v", AnnotationHealthCheckNodePort, err)
+				return 0, fmt.Errorf("Failed to parse annotation %v: %v", AnnotationHealthCheckNodePort, err)
+			}
+			return int32(p), nil
+		} else {
+			glog.Errorf("Service does not contain necessary annotation %v", AnnotationHealthCheckNodePort)
+		}
+	}
+	return 0, fmt.Errorf("No health check needed")
+}
+
+// Return the path programmed into the Cloud LB Health Check
+func GetServiceHealthCheckPathPort(service *api.Service) (string, int32) {
+	if !ServiceNeedsHealthCheck(service) {
+		return "", 0
+	}
+	port, err := GetServiceHealthCheckNodePort(service)
+	if err != nil {
+		return "", 0
+	}
+	return "/healthz", port
+}
