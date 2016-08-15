@@ -482,7 +482,7 @@ func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclie
 func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Servers: s.APIServerList}}).ClientConfig()
 }
 
 // createClientConfig creates a client configuration from the command line
@@ -517,10 +517,6 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 	if len(s.APIServerList) < 1 {
 		return nil, fmt.Errorf("no api servers specified")
-	}
-	// TODO: adapt Kube client to support LB over several servers
-	if len(s.APIServerList) > 1 {
-		glog.Infof("Multiple api servers specified.  Picking first one")
 	}
 
 	clientConfig, err := createClientConfig(s)
