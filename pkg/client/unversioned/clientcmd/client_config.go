@@ -99,7 +99,7 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	clientConfig := &restclient.Config{}
 
 	clientConfig.Hosts = configClusterInfo.Servers
-	if len(configClusterInfo.Servers) == 0 configClusterInfo.Server != "" {
+	if len(configClusterInfo.Servers) == 0 && configClusterInfo.Server != "" {
 		clientConfig.Hosts = []string{configClusterInfo.Server}
 	}
 
