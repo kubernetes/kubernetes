@@ -126,6 +126,79 @@ persistentvolumeclaim "claim1" deleted
 $ kubectl get pv
 
 ```
+Enable glusterfs dynamic provisioning by supplying `--enable-network-storage-provisioner=true --storage-config=/path/to/storage/config/directory` to `kube-controller-manager`.
+
+In the storage configuration directory, provide a gluster cluster configuration json like the following, where `endpoint` and `resturl` are mandatory and  the file must be named gluster.json.
+
+
+```gluster.json
+{
+   "endpoint": "glusterfs-cluster",
+   "resturl": "http://127.0.0.1:8081",
+   "restauthenabled":false,
+   "restuser":"",
+   "restuserkey":""
+}
+
+```
+Create a PVC json like the following:
+
+```json
+{
+  "kind": "PersistentVolumeClaim",
+  "apiVersion": "v1",
+  "metadata": {
+    "name": "glusterc",
+    "annotations": {
+      "volume.alpha.kubernetes.io/storage-class": "foo"
+    }
+  },
+  "spec": {
+    "accessModes": [
+      "ReadOnlyMany"
+    ],
+    "resources": {
+      "requests": {
+        "storage": "20Gi"
+      }
+    }
+  }
+}
+
+```
+
+Create the PVC using `kubectl`:
+
+```console
+# kubectl create -f claim1.json
+persistentvolumeclaim "glusterc" created
+```
+
+Confirm the PV is dynamically created using glusterfs volume with the specified size:
+```console
+[root@node]# ./kubectl get pv,pvc
+NAME                 CAPACITY   ACCESSMODES          STATUS     CLAIM              REASON    AGE
+pvc-855f9d52-3ee0-11e6-b6c7-54ee7551fd0c   20Gi       ROX                  Bound      default/glusterc             9s
+NAME                 STATUS     VOLUME               CAPACITY   ACCESSMODES        AGE
+glusterc             Bound      pvc-855f9d52-3ee0-11e6-b6c7-54ee7551fd0c   20Gi       ROX                9s
+
+
+Name:   pvc-855f9d52-3ee0-11e6-b6c7-54ee7551fd0c
+Labels:   <none>
+Status:   Bound
+Claim:    default/glusterc
+Reclaim Policy: Delete
+Access Modes: ROX
+Capacity: 20Gi
+Message:  
+Source:
+    Type:   Glusterfs (a Glusterfs mount on the host that shares a pod's lifetime)
+    EndpointsName:  glusterfs-cluster
+    Path:   vol_48d64f70d1da25bf4b225911786d5f04
+    ReadOnly:   false
+No events.
+
+```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()

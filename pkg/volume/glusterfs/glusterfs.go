@@ -21,8 +21,14 @@ import (
 	"os"
 	"path"
 
+	"encoding/json"
+	dstrings "strings"
+
 	"github.com/golang/glog"
+	gapp "github.com/heketi/heketi/apps/glusterfs"
+	gcli "github.com/heketi/heketi/client/api/go-client"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -31,17 +37,23 @@ import (
 )
 
 // This is the primary entrypoint for volume plugins.
-func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&glusterfsPlugin{nil, exec.New()}}
+func ProbeVolumePlugins(configdir string) []volume.VolumePlugin {
+	return []volume.VolumePlugin{&glusterfsPlugin{nil, exec.New(), configdir, new(glusterfsClusterConf)}}
 }
 
 type glusterfsPlugin struct {
-	host volume.VolumeHost
-	exe  exec.Interface
+	host        volume.VolumeHost
+	exe         exec.Interface
+	configdir   string
+	clusterconf *glusterfsClusterConf
 }
 
 var _ volume.VolumePlugin = &glusterfsPlugin{}
 var _ volume.PersistentVolumePlugin = &glusterfsPlugin{}
+var _ volume.DeletableVolumePlugin = &glusterfsPlugin{}
+var _ volume.ProvisionableVolumePlugin = &glusterfsPlugin{}
+var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
+var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
 	glusterfsPluginName = "kubernetes.io/glusterfs"
@@ -143,6 +155,29 @@ func (plugin *glusterfsPlugin) newUnmounterInternal(volName string, podUID types
 func (plugin *glusterfsPlugin) execCommand(command string, args []string) ([]byte, error) {
 	cmd := plugin.exe.Command(command, args...)
 	return cmd.CombinedOutput()
+}
+
+func (plugin *glusterfsPlugin) readClusterConf() (*glusterfsClusterConf, error) {
+
+	config := plugin.configdir
+	if config == "" {
+		glog.V(1).Infof("glusterfs: no cluster storage config dir provided")
+		return nil, fmt.Errorf("glusterfs: no gluster cluster storage config dir provided")
+	}
+	file := path.Join(config, "gluster.json")
+	fp, err := os.Open(file)
+	if err != nil {
+		glog.V(1).Infof("glusterfs: error opening file %s: %s", file, err)
+		return nil, fmt.Errorf("glusterfs: error opening file %s: %s", file, err)
+	}
+	defer fp.Close()
+
+	decoder := json.NewDecoder(fp)
+	if err = decoder.Decode(plugin.clusterconf); err != nil {
+		glog.V(1).Infof("glusterfs: cannot parse file %s: %s", file, err)
+		return nil, fmt.Errorf("glusterfs: cannot parse file %s: %s", file, err)
+	}
+	return plugin.clusterconf, nil
 }
 
 // Glusterfs volumes represent a bare host file or directory mount of an Glusterfs export.
@@ -301,4 +336,171 @@ func getVolumeSource(
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a Gluster volume type")
+}
+
+func (plugin *glusterfsPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if len(options.AccessModes) == 0 {
+		options.AccessModes = plugin.GetAccessModes()
+	}
+	return plugin.newProvisionerInternal(options)
+}
+
+func (plugin *glusterfsPlugin) newProvisionerInternal(options volume.VolumeOptions) (volume.Provisioner, error) {
+	return &glusterfsVolumeProvisioner{
+		glusterfsMounter: &glusterfsMounter{
+			glusterfs: &glusterfs{
+				plugin: plugin,
+			},
+		},
+		options: options,
+	}, nil
+}
+
+type glusterfsClusterConf struct {
+	Glusterep          string `json:"endpoint"`
+	GlusterRestvolpath string `json:"path"`
+	GlusterRestUrl     string `json:"resturl"`
+	GlusterRestAuth    bool   `json:"restauthenabled"`
+	GlusterRestUser    string `json:"restuser"`
+	GlusterRestUserKey string `json:"restuserkey"`
+}
+
+type glusterfsVolumeProvisioner struct {
+	*glusterfsMounter
+	*glusterfsClusterConf
+	options volume.VolumeOptions
+}
+
+func (plugin *glusterfsPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return plugin.newDeleterInternal(spec)
+}
+
+func (plugin *glusterfsPlugin) newDeleterInternal(spec *volume.Spec) (volume.Deleter, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.Glusterfs is nil")
+	}
+	return &glusterfsVolumeDeleter{
+		glusterfsMounter: &glusterfsMounter{
+			glusterfs: &glusterfs{
+
+				volName: spec.Name(),
+				plugin:  plugin,
+			},
+
+			path: spec.PersistentVolume.Spec.Glusterfs.Path,
+		}}, nil
+}
+
+type glusterfsVolumeDeleter struct {
+	*glusterfsMounter
+	*glusterfsClusterConf
+}
+
+func (d *glusterfsVolumeDeleter) GetPath() string {
+	name := glusterfsPluginName
+	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, strings.EscapeQualifiedNameForDisk(name), d.glusterfsMounter.glusterfs.volName)
+}
+
+func (d *glusterfsVolumeDeleter) Delete() error {
+	var err error
+	glog.V(2).Infof("glusterfs: delete volume :%s ", d.glusterfsMounter.path)
+	volumetodel := d.glusterfsMounter.path
+	d.glusterfsClusterConf, err = d.plugin.readClusterConf()
+	if err != nil {
+		glog.V(1).Infof("glusterfs: failed to read cluster configuration file")
+	}
+	newvolumetodel := dstrings.TrimPrefix(volumetodel, "vol_")
+	cli := gcli.NewClient(d.GlusterRestUrl, d.GlusterRestUser, d.GlusterRestUserKey)
+	if cli == nil {
+		glog.V(1).Infof("glusterfs: failed to create gluster rest client")
+		return fmt.Errorf("glusterfs: failed to create gluster rest client")
+	}
+	err = cli.VolumeDelete(newvolumetodel)
+	if err != nil {
+		glog.V(1).Infof("glusterfs: error when deleting the volume :%s", err)
+		return err
+	}
+	glog.V(1).Infof("glusterfs: volume %s deleted successfully", volumetodel)
+	return nil
+
+}
+
+func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
+
+	var err error
+	r.glusterfsClusterConf, err = r.plugin.readClusterConf()
+	if err != nil {
+		glog.V(1).Infof("glusterfs: failed to read cluster configuration file")
+	}
+
+	glusterfs, sizeGB, err := r.CreateVolume()
+	if err != nil {
+		glog.V(1).Infof("glusterfs: create volume err: %s.", err)
+		return nil, fmt.Errorf("glusterfs: create volume err: %s.", err)
+	}
+
+	pv, err := r.NewPersistentVolumeTemplate()
+	pv.Spec.PersistentVolumeSource.Glusterfs = glusterfs
+
+	pv.Spec.Capacity = api.ResourceList{
+		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+	}
+	return pv, nil
+}
+
+func (c *glusterfsVolumeProvisioner) NewPersistentVolumeTemplate() (*api.PersistentVolume, error) {
+	// Provide glusterfs api.PersistentVolume.Spec, it will be filled in
+	// glusterfsVolumeProvisioner.Provision()
+
+	return &api.PersistentVolume{
+		ObjectMeta: api.ObjectMeta{
+			GenerateName: "pv-glusterfs-",
+			Labels:       map[string]string{},
+			Annotations: map[string]string{
+				"kubernetes.io/createdby": "glusterfs-dynamic-provisioner",
+			},
+		},
+		Spec: api.PersistentVolumeSpec{
+			PersistentVolumeReclaimPolicy: c.options.PersistentVolumeReclaimPolicy,
+			AccessModes:                   c.options.AccessModes,
+			Capacity: api.ResourceList{
+				api.ResourceName(api.ResourceStorage): c.options.Capacity,
+			},
+			PersistentVolumeSource: api.PersistentVolumeSource{
+				Glusterfs: &api.GlusterfsVolumeSource{
+
+					EndpointsName: "test",
+					Path:          "foo",
+					ReadOnly:      true,
+				},
+			},
+		},
+	}, nil
+
+}
+
+func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSource, size int, err error) {
+	volSizeBytes := p.options.Capacity.Value()
+	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	glog.V(1).Infof("glusterfs: create volume of size:%s ", volSizeBytes)
+
+	if p.glusterfsClusterConf.GlusterRestUrl == "" {
+		glog.V(1).Infof("glusterfs : rest server endpoint is empty")
+
+	}
+	cli := gcli.NewClient(p.GlusterRestUrl, p.GlusterRestUser, p.GlusterRestUserKey)
+	if cli == nil {
+		glog.V(1).Infof("glusterfs: failed to create gluster rest client")
+	}
+	volumeReq := &gapp.VolumeCreateRequest{Size: sz}
+	volume, err := cli.VolumeCreate(volumeReq)
+	if err != nil {
+		glog.V(1).Infof("glusterfs: error creating volume %s ", err)
+	}
+	glog.V(1).Infof("\n glusterfs: volume with size :%d and name:%s created", volume.Size, volume.Name)
+	return &api.GlusterfsVolumeSource{
+		EndpointsName: p.glusterfsClusterConf.Glusterep,
+		Path:          volume.Name,
+		ReadOnly:      false,
+	}, sz, nil
 }

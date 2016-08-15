@@ -136,6 +136,8 @@ enable-debugging-handlers
 enable-garbage-collector
 enable-dynamic-provisioning
 enable-hostpath-provisioner
+enable-network-storage-provisioner
+storage-config
 enable-server
 enable-swagger-ui
 enable-garbage-collector

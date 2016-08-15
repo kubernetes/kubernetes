@@ -54,6 +54,8 @@ func NewPersistentVolumeController(
 	volumeSource, claimSource cache.ListerWatcher,
 	eventRecorder record.EventRecorder,
 	enableDynamicProvisioning bool,
+	enableNetworkStorageProvisioning bool,
+	storageConfigDir string,
 ) *PersistentVolumeController {
 
 	if eventRecorder == nil {
@@ -63,17 +65,19 @@ func NewPersistentVolumeController(
 	}
 
 	controller := &PersistentVolumeController{
-		volumes:                       newPersistentVolumeOrderedIndex(),
-		claims:                        cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc),
-		kubeClient:                    kubeClient,
-		eventRecorder:                 eventRecorder,
-		runningOperations:             goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
-		cloud:                         cloud,
-		provisioner:                   provisioner,
-		enableDynamicProvisioning:     enableDynamicProvisioning,
-		clusterName:                   clusterName,
-		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
-		createProvisionedPVInterval:   createProvisionedPVInterval,
+		volumes:                          newPersistentVolumeOrderedIndex(),
+		claims:                           cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc),
+		kubeClient:                       kubeClient,
+		eventRecorder:                    eventRecorder,
+		runningOperations:                goroutinemap.NewGoRoutineMap(false /* exponentialBackOffOnError */),
+		cloud:                            cloud,
+		provisioner:                      provisioner,
+		enableDynamicProvisioning:        enableDynamicProvisioning,
+		enableNetworkStorageProvisioning: enableNetworkStorageProvisioning,
+		storageConfigDir:                 storageConfigDir,
+		clusterName:                      clusterName,
+		createProvisionedPVRetryCount:    createProvisionedPVRetryCount,
+		createProvisionedPVInterval:      createProvisionedPVInterval,
 	}
 
 	controller.recyclePluginMgr.InitPlugins(recyclers, controller)

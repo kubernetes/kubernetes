@@ -142,19 +142,21 @@ const createProvisionedPVInterval = 10 * time.Second
 // framework.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
-	volumeController          *framework.Controller
-	volumeControllerStopCh    chan struct{}
-	volumeSource              cache.ListerWatcher
-	claimController           *framework.Controller
-	claimControllerStopCh     chan struct{}
-	claimSource               cache.ListerWatcher
-	kubeClient                clientset.Interface
-	eventRecorder             record.EventRecorder
-	cloud                     cloudprovider.Interface
-	recyclePluginMgr          vol.VolumePluginMgr
-	provisioner               vol.ProvisionableVolumePlugin
-	enableDynamicProvisioning bool
-	clusterName               string
+	volumeController                 *framework.Controller
+	volumeControllerStopCh           chan struct{}
+	volumeSource                     cache.ListerWatcher
+	claimController                  *framework.Controller
+	claimControllerStopCh            chan struct{}
+	claimSource                      cache.ListerWatcher
+	kubeClient                       clientset.Interface
+	eventRecorder                    record.EventRecorder
+	cloud                            cloudprovider.Interface
+	recyclePluginMgr                 vol.VolumePluginMgr
+	provisioner                      vol.ProvisionableVolumePlugin
+	enableDynamicProvisioning        bool
+	enableNetworkStorageProvisioning bool
+	storageConfigDir                 string
+	clusterName                      string
 
 	// Cache of the last known version of volumes and claims. This cache is
 	// thread safe as long as the volumes/claims there are not modified, they

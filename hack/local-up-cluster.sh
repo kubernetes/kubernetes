@@ -130,6 +130,9 @@ RKT_STAGE1_IMAGE=${RKT_STAGE1_IMAGE:-""}
 CHAOS_CHANCE=${CHAOS_CHANCE:-0.0}
 CPU_CFS_QUOTA=${CPU_CFS_QUOTA:-false}
 ENABLE_HOSTPATH_PROVISIONER=${ENABLE_HOSTPATH_PROVISIONER:-"false"}
+ENABLE_NETWORK_STORAGE_PROVISIONER=${ENABLE_NETWORK_STORAGE_PROVISIONER:-"true"}
+STORAGE_CONFIG=${STORAGE_CONFIG:-""}
+
 CLAIM_BINDER_SYNC_PERIOD=${CLAIM_BINDER_SYNC_PERIOD:-"15s"} # current k8s default
 
 function test_apiserver_off {
@@ -324,6 +327,8 @@ function start_controller_manager {
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
+      --enable-network-storage-provisioner="${ENABLE_NETWORK_STORAGE_PROVISIONER}" \
+      --storage-config=${STORAGE_CONFIG} \
       ${node_cidr_args} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
       --cloud-provider="${CLOUD_PROVIDER}" \

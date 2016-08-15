@@ -594,6 +594,9 @@ type KubeControllerManagerConfiguration struct {
 	// rootCAFile is the root certificate authority will be included in service
 	// account's token secret. This must be a valid PEM-encoded CA bundle.
 	RootCAFile string `json:"rootCAFile"`
+	// storageConfigDir is the location where network storage provisioner
+	// keep its configuration file
+	StorageConfigDir string `json:"storageConfigDir"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver.
@@ -629,11 +632,17 @@ type VolumeConfiguration struct {
 	// enableDynamicProvisioning enables the provisioning of volumes when running within an environment
 	// that supports dynamic provisioning. Defaults to true.
 	EnableDynamicProvisioning bool `json:"enableDynamicProvisioning"`
+	// enablenetworkProvisioning enables the provisioning of volumes when running within an environment
+	// that supports network storage provisioning.
+	EnableNetworkStorageProvisioning bool `json:"enableNetworkStorageProvisioning"`
 	// persistentVolumeRecyclerConfiguration holds configuration for persistent volume plugins.
 	PersistentVolumeRecyclerConfiguration PersistentVolumeRecyclerConfiguration `json:"persitentVolumeRecyclerConfiguration"`
 	// volumePluginDir is the full path of the directory in which the flex
 	// volume plugin should search for additional third party volume plugins
 	FlexVolumePluginDir string `json:"flexVolumePluginDir"`
+	// StorageconfigDir is the full path of the directory in which the network
+	// storage provisioner should search for its configuratino file
+	StorageConfigDir string `json:"storageConfigDir"`
 }
 
 type PersistentVolumeRecyclerConfiguration struct {

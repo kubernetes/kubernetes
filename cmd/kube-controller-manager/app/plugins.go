@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
+	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
@@ -99,6 +100,7 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins(config.StorageConfigDir)...)
 
 	return allPlugins
 }
@@ -109,6 +111,8 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 // Not all cloudproviders have provisioning capability, which is the reason for the bool in the return to tell the caller to expect one or not.
 func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
 	switch {
+	case config.EnableNetworkStorageProvisioning:
+		return getProvisionablePluginFromVolumePlugins(glusterfs.ProbeVolumePlugins(config.StorageConfigDir))
 	case cloud == nil && config.EnableHostPathProvisioning:
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
 	case cloud != nil && aws.ProviderName == cloud.ProviderName():
