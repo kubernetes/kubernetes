@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type cinderDiskAttacher struct {
@@ -130,7 +131,7 @@ func (attacher *cinderDiskAttacher) WaitForAttach(spec *volume.Spec, devicePath 
 		case <-ticker.C:
 			glog.V(5).Infof("Checking Cinder disk %q is attached.", volumeID)
 			probeAttachedVolume()
-			exists, err := pathExists(devicePath)
+			exists, err := volumeutil.PathExists(devicePath)
 			if exists && err == nil {
 				glog.Infof("Successfully found attached Cinder disk %q.", volumeID)
 				return devicePath, nil
@@ -250,7 +251,7 @@ func (detacher *cinderDiskDetacher) WaitForDetach(devicePath string, timeout tim
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking device %q is detached.", devicePath)
-			if pathExists, err := pathExists(devicePath); err != nil {
+			if pathExists, err := volumeutil.PathExists(devicePath); err != nil {
 				return fmt.Errorf("Error checking if device path exists: %v", err)
 			} else if !pathExists {
 				return nil
@@ -262,35 +263,5 @@ func (detacher *cinderDiskDetacher) WaitForDetach(devicePath string, timeout tim
 }
 
 func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	volume := path.Base(deviceMountPath)
-	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, detacher.mounter); err != nil {
-		glog.Errorf("Error unmounting %q: %v", volume, err)
-	}
-
-	return nil
-}
-
-// Checks if the specified path exists
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else {
-		return false, err
-	}
-}
-
-// Unmount the global mount path, which should be the only one, and delete it.
-func unmountPDAndRemoveGlobalPath(globalMountPath string, mounter mount.Interface) error {
-	if pathExists, pathErr := pathExists(globalMountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
-	} else if !pathExists {
-		glog.V(5).Infof("Warning: Unmount skipped because path does not exist: %v", globalMountPath)
-		return nil
-	}
-	err := mounter.Unmount(globalMountPath)
-	os.Remove(globalMountPath)
-	return err
+	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }
