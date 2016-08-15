@@ -29,6 +29,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	fed_v1b1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
+	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app"
 	"k8s.io/kubernetes/federation/cmd/federation-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -90,7 +91,7 @@ func TestRun(t *testing.T) {
 	s.ServiceClusterIPRange = *ipNet
 	s.StorageConfig.ServerList = []string{"http://localhost:2379"}
 	go func() {
-		if err := Run(s); err != nil {
+		if err := app.Run(s); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
