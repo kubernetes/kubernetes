@@ -397,23 +397,53 @@ func (d *DefaultLimitRangerActions) Limit(limitRange *api.LimitRange, resourceNa
 	switch resourceName {
 	case "pods":
 		return PodLimitFunc(limitRange, obj.(*api.Pod))
+	case "persistentvolumeclaims":
+		return PersistentVolumeClaimLimitFunc(limitRange, obj.(*api.PersistentVolumeClaim))
 	}
 	return nil
 }
 
-// SupportsAttributes ignores all calls that do not deal with pod resources since that is
-// all this supports now.  Also ignores any call that has a subresource defined.
+// SupportsAttributes ignores all calls that do not deal with pod resources or storage requests (PVCs).
+// Also ignores any call that has a subresource defined.
 func (d *DefaultLimitRangerActions) SupportsAttributes(a admission.Attributes) bool {
 	if a.GetSubresource() != "" {
 		return false
 	}
 
-	return a.GetKind().GroupKind() == api.Kind("Pod")
+	return a.GetKind().GroupKind() == api.Kind("Pod") || a.GetKind().GroupKind() == api.Kind("PersistentVolumeClaim")
 }
 
 // SupportsLimit always returns true.
 func (d *DefaultLimitRangerActions) SupportsLimit(limitRange *api.LimitRange) bool {
 	return true
+}
+
+// PersistentVolumeClaimLimitFunc enforces storage limits for PVCs.
+// Users request storage via pvc.Spec.Resources.Requests.  Min/Max is enforced by an admin with LimitRange.
+// Claims will not be modified with default values because storage is a required part of pvc.Spec.
+// All storage enforced values *only* apply to pvc.Spec.Resources.Requests.
+func PersistentVolumeClaimLimitFunc(limitRange *api.LimitRange, pvc *api.PersistentVolumeClaim) error {
+	var errs []error
+	for i := range limitRange.Spec.Limits {
+		limit := limitRange.Spec.Limits[i]
+		limitType := limit.Type
+		if limitType == api.LimitTypePersistentVolumeClaim {
+			for k, v := range limit.Min {
+				// normal usage of minConstraint. pvc.Spec.Resources.Limits is not recognized as user input
+				if err := minConstraint(limitType, k, v, pvc.Spec.Resources.Requests, api.ResourceList{}); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			for k, v := range limit.Max {
+				// reverse usage of maxConstraint. We want to enforce the max of the LimitRange against what
+				// the user requested.
+				if err := maxConstraint(limitType, k, v, api.ResourceList{}, pvc.Spec.Resources.Requests); err != nil {
+					errs = append(errs, err)
+				}
+			}
+		}
+	}
+	return utilerrors.NewAggregate(errs)
 }
 
 // PodLimitFunc enforces resource requirements enumerated by the pod against
