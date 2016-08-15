@@ -61,3 +61,5 @@ func EmptyMetadataProducer(pod *api.Pod) interface{} {
 type PredicateFailureReason interface {
 	GetReason() string
 }
+
+type GetEquivalencePodFunc func(pod *api.Pod) interface{}

@@ -76,8 +76,12 @@ var (
 	fitPredicateMap      = make(map[string]FitPredicateFactory)
 	priorityFunctionMap  = make(map[string]PriorityConfigFactory)
 	algorithmProviderMap = make(map[string]AlgorithmProviderConfig)
+
 	// Registered metadata producers
 	priorityMetadataProducer MetadataProducerFactory
+
+	// get equivalence pod function
+	getEquivalencePodFunc algorithm.GetEquivalencePodFunc = nil
 )
 
 const (
@@ -242,6 +246,11 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	}
 
 	return RegisterPriorityConfigFactory(policy.Name, *pcf)
+}
+
+func RegisterGetEquivalencePodFunction(equivalenceFunc algorithm.GetEquivalencePodFunc) {
+	glog.Info("Register getEquivalencePodFunc.")
+	getEquivalencePodFunc = equivalenceFunc
 }
 
 // This check is useful for testing providers.
