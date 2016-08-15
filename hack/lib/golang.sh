@@ -348,6 +348,9 @@ kube::golang::setup_env() {
   subdir=$(kube::realpath . | sed "s|$KUBE_ROOT||")
   cd "${KUBE_GOPATH}/src/${KUBE_GO_PACKAGE}/${subdir}"
 
+  # Set GOROOT so binaries that parse code can work properly.
+  export GOROOT=$(go env GOROOT)
+
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
 
@@ -612,18 +615,18 @@ kube::golang::build_binaries() {
     local use_go_build
     local -a targets=()
     local arg
-    
+
     # Add any files with those //generate annotations in the array below.
     readonly BINDATAS=( "${KUBE_ROOT}/test/e2e/framework/gobindata_util.go" )
     kube::log::status "Generating bindata:" "${BINDATAS[@]}"
     for bindata in ${BINDATAS[@]}; do
-	  # Only try to generate bindata if the file exists, since in some cases
-	  # one-off builds of individual directories may exclude some files.
+          # Only try to generate bindata if the file exists, since in some cases
+          # one-off builds of individual directories may exclude some files.
       if [[ -f $bindata ]]; then
           go generate "${bindata}"
       fi
     done
-    
+
     for arg; do
       if [[ "${arg}" == "--use_go_build" ]]; then
         use_go_build=true
