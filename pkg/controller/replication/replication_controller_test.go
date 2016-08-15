@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	fakeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller"
@@ -606,23 +607,11 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
-	manager.syncReplicationController(getKey(rc, t))
-
-	ch := make(chan interface{})
-	go func() {
-		item, _ := manager.queue.Get()
-		ch <- item
-	}()
-	select {
-	case key := <-ch:
-		expectedKey := getKey(rc, t)
-		if key != expectedKey {
-			t.Errorf("Expected requeue of controller with key %s got %s", expectedKey, key)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		manager.queue.ShutDown()
-		t.Errorf("Expected to find an rc in the queue, found none.")
+	// an error from the sync function will be requeued, check to make sure we returned an error
+	if err := manager.syncReplicationController(getKey(rc, t)); err == nil {
+		t.Errorf("missing error for requeue")
 	}
+
 	// 1 Update and 1 GET, both of which fail
 	fakeHandler.ValidateRequestCount(t, 2)
 }
@@ -1136,8 +1125,8 @@ func BenchmarkGetPodControllerSingleNS(b *testing.B) {
 }
 
 // setupManagerWithGCEnabled creates a RC manager with a fakePodControl and with garbageCollectorEnabled set to true
-func setupManagerWithGCEnabled() (manager *ReplicationManager, fakePodControl *controller.FakePodControl) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+func setupManagerWithGCEnabled(objs ...runtime.Object) (manager *ReplicationManager, fakePodControl *controller.FakePodControl) {
+	c := fakeclientset.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager = NewReplicationManagerFromClient(c, controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.garbageCollectorEnabled = true
@@ -1165,8 +1154,8 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 }
 
 func TestPatchPodWithOtherOwnerRef(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
+	manager, fakePodControl := setupManagerWithGCEnabled(rc)
 	manager.rcStore.Indexer.Add(rc)
 	// add to podStore one more matching pod that doesn't have a controller
 	// ref, but has an owner ref pointing to other object. Expect a patch to
@@ -1185,8 +1174,8 @@ func TestPatchPodWithOtherOwnerRef(t *testing.T) {
 }
 
 func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
+	manager, fakePodControl := setupManagerWithGCEnabled(rc)
 	manager.rcStore.Indexer.Add(rc)
 	// add to podStore a matching pod that has an ownerRef pointing to the rc,
 	// but ownerRef.Controller is false. Expect a patch to take control it.
@@ -1204,8 +1193,8 @@ func TestPatchPodWithCorrectOwnerRef(t *testing.T) {
 }
 
 func TestPatchPodFails(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
+	manager, fakePodControl := setupManagerWithGCEnabled(rc)
 	manager.rcStore.Indexer.Add(rc)
 	// add to podStore two matching pods. Expect two patches to take control
 	// them.
@@ -1215,16 +1204,16 @@ func TestPatchPodFails(t *testing.T) {
 	// control of the pods and create new ones.
 	fakePodControl.Err = fmt.Errorf("Fake Error")
 	err := manager.syncReplicationController(getKey(rc, t))
-	if err != nil {
-		t.Fatal(err)
+	if err == nil || err.Error() != "Fake Error" {
+		t.Fatalf("expected Fake Error, got %v", err)
 	}
 	// 2 patches to take control of pod1 and pod2 (both fail), 2 creates.
 	validateSyncReplication(t, fakePodControl, 2, 0, 2)
 }
 
 func TestPatchExtraPodsThenDelete(t *testing.T) {
-	manager, fakePodControl := setupManagerWithGCEnabled()
 	rc := newReplicationController(2)
+	manager, fakePodControl := setupManagerWithGCEnabled(rc)
 	manager.rcStore.Indexer.Add(rc)
 	// add to podStore three matching pods. Expect three patches to take control
 	// them, and later delete one of them.
