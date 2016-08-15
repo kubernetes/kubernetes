@@ -4,7 +4,7 @@
 
 // +build !go1.7
 
-package ctxhttp
+package ctxhttp // import "golang.org/x/net/context/ctxhttp"
 
 import (
 	"io"
