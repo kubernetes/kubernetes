@@ -478,6 +478,19 @@ func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclie
 }
 
 func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
+	if s.WaitForKubeConfig {
+		glog.Infof("Looking for kubeconfig file (%s), will wait until it appears and ignore --api-servers", s.KubeConfig.Value())
+		wait.PollInfinite(250*time.Millisecond, func() (bool, error) {
+			_, err := os.Stat(s.KubeConfig.Value())
+			return err == nil, nil
+		})
+	}
+	if len(s.APIServerList) < 1 && s.WaitForKubeConfig {
+		glog.Infof("Loading kubeconfig file (%s)", s.KubeConfig.Value())
+		return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
+			&clientcmd.ConfigOverrides{}).ClientConfig()
+	}
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
@@ -513,7 +526,8 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 // the configuration via addChaosToClientConfig. This func is exported to support
 // integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	if len(s.APIServerList) < 1 {
+	if len(s.APIServerList) < 1 && !s.WaitForKubeConfig {
+		// Backwards compatibility
 		return nil, fmt.Errorf("no api servers specified")
 	}
 	// TODO: adapt Kube client to support LB over several servers
