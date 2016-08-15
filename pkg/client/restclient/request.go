@@ -58,10 +58,6 @@ var (
 	longThrottleLatency = 50 * time.Millisecond
 )
 
-func init() {
-	metrics.Register()
-}
-
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -609,7 +605,7 @@ func (r *Request) URL() *url.URL {
 // underyling object.  This means some useful request info (like the types of field
 // selectors in use) will be lost.
 // TODO: preserve field selector keys
-func (r Request) finalURLTemplate() string {
+func (r Request) finalURLTemplate() url.URL {
 	if len(r.resourceName) != 0 {
 		r.resourceName = "{name}"
 	}
@@ -622,7 +618,8 @@ func (r Request) finalURLTemplate() string {
 		newParams[k] = v
 	}
 	r.params = newParams
-	return r.URL().String()
+	url := r.URL()
+	return *url
 }
 
 func (r *Request) tryThrottle() {
@@ -697,10 +694,10 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 
 	// If we have an error (i.e. apiserver down) we report that as a metric label.
 	if err != nil {
-		metrics.RequestResult.WithLabelValues(err.Error(), req.verb, url).Inc()
+		metrics.RequestResult.Increment(err.Error(), req.verb, url)
 	} else {
 		//Metrics for failure codes
-		metrics.RequestResult.WithLabelValues(strconv.Itoa(resp.StatusCode), req.verb, url).Inc()
+		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, url)
 	}
 }
 
@@ -775,7 +772,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	//Metrics for total request latency
 	start := time.Now()
 	defer func() {
-		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
+		metrics.RequestLatency.Observe(r.verb, r.finalURLTemplate(), time.Since(start))
 	}()
 
 	if r.err != nil {
