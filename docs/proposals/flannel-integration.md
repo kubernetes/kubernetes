@@ -124,7 +124,7 @@ Kubernetes integration is fairly straight-forward once we understand the pieces 
 * Flannel server consults the Kubernetes master for everything network related
 * Flannel daemon works through network plugins in a generic way without bothering the kubelet: needs CNI x Kubernetes standardization
 
-The first is accomplished in this PR, while a timeline for 2. and 3. are TDB. To implement the flannel api we can either run a proxy per node and get rid of the flannel server, or service all requests in the flannel server with something like a go-routine per node:
+The first is accomplished in this PR, while a timeline for 2. and 3. is TDB. To implement the flannel api we can either run a proxy per node and get rid of the flannel server, or service all requests in the flannel server with something like a go-routine per node:
 * `/network/config`: read network configuration and return
 * `/network/leases`:
 	- Post:  Return a lease as understood by flannel
@@ -136,7 +136,7 @@ The first is accomplished in this PR, while a timeline for 2. and 3. are TDB. To
 	- Put: This is a request for a lease. If the nodecontroller is allocating CIDRs we can probably just no-op.
 * `/network/reservations`: TDB, we can probably use this to accommodate node controller allocating CIDR instead of flannel requesting it
 
-The ick-iest part of this implementation is going to the the `GET /network/leases`, i.e the watch proxy. We can side-step by waiting for a more generic Kubernetes resource. However, we can also implement it as follows:
+The ick-iest part of this implementation is going to the `GET /network/leases`, i.e the watch proxy. We can side-step by waiting for a more generic Kubernetes resource. However, we can also implement it as follows:
 * Watch all nodes, ignore heartbeats
 * On each change, figure out the lease for the node, construct a [lease watch result](https://github.com/coreos/flannel/blob/0bf263826eab1707be5262703a8092c7d15e0be4/subnet/subnet.go#L72), and send it down the watch with the RV from the node
 * Implement a lease list that does a similar translation
@@ -158,7 +158,7 @@ This proposal is really just a call for community help in writing a Kubernetes x
 * Flannel server talks to apiserver, described in proposal above
 * HTTPs between flannel daemon/server
 * Investigate flannel server running on every node (as done in the reference implementation mentioned above)
-* Use flannel reservation mode to support node controller podcidr alloction
+* Use flannel reservation mode to support node controller podcidr allocation
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
