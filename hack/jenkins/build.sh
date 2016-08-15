@@ -62,7 +62,11 @@ git clean -fdx
 # docker images -q | xargs -r docker rmi
 
 # Build
-go run ./hack/e2e.go -v --build
+if [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
+    make quick-release
+else
+    make release
+fi
 
 # Push to GCS?
 if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
