@@ -104,7 +104,7 @@ type ReplicationManager struct {
 	lookupCache *controller.MatchingCache
 
 	// Controllers that need to be synced
-	queue *workqueue.Type
+	queue workqueue.RateLimitingInterface
 }
 
 // NewReplicationManager creates a replication manager
@@ -131,7 +131,7 @@ func newReplicationManagerInternal(eventRecorder record.EventRecorder, podInform
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:         workqueue.New(),
+		queue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 	}
 
 	rm.rcStore.Indexer, rm.rcController = framework.NewIndexerInformer(
@@ -442,10 +442,15 @@ func (rm *ReplicationManager) worker() {
 			return true
 		}
 		defer rm.queue.Done(key)
+
 		err := rm.syncHandler(key.(string))
-		if err != nil {
-			glog.Errorf("Error syncing replication controller: %v", err)
+		if err == nil {
+			rm.queue.Forget(key)
+			return false
 		}
+
+		rm.queue.AddRateLimited(key)
+		utilruntime.HandleError(err)
 		return false
 	}
 	for {
@@ -457,13 +462,16 @@ func (rm *ReplicationManager) worker() {
 }
 
 // manageReplicas checks and updates replicas for the given replication controller.
-func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.ReplicationController) {
+func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.ReplicationController) error {
 	diff := len(filteredPods) - int(rc.Spec.Replicas)
 	rcKey, err := controller.KeyFunc(rc)
 	if err != nil {
-		glog.Errorf("Couldn't get key for replication controller %#v: %v", rc, err)
-		return
+		return err
 	}
+	if diff == 0 {
+		return nil
+	}
+
 	if diff < 0 {
 		diff *= -1
 		if diff > rm.burstReplicas {
@@ -474,6 +482,7 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 		// UID, which would require locking *across* the create, which will turn
 		// into a performance bottleneck. We should generate a UID for the pod
 		// beforehand and store it via ExpectCreations.
+		errCh := make(chan error, diff)
 		rm.expectations.ExpectCreations(rcKey, diff)
 		wait := sync.WaitGroup{}
 		wait.Add(diff)
@@ -485,55 +494,79 @@ func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.Re
 					// Decrement the expected number of creates because the informer won't observe this pod
 					glog.V(2).Infof("Failed creation, decrementing expectations for controller %q/%q", rc.Namespace, rc.Name)
 					rm.expectations.CreationObserved(rcKey)
-					rm.enqueueController(rc)
+					errCh <- err
 					utilruntime.HandleError(err)
 				}
 			}()
 		}
 		wait.Wait()
-	} else if diff > 0 {
-		if diff > rm.burstReplicas {
-			diff = rm.burstReplicas
+
+		select {
+		case err := <-errCh:
+			// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
+			if err != nil {
+				return err
+			}
+		default:
 		}
-		glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
-		// No need to sort pods if we are about to delete all of them
-		if rc.Spec.Replicas != 0 {
-			// Sort the pods in the order such that not-ready < ready, unscheduled
-			// < scheduled, and pending < running. This ensures that we delete pods
-			// in the earlier stages whenever possible.
-			sort.Sort(controller.ActivePods(filteredPods))
-		}
-		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
-		// deleted, so we know to record their expectations exactly once either
-		// when we see it as an update of the deletion timestamp, or as a delete.
-		// Note that if the labels on a pod/rc change in a way that the pod gets
-		// orphaned, the rs will only wake up after the expectations have
-		// expired even if other pods are deleted.
-		deletedPodKeys := []string{}
-		for i := 0; i < diff; i++ {
-			deletedPodKeys = append(deletedPodKeys, controller.PodKey(filteredPods[i]))
-		}
-		// We use pod namespace/name as a UID to wait for deletions, so if the
-		// labels on a pod/rc change in a way that the pod gets orphaned, the
-		// rc will only wake up after the expectation has expired.
-		rm.expectations.ExpectDeletions(rcKey, deletedPodKeys)
-		wait := sync.WaitGroup{}
-		wait.Add(diff)
-		for i := 0; i < diff; i++ {
-			go func(ix int) {
-				defer wait.Done()
-				if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name, rc); err != nil {
-					// Decrement the expected number of deletes because the informer won't observe this deletion
-					podKey := controller.PodKey(filteredPods[ix])
-					glog.V(2).Infof("Failed to delete %v due to %v, decrementing expectations for controller %q/%q", podKey, err, rc.Namespace, rc.Name)
-					rm.expectations.DeletionObserved(rcKey, podKey)
-					rm.enqueueController(rc)
-					utilruntime.HandleError(err)
-				}
-			}(i)
-		}
-		wait.Wait()
+
+		return nil
+
 	}
+
+	if diff > rm.burstReplicas {
+		diff = rm.burstReplicas
+	}
+	glog.V(2).Infof("Too many %q/%q replicas, need %d, deleting %d", rc.Namespace, rc.Name, rc.Spec.Replicas, diff)
+	// No need to sort pods if we are about to delete all of them
+	if rc.Spec.Replicas != 0 {
+		// Sort the pods in the order such that not-ready < ready, unscheduled
+		// < scheduled, and pending < running. This ensures that we delete pods
+		// in the earlier stages whenever possible.
+		sort.Sort(controller.ActivePods(filteredPods))
+	}
+	// Snapshot the UIDs (ns/name) of the pods we're expecting to see
+	// deleted, so we know to record their expectations exactly once either
+	// when we see it as an update of the deletion timestamp, or as a delete.
+	// Note that if the labels on a pod/rc change in a way that the pod gets
+	// orphaned, the rs will only wake up after the expectations have
+	// expired even if other pods are deleted.
+	deletedPodKeys := []string{}
+	for i := 0; i < diff; i++ {
+		deletedPodKeys = append(deletedPodKeys, controller.PodKey(filteredPods[i]))
+	}
+	// We use pod namespace/name as a UID to wait for deletions, so if the
+	// labels on a pod/rc change in a way that the pod gets orphaned, the
+	// rc will only wake up after the expectation has expired.
+	errCh := make(chan error, diff)
+	rm.expectations.ExpectDeletions(rcKey, deletedPodKeys)
+	wait := sync.WaitGroup{}
+	wait.Add(diff)
+	for i := 0; i < diff; i++ {
+		go func(ix int) {
+			defer wait.Done()
+			if err := rm.podControl.DeletePod(rc.Namespace, filteredPods[ix].Name, rc); err != nil {
+				// Decrement the expected number of deletes because the informer won't observe this deletion
+				podKey := controller.PodKey(filteredPods[ix])
+				glog.V(2).Infof("Failed to delete %v due to %v, decrementing expectations for controller %q/%q", podKey, err, rc.Namespace, rc.Name)
+				rm.expectations.DeletionObserved(rcKey, podKey)
+				errCh <- err
+				utilruntime.HandleError(err)
+			}
+		}(i)
+	}
+	wait.Wait()
+
+	select {
+	case err := <-errCh:
+		// all errors have been reported before and they're likely to be the same, so we'll only return the first one we hit.
+		if err != nil {
+			return err
+		}
+	default:
+	}
+
+	return nil
 }
 
 // syncReplicationController will sync the rc with the given key if it has had its expectations fulfilled, meaning
@@ -563,8 +596,6 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 		return nil
 	}
 	if err != nil {
-		glog.Infof("Unable to retrieve rc %v from store: %v", key, err)
-		rm.queue.Add(key)
 		return err
 	}
 	rc := *obj.(*api.ReplicationController)
@@ -582,16 +613,15 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	trace.Step("Expectations restored")
 	podList, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector())
 	if err != nil {
-		glog.Errorf("Error getting pods for rc %q: %v", key, err)
-		rm.queue.Add(key)
 		return err
 	}
 	trace.Step("Pods listed")
 
 	// TODO: Do this in a single pass, or use an index.
+	var manageReplicasErr error
 	filteredPods := controller.FilterActivePods(podList.Items)
 	if rcNeedsSync {
-		rm.manageReplicas(filteredPods, &rc)
+		manageReplicasErr = rm.manageReplicas(filteredPods, &rc)
 	}
 	trace.Step("manageReplicas done")
 
@@ -610,10 +640,9 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 
 	// Always updates status as pods come up or die.
 	if err := updateReplicaCount(rm.kubeClient.Core().ReplicationControllers(rc.Namespace), rc, len(filteredPods), fullyLabeledReplicasCount); err != nil {
-		// Multiple things could lead to this update failing. Requeuing the controller ensures
-		// we retry with some fairness.
-		glog.V(2).Infof("Failed to update replica count for controller %v/%v; requeuing; error: %v", rc.Namespace, rc.Name, err)
-		rm.enqueueController(&rc)
+		// Multiple things could lead to this update failing.  Returning an error causes a requeue without forcing a hotloop
+		return err
 	}
-	return nil
+
+	return manageReplicasErr
 }

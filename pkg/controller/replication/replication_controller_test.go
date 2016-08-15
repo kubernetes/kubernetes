@@ -591,23 +591,11 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	fakePodControl := controller.FakePodControl{}
 	manager.podControl = &fakePodControl
 
-	manager.syncReplicationController(getKey(rc, t))
-
-	ch := make(chan interface{})
-	go func() {
-		item, _ := manager.queue.Get()
-		ch <- item
-	}()
-	select {
-	case key := <-ch:
-		expectedKey := getKey(rc, t)
-		if key != expectedKey {
-			t.Errorf("Expected requeue of controller with key %s got %s", expectedKey, key)
-		}
-	case <-time.After(wait.ForeverTestTimeout):
-		manager.queue.ShutDown()
-		t.Errorf("Expected to find an rc in the queue, found none.")
+	// an error from the sync function will be requeued, check to make sure we returned an error
+	if err := manager.syncReplicationController(getKey(rc, t)); err == nil {
+		t.Errorf("missing error for requeue")
 	}
+
 	// 1 Update and 1 GET, both of which fail
 	fakeHandler.ValidateRequestCount(t, 2)
 }
