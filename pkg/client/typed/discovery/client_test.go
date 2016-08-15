@@ -101,7 +101,7 @@ func TestGetServerGroupsWithBrokenServer(t *testing.T) {
 			w.WriteHeader(statusCode)
 		}))
 		defer server.Close()
-		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Hosts: []string{server.URL}})
 		// ServerGroups should not return an error even if server returns Not Found or Forbidden error at all end points
 		apiGroupList, err := client.ServerGroups()
 		if err != nil {
