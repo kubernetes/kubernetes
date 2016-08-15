@@ -70,6 +70,22 @@ const (
 	orgName        = "Kubernetes Cluster Federation"
 	cmName         = "federation-controller-manager"
 	kubeconfigName = "kubeconfig"
+
+	// credCharTable provides a source of valid characters to credentials
+	// generator.
+	//
+	// NOTE: Do *NOT* modify this table. In particular, do not insert
+	// non-ASCII characters. The credentials generator indexes into this
+	// string assuming that the bytes of this string are also valid ASCII
+	// characters, which isn't true for non-ASCII characters. See
+	// https://blog.golang.org/strings for a detailed discussion on this
+	// topic.
+	credCharTable = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+	passwdLen = 16
+	tokenLen  = 32
+	adminUser = "admin"
+	adminUID  = "admin"
 )
 
 var (
@@ -135,13 +151,25 @@ func main() {
 			Fatal("Failed to generate certificates")
 	}
 
+	password, err := credGen(passwdLen)
+	if err != nil {
+		log.WithField("error", err).
+			Fatal("Failed to generate pseudorandom password")
+	}
+
+	token, err := credGen(tokenLen)
+	if err != nil {
+		log.WithField("error", err).
+			Fatal("Failed to generate pseudorandom token")
+	}
+
 	cmKubeconfig, err := controllerManagerKubeconfig(*namespace, *svcName, cks["ca"].cert, cks["controller-manager"])
 	if err != nil {
 		log.WithField("error", err).
 			Fatal("Failed to controller manager kubeconfig")
 	}
 
-	if err := createSecrets(clientset, *namespace, *svcName, cAddr, *secretName, *cmSecretName, cks, cmKubeconfig); err != nil {
+	if err := createSecrets(clientset, *namespace, *svcName, cAddr, *secretName, *cmSecretName, password, token, cks, cmKubeconfig); err != nil {
 		log.WithField("error", err).
 			Fatal("Failed to create secrets")
 	}
@@ -396,18 +424,20 @@ func cert(name string, ips []net.IP, hostnames []string, template x509.Certifica
 	return &certKey{cert, priv, privKey}, nil
 }
 
-func createSecrets(clientset *release_1_4.Clientset, namespace, svcName, cAddr, secretName, cmSecretName string, cks map[string]*certKey, cmKubeconfig []byte) error {
+func createSecrets(clientset *release_1_4.Clientset, namespace, svcName, cAddr, secretName, cmSecretName, password, token string, cks map[string]*certKey, cmKubeconfig []byte) error {
 	buf := &bytes.Buffer{}
 
-	cksPem := make(map[string][]byte)
-	for name, ck := range cks {
-		ckPem := encodeCertKey(buf, ck)
-		cksPem[fmt.Sprintf("%s.crt", name)] = ckPem.cert
-		cksPem[fmt.Sprintf("%s.key", name)] = ckPem.key
+	data := map[string][]byte{
+		fmt.Sprintf("%s-advertise-address", svcName): []byte(cAddr),
+		"basic_auth.csv":                             []byte(fmt.Sprintf("%s,%s,%s", password, adminUser, adminUID)),
+		"known_tokens.csv":                           []byte(fmt.Sprintf("%s,%s,%s", token, adminUser, adminUID)),
 	}
 
-	data := cksPem
-	data[fmt.Sprintf("%s-advertise-address", svcName)] = []byte(cAddr)
+	for name, ck := range cks {
+		ckPem := encodeCertKey(buf, ck)
+		data[fmt.Sprintf("%s.crt", name)] = ckPem.cert
+		data[fmt.Sprintf("%s.key", name)] = ckPem.key
+	}
 
 	// Intentionally using the default secret type - `SecretTypeOpaque` (not
 	// set, but it will be defaulted) instead of `SecretTypeTLS` or other
@@ -417,7 +447,7 @@ func createSecrets(clientset *release_1_4.Clientset, namespace, svcName, cAddr, 
 		ObjectMeta: corev1.ObjectMeta{
 			Name: secretName,
 		},
-		Data: cksPem,
+		Data: data,
 	}
 
 	secret, err := clientset.Core().Secrets(namespace).Create(secret)
@@ -526,4 +556,21 @@ func controllerManagerKubeconfig(namespace, svcName string, caCert []byte, cmCer
 		CurrentContext: svcName,
 	}
 	return clientcmd.Write(config)
+}
+
+func credGen(n uint) (string, error) {
+	max := big.NewInt(int64(len(credCharTable)))
+
+	cred := ""
+	for i := uint(0); i < n; i++ {
+		rn, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate a random number(%d): %v", i, err)
+		}
+		// This type of string concatenation, i.e. using arithmetic plus
+		// operator is not necessarily efficient but is more readable.
+		// Since it is not necessary to be fast here, readability wins.
+		cred += string(credCharTable[rn.Int64()])
+	}
+	return cred, nil
 }
