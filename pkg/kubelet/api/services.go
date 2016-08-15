@@ -47,12 +47,9 @@ type ContainerManager interface {
 	Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error
 }
 
-// RuntimeService interface should be implemented by a container runtime.
-// The methods should be thread-safe.
-type RuntimeService interface {
-	RuntimeVersioner
-	ContainerManager
-
+// PodSandboxManager contains methods for operating on PodSandboxes. The methods
+// are thread-safe.
+type PodSandboxManager interface {
 	// CreatePodSandbox creates a pod-level sandbox.
 	// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
 	CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (string, error)
@@ -66,6 +63,14 @@ type RuntimeService interface {
 	PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error)
 	// ListPodSandbox returns a list of Sandbox.
 	ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error)
+}
+
+// RuntimeService interface should be implemented by a container runtime.
+// The methods should be thread-safe.
+type RuntimeService interface {
+	RuntimeVersioner
+	ContainerManager
+	PodSandboxManager
 }
 
 // ImageManagerService interface should be implemented by a container image
