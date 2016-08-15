@@ -41,6 +41,12 @@ type Selector interface {
 
 	// Add adds requirements to the Selector
 	Add(r ...Requirement) Selector
+
+	// Requirements converts this interface into Requirements to expose
+	// more detailed selection information.
+	// If there are querying parameters, it will return converted requirements and selectable=true.
+	// If this selector doesn't want to select anything, it will return selectable=false.
+	Requirements() (requirements []Requirement, selectable bool)
 }
 
 // Everything returns a selector that matches all labels.
@@ -50,10 +56,11 @@ func Everything() Selector {
 
 type nothingSelector struct{}
 
-func (n nothingSelector) Matches(_ Labels) bool         { return false }
-func (n nothingSelector) Empty() bool                   { return false }
-func (n nothingSelector) String() string                { return "<null>" }
-func (n nothingSelector) Add(_ ...Requirement) Selector { return n }
+func (n nothingSelector) Matches(_ Labels) bool               { return false }
+func (n nothingSelector) Empty() bool                         { return false }
+func (n nothingSelector) String() string                      { return "<null>" }
+func (n nothingSelector) Add(_ ...Requirement) Selector       { return n }
+func (n nothingSelector) Requirements() ([]Requirement, bool) { return nil, false }
 
 // Nothing returns a selector that matches no labels
 func Nothing() Selector {
@@ -300,6 +307,8 @@ func (lsel internalSelector) Matches(l Labels) bool {
 	}
 	return true
 }
+
+func (lsel internalSelector) Requirements() ([]Requirement, bool) { return lsel, true }
 
 // String returns a comma-separated string of all
 // the internalSelector Requirements' human-readable strings.
