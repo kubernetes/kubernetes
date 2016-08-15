@@ -1152,7 +1152,7 @@ func (proxier *Proxier) syncProxyRules() {
 		n = len(localEndpointChains)
 		if n == 0 {
 			// Blackhole all LB traffic that should not be double-hopped.
-			// TODO - nat table does not allow DROP action - what is a suitable blackhole action ?
+			// TODO - nat table does not allow DROP action - use mark action from FW chain (Minhan's commit)
 			args := []string{
 				"-A", string(svcLbChain),
 				"-m", "comment", "--comment",
