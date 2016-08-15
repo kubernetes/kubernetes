@@ -19,6 +19,8 @@ package aws_ebs
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -83,6 +85,28 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (strin
 		CapacityGB: requestGB,
 		Tags:       tags,
 		PVCName:    c.options.PVCName,
+	}
+	// Apply Parameters (case-insensitive). We leave validation of
+	// the values to the cloud provider.
+	for k, v := range c.options.Parameters {
+		switch strings.ToLower(k) {
+		case "type":
+			volumeOptions.VolumeType = v
+		case "zone":
+			volumeOptions.AvailabilityZone = v
+		case "iopspergb":
+			volumeOptions.IOPSPerGB, err = strconv.Atoi(v)
+			if err != nil {
+				return "", 0, nil, fmt.Errorf("invalid iopsPerGB value %q, must be integer between 1 and 30: %v", v, err)
+			}
+		default:
+			return "", 0, nil, fmt.Errorf("invalid option %q for volume plugin %s", k, c.plugin.GetPluginName())
+		}
+	}
+
+	// TODO: implement c.options.ProvisionerSelector parsing
+	if c.options.ProvisionerSelector != nil {
+		return "", 0, nil, fmt.Errorf("claim.Spec.Selector is not supported for dynamic provisioning on AWS")
 	}
 
 	name, err := cloud.CreateDisk(volumeOptions)
