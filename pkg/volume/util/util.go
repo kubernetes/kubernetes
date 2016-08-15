@@ -17,10 +17,12 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
 	"os"
 	"path"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 const readyFileName = "ready"
@@ -59,4 +61,36 @@ func SetReady(dir string) {
 		return
 	}
 	file.Close()
+}
+
+// UnmountPath is a common unmount routine that unmounts the given path and
+// deletes the remaining directory if successful.
+func UnmountPath(mountPath string, mounter mount.Interface) error {
+	if pathExists, pathErr := PathExists(mountPath); pathErr != nil {
+		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+	} else if !pathExists {
+		glog.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		return nil
+	}
+
+	err := mounter.Unmount(mountPath)
+	if err == nil {
+		// Only delete directory on successful unmount
+		glog.V(5).Infof("Unmounted %q. Deleting path.", mountPath)
+		return os.Remove(mountPath)
+	}
+
+	return err
+}
+
+// PathExists returns true if the specified path exists.
+func PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else {
+		return false, err
+	}
 }
