@@ -110,6 +110,7 @@ else
 endif
 
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
+	rm -f "${TEMP_DIR}"
 
 push: build
 	gcloud docker push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
