@@ -399,6 +399,10 @@ type KubeletConfiguration struct {
 	KubeReserved utilconfig.ConfigurationMap `json:"kubeReserved"`
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
+	// enableLogServer enables the logServer to startup,
+	// defaults to /logs/ from /var/log, and
+	// disables kubelet from exposing logs by http style
+	EnableLogServer bool `json:"enableLogServer"`
 }
 
 type KubeSchedulerConfiguration struct {
