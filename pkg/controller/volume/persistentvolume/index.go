@@ -27,13 +27,13 @@ import (
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
-// indexed by AccessModes and ordered by storage capacity.
+// indexed by AccessModes.
 type persistentVolumeOrderedIndex struct {
 	store cache.Indexer
 }
 
 func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
-	return persistentVolumeOrderedIndex{cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"accessmodes": accessModesIndexFunc})}
+	return persistentVolumeOrderedIndex{cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"accessmodes": accessModesIndexFunc, "claimref": claimRefIndexFunc})}
 }
 
 // accessModesIndexFunc is an indexing function that returns a persistent
@@ -42,6 +42,19 @@ func accessModesIndexFunc(obj interface{}) ([]string, error) {
 	if pv, ok := obj.(*api.PersistentVolume); ok {
 		modes := api.GetAccessModesAsString(pv.Spec.AccessModes)
 		return []string{modes}, nil
+	}
+	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
+}
+
+// claimRefIndexFunc is an indexing function that returns an unbound persistent
+// volume's ClaimRef namespace & name as a string "namespace/name", or "nil" if
+// its ClaimRef is nil or it is already bound
+func claimRefIndexFunc(obj interface{}) ([]string, error) {
+	if pv, ok := obj.(*api.PersistentVolume); ok {
+		if pv.Spec.ClaimRef != nil && pv.Spec.ClaimRef.UID == "" {
+			return []string{pv.Spec.ClaimRef.Namespace + "/" + pv.Spec.ClaimRef.Name}, nil
+		}
+		return []string{"nil"}, nil
 	}
 	return []string{""}, fmt.Errorf("object is not a persistent volume: %v", obj)
 }
@@ -68,11 +81,57 @@ func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.Persi
 	return volumes, nil
 }
 
+// listHasClaimRef returns all unbound volumes with a ClaimRef with the given
+// namespace and name. The list is unsorted!
+func (pvIndex *persistentVolumeOrderedIndex) listByClaimRef(namespace, name string) ([]*api.PersistentVolume, error) {
+	pv := &api.PersistentVolume{
+		Spec: api.PersistentVolumeSpec{
+			ClaimRef: &api.ObjectReference{
+				Namespace: namespace,
+				Name:      name,
+			},
+		},
+	}
+
+	objs, err := pvIndex.store.Index("claimref", pv)
+	if err != nil {
+		return nil, err
+	}
+
+	volumes := make([]*api.PersistentVolume, len(objs))
+	for i, obj := range objs {
+		volumes[i] = obj.(*api.PersistentVolume)
+	}
+
+	return volumes, nil
+}
+
 // matchPredicate is a function that indicates that a persistent volume matches another
 type matchPredicate func(compareThis, toThis *api.PersistentVolume) bool
 
 // find returns the nearest PV from the ordered list or nil if a match is not found
 func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVolumeClaim, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
+	// First, search for a volume that is pre-bound to the claim, since a
+	// PV that is pre-bound satisfies the claim regardless of its size or
+	// access modes
+	volumes, err := pvIndex.listByClaimRef(claim.Namespace, claim.Name)
+	if err != nil {
+		return nil, err
+	}
+	// There shouldn't be more than one volume pre-bound to the claim but
+	// nothing prevents the user from creating them; return the first
+	for _, volume := range volumes {
+		if !isVolumeBoundToClaim(volume, claim) {
+			return nil, fmt.Errorf(
+				"expected to find the PV that's pre-bound to claim %s/%s but got the PV %s/%s instead",
+				claim.Namespace,
+				claim.Name,
+				volume.Namespace,
+				volume.Name)
+		}
+		return volume, nil
+	}
+
 	// PVs are indexed by their access modes to allow easier searching.  Each
 	// index is the string representation of a set of access modes. There is a
 	// finite number of possible sets and PVs will only be indexed in one of
@@ -109,20 +168,10 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 			return nil, err
 		}
 
-		// Go through all available volumes with two goals:
-		// - find a volume that is either pre-bound by user or dynamically
-		//   provisioned for this claim. Because of this we need to loop through
-		//   all volumes.
+		// Go through all available volumes with one goal:
 		// - find the smallest matching one if there is no volume pre-bound to
-		//   the claim.
+		//   the claim, as the pre-bound would have been found above.
 		for _, volume := range volumes {
-			if isVolumeBoundToClaim(volume, claim) {
-				// this claim and volume are bound; return it,
-				// whether the claim is prebound or for volumes
-				// intended for dynamic provisioning v1
-				return volume, nil
-			}
-
 			// filter out:
 			// - volumes bound to another claim
 			// - volumes whose labels don't match the claim's selector, if specified
