@@ -62,7 +62,7 @@ git clean -fdx
 # docker images -q | xargs -r docker rmi
 
 # Build
-go run ./hack/e2e.go -v --build
+make release
 
 # Push to GCS?
 if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
