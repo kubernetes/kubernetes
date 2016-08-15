@@ -218,7 +218,7 @@ func TestDeleteFinalStateUnknown(t *testing.T) {
 
 func TestSyncReplicaSetCreates(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewReplicaSetController(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
+	manager := NewReplicaSetControllerFromClient(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.podStoreSynced = alwaysReady
 
 	// A controller with 2 replicas and no pods in the store, 2 creates expected
@@ -241,7 +241,7 @@ func TestStatusUpdatesWithoutReplicasChange(t *testing.T) {
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
 	client := clientset.NewForConfigOrDie(&restclient.Config{Hosts: []string{testServer.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewReplicaSetController(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
+	manager := NewReplicaSetControllerFromClient(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.podStoreSynced = alwaysReady
 
 	// Steady state for the ReplicaSet, no Status.Replicas updates expected
@@ -284,7 +284,7 @@ func TestControllerUpdateReplicas(t *testing.T) {
 	defer testServer.Close()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Hosts: []string{testServer.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewReplicaSetController(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
+	manager := NewReplicaSetControllerFromClient(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.podStoreSynced = alwaysReady
 
 	// Insufficient number of pods in the system, and Status.Replicas is wrong;
@@ -378,7 +378,7 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 }
 
 func TestPodControllerLookup(t *testing.T) {
-	manager := NewReplicaSetController(clientset.NewForConfigOrDie(&restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}), controller.NoResyncPeriodFunc, BurstReplicas, 0)
+	manager := NewReplicaSetControllerFromClient(clientset.NewForConfigOrDie(&restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}), controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.podStoreSynced = alwaysReady
 	testCases := []struct {
 		inRSs     []*extensions.ReplicaSet
@@ -613,7 +613,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 	defer testServer.Close()
 
 	client := clientset.NewForConfigOrDie(&restclient.Config{Hosts: []string{testServer.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewReplicaSetController(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
+	manager := NewReplicaSetControllerFromClient(client, controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.podStoreSynced = alwaysReady
 
 	labelMap := map[string]string{"foo": "bar"}
@@ -871,7 +871,7 @@ func TestRSSyncExpectations(t *testing.T) {
 
 func TestDeleteControllerAndExpectations(t *testing.T) {
 	client := clientset.NewForConfigOrDie(&restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
-	manager := NewReplicaSetController(client, controller.NoResyncPeriodFunc, 10, 0)
+	manager := NewReplicaSetControllerFromClient(client, controller.NoResyncPeriodFunc, 10, 0)
 	manager.podStoreSynced = alwaysReady
 
 	rs := newReplicaSet(1, map[string]string{"foo": "bar"})
@@ -1074,7 +1074,7 @@ func TestDeletionTimestamp(t *testing.T) {
 // setupManagerWithGCEnabled creates a RS manager with a fakePodControl
 // and with garbageCollectorEnabled set to true
 func setupManagerWithGCEnabled() (manager *ReplicaSetController, fakePodControl *controller.FakePodControl) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	c := clientset.NewForConfigOrDie(&restclient.Config{Hosts: []string{"0.0.0.0:8000"}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	fakePodControl = &controller.FakePodControl{}
 	manager = NewReplicaSetControllerFromClient(c, controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.garbageCollectorEnabled = true

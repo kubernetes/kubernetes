@@ -73,7 +73,7 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 	if dnsConfig.KubeMasterURL != "" && dnsConfig.KubeConfigFile == "" {
 		// Only --kube-master-url was provided.
 		config = &restclient.Config{
-			Host:          dnsConfig.KubeMasterURL,
+			Hosts:         []string{dnsConfig.KubeMasterURL},
 			ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}},
 		}
 	} else {
@@ -91,7 +91,7 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 		}
 	}
 
-	glog.Infof("Using %s for kubernetes master, kubernetes API: %v", config.Host, config.GroupVersion)
+	glog.Infof("Using %v to access kubernetes API: %v", config.Hosts, config.GroupVersion)
 	return clientset.NewForConfig(config)
 }
 

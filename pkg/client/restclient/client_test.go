@@ -290,7 +290,7 @@ func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting
 
 func restClient(testServer *httptest.Server) (*RESTClient, error) {
 	c, err := RESTClientFor(&Config{
-		Host: testServer.URL,
+		Hosts: []string{testServer.URL},
 		ContentConfig: ContentConfig{
 			GroupVersion:         testapi.Default.GroupVersion(),
 			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
