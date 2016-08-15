@@ -83,7 +83,7 @@ func (podTemplateStrategy) Export(ctx api.Context, obj runtime.Object, exact boo
 }
 
 func PodTemplateToSelectableFields(podTemplate *api.PodTemplate) fields.Set {
-	return fields.Set{}
+	return nil
 }
 
 func MatchPodTemplate(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
