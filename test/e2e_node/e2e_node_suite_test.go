@@ -193,7 +193,7 @@ const (
 
 func startNamespaceController() {
 	// Use the default QPS
-	config := restclient.AddUserAgent(&restclient.Config{Host: framework.TestContext.Host}, "node-e2e-namespace-controller")
+	config := restclient.AddUserAgent(&restclient.Config{Hosts: []string{framework.TestContext.Host}}, "node-e2e-namespace-controller")
 	client, err := clientset.NewForConfig(config)
 	Expect(err).NotTo(HaveOccurred())
 	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)

@@ -25,6 +25,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -103,6 +104,7 @@ func NewRESTClient(hosts []*url.URL, versionedAPIPath string, config ContentConf
 	} else if rateLimiter != nil {
 		throttle = rateLimiter
 	}
+	glog.V(4).Infof("Rest client initialized with following urls %v", hosts)
 	return &RESTClient{
 		urlProvider:      &RoundRobinProvider{urls: hosts},
 		versionedAPIPath: versionedAPIPath,
