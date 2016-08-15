@@ -14,54 +14,48 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package metrics provides utilities for registering client metrics to Prometheus.
+// Package metrics provides abstractions for registering which metrics
+// to record.
 package metrics
 
 import (
+	"net/url"
 	"sync"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
-)
-
-const restClientSubsystem = "rest_client"
-
-var (
-	// RequestLatency is a Prometheus Summary metric type partitioned by
-	// "verb" and "url" labels. It is used for the rest client latency metrics.
-	RequestLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: restClientSubsystem,
-			Name:      "request_latency_microseconds",
-			Help:      "Request latency in microseconds. Broken down by verb and URL",
-			MaxAge:    time.Hour,
-		},
-		[]string{"verb", "url"},
-	)
-
-	RequestResult = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: restClientSubsystem,
-			Name:      "request_status_codes",
-			Help:      "Number of http requests, partitioned by metadata",
-		},
-		[]string{"code", "method", "host"},
-	)
 )
 
 var registerMetrics sync.Once
 
-// Register registers all metrics to Prometheus with
-// respect to the RequestLatency.
-func Register() {
-	// Register the metrics.
+// LatencyMetric observes client latency partitioned by verb and url.
+type LatencyMetric interface {
+	Observe(verb string, u url.URL, latency time.Duration)
+}
+
+// ResultMetric counts response codes partitioned by method and host.
+type ResultMetric interface {
+	Increment(code string, method string, host string)
+}
+
+var (
+	// RequestLatency is the latency metric that rest clients will update.
+	RequestLatency LatencyMetric = noopLatency{}
+	// RequestResult is the result metric that rest clients will update.
+	RequestResult ResultMetric = noopResult{}
+)
+
+// Register registers metrics for the rest client to use. This can
+// only be called once.
+func Register(lm LatencyMetric, rm ResultMetric) {
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(RequestLatency)
-		prometheus.MustRegister(RequestResult)
+		RequestLatency = lm
+		RequestResult = rm
 	})
 }
 
-// Calculates the time since the specified start in microseconds.
-func SinceInMicroseconds(start time.Time) float64 {
-	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
-}
+type noopLatency struct{}
+
+func (noopLatency) Observe(string, url.URL, time.Duration) {}
+
+type noopResult struct{}
+
+func (noopResult) Increment(string, string, string) {}
