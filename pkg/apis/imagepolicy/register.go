@@ -54,3 +54,5 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	//	versioned.AddToGroupVersion(scheme, SchemeGroupVersion)
 	return nil
 }
+
+func (obj *ImageReview) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
