@@ -196,6 +196,7 @@ function setup_gci_vars() {
 if running_in_docker; then
     record_command "${STAGE_PRE}" "download_gcloud" curl -fsSL --retry 3 --keepalive-time 2 -o "${WORKSPACE}/google-cloud-sdk.tar.gz" 'https://dl.google.com/dl/cloudsdk/channels/rapid/google-cloud-sdk.tar.gz'
     install_google_cloud_sdk_tarball "${WORKSPACE}/google-cloud-sdk.tar.gz" /
+    gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
     if [[ "${KUBERNETES_PROVIDER}" == 'aws' ]]; then
         pip install awscli
     fi
@@ -226,20 +227,7 @@ if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
   setup_gci_vars
 fi
 
-echo "XXXXX gcloud auth before activation XXXXX"
-gcloud auth list || true
-
-if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
-  echo 'Activating service account...'  # No harm in doing this multiple times.
-  gcloud auth activate-service-account --key-file="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
-  # https://developers.google.com/identity/protocols/application-default-credentials
-  export GOOGLE_APPLICATION_CREDENTIALS="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
-  unset KUBEKINS_SERVICE_ACCOUNT_FILE
-elif [[ -n "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
-  echo "ERROR: cannot access service account file at: ${KUBEKINS_SERVICE_ACCOUNT_FILE}"
-fi
-
-echo "XXXXX gcloud auth after activation XXXXX"
+echo "XXXXX gcloud auth XXXXX"
 gcloud auth list || true
 
 echo "--------------------------------------------------------------------------------"

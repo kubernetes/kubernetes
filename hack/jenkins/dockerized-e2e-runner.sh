@@ -28,10 +28,12 @@ mkdir -p "${HOST_ARTIFACTS_DIR}"
 # TODO(ixdy): remove when all jobs are setting these vars using Jenkins credentials
 : ${JENKINS_GCE_SSH_PRIVATE_KEY_FILE:='/var/lib/jenkins/gce_keys/google_compute_engine'}
 : ${JENKINS_GCE_SSH_PUBLIC_KEY_FILE:='/var/lib/jenkins/gce_keys/google_compute_engine.pub'}
+: ${GOOGLE_APPLICATION_CREDENTIALS:=${KUBEKINS_SERVICE_ACCOUNT_FILE:-}}
 
 env \
   -u HOME \
   -u KUBEKINS_SERVICE_ACCOUNT_FILE \
+  -u GOOGLE_APPLICATION_CREDENTIALS \
   -u PATH \
   -u PWD \
   -u WORKSPACE \
@@ -57,11 +59,11 @@ docker run --rm=true -i \
   ${JENKINS_AWS_SSH_PRIVATE_KEY_FILE:+-v "${JENKINS_AWS_SSH_PRIVATE_KEY_FILE}:/workspace/.ssh/kube_aws_rsa:ro"} \
   ${JENKINS_AWS_SSH_PUBLIC_KEY_FILE:+-v "${JENKINS_AWS_SSH_PUBLIC_KEY_FILE}:/workspace/.ssh/kube_aws_rsa.pub:ro"} \
   ${JENKINS_AWS_CREDENTIALS_FILE:+-v "${JENKINS_AWS_CREDENTIALS_FILE}:/workspace/.aws/credentials:ro"} \
-  ${KUBEKINS_SERVICE_ACCOUNT_FILE:+-v "${KUBEKINS_SERVICE_ACCOUNT_FILE}:/service-account.json:ro"} \
+  ${GOOGLE_APPLICATION_CREDENTIALS:+-v "${GOOGLE_APPLICATION_CREDENTIALS}:/service-account.json:ro"} \
   --env-file "${WORKSPACE}/env.list" \
   -e "HOME=/workspace" \
   -e "WORKSPACE=/workspace" \
-  ${KUBEKINS_SERVICE_ACCOUNT_FILE:+-e "KUBEKINS_SERVICE_ACCOUNT_FILE=/service-account.json"} \
+  ${GOOGLE_APPLICATION_CREDENTIALS:+-e "GOOGLE_APPLICATION_CREDENTIALS=/service-account.json"} \
   "${docker_extra_args[@]:+${docker_extra_args[@]}}" \
   gcr.io/google_containers/kubekins-test:go1.6.3-docker1.9.1-rev3 \
   bash -c "/workspace/e2e-runner.sh"
