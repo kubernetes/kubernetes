@@ -221,9 +221,9 @@ kubectl is modified to support the **ResourceQuota** resource.
 For example:
 
 ```console
-$ kubectl create -f docs/admin/resourcequota/namespace.yaml
+$ kubectl create -f test/fixtures/doc-yaml/admin/resourcequota/namespace.yaml
 namespace "quota-example" created
-$ kubectl create -f docs/admin/resourcequota/quota.yaml --namespace=quota-example
+$ kubectl create -f test/fixtures/doc-yaml/admin/resourcequota/quota.yaml --namespace=quota-example
 resourcequota "quota" created
 $ kubectl describe quota quota --namespace=quota-example
 Name:                    quota

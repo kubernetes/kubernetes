@@ -107,8 +107,8 @@ kube::etcd::start
 
 # source_file,resource,namespace,name,old_version,new_version
 tests=(
-docs/user-guide/job.yaml,jobs,default,pi,extensions/v1beta1,batch/v1
-docs/user-guide/horizontal-pod-autoscaling/hpa-php-apache.yaml,horizontalpodautoscalers,default,php-apache,extensions/v1beta1,autoscaling/v1
+test/fixtures/doc-yaml/user-guide/job.yaml,jobs,default,pi,extensions/v1beta1,batch/v1
+test/fixtures/doc-yaml/user-guide/horizontal-pod-autoscaling/hpa-php-apache.yaml,horizontalpodautoscalers,default,php-apache,extensions/v1beta1,autoscaling/v1
 )
 
 # need to include extensions/v1beta1 in new api version because its internal types are used by jobs

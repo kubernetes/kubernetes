@@ -198,7 +198,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 	framework.KubeDescribe("Update Demo", func() {
 		var nautilus, kitten []byte
 		BeforeEach(func() {
-			updateDemoRoot := "docs/user-guide/update-demo"
+			updateDemoRoot := "test/fixtures/doc-yaml/user-guide/update-demo"
 			nautilus = framework.ReadOrDie(filepath.Join(updateDemoRoot, "nautilus-rc.yaml"))
 			kitten = framework.ReadOrDie(filepath.Join(updateDemoRoot, "kitten-rc.yaml"))
 		})
