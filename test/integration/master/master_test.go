@@ -384,7 +384,7 @@ func TestMasterService(t *testing.T) {
 	_, s := framework.RunAMaster(framework.NewIntegrationTestMasterConfig())
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Hosts: []string{s.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	err := wait.Poll(time.Second, time.Minute, func() (bool, error) {
 		svcList, err := client.Services(api.NamespaceDefault).List(api.ListOptions{})

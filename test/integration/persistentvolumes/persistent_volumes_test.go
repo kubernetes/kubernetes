@@ -1097,13 +1097,13 @@ func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeri
 	// Use higher QPS and Burst, there is a test for race conditions which
 	// creates many objects and default values were too low.
 	binderClient := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          s.URL,
+		Hosts:         []string{s.URL},
 		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 		QPS:           1000000,
 		Burst:         1000000,
 	})
 	testClient := clientset.NewForConfigOrDie(&restclient.Config{
-		Host:          s.URL,
+		Hosts:         []string{s.URL},
 		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 		QPS:           1000000,
 		Burst:         1000000,

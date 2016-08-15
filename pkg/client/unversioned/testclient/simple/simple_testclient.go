@@ -102,7 +102,7 @@ func (c *Client) Setup(t *testing.T) *Client {
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
 		})
 		c.RbacClient = client.NewRbacOrDie(&restclient.Config{
-			Host:          c.server.URL,
+			Hosts:         []string{c.server.URL},
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Rbac.GroupVersion()},
 		})
 
