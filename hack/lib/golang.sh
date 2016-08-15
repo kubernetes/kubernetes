@@ -350,6 +350,7 @@ kube::golang::setup_env() {
 
   # Set GOROOT so binaries that parse code can work properly.
   export GOROOT=$(go env GOROOT)
+  export GOMAXPROCS=1
 
   # Unset GOBIN in case it already exists in the current session.
   unset GOBIN
