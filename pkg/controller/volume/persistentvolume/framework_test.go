@@ -669,6 +669,26 @@ func withLabels(labels map[string]string, volumes []*api.PersistentVolume) []*ap
 	return volumes
 }
 
+// volumesWithClass applies the given class to the first volume in the array
+// and returns the array.  Meant to be used to compose volumes specified inline
+// in a test.
+func volumesWithClass(class string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
+	volumes[0].Annotations = map[string]string{
+		annClass: class,
+	}
+	return volumes
+}
+
+// claimsWithClass applies the given class to the first volume in the array
+// and returns the array.  Meant to be used to compose volumes specified inline
+// in a test.
+func claimsWithClass(class string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+	claims[0].Annotations = map[string]string{
+		annClass: class,
+	}
+	return claims
+}
+
 // withLabelSelector sets the label selector of the first claim in the array
 // to be MatchLabels of the given label set and returns the array.  Meant
 // to be used to compose claims specified inline in a test.
