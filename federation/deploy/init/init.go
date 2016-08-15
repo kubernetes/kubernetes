@@ -42,7 +42,6 @@ limitations under the License.
 package main
 
 import (
-	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -310,7 +309,7 @@ func certs(svcName string, certValidity time.Duration, cAddr string, ips []net.I
 		NotAfter:  time.Now().Add(certValidity),
 
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth, x509.ExtKeyUsageClientAuth},
 		BasicConstraintsValid: true,
 	}
 
@@ -425,8 +424,6 @@ func cert(name string, ips []net.IP, hostnames []string, template x509.Certifica
 }
 
 func createSecrets(clientset *release_1_4.Clientset, namespace, svcName, cAddr, secretName, cmSecretName, password, token string, cks map[string]*certKey, cmKubeconfig []byte) error {
-	buf := &bytes.Buffer{}
-
 	data := map[string][]byte{
 		fmt.Sprintf("%s-advertise-address", svcName): []byte(cAddr),
 		"basic_auth.csv":                             []byte(fmt.Sprintf("%s,%s,%s", password, adminUser, adminUID)),
@@ -434,7 +431,7 @@ func createSecrets(clientset *release_1_4.Clientset, namespace, svcName, cAddr, 
 	}
 
 	for name, ck := range cks {
-		ckPem := encodeCertKey(buf, ck)
+		ckPem := encodeCertKey(ck)
 		data[fmt.Sprintf("%s.crt", name)] = ckPem.cert
 		data[fmt.Sprintf("%s.key", name)] = ckPem.key
 	}
@@ -524,7 +521,7 @@ func createSecrets(clientset *release_1_4.Clientset, namespace, svcName, cAddr, 
 	return err
 }
 
-func encodeCertKey(buf *bytes.Buffer, ck *certKey) *certKey {
+func encodeCertKey(ck *certKey) *certKey {
 	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: ck.cert})
 	keyPem := pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: ck.key})
 	return &certKey{certPem, keyPem, nil}
