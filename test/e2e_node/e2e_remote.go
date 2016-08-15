@@ -99,12 +99,8 @@ func CreateTestArchive() (string, error) {
 	if _, err := os.Stat(kubelet); err != nil {
 		return "", fmt.Errorf("failed to locate binary %s", kubelet)
 	}
-	apiserver := filepath.Join(buildOutputDir, "kube-apiserver")
-	if _, err := os.Stat(apiserver); err != nil {
-		return "", fmt.Errorf("failed to locate binary %s", apiserver)
-	}
 	ginkgo := filepath.Join(buildOutputDir, "ginkgo")
-	if _, err := os.Stat(apiserver); err != nil {
+	if _, err := os.Stat(ginkgo); err != nil {
 		return "", fmt.Errorf("failed to locate binary %s", ginkgo)
 	}
 
@@ -123,10 +119,6 @@ func CreateTestArchive() (string, error) {
 	out, err = exec.Command("cp", kubelet, filepath.Join(tardir, "kubelet")).CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to copy kubelet %v.", err)
-	}
-	out, err = exec.Command("cp", apiserver, filepath.Join(tardir, "kube-apiserver")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy kube-apiserver %v.", err)
 	}
 	out, err = exec.Command("cp", ginkgo, filepath.Join(tardir, "ginkgo")).CombinedOutput()
 	if err != nil {
