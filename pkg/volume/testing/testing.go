@@ -721,9 +721,16 @@ func VerifyZeroDetachCallCount(fakeVolumePlugin *FakeVolumePlugin) error {
 // manager and fake volume plugin using a fake volume host.
 func GetTestVolumePluginMgr(
 	t *testing.T) (*VolumePluginMgr, *FakeVolumePlugin) {
+	v := NewFakeVolumeHost(
+		"",  /* rootDir */
+		nil, /* kubeClient */
+		nil, /* plugins */
+		"",  /* rootContext */
+	)
 	plugins := ProbeVolumePlugins(VolumeConfig{})
-	volumePluginMgr := NewFakeVolumeHost(
-		"" /* rootDir */, nil /* kubeClient */, plugins, "" /* rootContext */).pluginMgr
+	if err := v.pluginMgr.InitPlugins(plugins, v); err != nil {
+		t.Fatal(err)
+	}
 
-	return &volumePluginMgr, plugins[0].(*FakeVolumePlugin)
+	return &v.pluginMgr, plugins[0].(*FakeVolumePlugin)
 }

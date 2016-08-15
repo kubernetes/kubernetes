@@ -175,16 +175,16 @@ func TestHTTPHeaders(t *testing.T) {
 	}{
 		{[]api.HTTPHeader{}, http.Header{}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"}}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
-			{"X-Muffins-Or-Plumcakes", "Muffins!"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
+			{Name: "X-Muffins-Or-Plumcakes", Value: "Muffins!"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"},
 			"X-Muffins-Or-Plumcakes": {"Muffins!"}}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
-			{"X-Muffins-Or-Cupcakes", "Cupcakes, too"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Cupcakes, too"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins", "Cupcakes, too"}}},
 	}
 	for _, test := range testCases {

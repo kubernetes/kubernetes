@@ -114,14 +114,12 @@ func NewMasterComponents(c *Config) *MasterComponents {
 	if c.StartReplicationManager {
 		go controllerManager.Run(goruntime.NumCPU(), rcStopCh)
 	}
-	var once sync.Once
 	return &MasterComponents{
 		ApiServer:         s,
 		KubeMaster:        m,
 		RestClient:        restClient,
 		ControllerManager: controllerManager,
 		rcStopCh:          rcStopCh,
-		once:              once,
 	}
 }
 
