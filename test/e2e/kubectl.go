@@ -287,7 +287,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			}
 
 			By("executing a command in the container with noninteractive stdin")
-			execOutput = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "cat").
+			execOutput, _ = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "cat").
 				WithStdinData("abcd1234").
 				ExecOrDie()
 			if e, a := "abcd1234", execOutput; e != a {
@@ -303,7 +303,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			defer closer.Close()
 
 			By("executing a command in the container with pseudo-interactive stdin")
-			execOutput = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "bash").
+			execOutput, _ = framework.NewKubectlCommand("exec", fmt.Sprintf("--namespace=%v", ns), "-i", simplePodName, "bash").
 				WithStdinReader(r).
 				ExecOrDie()
 			if e, a := "hi", strings.TrimSpace(execOutput); e != a {
@@ -328,7 +328,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			for _, proxyVar := range []string{"https_proxy", "HTTPS_PROXY"} {
 				proxyLogs.Reset()
 				By("Running kubectl via an HTTP proxy using " + proxyVar)
-				output := framework.NewKubectlCommand(fmt.Sprintf("--namespace=%s", ns), "exec", "nginx", "echo", "running", "in", "container").
+				output, _ := framework.NewKubectlCommand(fmt.Sprintf("--namespace=%s", ns), "exec", "nginx", "echo", "running", "in", "container").
 					WithEnv(append(os.Environ(), fmt.Sprintf("%s=%s", proxyVar, proxyAddr))).
 					ExecOrDie()
 
@@ -355,7 +355,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			By("executing a command with run and attach with stdin")
-			runOutput := framework.NewKubectlCommand(nsFlag, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput, _ := framework.NewKubectlCommand(nsFlag, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				ExecOrDie()
 			Expect(runOutput).To(ContainSubstring("abcd1234"))
@@ -363,7 +363,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			Expect(c.Extensions().Jobs(ns).Delete("run-test", nil)).To(BeNil())
 
 			By("executing a command with run and attach without stdin")
-			runOutput = framework.NewKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput, _ = framework.NewKubectlCommand(fmt.Sprintf("--namespace=%v", ns), "run", "run-test-2", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("abcd1234"))
@@ -371,7 +371,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			Expect(c.Extensions().Jobs(ns).Delete("run-test-2", nil)).To(BeNil())
 
 			By("executing a command with run and attach with stdin with open stdin should remain running")
-			runOutput = framework.NewKubectlCommand(nsFlag, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput, _ = framework.NewKubectlCommand(nsFlag, "run", "run-test-3", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--leave-stdin-open=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234\n").
 				ExecOrDie()
 			Expect(runOutput).ToNot(ContainSubstring("stdin closed"))
@@ -1102,7 +1102,7 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			By("executing a command with run --rm and attach with stdin")
 			t := time.NewTimer(runJobTimeout)
 			defer t.Stop()
-			runOutput := framework.NewKubectlCommand(nsFlag, "run", jobName, "--image="+busyboxImage, "--rm=true", "--generator=job/v1", "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
+			runOutput, _ := framework.NewKubectlCommand(nsFlag, "run", jobName, "--image="+busyboxImage, "--rm=true", "--generator=job/v1", "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
 				WithStdinData("abcd1234").
 				WithTimeout(t.C).
 				ExecOrDie()
@@ -1113,6 +1113,28 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			_, err := c.Extensions().Jobs(ns).Get(jobName)
 			Expect(err).To(HaveOccurred())
 			Expect(apierrs.IsNotFound(err)).To(BeTrue())
+		})
+	})
+
+	framework.KubeDescribe("Kubectl run --quiet job", func() {
+		jobName := "e2e-test-quiet-busybox-job"
+
+		It("should not output anything except the command when --quiet is set", func() {
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+
+			// The rkt runtime doesn't support attach, see #23335
+			framework.SkipIfContainerRuntimeIs("rkt")
+			framework.SkipUnlessServerVersionGTE(jobsVersion, c)
+
+			By("executing a command with run --rm and attach with stdin")
+			t := time.NewTimer(runJobTimeout)
+			defer t.Stop()
+			// TODO: remove sleep when attach works immediately
+			stdout, stderr := framework.NewKubectlCommand(nsFlag, "run", jobName, "--image="+busyboxImage, "--quiet", "--rm", "--restart=Never", "--stdin", "--", "sh", "-c", "sleep 3; echo output; sleep 3").
+				WithTimeout(t.C).
+				ExecOrDie()
+			Expect(stdout).To(Equal("output\n"), "Checking STDOUT contains only our output")
+			Expect(stderr).To(Equal(""), "Checking STDERR is empty")
 		})
 	})
 
