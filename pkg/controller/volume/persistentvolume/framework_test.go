@@ -591,6 +591,9 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	if claimSource == nil {
 		claimSource = framework.NewFakePVCControllerSource()
 	}
+	if classSource == nil {
+		classSource = framework.NewFakeControllerSource()
+	}
 	ctrl := NewPersistentVolumeController(
 		kubeClient,
 		5*time.Second,        // sync period
