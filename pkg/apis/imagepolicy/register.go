@@ -41,11 +41,11 @@ func AddToScheme(scheme *runtime.Scheme) {
 	addKnownTypes(scheme)
 }
 
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&ImageReview{},
-		&ImageReviewSpec{},
-		&ImageReviewContainerSpec{},
-		&ImageReviewStatus{},
 	)
+	return nil
 }
+
+func (obj *ImageReview) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

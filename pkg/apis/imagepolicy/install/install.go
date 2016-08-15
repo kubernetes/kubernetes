@@ -104,7 +104,7 @@ func addVersionsToScheme(externalVersions ...unversioned.GroupVersion) {
 }
 
 func newRESTMapper(externalVersions []unversioned.GroupVersion) meta.RESTMapper {
-	rootScoped := sets.NewString("TokenReview")
+	rootScoped := sets.NewString("ImageReview")
 	ignoredKinds := sets.NewString()
 	return api.NewDefaultRESTMapper(externalVersions, interfacesFor, importPrefix, ignoredKinds, rootScoped)
 }
