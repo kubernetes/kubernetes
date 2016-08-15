@@ -196,3 +196,6 @@ test/integration/openshift
 test/soak/cauldron
 test/soak/serve_hostnames
 third_party/forked/golang/expansion
+test/integration/discoverysummarizer
+test/integration/examples
+test/integration/federation

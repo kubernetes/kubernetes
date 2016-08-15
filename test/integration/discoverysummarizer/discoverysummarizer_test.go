@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/cmd/kubernetes-discovery/discoverysummarizer"
 	"k8s.io/kubernetes/examples/apiserver"
 )
 
@@ -46,10 +47,10 @@ func testResponse(t *testing.T, serverURL, path string, expectedStatusCode int) 
 }
 
 func runDiscoverySummarizer(t *testing.T) string {
-	configFilePath := "../config.json"
+	configFilePath := "../../../cmd/kubernetes-discovery/config.json"
 	port := "9090"
 	serverURL := "http://localhost:" + port
-	s, err := NewDiscoverySummarizer(configFilePath)
+	s, err := discoverysummarizer.NewDiscoverySummarizer(configFilePath)
 	if err != nil {
 		t.Errorf("unexpected error: %v\n", err)
 	}
