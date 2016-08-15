@@ -73,11 +73,6 @@ func newStore(c *clientv3.Client, codec runtime.Codec, prefix string) *store {
 	}
 }
 
-// Codec implements storage.Interface.Codec.
-func (s *store) Codec() runtime.Codec {
-	return s.codec
-}
-
 // Versioner implements storage.Interface.Versioner.
 func (s *store) Versioner() storage.Versioner {
 	return s.versioner
