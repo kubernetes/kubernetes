@@ -19,6 +19,7 @@ package persistentvolume
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -73,6 +74,7 @@ func NewPersistentVolumeController(
 		clusterName:                   clusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
+		syncPeriod:                    syncPeriod,
 	}
 
 	controller.volumePluginMgr.InitPlugins(volumePlugins, controller)
@@ -502,6 +504,81 @@ func (ctrl *PersistentVolumeController) upgradeVolumeFrom1_2(volume *api.Persist
 	return true
 }
 
+// getClaimClass returns name of class that is requested by given claim.
+// It applies defaulting logic:
+// - if claim.Spec.Class (or annClass annotation) is set, this is the requested
+//   class.
+// - if claim.Spec.Class is nil (or annClass is not set), the default class is
+//   requested
+//   - if no default class is set, classless PVs are requested, i.e. those with
+//     PV.Spec.Class == "".
+func (ctrl *PersistentVolumeController) getClaimClass(claim *api.PersistentVolumeClaim) (string, error) {
+	// TODO: change to PersistentVolumeClaim.Spec.Class value when this
+	// attribute is introduced.
+	class, found := claim.Annotations[annClass]
+	if found {
+		return class, nil
+	}
+
+	defaultClass, err := ctrl.getDefaultStorageClass()
+	if err != nil {
+		// Send the error event to the claim, so the user can talk to admin
+		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "StorageClassError", err.Error())
+		return "", err
+	}
+	if defaultClass != nil {
+		return defaultClass.Name, nil
+	}
+
+	// No default is set, the claim requests a PV with Class==""
+	return "", nil
+}
+
+// getDefaultStorageClass returns a StorageClass that is marked as default. When
+// no class is marked, returns nil,nil. Returns error and events when multiple
+// classes are marked as default.
+func (ctrl *PersistentVolumeController) getDefaultStorageClass() (*extensions.StorageClass, error) {
+	// Keep list of all default classses for error handling
+	var defaultClasses []*extensions.StorageClass
+	var defaultClassNames []string
+
+	for _, obj := range ctrl.classes.List() {
+		c, ok := obj.(*extensions.StorageClass)
+		if !ok {
+			return nil, fmt.Errorf("StorageClass instance expected, got %+v", obj)
+		}
+
+		if isStorageClassDefault(c) {
+			defaultClasses = append(defaultClasses, c)
+			defaultClassNames = append(defaultClassNames, c.Name)
+		}
+	}
+
+	count := len(defaultClasses)
+	if count == 0 {
+		glog.V(4).Infof("no default storage class found")
+		return nil, nil
+	}
+	if count == 1 {
+		glog.V(4).Infof("default storage class: %s", defaultClasses[0].Name)
+		return defaultClasses[0], nil
+	}
+
+	// There are several default classes. Send an event to all of them with
+	// some throttling - there can be many PVCs that refer to a default class,
+	// sending an event with each of them may be quite spammy.
+	now := time.Now()
+	if ctrl.lastStorageClassError.IsZero() || now.Sub(ctrl.lastStorageClassError) > ctrl.syncPeriod {
+		ctrl.lastStorageClassError = now
+		for _, c := range defaultClasses {
+			errorMsg := fmt.Sprintf("multiple default StorageClasses detected, dynamic provisioning and volume binding with default class is disabled. Default classes are: %s", strings.Join(defaultClassNames, ", "))
+			ctrl.eventRecorder.Event(c, api.EventTypeWarning, "MultipleDefault", errorMsg)
+		}
+	}
+
+	return nil, fmt.Errorf("Expected only one default StorageClass, got %d: %s", count, strings.Join(defaultClassNames, ", "))
+}
+
 // Stateless functions
 
 func hasAnnotation(obj api.ObjectMeta, ann string) bool {
@@ -609,16 +686,17 @@ func getVolumeClass(volume *api.PersistentVolume) string {
 	if class, found := volume.Annotations[annClass]; found {
 		return class
 	}
+
+	// 'nil' is interpreted as "", i.e. the volume does not belong to any class.
 	return ""
 }
 
-// getClaimClass returns value of annClass annotation or empty string in case
-// the annotation does not exist.
-// TODO: change to PersistentVolumeClaim.Spec.Class value when this attribute is
-// introduced.
-func getClaimClass(claim *api.PersistentVolumeClaim) string {
-	if class, found := claim.Annotations[annClass]; found {
-		return class
+func isStorageClassDefault(cl *extensions.StorageClass) bool {
+	// TODO: check StorageClass.Default attribute when this attribute is
+	// introduced.
+	value, found := cl.Annotations[annDefaultStorageClass]
+	if !found {
+		return false
 	}
-	return ""
+	return strings.ToLower(value) == "true"
 }

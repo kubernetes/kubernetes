@@ -147,6 +147,9 @@ const createProvisionedPVRetryCount = 5
 // Interval between retries when we create a PV object for a provisioned volume.
 const createProvisionedPVInterval = 10 * time.Second
 
+// Name of annotation that marks a StorageClass as default.
+const annDefaultStorageClass = "storage.beta.kubernetes.io/default-class"
+
 // PersistentVolumeController is a controller that synchronizes
 // PersistentVolumeClaims and PersistentVolumes. It starts two
 // framework.Controllers that watch PersistentVolume and PersistentVolumeClaim
@@ -167,7 +170,7 @@ type PersistentVolumeController struct {
 	volumePluginMgr           vol.VolumePluginMgr
 	enableDynamicProvisioning bool
 	clusterName               string
-	defaultStorageClass       string
+	syncPeriod                time.Duration
 
 	// Cache of the last known version of volumes and claims. This cache is
 	// thread safe as long as the volumes/claims there are not modified, they
@@ -187,6 +190,10 @@ type PersistentVolumeController struct {
 
 	createProvisionedPVRetryCount int
 	createProvisionedPVInterval   time.Duration
+
+	// Throttling of error events sent to StorageClasses. There may be many
+	// PVCs and we can't send an error event to StorageClass with every of them.
+	lastStorageClassError time.Time
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
@@ -213,6 +220,10 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 	if claim.Spec.VolumeName == "" {
 		// User did not care which PV they get.
 		// [Unit test set 1]
+		claimClass, err := ctrl.getClaimClass(claim)
+		if err != nil {
+			return err
+		}
 		volume, err := ctrl.volumes.findBestMatchForClaim(claim)
 		if err != nil {
 			glog.V(2).Infof("synchronizing unbound PersistentVolumeClaim[%s]: Error finding PV for claim: %v", claimToClaimKey(claim), err)
@@ -222,8 +233,8 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 			glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
-			if hasAnnotation(claim.ObjectMeta, annClass) {
-				if err = ctrl.provisionClaim(claim); err != nil {
+			if claimClass != "" {
+				if err = ctrl.provisionClaim(claim, claimClass); err != nil {
 					return err
 				}
 				return nil
@@ -1176,15 +1187,17 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 	return nil
 }
 
-// provisionClaim starts new asynchronous operation to provision a claim if provisioning is enabled.
-func (ctrl *PersistentVolumeController) provisionClaim(claim *api.PersistentVolumeClaim) error {
+// provisionClaim starts new asynchronous operation to provision a claim if
+// provisioning is enabled. Claim's class is explicitly provided as an argument
+// as it may be modified by defaulting.
+func (ctrl *PersistentVolumeController) provisionClaim(claim *api.PersistentVolumeClaim, claimClass string) error {
 	if !ctrl.enableDynamicProvisioning {
 		return nil
 	}
 	glog.V(4).Infof("provisionClaim[%s]: started", claimToClaimKey(claim))
 	opName := fmt.Sprintf("provision-%s[%s]", claimToClaimKey(claim), string(claim.UID))
 	ctrl.scheduleOperation(opName, func() error {
-		ctrl.provisionClaimOperation(claim)
+		ctrl.provisionClaimOperation(claim, claimClass)
 		return nil
 	})
 	return nil
@@ -1192,13 +1205,13 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *api.PersistentVolu
 
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
-func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interface{}) {
+func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interface{}, claimClass string) {
 	claim, ok := claimObj.(*api.PersistentVolumeClaim)
 	if !ok {
 		glog.Errorf("Cannot convert provisionClaimOperation argument to claim, got %#v", claimObj)
 		return
 	}
-	glog.V(4).Infof("provisionClaimOperation [%s] started", claimToClaimKey(claim))
+	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
@@ -1220,7 +1233,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		return
 	}
 
-	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
+	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim, claimClass)
 	if err != nil {
 		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ProvisioningFailed", err.Error())
 		glog.V(2).Infof("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
@@ -1275,7 +1288,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	// Add annBoundByController (used in deleting the volume)
 	setAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
 	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
-	setAnnotation(&volume.ObjectMeta, annClass, getClaimClass(claim))
+	setAnnotation(&volume.ObjectMeta, annClass, claimClass)
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
@@ -1355,39 +1368,23 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 	}
 }
 
-func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *extensions.StorageClass, error) {
-	storageClass, err := ctrl.findStorageClass(claim)
+func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.PersistentVolumeClaim, claimClass string) (vol.ProvisionableVolumePlugin, *extensions.StorageClass, error) {
+	classObj, found, err := ctrl.classes.GetByKey(claimClass)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	// Find a plugin for the class
-	plugin, err := ctrl.volumePluginMgr.FindProvisionablePluginByName(storageClass.Provisioner)
-	if err != nil {
-		return nil, nil, err
-	}
-	return plugin, storageClass, nil
-}
-
-func (ctrl *PersistentVolumeController) findStorageClass(claim *api.PersistentVolumeClaim) (*extensions.StorageClass, error) {
-	className := getClaimClass(claim)
-	if className == "" {
-		className = ctrl.defaultStorageClass
-	}
-	if className == "" {
-		return nil, fmt.Errorf("No default StorageClass configured")
-	}
-
-	classObj, found, err := ctrl.classes.GetByKey(className)
-	if err != nil {
-		return nil, err
 	}
 	if !found {
-		return nil, fmt.Errorf("StorageClass %q not found", className)
+		return nil, nil, fmt.Errorf("StorageClass %q not found", claimClass)
 	}
 	class, ok := classObj.(*extensions.StorageClass)
 	if !ok {
-		return nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
+		return nil, nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
 	}
-	return class, nil
+
+	// Find a plugin for the class
+	plugin, err := ctrl.volumePluginMgr.FindProvisionablePluginByName(class.Provisioner)
+	if err != nil {
+		return nil, nil, err
+	}
+	return plugin, class, nil
 }
