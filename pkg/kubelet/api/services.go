@@ -22,11 +22,17 @@ import (
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
+// RuntimeVersioner contains methods for runtime name, version and API version.
+type RuntimeVersioner interface {
+	// Version returns the runtime name, runtime version and runtime API version
+	Version(apiVersion string) (*runtimeApi.VersionResponse, error)
+}
+
 // RuntimeService interface should be implemented by a container runtime.
 // The methods should be thread-safe.
 type RuntimeService interface {
-	// Version returns the runtime name, runtime version and runtime API version
-	Version(apiVersion string) (*runtimeApi.VersionResponse, error)
+	RuntimeVersioner
+
 	// CreatePodSandbox creates a pod-level sandbox.
 	// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
 	CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (string, error)
