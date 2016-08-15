@@ -140,7 +140,7 @@ func loadTestProfiles() error {
 		}
 		return fmt.Errorf("failed to load profiles: %v", err)
 	}
-	glog.V(2).Infof("Loaded profiles from %s: %v", path, out)
+	glog.V(2).Infof("Loaded profiles: %v", out)
 	return nil
 }
 
