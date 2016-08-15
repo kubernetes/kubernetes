@@ -274,6 +274,7 @@ kubelet-read-only-port
 kubelet-root-dir
 kubelet-sync-frequency
 kubelet-timeout
+kubelet-enable-logserver
 kubernetes-service-node-port
 label-columns
 last-release-pr
