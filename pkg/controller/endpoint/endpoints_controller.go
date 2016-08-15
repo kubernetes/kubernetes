@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"encoding/json"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/endpoints"
@@ -482,7 +483,9 @@ func (e *EndpointController) syncService(key string) {
 	} else {
 		newEndpoints.Annotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	}
-	if len(currentEndpoints.ResourceVersion) == 0 {
+
+	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
+	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 	} else {
@@ -490,7 +493,15 @@ func (e *EndpointController) syncService(key string) {
 		_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
 	}
 	if err != nil {
-		glog.Errorf("Error updating endpoints: %v", err)
+		if createEndpoints && errors.IsForbidden(err) {
+			// A request is forbidden primarily for two reasons:
+			// 1. namespace is terminating, endpoint creation is not allowed by default.
+			// 2. policy is misconfigured, in which case no service would function anywhere.
+			// Given the frequency of 1, we log at a lower level.
+			glog.V(5).Infof("Forbidden from creating endpoints: %v", err)
+		} else {
+			utilruntime.HandleError(err)
+		}
 		e.queue.Add(key) // Retry
 	}
 }
