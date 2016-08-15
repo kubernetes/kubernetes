@@ -209,11 +209,29 @@ type EC2Metadata interface {
 	GetMetadata(path string) (string, error)
 }
 
+// AWS volume types
+const (
+	// Provisioned IOPS SSD
+	VolumeTypeIO1 = "io1"
+	// General Purpose SSD
+	VolumeTypeGP2 = "gp2"
+	// Cold HDD (sc1)
+	VolumeTypeSC1 = "sc1"
+	// Throughput Optimized HDD
+	VolumeTypeST1 = "st1"
+)
+
 // VolumeOptions specifies capacity and tags for a volume.
 type VolumeOptions struct {
-	CapacityGB int
-	Tags       map[string]string
-	PVCName    string
+	CapacityGB       int
+	Tags             map[string]string
+	PVCName          string
+	VolumeType       string
+	AvailabilityZone string
+	// IOPSPerGB x CapacityGB will give total IOPS of the volume to create.
+	// IOPSPerGB must be bigger than zero and smaller or equal to 30.
+	// Calculated total IOPS will be capped at 20000 IOPS.
+	IOPSPerGB int
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -1475,14 +1493,47 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 		return "", fmt.Errorf("error querying for all zones: %v", err)
 	}
 
-	createAZ := volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
+	createAZ := volumeOptions.AvailabilityZone
+	if createAZ == "" {
+		createAZ = volume.ChooseZoneForVolume(allZones, volumeOptions.PVCName)
+	}
+
+	var createType string
+	var iops int64
+	switch volumeOptions.VolumeType {
+	case VolumeTypeGP2, VolumeTypeSC1, VolumeTypeST1:
+		createType = volumeOptions.VolumeType
+
+	case VolumeTypeIO1:
+		// See http://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateVolume.html for IOPS constraints
+		if volumeOptions.IOPSPerGB <= 0 || volumeOptions.IOPSPerGB > 30 {
+			return "", fmt.Errorf("invalid iopsPerGB value %d, must be 0 < IOPSPerGB <= 30", volumeOptions.IOPSPerGB)
+		}
+		createType = volumeOptions.VolumeType
+		iops = int64(volumeOptions.CapacityGB * volumeOptions.IOPSPerGB)
+		if iops < 100 {
+			iops = 100
+		}
+		if iops > 20000 {
+			iops = 20000
+		}
+
+	case "":
+		createType = DefaultVolumeType
+
+	default:
+		return "", fmt.Errorf("invalid AWS VolumeType %q", volumeOptions.VolumeType)
+	}
 
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	request := &ec2.CreateVolumeInput{}
 	request.AvailabilityZone = &createAZ
 	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
-	request.VolumeType = aws.String(DefaultVolumeType)
+	request.VolumeType = &createType
+	if iops > 0 {
+		request.Iops = &iops
+	}
 	response, err := c.ec2.CreateVolume(request)
 	if err != nil {
 		return "", err
