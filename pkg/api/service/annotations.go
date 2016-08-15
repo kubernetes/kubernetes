@@ -25,4 +25,12 @@ const (
 	//
 	// Not all cloud providers support this annotation, though AWS & GCE do.
 	AnnotationLoadBalancerSourceRangesKey = "service.beta.kubernetes.io/load-balancer-source-ranges"
+
+	// An annotation that denotes if this Service desires to route external traffic to local
+	// endpoints only. This preserves Source IP and avoids a second hop.
+	AnnotationExternalTraffic            = "service.alpha.kubernetes.io/external-traffic"
+	AnnotationValueExternalTrafficLocal  = "OnlyLocal"
+	AnnotationValueExternalTrafficGlobal = "Global"
+
+	AnnotationHealthCheckNodePort = "service.alpha.kubernetes.io/healthcheck-nodeport"
 )

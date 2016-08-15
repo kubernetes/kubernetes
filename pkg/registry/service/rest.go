@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/rest"
+	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/registry/endpoint"
@@ -130,6 +131,35 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
 			}
 			servicePort.NodePort = int32(nodePort)
+		}
+	}
+
+	if shouldCheckOrAssignHealthCheckNodePort(service) {
+		var healthCheckNodePort int
+		var err error
+		if l, ok := service.Annotations[apiservice.AnnotationHealthCheckNodePort]; ok {
+			healthCheckNodePort, err = strconv.Atoi(l)
+			if err != nil {
+				return nil, errors.NewInternalError(fmt.Errorf("Failed to parse annotation %v: %v", apiservice.AnnotationHealthCheckNodePort, err))
+			}
+		}
+		if healthCheckNodePort > 0 {
+			// If the request has a health check nodePort in mind, attempt to reserve it
+			err := nodePortOp.Allocate(int(healthCheckNodePort))
+			if err != nil {
+				return nil, errors.NewInternalError(fmt.Errorf("Failed to allocate requested HealthCheck nodePort %v: %v", healthCheckNodePort, err))
+			}
+		} else {
+			// If the request has no health check nodePort specified, allocate any
+			healthCheckNodePort, err = nodePortOp.AllocateNext()
+			if err != nil {
+				// TODO: what error should be returned here?  It's not a
+				// field-level validation failure (the field is valid), and it's
+				// not really an internal error.
+				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+			}
+			// Insert the newly allocated health check port as an annotation (plan of record for Alpha)
+			service.Annotations[apiservice.AnnotationHealthCheckNodePort] = fmt.Sprintf("%d", healthCheckNodePort)
 		}
 	}
 
@@ -393,6 +423,30 @@ func shouldAssignNodePorts(service *api.Service) bool {
 		return true
 	case api.ServiceTypeClusterIP:
 		return false
+	default:
+		glog.Errorf("Unknown service type: %v", service.Spec.Type)
+		return false
+	}
+}
+
+func serviceNeedsHealthCheckNodePort(service *api.Service) bool {
+	if l, ok := service.Annotations[apiservice.AnnotationExternalTraffic]; ok {
+		if l == apiservice.AnnotationValueExternalTrafficLocal {
+			return true
+		} else if l == apiservice.AnnotationValueExternalTrafficGlobal {
+			return false
+		}
+		glog.Errorf("Invalid value for annotation %v", apiservice.AnnotationExternalTraffic)
+		return false
+	}
+	return false
+}
+
+func shouldCheckOrAssignHealthCheckNodePort(service *api.Service) bool {
+	switch service.Spec.Type {
+	case api.ServiceTypeLoadBalancer:
+		// True if Service-type == LoadBalancer AND annotation AnnotationExternalTraffic present
+		return serviceNeedsHealthCheckNodePort(service)
 	default:
 		glog.Errorf("Unknown service type: %v", service.Spec.Type)
 		return false
