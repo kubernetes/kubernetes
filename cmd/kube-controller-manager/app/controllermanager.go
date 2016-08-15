@@ -417,7 +417,6 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		nil, // classSource
 		nil, // eventRecorder
 		s.VolumeConfiguration.EnableDynamicProvisioning,
-		"", // default storageClass
 	)
 	volumeController.Run()
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))

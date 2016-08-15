@@ -584,7 +584,7 @@ func newVolumeReactor(client *fake.Clientset, ctrl *PersistentVolumeController, 
 	return reactor
 }
 
-func newTestController(kubeClient clientset.Interface, volumeSource, claimSource, classSource cache.ListerWatcher, enableDynamicProvisioning bool, defaultStorageClass string) *PersistentVolumeController {
+func newTestController(kubeClient clientset.Interface, volumeSource, claimSource, classSource cache.ListerWatcher, enableDynamicProvisioning bool) *PersistentVolumeController {
 	if volumeSource == nil {
 		volumeSource = framework.NewFakePVControllerSource()
 	}
@@ -602,7 +602,6 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 		classSource,
 		record.NewFakeRecorder(1000), // event recorder
 		enableDynamicProvisioning,
-		defaultStorageClass,
 	)
 
 	// Speed up the test
@@ -900,13 +899,13 @@ func evaluateTestResults(ctrl *PersistentVolumeController, reactor *volumeReacto
 // 2. Call the tested function (syncClaim/syncVolume) via
 //    controllerTest.testCall *once*.
 // 3. Compare resulting volumes and claims with expected volumes and claims.
-func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*extensions.StorageClass, defaultStorageClass string) {
+func runSyncTests(t *testing.T, tests []controllerTest, storageClasses []*extensions.StorageClass) {
 	for _, test := range tests {
 		glog.V(4).Infof("starting test %q", test.name)
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil, nil, true, defaultStorageClass)
+		ctrl := newTestController(client, nil, nil, nil, true)
 		reactor := newVolumeReactor(client, ctrl, nil, nil, test.errors)
 		for _, claim := range test.initialClaims {
 			ctrl.claims.Add(claim)
@@ -962,7 +961,7 @@ func runMultisyncTests(t *testing.T, tests []controllerTest, storageClasses []*e
 
 		// Initialize the controller
 		client := &fake.Clientset{}
-		ctrl := newTestController(client, nil, nil, nil, true, defaultStorageClass)
+		ctrl := newTestController(client, nil, nil, nil, true)
 
 		// Convert classes to []interface{}  and forcefully inject them into
 		// controller.

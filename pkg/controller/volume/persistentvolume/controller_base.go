@@ -54,7 +54,6 @@ func NewPersistentVolumeController(
 	volumeSource, claimSource, classSource cache.ListerWatcher,
 	eventRecorder record.EventRecorder,
 	enableDynamicProvisioning bool,
-	defaultStorageClass string,
 ) *PersistentVolumeController {
 
 	if eventRecorder == nil {
@@ -74,7 +73,6 @@ func NewPersistentVolumeController(
 		clusterName:                   clusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
-		defaultStorageClass:           defaultStorageClass,
 	}
 
 	controller.volumePluginMgr.InitPlugins(volumePlugins, controller)

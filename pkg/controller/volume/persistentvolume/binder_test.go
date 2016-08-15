@@ -423,7 +423,7 @@ func TestSync(t *testing.T) {
 			noevents, noerrors, testSyncVolume,
 		},
 	}
-	runSyncTests(t, tests, []*extensions.StorageClass{}, "")
+	runSyncTests(t, tests, []*extensions.StorageClass{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
