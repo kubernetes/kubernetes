@@ -17,7 +17,6 @@ limitations under the License.
 package azure
 
 import (
-	"errors"
 	"io"
 	"io/ioutil"
 
@@ -27,10 +26,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/arm/network"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/ghodss/yaml"
-)
-
-var (
-	VolumeNotFound = errors.New("volume not found")
 )
 
 // CloudProviderName is the value used for the --cloud-provider flag

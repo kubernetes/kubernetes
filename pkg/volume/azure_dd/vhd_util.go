@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
 
@@ -44,7 +45,8 @@ func (handler *osIOHandler) WriteFile(filename string, data []byte, perm os.File
 // given a LUN find the VHD device path like /dev/sdb
 // VHD disks under sysfs are like /sys/bus/scsi/devices/3:0:1:0
 // return empty string if no disk is found
-func findDiskByLun(lun int, io ioHandler) string {
+func findDiskByLun(lun int, io ioHandler) (string, error) {
+	var err error
 	sys_path := "/sys/bus/scsi/devices"
 	if dirs, err := io.ReadDir(sys_path); err == nil {
 		for _, f := range dirs {
@@ -55,10 +57,20 @@ func findDiskByLun(lun int, io ioHandler) string {
 				continue
 			}
 			target, err := strconv.Atoi(arr[0])
+			if err != nil {
+				glog.Errorf("failed to parse target from %v (%v), err %v", arr[0], name, err)
+				continue
+			}
+
 			// as observed, targets 0-3 are used by OS disks. Skip them
-			if err == nil && target > 3 {
+			if target > 3 {
 				l, err := strconv.Atoi(arr[3])
-				if err == nil && lun == l {
+				if err != nil {
+					// unknown path format, continue to read the next one
+					glog.Errorf("failed to parse lun from %v (%v), err %v", arr[3], name, err)
+					continue
+				}
+				if lun == l {
 					// find the matching LUN
 					// read vendor and model to ensure it is a VHD disk
 					vendor := path.Join(sys_path, name, "vendor")
@@ -66,21 +78,27 @@ func findDiskByLun(lun int, io ioHandler) string {
 					exe := exec.New()
 					out, err := exe.Command("cat", vendor, model).CombinedOutput()
 					if err != nil {
+						glog.Errorf("failed to cat device vendor and model, err: %v", err)
 						continue
 					}
 					matched, err := regexp.MatchString("^MSFT[ ]{0,}\nVIRTUAL DISK[ ]{0,}\n$", strings.ToUpper(string(out)))
 					if err != nil || !matched {
+						glog.V(4).Infof("doesn't match VHD, output %v, error %v", string(out), err)
 						continue
 					}
 					// find it!
-					if dev, err := io.ReadDir(path.Join(sys_path, name, "block")); err == nil {
-						return "/dev/" + dev[0].Name()
+					dir := path.Join(sys_path, name, "block")
+					dev, err := io.ReadDir(dir)
+					if err != nil {
+						glog.Errorf("failed to read %s", dir)
+					} else {
+						return "/dev/" + dev[0].Name(), nil
 					}
 				}
 			}
 		}
 	}
-	return ""
+	return "", err
 }
 
 // rescan scsi bus

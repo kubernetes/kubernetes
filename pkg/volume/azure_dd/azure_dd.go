@@ -280,7 +280,9 @@ func (c *azureDiskUnmounter) TearDownAt(dir string) error {
 		glog.V(2).Info("Not mountpoint, deleting")
 		return os.Remove(dir)
 	}
-
+	// lock the volume (and thus wait for any concurrrent SetUpAt to finish)
+	c.plugin.volumeLocks.LockKey(c.diskName)
+	defer c.plugin.volumeLocks.UnlockKey(c.diskName)
 	refs, err := mount.GetMountRefs(c.mounter, dir)
 	if err != nil {
 		glog.Errorf("Error getting mountrefs for %s: %v", dir, err)
@@ -293,15 +295,6 @@ func (c *azureDiskUnmounter) TearDownAt(dir string) error {
 	c.diskName = path.Base(refs[0])
 	glog.V(4).Infof("Found volume %s mounted to %s", c.diskName, dir)
 
-	// lock the volume (and thus wait for any concurrrent SetUpAt to finish)
-	c.plugin.volumeLocks.LockKey(c.diskName)
-	defer c.plugin.volumeLocks.UnlockKey(c.diskName)
-	// Reload list of references, there might be SetUpAt finished in the meantime
-	refs, err = mount.GetMountRefs(c.mounter, dir)
-	if err != nil {
-		glog.Errorf("GetMountRefs failed: %v", err)
-		return err
-	}
 	// Unmount the bind-mount inside this pod
 	if err := c.mounter.Unmount(dir); err != nil {
 		glog.Errorf("Error unmounting dir %s %v", dir, err)
@@ -322,14 +315,11 @@ func (c *azureDiskUnmounter) TearDownAt(dir string) error {
 }
 
 func getVolumeSource(spec *volume.Spec) (*api.AzureDiskVolumeSource, error) {
-	var azure *api.AzureDiskVolumeSource
 	if spec.Volume != nil && spec.Volume.AzureDisk != nil {
-		azure = spec.Volume.AzureDisk
-		return azure, nil
+		return spec.Volume.AzureDisk, nil
 	}
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.AzureDisk != nil {
-		azure = spec.PersistentVolume.Spec.AzureDisk
-		return azure, nil
+		return spec.PersistentVolume.Spec.AzureDisk, nil
 	}
 
 	return nil, fmt.Errorf("Spec does not reference an Azure disk volume type")

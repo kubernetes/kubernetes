@@ -116,13 +116,13 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, lunStr strin
 		return "", err
 	}
 
-	if lunStr == "" {
+	if len(lunStr) == 0 {
 		return "", fmt.Errorf("WaitForAttach failed for Azure disk %q: lun is empty.", volumeSource.DiskName)
 	}
 
 	lun, err := strconv.Atoi(lunStr)
 	if err != nil {
-		return "", fmt.Errorf("WaitForAttach: wrong lun %q", lunStr)
+		return "", fmt.Errorf("WaitForAttach: wrong lun %q, err: %v", lunStr, err)
 	}
 	scsiHostRescan(&osIOHandler{})
 	ticker := time.NewTicker(checkSleepDuration)
@@ -134,8 +134,7 @@ func (attacher *azureDiskAttacher) WaitForAttach(spec *volume.Spec, lunStr strin
 		select {
 		case <-ticker.C:
 			glog.V(4).Infof("Checking Azure disk %q(lun %s) is attached.", volumeSource.DiskName, lunStr)
-			devicePath := findDiskByLun(lun, &osIOHandler{})
-			if devicePath != "" {
+			if devicePath, err := findDiskByLun(lun, &osIOHandler{}); err == nil {
 				glog.V(4).Infof("Successfully found attached Azure disk %q(lun %s, device path %s).", volumeSource.DiskName, lunStr, devicePath)
 				return devicePath, nil
 			} else {
@@ -210,13 +209,14 @@ func (plugin *azureDataDiskPlugin) NewDetacher() (volume.Detacher, error) {
 	}, nil
 }
 
-func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
-	if dev == "" {
-		return fmt.Errorf("invalid dev to detach: %q", dev)
+func (detacher *azureDiskDetacher) Detach(diskName string, hostName string) error {
+	if diskName == "" {
+		return fmt.Errorf("invalid disk to detach: %q", diskName)
 	}
 	instanceid, err := detacher.azureProvider.InstanceID(hostName)
 	if err != nil {
-		return fmt.Errorf("failed to get azure instance id for host %q", hostName)
+		glog.V(2).Infof("no instance id for host %q, skip detaching", hostName)
+		return nil
 	}
 	if ind := strings.LastIndex(instanceid, "/"); ind >= 0 {
 		instanceid = instanceid[(ind + 1):]
@@ -224,10 +224,10 @@ func (detacher *azureDiskDetacher) Detach(dev string, hostName string) error {
 	attachDetachMutex.LockKey(instanceid)
 	defer attachDetachMutex.UnlockKey(instanceid)
 
-	glog.V(4).Infof("detach %v from host %q", dev, instanceid)
-	err = detacher.azureProvider.DetachDiskByName(dev, "", instanceid)
+	glog.V(4).Infof("detach %v from host %q", diskName, instanceid)
+	err = detacher.azureProvider.DetachDiskByName(diskName, "" /* diskURI */, instanceid)
 	if err != nil {
-		glog.V(2).Infof("failed to detach azure disk %q, err %v", dev, err)
+		glog.Errorf("failed to detach azure disk %q, err %v", diskName, err)
 	}
 
 	return err
@@ -257,7 +257,7 @@ func (detacher *azureDiskDetacher) WaitForDetach(devicePath string, timeout time
 func (detacher *azureDiskDetacher) UnmountDevice(deviceMountPath string) error {
 	volume := path.Base(deviceMountPath)
 	if err := unmountPDAndRemoveGlobalPath(deviceMountPath, detacher.mounter); err != nil {
-		glog.V(4).Infof("Error unmounting %q: %v", volume, err)
+		glog.Errorf("Error unmounting %q: %v", volume, err)
 	}
 
 	return nil
@@ -278,12 +278,14 @@ func pathExists(path string) (bool, error) {
 // Unmount the global mount path, which should be the only one, and delete it.
 func unmountPDAndRemoveGlobalPath(globalMountPath string, mounter mount.Interface) error {
 	if pathExists, pathErr := pathExists(globalMountPath); pathErr != nil {
-		return fmt.Errorf("Error checking if path exists: %v", pathErr)
+		return pathErr
 	} else if !pathExists {
 		glog.V(4).Infof("Unmount skipped because path does not exist: %v", globalMountPath)
 		return nil
 	}
 	err := mounter.Unmount(globalMountPath)
-	os.Remove(globalMountPath)
+	if err == nil {
+		os.Remove(globalMountPath)
+	}
 	return err
 }

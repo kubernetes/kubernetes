@@ -17,6 +17,8 @@ limitations under the License.
 package azure
 
 import (
+	"fmt"
+
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/cloudprovider"
@@ -55,9 +57,8 @@ func (az *Cloud) AttachDisk(diskName, diskUri, vmName string, lun int32, caching
 			},
 		},
 	}
-	res, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName,
-		newVM, nil)
-	glog.V(4).Infof("azure attach result:%#v, err: %v", res, err)
+	_, err = az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
+	glog.V(4).Infof("azure attach, err: %v", err)
 	return err
 }
 
@@ -74,7 +75,7 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 	for i, disk := range disks {
 		if (disk.Name != nil && diskName != "" && *disk.Name == diskName) || (disk.Vhd.URI != nil && diskUri != "" && *disk.Vhd.URI == diskUri) {
 			// found the disk
-			glog.V(4).Infof("detach disk: lun %d name %q uri %q", *disk.Lun, diskName, diskUri)
+			glog.V(4).Infof("detach disk: name %q uri %q", diskName, diskUri)
 			disks = append(disks[:i], disks[i+1:]...)
 			break
 		}
@@ -87,9 +88,8 @@ func (az *Cloud) DetachDiskByName(diskName, diskUri, vmName string) error {
 			},
 		},
 	}
-	res, err := az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName,
-		newVM, nil)
-	glog.V(4).Infof("azure detach result:%#v, err: %v", res, err)
+	_, err = az.VirtualMachinesClient.CreateOrUpdate(az.ResourceGroup, vmName, newVM, nil)
+	glog.V(4).Infof("azure detach, err: %v", err)
 	return err
 }
 
@@ -111,7 +111,7 @@ func (az *Cloud) GetDiskLun(diskName, diskUri, vmName string) (int32, error) {
 			}
 		}
 	}
-	return -1, VolumeNotFound
+	return -1, fmt.Errorf("Cannot find Lun for disk %s", diskName)
 }
 
 // search all vhd attachment on the host and find unused lun
@@ -135,5 +135,5 @@ func (az *Cloud) GetNextDiskLun(vmName string) (int32, error) {
 			return int32(k), nil
 		}
 	}
-	return -1, VolumeNotFound
+	return -1, fmt.Errorf("All Luns are used")
 }
