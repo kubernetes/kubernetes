@@ -98,7 +98,7 @@ func (e *E2EServices) Stop() error {
 		if manifestPath != "" {
 			err := os.RemoveAll(manifestPath)
 			if err != nil {
-				glog.Errorf("Failed to delete static pod manifest directory %s.\n%v", manifestPath, err)
+				glog.Errorf("Failed to delete static pod manifest directory %s: %v", manifestPath, err)
 			}
 		}
 	}()
@@ -119,7 +119,6 @@ func RunE2EServices() {
 
 // Ports of different e2e services.
 const (
-	etcdPort            = "4001"
 	apiserverPort       = "8080"
 	kubeletPort         = "10250"
 	kubeletReadOnlyPort = "10255"
@@ -127,7 +126,6 @@ const (
 
 // Health check urls of different e2e services.
 var (
-	etcdHealthCheckURL      = getEndpoint(etcdPort) + "/v2/keys/" // Trailing slash is required,
 	apiserverHealthCheckURL = getEndpoint(apiserverPort) + "/healthz"
 	kubeletHealthCheckURL   = getEndpoint(kubeletReadOnlyPort) + "/healthz"
 )
@@ -139,7 +137,7 @@ func getEndpoint(port string) string {
 
 func getHealthCheckURLs() []string {
 	return []string{
-		etcdHealthCheckURL,
+		getEtcdHealthCheckURL(),
 		apiserverHealthCheckURL,
 		kubeletHealthCheckURL,
 	}
@@ -150,6 +148,9 @@ type e2eService struct {
 	services []*server
 	rmDirs   []string
 	logFiles map[string]logFileData
+
+	// All statically linked e2e services
+	etcdServer *EtcdServer
 }
 
 type logFileData struct {
@@ -201,13 +202,12 @@ func (es *e2eService) start() error {
 		return err
 	}
 
-	s, err := es.startEtcd()
+	err := es.startEtcd()
 	if err != nil {
 		return err
 	}
-	es.services = append(es.services, s)
 
-	s, err = es.startApiServer()
+	s, err := es.startApiServer()
 	if err != nil {
 		return err
 	}
@@ -284,6 +284,10 @@ func (es *e2eService) stop() {
 			glog.Errorf("Failed to stop %v: %v", s.name, err)
 		}
 	}
+	// TODO(random-liu): Use a loop to stop all services after introducing service interface.
+	if err := es.etcdServer.Stop(); err != nil {
+		glog.Errorf("Failed to stop %q: %v", es.etcdServer.Name(), err)
+	}
 	for _, d := range es.rmDirs {
 		err := os.RemoveAll(d)
 		if err != nil {
@@ -292,45 +296,20 @@ func (es *e2eService) stop() {
 	}
 }
 
-func (es *e2eService) startEtcd() (*server, error) {
+func (es *e2eService) startEtcd() error {
 	dataDir, err := ioutil.TempDir("", "node-e2e")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Mark the dataDir as directories to remove.
 	es.rmDirs = append(es.rmDirs, dataDir)
-	var etcdPath string
-	// CoreOS ships a binary named 'etcd' which is really old, so prefer 'etcd2' if it exists
-	etcdPath, err = exec.LookPath("etcd2")
-	if err != nil {
-		etcdPath, err = exec.LookPath("etcd")
-	}
-	if err != nil {
-		glog.Infof("etcd not found in PATH. Defaulting to %s...", defaultEtcdPath)
-		_, err = os.Stat(defaultEtcdPath)
-		if err != nil {
-			return nil, fmt.Errorf("etcd binary not found")
-		}
-		etcdPath = defaultEtcdPath
-	}
-	cmd := exec.Command(etcdPath,
-		"--listen-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001",
-		"--advertise-client-urls=http://0.0.0.0:2379,http://0.0.0.0:4001")
-	// Execute etcd in the data directory instead of using --data-dir because the flag sometimes requires additional
-	// configuration (e.g. --name in version 0.4.9)
-	cmd.Dir = dataDir
-	server := newServer(
-		"etcd",
-		cmd,
-		nil,
-		[]string{etcdHealthCheckURL},
-		"etcd.log")
-	return server, server.start()
+	es.etcdServer = NewEtcd(dataDir)
+	return es.etcdServer.Start()
 }
 
 func (es *e2eService) startApiServer() (*server, error) {
 	cmd := exec.Command("sudo", getApiServerBin(),
-		"--etcd-servers", getEndpoint(etcdPort),
+		"--etcd-servers", getEtcdClientURL(),
 		"--insecure-bind-address", "0.0.0.0",
 		"--service-cluster-ip-range", "10.0.0.1/24",
 		"--kubelet-port", kubeletPort,
