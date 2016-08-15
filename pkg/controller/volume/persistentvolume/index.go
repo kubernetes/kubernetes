@@ -18,11 +18,12 @@ package persistentvolume
 
 import (
 	"fmt"
+	"sort"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
-	"sort"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
@@ -71,7 +72,7 @@ func (pvIndex *persistentVolumeOrderedIndex) listByAccessModes(modes []api.Persi
 type matchPredicate func(compareThis, toThis *api.PersistentVolume) bool
 
 // find returns the nearest PV from the ordered list or nil if a match is not found
-func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVolumeClaim, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
+func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVolumeClaim, claimClass string, matchPredicate matchPredicate) (*api.PersistentVolume, error) {
 	// PVs are indexed by their access modes to allow easier searching.  Each
 	// index is the string representation of a set of access modes. There is a
 	// finite number of possible sets and PVs will only be indexed in one of
@@ -131,8 +132,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 			} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 				continue
 			}
-			claimClass := getClaimClass(claim)
-			if claimClass != "" && claimClass != getVolumeClass(volume) {
+			if claimClass != getVolumeClass(volume) {
 				continue
 			}
 
@@ -154,9 +154,11 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 	return nil, nil
 }
 
-// findBestMatchForClaim is a convenience method that finds a volume by the claim's AccessModes and requests for Storage
-func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *api.PersistentVolumeClaim) (*api.PersistentVolume, error) {
-	return pvIndex.findByClaim(claim, matchStorageCapacity)
+// findBestMatchForClaim is a convenience method that finds a volume by the
+// claim's AccessModes and requests for Storage. Claim's class is explicitly
+// provided as an argument as it may be modified by defaulting.
+func (pvIndex *persistentVolumeOrderedIndex) findBestMatchForClaim(claim *api.PersistentVolumeClaim, claimClass string) (*api.PersistentVolume, error) {
+	return pvIndex.findByClaim(claim, claimClass, matchStorageCapacity)
 }
 
 // matchStorageCapacity is a matchPredicate used to sort and find volumes

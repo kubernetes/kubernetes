@@ -218,7 +218,11 @@ func TestMatchVolume(t *testing.T) {
 	}
 
 	for name, scenario := range scenarios {
-		volume, err := volList.findBestMatchForClaim(scenario.claim)
+		claimClass, ok := scenario.claim.Annotations[annClass]
+		if !ok {
+			claimClass = ""
+		}
+		volume, err := volList.findBestMatchForClaim(scenario.claim, claimClass)
 		if err != nil {
 			t.Errorf("Unexpected error matching volume by claim: %v", err)
 		}
@@ -289,7 +293,7 @@ func TestMatchingWithBoundVolumes(t *testing.T) {
 		},
 	}
 
-	volume, err := volumeIndex.findBestMatchForClaim(claim)
+	volume, err := volumeIndex.findBestMatchForClaim(claim, "")
 	if err != nil {
 		t.Fatalf("Unexpected error matching volume by claim: %v", err)
 	}
@@ -412,27 +416,27 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	index.store.Add(ebs)
 	index.store.Add(nfs)
 
-	volume, _ := index.findBestMatchForClaim(claim)
+	volume, _ := index.findBestMatchForClaim(claim, "")
 	if volume.Name != ebs.Name {
 		t.Errorf("Expected %s but got volume %s instead", ebs.Name, volume.Name)
 	}
 
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce, api.ReadOnlyMany}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, "")
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
 
 	// order of the requested modes should not matter
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteMany, api.ReadWriteOnce, api.ReadOnlyMany}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, "")
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
 
 	// fewer modes requested should still match
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteMany}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, "")
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
@@ -440,7 +444,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// pretend the exact match is bound.  should get the next level up of modes.
 	ebs.Spec.ClaimRef = &api.ObjectReference{}
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, "")
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
@@ -448,7 +452,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// continue up the levels of modes.
 	gce.Spec.ClaimRef = &api.ObjectReference{}
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, "")
 	if volume.Name != nfs.Name {
 		t.Errorf("Expected %s but got volume %s instead", nfs.Name, volume.Name)
 	}
@@ -456,7 +460,7 @@ func TestFindingVolumeWithDifferentAccessModes(t *testing.T) {
 	// partial mode request
 	gce.Spec.ClaimRef = nil
 	claim.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadOnlyMany}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, "")
 	if volume.Name != gce.Name {
 		t.Errorf("Expected %s but got volume %s instead", gce.Name, volume.Name)
 	}
@@ -725,14 +729,14 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	index.store.Add(pv8)
 
 	// expected exact match on size
-	volume, _ := index.findBestMatchForClaim(claim)
+	volume, _ := index.findBestMatchForClaim(claim, "")
 	if volume.Name != pv1.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
 	}
 
 	// pretend the exact match is pre-bound.  should get the next size up.
 	pv1.Spec.ClaimRef = &api.ObjectReference{Name: "foo", Namespace: "bar"}
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, "")
 	if volume.Name != pv5.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv5.Name, volume.Name)
 	}
