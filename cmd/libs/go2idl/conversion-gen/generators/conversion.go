@@ -280,8 +280,7 @@ func Packages(context *generator.Context, arguments *args.GeneratorArgs) generat
 			}
 		}
 		if !pkgNeedsGeneration {
-			glog.V(5).Infof("  no viable conversions, not generating for this package")
-			continue
+			glog.Errorf("Package %v has 'k8s:conversion-gen' tags but no viable conversions", i)
 		}
 
 		packages = append(packages,
