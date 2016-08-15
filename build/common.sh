@@ -43,6 +43,15 @@ readonly KUBE_GCS_DOCKER_REG_PREFIX=${KUBE_GCS_DOCKER_REG_PREFIX-docker-reg}/
 readonly KUBE_GCS_PUBLISH_VERSION=${KUBE_GCS_PUBLISH_VERSION:-}
 readonly KUBE_GCS_DELETE_EXISTING="${KUBE_GCS_DELETE_EXISTING:-n}"
 
+# Set KUBE_BUILD_PPC64LE to y to build for ppc64le in addition to other
+# platforms.
+# TODO(IBM): remove KUBE_BUILD_PPC64LE and reenable ppc64le compilation by
+# default when
+# https://github.com/kubernetes/kubernetes/issues/30384 and
+# https://github.com/kubernetes/kubernetes/issues/25886 are fixed.
+# The majority of the logic is in hack/lib/golang.sh.
+readonly KUBE_BUILD_PPC64LE="${KUBE_BUILD_PPC64LE:-n}"
+
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
 readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat build/build-image/cross/VERSION)"
@@ -602,6 +611,7 @@ function kube::build::run_build_command() {
   docker_run_opts+=(
     --env "KUBE_FASTBUILD=${KUBE_FASTBUILD:-false}"
     --env "KUBE_BUILDER_OS=${OSTYPE:-notdetected}"
+    --env "KUBE_BUILD_PPC64LE=${KUBE_BUILD_PPC64LE}"  # TODO(IBM): remove
   )
 
   # If we have stdin we can run interactive.  This allows things like 'shell.sh'
@@ -698,12 +708,8 @@ function kube::release::package_hyperkube() {
   # If we have these variables set then we want to build all docker images.
   if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" ]]; then
     for arch in "${KUBE_SERVER_PLATFORMS[@]##*/}"; do
-
-      # TODO(IBM): Enable hyperkube builds for ppc64le again
-      if [[ ${arch} != "ppc64le" ]]; then
-        kube::log::status "Building hyperkube image for arch: ${arch}"
-        REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
-      fi
+      kube::log::status "Building hyperkube image for arch: ${arch}"
+      REGISTRY="${KUBE_DOCKER_REGISTRY}" VERSION="${KUBE_DOCKER_IMAGE_TAG}" ARCH="${arch}" make -C cluster/images/hyperkube/ build
     done
   fi
 }
