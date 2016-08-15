@@ -34,7 +34,7 @@ The following instructions show you how to set up a simple, single node Kubernet
 
 Here's a diagram of what the final result will look like:
 
-![Kubernetes Single Node on Docker](../../getting-started-guides/k8s-singlenode-docker.png)
+![Kubernetes Single Node on Docker](k8s-singlenode-docker.png)
 
 ## Prerequisites
 

@@ -253,7 +253,7 @@ var aRC string = `
 
 func TestPathBuilderAndVersionedObjectNotDefaulted(t *testing.T) {
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClient(), testapi.Default.Codec()).
-		FilenameParam(false, false, "../../../docs/user-guide/update-demo/kitten-rc.yaml")
+		FilenameParam(false, false, "../../../test/fixtures/pkg/kubectl/builder/kitten-rc.yaml")
 
 	test := &testVisitor{}
 	singular := false
