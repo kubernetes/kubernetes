@@ -37,16 +37,6 @@ const (
 	pollInterval           = time.Second * 1
 )
 
-type testStatus struct {
-	Name             string
-	RestartPolicy    api.RestartPolicy
-	Phase            api.PodPhase
-	State            ContainerState
-	RestartCountOper string
-	RestartCount     int32
-	Ready            bool
-}
-
 var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 	f := framework.NewDefaultFramework("runtime-conformance")
 	var cl *client.Client
