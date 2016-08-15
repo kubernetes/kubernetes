@@ -174,6 +174,16 @@ func TestMatchImageTagOrSHA(t *testing.T) {
 			Output:    false,
 		},
 		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"colemickens/hyperkube-amd64:217.9beff63"}},
+			Image:     "colemickens/hyperkube-amd64:217.9beff63",
+			Output:    true,
+		},
+		{
+			Inspected: dockertypes.ImageInspect{RepoTags: []string{"colemickens/hyperkube-amd64:217.9beff63"}},
+			Image:     "docker.io/colemickens/hyperkube-amd64:217.9beff63",
+			Output:    true,
+		},
+		{
 			Inspected: dockertypes.ImageInspect{
 				ID: "sha256:2208f7a29005d226d1ee33a63e33af1f47af6156c740d7d23c7948e8d282d53d",
 			},
