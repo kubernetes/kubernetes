@@ -1714,7 +1714,7 @@ type ClientConfigGetter func() (*restclient.Config, error)
 func LoadConfig() (*restclient.Config, error) {
 	if TestContext.NodeName != "" {
 		// This is a node e2e test, apply the node e2e configuration
-		return &restclient.Config{Host: TestContext.Host}, nil
+		return &restclient.Config{Hosts: []string{TestContext.Host}}, nil
 	}
 	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {

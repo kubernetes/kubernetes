@@ -129,7 +129,7 @@ func rmSetup(t *testing.T, enableGarbageCollector bool) (*httptest.Server, *repl
 	masterConfig.EnableCoreControllers = false
 	_, s := framework.RunAMaster(masterConfig)
 
-	config := restclient.Config{Host: s.URL}
+	config := restclient.Config{Hosts: []string{s.URL}}
 	clientSet, err := clientset.NewForConfig(&config)
 	if err != nil {
 		t.Fatalf("Error in create clientset: %v", err)

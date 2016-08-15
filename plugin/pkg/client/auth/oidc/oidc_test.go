@@ -144,7 +144,7 @@ func TestNewOIDCAuthProvider(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		ap, err := newOIDCAuthProvider("cluster.example.com", tt.cfg, nil)
+		ap, err := newOIDCAuthProvider([]string{"cluster.example.com"}, tt.cfg, nil)
 		if tt.wantErr {
 			if err == nil {
 				t.Errorf("case %d: want non-nil err", i)

@@ -538,7 +538,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		serializers.RenegotiatedDecoder = negotiator.invoke
 		contentConfig := defaultContentConfig()
 		contentConfig.ContentType = test.ContentType
-		r := NewRequest(nil, "", uri, "", contentConfig, serializers, nil, nil)
+		r := NewRequest(nil, "", NewRoundRobinProvider(uri), "", contentConfig, serializers, nil, nil)
 		if test.Response.Body == nil {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
