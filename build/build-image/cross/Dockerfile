@@ -62,7 +62,7 @@ RUN echo "deb http://emdebian.org/tools/debian/ jessie main" > /etc/apt/sources.
 # work around 64MB tmpfs size in Docker 1.6
 ENV TMPDIR /tmp.k8s
 
-# Get the code coverage tool, godep, and go-bindata
+# Get the code coverage tool, govendor, and go-bindata
 RUN mkdir $TMPDIR \
   && chmod a+rwx $TMPDIR \
   && chmod o+t $TMPDIR \

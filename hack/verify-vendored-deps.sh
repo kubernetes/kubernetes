@@ -30,24 +30,8 @@ if ! [[ ${KUBE_FORCE_VERIFY_CHECKS:-} =~ ^[yY]$ ]] && \
   exit 0
 fi
 
-# Create a nice clean place to put our new vendored deps
-_tmpdir="$(mktemp -d -t gopath.XXXXXX)"
-function cleanup {
-  echo "Removing ${_tmpdir}"
-  rm -rf "${_tmpdir}"
-}
-trap cleanup EXIT
-
-# Copy the contents of the kube directory into the nice clean place
-_kubetmp="${_tmpdir}/src/k8s.io"
-mkdir -p "${_kubetmp}"
-# should create ${_kubectmp}/kubernetes
-git archive --format=tar --prefix=kubernetes/ $(git write-tree) | (cd "${_kubetmp}" && tar xf -)
-_kubetmp="${_kubetmp}/kubernetes"
-
-# Do all our work in the new GOPATH
-export GOPATH="${_tmpdir}"
-cd "${_kubetmp}"
+(
+cd "${KUBE_ROOT}"
 
 # Build the govendor tool
 go get -u github.com/kardianos/govendor 2>/dev/null
@@ -59,12 +43,14 @@ echo "Starting to sync all kubernetes vendored deps. This takes a while"
 echo "Sync finished"
 
 # Test for diffs
-if ! _out="$(diff -Naupr ${KUBE_ROOT}/vendor ${_kubetmp}/vendor)"; then
+diffs="$(git status --porcelain -- vendor 2>/dev/null)"
+if [ "$diffs" ]; then
   echo "Your vendor/ dir is different:"
-  echo "${_out}"
+  echo "${diffs}"
   echo "Vendored deps verify failed."
   exit 1
 fi
 
 echo "Vendored deps verified."
+)
 # ex: ts=2 sw=2 et filetype=sh
