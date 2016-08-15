@@ -210,17 +210,19 @@ func (e *EndpointController) addPod(obj interface{}) {
 // and what services it will be a member of, and enqueue the union of these.
 // old and cur must be *api.Pod types.
 func (e *EndpointController) updatePod(old, cur interface{}) {
-	if api.Semantic.DeepEqual(old, cur) {
+	newPod := cur.(*api.Pod)
+	oldPod := old.(*api.Pod)
+	if newPod.ResourceVersion == oldPod.ResourceVersion {
+		// Periodic resync will send update events for all known pods.
+		// Two different versions of the same pod will always have different RVs.
 		return
 	}
-	newPod := old.(*api.Pod)
 	services, err := e.getPodServiceMemberships(newPod)
 	if err != nil {
 		glog.Errorf("Unable to get pod %v/%v's service memberships: %v", newPod.Namespace, newPod.Name, err)
 		return
 	}
 
-	oldPod := cur.(*api.Pod)
 	// Only need to get the old services if the labels changed.
 	if !reflect.DeepEqual(newPod.Labels, oldPod.Labels) ||
 		!hostNameAndDomainAreEqual(newPod, oldPod) {
@@ -485,7 +487,9 @@ func (e *EndpointController) syncService(key string) {
 	} else {
 		newEndpoints.Annotations[endpoints.PodHostnamesAnnotation] = serializedPodHostNames
 	}
-	if len(currentEndpoints.ResourceVersion) == 0 {
+
+	createEndpoints := len(currentEndpoints.ResourceVersion) == 0
+	if createEndpoints {
 		// No previous endpoints, create them
 		_, err = e.client.Endpoints(service.Namespace).Create(newEndpoints)
 	} else {
@@ -493,7 +497,15 @@ func (e *EndpointController) syncService(key string) {
 		_, err = e.client.Endpoints(service.Namespace).Update(newEndpoints)
 	}
 	if err != nil {
-		glog.Errorf("Error updating endpoints: %v", err)
+		if createEndpoints && errors.IsForbidden(err) {
+			// A request is forbidden primarily for two reasons:
+			// 1. namespace is terminating, endpoint creation is not allowed by default.
+			// 2. policy is misconfigured, in which case no service would function anywhere.
+			// Given the frequency of 1, we log at a lower level.
+			glog.V(5).Infof("Forbidden from creating endpoints: %v", err)
+		} else {
+			utilruntime.HandleError(err)
+		}
 		e.queue.Add(key) // Retry
 	}
 }

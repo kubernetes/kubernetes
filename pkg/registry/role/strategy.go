@@ -58,12 +58,12 @@ func (strategy) AllowCreateOnUpdate() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users
 // on creation.
-func (strategy) PrepareForCreate(obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	_ = obj.(*rbac.Role)
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (strategy) PrepareForUpdate(obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newRole := obj.(*rbac.Role)
 	oldRole := old.(*rbac.Role)
 
@@ -97,7 +97,7 @@ func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (s strategy) Export(obj runtime.Object, exact bool) error {
+func (s strategy) Export(ctx api.Context, obj runtime.Object, exact bool) error {
 	return nil
 }
 

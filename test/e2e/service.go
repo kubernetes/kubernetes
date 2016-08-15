@@ -1402,7 +1402,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 }
 
 func stopServeHostnameService(c *client.Client, ns, name string) error {
-	if err := framework.DeleteRC(c, ns, name); err != nil {
+	if err := framework.DeleteRCAndPods(c, ns, name); err != nil {
 		return err
 	}
 	if err := c.Services(ns).Delete(name); err != nil {

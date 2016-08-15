@@ -91,8 +91,7 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 		}
 	}
 
-	glog.Infof("Using %s for kubernetes master", config.Host)
-	glog.Infof("Using kubernetes API %v", config.GroupVersion)
+	glog.Infof("Using %s for kubernetes master, kubernetes API: %v", config.Host, config.GroupVersion)
 	return clientset.NewForConfig(config)
 }
 
@@ -142,8 +141,8 @@ func (d *KubeDNSServer) startSkyDNSServer() {
 	s := server.New(d.kd, skydnsConfig)
 	if err := metrics.Metrics(); err != nil {
 		glog.Fatalf("skydns: %s", err)
-	} else {
-		glog.Infof("skydns: metrics enabled on :%s%s", metrics.Port, metrics.Path)
 	}
+	glog.Infof("skydns: metrics enabled on : %s:%s", metrics.Path, metrics.Port)
+
 	go s.Run()
 }

@@ -56,7 +56,7 @@ func TestStatusUpdates(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		deploymentStatusStrategy{}.PrepareForUpdate(test.obj, test.old)
+		deploymentStatusStrategy{}.PrepareForUpdate(api.NewContext(), test.obj, test.old)
 		if !reflect.DeepEqual(test.expected, test.obj) {
 			t.Errorf("Unexpected object mismatch! Expected:\n%#v\ngot:\n%#v", test.expected, test.obj)
 		}

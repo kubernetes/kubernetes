@@ -16736,7 +16736,7 @@
      },
      "phase": {
       "type": "string",
-      "description": "NodePhase is the recently observed lifecycle phase of the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase"
+      "description": "NodePhase is the recently observed lifecycle phase of the node. More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase The field is never populated, and now is deprecated."
      },
      "conditions": {
       "type": "array",

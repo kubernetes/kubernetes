@@ -19,7 +19,7 @@ package rktshim
 import (
 	"errors"
 
-	"k8s.io/kubernetes/pkg/kubelet/container"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 // TODO(tmrts): Move these errors to the container API for code re-use.
@@ -27,7 +27,7 @@ var (
 	ErrImageNotFound = errors.New("rktshim: image not found")
 )
 
-var _ container.ImageService = (*ImageStore)(nil)
+// var _ kubeletApi.ImageManagerService = (*ImageStore)(nil)
 
 // ImageStore supports CRUD operations for images.
 type ImageStore struct{}
@@ -36,26 +36,26 @@ type ImageStore struct{}
 type ImageStoreConfig struct{}
 
 // NewImageStore creates an image storage that allows CRUD operations for images.
-func NewImageStore(ImageStoreConfig) (container.ImageService, error) {
+func NewImageStore(ImageStoreConfig) (*ImageStore, error) {
 	return &ImageStore{}, nil
 }
 
 // List lists the images residing in the image store.
-func (*ImageStore) List() ([]container.Image, error) {
+func (*ImageStore) List() ([]runtimeApi.Image, error) {
 	panic("not implemented")
 }
 
 // Pull pulls an image into the image store and uses the given authentication method.
-func (*ImageStore) Pull(container.ImageSpec, container.AuthConfig, *container.PodSandboxConfig) error {
+func (*ImageStore) Pull(runtimeApi.ImageSpec, runtimeApi.AuthConfig, *runtimeApi.PodSandboxConfig) error {
 	panic("not implemented")
 }
 
 // Remove removes the image from the image store.
-func (*ImageStore) Remove(container.ImageSpec) error {
+func (*ImageStore) Remove(runtimeApi.ImageSpec) error {
 	panic("not implemented")
 }
 
 // Status returns the status of the image.
-func (*ImageStore) Status(container.ImageSpec) (container.Image, error) {
+func (*ImageStore) Status(runtimeApi.ImageSpec) (runtimeApi.Image, error) {
 	panic("not implemented")
 }

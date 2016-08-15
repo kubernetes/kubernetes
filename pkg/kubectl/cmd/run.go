@@ -24,6 +24,9 @@ import (
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/distribution/reference"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -135,6 +138,13 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 		return cmdutil.UsageError(cmd, "NAME is required for run")
 	}
 
+	// validate image name
+	imageName := cmdutil.GetFlagString(cmd, "image")
+	validImageRef := reference.ReferenceRegexp.MatchString(imageName)
+	if !validImageRef {
+		return fmt.Errorf("Invalid image name %q: %v", imageName, reference.ErrReferenceInvalidFormat)
+	}
+
 	interactive := cmdutil.GetFlagBool(cmd, "stdin")
 	tty := cmdutil.GetFlagBool(cmd, "tty")
 	if tty && !interactive {
@@ -240,6 +250,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 				Err:   cmdErr,
 				Stdin: interactive,
 				TTY:   tty,
+				Quiet: quiet,
 			},
 
 			CommandName: cmd.Parent().CommandPath() + " attach",
@@ -284,7 +295,7 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 				ResourceNames(mapping.Resource, name).
 				Flatten().
 				Do()
-			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper)
+			return ReapResult(r, f, cmdOut, true, true, 0, -1, false, mapper, quiet)
 		}
 		return nil
 	}

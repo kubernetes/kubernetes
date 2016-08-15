@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
+var _ = framework.KubeDescribe("Kubelet Cgroup Manager [Skip]", func() {
 	f := framework.NewDefaultFramework("kubelet-cgroup-manager")
 	Describe("QOS containers", func() {
 		Context("On enabling QOS cgroup hierarchy", func() {

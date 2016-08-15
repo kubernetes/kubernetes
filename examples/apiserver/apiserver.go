@@ -78,13 +78,13 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 		return fmt.Errorf("%v", err)
 	}
 	storageFactory := newStorageFactory()
-	storage, err := storageFactory.New(unversioned.GroupResource{Group: groupName, Resource: "testtype"})
+	storageConfig, err := storageFactory.NewConfig(unversioned.GroupResource{Group: groupName, Resource: "testtype"})
 	if err != nil {
-		return fmt.Errorf("Unable to get storage: %v", err)
+		return fmt.Errorf("Unable to get storage config: %v", err)
 	}
 
 	restStorageMap := map[string]rest.Storage{
-		"testtypes": testgroupetcd.NewREST(storage, s.StorageDecorator()),
+		"testtypes": testgroupetcd.NewREST(storageConfig, s.StorageDecorator()),
 	}
 	apiGroupInfo := genericapiserver.APIGroupInfo{
 		GroupMeta: *groupMeta,

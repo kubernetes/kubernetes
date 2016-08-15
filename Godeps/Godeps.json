@@ -1796,6 +1796,11 @@
 			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
 		},
 		{
+			"ImportPath": "github.com/rackspace/gophercloud/openstack/common/extensions",
+			"Comment": "v1.0.0-920-g934dbf8",
+			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+		},
+		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/compute/v2/extensions/bootfromvolume",
 			"Comment": "v1.0.0-920-g934dbf8",
 			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
@@ -1837,6 +1842,11 @@
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/identity/v3/tokens",
+			"Comment": "v1.0.0-920-g934dbf8",
+			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
+		},
+		{
+			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions",
 			"Comment": "v1.0.0-920-g934dbf8",
 			"Rev": "934dbf81977c67c521c75492dc1f55ca74dc5b04"
 		},
@@ -2112,6 +2122,11 @@
 			"ImportPath": "github.com/vmware/govmomi/vim25/xml",
 			"Comment": "v0.8.0-9-gb5ee639",
 			"Rev": "b5ee639d7aa4b8dbb48ab4f75dddc19f71b5c514"
+		},
+		{
+			"ImportPath": "github.com/xanzy/go-cloudstack/cloudstack",
+			"Comment": "v2.1.1-1-g1e2cbf6",
+			"Rev": "1e2cbf647e57fa90353612074fdfc42faf5073bf"
 		},
 		{
 			"ImportPath": "github.com/xiang90/probing",

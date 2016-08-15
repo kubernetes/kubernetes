@@ -20,6 +20,7 @@ import (
 	// Cloud providers
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/mesos"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"

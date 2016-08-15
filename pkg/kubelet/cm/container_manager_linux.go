@@ -199,7 +199,6 @@ func createManager(containerName string) *fs.Manager {
 	}
 }
 
-// TODO: plumb this up as a flag to Kubelet in a future PR
 type KernelTunableBehavior string
 
 const (
@@ -288,8 +287,11 @@ func (cm *containerManagerImpl) setupNode() error {
 	if !f.cpuHardcapping {
 		cm.status.SoftRequirements = fmt.Errorf("CPU hardcapping unsupported")
 	}
-	// TODO: plumb kernel tunable options into container manager, right now, we modify by default
-	if err := setupKernelTunables(KernelTunableModify); err != nil {
+	b := KernelTunableModify
+	if cm.GetNodeConfig().ProtectKernelDefaults {
+		b = KernelTunableError
+	}
+	if err := setupKernelTunables(b); err != nil {
 		return err
 	}
 
@@ -525,7 +527,7 @@ func getPidsForProcess(name, pidFile string) ([]int, error) {
 			runtime.HandleError(err)
 		}
 	}
-	return procfs.PidOf(name), nil
+	return procfs.PidOf(name)
 }
 
 // Ensures that the Docker daemon is in the desired container.

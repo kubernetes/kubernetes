@@ -47,7 +47,7 @@ func (rcStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a replication controller before creation.
-func (rcStrategy) PrepareForCreate(obj runtime.Object) {
+func (rcStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	controller := obj.(*api.ReplicationController)
 	controller.Status = api.ReplicationControllerStatus{}
 
@@ -55,7 +55,7 @@ func (rcStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (rcStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (rcStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newController := obj.(*api.ReplicationController)
 	oldController := old.(*api.ReplicationController)
 	// update is not allowed to set status
@@ -133,7 +133,7 @@ type rcStatusStrategy struct {
 
 var StatusStrategy = rcStatusStrategy{Strategy}
 
-func (rcStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (rcStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newRc := obj.(*api.ReplicationController)
 	oldRc := old.(*api.ReplicationController)
 	// update is not allowed to set spec

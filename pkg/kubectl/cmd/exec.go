@@ -107,6 +107,8 @@ type StreamOptions struct {
 	ContainerName string
 	Stdin         bool
 	TTY           bool
+	// minimize unnecessary output
+	Quiet bool
 	// InterruptParent, if set, is used to handle interrupts while attached
 	InterruptParent *interrupt.Handler
 	In              io.Reader

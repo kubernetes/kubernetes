@@ -253,6 +253,8 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 		cmdArgs = append(cmdArgs,
 			"--runtime-cgroups=/docker-daemon",
 			"--kubelet-cgroups=/kubelet",
+			"--cgroup-root=/",
+			"--system-cgroups=/system",
 		)
 	}
 	cmdArgs = append(cmdArgs,
@@ -273,7 +275,6 @@ func (es *e2eService) startKubeletServer() (*killCmd, error) {
 	if es.cgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
 			"--cgroups-per-qos", "true",
-			"--cgroup-root", "/",
 		)
 	}
 	if !*disableKubenet {

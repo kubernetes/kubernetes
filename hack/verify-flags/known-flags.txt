@@ -16,6 +16,10 @@ api-servers
 api-token
 api-version
 apiserver-count
+audit-log-maxage
+audit-log-maxbackup
+audit-log-maxsize
+audit-log-path
 auth-path
 auth-provider
 auth-provider-arg
@@ -370,6 +374,7 @@ portal-net
 prepull-images
 private-mountns
 prom-push-gateway
+protect-kernel-defaults
 proto-import
 proxy-bindall
 proxy-kubeconfig
@@ -500,3 +505,4 @@ whitelist-override-label
 windows-line-endings
 www-prefix
 zone-name
+garbage-collector-enabled

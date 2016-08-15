@@ -83,7 +83,7 @@ func TestExportSecret(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		err := Strategy.Export(test.objIn, test.exact)
+		err := Strategy.Export(api.NewContext(), test.objIn, test.exact)
 		if err != nil {
 			if !test.expectErr {
 				t.Errorf("unexpected error: %v", err)

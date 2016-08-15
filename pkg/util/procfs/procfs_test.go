@@ -19,9 +19,12 @@ package procfs
 import (
 	"io/ioutil"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -66,7 +69,27 @@ func TestPidOf(t *testing.T) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
 	}
-	pids := PidOf(filepath.Base(os.Args[0]))
+	pids, err := PidOf(filepath.Base(os.Args[0]))
+	assert.Empty(t, err)
 	assert.NotZero(t, pids)
 	assert.Contains(t, pids, os.Getpid())
+}
+
+func TestPKill(t *testing.T) {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
+	}
+	sig := syscall.SIGCONT
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, sig)
+	defer signal.Stop(c)
+	PKill(os.Args[0], sig)
+	select {
+	case s := <-c:
+		if s != sig {
+			t.Fatalf("signal was %v, want %v", s, sig)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("timeout waiting for %v", sig)
+	}
 }

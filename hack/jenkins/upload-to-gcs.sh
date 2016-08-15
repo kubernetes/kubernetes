@@ -94,6 +94,10 @@ function find_version() {
     source "hack/lib/version.sh"
     kube::version::get_version_vars
     echo "${KUBE_GIT_VERSION-}"
+  else
+    # Last resort from the started.json
+    gsutil cat ${gcs_build_path}/started.json 2>/dev/null |\
+     sed -n 's/ *"version": *"\([^"]*\)",*/\1/p'
   fi
   )
 }

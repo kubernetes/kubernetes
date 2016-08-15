@@ -21,72 +21,77 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/container"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
 var (
 	emptyImgStoreConfig = ImageStoreConfig{}
 	// TODO(tmrts): fill the pod configuration
-	testPodConfig *container.PodSandboxConfig = nil
+	testPodConfig *runtimeApi.PodSandboxConfig = nil
 )
 
 type imageTestCase struct {
-	Spec           *container.ImageSpec
-	ExpectedStatus *container.Image
+	Spec           *runtimeApi.ImageSpec
+	ExpectedStatus *runtimeApi.Image
 }
 
-func compareContainerImages(got, expected container.Image) error {
-	if got.ID != expected.ID {
-		return fmt.Errorf("mismatching IDs -> expected %q, got %q", got.ID, expected.ID)
+func compareContainerImages(got, expected runtimeApi.Image) error {
+	if got.Id != expected.Id {
+		return fmt.Errorf("mismatching Ids -> expected %q, got %q", got.Id, expected.Id)
 	}
 
 	if !reflect.DeepEqual(got.RepoTags, expected.RepoTags) {
-		return fmt.Errorf("mismatching RepoTags -> expected %q, got %q", got.ID, expected.ID)
+		return fmt.Errorf("mismatching RepoTags -> expected %q, got %q", got.Id, expected.Id)
 	}
 
 	if !reflect.DeepEqual(got.RepoDigests, expected.RepoDigests) {
-		return fmt.Errorf("mismatching RepoDigests -> expected %q, got %q", got.ID, expected.ID)
+		return fmt.Errorf("mismatching RepoDigests -> expected %q, got %q", got.Id, expected.Id)
 	}
 
-	if got.Size != expected.Size {
-		return fmt.Errorf("mismatching Sizes -> expected %q, got %q", got.ID, expected.ID)
+	if got.Size_ != expected.Size_ {
+		return fmt.Errorf("mismatching Sizes -> expected %q, got %q", got.Id, expected.Id)
 	}
 
 	return nil
 }
 
+var (
+	busyboxStr   = "busybox"
+	gibberishStr = "XXXX_GIBBERISH_XXXX"
+)
+
 var testImgSpecs = map[string]imageTestCase{
 	"non-existent-image": {
-		&container.ImageSpec{
-			Image: "XXXX_GIBBERISH_XXXX",
+		&runtimeApi.ImageSpec{
+			Image: &gibberishStr,
 		},
 		nil,
 	},
 	"busybox": {
-		&container.ImageSpec{
-			Image: "busybox",
+		&runtimeApi.ImageSpec{
+			Image: &busyboxStr,
 		},
-		&container.Image{
-			ID:          "",
+		&runtimeApi.Image{
+			Id:          nil,
 			RepoTags:    []string{},
 			RepoDigests: []string{},
-			Size:        0,
+			Size_:       nil,
 		},
 	},
 }
 
-var testAuthConfig = map[string]container.AuthConfig{
+var testAuthConfig = map[string]runtimeApi.AuthConfig{
 	"no-auth": {},
 }
 
-func testNewImageStore(t *testing.T, cfg ImageStoreConfig) container.ImageService {
-	imgStore, err := NewImageStore(cfg)
+func testNewImageStore(t *testing.T, cfg ImageStoreConfig) *ImageStore {
+	s, err := NewImageStore(cfg)
 	if err != nil {
 		// TODO(tmrts): Implement stringer for rktshim.ImageStoreConfig for test readability.
 		t.Fatalf("rktshim.NewImageStore(%s) got error %q", cfg, err)
 	}
 
-	return imgStore
+	return s
 }
 
 func TestPullsImageWithoutAuthentication(t *testing.T) {
@@ -196,10 +201,10 @@ func TestListsImages(t *testing.T) {
 	}
 
 	for _, img := range imgs {
-		expectedImg := *testImgSpecs[img.ID].ExpectedStatus
+		expectedImg := *testImgSpecs[*img.Id].ExpectedStatus
 
 		if err := compareContainerImages(img, expectedImg); err != nil {
-			t.Errorf("rktshim.ImageStore.List() for %q, %v", img.ID, err)
+			t.Errorf("rktshim.ImageStore.List() for %q, %v", img.Id, err)
 		}
 	}
 }
