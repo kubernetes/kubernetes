@@ -116,7 +116,7 @@ func NewPersistentVolumeController(
 			UpdateFunc: controller.updateVolume,
 			DeleteFunc: controller.deleteVolume,
 		},
-		cache.Indexers{"accessmodes": accessModesIndexFunc},
+		cache.Indexers{"accessmodes": accessModesIndexFunc, "claimref": claimRefIndexFunc},
 	)
 	_, controller.claimController = framework.NewInformer(
 		claimSource,
