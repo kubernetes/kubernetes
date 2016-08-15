@@ -22,6 +22,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/controller/framework"
@@ -281,4 +283,120 @@ func addVolumeAnnotation(volume *api.PersistentVolume, annName, annValue string)
 	}
 	volume.Annotations[annName] = annValue
 	return volume
+}
+
+func TestDefaultStorageClass(t *testing.T) {
+	tests := []struct {
+		name            string
+		classes         []*extensions.StorageClass
+		expectedDefault string
+		expectError     bool
+		expectedEvent   string
+	}{
+		{
+			"one storage class",
+			[]*extensions.StorageClass{
+				createStorageClass("gold", "true"),
+				createStorageClass("silver", "false"),
+				createStorageClass("bronze", ""),
+			},
+			"gold",
+			false,
+			"",
+		},
+		{
+			"no storage class",
+			[]*extensions.StorageClass{
+				createStorageClass("gold", "XtrueX"),
+				createStorageClass("silver", "false"),
+				createStorageClass("bronze", ""),
+			},
+			"",
+			false,
+			"",
+		},
+		{
+			"two storage classes",
+			[]*extensions.StorageClass{
+				createStorageClass("gold", "true"),
+				createStorageClass("silver", "false"),
+				createStorageClass("bronze", "true"),
+			},
+			"",
+			true,
+			"Warning MultipleDefault multiple default StorageClasses detected",
+		},
+	}
+
+	for _, test := range tests {
+		// create the controller and inject storage classes into it
+		ctrl := newTestController(
+			nil,   // kubeClient,
+			nil,   // volumeSource
+			nil,   // claimSource
+			nil,   // classSource
+			false, // enableDynamicProvisioning
+		)
+
+		// Convert classes to []interface{} and forcefully inject them into
+		// controller.
+		storageClassPtrs := make([]interface{}, len(test.classes))
+		for i, s := range test.classes {
+			storageClassPtrs[i] = s
+		}
+		ctrl.classes.Replace(storageClassPtrs, "1") // 1 is the resource version
+
+		// Call the tested function
+		defaultClass, err := ctrl.getDefaultStorageClass()
+
+		// Check error
+		if err != nil && !test.expectError {
+			t.Errorf("Test %q: Unexpected error: %v", test.name, err)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("Test %q: Expected error, got nil instead", test.name)
+		}
+
+		// Check the default class
+		if test.expectedDefault != "" {
+			// some default class was expected
+			if defaultClass == nil {
+				t.Errorf("Test %q: expected default class %q, got nil", test.name, test.expectedDefault)
+			} else {
+				if defaultClass.Name != test.expectedDefault {
+					t.Errorf("Test %q: expected default class %q, got %q", test.name, test.expectedDefault, defaultClass.Name)
+				}
+			}
+		} else {
+			// no default class was expected
+			if defaultClass != nil {
+				t.Errorf("Test %q: No default class expected, got %q", test.name, defaultClass.Name)
+			}
+		}
+
+		// Check event
+		if test.expectedEvent != "" {
+			_ = checkEvents(t, []string{test.expectedEvent}, ctrl)
+		} else {
+			_ = checkEvents(t, []string{}, ctrl)
+		}
+	}
+}
+
+func createStorageClass(name string, defaultValue string) *extensions.StorageClass {
+	c := &extensions.StorageClass{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "StorageClass",
+		},
+
+		ObjectMeta: api.ObjectMeta{
+			Name: name,
+		},
+	}
+	if defaultValue != "" {
+		c.ObjectMeta.Annotations = map[string]string{
+			annDefaultStorageClass: defaultValue,
+		}
+	}
+	return c
 }
