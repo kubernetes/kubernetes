@@ -100,6 +100,14 @@ func ValidateDNS1123Label(value string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, msg := range validation.IsDNS1123Subdomain(value) {
+		allErrs = append(allErrs, field.Invalid(fldPath, value, msg))
+	}
+	return allErrs
+}
+
 func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if annotations[api.AffinityAnnotationKey] != "" {
@@ -2118,14 +2126,15 @@ func ValidatePodTemplateUpdate(newPod, oldPod *api.PodTemplate) field.ErrorList 
 
 var supportedSessionAffinityType = sets.NewString(string(api.ServiceAffinityClientIP), string(api.ServiceAffinityNone))
 var supportedServiceType = sets.NewString(string(api.ServiceTypeClusterIP), string(api.ServiceTypeNodePort),
-	string(api.ServiceTypeLoadBalancer))
+	string(api.ServiceTypeLoadBalancer), string(api.ServiceTypeExternalName))
 
 // ValidateService tests if required fields in the service are set.
 func ValidateService(service *api.Service) field.ErrorList {
 	allErrs := ValidateObjectMeta(&service.ObjectMeta, true, ValidateServiceName, field.NewPath("metadata"))
 
 	specPath := field.NewPath("spec")
-	if len(service.Spec.Ports) == 0 && service.Spec.ClusterIP != api.ClusterIPNone {
+	isHeadlessService := service.Spec.ClusterIP == api.ClusterIPNone
+	if len(service.Spec.Ports) == 0 && !isHeadlessService {
 		allErrs = append(allErrs, field.Required(specPath.Child("ports"), ""))
 	}
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
@@ -2139,9 +2148,15 @@ func ValidateService(service *api.Service) field.ErrorList {
 				allErrs = append(allErrs, field.Invalid(portPath, port.Port, "may not expose port 10250 externally since it is used by kubelet"))
 			}
 		}
+	} else if service.Spec.Type == api.ServiceTypeExternalName {
+		if !isHeadlessService {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "must be 'None'"))
+		}
+		if len(service.Spec.ExternalName) > 0 {
+			allErrs = append(allErrs, ValidateDNS1123Subdomain(service.Spec.ExternalName, specPath.Child("externalName"))...)
+		}
 	}
 
-	isHeadlessService := service.Spec.ClusterIP == api.ClusterIPNone
 	allPortNames := sets.String{}
 	portsPath := specPath.Child("ports")
 	for i := range service.Spec.Ports {
