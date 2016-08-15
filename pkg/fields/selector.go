@@ -20,6 +20,9 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Selector represents a field selector.
@@ -38,6 +41,10 @@ type Selector interface {
 	// Transform returns a new copy of the selector after TransformFunc has been
 	// applied to the entire selector, or an error if fn returns an error.
 	Transform(fn TransformFunc) (Selector, error)
+
+	// ToRequirements converts this interface into Requirement struct to expose
+	// more detailed selection information.
+	ToRequirements() []labels.Requirement
 
 	// String returns a human readable string that represents this selector.
 	String() string
@@ -75,6 +82,14 @@ func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
 	return &hasTerm{field, value}, nil
 }
 
+func (t *hasTerm) ToRequirements() []labels.Requirement {
+	r, err := labels.NewRequirement(t.field, labels.EqualsOperator, sets.NewString(t.value))
+	if err != nil {
+		panic(fmt.Sprintf("Impossible to create invalid requirement label. Err: %v", err))
+	}
+	return []labels.Requirement{*r}
+}
+
 func (t *hasTerm) String() string {
 	return fmt.Sprintf("%v=%v", t.field, t.value)
 }
@@ -101,6 +116,14 @@ func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
 		return nil, err
 	}
 	return &notHasTerm{field, value}, nil
+}
+
+func (t *notHasTerm) ToRequirements() []labels.Requirement {
+	r, err := labels.NewRequirement(t.field, labels.NotEqualsOperator, sets.NewString(t.value))
+	if err != nil {
+		panic(fmt.Sprintf("Impossible to create invalid requirement label. Err: %v", err))
+	}
+	return []labels.Requirement{*r}
 }
 
 func (t *notHasTerm) String() string {
@@ -155,6 +178,14 @@ func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
 		next[i] = n
 	}
 	return andTerm(next), nil
+}
+
+func (t andTerm) ToRequirements() (reqs []labels.Requirement) {
+	for _, s := range []Selector(t) {
+		rs := s.ToRequirements()
+		reqs = append(reqs, rs...)
+	}
+	return reqs
 }
 
 func (t andTerm) String() string {
