@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Test single call to syncClaim and syncVolume methods.
@@ -422,7 +423,7 @@ func TestSync(t *testing.T) {
 			noevents, noerrors, testSyncVolume,
 		},
 	}
-	runSyncTests(t, tests)
+	runSyncTests(t, tests, []*extensions.StorageClass{}, "")
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -469,5 +470,5 @@ func TestMultiSync(t *testing.T) {
 		},
 	}
 
-	runMultisyncTests(t, tests)
+	runMultisyncTests(t, tests, []*extensions.StorageClass{}, "")
 }

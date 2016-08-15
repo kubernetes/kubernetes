@@ -21,7 +21,58 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
+
+var class1Parameters = map[string]string{
+	"param1": "value1",
+}
+var class2Parameters = map[string]string{
+	"param2": "value2",
+}
+var storageClasses = []*extensions.StorageClass{
+	{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "StorageClass",
+		},
+
+		ObjectMeta: api.ObjectMeta{
+			Name: "gold",
+		},
+
+		Provisioner: mockPluginName,
+		Parameters:  class1Parameters,
+	},
+	{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "silver",
+		},
+		Provisioner: mockPluginName,
+		Parameters:  class2Parameters,
+	},
+}
+
+// call to storageClass 1, returning an error
+var provision1Error = provisionCall{
+	ret:                errors.New("Moc provisioner error"),
+	expectedParameters: class1Parameters,
+}
+
+// call to storageClass 1, returning a valid PV
+var provision1Success = provisionCall{
+	ret:                nil,
+	expectedParameters: class1Parameters,
+}
+
+// call to storageClass 2, returning a valid PV
+var provision2Success = provisionCall{
+	ret:                nil,
+	expectedParameters: class2Parameters,
+}
 
 // Test single call to syncVolume, expecting provisioning to happen.
 // 1. Fill in the controller with initial data
@@ -30,14 +81,14 @@ import (
 func TestProvisionSync(t *testing.T) {
 	tests := []controllerTest{
 		{
-			// Provision a volume
-			"11-1 - successful provision",
+			// Provision a volume (with the default class)
+			"11-1 - successful provision with storage class 1",
 			novolumes,
-			newVolumeArray("pvc-uid11-1", "1Gi", "uid11-1", "claim11-1", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
+			newVolumeArray("pvc-uid11-1", "1Gi", "uid11-1", "claim11-1", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned, annClass),
 			newClaimArray("claim11-1", "uid11-1", "1Gi", "", api.ClaimPending, annClass),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-1", "uid11-1", "1Gi", "", api.ClaimPending, annClass),
-			noevents, noerrors, wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision failure - plugin not found
@@ -57,7 +108,7 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-3", "uid11-3", "1Gi", "", api.ClaimPending, annClass),
 			newClaimArray("claim11-3", "uid11-3", "1Gi", "", api.ClaimPending, annClass),
 			[]string{"Warning ProvisioningFailed"}, noerrors,
-			wrapTestWithControllerConfig(operationProvision, []error{}, testSyncClaim),
+			wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 		{
 			// Provision failure - Provision returns error
@@ -67,40 +118,35 @@ func TestProvisionSync(t *testing.T) {
 			newClaimArray("claim11-4", "uid11-4", "1Gi", "", api.ClaimPending, annClass),
 			newClaimArray("claim11-4", "uid11-4", "1Gi", "", api.ClaimPending, annClass),
 			[]string{"Warning ProvisioningFailed"}, noerrors,
-			wrapTestWithControllerConfig(operationProvision, []error{errors.New("Moc provisioner error")}, testSyncClaim),
+			wrapTestWithProvisionCalls([]provisionCall{provision1Error}, testSyncClaim),
 		},
 		{
-			// Provision success - there is already a volume available, still
-			// we provision a new one when requested.
+			// No provisioning if there is a matching volume available
 			"11-6 - provisioning when there is a volume available",
-			newVolumeArray("volume11-6", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
-			[]*api.PersistentVolume{
-				newVolume("volume11-6", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
-				newVolume("pvc-uid11-6", "1Gi", "uid11-6", "claim11-6", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
-			},
+			newVolumeArray("volume11-6", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain, annClass),
+			newVolumeArray("volume11-6", "1Gi", "uid11-6", "claim11-6", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController, annClass),
 			newClaimArray("claim11-6", "uid11-6", "1Gi", "", api.ClaimPending, annClass),
-			// Binding will be completed in the next syncClaim
-			newClaimArray("claim11-6", "uid11-6", "1Gi", "", api.ClaimPending, annClass),
+			newClaimArray("claim11-6", "uid11-6", "1Gi", "volume11-6", api.ClaimBound, annClass, annBoundByController, annBindCompleted),
 			noevents, noerrors,
 			// No provisioning plugin confingure - makes the test fail when
 			// the controller errorneously tries to provision something
-			wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision success? - claim is bound before provisioner creates
 			// a volume.
 			"11-7 - claim is bound before provisioning",
 			novolumes,
-			newVolumeArray("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
+			newVolumeArray("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned, annClass),
 			newClaimArray("claim11-7", "uid11-7", "1Gi", "", api.ClaimPending, annClass),
 			// The claim would be bound in next syncClaim
 			newClaimArray("claim11-7", "uid11-7", "1Gi", "", api.ClaimPending, annClass),
 			noevents, noerrors,
-			wrapTestWithInjectedOperation(wrapTestWithControllerConfig(operationProvision, []error{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
+			wrapTestWithInjectedOperation(wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim), func(ctrl *PersistentVolumeController, reactor *volumeReactor) {
 				// Create a volume before provisionClaimOperation starts.
 				// This similates a parallel controller provisioning the volume.
 				reactor.lock.Lock()
-				volume := newVolume("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned)
+				volume := newVolume("pvc-uid11-7", "1Gi", "uid11-7", "claim11-7", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned, annClass)
 				reactor.volumes[volume.Name] = volume
 				reactor.lock.Unlock()
 			}),
@@ -110,7 +156,7 @@ func TestProvisionSync(t *testing.T) {
 			// second retry succeeds
 			"11-8 - cannot save provisioned volume",
 			novolumes,
-			newVolumeArray("pvc-uid11-8", "1Gi", "uid11-8", "claim11-8", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
+			newVolumeArray("pvc-uid11-8", "1Gi", "uid11-8", "claim11-8", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned, annClass),
 			newClaimArray("claim11-8", "uid11-8", "1Gi", "", api.ClaimPending, annClass),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim11-8", "uid11-8", "1Gi", "", api.ClaimPending, annClass),
@@ -121,7 +167,7 @@ func TestProvisionSync(t *testing.T) {
 				// will succeed.
 				{"create", "persistentvolumes", errors.New("Mock creation error")},
 			},
-			wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision success? - cannot save provisioned PV five times,
@@ -141,8 +187,12 @@ func TestProvisionSync(t *testing.T) {
 				{"create", "persistentvolumes", errors.New("Mock creation error4")},
 				{"create", "persistentvolumes", errors.New("Mock creation error5")},
 			},
-			wrapTestWithControllerConfig(operationDelete, []error{nil},
-				wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim)),
+			wrapTestWithPluginCalls(
+				nil,                                // recycle calls
+				[]error{nil},                       // delete calls
+				[]provisionCall{provision1Success}, // provision calls
+				testSyncClaim,
+			),
 		},
 		{
 			// Provision failure - cannot save provisioned PV five times,
@@ -163,7 +213,7 @@ func TestProvisionSync(t *testing.T) {
 				{"create", "persistentvolumes", errors.New("Mock creation error5")},
 			},
 			// No deleteCalls are configured, which results into no deleter plugin available for the volume
-			wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 		{
 			// Provision failure - cannot save provisioned PV five times,
@@ -183,16 +233,17 @@ func TestProvisionSync(t *testing.T) {
 				{"create", "persistentvolumes", errors.New("Mock creation error4")},
 				{"create", "persistentvolumes", errors.New("Mock creation error5")},
 			},
-			wrapTestWithControllerConfig(
-				operationDelete, []error{
+			wrapTestWithPluginCalls(
+				nil, // recycle calls
+				[]error{ // delete calls
 					errors.New("Mock deletion error1"),
 					errors.New("Mock deletion error2"),
 					errors.New("Mock deletion error3"),
 					errors.New("Mock deletion error4"),
 					errors.New("Mock deletion error5"),
 				},
-				wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
-			),
+				[]provisionCall{provision1Success}, // provision calls
+				testSyncClaim),
 		},
 		{
 			// Provision failure - cannot save provisioned PV five times,
@@ -212,16 +263,37 @@ func TestProvisionSync(t *testing.T) {
 				{"create", "persistentvolumes", errors.New("Mock creation error4")},
 				{"create", "persistentvolumes", errors.New("Mock creation error5")},
 			},
-			wrapTestWithControllerConfig(
-				operationDelete, []error{
+			wrapTestWithPluginCalls(
+				nil, // recycle calls
+				[]error{ // delete calls
 					errors.New("Mock deletion error1"),
 					nil,
-				},
-				wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+				}, //  provison calls
+				[]provisionCall{provision1Success},
+				testSyncClaim,
 			),
 		},
+		{
+			// Provision a volume (with non-default class)
+			"11-13 - successful provision with storage class 2",
+			novolumes,
+			volumeWithClass("silver", newVolumeArray("pvc-uid11-13", "1Gi", "uid11-13", "claim11-13", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned)),
+			claimWithClass("silver", newClaimArray("claim11-13", "uid11-13", "1Gi", "", api.ClaimPending)),
+			// Binding will be completed in the next syncClaim
+			claimWithClass("silver", newClaimArray("claim11-13", "uid11-13", "1Gi", "", api.ClaimPending)),
+			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision2Success}, testSyncClaim),
+		},
+		{
+			// Provision error - non existing class
+			"11-14 - fail due to non-existing class",
+			novolumes,
+			novolumes,
+			claimWithClass("non-existing", newClaimArray("claim11-14", "uid11-14", "1Gi", "", api.ClaimPending)),
+			claimWithClass("non-existing", newClaimArray("claim11-14", "uid11-14", "1Gi", "", api.ClaimPending)),
+			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+		},
 	}
-	runSyncTests(t, tests)
+	runSyncTests(t, tests, storageClasses, storageClasses[0].Name)
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -244,20 +316,20 @@ func TestProvisionMultiSync(t *testing.T) {
 			// Provision a volume with binding
 			"12-1 - successful provision",
 			novolumes,
-			newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned),
+			newVolumeArray("pvc-uid12-1", "1Gi", "uid12-1", "claim12-1", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned, annClass),
 			newClaimArray("claim12-1", "uid12-1", "1Gi", "", api.ClaimPending, annClass),
 			// Binding will be completed in the next syncClaim
 			newClaimArray("claim12-1", "uid12-1", "1Gi", "pvc-uid12-1", api.ClaimBound, annClass, annBoundByController, annBindCompleted),
-			noevents, noerrors, wrapTestWithControllerConfig(operationProvision, []error{nil}, testSyncClaim),
+			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{provision1Success}, testSyncClaim),
 		},
 	}
 
-	runMultisyncTests(t, tests)
+	runMultisyncTests(t, tests, storageClasses, storageClasses[0].Name)
 }
 
 // When provisioning is disabled, provisioning a claim should instantly return nil
 func TestDisablingDynamicProvisioner(t *testing.T) {
-	ctrl := newTestController(nil, nil, nil, false)
+	ctrl := newTestController(nil, nil, nil, nil, false, "")
 	retVal := ctrl.provisionClaim(nil)
 	if retVal != nil {
 		t.Errorf("Expected nil return but got %v", retVal)
