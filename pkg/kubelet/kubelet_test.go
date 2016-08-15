@@ -705,7 +705,7 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		podStatus := &api.PodStatus{ContainerStatuses: tc.statuses}
 		_, err := kubelet.validateContainerLogStatus("podName", podStatus, containerName, previous)
 		if !tc.success {
-			assert.Error(t, err, "[case %d] error", i)
+			assert.Error(t, err, fmt.Sprintf("[case %d] error", i))
 		} else {
 			assert.NoError(t, err, "[case %d] error", i)
 		}
@@ -713,13 +713,13 @@ func TestValidateContainerLogStatus(t *testing.T) {
 		previous = true
 		_, err = kubelet.validateContainerLogStatus("podName", podStatus, containerName, previous)
 		if !tc.pSuccess {
-			assert.Error(t, err, "[case %d] error", i)
+			assert.Error(t, err, fmt.Sprintf("[case %d] error", i))
 		} else {
 			assert.NoError(t, err, "[case %d] error", i)
 		}
 		// Access the log of a container that's not in the pod
 		_, err = kubelet.validateContainerLogStatus("podName", podStatus, "blah", false)
-		assert.Error(t, err, "[case %d] invalid container name should cause an error", i)
+		assert.Error(t, err, fmt.Sprintf("[case %d] invalid container name should cause an error", i))
 	}
 }
 
