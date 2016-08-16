@@ -171,7 +171,8 @@ func (conn *Conn) SetIdleTimeout(duration time.Duration) {
 	conn.timeout = duration
 }
 
-// Open the connection and create channels for reading and writing.
+// Open the connection and create channels for reading and writing. It returns
+// the selected subprotocol, a slice of channels and an error.
 func (conn *Conn) Open(w http.ResponseWriter, req *http.Request) (string, []io.ReadWriteCloser, error) {
 	go func() {
 		defer runtime.HandleCrash()
