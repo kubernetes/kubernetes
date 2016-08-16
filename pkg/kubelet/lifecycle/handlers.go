@@ -30,6 +30,7 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
@@ -141,4 +142,26 @@ func getHttpRespBody(resp *http.Response) string {
 		return string(bytes)
 	}
 	return ""
+}
+
+func NewAppArmorAdmitHandler(runtime string) PodAdmitHandler {
+	return &appArmorAdmitHandler{
+		Validator: apparmor.NewValidator(runtime),
+	}
+}
+
+type appArmorAdmitHandler struct {
+	apparmor.Validator
+}
+
+func (a *appArmorAdmitHandler) Admit(attrs *PodAdmitAttributes) PodAdmitResult {
+	err := a.Validate(attrs.Pod)
+	if err == nil {
+		return PodAdmitResult{Admit: true}
+	}
+	return PodAdmitResult{
+		Admit:   false,
+		Reason:  "AppArmor",
+		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+	}
 }
