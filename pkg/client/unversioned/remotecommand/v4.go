@@ -72,7 +72,7 @@ func (p *streamProtocolV4) stream(conn streamCreator) error {
 	return <-errorChan
 }
 
-// errorDecoderV4 interprets the json data on the error channel and creates an uexec.ExitError from it.
+// errorDecoderV4 interprets the json data on the error channel and creates an exec.ExitError from it.
 type errorDecoderV4 struct{}
 
 func (d *errorDecoderV4) decode(message []byte) error {
