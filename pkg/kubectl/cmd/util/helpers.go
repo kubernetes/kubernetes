@@ -117,6 +117,8 @@ func checkErrWithPrefix(prefix string, err error) {
 	checkErr(prefix, err, fatalErrHandler)
 }
 
+// checkErr formats a given error as a string and calls the passed handleErr
+// func with that string and an kubectl exit code.
 func checkErr(prefix string, err error, handleErr func(string, int)) {
 	switch {
 	case err == nil:
