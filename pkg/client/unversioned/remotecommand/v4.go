@@ -18,10 +18,10 @@ package remotecommand
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
-	"errors"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
