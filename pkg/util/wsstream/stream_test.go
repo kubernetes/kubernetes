@@ -112,25 +112,26 @@ func TestStreamVersionedCopy(t *testing.T) {
 
 			config, err := websocket.NewConfig("ws://"+addr, "http://localhost/")
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
+				return
 			}
 			config.Protocol = test.requested
 			client, err := websocket.DialConfig(config)
 			if err != nil {
 				if !test.error {
-					t.Fatalf("test %d: didn't expect error: %v", i, err)
-				} else {
-					return
+					t.Errorf("test %d: didn't expect error: %v", i, err)
 				}
+				return
 			}
 			defer client.Close()
 			if test.error && err == nil {
-				t.Fatalf("test %d: expected an error", i)
+				t.Errorf("test %d: expected an error", i)
+				return
 			}
 
 			<-r.err
 			if got, expected := r.selectedProtocol, test.expected; got != expected {
-				t.Fatalf("test %d: unexpected protocol version: got=%s expected=%s", i, got, expected)
+				t.Errorf("test %d: unexpected protocol version: got=%s expected=%s", i, got, expected)
 			}
 		}()
 	}
