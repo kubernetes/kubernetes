@@ -40,29 +40,25 @@ const (
 )
 
 // TODO: Leverage dynamic Kubelet settings when it's implemented to only modify the kubelet eviction option in this test.
-// To manually trigger the test on a node with disk space just over 15Gi :
-//   make test-e2e-node FOCUS="hard eviction test" TEST_ARGS="--eviction-hard=nodefs.available<15Gi"
-var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("kubelet-eviction-manager")
 	var podClient *framework.PodClient
 	var c *client.Client
-	var n *api.Node
 
 	BeforeEach(func() {
 		podClient = f.PodClient()
 		c = f.Client
-		nodeList := framework.GetReadySchedulableNodesOrDie(c)
-		n = &nodeList.Items[0]
 	})
 
 	Describe("hard eviction test", func() {
 		Context("pod using the most disk space gets evicted when the node disk usage is above the eviction hard threshold", func() {
-			var busyPodName, idlePodName string
+			var busyPodName, idlePodName, verifyPodName string
 			var containersToCleanUp map[string]bool
 
 			AfterEach(func() {
 				podClient.Delete(busyPodName, &api.DeleteOptions{})
 				podClient.Delete(idlePodName, &api.DeleteOptions{})
+				podClient.Delete(verifyPodName, &api.DeleteOptions{})
 				for container := range containersToCleanUp {
 					// TODO: to be container implementation agnostic
 					cmd := exec.Command("docker", "rm", "-f", strings.Trim(container, dockertools.DockerPrefix))
@@ -77,21 +73,9 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 
 				busyPodName = "to-evict" + string(uuid.NewUUID())
 				idlePodName = "idle" + string(uuid.NewUUID())
+				verifyPodName = "verify" + string(uuid.NewUUID())
 				containersToCleanUp = make(map[string]bool)
-				podClient.Create(&api.Pod{
-					ObjectMeta: api.ObjectMeta{
-						Name: idlePodName,
-					},
-					Spec: api.PodSpec{
-						RestartPolicy: api.RestartPolicyNever,
-						Containers: []api.Container{
-							{
-								Image: ImageRegistry[pauseImage],
-								Name:  idlePodName,
-							},
-						},
-					},
-				})
+				createIdlePod(idlePodName, podClient)
 				podClient.Create(&api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name: busyPodName,
@@ -104,7 +88,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 								Name:  busyPodName,
 								// Filling the disk
 								Command: []string{"sh", "-c",
-									fmt.Sprintf("for NUM in `seq 1 1 1000`; do dd if=/dev/urandom of=%s.$NUM bs=4000000 count=10; sleep 3; done",
+									fmt.Sprintf("for NUM in `seq 1 1 100000`; do dd if=/dev/urandom of=%s.$NUM bs=50000000 count=10; sleep 0.5; done",
 										dummyFile)},
 							},
 						},
@@ -112,14 +96,17 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 				})
 			})
 
-			It("should evict the pod using the most disk space", func() {
+			It("should evict the pod using the most disk space [Slow]", func() {
 				if !evictionOptionIsSet() {
 					framework.Logf("test skipped because eviction option is not set")
 					return
 				}
 
 				evictionOccurred := false
+				nodeDiskPressureCondition := false
+				podRescheduleable := false
 				Eventually(func() error {
+					// The pod should be evicted.
 					if !evictionOccurred {
 						podData, err := podClient.Get(busyPodName)
 						if err != nil {
@@ -131,9 +118,6 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 						if err != nil {
 							return err
 						}
-						if !nodeHasDiskPressure(f.Client) {
-							return fmt.Errorf("expected disk pressure condition is not set")
-						}
 
 						podData, err = podClient.Get(idlePodName)
 						if err != nil {
@@ -142,22 +126,67 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 						recordContainerId(containersToCleanUp, podData.Status.ContainerStatuses)
 
 						if podData.Status.Phase != api.PodRunning {
-							return fmt.Errorf("expected phase to be running. got %+v", podData.Status.Phase)
+							err = verifyPodEviction(podData)
+							if err != nil {
+								return err
+							}
 						}
-
 						evictionOccurred = true
+						return fmt.Errorf("waiting for node disk pressure condition to be set")
 					}
 
-					// After eviction happens the pod is evicted so eventually the node disk pressure should be gone.
-					if nodeHasDiskPressure(f.Client) {
-						return fmt.Errorf("expected disk pressure condition relief has not happened")
+					// The node should have disk pressure condition after the pods are evicted.
+					if !nodeDiskPressureCondition {
+						if !nodeHasDiskPressure(f.Client) {
+							return fmt.Errorf("expected disk pressure condition is not set")
+						}
+						nodeDiskPressureCondition = true
+						return fmt.Errorf("waiting for node disk pressure condition to be cleared")
 					}
+
+					// After eviction happens the pod is evicted so eventually the node disk pressure should be relieved.
+					if !podRescheduleable {
+						if nodeHasDiskPressure(f.Client) {
+							return fmt.Errorf("expected disk pressure condition relief has not happened")
+						}
+						createIdlePod(verifyPodName, podClient)
+						podRescheduleable = true
+						return fmt.Errorf("waiting for the node to accept a new pod")
+					}
+
+					// The new pod should be able to be scheduled and run after the disk pressure is relieved.
+					podData, err := podClient.Get(verifyPodName)
+					if err != nil {
+						return err
+					}
+					recordContainerId(containersToCleanUp, podData.Status.ContainerStatuses)
+					if podData.Status.Phase != api.PodRunning {
+						return fmt.Errorf("waiting for the new pod to be running")
+					}
+
 					return nil
-				}, time.Minute*5, podCheckInterval).Should(BeNil())
+				}, time.Minute*15 /* based on n1-standard-1 machine type */, podCheckInterval).Should(BeNil())
 			})
 		})
 	})
 })
+
+func createIdlePod(podName string, podClient *framework.PodClient) {
+	podClient.Create(&api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name: podName,
+		},
+		Spec: api.PodSpec{
+			RestartPolicy: api.RestartPolicyNever,
+			Containers: []api.Container{
+				{
+					Image: ImageRegistry[pauseImage],
+					Name:  podName,
+				},
+			},
+		},
+	})
+}
 
 func verifyPodEviction(podData *api.Pod) error {
 	if podData.Status.Phase != api.PodFailed {
