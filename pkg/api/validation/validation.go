@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
@@ -110,7 +111,7 @@ func ValidateDNS1123Subdomain(value string, fldPath *field.Path) field.ErrorList
 	return allErrs
 }
 
-func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
+func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if annotations[api.AffinityAnnotationKey] != "" {
 		allErrs = append(allErrs, ValidateAffinityInPodAnnotations(annotations, fldPath)...)
@@ -129,7 +130,33 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *fiel
 	}
 
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
+	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
 
+	return allErrs
+}
+
+func ValidatePodSpecificAnnotationUpdates(newPod, oldPod *api.Pod, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	newAnnotations := newPod.Annotations
+	oldAnnotations := oldPod.Annotations
+	for k, oldVal := range oldAnnotations {
+		if newAnnotations[k] == oldVal {
+			continue // No change.
+		}
+		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not update AppArmor annotations"))
+		}
+	}
+	// Check for removals.
+	for k := range newAnnotations {
+		if _, ok := oldAnnotations[k]; ok {
+			continue // No change.
+		}
+		if strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "may not remove AppArmor annotations"))
+		}
+	}
+	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newAnnotations, &newPod.Spec, fldPath)...)
 	return allErrs
 }
 
@@ -1717,7 +1744,7 @@ func validateTolerations(tolerations []api.Toleration, fldPath *field.Path) fiel
 func ValidatePod(pod *api.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
-	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&pod.Spec, field.NewPath("spec"))...)
 	return allErrs
 }
@@ -2033,6 +2060,39 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 	return allErrs
 }
 
+func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *api.PodSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for k, p := range annotations {
+		if !strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
+			continue
+		}
+		containerName := strings.TrimPrefix(k, apparmor.ContainerAnnotationKeyPrefix)
+		if !podSpecHasContainer(spec, containerName) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child(k), containerName, "container not found"))
+		}
+
+		if err := apparmor.ValidateProfileFormat(p); err != nil {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child(k), p, err.Error()))
+		}
+	}
+
+	return allErrs
+}
+
+func podSpecHasContainer(spec *api.PodSpec, containerName string) bool {
+	for _, c := range spec.InitContainers {
+		if c.Name == containerName {
+			return true
+		}
+	}
+	for _, c := range spec.Containers {
+		if c.Name == containerName {
+			return true
+		}
+	}
+	return false
+}
+
 // ValidatePodSecurityContext test that the specified PodSecurityContext has valid data.
 func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *api.PodSpec, specPath, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -2081,7 +2141,7 @@ func ValidateContainerUpdates(newContainers, oldContainers []api.Container, fldP
 func ValidatePodUpdate(newPod, oldPod *api.Pod) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
-	allErrs = append(allErrs, ValidatePodSpecificAnnotations(newPod.ObjectMeta.Annotations, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"))...)
 	specPath := field.NewPath("spec")
 
 	// validate updateable fields:
@@ -2473,7 +2533,7 @@ func ValidatePodTemplateSpec(spec *api.PodTemplateSpec, fldPath *field.Path) fie
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, unversionedvalidation.ValidateLabels(spec.Labels, fldPath.Child("labels"))...)
 	allErrs = append(allErrs, ValidateAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
-	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, fldPath.Child("annotations"))...)
+	allErrs = append(allErrs, ValidatePodSpecificAnnotations(spec.Annotations, &spec.Spec, fldPath.Child("annotations"))...)
 	allErrs = append(allErrs, ValidatePodSpec(&spec.Spec, fldPath.Child("spec"))...)
 	return allErrs
 }

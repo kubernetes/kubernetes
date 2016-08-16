@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -3186,6 +3187,11 @@ func TestValidatePodSpec(t *testing.T) {
 }
 
 func TestValidatePod(t *testing.T) {
+	validPodSpec := api.PodSpec{
+		Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+		RestartPolicy: api.RestartPolicyAlways,
+		DNSPolicy:     api.DNSClusterFirst,
+	}
 	successCases := []api.Pod{
 		{ // Basic fields.
 			ObjectMeta: api.ObjectMeta{Name: "123", Namespace: "ns"},
@@ -3305,11 +3311,7 @@ func TestValidatePod(t *testing.T) {
 					}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // Serialized pod anti affinity with different Label Operators in affinity requirements in annotations.
 			ObjectMeta: api.ObjectMeta{
@@ -3357,11 +3359,7 @@ func TestValidatePod(t *testing.T) {
 					}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // populate tolerations equal operator in annotations.
 			ObjectMeta: api.ObjectMeta{
@@ -3377,11 +3375,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // populate tolerations exists operator in annotations.
 			ObjectMeta: api.ObjectMeta{
@@ -3396,11 +3390,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // empty operator is ok for toleration
 			ObjectMeta: api.ObjectMeta{
@@ -3415,11 +3405,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // empty efffect is ok for toleration
 			ObjectMeta: api.ObjectMeta{
@@ -3434,11 +3420,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // docker default seccomp profile
 			ObjectMeta: api.ObjectMeta{
@@ -3448,11 +3430,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "docker/default",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // unconfined seccomp profile
 			ObjectMeta: api.ObjectMeta{
@@ -3462,11 +3440,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "unconfined",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // localhost seccomp profile
 			ObjectMeta: api.ObjectMeta{
@@ -3476,11 +3450,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "localhost/foo",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		{ // localhost seccomp profile for a container
 			ObjectMeta: api.ObjectMeta{
@@ -3490,11 +3460,42 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
+			Spec: validPodSpec,
+		},
+		{ // default AppArmor profile for a container
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					apparmor.ContainerAnnotationKeyPrefix + "ctr": apparmor.ProfileRuntimeDefault,
+				},
 			},
+			Spec: validPodSpec,
+		},
+		{ // default AppArmor profile for an init container
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					apparmor.ContainerAnnotationKeyPrefix + "init-ctr": apparmor.ProfileRuntimeDefault,
+				},
+			},
+			Spec: api.PodSpec{
+				InitContainers: []api.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:  api.RestartPolicyAlways,
+				DNSPolicy:      api.DNSClusterFirst,
+			},
+		},
+		{ // localhost AppArmor profile for a container
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					apparmor.ContainerAnnotationKeyPrefix + "ctr": apparmor.ProfileNamePrefix + "foo",
+				},
+			},
+			Spec: validPodSpec,
 		},
 	}
 	for _, pod := range successCases {
@@ -3552,11 +3553,7 @@ func TestValidatePod(t *testing.T) {
 					`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid node selector requirement in node affinity in pod annotations, operator can't be null": {
 			ObjectMeta: api.ObjectMeta{
@@ -3573,11 +3570,7 @@ func TestValidatePod(t *testing.T) {
 					}}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid preferredSchedulingTerm in node affinity in pod annotations, weight should be in range 1-100": {
 			ObjectMeta: api.ObjectMeta{
@@ -3599,11 +3592,7 @@ func TestValidatePod(t *testing.T) {
 					]}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector, nodeSelectorTerms must have at least one term": {
 			ObjectMeta: api.ObjectMeta{
@@ -3618,11 +3607,7 @@ func TestValidatePod(t *testing.T) {
 					}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid requiredDuringSchedulingIgnoredDuringExecution node selector term, matchExpressions must have at least one node selector requirement": {
 			ObjectMeta: api.ObjectMeta{
@@ -3639,11 +3624,7 @@ func TestValidatePod(t *testing.T) {
 					}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid weight in preferredDuringSchedulingIgnoredDuringExecution in pod affinity annotations, weight should be in range 1-100": {
 			ObjectMeta: api.ObjectMeta{
@@ -3668,11 +3649,7 @@ func TestValidatePod(t *testing.T) {
 					}]}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid labelSelector in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, values should be empty if the operator is Exists": {
 			ObjectMeta: api.ObjectMeta{
@@ -3697,11 +3674,7 @@ func TestValidatePod(t *testing.T) {
 					}]}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid name space in preferredDuringSchedulingIgnoredDuringExecution in podaffinity annotations, name space shouldbe valid": {
 			ObjectMeta: api.ObjectMeta{
@@ -3726,11 +3699,7 @@ func TestValidatePod(t *testing.T) {
 					}]}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid labelOperator in preferredDuringSchedulingIgnoredDuringExecution in podantiaffinity annotations, labelOperator should be proper": {
 			ObjectMeta: api.ObjectMeta{
@@ -3755,11 +3724,7 @@ func TestValidatePod(t *testing.T) {
 					}]}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid pod affinity, empty topologyKey is not allowed for hard pod affinity": {
 			ObjectMeta: api.ObjectMeta{
@@ -3784,11 +3749,7 @@ func TestValidatePod(t *testing.T) {
 					}]}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid pod anti-affinity, empty topologyKey is not allowed for hard pod anti-affinity": {
 			ObjectMeta: api.ObjectMeta{
@@ -3813,11 +3774,7 @@ func TestValidatePod(t *testing.T) {
 					}]}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid pod anti-affinity, empty topologyKey is not allowed for soft pod affinity": {
 			ObjectMeta: api.ObjectMeta{
@@ -3842,11 +3799,7 @@ func TestValidatePod(t *testing.T) {
 					}]}}`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid toleration key": {
 			ObjectMeta: api.ObjectMeta{
@@ -3862,11 +3815,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid toleration operator": {
 			ObjectMeta: api.ObjectMeta{
@@ -3882,11 +3831,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"value must be empty when `operator` is 'Exists'": {
 			ObjectMeta: api.ObjectMeta{
@@ -3902,11 +3847,7 @@ func TestValidatePod(t *testing.T) {
 					}]`,
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"must be a valid pod seccomp profile": {
 			ObjectMeta: api.ObjectMeta{
@@ -3916,11 +3857,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "foo",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"must be a valid container seccomp profile": {
 			ObjectMeta: api.ObjectMeta{
@@ -3930,11 +3867,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompContainerAnnotationKeyPrefix + "foo": "foo",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"must be a non-empty container name in seccomp annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3944,11 +3877,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompContainerAnnotationKeyPrefix: "foo",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"must be a non-empty container profile in seccomp annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3958,11 +3887,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompContainerAnnotationKeyPrefix + "foo": "",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"must be a relative path in a node-local seccomp profile annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -3972,11 +3897,7 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "localhost//foo",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"must not start with '../'": {
 			ObjectMeta: api.ObjectMeta{
@@ -3986,11 +3907,44 @@ func TestValidatePod(t *testing.T) {
 					api.SeccompPodAnnotationKey: "localhost/../foo",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
+			Spec: validPodSpec,
+		},
+		"AppArmor profile must apply to a container": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					apparmor.ContainerAnnotationKeyPrefix + "ctr":      apparmor.ProfileRuntimeDefault,
+					apparmor.ContainerAnnotationKeyPrefix + "init-ctr": apparmor.ProfileRuntimeDefault,
+					apparmor.ContainerAnnotationKeyPrefix + "fake-ctr": apparmor.ProfileRuntimeDefault,
+				},
 			},
+			Spec: api.PodSpec{
+				InitContainers: []api.Container{{Name: "init-ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				Containers:     []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy:  api.RestartPolicyAlways,
+				DNSPolicy:      api.DNSClusterFirst,
+			},
+		},
+		"AppArmor profile format must be valid": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					apparmor.ContainerAnnotationKeyPrefix + "ctr": "bad-name",
+				},
+			},
+			Spec: validPodSpec,
+		},
+		"only default AppArmor profile may start with runtime/": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					apparmor.ContainerAnnotationKeyPrefix + "ctr": "runtime/foo",
+				},
+			},
+			Spec: validPodSpec,
 		},
 	}
 	for k, v := range errorCases {
