@@ -375,7 +375,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Starting %s apis", groupVersion)
 		if containsResource(resources, "poddisruptionbudgets") {
 			glog.Infof("Starting disruption controller")
-			go disruption.NewDisruptionController(podInformer, kubeClient).Run(wait.NeverStop)
+			go disruption.NewDisruptionController(sharedInformers.Pods().Informer(), kubeClient).Run(wait.NeverStop)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	}
