@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package equivalencecache
+package scheduler
 
 import (
-	//	"github.com/golang/glog"
 	"github.com/golang/groupcache/lru"
 	"hash/adler32"
 
@@ -32,14 +31,8 @@ import (
 const maxCacheEntries = 4096
 
 type HostPredicate struct {
-	Fit        bool
-	FailReason sets.String
-}
-
-type podCacheEnty struct {
-	Fit        bool
-	FailReason sets.String
-	Score      schedulerapi.HostPriority
+	Fit         bool
+	FailReasons []algorithm.PredicateFailureReason
 }
 
 type AlgorithmCache struct {
@@ -56,10 +49,8 @@ func newAlgorithmCache() AlgorithmCache {
 
 // Store a map of predicate cache with maxsize
 type EquivalenceCache struct {
-	getEquivalencePod algorithm.GetEquivalencePodFunc
-	algorithmCache    map[string]AlgorithmCache
-	//	realCacheLock     *sync.RWMutex
-
+	getEquivalencePod         algorithm.GetEquivalencePodFunc
+	algorithmCache            map[string]AlgorithmCache
 	invalidAlgorithmCacheList sets.String
 	allCacheExpired           bool
 	expireLock                *sync.RWMutex
@@ -67,15 +58,15 @@ type EquivalenceCache struct {
 
 func NewEquivalenceCache(getEquivalencePodFunc algorithm.GetEquivalencePodFunc) *EquivalenceCache {
 	return &EquivalenceCache{
-		getEquivalencePod: getEquivalencePodFunc,
-		algorithmCache:    make(map[string]AlgorithmCache),
-		//		realCacheLock:         new(sync.RWMutex),
+		getEquivalencePod:         getEquivalencePodFunc,
+		algorithmCache:            make(map[string]AlgorithmCache),
 		invalidAlgorithmCacheList: sets.NewString(),
 		allCacheExpired:           false,
 		expireLock:                new(sync.RWMutex),
 	}
 }
 
+// addPodPriority adds pod priority for equivalence class
 func (ec *EquivalenceCache) addPodPriority(podKey uint64, nodeName string, score int) {
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
 		ec.algorithmCache[nodeName] = newAlgorithmCache()
@@ -83,24 +74,27 @@ func (ec *EquivalenceCache) addPodPriority(podKey uint64, nodeName string, score
 	ec.algorithmCache[nodeName].prioritiesCache.Add(podKey, schedulerapi.HostPriority{Host: nodeName, Score: score})
 }
 
-func (ec *EquivalenceCache) addPodPredicate(podKey uint64, nodeName string, fit bool, failReason sets.String) {
+// addPodPredicate adds pod predicate for equivalence class
+func (ec *EquivalenceCache) addPodPredicate(podKey uint64, nodeName string, fit bool, failReasons []algorithm.PredicateFailureReason) {
 	if _, exist := ec.algorithmCache[nodeName]; !exist {
 		ec.algorithmCache[nodeName] = newAlgorithmCache()
 	}
-	ec.algorithmCache[nodeName].predicatesCache.Add(podKey, HostPredicate{Fit: fit, FailReason: failReason})
+	ec.algorithmCache[nodeName].predicatesCache.Add(podKey, HostPredicate{Fit: fit, FailReasons: failReasons})
 }
 
-func (ec *EquivalenceCache) AddPodPredicatesCache(pod *api.Pod, fitNodeList *api.NodeList, failedPredicates *FailedPredicateMap) {
+// AddPodPredicatesCache cache pod predicate for equivalence class
+func (ec *EquivalenceCache) AddPodPredicatesCache(pod *api.Pod, fitNodeList []*api.Node, failedPredicates *FailedPredicateMap) {
 	equivalenceHash := ec.hashEquivalencePod(pod)
 
-	for _, fitNode := range fitNodeList.Items {
-		ec.addPodPredicate(equivalenceHash, fitNode.Name, true, sets.String{})
+	for _, fitNode := range fitNodeList {
+		ec.addPodPredicate(equivalenceHash, fitNode.Name, true, nil)
 	}
-	for failNodeName, failReason := range *failedPredicates {
-		ec.addPodPredicate(equivalenceHash, failNodeName, false, failReason)
+	for failNodeName, failReasons := range *failedPredicates {
+		ec.addPodPredicate(equivalenceHash, failNodeName, false, failReasons)
 	}
 }
 
+// AddPodPredicatesCache cache pod priority for equivalence class
 func (ec *EquivalenceCache) AddPodPrioritiesCache(pod *api.Pod, priorities schedulerapi.HostPriorityList) {
 	equivalenceHash := ec.hashEquivalencePod(pod)
 
@@ -109,41 +103,40 @@ func (ec *EquivalenceCache) AddPodPrioritiesCache(pod *api.Pod, priorities sched
 	}
 }
 
-func (ec *EquivalenceCache) GetCachedPredicates(pod *api.Pod, nodes api.NodeList) (api.NodeList, FailedPredicateMap, api.NodeList) {
-	fitNodeList := api.NodeList{}
+// GetCachedPredicates gets cached predicates for equivalence class
+func (ec *EquivalenceCache) GetCachedPredicates(pod *api.Pod, nodes []*api.Node) ([]*api.Node, FailedPredicateMap, []*api.Node) {
+	fitNodeList := []*api.Node{}
 	failedPredicates := FailedPredicateMap{}
-	noCacheNodeList := api.NodeList{}
-
+	noCacheNodeList := []*api.Node{}
 	equivalenceHash := ec.hashEquivalencePod(pod)
-
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		findCache := false
 		if algorithmCache, exist := ec.algorithmCache[node.Name]; exist {
 			if cachePredicate, exist := algorithmCache.predicatesCache.Get(equivalenceHash); exist {
 				hostPredicate := cachePredicate.(HostPredicate)
 				if hostPredicate.Fit {
-					fitNodeList.Items = append(fitNodeList.Items, node)
+					fitNodeList = append(fitNodeList, node)
 				} else {
-					failedPredicates[node.Name] = hostPredicate.FailReason
+					failedPredicates[node.Name] = hostPredicate.FailReasons
 				}
 				findCache = true
 			}
 		}
 		if !findCache {
-			noCacheNodeList.Items = append(noCacheNodeList.Items, node)
+			noCacheNodeList = append(noCacheNodeList, node)
 		}
 	}
-	//	glog.Infof("Get predicate cache: %v ----%v, nodes: %v has no cache date.", fitNodeList.Items, failedPredicates, noCacheNodeList.Items)
 	return fitNodeList, failedPredicates, noCacheNodeList
 }
 
-func (ec *EquivalenceCache) GetCachedPriorities(pod *api.Pod, nodes api.NodeList) (schedulerapi.HostPriorityList, api.NodeList) {
+// GetCachedPriorities gets cached priorities for equivalence class
+func (ec *EquivalenceCache) GetCachedPriorities(pod *api.Pod, nodes []*api.Node) (schedulerapi.HostPriorityList, []*api.Node) {
 	cachedPriorities := schedulerapi.HostPriorityList{}
-	noCacheNodeList := api.NodeList{}
+	noCacheNodeList := []*api.Node{}
 
 	equivalenceHash := ec.hashEquivalencePod(pod)
 
-	for _, node := range nodes.Items {
+	for _, node := range nodes {
 		findCache := false
 		if algorithmCache, exist := ec.algorithmCache[node.Name]; exist {
 			if cachePriority, exist := algorithmCache.prioritiesCache.Get(equivalenceHash); exist {
@@ -153,13 +146,14 @@ func (ec *EquivalenceCache) GetCachedPriorities(pod *api.Pod, nodes api.NodeList
 			}
 		}
 		if !findCache {
-			noCacheNodeList.Items = append(noCacheNodeList.Items, node)
+			noCacheNodeList = append(noCacheNodeList, node)
 		}
 	}
 
 	return cachedPriorities, noCacheNodeList
 }
 
+// SendInvalidAlgorithmCacheReq marks AlgorithmCache item as invalid
 func (ec *EquivalenceCache) SendInvalidAlgorithmCacheReq(nodeName string) {
 	ec.expireLock.RLock()
 	allExpired := ec.allCacheExpired
@@ -172,6 +166,7 @@ func (ec *EquivalenceCache) SendInvalidAlgorithmCacheReq(nodeName string) {
 	}
 }
 
+// SendClearAllCacheReq marks all cached item as invalid
 func (ec *EquivalenceCache) SendClearAllCacheReq() {
 	ec.expireLock.RLock()
 	allExpired := ec.allCacheExpired
@@ -184,6 +179,7 @@ func (ec *EquivalenceCache) SendClearAllCacheReq() {
 	}
 }
 
+// HandleExpireDate removes expired AlgorithmCache
 func (ec *EquivalenceCache) HandleExpireDate() {
 	ec.expireLock.Lock()
 	defer ec.expireLock.Unlock()

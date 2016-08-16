@@ -383,6 +383,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache schedulercache.Cache, nodeLister algorithm.FakeNodeLister, predicateMap map[string]algorithm.FitPredicate) (*Scheduler, chan *api.Binding, chan error) {
 	algo := NewGenericScheduler(
 		scache,
+		nil,
 		predicateMap,
 		[]algorithm.PriorityConfig{},
 		[]algorithm.SchedulerExtender{})

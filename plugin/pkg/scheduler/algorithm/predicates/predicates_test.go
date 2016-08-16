@@ -467,7 +467,7 @@ func TestGetUsedPorts(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ports := getUsedPorts(test.pods...)
+		ports := GetUsedPorts(test.pods...)
 		if !reflect.DeepEqual(test.ports, ports) {
 			t.Errorf("%s: expected %v, got %v", "test get used ports", test.ports, ports)
 		}

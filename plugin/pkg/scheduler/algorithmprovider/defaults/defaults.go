@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 
 	"github.com/golang/glog"
 )
@@ -94,6 +95,8 @@ func init() {
 	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
+	// Use equivalence class to speed up predicates & priorities
+	factory.RegisterGetEquivalencePodFunction(GetEquivalencePod)
 }
 
 func defaultPredicates() sets.String {
@@ -188,7 +191,6 @@ func defaultPriorities() sets.String {
 				Weight: 1,
 			},
 		),
-		factory.RegisterGetEquivalencePodFunction(GetEquivalencePod),
 	)
 }
 
@@ -208,5 +210,5 @@ type EquivalencePod struct {
 	Volumes      []api.Volume
 	NodeSelector map[string]string
 	Ports        map[int]bool
-	Request      predicates.ResourceRequest
+	Request      *schedulercache.Resource
 }
