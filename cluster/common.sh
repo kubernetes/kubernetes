@@ -785,6 +785,7 @@ function sha1sum-file() {
 #
 # Assumed vars
 #   KUBE_TEMP
+#   MASTER_NAME
 #
 # Vars set:
 #   CERT_DIR
@@ -812,24 +813,8 @@ function create-certs {
 
   echo "Generating certs for alternate-names: ${sans}"
 
-  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
-  # Note: This was heavily cribbed from make-ca-cert.sh
-  (set -x
-    cd "${KUBE_TEMP}"
-    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
-    tar xzf easy-rsa.tar.gz
-    cd easy-rsa-master/easyrsa3
-    ./easyrsa init-pki
-    ./easyrsa --batch "--req-cn=${primary_cn}@$(date +%s)" build-ca nopass
-    ./easyrsa --subject-alt-name="${sans}" build-server-full "${MASTER_NAME}" nopass
-    ./easyrsa build-client-full kubelet nopass
-    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
-    # If there was an error in the subshell, just die.
-    # TODO(roberthbailey): add better error handling here
-    cat "${cert_create_debug_output}" >&2
-    echo "=== Failed to generate certificates: Aborting ===" >&2
-    exit 2
-  }
+  PRIMARY_CN="${primary_cn}" SANS="${sans}" generate-certs
+
   CERT_DIR="${KUBE_TEMP}/easy-rsa-master/easyrsa3"
   # By default, linux wraps base64 output every 76 cols, so we use 'tr -d' to remove whitespaces.
   # Note 'base64 -w0' doesn't work on Mac OS X, which has different flags.
@@ -840,6 +825,37 @@ function create-certs {
   KUBELET_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubelet.key" | base64 | tr -d '\r\n')
   KUBECFG_CERT_BASE64=$(cat "${CERT_DIR}/pki/issued/kubecfg.crt" | base64 | tr -d '\r\n')
   KUBECFG_KEY_BASE64=$(cat "${CERT_DIR}/pki/private/kubecfg.key" | base64 | tr -d '\r\n')
+}
+
+# Runs the easy RSA commands to generate certificate files.
+# The generated files are at ${KUBE_TEMP}/easy-rsa-master/easyrsa3
+#
+# Assumed vars
+#   KUBE_TEMP
+#   MASTER_NAME
+#   PRIMARY_CN: Primary canonical name
+#   SANS: Subject alternate names
+#
+#
+function generate-certs {
+  local -r cert_create_debug_output=$(mktemp "${KUBE_TEMP}/cert_create_debug_output.XXX")
+  # Note: This was heavily cribbed from make-ca-cert.sh
+  (set -x
+    cd "${KUBE_TEMP}"
+    curl -L -O --connect-timeout 20 --retry 6 --retry-delay 2 https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz
+    tar xzf easy-rsa.tar.gz
+    cd easy-rsa-master/easyrsa3
+    ./easyrsa init-pki
+    ./easyrsa --batch "--req-cn=${PRIMARY_CN}@$(date +%s)" build-ca nopass
+    ./easyrsa --subject-alt-name="${SANS}" build-server-full "${MASTER_NAME}" nopass
+    ./easyrsa build-client-full kubelet nopass
+    ./easyrsa build-client-full kubecfg nopass) &>${cert_create_debug_output} || {
+    # If there was an error in the subshell, just die.
+    # TODO(roberthbailey): add better error handling here
+    cat "${cert_create_debug_output}" >&2
+    echo "=== Failed to generate certificates: Aborting ===" >&2
+    exit 2
+  }
 }
 
 #
