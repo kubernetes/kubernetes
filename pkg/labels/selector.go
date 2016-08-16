@@ -98,11 +98,10 @@ func (a ByKey) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 func (a ByKey) Less(i, j int) bool { return a[i].key < a[j].key }
 
-// Requirement is a selector that contains values, a key
-// and an operator that relates the key and values. The zero
-// value of Requirement is invalid.
+// Requirement contains values, a key, and an operator that relates the key and values.
+// The zero value of Requirement is invalid.
 // Requirement implements both set based match and exact match
-// Requirement is initialized via NewRequirement constructor for creating a valid Requirement.
+// Requirement should be initialized via NewRequirement constructor for creating a valid Requirement.
 type Requirement struct {
 	key       string
 	operator  Operator

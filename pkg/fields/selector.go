@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // Selector represents a field selector.
@@ -42,9 +41,9 @@ type Selector interface {
 	// applied to the entire selector, or an error if fn returns an error.
 	Transform(fn TransformFunc) (Selector, error)
 
-	// Requirements converts this interface to label Requirements to expose
+	// Requirements converts this interface to Requirements to expose
 	// more detailed selection information.
-	Requirements() []labels.Requirement
+	Requirements() []Requirement
 
 	// String returns a human readable string that represents this selector.
 	String() string
@@ -82,12 +81,12 @@ func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
 	return &hasTerm{field, value}, nil
 }
 
-func (t *hasTerm) Requirements() []labels.Requirement {
-	r, err := labels.NewRequirement(t.field, labels.EqualsOperator, sets.NewString(t.value))
-	if err != nil {
-		panic(fmt.Sprintf("Impossible to create invalid requirement label. Err: %v", err))
-	}
-	return []labels.Requirement{*r}
+func (t *hasTerm) Requirements() []Requirement {
+	return []Requirement{{
+		Field:    t.field,
+		Operator: labels.EqualsOperator,
+		Value:    t.value,
+	}}
 }
 
 func (t *hasTerm) String() string {
@@ -118,12 +117,12 @@ func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
 	return &notHasTerm{field, value}, nil
 }
 
-func (t *notHasTerm) Requirements() []labels.Requirement {
-	r, err := labels.NewRequirement(t.field, labels.NotEqualsOperator, sets.NewString(t.value))
-	if err != nil {
-		panic(fmt.Sprintf("Impossible to create invalid requirement label. Err: %v", err))
-	}
-	return []labels.Requirement{*r}
+func (t *notHasTerm) Requirements() []Requirement {
+	return []Requirement{{
+		Field:    t.field,
+		Operator: labels.NotEqualsOperator,
+		Value:    t.value,
+	}}
 }
 
 func (t *notHasTerm) String() string {
@@ -180,8 +179,8 @@ func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
 	return andTerm(next), nil
 }
 
-func (t andTerm) Requirements() []labels.Requirement {
-	reqs := make([]labels.Requirement, 0, len(t))
+func (t andTerm) Requirements() []Requirement {
+	reqs := make([]Requirement, 0, len(t))
 	for _, s := range []Selector(t) {
 		rs := s.Requirements()
 		reqs = append(reqs, rs...)
