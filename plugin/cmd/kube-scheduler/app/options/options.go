@@ -37,9 +37,6 @@ type SchedulerServer struct {
 	// Kubeconfig is Path to kubeconfig file with authorization and master
 	// location information.
 	Kubeconfig string
-	// A set of key=value pairs describing feature configuration for
-	// scheduler.
-	FeatureConfig config.ConfigurationMap
 }
 
 // NewSchedulerServer creates a new SchedulerServer with default parameters
@@ -49,7 +46,6 @@ func NewSchedulerServer() *SchedulerServer {
 	cfg.LeaderElection.LeaderElect = true
 	s := SchedulerServer{
 		KubeSchedulerConfiguration: cfg,
-		FeatureConfig:              make(config.ConfigurationMap),
 	}
 	return &s
 }
@@ -63,7 +59,6 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableProfiling, "profiling", true, "Enable profiling via web interface host:port/debug/pprof/")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.Var(&s.FeatureConfig, "feature-config", "A set of key=value pairs that describe feature configuration for scheduler.")
 	var unusedBindPodsQPS float32
 	fs.Float32Var(&unusedBindPodsQPS, "bind-pods-qps", 0, "unused, use --kube-api-qps")
 	fs.MarkDeprecated("bind-pods-qps", "flag is unused and will be removed. Use kube-api-qps instead.")
@@ -79,4 +74,5 @@ func (s *SchedulerServer) AddFlags(fs *pflag.FlagSet) {
 			"to every RequiredDuringScheduling affinity rule. --hard-pod-affinity-symmetric-weight represents the weight of implicit PreferredDuringScheduling affinity rule.")
 	fs.StringVar(&s.FailureDomains, "failure-domains", api.DefaultFailureDomains, "Indicate the \"all topologies\" set for an empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
+	config.AddFeatureConfigFlag(fs)
 }

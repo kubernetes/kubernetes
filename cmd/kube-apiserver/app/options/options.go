@@ -65,6 +65,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	s.ServerRunOptions.AddUniversalFlags(fs)
 	//Add etcd specific flags.
 	s.ServerRunOptions.AddEtcdStorageFlags(fs)
+	config.AddFeatureConfigFlag(fs)
+
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
 

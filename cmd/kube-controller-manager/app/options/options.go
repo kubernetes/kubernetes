@@ -36,9 +36,8 @@ import (
 type CMServer struct {
 	componentconfig.KubeControllerManagerConfiguration
 
-	Master        string
-	Kubeconfig    string
-	FeatureConfig config.ConfigurationMap
+	Master     string
+	Kubeconfig string
 }
 
 // NewCMServer creates a new CMServer with a default config.
@@ -99,7 +98,6 @@ func NewCMServer() *CMServer {
 			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
 			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
 		},
-		FeatureConfig: make(config.ConfigurationMap),
 	}
 	s.LeaderElection.LeaderElect = true
 	return &s
@@ -169,7 +167,6 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.ConfigureCloudRoutes, "configure-cloud-routes", true, "Should CIDRs allocated by allocate-node-cidrs be configured on the cloud provider.")
 	fs.StringVar(&s.Master, "master", s.Master, "The address of the Kubernetes API server (overrides any value in kubeconfig)")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization and master location information.")
-	fs.Var(&s.FeatureConfig, "feature-config", "A set of key=value pairs that describe feature configuration for controller-manager.")
 	fs.StringVar(&s.RootCAFile, "root-ca-file", s.RootCAFile, "If set, this root certificate authority will be included in service account's token secret. This must be a valid PEM-encoded CA bundle.")
 	fs.StringVar(&s.ContentType, "kube-api-content-type", s.ContentType, "Content type of requests sent to apiserver.")
 	fs.Float32Var(&s.KubeAPIQPS, "kube-api-qps", s.KubeAPIQPS, "QPS to use while talking with kubernetes apiserver")
@@ -178,4 +175,5 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.EnableGarbageCollector, "enable-garbage-collector", s.EnableGarbageCollector, "Enables the generic garbage collector. MUST be synced with the corresponding flag of the kube-apiserver. WARNING: the generic garbage collector is an alpha feature.")
 	fs.Int32Var(&s.ConcurrentGCSyncs, "concurrent-gc-syncs", s.ConcurrentGCSyncs, "The number of garbage collector workers that are allowed to sync concurrently.")
 	leaderelection.BindFlags(&s.LeaderElection, fs)
+	config.AddFeatureConfigFlag(fs)
 }

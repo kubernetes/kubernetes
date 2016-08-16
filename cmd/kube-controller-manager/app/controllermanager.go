@@ -138,8 +138,6 @@ func Run(s *options.CMServer) error {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
 
-	glog.Infof("feature-config: %v", s.FeatureConfig)
-
 	go func() {
 		mux := http.NewServeMux()
 		healthz.InstallHandler(mux)
