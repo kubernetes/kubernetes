@@ -102,7 +102,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 				Ports:     []api.EndpointPort{{Port: 1000}},
 			}},
 		}})
@@ -134,7 +134,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 					ResourceVersion: "1",
 				},
 				Subsets: []api.EndpointSubset{{
-					Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+					Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 					Ports:     []api.EndpointPort{{Port: 1000}},
 				}},
 			}},
@@ -164,7 +164,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "TCP"}},
 			}},
 		}})
@@ -190,7 +190,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
@@ -207,7 +207,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "UDP"}},
 			}},
 		}})
@@ -232,7 +232,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "UDP"}},
 		}},
 	})
