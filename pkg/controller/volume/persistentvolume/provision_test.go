@@ -81,7 +81,7 @@ var provision2Success = provisionCall{
 func TestProvisionSync(t *testing.T) {
 	tests := []controllerTest{
 		{
-			// Provision a volume (with the default class)
+			// Provision a volume (with a default class)
 			"11-1 - successful provision with storage class 1",
 			novolumes,
 			newVolumeArray("pvc-uid11-1", "1Gi", "uid11-1", "claim11-1", api.VolumeBound, api.PersistentVolumeReclaimDelete, annBoundByController, annDynamicallyProvisioned, annClass),
@@ -290,6 +290,24 @@ func TestProvisionSync(t *testing.T) {
 			novolumes,
 			claimWithClass("non-existing", newClaimArray("claim11-14", "uid11-14", "1Gi", "", api.ClaimPending)),
 			claimWithClass("non-existing", newClaimArray("claim11-14", "uid11-14", "1Gi", "", api.ClaimPending)),
+			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+		},
+		{
+			// No provisioning with class=""
+			"11-15 - no provisioning with class=''",
+			novolumes,
+			novolumes,
+			claimWithClass("", newClaimArray("claim11-15", "uid11-15", "1Gi", "", api.ClaimPending)),
+			claimWithClass("", newClaimArray("claim11-15", "uid11-15", "1Gi", "", api.ClaimPending)),
+			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
+		},
+		{
+			// No provisioning with class=nil
+			"11-16 - no provisioning with class=nil",
+			novolumes,
+			novolumes,
+			newClaimArray("claim11-15", "uid11-15", "1Gi", "", api.ClaimPending),
+			newClaimArray("claim11-15", "uid11-15", "1Gi", "", api.ClaimPending),
 			noevents, noerrors, wrapTestWithProvisionCalls([]provisionCall{}, testSyncClaim),
 		},
 	}

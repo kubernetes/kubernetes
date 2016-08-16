@@ -591,6 +591,9 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	if claimSource == nil {
 		claimSource = framework.NewFakePVCControllerSource()
 	}
+	if classSource == nil {
+		classSource = framework.NewFakeControllerSource()
+	}
 	ctrl := NewPersistentVolumeController(
 		kubeClient,
 		5*time.Second,        // sync period
@@ -664,6 +667,28 @@ func newVolume(name, capacity, boundToClaimUID, boundToClaimName string, phase a
 func withLabels(labels map[string]string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
 	volumes[0].Labels = labels
 	return volumes
+}
+
+// volumesWithClass applies the given class to the first volume in the array
+// and returns the array.  Meant to be used to compose volumes specified inline
+// in a test.
+func volumesWithClass(class string, volumes []*api.PersistentVolume) []*api.PersistentVolume {
+	if volumes[0].Annotations == nil {
+		volumes[0].Annotations = make(map[string]string)
+	}
+	volumes[0].Annotations[annClass] = class
+	return volumes
+}
+
+// claimsWithClass applies the given class to the first volume in the array
+// and returns the array.  Meant to be used to compose volumes specified inline
+// in a test.
+func claimsWithClass(class string, claims []*api.PersistentVolumeClaim) []*api.PersistentVolumeClaim {
+	if claims[0].Annotations == nil {
+		claims[0].Annotations = make(map[string]string)
+	}
+	claims[0].Annotations[annClass] = class
+	return claims
 }
 
 // withLabelSelector sets the label selector of the first claim in the array
