@@ -40,19 +40,14 @@ const (
 )
 
 // TODO: Leverage dynamic Kubelet settings when it's implemented to only modify the kubelet eviction option in this test.
-// To manually trigger the test on a node with disk space just over 15Gi :
-//   make test-e2e-node FOCUS="hard eviction test" TEST_ARGS="--eviction-hard=nodefs.available<15Gi"
-var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("kubelet-eviction-manager")
 	var podClient *framework.PodClient
 	var c *client.Client
-	var n *api.Node
 
 	BeforeEach(func() {
 		podClient = f.PodClient()
 		c = f.Client
-		nodeList := framework.GetReadySchedulableNodesOrDie(c)
-		n = &nodeList.Items[0]
 	})
 
 	Describe("hard eviction test", func() {
@@ -104,7 +99,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 								Name:  busyPodName,
 								// Filling the disk
 								Command: []string{"sh", "-c",
-									fmt.Sprintf("for NUM in `seq 1 1 1000`; do dd if=/dev/urandom of=%s.$NUM bs=4000000 count=10; sleep 3; done",
+									fmt.Sprintf("for NUM in `seq 1 1 100000`; do dd if=/dev/urandom of=%s.$NUM bs=50000000 count=10; sleep 0.5; done",
 										dummyFile)},
 							},
 						},
@@ -112,14 +107,16 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 				})
 			})
 
-			It("should evict the pod using the most disk space", func() {
+			It("should evict the pod using the most disk space [Slow]", func() {
 				if !evictionOptionIsSet() {
 					framework.Logf("test skipped because eviction option is not set")
 					return
 				}
 
 				evictionOccurred := false
+				nodeDiskPressureCondition := false
 				Eventually(func() error {
+					// The pod should be evicted.
 					if !evictionOccurred {
 						podData, err := podClient.Get(busyPodName)
 						if err != nil {
@@ -131,9 +128,6 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 						if err != nil {
 							return err
 						}
-						if !nodeHasDiskPressure(f.Client) {
-							return fmt.Errorf("expected disk pressure condition is not set")
-						}
 
 						podData, err = podClient.Get(idlePodName)
 						if err != nil {
@@ -142,18 +136,30 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Flaky] [Serial] [Disru
 						recordContainerId(containersToCleanUp, podData.Status.ContainerStatuses)
 
 						if podData.Status.Phase != api.PodRunning {
-							return fmt.Errorf("expected phase to be running. got %+v", podData.Status.Phase)
+							err = verifyPodEviction(podData)
+							if err != nil {
+								return err
+							}
 						}
-
 						evictionOccurred = true
+						return fmt.Errorf("waiting for node disk pressure condition to be set")
 					}
 
-					// After eviction happens the pod is evicted so eventually the node disk pressure should be gone.
+					// The node should have disk pressure condition after the pods are evicted.
+					if !nodeDiskPressureCondition {
+						if !nodeHasDiskPressure(f.Client) {
+							return fmt.Errorf("expected disk pressure condition is not set")
+						}
+						nodeDiskPressureCondition = true
+						return fmt.Errorf("waiting for node disk pressure condition to be cleared")
+					}
+
+					// After eviction happens the pod is evicted so eventually the node disk pressure should be relieved.
 					if nodeHasDiskPressure(f.Client) {
 						return fmt.Errorf("expected disk pressure condition relief has not happened")
 					}
 					return nil
-				}, time.Minute*5, podCheckInterval).Should(BeNil())
+				}, time.Minute*15 /* based on n1-standard-1 machine type */, podCheckInterval).Should(BeNil())
 			})
 		})
 	})
