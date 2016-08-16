@@ -74,7 +74,7 @@ func AddSourceToErr(verb string, source string, err error) error {
 var fatalErrHandler = fatal
 
 // BehaviorOnFatal allows you to override the default behavior when a fatal
-// error occurs, which is call os.Exit(code). You can pass 'panic' as a function
+// error occurs, which is to call os.Exit(code). You can pass 'panic' as a function
 // here if you prefer the panic() over os.Exit(1).
 func BehaviorOnFatal(f func(string, int)) {
 	fatalErrHandler = f
