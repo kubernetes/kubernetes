@@ -138,6 +138,9 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	glog.Infof("Starting namespace controller")
 	startNamespaceController()
 
+	glog.Infof("Wait for the node to be ready")
+	waitForNodeReady()
+
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
 
@@ -182,6 +185,34 @@ func maskLocksmithdOnCoreos() {
 		}
 		glog.Infof("Locksmithd is masked successfully")
 	}
+}
+
+const (
+	nodeReadyTimeout      = 2 * time.Minute
+	nodeReadyPollInterval = 1 * time.Second
+)
+
+func waitForNodeReady() {
+	config, err := framework.LoadConfig()
+	Expect(err).NotTo(HaveOccurred())
+	client, err := clientset.NewForConfig(config)
+	Expect(err).NotTo(HaveOccurred())
+	Eventually(func() error {
+		nodes, err := client.Nodes().List(api.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		if nodes == nil {
+			return fmt.Errorf("the node list is nil.")
+		}
+		Expect(len(nodes.Items) > 2).NotTo(BeTrue())
+		if len(nodes.Items) == 0 {
+			return fmt.Errorf("empty node list: %+v", nodes)
+		}
+		node := nodes.Items[0]
+		if !api.IsNodeReady(&node) {
+			return fmt.Errorf("node is not ready: %+v", node)
+		}
+		return nil
+	}, nodeReadyTimeout, nodeReadyPollInterval).Should(Succeed())
 }
 
 const (
