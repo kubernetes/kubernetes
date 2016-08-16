@@ -70,12 +70,13 @@ func createEventOrFail(clientset *federation_release_1_4.Clientset, namespace st
 
 	event := &v1.Event{
 		ObjectMeta: v1.ObjectMeta{
-			Name: FederationEventName,
+			Name:      FederationEventName,
+			Namespace: namespace,
 		},
 		InvolvedObject: v1.ObjectReference{
 			Kind:       "Pod",
 			Name:       "pod-name",
-			Namespace:  "default",
+			Namespace:  namespace,
 			UID:        "C934D34AFB20242",
 			APIVersion: "version",
 		},
