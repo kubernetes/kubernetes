@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/securitycontext"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -108,8 +109,8 @@ var (
 	// TODO: make this a TTL based pull (if image older than X policy, pull)
 	podInfraContainerImagePullPolicy = api.PullIfNotPresent
 
-	// Default security option, only seccomp for now
-	defaultSeccompProfile = "unconfined"
+	// Default set of seccomp security options.
+	defaultSeccompOpt = []dockerOpt{{"seccomp", "unconfined"}}
 )
 
 type DockerManager struct {
@@ -1040,22 +1041,52 @@ func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]string
 		return nil, err
 	}
 
-	// seccomp is only on docker versions >= v1.10
-	result, err := version.Compare(dockerV110APIVersion)
-	if err != nil {
+	var securityOpts []dockerOpt
+	if seccompOpts, err := dm.getSeccompOpts(pod, ctrName, version); err != nil {
 		return nil, err
-	}
-	var optFmt string
-	switch {
-	case result < 0:
-		return nil, nil // return early for Docker < 1.10
-	case result == 0:
-		optFmt = "%s:%s" // use colon notation for Docker 1.10
-	case result > 0:
-		optFmt = "%s=%s" // use = notation for Docker >= 1.11
+	} else {
+		securityOpts = append(securityOpts, seccompOpts...)
 	}
 
-	defaultSecurityOpts := []string{fmt.Sprintf(optFmt, "seccomp", defaultSeccompProfile)}
+	if appArmorOpts, err := dm.getAppArmorOpts(pod, ctrName); err != nil {
+		return nil, err
+	} else {
+		securityOpts = append(securityOpts, appArmorOpts...)
+	}
+
+	const (
+		// Docker changed the API for specifying options in v1.11
+		optSeparatorChangeVersion = "1.23" // Corresponds to docker 1.11.x
+		optSeparatorOld           = ':'
+		optSeparatorNew           = '='
+	)
+
+	sep := optSeparatorNew
+	if result, err := version.Compare(optSeparatorChangeVersion); err != nil {
+		return nil, fmt.Errorf("error parsing docker API version: %v", err)
+	} else if result < 0 {
+		sep = optSeparatorOld
+	}
+
+	opts := make([]string, len(securityOpts))
+	for i, opt := range securityOpts {
+		opts[i] = fmt.Sprintf("%s%c%s", opt.key, sep, opt.value)
+	}
+	return opts, nil
+}
+
+type dockerOpt struct {
+	key, value string
+}
+
+// Get the docker security options for seccomp.
+func (dm *DockerManager) getSeccompOpts(pod *api.Pod, ctrName string, version kubecontainer.Version) ([]dockerOpt, error) {
+	// seccomp is only on docker versions >= v1.10
+	if result, err := version.Compare(dockerV110APIVersion); err != nil {
+		return nil, err
+	} else if result < 0 {
+		return nil, nil // return early for Docker < 1.10
+	}
 
 	profile, profileOK := pod.ObjectMeta.Annotations[api.SeccompContainerAnnotationKeyPrefix+ctrName]
 	if !profileOK {
@@ -1063,13 +1094,13 @@ func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]string
 		profile, profileOK = pod.ObjectMeta.Annotations[api.SeccompPodAnnotationKey]
 		if !profileOK {
 			// return early the default
-			return defaultSecurityOpts, nil
+			return defaultSeccompOpt, nil
 		}
 	}
 
 	if profile == "unconfined" {
 		// return early the default
-		return defaultSecurityOpts, nil
+		return defaultSeccompOpt, nil
 	}
 
 	if profile == "docker/default" {
@@ -1093,7 +1124,20 @@ func (dm *DockerManager) getSecurityOpts(pod *api.Pod, ctrName string) ([]string
 		return nil, err
 	}
 
-	return []string{fmt.Sprintf(optFmt, "seccomp", b.Bytes())}, nil
+	return []dockerOpt{{"seccomp", b.String()}}, nil
+}
+
+// Get the docker security options for AppArmor.
+func (dm *DockerManager) getAppArmorOpts(pod *api.Pod, ctrName string) ([]dockerOpt, error) {
+	profile := apparmor.GetProfileName(pod, ctrName)
+	if profile == "" || profile == apparmor.ProfileRuntimeDefault {
+		// The docker applies the default profile by default.
+		return nil, nil
+	}
+
+	// Assume validation has already happened.
+	profileName := strings.TrimPrefix(profile, apparmor.ProfileNamePrefix)
+	return []dockerOpt{{"apparmor", profileName}}, nil
 }
 
 type dockerExitError struct {
