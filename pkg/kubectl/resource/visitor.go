@@ -164,6 +164,14 @@ func (i *Info) ResourceMapping() *meta.RESTMapping {
 	return i.Mapping
 }
 
+func (i *Info) APIResource() *unversioned.APIResource {
+	return &unversioned.APIResource{
+		Name:       i.Mapping.Resource,
+		Namespaced: i.Namespaced(),
+		Kind:       i.Mapping.GroupVersionKind.Kind,
+	}
+}
+
 // VisitorList implements Visit for the sub visitors it contains. The first error
 // returned from a child Visitor will terminate iteration.
 type VisitorList []Visitor
