@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
+	replicasetcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -149,6 +150,10 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
 	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
 	namespaceController.Run(wait.NeverStop)
+
+	replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
+	replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
+	go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 
 	select {}
 }
