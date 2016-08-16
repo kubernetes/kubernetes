@@ -3075,6 +3075,7 @@ func DeleteRCAndPods(c *client.Client, ns, name string) error {
 	if err != nil {
 		return err
 	}
+	defer ps.Stop()
 	startTime := time.Now()
 	err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
 	if apierrs.IsNotFound(err) {
@@ -3116,6 +3117,7 @@ func DeleteRCAndWaitForGC(c *client.Client, ns, name string) error {
 	if err != nil {
 		return err
 	}
+	defer ps.Stop()
 	startTime := time.Now()
 	falseVar := false
 	deleteOption := &api.DeleteOptions{OrphanDependents: &falseVar}
@@ -3161,7 +3163,6 @@ func podStoreForRC(c *client.Client, rc *api.ReplicationController) (*PodStore, 
 // and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
 // when the pod is inactvie.
 func waitForPodsInactive(ps *PodStore, interval, timeout time.Duration) error {
-	defer ps.Stop()
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pods := ps.List()
 		for _, pod := range pods {
@@ -3175,28 +3176,8 @@ func waitForPodsInactive(ps *PodStore, interval, timeout time.Duration) error {
 
 // waitForPodsGone waits until there are no pods left in the PodStore.
 func waitForPodsGone(ps *PodStore, interval, timeout time.Duration) error {
-	defer ps.Stop()
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		if pods := ps.List(); len(pods) == 0 {
-			return true, nil
-		}
-		return false, nil
-	})
-}
-
-// waitForRCPodsGone waits until there are no pods reported under an RC's selector (because the pods
-// have completed termination).
-func waitForRCPodsGone(c *client.Client, rc *api.ReplicationController, timeout *time.Duration) error {
-	if timeout == nil {
-		defaultTimeout := 2 * time.Minute
-		timeout = &defaultTimeout
-	}
-	labels := labels.SelectorFromSet(rc.Spec.Selector)
-	PodStore := NewPodStore(c, rc.Namespace, labels, fields.Everything())
-	defer PodStore.Stop()
-
-	return wait.PollImmediate(Poll, *timeout, func() (bool, error) {
-		if pods := PodStore.List(); len(pods) == 0 {
 			return true, nil
 		}
 		return false, nil
@@ -4346,8 +4327,13 @@ func ScaleRCByLabels(client *client.Client, ns string, l map[string]string, repl
 			return err
 		}
 		if replicas == 0 {
-			if err := waitForRCPodsGone(client, rc, nil); err != nil {
+			ps, err := podStoreForRC(client, rc)
+			if err != nil {
 				return err
+			}
+			defer ps.Stop()
+			if err = waitForPodsGone(ps, 10*time.Second, 10*time.Minute); err != nil {
+				return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
 			}
 		} else {
 			if err := WaitForPodsWithLabelRunning(
