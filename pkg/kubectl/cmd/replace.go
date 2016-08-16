@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
+	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // ReplaceOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -187,8 +188,11 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		}
 	}
 
-	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	mapper, typer, err := f.UnstructuredObject()
+	if err != nil {
+		return err
+	}
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
@@ -212,7 +216,7 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		return err
 	}
 
-	r = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+	r = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
