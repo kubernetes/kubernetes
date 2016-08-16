@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
+	ingresscontroller "k8s.io/kubernetes/federation/pkg/federation-controller/ingress"
 	namespacecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/namespace"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
@@ -149,6 +150,10 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
 	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
 	namespaceController.Run(wait.NeverStop)
+
+	ingClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "ingress-controller"))
+	ingressController := ingresscontroller.NewIngressController(ingClientset)
+	ingressController.Run(wait.NeverStop)
 
 	select {}
 }
