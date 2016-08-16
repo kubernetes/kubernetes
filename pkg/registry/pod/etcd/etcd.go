@@ -125,7 +125,7 @@ type EvictionREST struct {
 	store *registry.Store
 }
 
-var _ = rest.Creater(&EvictionREST)
+var _ = rest.Creater(&EvictionREST{})
 
 // New creates a new eviction resource
 func (r *EvictionREST) New() runtime.Object {
