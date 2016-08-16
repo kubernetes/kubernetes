@@ -187,7 +187,7 @@ func (p *streamProtocolV2) stream(conn streamCreator) error {
 	return <-errorChan
 }
 
-// errorDecoderV2 interprets the error channel data as plain text error message.
+// errorDecoderV2 interprets the error channel data as plain text.
 type errorDecoderV2 struct{}
 
 func (d *errorDecoderV2) decode(message []byte) error {
