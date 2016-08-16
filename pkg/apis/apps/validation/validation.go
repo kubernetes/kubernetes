@@ -101,19 +101,24 @@ func ValidatePetSet(petSet *apps.PetSet) field.ErrorList {
 func ValidatePetSetUpdate(petSet, oldPetSet *apps.PetSet) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&petSet.ObjectMeta, &oldPetSet.ObjectMeta, field.NewPath("metadata"))
 
-	// TODO: For now we're taking the safe route and disallowing all updates to spec except for Spec.Replicas.
-	// Enable on a case by case basis.
+	// TODO: For now we're taking the safe route and disallowing all updates to
+	// spec except for Replicas, for scaling, and Template.Spec.containers.image
+	// for rolling-update. Enable others on a case by case basis.
 	restoreReplicas := petSet.Spec.Replicas
 	petSet.Spec.Replicas = oldPetSet.Spec.Replicas
+
+	restoreContainers := petSet.Spec.Template.Spec.Containers
+	petSet.Spec.Template.Spec.Containers = oldPetSet.Spec.Template.Spec.Containers
 
 	if !reflect.DeepEqual(petSet.Spec, oldPetSet.Spec) {
 		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec"), "updates to petset spec for fields other than 'replicas' are forbidden."))
 	}
-	if !reflect.DeepEqual(petSet.Status, oldPetSet.Status) {
-		allErrs = append(allErrs, field.Forbidden(field.NewPath("status"), "updates to petset status forbidden."))
-	}
 	petSet.Spec.Replicas = restoreReplicas
+	petSet.Spec.Template.Spec.Containers = restoreContainers
+
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(petSet.Spec.Replicas), field.NewPath("spec", "replicas"))...)
+	containerErrs, _ := apivalidation.ValidateContainerUpdates(petSet.Spec.Template.Spec.Containers, oldPetSet.Spec.Template.Spec.Containers, field.NewPath("spec").Child("template").Child("containers"))
+	allErrs = append(allErrs, containerErrs...)
 	return allErrs
 }
 
