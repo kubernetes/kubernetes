@@ -40,9 +40,9 @@ func CheckSetEq(lhs, rhs sets.String) bool {
 
 func TestAddNode(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 
 	queuePattern := []string{"first", "second", "third"}
 	if len(evictor.queue.queue) != len(queuePattern) {
@@ -70,9 +70,9 @@ func TestDelNode(t *testing.T) {
 		return t
 	}
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 	evictor.Remove("first")
 
 	queuePattern := []string{"second", "third"}
@@ -92,9 +92,9 @@ func TestDelNode(t *testing.T) {
 	}
 
 	evictor = NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 	evictor.Remove("second")
 
 	queuePattern = []string{"first", "third"}
@@ -114,9 +114,9 @@ func TestDelNode(t *testing.T) {
 	}
 
 	evictor = NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 	evictor.Remove("third")
 
 	queuePattern = []string{"first", "second"}
@@ -138,9 +138,9 @@ func TestDelNode(t *testing.T) {
 
 func TestTry(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 	evictor.Remove("second")
 
 	deletedMap := sets.NewString()
@@ -173,9 +173,9 @@ func TestTryOrdering(t *testing.T) {
 		return current
 	}
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 
 	order := []string{}
 	count := 0
@@ -225,9 +225,9 @@ func TestTryOrdering(t *testing.T) {
 
 func TestTryRemovingWhileTry(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 
 	processing := make(chan struct{})
 	wait := make(chan struct{})
@@ -271,9 +271,9 @@ func TestTryRemovingWhileTry(t *testing.T) {
 
 func TestClear(t *testing.T) {
 	evictor := NewRateLimitedTimedQueue(flowcontrol.NewFakeAlwaysRateLimiter())
-	evictor.Add("first")
-	evictor.Add("second")
-	evictor.Add("third")
+	evictor.Add("first", "11111")
+	evictor.Add("second", "22222")
+	evictor.Add("third", "33333")
 
 	evictor.Clear()
 
