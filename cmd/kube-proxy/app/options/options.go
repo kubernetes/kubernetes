@@ -47,7 +47,6 @@ type ProxyServerConfig struct {
 	NodeRef           *api.ObjectReference
 	Master            string
 	Kubeconfig        string
-	FeatureConfig     config.ConfigurationMap
 }
 
 func NewProxyConfig() *ProxyServerConfig {
@@ -59,7 +58,6 @@ func NewProxyConfig() *ProxyServerConfig {
 		KubeAPIQPS:             5.0,
 		KubeAPIBurst:           10,
 		ConfigSyncPeriod:       15 * time.Minute,
-		FeatureConfig:          make(config.ConfigurationMap),
 	}
 }
 
@@ -73,7 +71,6 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.ResourceContainer, "resource-container", s.ResourceContainer, "Absolute name of the resource-only container to create and run the Kube-proxy in (Default: /kube-proxy).")
 	fs.MarkDeprecated("resource-container", "This feature will be removed in a later release.")
 	fs.StringVar(&s.Kubeconfig, "kubeconfig", s.Kubeconfig, "Path to kubeconfig file with authorization information (the master location is set by the master flag).")
-	fs.Var(&s.FeatureConfig, "feature-config", "A set of key=value pairs that describe feature configuration for proxy server.")
 	fs.Var(componentconfig.PortRangeVar{Val: &s.PortRange}, "proxy-port-range", "Range of host ports (beginPort-endPort, inclusive) that may be consumed in order to proxy service traffic. If unspecified (0-0) then ports will be randomly chosen.")
 	fs.StringVar(&s.HostnameOverride, "hostname-override", s.HostnameOverride, "If non-empty, will use this string as identification instead of the actual hostname.")
 	fs.Var(&s.Mode, "proxy-mode", "Which proxy mode to use: 'userspace' (older) or 'iptables' (faster). If blank, look at the Node object on the Kubernetes API and respect the '"+ExperimentalProxyModeAnnotation+"' annotation if provided.  Otherwise use the best-available proxy (currently iptables).  If the iptables proxy is selected, regardless of how, but the system's kernel or iptables versions are insufficient, this always falls back to the userspace proxy.")
@@ -92,4 +89,5 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.ConntrackMaxPerCore, "conntrack-max-per-core", s.ConntrackMaxPerCore,
 		"Maximum number of NAT connections to track per CPU core (0 to leave as-is). This is only considered if conntrack-max is 0.")
 	fs.DurationVar(&s.ConntrackTCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", s.ConntrackTCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
+	config.AddFeatureConfigFlag(fs)
 }

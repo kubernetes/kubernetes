@@ -89,7 +89,6 @@ func Run(s *options.SchedulerServer) error {
 	if err != nil {
 		glog.Fatalf("Invalid API configuration: %v", err)
 	}
-	glog.Infof("feature-config: %v", s.FeatureConfig)
 
 	go func() {
 		mux := http.NewServeMux()

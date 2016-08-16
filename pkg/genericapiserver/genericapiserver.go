@@ -604,8 +604,6 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 			}
 		}
 	}
-
-	glog.Infof("feature-config: %v", options.FeatureConfig)
 }
 
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
