@@ -83,7 +83,7 @@ func cleanupOrphanedPods(pods []*api.Pod, nodeStore cache.Store, forcefulDeleteP
 
 // deletePods will delete all pods from master running on given node, and return true
 // if any pods were deleted.
-func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
+func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore cache.StoreToDaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
 	options := api.ListOptions{FieldSelector: selector}
@@ -93,7 +93,7 @@ func deletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	}
 
 	if len(pods.Items) > 0 {
-		recordNodeEvent(recorder, nodeName, api.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
+		recordNodeEvent(recorder, nodeName, nodeUID, api.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
 	}
 
 	for _, pod := range pods.Items {
@@ -257,11 +257,11 @@ func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName string) (
 	return true, nil
 }
 
-func recordNodeEvent(recorder record.EventRecorder, nodeName, eventtype, reason, event string) {
+func recordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
 	ref := &api.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
-		UID:       types.UID(nodeName),
+		UID:       types.UID(nodeUID),
 		Namespace: "",
 	}
 	glog.V(2).Infof("Recording %s event message for node %s", event, nodeName)
@@ -272,7 +272,7 @@ func recordNodeStatusChange(recorder record.EventRecorder, node *api.Node, new_s
 	ref := &api.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,
-		UID:       types.UID(node.Name),
+		UID:       node.UID,
 		Namespace: "",
 	}
 	glog.V(2).Infof("Recording status change %s event message for node %s", new_status, node.Name)
@@ -284,7 +284,7 @@ func recordNodeStatusChange(recorder record.EventRecorder, node *api.Node, new_s
 // terminatePods will ensure all pods on the given node that are in terminating state are eventually
 // cleaned up. Returns true if the node has no pods in terminating state, a duration that indicates how
 // long before we should check again (the next deadline for a pod to complete), or an error.
-func terminatePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, since time.Time, maxGracePeriod time.Duration) (bool, time.Duration, error) {
+func terminatePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName string, nodeUID string, since time.Time, maxGracePeriod time.Duration) (bool, time.Duration, error) {
 	// the time before we should try again
 	nextAttempt := time.Duration(0)
 	// have we deleted all pods
@@ -320,7 +320,7 @@ func terminatePods(kubeClient clientset.Interface, recorder record.EventRecorder
 		if remaining < 0 {
 			remaining = 0
 			glog.V(2).Infof("Removing pod %v after %s grace period", pod.Name, grace)
-			recordNodeEvent(recorder, nodeName, api.EventTypeNormal, "TerminatingEvictedPod", fmt.Sprintf("Pod %s has exceeded the grace period for deletion after being evicted from Node %q and is being force killed", pod.Name, nodeName))
+			recordNodeEvent(recorder, nodeName, nodeUID, api.EventTypeNormal, "TerminatingEvictedPod", fmt.Sprintf("Pod %s has exceeded the grace period for deletion after being evicted from Node %q and is being force killed", pod.Name, nodeName))
 			if err := kubeClient.Core().Pods(pod.Namespace).Delete(pod.Name, api.NewDeleteOptions(0)); err != nil {
 				glog.Errorf("Error completing deletion of pod %s: %v", pod.Name, err)
 				complete = false
