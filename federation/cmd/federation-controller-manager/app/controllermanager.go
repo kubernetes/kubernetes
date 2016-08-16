@@ -148,7 +148,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 
 	nsClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "namespace-controller"))
 	namespaceController := namespacecontroller.NewNamespaceController(nsClientset)
-	namespaceController.Start()
+	namespaceController.Run(wait.NeverStop)
 
 	select {}
 }
