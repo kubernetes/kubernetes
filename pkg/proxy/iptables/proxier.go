@@ -581,11 +581,11 @@ func servicePortChainName(s proxy.ServicePortName, protocol string) utiliptables
 	return utiliptables.Chain("KUBE-SVC-" + portProtoHash(s, protocol))
 }
 
-// servicePortChainName takes the ServicePortName for a service and
+// externalLoadBalancerChainName takes the ServicePortName for a service and
 // returns the associated iptables chain.  This is computed by hashing (sha256)
-// then encoding to base32 and truncating with the prefix "KUBE-FW-".
-func serviceFirewallChainName(s proxy.ServicePortName, protocol string) utiliptables.Chain {
-	return utiliptables.Chain("KUBE-FW-" + portProtoHash(s, protocol))
+// then encoding to base32 and truncating with the prefix "KUBE-XLB-".
+func externalLoadBalancerChainName(s proxy.ServicePortName, protocol string) utiliptables.Chain {
+	return utiliptables.Chain("KUBE-XLB-" + portProtoHash(s, protocol))
 }
 
 // This is the same as servicePortChainName but with the endpoint included.
@@ -872,6 +872,18 @@ func (proxier *Proxier) syncProxyRules() {
 		// Capture load-balancer ingress.
 		for _, ingress := range svcInfo.loadBalancerStatus.Ingress {
 			if ingress.IP != "" {
+				// create service external loadbalancer chain
+				xlbChain := externalLoadBalancerChainName(svcName, protocol)
+				if chain, ok := existingNATChains[xlbChain]; ok {
+					writeLine(natChains, chain)
+				} else {
+					writeLine(natChains, utiliptables.MakeChainLine(xlbChain))
+				}
+				activeNATChains[xlbChain] = true
+				// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
+				// This currently works for loadbalancers that preserves source ips.
+				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
+
 				args := []string{
 					"-A", string(kubeServicesChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcName.String()),
@@ -879,25 +891,12 @@ func (proxier *Proxier) syncProxyRules() {
 					"-d", fmt.Sprintf("%s/32", ingress.IP),
 					"--dport", fmt.Sprintf("%d", svcInfo.port),
 				}
-				// create service firewall chain
-				fwChain := serviceFirewallChainName(svcName, protocol)
-				if chain, ok := existingNATChains[fwChain]; ok {
-					writeLine(natChains, chain)
-				} else {
-					writeLine(natChains, utiliptables.MakeChainLine(fwChain))
-				}
 				// jump to service firewall chain
-				// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
-				// This currently works for loadbalancers that preserves source ips.
-				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
-				writeLine(natRules, append(args, "-j", string(fwChain))...)
+				writeLine(natRules, append(args, "-j", string(xlbChain))...)
 
 				args = []string{
-					"-A", string(fwChain),
+					"-A", string(xlbChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcName.String()),
-					"-m", protocol, "-p", protocol,
-					"-d", fmt.Sprintf("%s/32", ingress.IP),
-					"--dport", fmt.Sprintf("%d", svcInfo.port),
 				}
 				// We have to SNAT packets from external IPs.
 				writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
@@ -1056,7 +1055,7 @@ func (proxier *Proxier) syncProxyRules() {
 	for chain := range existingNATChains {
 		if !activeNATChains[chain] {
 			chainString := string(chain)
-			if !strings.HasPrefix(chainString, "KUBE-SVC-") && !strings.HasPrefix(chainString, "KUBE-SEP-") {
+			if !strings.HasPrefix(chainString, "KUBE-SVC-") && !strings.HasPrefix(chainString, "KUBE-SEP-") && !strings.HasPrefix(chainString, "KUBE-XLB-") {
 				// Ignore chains that aren't ours.
 				continue
 			}
