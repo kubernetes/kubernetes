@@ -355,19 +355,19 @@ func shouldScale(hpa *autoscaling.HorizontalPodAutoscaler, currentReplicas, desi
 		return false
 	}
 
+	if hpa.Status.LastScaleTime == nil {
+		return true
+	}
+
 	// Going down only if the usageRatio dropped significantly below the target
 	// and there was no rescaling in the last downscaleForbiddenWindow.
-	if desiredReplicas < currentReplicas &&
-		(hpa.Status.LastScaleTime == nil ||
-			hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp)) {
+	if desiredReplicas < currentReplicas && hpa.Status.LastScaleTime.Add(downscaleForbiddenWindow).Before(timestamp) {
 		return true
 	}
 
 	// Going up only if the usage ratio increased significantly above the target
 	// and there was no rescaling in the last upscaleForbiddenWindow.
-	if desiredReplicas > currentReplicas &&
-		(hpa.Status.LastScaleTime == nil ||
-			hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp)) {
+	if desiredReplicas > currentReplicas && hpa.Status.LastScaleTime.Add(upscaleForbiddenWindow).Before(timestamp) {
 		return true
 	}
 	return false
