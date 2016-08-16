@@ -1,5 +1,7 @@
+// +build !cgo !linux
+
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +18,11 @@ limitations under the License.
 
 package procfs
 
-type ProcFSInterface interface {
-	// GetFullContainerName gets the container name given the root process id of the container.
-	GetFullContainerName(pid int) (string, error)
+import (
+	"fmt"
+)
+
+// GetFullContainerName gets the container name given the root process id of the container.
+func GetFullContainerName(pid int) (string, error) {
+	return "", fmt.Errorf("GetFullContainerName is unsupported in this build")
 }
