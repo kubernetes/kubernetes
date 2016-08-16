@@ -48,7 +48,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&Cluster{},
 		&ClusterList{},
 		&api.ListOptions{},
-		&api.DeleteOptions{},
 	)
 	return nil
 }
