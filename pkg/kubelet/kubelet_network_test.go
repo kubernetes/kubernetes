@@ -217,3 +217,25 @@ func TestCleanupBandwidthLimits(t *testing.T) {
 		}
 	}
 }
+
+func TestGetIPTablesMark(t *testing.T) {
+	tests := []struct {
+		bit    int
+		expect string
+	}{
+		{
+			14,
+			"0x00004000/0x00004000",
+		},
+		{
+			15,
+			"0x00008000/0x00008000",
+		},
+	}
+	for _, tc := range tests {
+		res := getIPTablesMark(tc.bit)
+		if res != tc.expect {
+			t.Errorf("getIPTablesMark output unexpected result: %v when input bit is %d. Expect result: %v", res, tc.bit, tc.expect)
+		}
+	}
+}
