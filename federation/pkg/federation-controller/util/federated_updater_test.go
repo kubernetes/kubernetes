@@ -56,13 +56,13 @@ func TestFederatedUpdaterOK(t *testing.T) {
 
 	updater := NewFederatedUpdater(&fakeFederationView{},
 		func(_ federation_release_1_4.Interface, obj pkg_runtime.Object) error {
-			clusterName, _ := GetClusterName(obj)
-			addChan <- clusterName
+			service := obj.(*api_v1.Service)
+			addChan <- service.Name
 			return nil
 		},
 		func(_ federation_release_1_4.Interface, obj pkg_runtime.Object) error {
-			clusterName, _ := GetClusterName(obj)
-			updateChan <- clusterName
+			service := obj.(*api_v1.Service)
+			updateChan <- service.Name
 			return nil
 		},
 		noop)
@@ -74,14 +74,14 @@ func TestFederatedUpdaterOK(t *testing.T) {
 		},
 		{
 			Type: OperationTypeUpdate,
-			Obj:  makeService("B", "s1"),
+			Obj:  makeService("B", "s2"),
 		},
 	}, time.Minute)
 	assert.NoError(t, err)
 	add := <-addChan
 	update := <-updateChan
-	assert.Equal(t, "A", add)
-	assert.Equal(t, "B", update)
+	assert.Equal(t, "s1", add)
+	assert.Equal(t, "s2", update)
 }
 
 func TestFederatedUpdaterError(t *testing.T) {
@@ -132,9 +132,6 @@ func makeService(cluster, name string) *api_v1.Service {
 		ObjectMeta: api_v1.ObjectMeta{
 			Namespace: "ns1",
 			Name:      name,
-			Annotations: map[string]string{
-				ClusterNameAnnotation: cluster,
-			},
 		},
 	}
 }

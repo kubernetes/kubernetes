@@ -52,19 +52,13 @@ func TestHandlers(t *testing.T) {
 		}
 	}
 
-	trigger := NewTriggerOnAllChangesPreproc(
+	trigger := NewTriggerOnAllChanges(
 		func(obj pkg_runtime.Object) {
 			triggerChan <- struct{}{}
-		},
-		func(obj pkg_runtime.Object) {
-			SetClusterName(obj, "mycluster")
 		})
 
 	trigger.OnAdd(&service)
 	assert.True(t, triggered())
-	name, err := GetClusterName(&service)
-	assert.NoError(t, err)
-	assert.Equal(t, "mycluster", name)
 	trigger.OnDelete(&service)
 	assert.True(t, triggered())
 	trigger.OnUpdate(&service, &service)
@@ -72,20 +66,14 @@ func TestHandlers(t *testing.T) {
 	trigger.OnUpdate(&service, &service2)
 	assert.True(t, triggered())
 
-	trigger2 := NewTriggerOnMetaAndSpecChangesPreproc(
+	trigger2 := NewTriggerOnMetaAndSpecChanges(
 		func(obj pkg_runtime.Object) {
 			triggerChan <- struct{}{}
 		},
-		func(obj pkg_runtime.Object) {
-			SetClusterName(obj, "mycluster")
-		})
+	)
 
-	service.Annotations = make(map[string]string)
 	trigger2.OnAdd(&service)
 	assert.True(t, triggered())
-	name, err = GetClusterName(&service)
-	assert.NoError(t, err)
-	assert.Equal(t, "mycluster", name)
 	trigger2.OnDelete(&service)
 	assert.True(t, triggered())
 	trigger2.OnUpdate(&service, &service)
