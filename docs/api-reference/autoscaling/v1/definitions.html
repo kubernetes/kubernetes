@@ -506,6 +506,10 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 
 </div>
 <div class="sect2">
+<h3 id="__versioned_event">*versioned.Event</h3>
+
+</div>
+<div class="sect2">
 <h3 id="_unversioned_statusdetails">unversioned.StatusDetails</h3>
 <div class="paragraph">
 <p>StatusDetails is a set of additional properties that MAY be set by the server to provide additional information about a response. The Reason field of a Status object defines what attributes will be set. Clients must ignore fields that do not match the defined type of each attribute, and should assume that any attribute may be empty, invalid, or under defined.</p>
@@ -565,10 +569,6 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 </tbody>
 </table>
-
-</div>
-<div class="sect2">
-<h3 id="__versioned_event">*versioned.Event</h3>
 
 </div>
 <div class="sect2">
@@ -1194,6 +1194,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">cluster</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A referece to the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. An empty value means the object belongs to the local cluster (the one the client connects to). Cannot be updated.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_clusterreference">v1.ClusterReference</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -1255,6 +1262,40 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_clusterreference">v1.ClusterReference</h3>
+<div class="paragraph">
+<p>ClusterReference contains information to identify a cluster.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">clusterName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The name of the cluster. Cannot be updated.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
 </table>
@@ -1327,7 +1368,7 @@ Examples:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-06-28 21:15:27 UTC
+Last updated 2016-08-16 20:40:58 UTC
 </div>
 </div>
 </body>

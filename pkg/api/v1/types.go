@@ -192,7 +192,7 @@ type ObjectMeta struct {
 	// This is used to distinguish resources with same name and namespace in different clusters.
 	// An empty value means the object belongs to the local cluster (the one the client connects to).
 	// Cannot be updated.
-	Cluster *ClusterReference `json:"cluster,omitempty"`
+	Cluster *ClusterReference `json:"cluster,omitempty" protobuf:"bytes,15,opt,name=cluster"`
 }
 
 const (
@@ -206,7 +206,7 @@ const (
 type ClusterReference struct {
 	// The name of the cluster.
 	// Cannot be updated.
-	ClusterName string `json:"clusterName,omitempty"`
+	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,1,opt,name=clusterName"`
 }
 
 // Volume represents a named volume in a pod that may be accessed by any container in the pod.

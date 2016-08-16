@@ -54,6 +54,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource,
 		Convert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
 		Convert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
+		Convert_v1_ClusterReference_To_api_ClusterReference,
+		Convert_api_ClusterReference_To_v1_ClusterReference,
 		Convert_v1_ComponentCondition_To_api_ComponentCondition,
 		Convert_api_ComponentCondition_To_v1_ComponentCondition,
 		Convert_v1_ComponentStatus_To_api_ComponentStatus,
@@ -667,6 +669,24 @@ func autoConvert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in *api.CinderV
 
 func Convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in *api.CinderVolumeSource, out *CinderVolumeSource, s conversion.Scope) error {
 	return autoConvert_api_CinderVolumeSource_To_v1_CinderVolumeSource(in, out, s)
+}
+
+func autoConvert_v1_ClusterReference_To_api_ClusterReference(in *ClusterReference, out *api.ClusterReference, s conversion.Scope) error {
+	out.ClusterName = in.ClusterName
+	return nil
+}
+
+func Convert_v1_ClusterReference_To_api_ClusterReference(in *ClusterReference, out *api.ClusterReference, s conversion.Scope) error {
+	return autoConvert_v1_ClusterReference_To_api_ClusterReference(in, out, s)
+}
+
+func autoConvert_api_ClusterReference_To_v1_ClusterReference(in *api.ClusterReference, out *ClusterReference, s conversion.Scope) error {
+	out.ClusterName = in.ClusterName
+	return nil
+}
+
+func Convert_api_ClusterReference_To_v1_ClusterReference(in *api.ClusterReference, out *ClusterReference, s conversion.Scope) error {
+	return autoConvert_api_ClusterReference_To_v1_ClusterReference(in, out, s)
 }
 
 func autoConvert_v1_ComponentCondition_To_api_ComponentCondition(in *ComponentCondition, out *api.ComponentCondition, s conversion.Scope) error {
@@ -3665,6 +3685,15 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 		out.OwnerReferences = nil
 	}
 	out.Finalizers = in.Finalizers
+	if in.Cluster != nil {
+		in, out := &in.Cluster, &out.Cluster
+		*out = new(api.ClusterReference)
+		if err := Convert_v1_ClusterReference_To_api_ClusterReference(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Cluster = nil
+	}
 	return nil
 }
 
@@ -3699,6 +3728,15 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 		out.OwnerReferences = nil
 	}
 	out.Finalizers = in.Finalizers
+	if in.Cluster != nil {
+		in, out := &in.Cluster, &out.Cluster
+		*out = new(ClusterReference)
+		if err := Convert_api_ClusterReference_To_v1_ClusterReference(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.Cluster = nil
+	}
 	return nil
 }
 

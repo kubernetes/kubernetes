@@ -1113,6 +1113,10 @@
        "type": "string"
       },
       "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed."
+     },
+     "cluster": {
+      "$ref": "v1.ClusterReference",
+      "description": "A referece to the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. An empty value means the object belongs to the local cluster (the one the client connects to). Cannot be updated."
      }
     }
    },
@@ -1145,6 +1149,16 @@
      "controller": {
       "type": "boolean",
       "description": "If true, this reference points to the managing controller."
+     }
+    }
+   },
+   "v1.ClusterReference": {
+    "id": "v1.ClusterReference",
+    "description": "ClusterReference contains information to identify a cluster.",
+    "properties": {
+     "clusterName": {
+      "type": "string",
+      "description": "The name of the cluster. Cannot be updated."
      }
     }
    },

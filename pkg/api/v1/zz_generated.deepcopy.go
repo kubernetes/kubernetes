@@ -45,6 +45,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Capabilities, InType: reflect.TypeOf(&Capabilities{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_CephFSVolumeSource, InType: reflect.TypeOf(&CephFSVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_CinderVolumeSource, InType: reflect.TypeOf(&CinderVolumeSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ClusterReference, InType: reflect.TypeOf(&ClusterReference{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ComponentCondition, InType: reflect.TypeOf(&ComponentCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ComponentStatus, InType: reflect.TypeOf(&ComponentStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ComponentStatusList, InType: reflect.TypeOf(&ComponentStatusList{})},
@@ -350,6 +351,15 @@ func DeepCopy_v1_CinderVolumeSource(in interface{}, out interface{}, c *conversi
 		out.VolumeID = in.VolumeID
 		out.FSType = in.FSType
 		out.ReadOnly = in.ReadOnly
+		return nil
+	}
+}
+
+func DeepCopy_v1_ClusterReference(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*ClusterReference)
+		out := out.(*ClusterReference)
+		out.ClusterName = in.ClusterName
 		return nil
 	}
 }
@@ -1857,6 +1867,13 @@ func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Clone
 			copy(*out, *in)
 		} else {
 			out.Finalizers = nil
+		}
+		if in.Cluster != nil {
+			in, out := &in.Cluster, &out.Cluster
+			*out = new(ClusterReference)
+			**out = **in
+		} else {
+			out.Cluster = nil
 		}
 		return nil
 	}
