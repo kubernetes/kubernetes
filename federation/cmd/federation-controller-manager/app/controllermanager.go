@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/federation/cmd/federation-controller-manager/app/options"
 	"k8s.io/kubernetes/federation/pkg/dnsprovider"
 	clustercontroller "k8s.io/kubernetes/federation/pkg/federation-controller/cluster"
+	secretcontroller "k8s.io/kubernetes/federation/pkg/federation-controller/secret"
 	servicecontroller "k8s.io/kubernetes/federation/pkg/federation-controller/service"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -144,5 +145,9 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	if err := servicecontroller.Run(s.ConcurrentServiceSyncs, wait.NeverStop); err != nil {
 		glog.Errorf("Failed to start service controller: %v", err)
 	}
+	secretcontrollerClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, "secret-controller"))
+	secretcontroller := secretcontroller.NewSecretController(secretcontrollerClientset)
+	secretcontroller.Start()
+
 	select {}
 }

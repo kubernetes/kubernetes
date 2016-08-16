@@ -93,3 +93,42 @@ func NewTriggerOnMetaAndSpecChangesPreproc(triggerFunc func(pkg_runtime.Object),
 func TriggerOnMetaAndSpecChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
 	return NewTriggerOnAllChangesPreproc(triggerFunc, func(obj pkg_runtime.Object) {})
 }
+
+// Returns framework.ResourceEventHandlerFuncs that trigger the given function
+// on object add and delete. Preproc preprocessing is executed
+// before each trigger and check.
+func NewTriggerOnChangesPreproc(triggerFunc func(pkg_runtime.Object), preproc func(obj pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
+	getFieldOrPanic := func(obj interface{}, fieldName string) interface{} {
+		val := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
+		if val.IsValid() {
+			return val.Interface()
+		} else {
+			panic(fmt.Errorf("field not found: %s", fieldName))
+		}
+	}
+	return &framework.ResourceEventHandlerFuncs{
+		DeleteFunc: func(old interface{}) {
+			oldObj := old.(pkg_runtime.Object)
+			preproc(oldObj)
+			triggerFunc(oldObj)
+		},
+		AddFunc: func(cur interface{}) {
+			curObj := cur.(pkg_runtime.Object)
+			preproc(curObj)
+			triggerFunc(curObj)
+		},
+		UpdateFunc: func(old, cur interface{}) {
+			curObj := cur.(pkg_runtime.Object)
+			oldObj := cur.(pkg_runtime.Object)
+			preproc(curObj)
+			preproc(oldObj)
+			if !reflect.DeepEqual(getFieldOrPanic(old, "ObjectMeta"), getFieldOrPanic(cur, "ObjectMeta")) {
+				triggerFunc(curObj)
+			}
+		},
+	}
+}
+
+func TriggerOnChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
+	return NewTriggerOnAllChangesPreproc(triggerFunc, func(obj pkg_runtime.Object) {})
+}
