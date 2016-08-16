@@ -69,9 +69,8 @@ type Reader struct {
 // WebSocket connection. If ping is true, a zero length message will be sent to the client
 // before the stream begins reading.
 //
-// The protocols parameter maps subprotocol names to
-// StreamProtocols. The empty string subprotocol name is used if websocket.Config.Protocol
-// is empty.
+// The protocols parameter maps subprotocol names to StreamProtocols. The empty string
+// subprotocol name is used if websocket.Config.Protocol is empty.
 func NewReader(r io.Reader, ping bool, protocols map[string]ReaderProtocolConfig) *Reader {
 	return &Reader{
 		r:           r,
