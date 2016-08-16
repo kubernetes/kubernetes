@@ -201,6 +201,10 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostIPC"), pod.Spec.SecurityContext.HostIPC, "Host IPC is not allowed to be used"))
 	}
 
+	if !s.psp.Spec.HostUser && pod.Spec.SecurityContext.HostUser {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostUser"), pod.Spec.SecurityContext.HostUser, "HostUser is not allowed to be used"))
+	}
+
 	return allErrs
 }
 

@@ -172,6 +172,9 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 	failHostNetworkPod := defaultPod()
 	failHostNetworkPod.Spec.SecurityContext.HostNetwork = true
 
+	failHostUserPod := defaultPod()
+	failHostUserPod.Spec.SecurityContext.HostUser = true
+
 	failHostPIDPod := defaultPod()
 	failHostPIDPod.Spec.SecurityContext.HostPID = true
 
@@ -216,6 +219,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		psp           *extensions.PodSecurityPolicy
 		expectedError string
 	}{
+		"failHostUser": {
+			pod:           failHostUserPod,
+			psp:           defaultPSP(),
+			expectedError: "HostUser is not allowed to be used",
+		},
 		"failHostNetwork": {
 			pod:           failHostNetworkPod,
 			psp:           defaultPSP(),
@@ -396,6 +404,11 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 }
 
 func TestValidatePodSecurityContextSuccess(t *testing.T) {
+	hostUserPSP := defaultPSP()
+	hostUserPSP.Spec.HostUser = true
+	hostUserPod := defaultPod()
+	hostUserPod.Spec.SecurityContext.HostUser = true
+
 	hostNetworkPSP := defaultPSP()
 	hostNetworkPSP.Spec.HostNetwork = true
 	hostNetworkPod := defaultPod()
@@ -452,6 +465,10 @@ func TestValidatePodSecurityContextSuccess(t *testing.T) {
 		pod *api.Pod
 		psp *extensions.PodSecurityPolicy
 	}{
+		"pass hostUser validating PSP": {
+			pod: hostUserPod,
+			psp: hostUserPSP,
+		},
 		"pass hostNetwork validating PSP": {
 			pod: hostNetworkPod,
 			psp: hostNetworkPSP,

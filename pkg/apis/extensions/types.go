@@ -665,6 +665,8 @@ type PodSecurityPolicySpec struct {
 	HostPID bool `json:"hostPID,omitempty"`
 	// HostIPC determines if the policy allows the use of HostIPC in the pod spec.
 	HostIPC bool `json:"hostIPC,omitempty"`
+	// HostUser determines if the policy allows the use of HostUser in the pod spec.
+	HostUser bool `json:"hostUser,omitempty"`
 	// SELinux is the strategy that will dictate the allowable labels that may be set.
 	SELinux SELinuxStrategyOptions `json:"seLinux"`
 	// RunAsUser is the strategy that will dictate the allowable RunAsUser values that may be set.
