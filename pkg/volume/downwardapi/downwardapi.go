@@ -24,6 +24,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/fieldpath"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -196,24 +197,39 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 func (d *downwardAPIVolume) collectData() (map[string][]byte, error) {
 	errlist := []error{}
 	data := make(map[string][]byte)
-	for _, fileInfo := range d.items {
-		if fileInfo.FieldRef != nil {
-			if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fileInfo.FieldRef.FieldPath); err != nil {
-				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
-				errlist = append(errlist, err)
-			} else {
-				data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
-			}
-		} else if fileInfo.ResourceFieldRef != nil {
-			containerName := fileInfo.ResourceFieldRef.ContainerName
-			if values, err := fieldpath.ExtractResourceValueByContainerName(fileInfo.ResourceFieldRef, d.pod, containerName); err != nil {
-				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
-				errlist = append(errlist, err)
-			} else {
-				data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
-			}
-		}
-	}
+	kubeClient := d.plugin.host.GetKubeClient()
+	if kubeClient == nil {
+		return data, fmt.Errorf("Cannot setup configMap volume %v because kube client is not configured", d.volName)
+    }
+    for _, fileInfo := range d.items {
+        if fileInfo.FieldRef != nil {
+            if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fileInfo.FieldRef.FieldPath); err != nil {
+                glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
+                errlist = append(errlist, err)
+            } else {
+                data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
+            }
+        } else if fileInfo.ResourceFieldRef != nil {
+            containerName := fileInfo.ResourceFieldRef.ContainerName
+            if values, err := fieldpath.ExtractResourceValueByContainerName(fileInfo.ResourceFieldRef, d.pod, containerName); err != nil {
+                glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
+            } else {
+                data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
+            }
+        } else if fileInfo.ConfigMapRef != "" {
+            if configmap, err := kubeClient.Core().ConfigMaps(d.pod.Namespace).Get(fileInfo.ConfigMapRef); err != nil {
+                glog.Errorf("Problem retrieving configmap %s. %s", fileInfo.ConfigMapRef, err.Error())
+                errlist = append(errlist, err)
+            } else {
+                rendered, err := format.RenderConfigMap(configmap, d.pod, kubeClient, fileInfo.Template)
+                if err != nil {
+                    errlist = append(errlist, err)
+                } else {
+                    data[path.Clean(fileInfo.Path)] = rendered
+                }
+            }
+        }
+    }
 	return data, utilerrors.NewAggregate(errlist)
 }
 

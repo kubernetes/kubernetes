@@ -1442,6 +1442,8 @@ func autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *Downw
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	out.ConfigMapRef = in.ConfigMapRef
+	out.Template = in.Template
 	return nil
 }
 
@@ -1469,6 +1471,8 @@ func autoConvert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.D
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	out.ConfigMapRef = in.ConfigMapRef
+	out.Template = in.Template
 	return nil
 }
 

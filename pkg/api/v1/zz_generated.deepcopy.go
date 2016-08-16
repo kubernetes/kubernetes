@@ -754,6 +754,8 @@ func DeepCopy_v1_DownwardAPIVolumeFile(in interface{}, out interface{}, c *conve
 		} else {
 			out.ResourceFieldRef = nil
 		}
+		out.ConfigMapRef = in.ConfigMapRef
+		out.Template = in.Template
 		return nil
 	}
 }

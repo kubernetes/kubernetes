@@ -526,6 +526,10 @@ message DownwardAPIVolumeFile {
   // Selects a resource of the container: only resources limits and requests
   // (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
   optional ResourceFieldSelector resourceFieldRef = 3;
+
+  optional string configMapRef = 4;
+
+  optional string template = 5;
 }
 
 // DownwardAPIVolumeSource represents a volume containing downward API info.

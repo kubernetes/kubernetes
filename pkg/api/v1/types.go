@@ -3296,6 +3296,8 @@ type DownwardAPIVolumeFile struct {
 	// Selects a resource of the container: only resources limits and requests
 	// (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
 	ResourceFieldRef *ResourceFieldSelector `json:"resourceFieldRef,omitempty" protobuf:"bytes,3,opt,name=resourceFieldRef"`
+	ConfigMapRef     string                 `json:"configMapRef,omitempty" protobuf:"bytes,4,opt,name=configMapRef"`
+	Template         string                 `json:"template,omitempty" protobuf:"bytes,5,opt,name=template"`
 }
 
 // SecurityContext holds security configuration that will be applied to a container.
