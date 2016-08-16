@@ -139,7 +139,7 @@ type NodeController struct {
 
 	forcefullyDeletePod        func(*api.Pod) error
 	nodeExistsInCloudProvider  func(string) (bool, error)
-	computeZoneStateFunc       func(nodeConditions []*api.NodeCondition) zoneState
+	computeZoneStateFunc       func(nodeConditions []*api.NodeCondition) (int, zoneState)
 	enterPartialDisruptionFunc func(nodeNum int, defaultQPS float32) float32
 	enterFullDisruptionFunc    func(nodeNum int, defaultQPS float32) float32
 
@@ -327,6 +327,9 @@ func NewNodeController(
 			return nil, err
 		}
 	}
+
+	// Register prometheus metrics
+	Register()
 
 	return nc, nil
 }
@@ -566,7 +569,9 @@ func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*ap
 	newZoneStates := map[string]zoneState{}
 	allAreFullyDisrupted := true
 	for k, v := range zoneToNodeConditions {
-		newState := nc.computeZoneStateFunc(v)
+		ZoneSize.WithLabelValues(k).Set(float64(len(v)))
+		unhealthy, newState := nc.computeZoneStateFunc(v)
+		ZoneHealth.WithLabelValues(k).Set(float64(100*(len(v)-unhealthy)) / float64(len(v)))
 		if newState != stateFullDisruption {
 			allAreFullyDisrupted = false
 		}
@@ -579,6 +584,8 @@ func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*ap
 	allWasFullyDisrupted := true
 	for k, v := range nc.zoneStates {
 		if _, have := zoneToNodeConditions[k]; !have {
+			ZoneSize.WithLabelValues(k).Set(0)
+			ZoneHealth.WithLabelValues(k).Set(100)
 			delete(nc.zoneStates, k)
 			continue
 		}

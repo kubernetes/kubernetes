@@ -45,7 +45,7 @@ const (
 // - fullyDisrupted if there're no Ready Nodes,
 // - partiallyDisrupted if more than 1/3 of Nodes (at least 3) are not Ready,
 // - normal otherwise
-func ComputeZoneState(nodeReadyConditions []*api.NodeCondition) zoneState {
+func ComputeZoneState(nodeReadyConditions []*api.NodeCondition) (int, zoneState) {
 	readyNodes := 0
 	notReadyNodes := 0
 	for i := range nodeReadyConditions {
@@ -57,11 +57,11 @@ func ComputeZoneState(nodeReadyConditions []*api.NodeCondition) zoneState {
 	}
 	switch {
 	case readyNodes == 0 && notReadyNodes > 0:
-		return stateFullDisruption
+		return notReadyNodes, stateFullDisruption
 	case notReadyNodes > 2 && 2*notReadyNodes > readyNodes:
-		return statePartialDisruption
+		return notReadyNodes, statePartialDisruption
 	default:
-		return stateNormal
+		return notReadyNodes, stateNormal
 	}
 }
 
