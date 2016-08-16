@@ -233,10 +233,11 @@ func DiffResources(before, clusterUp, after, location string) {
 	if len(lines) < 3 { // Ignore the +++ and --- header lines
 		return
 	}
+	lines = lines[2:]
 
 	var added []string
 	for _, l := range lines {
-		if strings.HasPrefix(l, "+") {
+		if strings.HasPrefix(l, "+") && len(strings.TrimPrefix(l, "+")) > 0 {
 			added = append(added, l)
 		}
 	}
