@@ -96,6 +96,13 @@ type FederatedInformer interface {
 	Stop()
 }
 
+// FederatedInformer with extra method for setting fake clients.
+type FederatedInformerForTestOnly interface {
+	FederatedInformer
+
+	SetClientFactory(func(*federation_api.Cluster) (federation_release_1_4.Interface, error))
+}
+
 // A function that should be used to create an informer on the target object. Store should use
 // framework.DeletionHandlingMetaNamespaceKeyFunc as a keying function.
 type TargetInformerFactory func(*federation_api.Cluster, federation_release_1_4.Interface) (cache.Store, framework.ControllerInterface)
@@ -259,6 +266,13 @@ func (f *federatedInformerImpl) Start() {
 
 	f.clusterInformer.stopChan = make(chan struct{})
 	go f.clusterInformer.controller.Run(f.clusterInformer.stopChan)
+}
+
+func (f *federatedInformerImpl) SetClientFactory(clientFactory func(*federation_api.Cluster) (federation_release_1_4.Interface, error)) {
+	f.Lock()
+	defer f.Unlock()
+
+	f.clientFactory = clientFactory
 }
 
 // GetClientsetForCluster returns a clientset for the cluster, if present.
