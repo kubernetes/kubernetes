@@ -114,6 +114,27 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 	return allPlugins
 }
 
+// NewAlphaVolumeProvisioner returns a volume provisioner to use when running in
+// a cloud or development environment. The alpha implementation of provisioning
+// allows 1 implied provisioner per cloud and is here only for compatibility
+// with Kubernetes 1.3
+// TODO: remove in Kubernetes 1.5
+func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
+	switch {
+	case cloud == nil && config.EnableHostPathProvisioning:
+		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
+	case cloud != nil && aws.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
+	case cloud != nil && gce.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(gce_pd.ProbeVolumePlugins())
+	case cloud != nil && openstack.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(cinder.ProbeVolumePlugins())
+	case cloud != nil && vsphere.ProviderName == cloud.ProviderName():
+		return getProvisionablePluginFromVolumePlugins(vsphere_volume.ProbeVolumePlugins())
+	}
+	return nil, nil
+}
+
 func getProvisionablePluginFromVolumePlugins(plugins []volume.VolumePlugin) (volume.ProvisionableVolumePlugin, error) {
 	for _, plugin := range plugins {
 		if provisonablePlugin, ok := plugin.(volume.ProvisionableVolumePlugin); ok {

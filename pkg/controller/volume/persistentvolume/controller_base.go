@@ -48,6 +48,7 @@ import (
 func NewPersistentVolumeController(
 	kubeClient clientset.Interface,
 	syncPeriod time.Duration,
+	alphaProvisioner vol.ProvisionableVolumePlugin,
 	volumePlugins []vol.VolumePlugin,
 	cloud cloudprovider.Interface,
 	clusterName string,
