@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -37,7 +36,7 @@ func TestGetAppArmorFS(t *testing.T) {
 	assert.Equal(t, expectedPath, actualPath)
 }
 
-func TestAdmitHost(t *testing.T) {
+func TestValidateHost(t *testing.T) {
 	// This test only passes on systems running AppArmor with the default configuration.
 	// The test should be manually run if modifying the getAppArmorFS function.
 	t.Skip()
@@ -46,7 +45,7 @@ func TestAdmitHost(t *testing.T) {
 	assert.Error(t, validateHost("rkt"))
 }
 
-func TestAdmitProfile(t *testing.T) {
+func TestValidateProfile(t *testing.T) {
 	loadedProfiles := map[string]bool{
 		"docker-default":                                true,
 		"foo-bar":                                       true,
@@ -79,7 +78,7 @@ func TestAdmitProfile(t *testing.T) {
 	}
 }
 
-func TestAdmitBadHost(t *testing.T) {
+func TestValidateBadHost(t *testing.T) {
 	hostErr := errors.New("expected host error")
 	v := &validator{
 		validateHostErr: hostErr,
@@ -95,20 +94,16 @@ func TestAdmitBadHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := v.Admit(&lifecycle.PodAdmitAttributes{
-			Pod: getPodWithProfile(test.profile),
-		})
+		err := v.Validate(getPodWithProfile(test.profile))
 		if test.expectValid {
-			assert.True(t, result.Admit, "Pod with profile %q should be admitted", test.profile)
+			assert.NoError(t, err, "Pod with profile %q should be valid", test.profile)
 		} else {
-			assert.False(t, result.Admit, "Pod with profile %q should be rejected", test.profile)
-			assert.Equal(t, rejectReason, result.Reason, "Pod with profile %q", test.profile)
-			assert.Contains(t, result.Message, hostErr.Error(), "Pod with profile %q", test.profile)
+			assert.Equal(t, hostErr, err, "Pod with profile %q should trigger a host validation error", test.profile)
 		}
 	}
 }
 
-func TestAdmitValidHost(t *testing.T) {
+func TestValidateValidHost(t *testing.T) {
 	v := &validator{
 		appArmorFS: "./testdata/",
 	}
@@ -128,15 +123,11 @@ func TestAdmitValidHost(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		result := v.Admit(&lifecycle.PodAdmitAttributes{
-			Pod: getPodWithProfile(test.profile),
-		})
+		err := v.Validate(getPodWithProfile(test.profile))
 		if test.expectValid {
-			assert.True(t, result.Admit, "Pod with profile %q should be admitted", test.profile)
+			assert.NoError(t, err, "Pod with profile %q should be valid", test.profile)
 		} else {
-			assert.False(t, result.Admit, "Pod with profile %q should be rejected", test.profile)
-			assert.Equal(t, rejectReason, result.Reason, "Pod with profile %q", test.profile)
-			assert.NotEmpty(t, result.Message, "Pod with profile %q", test.profile)
+			assert.Error(t, err, "Pod with profile %q should trigger a validation error", test.profile)
 		}
 	}
 
@@ -160,16 +151,10 @@ func TestAdmitValidHost(t *testing.T) {
 			},
 		},
 	}
-	assert.True(t, v.Admit(&lifecycle.PodAdmitAttributes{Pod: pod}).Admit,
-		"Multi-container pod should be admitted")
+	assert.NoError(t, v.Validate(pod), "Multi-container pod should validate")
 	for k, val := range pod.Annotations {
 		pod.Annotations[k] = val + "-bad"
-
-		result := v.Admit(&lifecycle.PodAdmitAttributes{Pod: pod})
-		assert.False(t, result.Admit, "Multi-container pod with invalid profile should be rejected")
-		assert.Equal(t, rejectReason, result.Reason, "Multi-container pod with invalid profile")
-		assert.NotEmpty(t, result.Message, "Multi-container pod with invalid profile")
-
+		assert.Error(t, v.Validate(pod), "Multi-container pod with invalid profile %s:%s", k, pod.Annotations[k])
 		pod.Annotations[k] = val // Restore.
 	}
 }
