@@ -502,9 +502,11 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 			}
 			if controllerCount == 0 {
 				err = fmt.Errorf("asked for percentage, but found no controllers for pod %q", pod.Name)
+				dc.recorder.Event(pdb, api.EventTypeWarning, "NoControllers", err.Error())
 				return
 			} else if controllerCount > 1 {
 				err = fmt.Errorf("pod %q has %v>1 controllers", pod.Name, controllerCount)
+				dc.recorder.Event(pdb, api.EventTypeWarning, "TooManyControllers", err.Error())
 				return
 			}
 		}
