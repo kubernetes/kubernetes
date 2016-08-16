@@ -36,6 +36,7 @@ import (
 	"github.com/golang/glog"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -892,6 +894,25 @@ func (s *GenericAPIServer) InstallSwaggerAPI() {
 		},
 	}
 	swagger.RegisterSwaggerService(swaggerConfig, s.HandlerContainer)
+	openAPIConfig := openapi.Config{
+		SwaggerConfig:  &swaggerConfig,
+		IgnorePrefixes: []string{"/swaggerapi"},
+		Info: &spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Kubernetes APIs",
+				Version: "1.4",
+			},
+		},
+		DefaultResponse: &spec.Response{
+			ResponseProps: spec.ResponseProps{
+				Description: "Default Response.",
+			},
+		},
+	}
+	err := openapi.RegisterOpenAPIService(&openAPIConfig, s.HandlerContainer)
+	if err != nil {
+		glog.Fatalf("Failed to generate open api spec: %v", err)
+	}
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
