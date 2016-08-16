@@ -4697,6 +4697,42 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "valid ExternalName",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeExternalName
+				s.Spec.ClusterIP = api.ClusterIPNone
+				s.Spec.ExternalName = "foo.bar.example.com"
+			},
+			numErrs: 0,
+		},
+		{
+			name: "invalid ExternalName clusterIP (valid IP)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeExternalName
+				s.Spec.ClusterIP = "1.2.3.4"
+				s.Spec.ExternalName = "foo.bar.example.com"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid ExternalName clusterIP (empty IP)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeExternalName
+				s.Spec.ClusterIP = ""
+				s.Spec.ExternalName = "foo.bar.example.com"
+			},
+			numErrs: 1,
+		},
+		{
+			name: "invalid ExternalName (not a DNS name)",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeExternalName
+				s.Spec.ClusterIP = api.ClusterIPNone
+				s.Spec.ExternalName = "-123"
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
