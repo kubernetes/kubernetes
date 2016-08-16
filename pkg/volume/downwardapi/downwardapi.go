@@ -220,9 +220,9 @@ func (d *downwardAPIVolume) collectData() (map[string][]byte, error) {
 // sortLines sorts the strings generated from map based data
 // (annotations and labels)
 func sortLines(values string) string {
-	splitted := strings.Split(values, "\n")
-	sort.Strings(splitted)
-	return strings.Join(splitted, "\n")
+	split := strings.Split(values, "\n")
+	sort.Strings(split)
+	return strings.Join(split, "\n")
 }
 
 func (d *downwardAPIVolume) GetPath() string {

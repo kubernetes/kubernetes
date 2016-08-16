@@ -22,11 +22,14 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sort"
 	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/fieldpath"
 	"k8s.io/kubernetes/pkg/types"
+	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	utilstrings "k8s.io/kubernetes/pkg/util/strings"
@@ -139,6 +142,7 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 
 	return &flexVolumeMounter{
 		flexVolumeDisk: &flexVolumeDisk{
+			pod:          pod,
 			podUID:       pod.UID,
 			podNamespace: pod.Namespace,
 			podName:      pod.Name,
@@ -152,6 +156,7 @@ func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.P
 		fsType:             source.FSType,
 		readOnly:           source.ReadOnly,
 		options:            source.Options,
+		optionsItems:       source.OptionsItems,
 		runner:             runner,
 		manager:            manager,
 		blockDeviceMounter: &mount.SafeFormatAndMount{Interface: mounter, Runner: runner},
@@ -193,6 +198,7 @@ func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, sourceName strin
 
 // flexVolume is the disk resource provided by this plugin.
 type flexVolumeDisk struct {
+	pod *api.Pod
 	// podUID is the UID of the pod.
 	podUID types.UID
 	// podNamespace is the namespace of the pod.
@@ -234,6 +240,9 @@ type flexVolumeMounter struct {
 	// options are the extra params that will be passed to the plugin
 	// driverName.
 	options map[string]string
+	// options are the extra field params that will be passed to the plugin
+	// driverName.
+	optionsItems []api.FlexVolumeOptionsItem
 	// Runner used to setup the volume.
 	runner exec.Interface
 	// manager is the utility interface that provides API calls to the
@@ -302,6 +311,16 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		f.options[optionKeySecret+"/"+name] = secret
 	}
 
+	// Extract fieldOptions and pass it as options.
+	if data, err := f.getPodFields(); err != nil {
+		glog.Errorf("failed to extract fieldOptions data for %s", f.volName)
+		return err
+	} else {
+		for name, option := range data {
+			f.options[optionKeyItem+"/"+name] = option
+		}
+	}
+
 	glog.V(4).Infof("attempting to attach volume: %s with options %v", f.volName, f.options)
 	device, err := f.manager.attach(f)
 	if err != nil {
@@ -327,7 +346,19 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		}
 		// Extract secret and pass it as options.
 		for name, secret := range f.secrets {
+			// TODO: something is wrong here, we don't use f.options below
 			f.options[optionKeySecret+"/"+name] = secret
+		}
+
+		// Extract fieldOptions and pass it as options.
+		if data, err := f.getPodFields(); err != nil {
+			glog.Errorf("failed to extract fieldOptions data for %s", f.volName)
+			return err
+		} else {
+			for name, option := range data {
+				// TODO: something is wrong here, we don't use f.options below
+				f.options[optionKeyItem+"/"+name] = option
+			}
 		}
 
 		os.MkdirAll(dir, 0750)
@@ -422,4 +453,31 @@ func getVolumeSource(spec *volume.Spec) (*api.FlexVolumeSource, bool, error) {
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a Flex volume type")
+}
+
+// getPodFields fetches requested optionsItems in data map.
+// Map's key is the requested name of file to dump
+// Map's value is the (sorted) content of the field.
+func (f *flexVolumeMounter) getPodFields() (map[string]string, error) {
+	errlist := []error{}
+	data := make(map[string]string)
+	for _, fileInfo := range f.optionsItems {
+		if fileInfo.FieldRef != nil {
+			if values, err := fieldpath.ExtractFieldPathAsString(f.flexVolumeDisk.pod, fileInfo.FieldRef.FieldPath); err != nil {
+				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
+				errlist = append(errlist, err)
+			} else {
+				data[path.Clean(fileInfo.Name)] = sortLines(values)
+			}
+		}
+	}
+	return data, utilerrors.NewAggregate(errlist)
+}
+
+// sortLines sorts the strings generated from map based data
+// (annotations and labels)
+func sortLines(values string) string {
+	split := strings.Split(values, "\n")
+	sort.Strings(split)
+	return strings.Join(split, "\n")
 }
