@@ -43,7 +43,7 @@ const (
 	// kubernetes postrouting rules
 	KubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
 
-	// kubernetes postrouting rules
+	// kubernetes firewall rules
 	KubeFirewallChain utiliptables.Chain = "KUBE-FIREWALL"
 )
 
