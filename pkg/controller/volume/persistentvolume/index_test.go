@@ -164,7 +164,52 @@ func TestMatchVolume(t *testing.T) {
 					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
-							api.ResourceName(api.ResourceStorage): resource.MustParse("10000G"),
+							api.ResourceName(api.ResourceStorage): resource.MustParse("20000G"),
+						},
+					},
+				},
+			},
+		},
+		"successful-match-with-class": {
+			expectedMatch: "gce-pd-silver1",
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claim01",
+					Namespace: "myns",
+					Annotations: map[string]string{
+						annClass: "silver",
+					},
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Selector: &unversioned.LabelSelector{
+						MatchLabels: map[string]string{
+							"should-exist": "true",
+						},
+					},
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
+						},
+					},
+				},
+			},
+		},
+		"successful-match-with-class-and-labels": {
+			expectedMatch: "gce-pd-silver2",
+			claim: &api.PersistentVolumeClaim{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "claim01",
+					Namespace: "myns",
+					Annotations: map[string]string{
+						annClass: "silver",
+					},
+				},
+				Spec: api.PersistentVolumeClaimSpec{
+					AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+					Resources: api.ResourceRequirements{
+						Requests: api.ResourceList{
+							api.ResourceName(api.ResourceStorage): resource.MustParse("1G"),
 						},
 					},
 				},
@@ -563,7 +608,70 @@ func createTestVolumes() []*api.PersistentVolume {
 			},
 			Spec: api.PersistentVolumeSpec{
 				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("20000G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:  "gce-pd-silver1",
+				Name: "gce0023",
+				Labels: map[string]string{
+					"should-exist": "true",
+				},
+				Annotations: map[string]string{
+					annClass: "silver",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
 					api.ResourceName(api.ResourceStorage): resource.MustParse("10000G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:  "gce-pd-silver2",
+				Name: "gce0024",
+				Annotations: map[string]string{
+					annClass: "silver",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("100G"),
+				},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+				},
+			},
+		},
+		{
+			ObjectMeta: api.ObjectMeta{
+				UID:  "gce-pd-gold",
+				Name: "gce0025",
+				Annotations: map[string]string{
+					annClass: "gold",
+				},
+			},
+			Spec: api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("50G"),
 				},
 				PersistentVolumeSource: api.PersistentVolumeSource{
 					GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{},
@@ -632,7 +740,7 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	// pretend the exact match is available but the largest volume is pre-bound to the claim.
 	pv1.Spec.ClaimRef = nil
 	pv8.Spec.ClaimRef = claimRef
-	volume, _ = index.findBestMatchForClaim(claim)
+	volume, _ = index.findBestMatchForClaim(claim, "")
 	if volume.Name != pv8.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
 	}
