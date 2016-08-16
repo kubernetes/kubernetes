@@ -113,6 +113,8 @@ func SetDefaults_ServiceSpec(obj *ServiceSpec) {
 	}
 	if obj.Type == "" {
 		obj.Type = ServiceTypeClusterIP
+	} else if obj.Type == ServiceTypeExternalName {
+		obj.ClusterIP = ClusterIPNone
 	}
 	for i := range obj.Ports {
 		sp := &obj.Ports[i]
