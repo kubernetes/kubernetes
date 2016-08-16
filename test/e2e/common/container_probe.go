@@ -223,6 +223,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 								},
 							},
 							InitialDelaySeconds: 15,
+							TimeoutSeconds:      5,
 							FailureThreshold:    1,
 						},
 					},
