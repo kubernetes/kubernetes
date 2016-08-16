@@ -46,59 +46,6 @@ func UnsafeObjectConvertor(scheme *Scheme) ObjectConvertor {
 	return unsafeObjectConvertor{scheme}
 }
 
-// PreferredGroupVersion returns the desired group and version reported by the GroupVersioner, or
-// false if no such group version was indicated.
-func PreferredGroupVersion(target GroupVersioner) (unversioned.GroupVersion, bool) {
-	if group, ok := target.PrefersGroup(); ok {
-		if gv, ok := target.VersionForGroupKind(unversioned.GroupKind{Group: group}); ok {
-			return gv, true
-		}
-	}
-	return unversioned.GroupVersion{}, false
-}
-
-var (
-	InternalGroupVersioner GroupVersioner = internalGroupVersioner{}
-	DisabledGroupVersioner GroupVersioner = disabledGroupVersioner{}
-)
-
-type internalGroupVersioner struct{}
-
-func (internalGroupVersioner) VersionForGroupKind(group unversioned.GroupKind) (unversioned.GroupVersion, bool) {
-	return unversioned.GroupVersion{Group: group.Group, Version: APIVersionInternal}, true
-}
-
-func (internalGroupVersioner) PrefersGroup() (string, bool) { return "", false }
-
-type disabledGroupVersioner struct{}
-
-func (disabledGroupVersioner) VersionForGroupKind(group unversioned.GroupKind) (unversioned.GroupVersion, bool) {
-	return unversioned.GroupVersion{}, false
-}
-
-func (disabledGroupVersioner) PrefersGroup() (string, bool) { return "", false }
-
-type GroupVersioners []GroupVersioner
-
-func (gvs GroupVersioners) VersionForGroupKind(group unversioned.GroupKind) (unversioned.GroupVersion, bool) {
-	for _, gv := range gvs {
-		if v, ok := gv.VersionForGroupKind(group); ok {
-			return v, true
-		}
-	}
-	return unversioned.GroupVersion{}, false
-}
-
-func (gvs GroupVersioners) PrefersGroup() (string, bool) {
-	for _, gv := range gvs {
-		if g, ok := gv.PrefersGroup(); ok {
-			return g, true
-		}
-	}
-	return "", false
-
-}
-
 // SetField puts the value of src, into fieldName, which must be a member of v.
 // The value of src must be assignable to the field.
 func SetField(src interface{}, v reflect.Value, fieldName string) error {

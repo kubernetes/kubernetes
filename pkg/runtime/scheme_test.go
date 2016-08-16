@@ -555,7 +555,7 @@ func TestConvertToVersionBasic(t *testing.T) {
 	}
 	converted, ok := other.(*ExternalTestType1)
 	if !ok {
-		t.Fatalf("Got wrong type")
+		t.Fatalf("Got wrong type: %T", other)
 	}
 	if tt.A != converted.A {
 		t.Fatalf("Failed to convert object correctly: %#v", converted)
@@ -563,16 +563,12 @@ func TestConvertToVersionBasic(t *testing.T) {
 }
 
 type testGroupVersioner struct {
-	target  map[unversioned.GroupKind]unversioned.GroupVersion
-	prefers string
+	target unversioned.GroupVersionKind
+	ok     bool
 }
 
-func (m testGroupVersioner) VersionForGroupKind(group unversioned.GroupKind) (unversioned.GroupVersion, bool) {
-	gv, ok := m.target[group]
-	return gv, ok
-}
-func (m testGroupVersioner) PrefersGroup() (string, bool) {
-	return m.prefers, len(m.prefers) > 0
+func (m testGroupVersioner) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
+	return m.target, m.ok
 }
 
 func TestConvertToVersion(t *testing.T) {
@@ -661,7 +657,7 @@ func TestConvertToVersion(t *testing.T) {
 		{
 			scheme: GetTestScheme(),
 			in:     &ExternalTestType1{A: "test"},
-			gv:     testGroupVersioner{target: map[unversioned.GroupKind]unversioned.GroupVersion{{Kind: "TestType3"}: {Version: "v1"}}},
+			gv:     testGroupVersioner{ok: true, target: unversioned.GroupVersionKind{Kind: "TestType3", Version: "v1"}},
 			same:   true,
 			out: &ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType3"},
@@ -672,7 +668,7 @@ func TestConvertToVersion(t *testing.T) {
 		{
 			scheme: GetTestScheme(),
 			in:     &ExternalTestType1{A: "test"},
-			gv:     testGroupVersioner{target: map[unversioned.GroupKind]unversioned.GroupVersion{{Group: "custom", Kind: "TestType3"}: {Group: "custom", Version: "v1"}}},
+			gv:     testGroupVersioner{ok: true, target: unversioned.GroupVersionKind{Kind: "TestType3", Group: "custom", Version: "v1"}},
 			same:   true,
 			out: &ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType3"},
@@ -683,7 +679,7 @@ func TestConvertToVersion(t *testing.T) {
 		{
 			scheme: GetTestScheme(),
 			in:     &ExternalTestType1{A: "test"},
-			gv:     testGroupVersioner{target: map[unversioned.GroupKind]unversioned.GroupVersion{{Group: "custom", Kind: "TestType5"}: {Group: "custom", Version: "v1"}}},
+			gv:     testGroupVersioner{ok: true, target: unversioned.GroupVersionKind{Group: "custom", Version: "v1", Kind: "TestType5"}},
 			same:   true,
 			out: &ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType5"},
@@ -745,20 +741,20 @@ func TestConvertToVersion(t *testing.T) {
 		{
 			scheme: GetTestScheme(),
 			in:     &TestType1{A: "test"},
-			gv:     testGroupVersioner{target: map[unversioned.GroupKind]unversioned.GroupVersion{{Kind: "TestType3"}: {Version: "v1"}}},
+			gv:     testGroupVersioner{ok: true, target: unversioned.GroupVersionKind{Version: "v1", Kind: "TestType3"}},
 			out: &ExternalTestType1{
 				MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{APIVersion: "v1", ObjectKind: "TestType3"},
 				A: "test",
 			},
 		},
-		// limitation: group versioner can't choose a different kind
-		// TODO: change signature to return a GVK
+		// group versioner can choose a different kind
 		{
 			scheme: GetTestScheme(),
 			in:     &TestType1{A: "test"},
-			gv:     testGroupVersioner{target: map[unversioned.GroupKind]unversioned.GroupVersion{{Group: "custom", Kind: "TestType5"}: {Group: "custom", Version: "v1"}}},
-			errFn: func(err error) bool {
-				return err != nil && strings.Contains(err.Error(), "is not suitable for converting")
+			gv:     testGroupVersioner{ok: true, target: unversioned.GroupVersionKind{Kind: "TestType5", Group: "custom", Version: "v1"}},
+			out: &ExternalTestType1{
+				MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{APIVersion: "custom/v1", ObjectKind: "TestType5"},
+				A: "test",
 			},
 		},
 	}

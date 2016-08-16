@@ -494,35 +494,28 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		return nil, NewNotRegisteredErr(unversioned.GroupVersionKind{}, t)
 	}
 
-	// if the Go type is also registered to the destination kind, no conversion is necessary
-	if gv, ok := PreferredGroupVersion(target); ok {
-		for _, kind := range kinds {
-			if kind.Group == gv.Group && kind.Version == gv.Version {
-				return copyAndSetTargetKind(copy, s, in, kind)
-			}
-		}
+	gvk, ok := target.KindForGroupVersionKinds(kinds)
+	if !ok {
+		// TODO: should this be a typed error?
+		return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
 	}
+
+	// target wants to use the existing type, set kind and return (no conversion necessary)
 	for _, kind := range kinds {
-		if gv, ok := target.VersionForGroupKind(kind.GroupKind()); ok && kind.Version == gv.Version {
-			return copyAndSetTargetKind(copy, s, in, kind)
+		if gvk == kind {
+			return copyAndSetTargetKind(copy, s, in, gvk)
 		}
 	}
 
 	// type is unversioned, no conversion necessary
 	if unversionedKind, ok := s.unversionedTypes[t]; ok {
-		if desiredGV, ok := target.VersionForGroupKind(unversionedKind.GroupKind()); ok {
-			return copyAndSetTargetKind(copy, s, in, desiredGV.WithKind(unversionedKind.Kind))
+		if gvk, ok := target.KindForGroupVersionKinds([]unversioned.GroupVersionKind{unversionedKind}); ok {
+			return copyAndSetTargetKind(copy, s, in, gvk)
 		}
 		return copyAndSetTargetKind(copy, s, in, unversionedKind)
 	}
 
-	// allocate a new object as the target using the target kind
-	kind, ok := kindForGroupVersioner(kinds, target)
-	if !ok {
-		// TODO: should this be a typed error?
-		return nil, fmt.Errorf("%v is not suitable for converting to %q", t, target)
-	}
-	out, err := s.New(kind)
+	out, err := s.New(gvk)
 	if err != nil {
 		return nil, err
 	}
@@ -541,7 +534,7 @@ func (s *Scheme) convertToVersion(copy bool, in Object, target GroupVersioner) (
 		return nil, err
 	}
 
-	setTargetKind(out, kind)
+	setTargetKind(out, gvk)
 	return out, nil
 }
 

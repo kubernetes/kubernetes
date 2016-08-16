@@ -30,13 +30,13 @@ const (
 	APIVersionInternal = "__internal"
 )
 
-// GroupVersioner conveys information about a desired target version for objects being converted.
+// GroupVersioner refines a set of possible conversion targets into a single option.
 type GroupVersioner interface {
-	// VersionForGroupKind returns the desired GroupVersion for a given group, or false if no version
-	// is preferred. The kind on the GroupKind is optional, and implementers may choose to ignore it.
-	VersionForGroupKind(group unversioned.GroupKind) (unversioned.GroupVersion, bool)
-	// PrefersGroup returns the preferred group for a conversion, or false if no group is preferred.
-	PrefersGroup() (string, bool)
+	// KindForGroupVersionKinds returns a desired target group version kind for the given input, or returns ok false if no
+	// target is known. In general, if the return target is not in the input list, the caller is expected to invoke
+	// Scheme.New(target) and then perform a conversion between the current Go type and the destination Go type.
+	// Sophisticated implementations may use additional information about the input kinds to pick a destination kind.
+	KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (target unversioned.GroupVersionKind, ok bool)
 }
 
 // Encoders write objects to a serialized form

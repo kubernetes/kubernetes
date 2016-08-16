@@ -179,17 +179,21 @@ func (gv GroupVersion) String() string {
 	return gv.Version
 }
 
-// VersionForGroupKind identifies the preferred GroupVersion for a GroupKind, or false if no
-// group version is preferred.
-func (gv GroupVersion) VersionForGroupKind(src GroupKind) (GroupVersion, bool) {
-	if src.Group == gv.Group {
-		return gv, true
+// KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
+// if none of the options match the group. It prefers a match to group and version over just group.
+func (gv GroupVersion) KindForGroupVersionKinds(kinds []GroupVersionKind) (target GroupVersionKind, ok bool) {
+	for _, gvk := range kinds {
+		if gvk.Group == gv.Group && gvk.Version == gv.Version {
+			return gvk, true
+		}
 	}
-	return GroupVersion{}, false
+	for _, gvk := range kinds {
+		if gvk.Group == gv.Group {
+			return gv.WithKind(gvk.Kind), true
+		}
+	}
+	return GroupVersionKind{}, false
 }
-
-// PrefersGroup always returns the current group.
-func (gv GroupVersion) PrefersGroup() (string, bool) { return gv.Group, true }
 
 // ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
 // if it cannot parse the string.
@@ -256,23 +260,17 @@ func (gv *GroupVersion) UnmarshalText(value []byte) error {
 // GroupVersions can be used to represent a set of desired group versions.
 type GroupVersions []GroupVersion
 
-// VersionForGroupKind identifies the preferred GroupVersion for a GroupKind, or false if no
-// group version is preferred.
-func (gvs GroupVersions) VersionForGroupKind(src GroupKind) (GroupVersion, bool) {
+// KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
+// if none of the options match the group.
+func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (target GroupVersionKind, ok bool) {
 	for _, gv := range gvs {
-		if src.Group == gv.Group {
-			return gv, true
+		target, ok := gv.KindForGroupVersionKinds(kinds)
+		if !ok {
+			continue
 		}
+		return target, true
 	}
-	return GroupVersion{}, false
-}
-
-// PrefersGroup returns the first group, or false.
-func (gvs GroupVersions) PrefersGroup() (string, bool) {
-	if len(gvs) == 0 {
-		return "", false
-	}
-	return gvs[0].Group, true
+	return GroupVersionKind{}, false
 }
 
 // ToAPIVersionAndKind is a convenience method for satisfying runtime.Object on types that

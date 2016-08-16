@@ -235,10 +235,7 @@ func (t *thirdPartyResourceDataCodecFactory) StreamingSerializerForMediaType(med
 }
 
 func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
-	if target, ok := runtime.PreferredGroupVersion(gv); ok {
-		return &thirdPartyResourceDataEncoder{delegate: t.delegate.EncoderForVersion(s, gv), gvk: target.WithKind(t.kind)}
-	}
-	return &thirdPartyResourceDataEncoder{delegate: t.delegate.EncoderForVersion(s, gv)}
+	return &thirdPartyResourceDataEncoder{delegate: t.delegate.EncoderForVersion(s, gv), gvk: t.encodeGV.WithKind(t.kind)}
 }
 
 func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
