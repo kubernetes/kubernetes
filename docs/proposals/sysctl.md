@@ -318,8 +318,11 @@ Issues:
   * [x] **namespaced** in ipc ns
   * [ ] [temporarily **allocated in kmem** in a linked message list](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58), but **not accounted for** in memcg **with kernel >= 4.5**
   * [ ] **defaults to** [8kb max packet size, 16384 kb total queue size, 32000 queues](http://lxr.linux.no/linux+v4.7/include/uapi/linux/msg.h#L75), **which might be too small** for certain applications
-  * [ ] arbitrary values [up to INT_MAX](http://lxr.linux.no/linux+v4.7/ipc/ipc_sysctl.c#L135). Hence, **potential DoS attack vector** against the host
-- `fs.mqueue.*`: configure POSIX message queues. Here is a test-case which allocated 512 MB per container which is not accounted: https://github.com/sttts/kmem-ipc-msg-queues. A node with 8 GB will not survive that with >16 containers.
+  * [ ] arbitrary values [up to INT_MAX](http://lxr.linux.no/linux+v4.7/ipc/ipc_sysctl.c#L135). Hence, **potential DoS attack vector** against the host.
+
+  Even without using a sysctl the kernel default allows any pod to allocate 512 MB of message memory (compare https://github.com/sttts/kmem-ipc-msg-queues as a test-case). If kmem acconting is not active, this is outside of the pod resource limits. Then a node with 8 GB will not survive with >16 replicas of such a pod.
+
+- `fs.mqueue.*`: configure POSIX message queues.
   * [x] **namespaced** in ipc ns
   * [ ] uses the same [`load_msg`](http://lxr.linux.no/linux+v4.7/ipc/msgutil.c#L58) as System V messages, i.e. **no accounting for kernel >= 4.5**
   * does [strict checking against rlimits](http://lxr.free-electrons.com/source/ipc/mqueue.c#L278) though
