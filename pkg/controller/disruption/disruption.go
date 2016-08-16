@@ -382,12 +382,8 @@ func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) (
 		return []*api.Pod{}, err
 	}
 	pods := []*api.Pod{}
-	for _, p := range podList.Items {
-		obj, err := api.Scheme.DeepCopy(p)
-		if err != nil {
-			return []*api.Pod{}, err
-		}
-		pod := obj.(api.Pod)
+	for i := range podList.Items {
+		pod := podList.Items[i]
 		pods = append(pods, &pod)
 	}
 	return pods, nil
