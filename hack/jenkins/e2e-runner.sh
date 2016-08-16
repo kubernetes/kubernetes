@@ -361,11 +361,13 @@ e2e_go_args=( \
 )
 
 
-case "${KUBERNETES_PROVIDER}" in
-  gce|gke)
-    e2e_go_args+=(--check_leaked_resources)
-    ;;
-esac
+if [[ "${FAIL_ON_GCP_RESOURCE_LEAK:-true}" == "true" ]]; then
+  case "${KUBERNETES_PROVIDER}" in
+    gce|gke)
+      e2e_go_args+=(--check_leaked_resources)
+      ;;
+  esac
+fi
 
 if [[ "${E2E_UP,,}" == "true" ]]; then
   e2e_go_args+=(--up --ctl="version --match-server-version=false")
