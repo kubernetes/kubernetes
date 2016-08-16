@@ -38,7 +38,11 @@ if [[ -z "$SERVER_BIN_TAR" ]]; then
 fi
 
 # Create a temp dir for untaring
-KUBE_TEMP=$(mktemp --tmpdir=/srv -d -t kubernetes.XXXXXX)
+case "$OSTYPE" in
+  darwin*|bsd*) KUBE_TEMP=$(mktemp -d 2>/dev/null) ;;
+  *) KUBE_TEMP=$(mktemp --tmpdir=/srv -d -t kubernetes.XXXXXX) ;;
+esac
+
 trap 'rm -rf "${KUBE_TEMP}"' EXIT
 
 # This file is meant to run on the master.  It will install the salt configs
@@ -53,12 +57,12 @@ mkdir -p /srv/salt-new
 
 # This bash voodoo will prepend $SALT_ROOT to the start of each item in the
 # $SALTDIRS array
-cp -v -R --preserve=mode "${SALTDIRS[@]/#/${SALT_ROOT}/}" /srv/salt-new
+cp -v -a "${SALTDIRS[@]/#/${SALT_ROOT}/}" /srv/salt-new
 
 echo "+++ Installing salt overlay files"
 for dir in "${SALTDIRS[@]}"; do
   if [[ -d "/srv/salt-overlay/$dir" ]]; then
-    cp -v -R --preserve=mode "/srv/salt-overlay/$dir" "/srv/salt-new/"
+    cp -v -a "/srv/salt-overlay/$dir" "/srv/salt-new/"
   fi
 done
 
@@ -77,7 +81,10 @@ for docker_file in "${KUBE_DOCKER_WRAPPED_BINARIES[@]}"; do
   if [[ ! -z "${KUBE_IMAGE_TAG:-}" ]]; then
     docker_tag="${KUBE_IMAGE_TAG}"
   fi
-  sed -i "s/#${docker_file}_docker_tag_value#/${docker_tag}/" "${docker_images_sls_file}";
+  case "$OSTYPE" in
+    darwin*|bsd*) sed -i '' "s/#${docker_file}_docker_tag_value#/${docker_tag}/" "${docker_images_sls_file}"; ;;
+    *) sed -i "s/#${docker_file}_docker_tag_value#/${docker_tag}/" "${docker_images_sls_file}"; ;;
+  esac
 done
 
 cat <<EOF >>"${docker_images_sls_file}"
