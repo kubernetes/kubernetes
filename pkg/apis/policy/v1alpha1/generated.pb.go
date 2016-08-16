@@ -36,7 +36,7 @@ import proto "github.com/gogo/protobuf/proto"
 import fmt "fmt"
 import math "math"
 
-import k8s_io_kubernetes_pkg_api_unversioned "k8s.io/kubernetes/pkg/api/unversioned"
+import k8s_io_kubernetes_pkg_api_unversioned1 "k8s.io/kubernetes/pkg/api/unversioned"
 
 import strings "strings"
 import reflect "reflect"
@@ -332,7 +332,7 @@ func (this *PodDisruptionBudgetList) String() string {
 		return "nil"
 	}
 	s := strings.Join([]string{`&PodDisruptionBudgetList{`,
-		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned.ListMeta", 1), `&`, ``, 1) + `,`,
+		`ListMeta:` + strings.Replace(strings.Replace(this.ListMeta.String(), "ListMeta", "k8s_io_kubernetes_pkg_api_unversioned1.ListMeta", 1), `&`, ``, 1) + `,`,
 		`Items:` + strings.Replace(strings.Replace(fmt.Sprintf("%v", this.Items), "PodDisruptionBudget", "PodDisruptionBudget", 1), `&`, ``, 1) + `,`,
 		`}`,
 	}, "")
@@ -344,7 +344,7 @@ func (this *PodDisruptionBudgetSpec) String() string {
 	}
 	s := strings.Join([]string{`&PodDisruptionBudgetSpec{`,
 		`MinAvailable:` + strings.Replace(strings.Replace(this.MinAvailable.String(), "IntOrString", "k8s_io_kubernetes_pkg_util_intstr.IntOrString", 1), `&`, ``, 1) + `,`,
-		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned.LabelSelector", 1) + `,`,
+		`Selector:` + strings.Replace(fmt.Sprintf("%v", this.Selector), "LabelSelector", "k8s_io_kubernetes_pkg_api_unversioned1.LabelSelector", 1) + `,`,
 		`}`,
 	}, "")
 	return s
@@ -707,7 +707,7 @@ func (m *PodDisruptionBudgetSpec) Unmarshal(data []byte) error {
 				return io.ErrUnexpectedEOF
 			}
 			if m.Selector == nil {
-				m.Selector = &k8s_io_kubernetes_pkg_api_unversioned.LabelSelector{}
+				m.Selector = &k8s_io_kubernetes_pkg_api_unversioned1.LabelSelector{}
 			}
 			if err := m.Selector.Unmarshal(data[iNdEx:postIndex]); err != nil {
 				return err

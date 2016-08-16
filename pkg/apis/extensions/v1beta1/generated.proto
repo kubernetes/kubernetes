@@ -22,6 +22,7 @@ syntax = 'proto2';
 package k8s.io.kubernetes.pkg.apis.extensions.v1beta1;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/api/unversioned/extension.proto";
 import "k8s.io/kubernetes/pkg/api/unversioned/generated.proto";
 import "k8s.io/kubernetes/pkg/api/v1/generated.proto";
 import "k8s.io/kubernetes/pkg/runtime/generated.proto";
@@ -409,7 +410,7 @@ message IngressRule {
   // just traffic matching the host to the default backend or all traffic to the
   // default backend, is left to the controller fulfilling the Ingress. Http is
   // currently the only supported IngressRuleValue.
-  optional IngressRuleValue ingressRuleValue = 2;
+  optional IngressRuleValue ingressRuleValue = 2 [(k8s.io.kubernetes.pkg.api.unversioned.inline) = true];
 }
 
 // IngressRuleValue represents a rule to apply against incoming requests. If the

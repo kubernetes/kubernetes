@@ -22,6 +22,7 @@ syntax = 'proto2';
 package k8s.io.kubernetes.pkg.runtime;
 
 import "k8s.io/kubernetes/pkg/api/resource/generated.proto";
+import "k8s.io/kubernetes/pkg/api/unversioned/extension.proto";
 import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
@@ -106,7 +107,7 @@ message TypeMeta {
 // +k8s:deepcopy-gen=true
 // +protobuf=true
 message Unknown {
-  optional TypeMeta typeMeta = 1;
+  optional TypeMeta typeMeta = 1 [(k8s.io.kubernetes.pkg.api.unversioned.inline) = true];
 
   // Raw will hold the complete serialized object which couldn't be matched
   // with a registered type. Most likely, nothing should be done with this

@@ -48,3 +48,14 @@ func (tracker *ImportTracker) AddNullable() {
 		},
 	})
 }
+
+func (tracker *ImportTracker) AddInline() {
+	tracker.AddType(&types.Type{
+		Kind: types.Protobuf,
+		Name: types.Name{
+			Name:    "inline",
+			Package: "k8s.io/kubernetes/pkg/api/unversioned",
+			Path:    "k8s.io/kubernetes/pkg/api/unversioned/extension.proto",
+		},
+	})
+}
