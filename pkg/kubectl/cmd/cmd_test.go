@@ -46,7 +46,7 @@ import (
 
 func initTestErrorHandler(t *testing.T) {
 	cmdutil.BehaviorOnFatal(func(str string, code int) {
-		t.Errorf("Error running command (rc=%d): %s", code, str)
+		t.Errorf("Error running command (exit code %d): %s", code, str)
 	})
 }
 
