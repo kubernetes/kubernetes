@@ -18,11 +18,12 @@ package persistentvolume
 
 import (
 	"fmt"
+	"sort"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/labels"
-	"sort"
 )
 
 // persistentVolumeOrderedIndex is a cache.Store that keeps persistent volumes
@@ -91,6 +92,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 	var smallestVolumeSize int64
 	requestedQty := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 	requestedSize := requestedQty.Value()
+	requestedClass := getClaimClass(claim)
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
@@ -131,8 +133,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 			} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
 				continue
 			}
-			claimClass := getClaimClass(claim)
-			if claimClass != "" && claimClass != getVolumeClass(volume) {
+			if getVolumeClass(volume) != requestedClass {
 				continue
 			}
 
