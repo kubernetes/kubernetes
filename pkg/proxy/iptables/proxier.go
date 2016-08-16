@@ -886,18 +886,17 @@ func (proxier *Proxier) syncProxyRules() {
 				} else {
 					writeLine(natChains, utiliptables.MakeChainLine(fwChain))
 				}
-				// jump to service firewall chain
+
 				// The service firewall rules are created based on ServiceSpec.loadBalancerSourceRanges field.
 				// This currently works for loadbalancers that preserves source ips.
 				// For loadbalancers which direct traffic to service NodePort, the firewall rules will not apply.
+
+				// jump to service firewall chain
 				writeLine(natRules, append(args, "-j", string(fwChain))...)
 
 				args = []string{
 					"-A", string(fwChain),
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcName.String()),
-					"-m", protocol, "-p", protocol,
-					"-d", fmt.Sprintf("%s/32", ingress.IP),
-					"--dport", fmt.Sprintf("%d", svcInfo.port),
 				}
 				// We have to SNAT packets from external IPs.
 				writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
