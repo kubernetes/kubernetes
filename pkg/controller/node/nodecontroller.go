@@ -46,7 +46,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/watch"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
+
+func init() {
+	// Register prometheus metrics
+	Register()
+}
 
 var (
 	ErrCloudInstance        = errors.New("cloud provider doesn't support instances.")
@@ -142,7 +149,7 @@ type NodeController struct {
 
 	forcefullyDeletePod        func(*api.Pod) error
 	nodeExistsInCloudProvider  func(string) (bool, error)
-	computeZoneStateFunc       func(nodeConditions []*api.NodeCondition) zoneState
+	computeZoneStateFunc       func(nodeConditions []*api.NodeCondition) (int, zoneState)
 	enterPartialDisruptionFunc func(nodeNum int) float32
 	enterFullDisruptionFunc    func(nodeNum int) float32
 
@@ -158,6 +165,9 @@ type NodeController struct {
 	// the controller using NewDaemonSetsController(passing SharedInformer), this
 	// will be null
 	internalPodInformer framework.SharedIndexInformer
+
+	evictions10Minutes *evictionData
+	evictions1Hour     *evictionData
 }
 
 // NewNodeController returns a new node controller to sync instances from cloudprovider.
@@ -229,6 +239,8 @@ func NewNodeController(
 		largeClusterThreshold:       largeClusterThreshold,
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		zoneStates:                  make(map[string]zoneState),
+		evictions10Minutes:          newEvictionData(10 * time.Minute),
+		evictions1Hour:              newEvictionData(time.Hour),
 	}
 	nc.enterPartialDisruptionFunc = nc.ReducedQPSFunc
 	nc.enterFullDisruptionFunc = nc.HealthyQPSFunc
@@ -403,6 +415,18 @@ func (nc *NodeController) Run(period time.Duration) {
 		defer nc.evictorLock.Unlock()
 		for k := range nc.zonePodEvictor {
 			nc.zonePodEvictor[k].Try(func(value TimedValue) (bool, time.Duration) {
+				obj, exists, err := nc.nodeStore.Get(value.Value)
+				if err != nil {
+					glog.Warningf("Failed to get Node %v from the nodeStore: %v", value.Value, err)
+				} else if !exists {
+					glog.Warningf("Node %v no longer present in nodeStore!", value.Value)
+				} else {
+					node, _ := obj.(*api.Node)
+					zone := utilnode.GetZoneKey(node)
+					nc.evictions10Minutes.registerEviction(zone, value.Value)
+					nc.evictions1Hour.registerEviction(zone, value.Value)
+				}
+
 				nodeUid, _ := value.UID.(string)
 				remaining, err := deletePods(nc.kubeClient, nc.recorder, value.Value, nodeUid, nc.daemonSetStore)
 				if err != nil {
@@ -477,6 +501,8 @@ func (nc *NodeController) monitorNodeStatus() error {
 			nc.zonePodEvictor[zone] =
 				NewRateLimitedTimedQueue(
 					flowcontrol.NewTokenBucketRateLimiter(nc.evictionLimiterQPS, evictionRateLimiterBurst))
+			nc.evictions10Minutes.initZone(zone)
+			nc.evictions1Hour.initZone(zone)
 		}
 		if _, found := nc.zoneTerminationEvictor[zone]; !found {
 			nc.zoneTerminationEvictor[zone] = NewRateLimitedTimedQueue(
@@ -575,15 +601,28 @@ func (nc *NodeController) monitorNodeStatus() error {
 		}
 	}
 	nc.handleDisruption(zoneToNodeConditions, nodes)
+	nc.updateEvictionMetric(Evictions10Minutes, nc.evictions10Minutes)
+	nc.updateEvictionMetric(Evictions1Hour, nc.evictions1Hour)
 
 	return nil
+}
+
+func (nc *NodeController) updateEvictionMetric(metric *prometheus.GaugeVec, data *evictionData) {
+	data.slideWindow()
+	zones := data.getZones()
+	for _, z := range zones {
+		metric.WithLabelValues(z).Set(float64(data.countEvictions(z)))
+	}
 }
 
 func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*api.NodeCondition, nodes *api.NodeList) {
 	newZoneStates := map[string]zoneState{}
 	allAreFullyDisrupted := true
 	for k, v := range zoneToNodeConditions {
-		newState := nc.computeZoneStateFunc(v)
+		ZoneSize.WithLabelValues(k).Set(float64(len(v)))
+		unhealthy, newState := nc.computeZoneStateFunc(v)
+		ZoneHealth.WithLabelValues(k).Set(float64(100*(len(v)-unhealthy)) / float64(len(v)))
+		UnhealthyNodes.WithLabelValues(k).Set(float64(unhealthy))
 		if newState != stateFullDisruption {
 			allAreFullyDisrupted = false
 		}
@@ -596,6 +635,9 @@ func (nc *NodeController) handleDisruption(zoneToNodeConditions map[string][]*ap
 	allWasFullyDisrupted := true
 	for k, v := range nc.zoneStates {
 		if _, have := zoneToNodeConditions[k]; !have {
+			ZoneSize.WithLabelValues(k).Set(0)
+			ZoneHealth.WithLabelValues(k).Set(100)
+			UnhealthyNodes.WithLabelValues(k).Set(0)
 			delete(nc.zoneStates, k)
 			continue
 		}
@@ -876,6 +918,8 @@ func (nc *NodeController) cancelPodEviction(node *api.Node) bool {
 	wasTerminating := nc.zoneTerminationEvictor[zone].Remove(node.Name)
 	if wasDeleting || wasTerminating {
 		glog.V(2).Infof("Cancelling pod Eviction on Node: %v", node.Name)
+		nc.evictions10Minutes.removeEviction(zone, node.Name)
+		nc.evictions1Hour.removeEviction(zone, node.Name)
 		return true
 	}
 	return false
@@ -907,7 +951,7 @@ func (nc *NodeController) ReducedQPSFunc(nodeNum int) float32 {
 // - fullyDisrupted if there're no Ready Nodes,
 // - partiallyDisrupted if at least than nc.unhealthyZoneThreshold percent of Nodes are not Ready,
 // - normal otherwise
-func (nc *NodeController) ComputeZoneState(nodeReadyConditions []*api.NodeCondition) zoneState {
+func (nc *NodeController) ComputeZoneState(nodeReadyConditions []*api.NodeCondition) (int, zoneState) {
 	readyNodes := 0
 	notReadyNodes := 0
 	for i := range nodeReadyConditions {
@@ -919,10 +963,10 @@ func (nc *NodeController) ComputeZoneState(nodeReadyConditions []*api.NodeCondit
 	}
 	switch {
 	case readyNodes == 0 && notReadyNodes > 0:
-		return stateFullDisruption
+		return notReadyNodes, stateFullDisruption
 	case notReadyNodes > 2 && float32(notReadyNodes)/float32(notReadyNodes+readyNodes) >= nc.unhealthyZoneThreshold:
-		return statePartialDisruption
+		return notReadyNodes, statePartialDisruption
 	default:
-		return stateNormal
+		return notReadyNodes, stateNormal
 	}
 }
