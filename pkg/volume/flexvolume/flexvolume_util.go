@@ -36,6 +36,7 @@ const (
 	optionFSType    = "kubernetes.io/fsType"
 	optionReadWrite = "kubernetes.io/readwrite"
 	optionKeySecret = "kubernetes.io/secret"
+	optionKeyItem   = "kubernetes.io/item"
 )
 
 const (

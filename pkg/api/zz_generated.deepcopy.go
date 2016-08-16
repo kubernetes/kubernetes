@@ -81,6 +81,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ExecAction, InType: reflect.TypeOf(&ExecAction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ExportOptions, InType: reflect.TypeOf(&ExportOptions{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FCVolumeSource, InType: reflect.TypeOf(&FCVolumeSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FlexVolumeOptionsItem, InType: reflect.TypeOf(&FlexVolumeOptionsItem{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FlexVolumeSource, InType: reflect.TypeOf(&FlexVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_FlockerVolumeSource, InType: reflect.TypeOf(&FlockerVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_GCEPersistentDiskVolumeSource, InType: reflect.TypeOf(&GCEPersistentDiskVolumeSource{})},
@@ -1082,6 +1083,22 @@ func DeepCopy_api_FCVolumeSource(in interface{}, out interface{}, c *conversion.
 	}
 }
 
+func DeepCopy_api_FlexVolumeOptionsItem(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*FlexVolumeOptionsItem)
+		out := out.(*FlexVolumeOptionsItem)
+		out.Name = in.Name
+		if in.FieldRef != nil {
+			in, out := &in.FieldRef, &out.FieldRef
+			*out = new(ObjectFieldSelector)
+			**out = **in
+		} else {
+			out.FieldRef = nil
+		}
+		return nil
+	}
+}
+
 func DeepCopy_api_FlexVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*FlexVolumeSource)
@@ -1104,6 +1121,17 @@ func DeepCopy_api_FlexVolumeSource(in interface{}, out interface{}, c *conversio
 			}
 		} else {
 			out.Options = nil
+		}
+		if in.OptionsItems != nil {
+			in, out := &in.OptionsItems, &out.OptionsItems
+			*out = make([]FlexVolumeOptionsItem, len(*in))
+			for i := range *in {
+				if err := DeepCopy_api_FlexVolumeOptionsItem(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
+			}
+		} else {
+			out.OptionsItems = nil
 		}
 		return nil
 	}

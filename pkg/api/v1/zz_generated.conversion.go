@@ -120,6 +120,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_ExportOptions_To_v1_ExportOptions,
 		Convert_v1_FCVolumeSource_To_api_FCVolumeSource,
 		Convert_api_FCVolumeSource_To_v1_FCVolumeSource,
+		Convert_v1_FlexVolumeOptionsItem_To_api_FlexVolumeOptionsItem,
+		Convert_api_FlexVolumeOptionsItem_To_v1_FlexVolumeOptionsItem,
 		Convert_v1_FlexVolumeSource_To_api_FlexVolumeSource,
 		Convert_api_FlexVolumeSource_To_v1_FlexVolumeSource,
 		Convert_v1_FlockerVolumeSource_To_api_FlockerVolumeSource,
@@ -2099,6 +2101,42 @@ func Convert_api_FCVolumeSource_To_v1_FCVolumeSource(in *api.FCVolumeSource, out
 	return autoConvert_api_FCVolumeSource_To_v1_FCVolumeSource(in, out, s)
 }
 
+func autoConvert_v1_FlexVolumeOptionsItem_To_api_FlexVolumeOptionsItem(in *FlexVolumeOptionsItem, out *api.FlexVolumeOptionsItem, s conversion.Scope) error {
+	out.Name = in.Name
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(api.ObjectFieldSelector)
+		if err := Convert_v1_ObjectFieldSelector_To_api_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	return nil
+}
+
+func Convert_v1_FlexVolumeOptionsItem_To_api_FlexVolumeOptionsItem(in *FlexVolumeOptionsItem, out *api.FlexVolumeOptionsItem, s conversion.Scope) error {
+	return autoConvert_v1_FlexVolumeOptionsItem_To_api_FlexVolumeOptionsItem(in, out, s)
+}
+
+func autoConvert_api_FlexVolumeOptionsItem_To_v1_FlexVolumeOptionsItem(in *api.FlexVolumeOptionsItem, out *FlexVolumeOptionsItem, s conversion.Scope) error {
+	out.Name = in.Name
+	if in.FieldRef != nil {
+		in, out := &in.FieldRef, &out.FieldRef
+		*out = new(ObjectFieldSelector)
+		if err := Convert_api_ObjectFieldSelector_To_v1_ObjectFieldSelector(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.FieldRef = nil
+	}
+	return nil
+}
+
+func Convert_api_FlexVolumeOptionsItem_To_v1_FlexVolumeOptionsItem(in *api.FlexVolumeOptionsItem, out *FlexVolumeOptionsItem, s conversion.Scope) error {
+	return autoConvert_api_FlexVolumeOptionsItem_To_v1_FlexVolumeOptionsItem(in, out, s)
+}
+
 func autoConvert_v1_FlexVolumeSource_To_api_FlexVolumeSource(in *FlexVolumeSource, out *api.FlexVolumeSource, s conversion.Scope) error {
 	out.Driver = in.Driver
 	out.FSType = in.FSType
@@ -2113,6 +2151,17 @@ func autoConvert_v1_FlexVolumeSource_To_api_FlexVolumeSource(in *FlexVolumeSourc
 	}
 	out.ReadOnly = in.ReadOnly
 	out.Options = in.Options
+	if in.OptionsItems != nil {
+		in, out := &in.OptionsItems, &out.OptionsItems
+		*out = make([]api.FlexVolumeOptionsItem, len(*in))
+		for i := range *in {
+			if err := Convert_v1_FlexVolumeOptionsItem_To_api_FlexVolumeOptionsItem(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.OptionsItems = nil
+	}
 	return nil
 }
 
@@ -2134,6 +2183,17 @@ func autoConvert_api_FlexVolumeSource_To_v1_FlexVolumeSource(in *api.FlexVolumeS
 	}
 	out.ReadOnly = in.ReadOnly
 	out.Options = in.Options
+	if in.OptionsItems != nil {
+		in, out := &in.OptionsItems, &out.OptionsItems
+		*out = make([]FlexVolumeOptionsItem, len(*in))
+		for i := range *in {
+			if err := Convert_api_FlexVolumeOptionsItem_To_v1_FlexVolumeOptionsItem(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.OptionsItems = nil
+	}
 	return nil
 }
 

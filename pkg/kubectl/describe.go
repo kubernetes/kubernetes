@@ -606,6 +606,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printRBDVolumeSource(volume.VolumeSource.RBD, out)
 		case volume.VolumeSource.DownwardAPI != nil:
 			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
+		case volume.VolumeSource.FlexVolume != nil:
+			printFlexVolumeSource(volume.VolumeSource.FlexVolume, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -712,6 +714,21 @@ func printDownwardAPIVolumeSource(d *api.DownwardAPIVolumeSource, out io.Writer)
 		}
 		if mapping.ResourceFieldRef != nil {
 			fmt.Fprintf(out, "      %v -> %v\n", mapping.ResourceFieldRef.Resource, mapping.Path)
+		}
+	}
+}
+
+func printFlexVolumeSource(f *api.FlexVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tFlexVolume (a volume created by FlexVolume plugin)\n"+
+		"    Driver:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n"+
+		"    OptionsItems:\n",
+		f.Driver, f.FSType, f.ReadOnly)
+
+	for _, mapping := range f.OptionsItems {
+		if mapping.FieldRef != nil {
+			fmt.Fprintf(out, "      %v -> %v\n", mapping.FieldRef.FieldPath, mapping.Name)
 		}
 	}
 }
