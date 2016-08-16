@@ -716,7 +716,7 @@ type StoreToPodDisruptionBudgetLister struct {
 	Store
 }
 
-// GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.  Returns an error only if no match PodDisruptionBudgets are found.
+// GetPodPodDisruptionBudgets returns a list of PodDisruptionBudgets matching a pod.  Returns an error only if no matching PodDisruptionBudgets are found.
 func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.Pod) (pdbList []policy.PodDisruptionBudget, err error) {
 	var selector labels.Selector
 
@@ -736,8 +736,9 @@ func (s *StoreToPodDisruptionBudgetLister) GetPodPodDisruptionBudgets(pod *api.P
 		}
 		selector, err = unversioned.LabelSelectorAsSelector(pdb.Spec.Selector)
 		if err != nil {
-			err = fmt.Errorf("invalid selector: %v", err)
-			return
+			glog.Warningf("invalid selector: %v", err)
+			// TODO(mml): add an event to the PDB
+			continue
 		}
 
 		// If a PDB with a nil or empty selector creeps in, it should match nothing, not everything.
