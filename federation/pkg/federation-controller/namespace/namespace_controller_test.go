@@ -70,7 +70,9 @@ func TestNamespaceController(t *testing.T) {
 	namespaceController.namespaceReviewDelay = 50 * time.Millisecond
 	namespaceController.smallDelay = 20 * time.Millisecond
 	namespaceController.updateTimeout = 5 * time.Second
-	namespaceController.Start()
+
+	stop := make(chan struct{})
+	namespaceController.Run(stop)
 
 	ns1 := api_v1.Namespace{
 		ObjectMeta: api_v1.ObjectMeta{
@@ -101,7 +103,7 @@ func TestNamespaceController(t *testing.T) {
 	assert.Equal(t, ns1.Name, createdNamespace2.Name)
 	// assert.Contains(t, createdNamespace2.Annotations, "A")
 
-	namespaceController.Stop()
+	close(stop)
 }
 
 func toFederatedInformerForTestOnly(informer util.FederatedInformer) util.FederatedInformerForTestOnly {
