@@ -138,6 +138,9 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	glog.Infof("Starting namespace controller")
 	startNamespaceController()
 
+	glog.Infof("Wait for the node to be ready")
+	waitForNodeReady()
+
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
 
@@ -184,14 +187,42 @@ func maskLocksmithdOnCoreos() {
 	}
 }
 
-const (
-	// ncResyncPeriod is resync period of the namespace controller
-	ncResyncPeriod = 5 * time.Minute
-	// ncConcurrency is concurrency of the namespace controller
-	ncConcurrency = 2
-)
+func waitForNodeReady() {
+	const (
+		// nodeReadyTimeout is the time to wait for node to become ready.
+		nodeReadyTimeout = 2 * time.Minute
+		// nodeReadyPollInterval is the interval to check node ready.
+		nodeReadyPollInterval = 1 * time.Second
+	)
+	config, err := framework.LoadConfig()
+	Expect(err).NotTo(HaveOccurred())
+	client, err := clientset.NewForConfig(config)
+	Expect(err).NotTo(HaveOccurred())
+	Eventually(func() error {
+		nodes, err := client.Nodes().List(api.ListOptions{})
+		Expect(err).NotTo(HaveOccurred())
+		if nodes == nil {
+			return fmt.Errorf("the node list is nil.")
+		}
+		Expect(len(nodes.Items) > 1).NotTo(BeTrue())
+		if len(nodes.Items) == 0 {
+			return fmt.Errorf("empty node list: %+v", nodes)
+		}
+		node := nodes.Items[0]
+		if !api.IsNodeReady(&node) {
+			return fmt.Errorf("node is not ready: %+v", node)
+		}
+		return nil
+	}, nodeReadyTimeout, nodeReadyPollInterval).Should(Succeed())
+}
 
 func startNamespaceController() {
+	const (
+		// ncResyncPeriod is resync period of the namespace controller
+		ncResyncPeriod = 5 * time.Minute
+		// ncConcurrency is concurrency of the namespace controller
+		ncConcurrency = 2
+	)
 	// Use the default QPS
 	config := restclient.AddUserAgent(&restclient.Config{Host: framework.TestContext.Host}, "node-e2e-namespace-controller")
 	client, err := clientset.NewForConfig(config)
