@@ -23,7 +23,6 @@
 
 set -o errexit
 set -o nounset
-set -o pipefail
 
 if [ -z "${TARGET_STORAGE:-}" ]; then
   echo "TARGET_USAGE variable unset - skipping migration"
@@ -35,6 +34,7 @@ if [ -z "${DATA_DIRECTORY:-}" ]; then
   exit 0
 fi
 
+ETCDCTL="${ETCDCTL:-/usr/local/bin/etcdctl}"
 VERSION_FILE="version.txt"
 CURRENT_STORAGE='etcd2'
 if [ -e "${DATA_DIRECTORY}/${VERSION_FILE}" ]; then
@@ -48,7 +48,8 @@ if [ "${CURRENT_STORAGE}" = "etcd2" -a "${TARGET_STORAGE}" = "etcd3" ]; then
     if [ "$(ls -A ${DATA_DIRECTORY})" ]; then
       echo "Performing etcd2 -> etcd3 migration"
       # TODO: Pass a correct transformer to handle TTLs.
-      ETCDCTL_API=3 /usr/local/bin/etcdctl migrate --data-dir=${DATA_DIRECTORY}
+      echo "ETCDCTL_API=3 ${ETCDCTL} migrate --data-dir=${DATA_DIRECTORY}"
+      ETCDCTL_API=3 ${ETCDCTL} migrate --data-dir=${DATA_DIRECTORY}
     fi
   fi
 fi
