@@ -29,6 +29,10 @@ type errorStreamDecoder interface {
 	decode(message []byte) error
 }
 
+// watchErrorStream watches the errorStream for remote command error data,
+// decodes it with the given errorStreamDecoder, sends the decoded error (or nil if the remote
+// command exited successfully) to the returned error channel, and closes it.
+// This function returns immediately.
 func watchErrorStream(errorStream io.Reader, d errorStreamDecoder) chan error {
 	errorChan := make(chan error)
 
