@@ -20,15 +20,25 @@ import (
 	"github.com/spf13/pflag"
 )
 
-var globalFeatureConfig featureConfig
+var GlobalFeatureConfig FeatureConfig
+
+type FeatureConfig interface {
+	ConfigurationMap() ConfigurationMap
+	AddFlag(fs *pflag.FlagSet)
+	// TODO: Define accessors for each non-API alpha feature.
+}
 
 type featureConfig struct {
-	m *ConfigurationMap
+	configMap *ConfigurationMap
+}
+
+func init() {
+	GlobalFeatureConfig = &featureConfig{}
 }
 
 func (f *featureConfig) Set(value string) error {
-	*f.m = make(ConfigurationMap)
-	err := f.m.Set(value)
+	*f.configMap = make(ConfigurationMap)
+	err := f.configMap.Set(value)
 	if err == nil {
 		glog.Infof("feature config: %s", f.String())
 	}
@@ -36,17 +46,17 @@ func (f *featureConfig) Set(value string) error {
 }
 
 func (f *featureConfig) String() string {
-	return f.m.String()
+	return f.configMap.String()
 }
 
 func (f *featureConfig) Type() string {
-	return f.m.Type()
+	return f.configMap.Type()
 }
 
-// FeatureConfig returns the global feature config map.
-func FeatureConfig() ConfigurationMap {
+// Get Returns the feature ConfigurationMap
+func (f *featureConfig) ConfigurationMap() ConfigurationMap {
 	output := make(ConfigurationMap)
-	m := globalFeatureConfig.m
+	m := f.configMap
 	if m == nil {
 		return nil
 	}
@@ -58,7 +68,8 @@ func FeatureConfig() ConfigurationMap {
 
 // AddFeatureConfigFlag adds a flag for setting global feature config to the
 // specified FlagSet.
-func AddFeatureConfigFlag(fs *pflag.FlagSet) {
-	fs.Var(&globalFeatureConfig, "feature-config", ""+
+func (f *featureConfig) AddFlag(fs *pflag.FlagSet) {
+	// TODO: List keys in usage string for each feature that has an accessor defined
+	fs.Var(f, "feature-config", ""+
 		"A set of key=value pairs that describe feature configuration for alpha/experimental features.")
 }

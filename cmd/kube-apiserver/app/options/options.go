@@ -25,6 +25,7 @@ import (
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
+	"k8s.io/kubernetes/pkg/util/config"
 
 	"github.com/spf13/pflag"
 )
@@ -65,7 +66,8 @@ func (s *APIServer) AddFlags(fs *pflag.FlagSet) {
 	s.ServerRunOptions.AddUniversalFlags(fs)
 	//Add etcd specific flags.
 	s.ServerRunOptions.AddEtcdStorageFlags(fs)
-	config.AddFeatureConfigFlag(fs)
+
+	config.GlobalFeatureConfig.AddFlag(fs)
 
 	// Note: the weird ""+ in below lines seems to be the only way to get gofmt to
 	// arrange these text blocks sensibly. Grrr.
