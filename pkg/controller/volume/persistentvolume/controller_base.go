@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
 // This file contains the controller base functionality, i.e. framework to
@@ -46,12 +47,13 @@ import (
 // NewPersistentVolumeController creates a new PersistentVolumeController
 func NewPersistentVolumeController(
 	kubeClient clientset.Interface,
+	pvInformer framework.SharedIndexInformer,
 	syncPeriod time.Duration,
 	provisioner vol.ProvisionableVolumePlugin,
 	recyclers []vol.VolumePlugin,
 	cloud cloudprovider.Interface,
 	clusterName string,
-	volumeSource, claimSource cache.ListerWatcher,
+	claimSource cache.ListerWatcher,
 	eventRecorder record.EventRecorder,
 	enableDynamicProvisioning bool,
 ) *PersistentVolumeController {
@@ -63,7 +65,6 @@ func NewPersistentVolumeController(
 	}
 
 	controller := &PersistentVolumeController{
-		volumes:                       newPersistentVolumeOrderedIndex(),
 		claims:                        cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc),
 		kubeClient:                    kubeClient,
 		eventRecorder:                 eventRecorder,
@@ -83,17 +84,14 @@ func NewPersistentVolumeController(
 		}
 	}
 
-	if volumeSource == nil {
-		volumeSource = &cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Core().PersistentVolumes().List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Core().PersistentVolumes().Watch(options)
-			},
-		}
-	}
-	controller.volumeSource = volumeSource
+	pvInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
+		AddFunc:    controller.addVolume,
+		UpdateFunc: controller.updateVolume,
+		DeleteFunc: controller.deleteVolume,
+	})
+	pvInformer.AddIndexers(cache.Indexers{"accessmodes": accessModesIndexFunc})
+	controller.volumes = persistentVolumeOrderedIndex{pvInformer.GetIndexer()}
+	controller.volumeController = pvInformer.GetController()
 
 	if claimSource == nil {
 		claimSource = &cache.ListWatch{
@@ -107,17 +105,6 @@ func NewPersistentVolumeController(
 	}
 	controller.claimSource = claimSource
 
-	_, controller.volumeController = framework.NewIndexerInformer(
-		volumeSource,
-		&api.PersistentVolume{},
-		syncPeriod,
-		framework.ResourceEventHandlerFuncs{
-			AddFunc:    controller.addVolume,
-			UpdateFunc: controller.updateVolume,
-			DeleteFunc: controller.deleteVolume,
-		},
-		cache.Indexers{"accessmodes": accessModesIndexFunc},
-	)
 	_, controller.claimController = framework.NewInformer(
 		claimSource,
 		&api.PersistentVolumeClaim{},
@@ -131,32 +118,46 @@ func NewPersistentVolumeController(
 	return controller
 }
 
+func NewPersistentVolumeControllerFromClient(
+	kubeClient clientset.Interface,
+	syncPeriod time.Duration,
+	provisioner vol.ProvisionableVolumePlugin,
+	recyclers []vol.VolumePlugin,
+	cloud cloudprovider.Interface,
+	clusterName string,
+	volumeSource cache.ListerWatcher,
+	claimSource cache.ListerWatcher,
+	eventRecorder record.EventRecorder,
+	enableDynamicProvisioning bool,
+) *PersistentVolumeController {
+	pvInformer := informers.NewPVInformer(kubeClient, syncPeriod)
+	if volumeSource != nil {
+		pvInformer = framework.NewSharedIndexInformer(volumeSource, &api.PersistentVolume{}, syncPeriod, cache.Indexers{"accessmodes": accessModesIndexFunc})
+	}
+	ctrl := NewPersistentVolumeController(
+		kubeClient,
+		pvInformer,
+		syncPeriod,
+		provisioner,
+		recyclers,
+		cloud,
+		clusterName,
+		claimSource,
+		eventRecorder,
+		enableDynamicProvisioning,
+	)
+	ctrl.internalPVInformer = pvInformer
+
+	return ctrl
+}
+
 // initializeCaches fills all controller caches with initial data from etcd in
 // order to have the caches already filled when first addClaim/addVolume to
 // perform initial synchronization of the controller.
-func (ctrl *PersistentVolumeController) initializeCaches(volumeSource, claimSource cache.ListerWatcher) {
-	volumeListObj, err := volumeSource.List(api.ListOptions{})
-	if err != nil {
-		glog.Errorf("PersistentVolumeController can't initialize caches: %v", err)
-		return
-	}
-	volumeList, ok := volumeListObj.(*api.PersistentVolumeList)
-	if !ok {
-		glog.Errorf("PersistentVolumeController can't initialize caches, expected list of volumes, got: %#v", volumeListObj)
-		return
-	}
-	for _, volume := range volumeList.Items {
+func (ctrl *PersistentVolumeController) initializeCaches(volumes cache.Store, claimSource cache.ListerWatcher) {
+	for _, pv := range volumes.List() {
 		// Ignore template volumes from kubernetes 1.2
-		deleted := ctrl.upgradeVolumeFrom1_2(&volume)
-		if !deleted {
-			clone, err := conversion.NewCloner().DeepCopy(&volume)
-			if err != nil {
-				glog.Errorf("error cloning volume %q: %v", volume.Name, err)
-				continue
-			}
-			volumeClone := clone.(*api.PersistentVolume)
-			ctrl.storeVolumeUpdate(volumeClone)
-		}
+		ctrl.upgradeVolumeFrom1_2(pv.(*api.PersistentVolume))
 	}
 
 	claimListObj, err := claimSource.List(api.ListOptions{})
@@ -422,11 +423,14 @@ func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 func (ctrl *PersistentVolumeController) Run() {
 	glog.V(4).Infof("starting PersistentVolumeController")
 
-	ctrl.initializeCaches(ctrl.volumeSource, ctrl.claimSource)
+	ctrl.initializeCaches(ctrl.volumes.store, ctrl.claimSource)
 
 	if ctrl.volumeControllerStopCh == nil {
 		ctrl.volumeControllerStopCh = make(chan struct{})
 		go ctrl.volumeController.Run(ctrl.volumeControllerStopCh)
+	}
+	if ctrl.internalPVInformer != nil {
+		go ctrl.internalPVInformer.Run(ctrl.volumeControllerStopCh)
 	}
 
 	if ctrl.claimControllerStopCh == nil {

@@ -142,13 +142,21 @@ const createProvisionedPVInterval = 10 * time.Second
 // framework.Controllers that watch PersistentVolume and PersistentVolumeClaim
 // changes.
 type PersistentVolumeController struct {
-	volumeController          *framework.Controller
-	volumeControllerStopCh    chan struct{}
-	volumeSource              cache.ListerWatcher
-	claimController           *framework.Controller
-	claimControllerStopCh     chan struct{}
-	claimSource               cache.ListerWatcher
-	kubeClient                clientset.Interface
+	kubeClient clientset.Interface
+
+	volumeController       framework.ControllerInterface
+	volumeControllerStopCh chan struct{}
+	claimController        *framework.Controller
+	claimControllerStopCh  chan struct{}
+	claimSource            cache.ListerWatcher
+
+	// internalPVInformer is used to hold a personal informer.  If we're using
+	// a normal shared informer, then the informer will be started for us.  If
+	// we have a personal informer, we must start it ourselves.   If you start
+	// the controller using NewPersistentVolumeController(passing SharedInformer),
+	// this will be null
+	internalPVInformer framework.SharedInformer
+
 	eventRecorder             record.EventRecorder
 	cloud                     cloudprovider.Interface
 	recyclePluginMgr          vol.VolumePluginMgr

@@ -67,6 +67,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/spf13/pflag"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
 const (
@@ -290,16 +291,16 @@ func (s *CMServer) Run(_ []string) error {
 		glog.Fatalf("A Provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
 
+	sharedInformers := informers.NewSharedInformerFactory(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "shared-informers")), kubecontrollermanager.ResyncPeriod(s)())
 	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-binder")),
+		sharedInformers.PersistentVolumes().Informer(),
 		s.PVClaimBinderSyncPeriod.Duration,
 		provisioner,
 		kubecontrollermanager.ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
 		cloud,
 		s.ClusterName,
-		nil,
-		nil,
-		nil,
+		nil, nil, /* claimSource, eventRecorder */
 		s.VolumeConfiguration.EnableDynamicProvisioning,
 	)
 	volumeController.Run()

@@ -413,12 +413,13 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 
 	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-binder")),
+		sharedInformers.PersistentVolumes().Informer(),
 		s.PVClaimBinderSyncPeriod.Duration,
 		provisioner,
 		ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
 		cloud,
 		s.ClusterName,
-		nil, nil, nil,
+		nil, nil, /* claimSource, eventRecorder */
 		s.VolumeConfiguration.EnableDynamicProvisioning,
 	)
 	volumeController.Run()

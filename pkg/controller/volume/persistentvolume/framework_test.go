@@ -590,7 +590,7 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	if claimSource == nil {
 		claimSource = framework.NewFakePVCControllerSource()
 	}
-	ctrl := NewPersistentVolumeController(
+	ctrl := NewPersistentVolumeControllerFromClient(
 		kubeClient,
 		5*time.Second,        // sync period
 		nil,                  // provisioner
@@ -606,6 +606,10 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	// Speed up the test
 	ctrl.createProvisionedPVInterval = 5 * time.Millisecond
 	return ctrl
+}
+
+func newPersistentVolumeOrderedIndex() persistentVolumeOrderedIndex {
+	return persistentVolumeOrderedIndex{cache.NewIndexer(framework.DeletionHandlingMetaNamespaceKeyFunc, cache.Indexers{"accessmodes": accessModesIndexFunc})}
 }
 
 func addRecyclePlugin(ctrl *PersistentVolumeController, expectedRecycleCalls []error) {
