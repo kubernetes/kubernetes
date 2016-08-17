@@ -58,20 +58,20 @@ func (m *PodControllerRefManager) Classify(pods []api.Pod) (
 	matchesNeedsController []*api.Pod,
 	controlledDoesNotMatch []*api.Pod) {
 	for i := range pods {
-		pod := pods[i]
+		pod := &pods[i]
 		if !IsPodActive(pod) {
 			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
 				pod.Namespace, pod.Name, pod.Status.Phase, pod.DeletionTimestamp)
 			continue
 		}
-		controllerRef := getControllerOf(pod.ObjectMeta)
+		controllerRef := GetControllerOf(&pod.ObjectMeta)
 		if controllerRef != nil {
 			if controllerRef.UID == m.controllerObject.UID {
 				// already controlled
 				if m.controllerSelector.Matches(labels.Set(pod.Labels)) {
-					matchesAndControlled = append(matchesAndControlled, &pod)
+					matchesAndControlled = append(matchesAndControlled, pod)
 				} else {
-					controlledDoesNotMatch = append(controlledDoesNotMatch, &pod)
+					controlledDoesNotMatch = append(controlledDoesNotMatch, pod)
 				}
 			} else {
 				// ignoring the pod controlled by other controller
@@ -83,19 +83,20 @@ func (m *PodControllerRefManager) Classify(pods []api.Pod) (
 			if !m.controllerSelector.Matches(labels.Set(pod.Labels)) {
 				continue
 			}
-			matchesNeedsController = append(matchesNeedsController, &pod)
+			matchesNeedsController = append(matchesNeedsController, pod)
 		}
 	}
 	return matchesAndControlled, matchesNeedsController, controlledDoesNotMatch
 }
 
-// getControllerOf returns the controllerRef if controllee has a controller,
+// GetControllerOf returns the controllerRef if controllee has a controller,
 // otherwise returns nil.
-func getControllerOf(controllee api.ObjectMeta) *api.OwnerReference {
-	for _, owner := range controllee.OwnerReferences {
+func GetControllerOf(controllee *api.ObjectMeta) *api.OwnerReference {
+	for i := range controllee.OwnerReferences {
+		owner := &controllee.OwnerReferences[i]
 		// controlled by other controller
 		if owner.Controller != nil && *owner.Controller == true {
-			return &owner
+			return owner
 		}
 	}
 	return nil
