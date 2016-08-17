@@ -29,42 +29,42 @@ Documentation for other releases can be found at
 
 # Service externalName
 
-Author: Tim Hockin (@thockin), Rodrigo Campos (@rata)
+Author: Tim Hockin (@thockin), Rodrigo Campos (@rata), Rudi C (@therc)
 
-Date: July 2016
+Date: August 2016
 
-Status: Waiting LGTM
+Status: Implementation in progress
 
 # Goal
 
 Allow a service to have a CNAME record in the cluster internal DNS service. For
-example, a `db` service can have a CNAME to `something.rds.aws.amazon.com`
-pointing to an RDS resource.
+example, the lookup for a `db` service could return a CNAME that points to the
+RDS resource `something.rds.aws.amazon.com`. No proxying is involved.
 
 # Motivation
 
-There were tons of issues about this, I'd try to summarize motivation here. More
-info is on github issues/PRs: #13748, #11838, #13358, #23921
+There were many related issues, but we'll try to summarize them here. More info
+is on GitHub issues/PRs: #13748, #11838, #13358, #23921
 
-One motivation is to present as cluster services, services that are hosted by
-some provider. Some cloud providers, like AWS, give a hostname (IPs are not
-static) and the user wants to refer using regular kubernetes tools to these
-services. This was asked in bugs, at least for AWS in RedShift, RDS,
-Elasticsearch Service, ELB, etc.
+One motivation is to present as native cluster services, services that are
+hosted externally. Some cloud providers, like AWS, hand out hostnames (IPs are
+not static) and the user wants to refer to these services using regular
+Kubernetes tools. This was requested in bugs, at least for AWS, for RedShift,
+RDS, Elasticsearch Service, ELB, etc.
 
-Some others just want an external service, for example "oracle", with dns name
-"oracle-1.testdev.mycompany.com", without having to keep DNS in sync, and just
-want a CNAME.
+Other users just want to use an external service, for example `oracle`, with dns
+name `oracle-1.testdev.mycompany.com`, without having to keep DNS in sync, and
+are fine with a CNAME.
 
-Another use case is to "integrate" some services to local development. For
-example, I have a search service running in kubernetes in staging, let's say
-`search-1.stating.mycompany.com`. Let's say it's on AWS, so it's behind an ELB
-(which doesn't have a static IP, it has a hostname). I'm building an app that
-consumes `search-1` and I don't want to run it on my local PC (before kubernetes
-I didn't). I can just create a service that has a CNAME to the `search-1`
-endpoint in staging and be happy like I was before.
+Another use case is to "integrate" some services for local development. For
+example, consider a search service running in Kubernetes in staging, let's say
+`search-1.stating.mycompany.com`. It's running on AWS, so it resides behind an
+ELB (which has no static IP, just a hostname). A developer is building an app
+that consumes `search-1`, but doesn't want to run it on their machine (before
+Kubernetes, they didn't, either). They can just create a service that has a
+CNAME to the `search-1` endpoint in staging and be happy as before.
 
-Also, openshift needs this for "service refs". Service ref is really just the
+Also, Openshift needs this for "service refs". Service ref is really just the
 three use cases mentioned above, but in the future a way to automatically inject
 "service ref"s into namespaces via "service catalog"[1] might be considered. And
 service ref is the natural way to integrate an external service, since it takes
@@ -74,41 +74,41 @@ advantage of native DNS capabilities already in wide use.
 
 # Alternatives considered
 
-In the issues linked above, there is also some alternatives considered. I will
-try to sum them up here, but the list might not be complete or have all the
-discussion.
+In the issues linked above, some alternatives were also considered. A partial
+summary of them follows.
 
-One option is to add the hostname to endpoints. This was proposed in:
-https://github.com/kubernetes/kubernetes/pull/11838. This is problematic as
-endpoints are used in tons of places and users assume the required fields (like
-IP, for example) are always present and a valid IP (and check that). If the
-field is not required anymore, they can break, or if there is a hostname instead
-of the IP, they can break too.  But assuming that can be solved, it was also
-discussed that the hostname will have to be resolved, with a timeout, sync/async
-and the DNS entry has a TTL and presents other problems. One option, not
-perfect, was to only resolve the hostname on creation. But this was considered
-not a good idea. The best thing was to do this at a higher level, maybe a
-service type.
+One option is to add the hostname to endpoints, as proposed in
+https://github.com/kubernetes/kubernetes/pull/11838. This is problematic, as
+endpoints are used in many places and users assume the required fields (such as
+IP address) are always present and valid (and check that, too). If the field is
+not required anymore or if there is just a hostname instead of the IP,
+applications could break. Even assuming those cases could be solved, the
+hostname will have to be resolved, which presents further questions and issues:
+the timeout to use, whether the lookup is synchronous or asynchronous, dealing
+with DNS TTL and more. One imperfect approach was to only resolve the hostname
+upon creation, but this was considered not a great idea. A better approach
+would be at a higher level, maybe a service type.
 
-There are more ideas on how to approach this problem on #13748, but all pointed
-to some problem. Ranging from using another upstream DNS server to creating a
-Name object assoaciated with DNSs.
+There are more ideas described in #13748, but all raised further issues,
+ranging from using another upstream DNS server to creating a Name object
+associated with DNSs.
 
 # Proposed solution
 
-The proposed solution is to add this at the service layer by adding a new
-`externalName` type to the service. This will create a CNAME record in the
-internal cluster DNS service.
+The proposed solution works at the service layer, by adding a new `externalName`
+type for services. This will create a CNAME record in the internal cluster DNS
+service. No virtual IP or proxying is involved.
 
-Using a CNAME avoids having to do the lookup, decide a timeout for it, and
-having to lookup for it when the TTL expires. It's way simpler to implement,
-while solving the right problem. And doing it at the service layer avoids all
-the problem discussed with doing the change at the endpoints layer.
+Using a CNAME gets rid of unnecessary DNS lookups. There's no need for the
+Kubernetes control plane to issue them, to pick a timeout for them and having to
+refresh them when the TTL for a record expires. It's way simpler to implement,
+while solving the right problem. And addressing it at the service layer avoids
+all the complications mentioned above about doing it at the endpoints layer.
 
-The proposed solution is the one by Tim Hockin here:
+The solution was outlined by Tim Hockin in
 https://github.com/kubernetes/kubernetes/issues/13748#issuecomment-230397975
 
-Currently a ServiceSpec looks like this (comments stripped down):
+Currently a ServiceSpec looks like this, with comments edited for clarity:
 
 ```
 type ServiceSpec struct {
@@ -132,7 +132,7 @@ type ServiceSpec struct {
     LoadBalancerSourceRanges []string
 ```
 
-So, the proposal is to change it to:
+The proposal is to change it to:
 
 ```
 type ServiceSpec struct {
@@ -162,7 +162,7 @@ type ServiceSpec struct {
     LoadBalancerSourceRanges []string
 ```
 
-So, for example, it can be used like this:
+For example, it can be used like this:
 
 ```
 apiVersion: v1
@@ -176,10 +176,13 @@ type: ExternalName
 externalName: myapp.rds.whatever.aws.says
 ```
 
-There is one thing to take into account (that no other alternative considered
-fixes either): TLS. If the service is a CNAME for an endpoint that uses TLS,
-connecting with another name may fail cert validation. This is acknowledged and
-left for future consideration.
+There is one issue to take into account, that no other alternative considered
+fixes, either: TLS. If the service is a CNAME for an endpoint that uses TLS,
+connecting with the Kubernetes name `my-service.my-ns.svc.cluster.local` may
+result in a failure during server certificate validation. This is acknowledged
+and left for future consideration. For the time being, users and administrators
+might need to ensure that the server certificates also mentions the Kubernetes
+name as an alternate host name.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
