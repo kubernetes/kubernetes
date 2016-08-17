@@ -2490,6 +2490,7 @@ func DeepCopy_api_PodSecurityContext(in interface{}, out interface{}, c *convers
 		out.HostNetwork = in.HostNetwork
 		out.HostPID = in.HostPID
 		out.HostIPC = in.HostIPC
+		out.HostUser = in.HostUser
 		if in.SELinuxOptions != nil {
 			in, out := &in.SELinuxOptions, &out.SELinuxOptions
 			*out = new(SELinuxOptions)
