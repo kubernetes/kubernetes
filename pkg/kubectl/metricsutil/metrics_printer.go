@@ -19,30 +19,28 @@ package metricsutil
 import (
 	"fmt"
 	"io"
-	"time"
 
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/kubectl"
 )
 
 var (
-	MeasuredResources = []v1.ResourceName{
-		v1.ResourceCPU,
-		v1.ResourceMemory,
-		v1.ResourceStorage,
+	MeasuredResources = []api.ResourceName{
+		api.ResourceCPU,
+		api.ResourceMemory,
 	}
-	NodeColumns     = []string{"NAME", "CPU (cores)", "MEMORY (bytes)", "STORAGE (bytes)", "TIMESTAMP"}
-	PodColumns      = []string{"NAME", "CPU (cores)", "MEMORY (bytes)", "STORAGE (bytes)", "TIMESTAMP"}
+	NodeColumns     = []string{"NAME", "CPU(cores)", "CPU%", "MEMORY(bytes)", "MEMORY%"}
+	PodColumns      = []string{"NAME", "CPU(cores)", "MEMORY(bytes)"}
 	NamespaceColumn = "NAMESPACE"
 	PodColumn       = "POD"
 )
 
 type ResourceMetricsInfo struct {
 	Name      string
-	Metrics   v1.ResourceList
-	Timestamp string
+	Metrics   api.ResourceList
+	Available api.ResourceList
 }
 
 type TopCmdPrinter struct {
@@ -53,7 +51,7 @@ func NewTopCmdPrinter(out io.Writer) *TopCmdPrinter {
 	return &TopCmdPrinter{out: out}
 }
 
-func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics) error {
+func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics, availableResources map[string]api.ResourceList) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -61,11 +59,16 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics
 	defer w.Flush()
 
 	printColumnNames(w, NodeColumns)
+	var usage api.ResourceList
 	for _, m := range metrics {
+		err := api.Scheme.Convert(&m.Usage, &usage, nil)
+		if err != nil {
+			return err
+		}
 		printMetricsLine(w, &ResourceMetricsInfo{
 			Name:      m.Name,
-			Metrics:   m.Usage,
-			Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
+			Metrics:   usage,
+			Available: availableResources[m.Name],
 		})
 	}
 	return nil
@@ -86,7 +89,10 @@ func (printer *TopCmdPrinter) PrintPodMetrics(metrics []metrics_api.PodMetrics, 
 	}
 	printColumnNames(w, PodColumns)
 	for _, m := range metrics {
-		printSinglePodMetrics(w, &m, printContainers, withNamespace)
+		err := printSinglePodMetrics(w, &m, printContainers, withNamespace)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -98,18 +104,23 @@ func printColumnNames(out io.Writer, names []string) {
 	fmt.Fprint(out, "\n")
 }
 
-func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContainersOnly bool, withNamespace bool) {
-	containers := make(map[string]v1.ResourceList)
-	podMetrics := make(v1.ResourceList)
+func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContainersOnly bool, withNamespace bool) error {
+	containers := make(map[string]api.ResourceList)
+	podMetrics := make(api.ResourceList)
 	for _, res := range MeasuredResources {
 		podMetrics[res], _ = resource.ParseQuantity("0")
 	}
+	var usage api.ResourceList
 	for _, c := range m.Containers {
-		containers[c.Name] = c.Usage
+		err := api.Scheme.Convert(&c.Usage, &usage, nil)
+		if err != nil {
+			return err
+		}
+		containers[c.Name] = usage
 		if !printContainersOnly {
 			for _, res := range MeasuredResources {
 				quantity := podMetrics[res]
-				quantity.Add(c.Usage[res])
+				quantity.Add(usage[res])
 				podMetrics[res] = quantity
 			}
 		}
@@ -123,7 +134,7 @@ func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 			printMetricsLine(out, &ResourceMetricsInfo{
 				Name:      contName,
 				Metrics:   containers[contName],
-				Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
+				Available: api.ResourceList{},
 			})
 		}
 	} else {
@@ -133,15 +144,15 @@ func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 		printMetricsLine(out, &ResourceMetricsInfo{
 			Name:      m.Name,
 			Metrics:   podMetrics,
-			Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
+			Available: api.ResourceList{},
 		})
 	}
+	return nil
 }
 
 func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo) {
 	printValue(out, metrics.Name)
-	printAllResourceUsages(out, metrics.Metrics)
-	printValue(out, metrics.Timestamp)
+	printAllResourceUsages(out, metrics)
 	fmt.Fprint(out, "\n")
 }
 
@@ -149,23 +160,24 @@ func printValue(out io.Writer, value interface{}) {
 	fmt.Fprintf(out, "%v\t", value)
 }
 
-func printAllResourceUsages(out io.Writer, usage v1.ResourceList) {
+func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
 	for _, res := range MeasuredResources {
-		quantity := usage[res]
+		quantity := metrics.Metrics[res]
 		printSingleResourceUsage(out, res, quantity)
 		fmt.Fprint(out, "\t")
+		if available, found := metrics.Available[res]; found {
+			fraction := float64(quantity.MilliValue()) / float64(available.MilliValue()) * 100
+			fmt.Fprintf(out, "%d%%\t", int64(fraction))
+		}
 	}
 }
 
-func printSingleResourceUsage(out io.Writer, resourceType v1.ResourceName, quantity resource.Quantity) {
+func printSingleResourceUsage(out io.Writer, resourceType api.ResourceName, quantity resource.Quantity) {
 	switch resourceType {
-	case v1.ResourceCPU:
+	case api.ResourceCPU:
 		fmt.Fprintf(out, "%vm", quantity.MilliValue())
-	case v1.ResourceMemory:
+	case api.ResourceMemory:
 		fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
-	case v1.ResourceStorage:
-		// TODO: Change it after storage metrics collection is finished.
-		fmt.Fprint(out, "-")
 	default:
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}

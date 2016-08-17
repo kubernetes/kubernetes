@@ -45,7 +45,7 @@ var (
 )
 
 type HeapsterMetricsClient struct {
-	Client            *client.Client
+	*client.Client
 	HeapsterNamespace string
 	HeapsterScheme    string
 	HeapsterService   string
@@ -66,7 +66,7 @@ func DefaultHeapsterMetricsClient(client *client.Client) *HeapsterMetricsClient 
 	return NewHeapsterMetricsClient(client, DefaultHeapsterNamespace, DefaultHeapsterScheme, DefaultHeapsterService, DefaultHeapsterPort)
 }
 
-func PodMetricsUrl(namespace string, name string) (string, error) {
+func podMetricsUrl(namespace string, name string) (string, error) {
 	errs := validation.ValidateNamespaceName(namespace, false)
 	if len(errs) > 0 {
 		message := fmt.Sprintf("invalid namespace: %s - %v", namespace, errs)
@@ -82,7 +82,7 @@ func PodMetricsUrl(namespace string, name string) (string, error) {
 	return fmt.Sprintf("%s/namespaces/%s/pods/%s", MetricsRoot, namespace, name), nil
 }
 
-func NodeMetricsUrl(name string) (string, error) {
+func nodeMetricsUrl(name string) (string, error) {
 	if len(name) > 0 {
 		errs := validation.ValidateNodeName(name, false)
 		if len(errs) > 0 {
@@ -95,7 +95,7 @@ func NodeMetricsUrl(name string) (string, error) {
 
 func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector string) ([]metrics_api.NodeMetrics, error) {
 	params := map[string]string{"labelSelector": selector}
-	path, err := NodeMetricsUrl(nodeName)
+	path, err := nodeMetricsUrl(nodeName)
 	if err != nil {
 		return []metrics_api.NodeMetrics{}, err
 	}
@@ -139,7 +139,7 @@ func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string
 	params := map[string]string{"labelSelector": selector}
 	allMetrics := make([]metrics_api.PodMetrics, 0)
 	for _, ns := range namespaces {
-		path, err := PodMetricsUrl(ns, podName)
+		path, err := podMetricsUrl(ns, podName)
 		if err != nil {
 			return []metrics_api.PodMetrics{}, err
 		}
@@ -167,7 +167,7 @@ func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string
 }
 
 func GetHeapsterMetrics(cli *HeapsterMetricsClient, path string, params map[string]string) ([]byte, error) {
-	return cli.Client.Services(cli.HeapsterNamespace).
+	return cli.Services(cli.HeapsterNamespace).
 		ProxyGet(cli.HeapsterScheme, cli.HeapsterService, cli.HeapsterPort, path, params).
 		DoRaw()
 }
