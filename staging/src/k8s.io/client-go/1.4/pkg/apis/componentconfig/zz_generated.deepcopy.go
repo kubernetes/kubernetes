@@ -325,6 +325,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		} else {
 			out.KubeReserved = nil
 		}
+		out.ProtectKernelDefaults = in.ProtectKernelDefaults
 		return nil
 	}
 }

@@ -1889,6 +1889,8 @@ type EndpointAddress struct {
 	// Optional: Hostname of this endpoint
 	// Meant to be used by DNS servers etc.
 	Hostname string `json:"hostname,omitempty"`
+	// Optional: Node hosting this endpoint. This can be used to determine endpoints local to a node.
+	NodeName *string `json:"nodeName,omitempty"`
 	// Optional: The kubernetes object related to the entry point.
 	TargetRef *ObjectReference
 }
