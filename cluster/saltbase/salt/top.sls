@@ -101,6 +101,9 @@ base:
 {% if pillar.get('enable_cluster_autoscaler', '').lower() == 'true' %}
     - cluster-autoscaler
 {% endif %}
+{% if pillar.get('enable_rescheduler', '').lower() == 'true' %}
+    - rescheduler
+{% endif %}
 {% if pillar.get('network_policy_provider', '').lower() == 'calico' %}
     - calico.master
 {% endif %}

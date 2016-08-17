@@ -701,6 +701,15 @@ start_cluster_autoscaler() {
   fi
 }
 
+# Starts rescheduler.
+start-rescheduler() {
+  if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
+    prepare-log-file /var/log/rescheduler.log
+    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
+       /etc/kubernetes/manifests/
+  fi
+}
+
 # Starts a fluentd static pod for logging.
 start_fluentd() {
   if [ "${ENABLE_NODE_LOGGING:-}" = "true" ]; then
