@@ -1323,21 +1323,28 @@ function kube-down {
                                       Name=tag:KubernetesCluster,Values=${CLUSTER_ID} \
                             --query Reservations[].Instances[].InstanceId)
 
+    asg_groups=""
     if [[ -n "${instance_ids}" ]]; then
       asg_groups=$($AWS_CMD   describe-instances \
-                              --query 'Reservations[].Instances[].Tags[?Key==`aws:autoscaling:groupName`].Value[]' \
-                              --instance-ids ${instance_ids})
-      for asg_group in ${asg_groups}; do
-        if [[ -n $(${AWS_ASG_CMD} describe-auto-scaling-groups --auto-scaling-group-names ${asg_group} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
-          echo "Deleting auto-scaling group: ${asg_group}"
-          ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${asg_group}
-        fi
-        if [[ -n $(${AWS_ASG_CMD} describe-launch-configurations --launch-configuration-names ${asg_group} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
-          echo "Deleting auto-scaling launch configuration: ${asg_group}"
-          ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${asg_group}
-        fi
-      done
+        --query 'Reservations[].Instances[].Tags[?Key==`aws:autoscaling:groupName`].Value[]' \
+        --instance-ids ${instance_ids})
+    fi
+    if [[ -z "${asg_groups}" ]]; then
+      # Always check for AutoScalingGroups/LaunchConfigurations named $ASG_NAME
+      asg_groups=${ASG_NAME}
+    fi
+    for asg_group in ${asg_groups}; do
+      if [[ -n $(${AWS_ASG_CMD} describe-auto-scaling-groups --auto-scaling-group-names ${asg_group} --query AutoScalingGroups[].AutoScalingGroupName) ]]; then
+        echo "Deleting auto-scaling group: ${asg_group}"
+        ${AWS_ASG_CMD} delete-auto-scaling-group --force-delete --auto-scaling-group-name ${asg_group}
+      fi
+      if [[ -n $(${AWS_ASG_CMD} describe-launch-configurations --launch-configuration-names ${asg_group} --query LaunchConfigurations[].LaunchConfigurationName) ]]; then
+        echo "Deleting auto-scaling launch configuration: ${asg_group}"
+        ${AWS_ASG_CMD} delete-launch-configuration --launch-configuration-name ${asg_group}
+      fi
+    done
 
+    if [[ -n "${instance_ids}" ]]; then
       $AWS_CMD terminate-instances --instance-ids ${instance_ids} > $LOG
       echo "Waiting for instances to be deleted"
       for instance_id in ${instance_ids}; do
