@@ -615,13 +615,14 @@ func getCertFromAPIServer(s *options.KubeletServer, certfile, keyfile string) (c
 // It returns the API server's issued certificate (pem-encoded) on success.
 // If there is any errors, or the watch timeouts, it returns an error.
 func requestCertificate(client unversionedcertificates.CertificateSigningRequestsGetter, request []byte, defaultTimeoutSeconds int64) (certificate []byte, err error) {
-	if _, err = client.CertificateSigningRequests().Create(&certificates.CertificateSigningRequest{
+	req, err := client.CertificateSigningRequests().Create(&certificates.CertificateSigningRequest{
 		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
 		ObjectMeta: api.ObjectMeta{GenerateName: "csr-"},
 
 		// Username, UID, Groups will be injected by API server.
 		Spec: certificates.CertificateSigningRequestSpec{Request: request},
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
 
 	}
@@ -645,6 +646,9 @@ func requestCertificate(client unversionedcertificates.CertificateSigningRequest
 		}
 
 		if event.Type == watch.Modified {
+			if event.Object.(*certificates.CertificateSigningRequest).UID != req.UID {
+				continue
+			}
 			status = event.Object.(*certificates.CertificateSigningRequest).Status
 			for _, c := range status.Conditions {
 				if c.Type == certificates.CertificateDenied {
