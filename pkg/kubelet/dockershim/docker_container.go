@@ -38,9 +38,6 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	f := newDockerFilter(&opts.Filter)
 
 	if filter != nil {
-		if filter.Name != nil {
-			f.Add("name", filter.GetName())
-		}
 		if filter.Id != nil {
 			f.Add("id", filter.GetId())
 		}
@@ -66,6 +63,13 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	// Convert docker to runtime api containers.
 	result := []*runtimeApi.Container{}
 	for _, c := range containers {
+		if len(filter.GetName()) > 0 {
+			_, _, _, containerName, _, err := parseContainerName(c.Names[0])
+			if err != nil || containerName != filter.GetName() {
+				continue
+			}
+		}
+
 		result = append(result, toRuntimeAPIContainer(&c))
 	}
 	return result, nil
@@ -79,7 +83,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		return "", fmt.Errorf("container config is nil")
 	}
 	if sandboxConfig == nil {
-		return "", fmt.Errorf("sandbox config is nil for container %q", config.GetName())
+		return "", fmt.Errorf("sandbox config is nil for container %q", config.Metadata.GetName())
 	}
 
 	// Merge annotations and labels because docker supports only labels.
@@ -94,7 +98,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		image = iSpec.GetImage()
 	}
 	createConfig := dockertypes.ContainerCreateConfig{
-		Name: config.GetName(),
+		Name: buildContainerName(sandboxConfig, config),
 		Config: &dockercontainer.Config{
 			// TODO: set User.
 			Hostname:   sandboxConfig.GetHostname(),
@@ -274,9 +278,17 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	ct, st, ft := createdAt.Unix(), startedAt.Unix(), finishedAt.Unix()
 	exitCode := int32(r.State.ExitCode)
 
+	_, _, _, containerName, attempt, err := parseContainerName(r.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	return &runtimeApi.ContainerStatus{
-		Id:         &r.ID,
-		Name:       &r.Name,
+		Id: &r.ID,
+		Metadata: &runtimeApi.ContainerMetadata{
+			Name:    &containerName,
+			Attempt: &attempt,
+		},
 		Image:      &runtimeApi.ImageSpec{Image: &r.Config.Image},
 		ImageRef:   &r.Image,
 		Mounts:     mounts,

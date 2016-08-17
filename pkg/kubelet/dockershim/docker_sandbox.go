@@ -55,7 +55,7 @@ func (ds *dockerService) CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (
 	createConfig := makeSandboxDockerConfig(config, image)
 	createResp, err := ds.client.CreateContainer(*createConfig)
 	if err != nil || createResp == nil {
-		return "", fmt.Errorf("failed to create a sandbox for pod %q: %v", config.GetName(), err)
+		return "", fmt.Errorf("failed to create a sandbox for pod %q: %v", config.Metadata.GetName(), err)
 	}
 
 	// Step 3: Start the sandbox container.
@@ -117,11 +117,21 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	network := &runtimeApi.PodSandboxNetworkStatus{Ip: &IP}
 	netNS := getNetworkNamespace(r)
 
+	podName, podNamespace, podUID, attempt, err := parseSandboxName(r.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	return &runtimeApi.PodSandboxStatus{
 		Id:        &r.ID,
-		Name:      &r.Name,
 		State:     &state,
 		CreatedAt: &ct,
+		Metadata: &runtimeApi.PodSandboxMetadata{
+			Name:      &podName,
+			Namespace: &podNamespace,
+			Uid:       &podUID,
+			Attempt:   &attempt,
+		},
 		// TODO: We write annotations as labels on the docker containers. All
 		// these annotations will be read back as labels. Need to fix this.
 		// Also filter out labels only relevant to this shim.
@@ -140,9 +150,6 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	opts.Filter = dockerfilters.NewArgs()
 	f := newDockerFilter(&opts.Filter)
 	if filter != nil {
-		if filter.Name != nil {
-			f.Add("name", filter.GetName())
-		}
 		if filter.Id != nil {
 			f.Add("id", filter.GetId())
 		}
@@ -176,6 +183,13 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	// Convert docker containers to runtime api sandboxes.
 	result := []*runtimeApi.PodSandbox{}
 	for _, c := range containers {
+		if len(filter.GetName()) > 0 {
+			sandboxName, _, _, _, err := parseSandboxName(c.Names[0])
+			if err != nil || sandboxName != filter.GetName() {
+				continue
+			}
+		}
+
 		s := toRuntimeAPISandbox(&c)
 		if filterOutReadySandboxes && s.GetState() == runtimeApi.PodSandBoxState_READY {
 			continue
@@ -193,7 +207,7 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{
-		Name: c.GetName(),
+		Name: buildSandboxName(c),
 		Config: &dockercontainer.Config{
 			Hostname: c.GetHostname(),
 			// TODO: Handle environment variables.
