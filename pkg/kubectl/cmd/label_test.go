@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -322,7 +323,7 @@ func TestLabelErrors(t *testing.T) {
 		for k, v := range testCase.flags {
 			cmd.Flags().Set(k, v)
 		}
-		err := RunLabel(f, buf, cmd, testCase.args, &LabelOptions{})
+		err := RunLabel(f, buf, cmd, testCase.args, &resource.FilenameOptions{})
 		if !testCase.errFn(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue
@@ -370,9 +371,8 @@ func TestLabelForResourceFromFile(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdLabel(f, buf)
-	options := &LabelOptions{
-		Filenames: []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"},
-	}
+	options := &resource.FilenameOptions{}
+	options.Filenames = []string{"../../../examples/storage/cassandra/cassandra-controller.yaml"}
 
 	err := RunLabel(f, buf, cmd, []string{"a=b"}, options)
 	if err != nil {
@@ -421,7 +421,7 @@ func TestLabelMultipleObjects(t *testing.T) {
 	cmd := NewCmdLabel(f, buf)
 	cmd.Flags().Set("all", "true")
 
-	if err := RunLabel(f, buf, cmd, []string{"pods", "a=b"}, &LabelOptions{}); err != nil {
+	if err := RunLabel(f, buf, cmd, []string{"pods", "a=b"}, &resource.FilenameOptions{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if strings.Count(buf.String(), "labeled") != len(pods.Items) {

@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
 func TestDeleteObjectByTuple(t *testing.T) {
@@ -145,9 +146,8 @@ func TestDeleteObjectNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"},
-	}
+	options := &resource.FilenameOptions{}
+	options.Filenames = []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	err := RunDelete(f, buf, cmd, []string{}, options)
@@ -222,7 +222,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 	cmd.Flags().Set("ignore-not-found", "false")
 	cmd.Flags().Set("output", "name")
 
-	err := RunDelete(f, buf, cmd, []string{"services"}, &DeleteOptions{})
+	err := RunDelete(f, buf, cmd, []string{"services"}, &resource.FilenameOptions{})
 	if err == nil || !errors.IsNotFound(err) {
 		t.Errorf("unexpected error: expected NotFound, got %v", err)
 	}
@@ -325,9 +325,8 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"},
-	}
+	options := &resource.FilenameOptions{}
+	options.Filenames = []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	err := RunDelete(f, buf, cmd, []string{}, options)
@@ -486,7 +485,7 @@ func TestResourceErrors(t *testing.T) {
 		for k, v := range testCase.flags {
 			cmd.Flags().Set(k, v)
 		}
-		err := RunDelete(f, buf, cmd, testCase.args, &DeleteOptions{})
+		err := RunDelete(f, buf, cmd, testCase.args, &resource.FilenameOptions{})
 		if !testCase.errFn(err) {
 			t.Errorf("%s: unexpected error: %v", k, err)
 			continue

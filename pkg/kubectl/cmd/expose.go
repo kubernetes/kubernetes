@@ -32,13 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
-// ExposeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type ExposeOptions struct {
-	Filenames []string
-	Recursive bool
-}
-
 var (
 	expose_resources = dedent.Dedent(`
 		pod (po), service (svc), replicationcontroller (rc),
@@ -81,7 +74,7 @@ var (
 )
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &ExposeOptions{}
+	options := &resource.FilenameOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
 	resources := regexp.MustCompile(`\s*,`).Split(expose_resources, -1)
@@ -122,16 +115,15 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
 	cmd.Flags().String("cluster-ip", "", "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.")
 
-	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
+	usage := "identifying the resource to expose a service"
+	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddApplyAnnotationFlags(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	return cmd
 }
 
-func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *ExposeOptions) error {
+func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -141,7 +133,7 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(namespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(false, args...).
 		Flatten().
 		Do()

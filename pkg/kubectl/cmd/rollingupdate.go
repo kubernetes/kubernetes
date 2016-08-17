@@ -37,12 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
-// RollingUpdateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type RollingUpdateOptions struct {
-	Filenames []string
-}
-
 var (
 	rollingUpdate_long = dedent.Dedent(`
 		Perform a rolling update of the given ReplicationController.
@@ -76,7 +70,7 @@ var (
 )
 
 func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &RollingUpdateOptions{}
+	options := &resource.FilenameOptions{}
 
 	cmd := &cobra.Command{
 		Use: "rolling-update OLD_CONTROLLER_NAME ([NEW_CONTROLLER_NAME] --image=NEW_CONTAINER_IMAGE | -f NEW_CONTROLLER_SPEC)",
@@ -142,7 +136,7 @@ func validateArguments(cmd *cobra.Command, filenames, args []string) error {
 	return nil
 }
 
-func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *RollingUpdateOptions) error {
+func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions) error {
 	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}
@@ -207,7 +201,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		request := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 			Schema(schema).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
-			FilenameParam(enforceNamespace, false, filename).
+			FilenameParam(enforceNamespace, &resource.FilenameOptions{Recursive: false, Filenames: []string{filename}}).
 			Do()
 		obj, err := request.Object()
 		if err != nil {
