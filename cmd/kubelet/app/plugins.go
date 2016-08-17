@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -92,7 +92,7 @@ func ProbeNetworkPlugins(pluginDir string) []network.NetworkPlugin {
 	// for each existing plugin, add to the list
 	allPlugins = append(allPlugins, exec.ProbeNetworkPlugins(pluginDir)...)
 	allPlugins = append(allPlugins, cni.ProbeNetworkPlugins(pluginDir)...)
-	allPlugins = append(allPlugins, kubenet.NewPlugin())
+	allPlugins = append(allPlugins, kubenet.NewPlugin(pluginDir))
 
 	return allPlugins
 }

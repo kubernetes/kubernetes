@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/devel/api-conventions.md).
+[here](http://releases.k8s.io/release-1.3/docs/devel/api-conventions.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -134,8 +134,9 @@ specific actions that create, update, delete, or get.
 2. **Lists** are collections of **resources** of one (usually) or more
 (occasionally) kinds.
 
-   Lists have a limited set of common metadata. All lists use the "items" field
-to contain the array of objects they return.
+   The name of a list kind must end with "List". Lists have a limited set of
+common metadata. All lists use the required "items" field to contain the array
+of objects they return. Any kind that has the "items" field must be a list kind.
 
    Most objects defined in the system should have an endpoint that returns the
 full set of resources, as well as zero or more endpoints that return subsets of

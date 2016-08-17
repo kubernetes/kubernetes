@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -211,31 +211,37 @@ func (s *Scheme) KnownTypes(gv unversioned.GroupVersion) map[string]reflect.Type
 	return types
 }
 
-// ObjectKind returns the group,version,kind of the go object,
-// or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectKind(obj Object) (unversioned.GroupVersionKind, error) {
-	gvks, err := s.ObjectKinds(obj)
-	if err != nil {
-		return unversioned.GroupVersionKind{}, err
-	}
-	return gvks[0], nil
+// AllKnownTypes returns the all known types.
+func (s *Scheme) AllKnownTypes() map[unversioned.GroupVersionKind]reflect.Type {
+	return s.gvkToType
 }
 
-// ObjectKinds returns all possible group,version,kind of the go object,
-// or an error if it's not a pointer or is unregistered.
-func (s *Scheme) ObjectKinds(obj Object) ([]unversioned.GroupVersionKind, error) {
+// ObjectKind returns the group,version,kind of the go object and true if this object
+// is considered unversioned, or an error if it's not a pointer or is unregistered.
+func (s *Scheme) ObjectKind(obj Object) (unversioned.GroupVersionKind, bool, error) {
+	gvks, unversionedType, err := s.ObjectKinds(obj)
+	if err != nil {
+		return unversioned.GroupVersionKind{}, false, err
+	}
+	return gvks[0], unversionedType, nil
+}
+
+// ObjectKinds returns all possible group,version,kind of the go object, true if the
+// object is considered unversioned, or an error if it's not a pointer or is unregistered.
+func (s *Scheme) ObjectKinds(obj Object) ([]unversioned.GroupVersionKind, bool, error) {
 	v, err := conversion.EnforcePtr(obj)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	t := v.Type()
 
 	gvks, ok := s.typeToGVK[t]
 	if !ok {
-		return nil, &notRegisteredErr{t: t}
+		return nil, false, &notRegisteredErr{t: t}
 	}
+	_, unversionedType := s.unversionedTypes[t]
 
-	return gvks, nil
+	return gvks, unversionedType, nil
 }
 
 // Recognizes returns true if the scheme is able to handle the provided group,version,kind
@@ -356,9 +362,9 @@ func (s *Scheme) AddDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
 
 // Similar to AddDeepCopyFuncs, but registers deep-copy functions that were
 // automatically generated.
-func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...interface{}) error {
-	for _, f := range deepCopyFuncs {
-		if err := s.cloner.RegisterGeneratedDeepCopyFunc(f); err != nil {
+func (s *Scheme) AddGeneratedDeepCopyFuncs(deepCopyFuncs ...conversion.GeneratedDeepCopyFunc) error {
+	for _, fn := range deepCopyFuncs {
+		if err := s.cloner.RegisterGeneratedDeepCopyFunc(fn); err != nil {
 			return err
 		}
 	}
@@ -439,13 +445,13 @@ func (s *Scheme) Convert(in, out interface{}) error {
 	inVersion := unversioned.GroupVersion{Group: "unknown", Version: "unknown"}
 	outVersion := unversioned.GroupVersion{Group: "unknown", Version: "unknown"}
 	if inObj, ok := in.(Object); ok {
-		if gvk, err := s.ObjectKind(inObj); err == nil {
-			inVersion = gvk.GroupVersion()
+		if gvks, _, err := s.ObjectKinds(inObj); err == nil {
+			inVersion = gvks[0].GroupVersion()
 		}
 	}
 	if outObj, ok := out.(Object); ok {
-		if gvk, err := s.ObjectKind(outObj); err == nil {
-			outVersion = gvk.GroupVersion()
+		if gvks, _, err := s.ObjectKinds(outObj); err == nil {
+			outVersion = gvks[0].GroupVersion()
 		}
 	}
 	flags, meta := s.generateConvertMeta(inVersion, outVersion, in)
@@ -504,7 +510,7 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion unversioned.GroupVersion
 
 	outKind := outVersion.WithKind(kind.Kind)
 
-	inKind, err := s.ObjectKind(in)
+	inKinds, _, err := s.ObjectKinds(in)
 	if err != nil {
 		return nil, err
 	}
@@ -514,7 +520,7 @@ func (s *Scheme) ConvertToVersion(in Object, outVersion unversioned.GroupVersion
 		return nil, err
 	}
 
-	flags, meta := s.generateConvertMeta(inKind.GroupVersion(), outVersion, in)
+	flags, meta := s.generateConvertMeta(inKinds[0].GroupVersion(), outVersion, in)
 	if err := s.converter.Convert(in, out, flags, meta); err != nil {
 		return nil, err
 	}
@@ -603,8 +609,11 @@ func setTargetVersion(obj Object, raw *Scheme, gv unversioned.GroupVersion) {
 		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{})
 		return
 	}
-	gvk, _ := raw.ObjectKind(obj)
-	obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: gvk.Kind})
+	if gvks, _, _ := raw.ObjectKinds(obj); len(gvks) > 0 {
+		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version, Kind: gvks[0].Kind})
+	} else {
+		obj.GetObjectKind().SetGroupVersionKind(unversioned.GroupVersionKind{Group: gv.Group, Version: gv.Version})
+	}
 }
 
 // setTargetKind sets the kind on an object, taking into account whether the target kind is the internal version.

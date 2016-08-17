@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -102,20 +102,39 @@ func (ds *discoverySummarizerServer) indexHandler(w http.ResponseWriter, r *http
 func (ds *discoverySummarizerServer) summarizeGroupVersionsHandler(path string) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var apiGroupList *unversioned.APIGroupList
-		// TODO: We can cache and parallelize the calls to all servers.
+		// TODO: We can cache calls to all servers.
+		groups := make(chan *unversioned.APIGroupList)
+		errorChannel := make(chan error)
 		for _, serverAddress := range ds.groupVersionPaths[path] {
-			groupList, err := ds.getAPIGroupList(serverAddress + path)
-			if err != nil {
+			addr := serverAddress
+			go func(groups chan *unversioned.APIGroupList, error_channel chan error) {
+				groupList, err := ds.getAPIGroupList(addr + path)
+				if err != nil {
+					errorChannel <- err
+					return
+				}
+				groups <- groupList
+				return
+			}(groups, errorChannel)
+		}
+
+		var groupList *unversioned.APIGroupList
+		var err error
+		for range ds.groupVersionPaths[path] {
+			select {
+			case groupList = <-groups:
+				if apiGroupList == nil {
+					apiGroupList = &unversioned.APIGroupList{}
+					*apiGroupList = *groupList
+				} else {
+					apiGroupList.Groups = append(apiGroupList.Groups, groupList.Groups...)
+				}
+			case err = <-errorChannel:
 				ds.writeErr(http.StatusBadGateway, err, w)
 				return
 			}
-			if apiGroupList == nil {
-				apiGroupList = &unversioned.APIGroupList{}
-				*apiGroupList = *groupList
-			} else {
-				apiGroupList.Groups = append(apiGroupList.Groups, groupList.Groups...)
-			}
 		}
+
 		ds.writeRawJSON(http.StatusOK, *apiGroupList, w)
 		return
 	}

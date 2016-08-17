@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ package stats
 
 import (
 	"fmt"
-	"runtime"
 	"strings"
 	"time"
 
@@ -27,10 +26,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/kubelet/leaky"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/kubelet/types"
+	kubetypes "k8s.io/kubernetes/pkg/types"
 
 	"github.com/golang/glog"
 
@@ -53,8 +52,6 @@ var _ SummaryProvider = &summaryProviderImpl{}
 
 // NewSummaryProvider returns a new SummaryProvider
 func NewSummaryProvider(statsProvider StatsProvider, fsResourceAnalyzer fsResourceAnalyzerInterface, cruntime container.Runtime) SummaryProvider {
-	stackBuff := []byte{}
-	runtime.Stack(stackBuff, false)
 	return &summaryProviderImpl{statsProvider, fsResourceAnalyzer, cruntime}
 }
 
@@ -127,13 +124,17 @@ func (sb *summaryBuilder) build() (*stats.Summary, error) {
 		Fs: &stats.FsStats{
 			AvailableBytes: &sb.rootFsInfo.Available,
 			CapacityBytes:  &sb.rootFsInfo.Capacity,
-			UsedBytes:      &sb.rootFsInfo.Usage},
+			UsedBytes:      &sb.rootFsInfo.Usage,
+			InodesFree:     sb.rootFsInfo.InodesFree,
+			Inodes:         sb.rootFsInfo.Inodes},
 		StartTime: rootStats.StartTime,
 		Runtime: &stats.RuntimeStats{
 			ImageFs: &stats.FsStats{
 				AvailableBytes: &sb.imageFsInfo.Available,
 				CapacityBytes:  &sb.imageFsInfo.Capacity,
 				UsedBytes:      &sb.imageStats.TotalStorageBytes,
+				InodesFree:     sb.imageFsInfo.InodesFree,
+				Inodes:         sb.rootFsInfo.Inodes,
 			},
 		},
 	}
@@ -165,12 +166,16 @@ func (sb *summaryBuilder) containerInfoV2FsStats(
 	cs.Logs = &stats.FsStats{
 		AvailableBytes: &sb.rootFsInfo.Available,
 		CapacityBytes:  &sb.rootFsInfo.Capacity,
+		InodesFree:     sb.rootFsInfo.InodesFree,
+		Inodes:         sb.rootFsInfo.Inodes,
 	}
 
 	// The container rootFs lives on the imageFs devices (which may not be the node root fs)
 	cs.Rootfs = &stats.FsStats{
 		AvailableBytes: &sb.imageFsInfo.Available,
 		CapacityBytes:  &sb.imageFsInfo.Capacity,
+		InodesFree:     sb.imageFsInfo.InodesFree,
+		Inodes:         sb.imageFsInfo.Inodes,
 	}
 	lcs, found := sb.latestContainerStats(info)
 	if !found {
@@ -226,7 +231,7 @@ func (sb *summaryBuilder) buildSummaryPods() []stats.PodStats {
 		}
 
 		// Update the PodStats entry with the stats from the container by adding it to stats.Containers
-		containerName := dockertools.GetContainerName(cinfo.Spec.Labels)
+		containerName := types.GetContainerName(cinfo.Spec.Labels)
 		if containerName == leaky.PodInfraContainerName {
 			// Special case for infrastructure container which is hidden from the user and has network stats
 			podStats.Network = sb.containerInfoV2ToNetworkStats("pod:"+ref.Namespace+"_"+ref.Name, &cinfo)
@@ -240,7 +245,7 @@ func (sb *summaryBuilder) buildSummaryPods() []stats.PodStats {
 	result := make([]stats.PodStats, 0, len(podToStats))
 	for _, podStats := range podToStats {
 		// Lookup the volume stats for each pod
-		podUID := types.UID(podStats.PodRef.UID)
+		podUID := kubetypes.UID(podStats.PodRef.UID)
 		if vstats, found := sb.fsResourceAnalyzer.GetPodVolumeStats(podUID); found {
 			podStats.VolumeStats = vstats.Volumes
 		}
@@ -251,16 +256,16 @@ func (sb *summaryBuilder) buildSummaryPods() []stats.PodStats {
 
 // buildPodRef returns a PodReference that identifies the Pod managing cinfo
 func (sb *summaryBuilder) buildPodRef(cinfo *cadvisorapiv2.ContainerInfo) stats.PodReference {
-	podName := dockertools.GetPodName(cinfo.Spec.Labels)
-	podNamespace := dockertools.GetPodNamespace(cinfo.Spec.Labels)
-	podUID := dockertools.GetPodUID(cinfo.Spec.Labels)
+	podName := types.GetPodName(cinfo.Spec.Labels)
+	podNamespace := types.GetPodNamespace(cinfo.Spec.Labels)
+	podUID := types.GetPodUID(cinfo.Spec.Labels)
 	return stats.PodReference{Name: podName, Namespace: podNamespace, UID: podUID}
 }
 
 // isPodManagedContainer returns true if the cinfo container is managed by a Pod
 func (sb *summaryBuilder) isPodManagedContainer(cinfo *cadvisorapiv2.ContainerInfo) bool {
-	podName := dockertools.GetPodName(cinfo.Spec.Labels)
-	podNamespace := dockertools.GetPodNamespace(cinfo.Spec.Labels)
+	podName := types.GetPodName(cinfo.Spec.Labels)
+	podNamespace := types.GetPodNamespace(cinfo.Spec.Labels)
 	managed := podName != "" && podNamespace != ""
 	if !managed && podName != podNamespace {
 		glog.Warningf(
@@ -344,7 +349,7 @@ func (sb *summaryBuilder) containerInfoV2ToNetworkStats(name string, info *cadvi
 			}
 		}
 	}
-	glog.Warningf("Missing default interface %q for s", network.DefaultInterfaceName, name)
+	glog.Warningf("Missing default interface %q for %s", network.DefaultInterfaceName, name)
 	return nil
 }
 

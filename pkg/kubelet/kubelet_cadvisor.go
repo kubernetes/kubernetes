@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,6 +43,19 @@ func (kl *Kubelet) GetContainerInfo(podFullName string, podUID types.UID, contai
 		return nil, err
 	}
 	return &ci, nil
+}
+
+// HasDedicatedImageFs returns true if the imagefs has a dedicated device.
+func (kl *Kubelet) HasDedicatedImageFs() (bool, error) {
+	imageFsInfo, err := kl.ImagesFsInfo()
+	if err != nil {
+		return false, err
+	}
+	rootFsInfo, err := kl.RootFsInfo()
+	if err != nil {
+		return false, err
+	}
+	return imageFsInfo.Device != rootFsInfo.Device, nil
 }
 
 // GetContainerInfoV2 returns stats (from Cadvisor) for containers.

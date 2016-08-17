@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -561,6 +561,7 @@ func benchmarkItems() []api.Pod {
 	items := make([]api.Pod, 3)
 	for i := range items {
 		apiObjectFuzzer.Fuzz(&items[i])
+		items[i].Spec.InitContainers, items[i].Status.InitContainerStatuses = nil, nil
 	}
 	return items
 }

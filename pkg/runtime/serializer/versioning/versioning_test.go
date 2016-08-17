@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ func TestDecode(t *testing.T) {
 		convertor  runtime.ObjectConvertor
 		creater    runtime.ObjectCreater
 		copier     runtime.ObjectCopier
-		typer      runtime.Typer
+		typer      runtime.ObjectTyper
 		yaml       bool
 		pretty     bool
 
@@ -261,9 +261,8 @@ func (c *checkConvertor) ConvertFieldLabel(version, kind, label, value string) (
 }
 
 type mockSerializer struct {
-	err      error
-	obj      runtime.Object
-	versions []unversioned.GroupVersion
+	err error
+	obj runtime.Object
 
 	defaults, actual *unversioned.GroupVersionKind
 	into             runtime.Object
@@ -275,9 +274,8 @@ func (s *mockSerializer) Decode(data []byte, defaults *unversioned.GroupVersionK
 	return s.obj, s.actual, s.err
 }
 
-func (s *mockSerializer) EncodeToStream(obj runtime.Object, w io.Writer, versions ...unversioned.GroupVersion) error {
+func (s *mockSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	s.obj = obj
-	s.versions = versions
 	return s.err
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import (
 	"testing"
 
 	_ "k8s.io/kubernetes/pkg/api/install"
+	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/pkg/api"
@@ -33,15 +35,20 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/json"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/workqueue"
 )
 
 func TestNewGarbageCollector(t *testing.T) {
-	clientPool := dynamic.NewClientPool(&restclient.Config{}, dynamic.LegacyAPIPathResolverFunc)
+	config := &restclient.Config{}
+	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
+	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	config.ContentConfig.NegotiatedSerializer = nil
+	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(clientPool, podResource)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,6 +59,7 @@ func TestNewGarbageCollector(t *testing.T) {
 type fakeAction struct {
 	method string
 	path   string
+	query  string
 }
 
 // String returns method=path to aid in testing
@@ -78,7 +86,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
-	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path})
+	f.actions = append(f.actions, fakeAction{method: request.Method, path: request.URL.Path, query: request.URL.RawQuery})
 	fakeResponse, ok := f.response[request.Method+request.URL.Path]
 	if !ok {
 		fakeResponse.statusCode = 200
@@ -140,8 +148,11 @@ func TestProcessItem(t *testing.T) {
 	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
+	clientConfig.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
+	metaOnlyClientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
+	clientConfig.ContentConfig.NegotiatedSerializer = nil
 	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
-	gc, err := NewGarbageCollector(clientPool, podResource)
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,16 +283,78 @@ func TestProcessEvent(t *testing.T) {
 
 	for _, scenario := range testScenarios {
 		propagator := &Propagator{
-			eventQueue: workqueue.New(),
-			uidToNode:  make(map[types.UID]*node),
+			eventQueue: workqueue.NewTimedWorkQueue(clock.RealClock{}),
+			uidToNode: &concurrentUIDToNode{
+				RWMutex:   &sync.RWMutex{},
+				uidToNode: make(map[types.UID]*node),
+			},
 			gc: &GarbageCollector{
-				dirtyQueue: workqueue.New(),
+				dirtyQueue: workqueue.NewTimedWorkQueue(clock.RealClock{}),
+				clock:      clock.RealClock{},
 			},
 		}
 		for i := 0; i < len(scenario.events); i++ {
 			propagator.eventQueue.Add(scenario.events[i])
 			propagator.processEvent()
-			verifyGraphInvariants(scenario.name, propagator.uidToNode, t)
+			verifyGraphInvariants(scenario.name, propagator.uidToNode.uidToNode, t)
 		}
+	}
+}
+
+// TestDependentsRace relies on golang's data race detector to check if there is
+// data race among in the dependents field.
+func TestDependentsRace(t *testing.T) {
+	config := &restclient.Config{}
+	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
+	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	config.ContentConfig.NegotiatedSerializer = nil
+	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const updates = 100
+	owner := &node{dependents: make(map[*node]struct{})}
+	ownerUID := types.UID("owner")
+	gc.propagator.uidToNode.Write(owner)
+	go func() {
+		for i := 0; i < updates; i++ {
+			dependent := &node{}
+			gc.propagator.addDependentToOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
+			gc.propagator.removeDependentFromOwners(dependent, []metatypes.OwnerReference{{UID: ownerUID}})
+		}
+	}()
+	go func() {
+		gc.orphanQueue.Add(owner)
+		for i := 0; i < updates; i++ {
+			gc.orphanFinalizer()
+		}
+	}()
+}
+
+// test the list and watch functions correctly converts the ListOptions
+func TestGCListWatcher(t *testing.T) {
+	testHandler := &fakeActionHandler{}
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
+	podResource := unversioned.GroupVersionResource{Version: "v1", Resource: "pods"}
+	client, err := clientPool.ClientForGroupVersion(podResource.GroupVersion())
+	if err != nil {
+		t.Fatal(err)
+	}
+	lw := gcListWatcher(client, podResource)
+	lw.Watch(api.ListOptions{ResourceVersion: "1"})
+	lw.List(api.ListOptions{ResourceVersion: "1"})
+	if e, a := 2, len(testHandler.actions); e != a {
+		t.Errorf("expect %d requests, got %d", e, a)
+	}
+	if e, a := "resourceVersion=1", testHandler.actions[0].query; e != a {
+		t.Errorf("expect %s, got %s", e, a)
+	}
+	if e, a := "resourceVersion=1", testHandler.actions[1].query; e != a {
+		t.Errorf("expect %s, got %s", e, a)
 	}
 }

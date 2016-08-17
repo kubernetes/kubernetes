@@ -1,13 +1,13 @@
 ## JSON-Patch
 
-Provides the abiilty to modify and test a JSON according to a
-[RFC6902 JSON patch](http://tools.ietf.org/html/rfc6902) and [RFC7386 JSON Merge Patch](https://tools.ietf.org/html/rfc7386).
+Provides the ability to modify and test a JSON according to a
+[RFC6902 JSON patch](http://tools.ietf.org/html/rfc6902) and [RFC7396 JSON Merge Patch](https://tools.ietf.org/html/rfc7396).
 
 *Version*: **1.0**
 
 [![GoDoc](https://godoc.org/github.com/evanphx/json-patch?status.svg)](http://godoc.org/github.com/evanphx/json-patch)
 
-[![Build Status](https://travis-ci.org/evanphx/json-patch.svg?branch=RFC7386)](https://travis-ci.org/evanphx/json-patch)
+[![Build Status](https://travis-ci.org/evanphx/json-patch.svg?branch=master)](https://travis-ci.org/evanphx/json-patch)
 
 ### API Usage
 

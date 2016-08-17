@@ -752,7 +752,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"><p class="tableblock">startedAt</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Time at which the container was last (re-)started</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -845,6 +845,13 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">selector</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A label query over volumes to consider for binding.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_labelselector">unversioned.LabelSelector</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">resources</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Resources represents the minimum resources the volume should have. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -887,7 +894,7 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">monitors</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Required: Monitors is a collection of Ceph monitors More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Required: Monitors is a collection of Ceph monitors More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -901,28 +908,28 @@ span.icon > [class^="icon-"], span.icon > [class*=" icon-"] { cursor: default; }
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: User is the rados user name, default is admin More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: User is the rados user name, default is admin More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretFile</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: SecretRef is reference to the authentication secret for User, default is empty. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: <a href="http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -1733,14 +1740,14 @@ Examples:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastHeartbeatTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Last time we got an update on a given condition.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastTransitionTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Last time the condition transit from one status to another.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1958,7 +1965,7 @@ Populated by the system. Read-only. Value must be treated as opaque by clients a
 <br>
 Populated by the system. Read-only. Null for lists. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1967,7 +1974,7 @@ Populated by the system. Read-only. Null for lists. More info: <a href="http://r
 <br>
 Populated by the system when a graceful deletion is requested. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -1993,7 +2000,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">ownerReferences</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of objects depended by this object. If ALL objects in the list have been deleted, this object will be garbage collected. If this object is managed by a controller, then an entry in this list will point to this controller, with the controller field set to true. There cannot be more than one managing controller.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_ownerreference">v1.OwnerReference</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -2260,6 +2267,61 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 </div>
 <div class="sect2">
+<h3 id="_v1_namespacelist">v1.NamespaceList</h3>
+<div class="paragraph">
+<p>NamespaceList is a list of Namespaces.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_listmeta">unversioned.ListMeta</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Items is the list of Namespace objects in the list. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md">http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_namespace">v1.Namespace</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_persistentvolumeclaim">v1.PersistentVolumeClaim</h3>
 <div class="paragraph">
 <p>PersistentVolumeClaim is a user&#8217;s request for and claim to a persistent volume</p>
@@ -2315,61 +2377,6 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">Status represents the current information/status of a persistent volume claim. Read-only. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims">http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_persistentvolumeclaimstatus">v1.PersistentVolumeClaimStatus</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-</tbody>
-</table>
-
-</div>
-<div class="sect2">
-<h3 id="_v1_namespacelist">v1.NamespaceList</h3>
-<div class="paragraph">
-<p>NamespaceList is a list of Namespaces.</p>
-</div>
-<table class="tableblock frame-all grid-all" style="width:100%; ">
-<colgroup>
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;">
-<col style="width:20%;"> 
-</colgroup>
-<thead>
-<tr>
-<th class="tableblock halign-left valign-top">Name</th>
-<th class="tableblock halign-left valign-top">Description</th>
-<th class="tableblock halign-left valign-top">Required</th>
-<th class="tableblock halign-left valign-top">Schema</th>
-<th class="tableblock halign-left valign-top">Default</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">kind</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">apiVersion</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Standard list metadata. More info: <a href="http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds">http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_listmeta">unversioned.ListMeta</a></p></td>
-<td class="tableblock halign-left valign-top"></td>
-</tr>
-<tr>
-<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Items is the list of Namespace objects in the list. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md">http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_namespace">v1.Namespace</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -2761,6 +2768,51 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
+<h3 id="_v1_uniquevolumename">v1.UniqueVolumeName</h3>
+
+</div>
+<div class="sect2">
+<h3 id="_unversioned_labelselector">unversioned.LabelSelector</h3>
+<div class="paragraph">
+<p>A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchLabels</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchExpressions</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">matchExpressions is a list of label selector requirements. The requirements are ANDed.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_unversioned_labelselectorrequirement">unversioned.LabelSelectorRequirement</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_endpointsubset">v1.EndpointSubset</h3>
 <div class="paragraph">
 <p>EndpointSubset is a group of addresses with a common set of ports. The expanded set of endpoints is the Cartesian product of Addresses x Ports. For example, given:<br>
@@ -2949,6 +3001,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Selects a field of the pod; only name and namespace are supported.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectfieldselector">v1.ObjectFieldSelector</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceFieldRef</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_resourcefieldselector">v1.ResourceFieldSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -3535,14 +3594,14 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">iscsi</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ISCSI represents an ISCSI Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="http://releases.k8s.io/HEAD/examples/iscsi/README.md">http://releases.k8s.io/HEAD/examples/iscsi/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ISCSI represents an ISCSI Disk resource that is attached to a kubelet&#8217;s host machine and then exposed to the pod. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md">http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_iscsivolumesource">v1.ISCSIVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">glusterfs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs represents a Glusterfs mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/glusterfs/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs represents a Glusterfs mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_glusterfsvolumesource">v1.GlusterfsVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3556,7 +3615,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rbd</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">RBD represents a Rados Block Device mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md">http://releases.k8s.io/HEAD/examples/rbd/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RBD represents a Rados Block Device mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_rbdvolumesource">v1.RBDVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -3622,6 +3681,54 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_vspherevirtualdiskvolumesource">v1.VsphereVirtualDiskVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_resourcefieldselector">v1.ResourceFieldSelector</h3>
+<div class="paragraph">
+<p>ResourceFieldSelector represents container resources (cpu, memory) and their output format</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">containerName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Container name: required for volumes, optional for env vars</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resource</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Required: resource to select</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">divisor</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Specifies the output format of the exposed resources, defaults to "1"</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -3990,7 +4097,7 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">startTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">RFC 3339 date and time at which the object was acknowledged by the Kubelet. This is before the Kubelet pulled the container image(s) for the pod.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -4092,8 +4199,15 @@ The resulting set of endpoints can be viewed as:<br>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">fieldRef</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectfieldselector">v1.ObjectFieldSelector</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceFieldRef</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_resourcefieldselector">v1.ResourceFieldSelector</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -4601,7 +4715,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">phase</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">NodePhase is the recently observed lifecycle phase of the node. More info: <a href="http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase">http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">NodePhase is the recently observed lifecycle phase of the node. More info: <a href="http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase">http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase</a> The field is never populated, and now is deprecated.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4641,6 +4755,20 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_containerimage">v1.ContainerImage</a> array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">volumesInUse</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of attachable volumes in use (mounted) by the node.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_uniquevolumename">v1.UniqueVolumeName</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">volumesAttached</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">List of volumes that are attached to the node.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_attachedvolume">v1.AttachedVolume</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
 </tbody>
 </table>
 
@@ -4670,24 +4798,65 @@ The resulting set of endpoints can be viewed as:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">endpoints</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">EndpointsName is the endpoint name that details Glusterfs topology. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">EndpointsName is the endpoint name that details Glusterfs topology. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">path</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Path is the Glusterfs volume path. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Path is the Glusterfs volume path. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
+<h3 id="_v1_attachedvolume">v1.AttachedVolume</h3>
+<div class="paragraph">
+<p>AttachedVolume describes a volume attached to a node</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Name of the attached volume</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">devicePath</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">DevicePath represents the device path where the volume should be avilable</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
 </table>
@@ -4775,14 +4944,14 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastProbeTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Last time we probed the condition.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastTransitionTime</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Last time the condition transitioned from one status to another.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -4828,14 +4997,14 @@ The resulting set of endpoints can be viewed as:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">monitors</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">A collection of Ceph monitors. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">A collection of Ceph monitors. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">image</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The rados image name. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The rados image name. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -4849,35 +5018,35 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">pool</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The rados pool name. Default is rbd. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a>.</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The rados pool name. Default is rbd. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a>.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">user</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">The rados user name. Default is admin. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">The rados user name. Default is admin. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">keyring</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Keyring is the path to key ring for RBDUser. Default is /etc/ceph/keyring. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">secretRef</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is empty. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">SecretRef is name of the authentication secret for RBDUser. If provided overrides keyring. Default is nil. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_localobjectreference">v1.LocalObjectReference</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">readOnly</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">ReadOnly here will force the ReadOnly setting in VolumeMounts. Defaults to false. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -5684,7 +5853,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">glusterfs</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod. Provisioned by an admin. More info: <a href="http://releases.k8s.io/HEAD/examples/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/glusterfs/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Glusterfs represents a Glusterfs volume that is attached to a host and exposed to the pod. Provisioned by an admin. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md">http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_glusterfsvolumesource">v1.GlusterfsVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -5698,7 +5867,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">rbd</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">RBD represents a Rados Block Device mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/rbd/README.md">http://releases.k8s.io/HEAD/examples/rbd/README.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">RBD represents a Rados Block Device mount on the host that shares a pod&#8217;s lifetime. More info: <a href="http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md">http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_rbdvolumesource">v1.RBDVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -6004,6 +6173,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">controller</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If true, this reference points to the managing controller.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">boolean</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+</tr>
 </tbody>
 </table>
 
@@ -6186,14 +6362,14 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">startedAt</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Time at which previous execution of the container started</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">finishedAt</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Time at which the container last terminated</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -6754,6 +6930,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">stringData</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">stringData allows specifying non-binary secret data in string form. It is provided as a write-only convenience method. All keys and values are merged into the data field on write, overwriting any existing values. It is never output when reading from the API.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">type</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Used to facilitate programmatic handling of secret data.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -6840,14 +7023,14 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">firstTimestamp</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The time at which the event was first recorded. (Time of server receipt is in TypeMeta.)</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">lastTimestamp</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">The time at which the most recent occurrence of this event was recorded.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string (date-time)</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
@@ -6945,14 +7128,14 @@ The resulting set of endpoints can be viewed as:<br>
 <tbody>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">limits</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Limits describes the maximum amount of compute resources allowed. More info: <a href="http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications">http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Limits describes the maximum amount of compute resources allowed. More info: <a href="http://kubernetes.io/docs/user-guide/compute-resources/">http://kubernetes.io/docs/user-guide/compute-resources/</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">requests</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: <a href="http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications">http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: <a href="http://kubernetes.io/docs/user-guide/compute-resources/">http://kubernetes.io/docs/user-guide/compute-resources/</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -7368,6 +7551,54 @@ The resulting set of endpoints can be viewed as:<br>
 
 </div>
 <div class="sect2">
+<h3 id="_unversioned_labelselectorrequirement">unversioned.LabelSelectorRequirement</h3>
+<div class="paragraph">
+<p>A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">key</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">key is the label key that the selector applies to.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">operator</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">operator represents a key&#8217;s relationship to a set of values. Valid operators ard In, NotIn, Exists and DoesNotExist.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">values</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_containerstatewaiting">v1.ContainerStateWaiting</h3>
 <div class="paragraph">
 <p>ContainerStateWaiting is a waiting state of a container.</p>
@@ -7661,7 +7892,7 @@ The resulting set of endpoints can be viewed as:<br>
 </tr>
 <tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">selector</p></td>
-<td class="tableblock halign-left valign-top"><p class="tableblock">This service will route traffic to pods having labels matching this selector. Label keys and values that must match in order to receive traffic for this service. If empty, all pods are selected, if not specified, endpoints must be manually specified. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview">http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">This service will route traffic to pods having labels matching this selector. Label keys and values that must match in order to receive traffic for this service. If not specified, endpoints must be manually specified and the system will not automatically manage them. More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview">http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview</a></p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">object</p></td>
 <td class="tableblock halign-left valign-top"></td>
@@ -7706,6 +7937,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Only applies to Service Type: LoadBalancer LoadBalancer will get created with the IP specified in this field. This feature depends on whether the underlying cloud-provider supports specifying the loadBalancerIP when a load balancer is created. This field will be ignored if the cloud-provider does not support the feature.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">loadBalancerSourceRanges</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">If specified and supported by the platform, this will restrict traffic through the cloud-provider load-balancer will be restricted to the specified client IPs. This field will be ignored if the cloud-provider does not support the feature." More info: <a href="http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md">http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md</a></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string array</p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -7867,6 +8105,13 @@ The resulting set of endpoints can be viewed as:<br>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 <tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">nodeName</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: Node hosting this endpoint. This can be used to determine endpoints local to a node.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
 <td class="tableblock halign-left valign-top"><p class="tableblock">targetRef</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">Reference to object providing the endpoint.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
@@ -7922,7 +8167,7 @@ The resulting set of endpoints can be viewed as:<br>
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-05-21 03:08:11 UTC
+Last updated 2016-08-17 09:55:44 UTC
 </div>
 </div>
 </body>

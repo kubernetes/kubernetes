@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -184,7 +184,7 @@ func newTestHost(t *testing.T, clientset clientset.Interface) (string, volume.Vo
 		t.Fatalf("can't make a temp rootdir: %v", err)
 	}
 
-	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins())
+	return tempDir, volumetest.NewFakeVolumeHost(tempDir, clientset, empty_dir.ProbeVolumePlugins(), "" /* rootContext */)
 }
 
 func TestCanSupport(t *testing.T) {
@@ -196,8 +196,8 @@ func TestCanSupport(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	if plugin.Name() != configMapPluginName {
-		t.Errorf("Wrong name: %s", plugin.Name())
+	if plugin.GetPluginName() != configMapPluginName {
+		t.Errorf("Wrong name: %s", plugin.GetPluginName())
 	}
 	if !plugin.CanSupport(&volume.Spec{Volume: &api.Volume{VolumeSource: api.VolumeSource{ConfigMap: &api.ConfigMapVolumeSource{LocalObjectReference: api.LocalObjectReference{Name: ""}}}}}) {
 		t.Errorf("Expected true")
@@ -228,13 +228,21 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID}}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)
 	}
 	if mounter == nil {
 		t.Errorf("Got a nil Mounter")
+	}
+
+	vName, err := plugin.GetVolumeName(volume.NewSpecFromVolume(volumeSpec))
+	if err != nil {
+		t.Errorf("Failed to GetVolumeName: %v", err)
+	}
+	if vName != "test_volume_name/test_configmap_name" {
+		t.Errorf("Got unexpect VolumeName %v", vName)
 	}
 
 	volumePath := mounter.GetPath()
@@ -283,7 +291,7 @@ func TestPluginReboot(t *testing.T) {
 		t.Errorf("Can't find the plugin by name")
 	}
 
-	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: testPodUID}}
+	pod := &api.Pod{ObjectMeta: api.ObjectMeta{Namespace: testNamespace, UID: testPodUID}}
 	mounter, err := plugin.NewMounter(volume.NewSpecFromVolume(volumeSpec), pod, volume.VolumeOptions{})
 	if err != nil {
 		t.Errorf("Failed to make a new Mounter: %v", err)

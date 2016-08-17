@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,30 +32,35 @@ import (
 
 const (
 	bash_completion_func = `# call kubectl get $1,
-__kubectl_namespace_flag()
+__kubectl_override_flag_list=(kubeconfig cluster user context namespace server)
+__kubectl_override_flags()
 {
-    local ret two_word_ns
-    ret=""
-    two_word_ns=false
+    local ${__kubectl_override_flag_list[*]} two_word_of of
     for w in "${words[@]}"; do
-        if [ "$two_word_ns" = true ]; then
-            ret="--namespace=${w}"
-            two_word_ns=false
+        if [ -n "${two_word_of}" ]; then
+            eval "${two_word_of}=\"--${two_word_of}=\${w}\""
+            two_word_of=
             continue
         fi
-        case "${w}" in
-            --namespace=*)
-                ret=${w}
-                ;;
-            --namespace)
-                two_word_ns=true
-                ;;
-            --all-namespaces)
-                ret=${w}
-                ;;
-        esac
+        for of in "${__kubectl_override_flag_list[@]}"; do
+            case "${w}" in
+                --${of}=*)
+                    eval "${of}=\"--${of}=\${w}\""
+                    ;;
+                --${of})
+                    two_word_of="${of}"
+                    ;;
+            esac
+        done
+        if [ "${w}" == "--all-namespaces" ]; then
+            namespace="--all-namespaces"
+        fi
     done
-    echo $ret
+    for of in "${__kubectl_override_flag_list[@]}"; do
+        if eval "test -n \"\$${of}\""; then
+            eval "echo \${${of}}"
+        fi
+    done
 }
 
 __kubectl_get_namespaces()
@@ -72,7 +77,7 @@ __kubectl_parse_get()
     local template
     template="{{ range .items  }}{{ .metadata.name }} {{ end }}"
     local kubectl_out
-    if kubectl_out=$(kubectl get $(__kubectl_namespace_flag) -o template --template="${template}" "$1" 2>/dev/null); then
+    if kubectl_out=$(kubectl get $(__kubectl_override_flags) -o template --template="${template}" "$1" 2>/dev/null); then
         COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
@@ -153,9 +158,9 @@ __custom_func() {
 	// and add a short forms entry in expandResourceShortcut() when appropriate.
 	valid_resources = `Valid resource types include:
    * componentstatuses (aka 'cs')
-   * configmaps
+   * configmaps (aka 'cm')
    * daemonsets (aka 'ds')
-   * deployments
+   * deployments (aka 'deploy')
    * events (aka 'ev')
    * endpoints (aka 'ep')
    * horizontalpodautoscalers (aka 'hpa')
@@ -164,6 +169,7 @@ __custom_func() {
    * limitranges (aka 'limits')
    * nodes (aka 'no')
    * namespaces (aka 'ns')
+   * petsets (alpha feature, may be unstable)
    * pods (aka 'po')
    * persistentvolumes (aka 'pv')
    * persistentvolumeclaims (aka 'pvc')
@@ -175,6 +181,33 @@ __custom_func() {
    * serviceaccounts (aka 'sa')
    * services (aka 'svc')
 `
+	usage_template = `{{if gt .Aliases 0}}
+
+Aliases:
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+Examples:
+{{ .Example }}{{end}}{{ if .HasAvailableSubCommands}}
+
+Available Sub-commands:{{range .Commands}}{{if .IsAvailableCommand}}
+  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}{{end}}{{ if .HasLocalFlags}}
+
+Flags:
+{{.LocalFlags.FlagUsages | trimRightSpace}}{{end}}{{ if .HasInheritedFlags}}
+
+Global Flags:
+{{.InheritedFlags.FlagUsages | trimRightSpace}}{{end}}{{if .HasHelpSubCommands}}
+
+Additional help topics:{{range .Commands}}{{if .IsHelpCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}
+
+Usage:{{if .Runnable}}
+  {{if .HasFlags}}{{appendIfNotPresent .UseLine "[flags]"}}{{else}}{{.UseLine}}{{end}}{{end}}{{ if .HasSubCommands }}
+  {{ .CommandPath}} [command]
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}
+`
+	help_template = `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 )
 
 // NewKubectlCommand creates the `kubectl` command and its nested children.
@@ -189,14 +222,18 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		Run: runHelp,
 		BashCompletionFunction: bash_completion_func,
 	}
+	cmds.SetHelpTemplate(help_template)
+	cmds.SetUsageTemplate(usage_template)
 
 	f.BindFlags(cmds.PersistentFlags())
 	f.BindExternalFlags(cmds.PersistentFlags())
 
+	cmds.SetHelpCommand(NewCmdHelp(f, out))
+
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
-	cmds.AddCommand(NewCmdGet(f, out))
+	cmds.AddCommand(NewCmdGet(f, out, err))
 	cmds.AddCommand(set.NewCmdSet(f, out))
 	cmds.AddCommand(NewCmdDescribe(f, out))
 	cmds.AddCommand(NewCmdCreate(f, out))
@@ -235,14 +272,19 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdVersion(f, out))
 	cmds.AddCommand(NewCmdExplain(f, out))
 	cmds.AddCommand(NewCmdConvert(f, out))
+	cmds.AddCommand(NewCmdCompletion(f, out))
 
-	if cmds.Flag("namespace").Annotations == nil {
-		cmds.Flag("namespace").Annotations = map[string][]string{}
+	cmds.AddCommand(NewCmdTop(f, out))
+
+	if cmds.Flag("namespace") != nil {
+		if cmds.Flag("namespace").Annotations == nil {
+			cmds.Flag("namespace").Annotations = map[string][]string{}
+		}
+		cmds.Flag("namespace").Annotations[cobra.BashCompCustom] = append(
+			cmds.Flag("namespace").Annotations[cobra.BashCompCustom],
+			"__kubectl_get_namespaces",
+		)
 	}
-	cmds.Flag("namespace").Annotations[cobra.BashCompCustom] = append(
-		cmds.Flag("namespace").Annotations[cobra.BashCompCustom],
-		"__kubectl_get_namespaces",
-	)
 
 	return cmds
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -116,19 +116,19 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory.CreateFromConfig(policy)
 }
 
-func PredicateOne(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
-	return true, nil
+func PredicateOne(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	return true, nil, nil
 }
 
-func PredicateTwo(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, error) {
-	return true, nil
+func PredicateTwo(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	return true, nil, nil
 }
 
-func PriorityOne(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func PriorityOne(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
-func PriorityTwo(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
+func PriorityTwo(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
 	return []schedulerapi.HostPriority{}, nil
 }
 
@@ -429,4 +429,47 @@ func TestInvalidFactoryArgs(t *testing.T) {
 		}
 	}
 
+}
+
+func TestNodeConditionPredicate(t *testing.T) {
+	nodeFunc := getNodeConditionPredicate()
+	nodeList := &api.NodeList{
+		Items: []api.Node{
+			// node1 considered
+			{ObjectMeta: api.ObjectMeta{Name: "node1"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}}}},
+			// node2 ignored - node not Ready
+			{ObjectMeta: api.ObjectMeta{Name: "node2"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}}}},
+			// node3 ignored - node out of disk
+			{ObjectMeta: api.ObjectMeta{Name: "node3"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeOutOfDisk, Status: api.ConditionTrue}}}},
+			// node4 considered
+			{ObjectMeta: api.ObjectMeta{Name: "node4"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeOutOfDisk, Status: api.ConditionFalse}}}},
+
+			// node5 ignored - node out of disk
+			{ObjectMeta: api.ObjectMeta{Name: "node5"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}, {Type: api.NodeOutOfDisk, Status: api.ConditionTrue}}}},
+			// node6 considered
+			{ObjectMeta: api.ObjectMeta{Name: "node6"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionTrue}, {Type: api.NodeOutOfDisk, Status: api.ConditionFalse}}}},
+			// node7 ignored - node out of disk, node not Ready
+			{ObjectMeta: api.ObjectMeta{Name: "node7"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}, {Type: api.NodeOutOfDisk, Status: api.ConditionTrue}}}},
+			// node8 ignored - node not Ready
+			{ObjectMeta: api.ObjectMeta{Name: "node8"}, Status: api.NodeStatus{Conditions: []api.NodeCondition{{Type: api.NodeReady, Status: api.ConditionFalse}, {Type: api.NodeOutOfDisk, Status: api.ConditionFalse}}}},
+
+			// node9 ignored - node unschedulable
+			{ObjectMeta: api.ObjectMeta{Name: "node9"}, Spec: api.NodeSpec{Unschedulable: true}},
+			// node10 considered
+			{ObjectMeta: api.ObjectMeta{Name: "node10"}, Spec: api.NodeSpec{Unschedulable: false}},
+			// node11 considered
+			{ObjectMeta: api.ObjectMeta{Name: "node11"}},
+		},
+	}
+
+	nodeNames := []string{}
+	for _, node := range nodeList.Items {
+		if nodeFunc(&node) {
+			nodeNames = append(nodeNames, node.Name)
+		}
+	}
+	expectedNodes := []string{"node1", "node4", "node6", "node10", "node11"}
+	if !reflect.DeepEqual(expectedNodes, nodeNames) {
+		t.Errorf("expected: %v, got %v", expectedNodes, nodeNames)
+	}
 }

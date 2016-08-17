@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -50,6 +50,12 @@ func TestGetEnvAsIntOrFallback(t *testing.T) {
 	key = "FLOCKER_UNSET_VAR"
 	returnVal, _ = GetEnvAsIntOrFallback(key, expected)
 	assert.Equal(expected, returnVal)
+
+	key = "FLOCKER_SET_VAR"
+	os.Setenv(key, "not-an-int")
+	returnVal, err := GetEnvAsIntOrFallback(key, 1)
+	assert.Equal(expected, returnVal)
+	assert.EqualError(err, "strconv.ParseInt: parsing \"not-an-int\": invalid syntax")
 }
 
 func TestGetEnvAsFloat64OrFallback(t *testing.T) {
@@ -65,4 +71,10 @@ func TestGetEnvAsFloat64OrFallback(t *testing.T) {
 	key = "FLOCKER_UNSET_VAR"
 	returnVal, _ = GetEnvAsFloat64OrFallback(key, 1.0)
 	assert.Equal(expected, returnVal)
+
+	key = "FLOCKER_SET_VAR"
+	os.Setenv(key, "not-a-float")
+	returnVal, err := GetEnvAsFloat64OrFallback(key, 1.0)
+	assert.Equal(expected, returnVal)
+	assert.EqualError(err, "strconv.ParseFloat: parsing \"not-a-float\": invalid syntax")
 }

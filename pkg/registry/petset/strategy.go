@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func (petSetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an PetSet before creation.
-func (petSetStrategy) PrepareForCreate(obj runtime.Object) {
+func (petSetStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	petSet := obj.(*apps.PetSet)
 	// create cannot set status
 	petSet.Status = apps.PetSetStatus{}
@@ -54,7 +54,7 @@ func (petSetStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (petSetStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (petSetStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPetSet := obj.(*apps.PetSet)
 	oldPetSet := old.(*apps.PetSet)
 	// Update is not allowed to set status
@@ -124,7 +124,7 @@ type petSetStatusStrategy struct {
 var StatusStrategy = petSetStatusStrategy{Strategy}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
-func (petSetStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (petSetStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPetSet := obj.(*apps.PetSet)
 	oldPetSet := old.(*apps.PetSet)
 	// status changes are not allowed to update spec

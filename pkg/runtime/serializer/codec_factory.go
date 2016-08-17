@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 package serializer
 
 import (
+	"io"
+
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/json"
@@ -58,9 +60,9 @@ type serializerType struct {
 }
 
 func newSerializersForScheme(scheme *runtime.Scheme, mf json.MetaFactory) []serializerType {
-	jsonSerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), false)
-	jsonPrettySerializer := json.NewSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme), true)
-	yamlSerializer := json.NewYAMLSerializer(mf, scheme, runtime.ObjectTyperToTyper(scheme))
+	jsonSerializer := json.NewSerializer(mf, scheme, scheme, false)
+	jsonPrettySerializer := json.NewSerializer(mf, scheme, scheme, true)
+	yamlSerializer := json.NewYAMLSerializer(mf, scheme, scheme)
 
 	serializers := []serializerType{
 		{
@@ -213,7 +215,7 @@ func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) run
 	return f.CodecForVersions(nil, f.universal, nil, versions)
 }
 
-// CodecFor creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
+// CodecForVersions creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
 // it will default to runtime.APIVersionInternal. If encode is not specified for an object's group, the object is not
 // converted. If encode or decode are nil, no conversion is performed.
 func (f CodecFactory) CodecForVersions(encoder runtime.Encoder, decoder runtime.Decoder, encode []unversioned.GroupVersion, decode []unversioned.GroupVersion) runtime.Codec {
@@ -307,4 +309,56 @@ func (f CodecFactory) SerializerForFileExtension(extension string) (runtime.Seri
 		}
 	}
 	return nil, false
+}
+
+// DirectCodecFactory provides methods for retrieving "DirectCodec"s, which do not do conversion.
+type DirectCodecFactory struct {
+	CodecFactory
+}
+
+// EncoderForVersion returns an encoder that does not do conversion. gv is ignored.
+func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
+	return DirectCodec{
+		runtime.NewCodec(serializer, nil),
+		f.CodecFactory.scheme,
+	}
+}
+
+// DecoderToVersion returns an decoder that does not do conversion. gv is ignored.
+func (f DirectCodecFactory) DecoderToVersion(serializer runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
+	return DirectCodec{
+		runtime.NewCodec(nil, serializer),
+		nil,
+	}
+}
+
+// DirectCodec is a codec that does not do conversion. It sets the gvk during serialization, and removes the gvk during deserialization.
+type DirectCodec struct {
+	runtime.Serializer
+	runtime.ObjectTyper
+}
+
+// EncodeToStream does not do conversion. It sets the gvk during serialization. overrides are ignored.
+func (c DirectCodec) Encode(obj runtime.Object, stream io.Writer) error {
+	gvks, _, err := c.ObjectTyper.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
+	kind := obj.GetObjectKind()
+	oldGVK := kind.GroupVersionKind()
+	kind.SetGroupVersionKind(gvks[0])
+	err = c.Serializer.Encode(obj, stream)
+	kind.SetGroupVersionKind(oldGVK)
+	return err
+}
+
+// Decode does not do conversion. It removes the gvk during deserialization.
+func (c DirectCodec) Decode(data []byte, defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	obj, gvk, err := c.Serializer.Decode(data, defaults, into)
+	if obj != nil {
+		kind := obj.GetObjectKind()
+		// clearing the gvk is just a convention of a codec
+		kind.SetGroupVersionKind(unversioned.GroupVersionKind{})
+	}
+	return obj, gvk, err
 }

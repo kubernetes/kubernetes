@@ -908,14 +908,10 @@ func (h *BincHandle) newDecDriver(d *Decoder) decDriver {
 
 func (e *bincEncDriver) reset() {
 	e.w = e.e.w
-	e.s = 0
-	e.m = nil
 }
 
 func (d *bincDecDriver) reset() {
 	d.r = d.d.r
-	d.s = nil
-	d.bd, d.bdRead, d.vd, d.vs = 0, false, 0, 0
 }
 
 var _ decDriver = (*bincDecDriver)(nil)

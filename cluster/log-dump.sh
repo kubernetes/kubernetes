@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ function copy-logs-from-node() {
 
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
         local ip=$(get_ssh_hostname "${node}")
-        scp -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
+        scp -oLogLevel=quiet -oConnectTimeout=30 -oStrictHostKeyChecking=no -i "${AWS_SSH_KEY}" "${SSH_USER}@${ip}:${scp_files}" "${dir}" > /dev/null || true
     else
         gcloud compute copy-files --project "${PROJECT}" --zone "${ZONE}" "${node}:${scp_files}" "${dir}" > /dev/null || true
     fi
@@ -77,7 +77,7 @@ function save-logs() {
 readonly master_ssh_supported_providers="gce aws kubemark"
 readonly node_ssh_supported_providers="gce gke aws"
 
-readonly master_logfiles="kube-apiserver kube-scheduler kube-controller-manager etcd"
+readonly master_logfiles="kube-apiserver kube-scheduler kube-controller-manager etcd glbc cluster-autoscaler"
 readonly node_logfiles="kube-proxy"
 readonly aws_logfiles="cloud-init-output"
 readonly gce_logfiles="startupscript"

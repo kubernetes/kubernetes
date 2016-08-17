@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -194,6 +194,30 @@ func TestSetDefaultDeployment(t *testing.T) {
 						Type: RollingUpdateDeploymentStrategyType,
 						RollingUpdate: &RollingUpdateDeployment{
 							MaxSurge:       &differentIntOrString,
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+					Template: defaultTemplate,
+				},
+			},
+		},
+		{
+			original: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt32(3),
+					Strategy: DeploymentStrategy{
+						Type:          RollingUpdateDeploymentStrategyType,
+						RollingUpdate: nil,
+					},
+				},
+			},
+			expected: &Deployment{
+				Spec: DeploymentSpec{
+					Replicas: newInt32(3),
+					Strategy: DeploymentStrategy{
+						Type: RollingUpdateDeploymentStrategyType,
+						RollingUpdate: &RollingUpdateDeployment{
+							MaxSurge:       &defaultIntOrString,
 							MaxUnavailable: &defaultIntOrString,
 						},
 					},

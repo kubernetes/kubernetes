@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -105,4 +105,14 @@ func (c *FakeNodes) List(opts api.ListOptions) (result *v1.NodeList, err error) 
 func (c *FakeNodes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(nodesResource, opts))
+}
+
+// Patch applies the patch and returns the patched node.
+func (c *FakeNodes) Patch(name string, pt api.PatchType, data []byte) (result *v1.Node, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchAction(nodesResource, name, data), &v1.Node{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*v1.Node), err
 }

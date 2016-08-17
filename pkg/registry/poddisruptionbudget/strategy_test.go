@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(pdb)
+	Strategy.PrepareForCreate(ctx, pdb)
 	errs := Strategy.Validate(ctx, pdb)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error validating %v", errs)
@@ -61,7 +61,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 	}
 
 	// Nothing in Spec changes: OK
-	Strategy.PrepareForUpdate(newPdb, pdb)
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
 	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
 	if len(errs) != 0 {
 		t.Errorf("Unexpected error updating PodDisruptionBudget.")
@@ -69,7 +69,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 
 	// Changing the selector?  No.
 	newPdb.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "bar"}}
-	Strategy.PrepareForUpdate(newPdb, pdb)
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
 	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error since updates are disallowed on poddisruptionbudgets.")
@@ -78,7 +78,7 @@ func TestPodDisruptionBudgetStrategy(t *testing.T) {
 
 	// Changing MinAvailable?  Also no.
 	newPdb.Spec.MinAvailable = intstr.FromString("28%")
-	Strategy.PrepareForUpdate(newPdb, pdb)
+	Strategy.PrepareForUpdate(ctx, newPdb, pdb)
 	errs = Strategy.ValidateUpdate(ctx, newPdb, pdb)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error since updates are disallowed on poddisruptionbudgets.")
@@ -120,7 +120,7 @@ func TestPodDisruptionBudgetStatusStrategy(t *testing.T) {
 			ExpectedPods:         3,
 		},
 	}
-	StatusStrategy.PrepareForUpdate(newPdb, oldPdb)
+	StatusStrategy.PrepareForUpdate(ctx, newPdb, oldPdb)
 	if newPdb.Status.CurrentHealthy != 2 {
 		t.Errorf("PodDisruptionBudget status updates should allow change of CurrentHealthy: %v", newPdb.Status.CurrentHealthy)
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -92,17 +92,19 @@ type jwtTokenGenerator struct {
 func (j *jwtTokenGenerator) GenerateToken(serviceAccount api.ServiceAccount, secret api.Secret) (string, error) {
 	token := jwt.New(jwt.SigningMethodRS256)
 
+	claims, _ := token.Claims.(jwt.MapClaims)
+
 	// Identify the issuer
-	token.Claims[IssuerClaim] = Issuer
+	claims[IssuerClaim] = Issuer
 
 	// Username
-	token.Claims[SubjectClaim] = MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
+	claims[SubjectClaim] = MakeUsername(serviceAccount.Namespace, serviceAccount.Name)
 
 	// Persist enough structured info for the authenticator to be able to look up the service account and secret
-	token.Claims[NamespaceClaim] = serviceAccount.Namespace
-	token.Claims[ServiceAccountNameClaim] = serviceAccount.Name
-	token.Claims[ServiceAccountUIDClaim] = serviceAccount.UID
-	token.Claims[SecretNameClaim] = secret.Name
+	claims[NamespaceClaim] = serviceAccount.Namespace
+	claims[ServiceAccountNameClaim] = serviceAccount.Name
+	claims[ServiceAccountUIDClaim] = serviceAccount.UID
+	claims[SecretNameClaim] = secret.Name
 
 	// Sign and get the complete encoded token as a string
 	return token.SignedString(j.key)
@@ -156,30 +158,32 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(token string) (user.Info, bool
 
 		// If we get here, we have a token with a recognized signature
 
+		claims, _ := parsedToken.Claims.(jwt.MapClaims)
+
 		// Make sure we issued the token
-		iss, _ := parsedToken.Claims[IssuerClaim].(string)
+		iss, _ := claims[IssuerClaim].(string)
 		if iss != Issuer {
 			return nil, false, nil
 		}
 
 		// Make sure the claims we need exist
-		sub, _ := parsedToken.Claims[SubjectClaim].(string)
+		sub, _ := claims[SubjectClaim].(string)
 		if len(sub) == 0 {
 			return nil, false, errors.New("sub claim is missing")
 		}
-		namespace, _ := parsedToken.Claims[NamespaceClaim].(string)
+		namespace, _ := claims[NamespaceClaim].(string)
 		if len(namespace) == 0 {
 			return nil, false, errors.New("namespace claim is missing")
 		}
-		secretName, _ := parsedToken.Claims[SecretNameClaim].(string)
+		secretName, _ := claims[SecretNameClaim].(string)
 		if len(namespace) == 0 {
 			return nil, false, errors.New("secretName claim is missing")
 		}
-		serviceAccountName, _ := parsedToken.Claims[ServiceAccountNameClaim].(string)
+		serviceAccountName, _ := claims[ServiceAccountNameClaim].(string)
 		if len(serviceAccountName) == 0 {
 			return nil, false, errors.New("serviceAccountName claim is missing")
 		}
-		serviceAccountUID, _ := parsedToken.Claims[ServiceAccountUIDClaim].(string)
+		serviceAccountUID, _ := claims[ServiceAccountUIDClaim].(string)
 		if len(serviceAccountUID) == 0 {
 			return nil, false, errors.New("serviceAccountUID claim is missing")
 		}

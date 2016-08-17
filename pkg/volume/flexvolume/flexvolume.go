@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -73,14 +73,27 @@ func (plugin *flexVolumePlugin) getExecutable() string {
 	return path.Join(plugin.execPath, execName)
 }
 
-func (plugin *flexVolumePlugin) Name() string {
+func (plugin *flexVolumePlugin) GetPluginName() string {
 	return plugin.driverName
+}
+
+func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _, err := getVolumeSource(spec)
+	if err != nil {
+		return "", err
+	}
+
+	return volumeSource.Driver, nil
 }
 
 // CanSupport checks whether the plugin can support the input volume spec.
 func (plugin *flexVolumePlugin) CanSupport(spec *volume.Spec) bool {
-	source := plugin.getVolumeSource(spec)
+	source, _, _ := getVolumeSource(spec)
 	return (source != nil) && (source.Driver == plugin.driverName)
+}
+
+func (plugin *flexVolumePlugin) RequiresRemount() bool {
+	return false
 }
 
 // GetAccessModes gets the allowed access modes for this plugin.
@@ -91,19 +104,12 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 	}
 }
 
-func (plugin *flexVolumePlugin) getVolumeSource(spec *volume.Spec) *api.FlexVolumeSource {
-	var source *api.FlexVolumeSource
-	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
-		source = spec.Volume.FlexVolume
-	} else if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.FlexVolume != nil {
-		source = spec.PersistentVolume.Spec.FlexVolume
-	}
-	return source
-}
-
 // NewMounter is the mounter routine to build the volume.
 func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	fv := plugin.getVolumeSource(spec)
+	fv, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
 	secrets := make(map[string]string)
 	if fv.SecretRef != nil {
 		kubeClient := plugin.host.GetKubeClient()
@@ -126,7 +132,11 @@ func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ vo
 
 // newMounterInternal is the internal mounter routine to build the volume.
 func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, manager flexVolumeManager, mounter mount.Interface, runner exec.Interface, secrets map[string]string) (volume.Mounter, error) {
-	source := plugin.getVolumeSource(spec)
+	source, _, err := getVolumeSource(spec)
+	if err != nil {
+		return nil, err
+	}
+
 	return &flexVolumeMounter{
 		flexVolumeDisk: &flexVolumeDisk{
 			podUID:       pod.UID,
@@ -167,6 +177,18 @@ func (plugin *flexVolumePlugin) newUnmounterInternal(volName string, podUID type
 		runner:  runner,
 		manager: manager,
 	}, nil
+}
+
+func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, sourceName string) (*volume.Spec, error) {
+	flexVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			FlexVolume: &api.FlexVolumeSource{
+				Driver: sourceName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(flexVolume), nil
 }
 
 // flexVolume is the disk resource provided by this plugin.
@@ -255,7 +277,7 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 	notmnt, err := f.blockDeviceMounter.IsLikelyNotMountPoint(dir)
 	if err != nil && !os.IsNotExist(err) {
-		glog.Errorf("Cannot validate mountpoint: %s", dir)
+		glog.Errorf("Cannot validate mount point: %s %v", dir, err)
 		return err
 	}
 	if !notmnt {
@@ -280,18 +302,20 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		f.options[optionKeySecret+"/"+name] = secret
 	}
 
+	glog.V(4).Infof("attempting to attach volume: %s with options %v", f.volName, f.options)
 	device, err := f.manager.attach(f)
 	if err != nil {
 		if !isCmdNotSupportedErr(err) {
-			glog.Errorf("Failed to attach volume: %s", f.volName)
+			glog.Errorf("failed to attach volume: %s", f.volName)
 			return err
 		}
 		// Attach not supported or required. Continue to mount.
 	}
 
+	glog.V(4).Infof("attempting to mount volume: %s", f.volName)
 	if err := f.manager.mount(f, device, dir); err != nil {
 		if !isCmdNotSupportedErr(err) {
-			glog.Errorf("Failed to mount volume: %s", f.volName)
+			glog.Errorf("failed to mount volume: %s", f.volName)
 			return err
 		}
 		options := make([]string, 0)
@@ -308,13 +332,15 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 
 		os.MkdirAll(dir, 0750)
 		// Mount not supported by driver. Use core mounting logic.
+		glog.V(4).Infof("attempting to mount the volume: %s to device: %s", f.volName, device)
 		err = f.blockDeviceMounter.Mount(string(device), dir, f.fsType, options)
 		if err != nil {
-			glog.Errorf("Failed to mount the volume: %s, device: %s, error: %s", f.volName, device, err.Error())
+			glog.Errorf("failed to mount the volume: %s to device: %s, error: %v", f.volName, device, err)
 			return err
 		}
 	}
 
+	glog.V(4).Infof("Successfully mounted volume: %s on device: %s", f.volName, device)
 	return nil
 }
 
@@ -360,7 +386,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 		}
 		// Unmount not supported by the driver. Use core unmount logic.
 		if err := f.mounter.Unmount(dir); err != nil {
-			glog.Errorf("Failed to unmount volume: %s, error: %s", dir, err.Error())
+			glog.Errorf("Failed to unmount volume: %s, error: %v", dir, err)
 			return err
 		}
 	}
@@ -368,7 +394,7 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	if refCount == 1 {
 		if err := f.manager.detach(f, device); err != nil {
 			if !isCmdNotSupportedErr(err) {
-				glog.Errorf("Failed to teardown volume: %s, error: %s", dir, err.Error())
+				glog.Errorf("Failed to teardown volume: %s, error: %v", dir, err)
 				return err
 			}
 			// Teardown not supported by driver. Unmount is good enough.
@@ -385,4 +411,15 @@ func (f *flexVolumeUnmounter) TearDownAt(dir string) error {
 	}
 
 	return nil
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.FlexVolumeSource, bool, error) {
+	if spec.Volume != nil && spec.Volume.FlexVolume != nil {
+		return spec.Volume.FlexVolume, spec.Volume.FlexVolume.ReadOnly, nil
+	} else if spec.PersistentVolume != nil &&
+		spec.PersistentVolume.Spec.FlexVolume != nil {
+		return spec.PersistentVolume.Spec.FlexVolume, spec.ReadOnly, nil
+	}
+
+	return nil, false, fmt.Errorf("Spec does not reference a Flex volume type")
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,10 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-const (
-	scaleSubResource = "scale"
-)
-
 type HorizontalPodAutoscalerV1Beta1 struct{}
 
 func (HorizontalPodAutoscalerV1Beta1) ParamNames() []GeneratorParam {
@@ -46,6 +42,29 @@ func (HorizontalPodAutoscalerV1Beta1) ParamNames() []GeneratorParam {
 }
 
 func (HorizontalPodAutoscalerV1Beta1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	return generateHPA(genericParams)
+}
+
+type HorizontalPodAutoscalerV1 struct{}
+
+func (HorizontalPodAutoscalerV1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"default-name", true},
+		{"name", false},
+		{"scaleRef-kind", false},
+		{"scaleRef-name", false},
+		{"scaleRef-apiVersion", false},
+		{"min", false},
+		{"max", true},
+		{"cpu-percent", false},
+	}
+}
+
+func (HorizontalPodAutoscalerV1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	return generateHPA(genericParams)
+}
+
+func generateHPA(genericParams map[string]interface{}) (runtime.Object, error) {
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)

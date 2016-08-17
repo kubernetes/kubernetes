@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -34,21 +35,22 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-const (
-	logs_example = `# Return snapshot logs from pod nginx with only one container
-kubectl logs nginx
+var (
+	logs_example = dedent.Dedent(`
+		# Return snapshot logs from pod nginx with only one container
+		kubectl logs nginx
 
-# Return snapshot of previous terminated ruby container logs from pod web-1
-kubectl logs -p -c ruby web-1
+		# Return snapshot of previous terminated ruby container logs from pod web-1
+		kubectl logs -p -c ruby web-1
 
-# Begin streaming the logs of the ruby container in pod web-1
-kubectl logs -f -c ruby web-1
+		# Begin streaming the logs of the ruby container in pod web-1
+		kubectl logs -f -c ruby web-1
 
-# Display only the most recent 20 lines of output in pod nginx
-kubectl logs --tail=20 nginx
+		# Display only the most recent 20 lines of output in pod nginx
+		kubectl logs --tail=20 nginx
 
-# Show all logs from pod nginx written in the last hour
-kubectl logs --since=1h nginx`
+		# Show all logs from pod nginx written in the last hour
+		kubectl logs --since=1h nginx`)
 )
 
 type LogsOptions struct {
@@ -72,7 +74,7 @@ func NewCmdLogs(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	o := &LogsOptions{}
 	cmd := &cobra.Command{
 		Use:     "logs [-f] [-p] POD [-c CONTAINER]",
-		Short:   "Print the logs for a container in a pod.",
+		Short:   "Print the logs for a container in a pod",
 		Long:    "Print the logs for a container in a pod. If the pod has only one container, the container name is optional.",
 		Example: logs_example,
 		PreRun: func(cmd *cobra.Command, args []string) {

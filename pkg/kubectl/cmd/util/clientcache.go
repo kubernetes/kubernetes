@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,19 +76,19 @@ func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) 
 		preferredGV = &versionCopy
 	}
 
+	client.SetKubernetesDefaults(&config)
 	negotiatedVersion, err := client.NegotiateVersion(c.defaultClient, &config, preferredGV, registered.EnabledVersions())
 	if err != nil {
 		return nil, err
 	}
 	config.GroupVersion = negotiatedVersion
-	client.SetKubernetesDefaults(&config)
 
 	if version != nil {
 		c.configs[*version] = &config
 	}
 
 	// `version` does not necessarily equal `config.Version`.  However, we know that we call this method again with
-	// `config.Version`, we should get the the config we've just built.
+	// `config.Version`, we should get the config we've just built.
 	configCopy := config
 	c.configs[*config.GroupVersion] = &configCopy
 

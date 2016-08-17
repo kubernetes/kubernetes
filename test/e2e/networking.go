@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -111,7 +111,19 @@ var _ = framework.KubeDescribe("Networking", func() {
 
 		By("Creating a webserver (pending) pod on each node")
 
+		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(f.Client))
 		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+		// This test is super expensive in terms of network usage - large services
+		// result in huge "Endpoint" objects and all underlying pods read them
+		// periodically. Moreover, all KubeProxies watch all of them.
+		// Thus we limit the maximum number of pods under a service.
+		//
+		// TODO: Remove this limitation once services, endpoints and data flows
+		// between nodes and master are better optimized.
+		maxNodeCount := 250
+		if len(nodes.Items) > maxNodeCount {
+			nodes.Items = nodes.Items[:maxNodeCount]
+		}
 
 		if len(nodes.Items) == 1 {
 			// in general, the test requires two nodes. But for local development, often a one node cluster
@@ -124,7 +136,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 				"Rerun it with at least two nodes to get complete coverage.")
 		}
 
-		podNames := LaunchNetTestPodPerNode(f, nodes, svcname, "1.8")
+		podNames := LaunchNetTestPodPerNode(f, nodes, svcname)
 
 		// Clean up the pods
 		defer func() {
@@ -256,7 +268,7 @@ var _ = framework.KubeDescribe("Networking", func() {
 	})
 })
 
-func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name, version string) []string {
+func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name string) []string {
 	podNames := []string{}
 
 	totalPods := len(nodes.Items)
@@ -275,7 +287,7 @@ func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name, 
 				Containers: []api.Container{
 					{
 						Name:  "webserver",
-						Image: "gcr.io/google_containers/nettest:" + version,
+						Image: "gcr.io/google_containers/nettest:1.9",
 						Args: []string{
 							"-service=" + name,
 							//peers >= totalPods should be asserted by the container.

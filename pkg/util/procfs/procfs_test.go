@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,15 @@ package procfs
 
 import (
 	"io/ioutil"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"runtime"
+	"syscall"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func verifyContainerName(procCgroupText, expectedName string, expectedErr bool, t *testing.T) {
@@ -55,4 +63,33 @@ func TestContainerNameFromProcCgroup(t *testing.T) {
 
 	procCgroupInvalid := "devices:docker/kubelet\ncpuacct:pkg/kubectl"
 	verifyContainerName(procCgroupInvalid, "", true, t)
+}
+
+func TestPidOf(t *testing.T) {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
+	}
+	pids, err := PidOf(filepath.Base(os.Args[0]))
+	assert.Empty(t, err)
+	assert.NotZero(t, pids)
+	assert.Contains(t, pids, os.Getpid())
+}
+
+func TestPKill(t *testing.T) {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+		t.Skipf("not supported on GOOS=%s", runtime.GOOS)
+	}
+	sig := syscall.SIGCONT
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, sig)
+	defer signal.Stop(c)
+	PKill(os.Args[0], sig)
+	select {
+	case s := <-c:
+		if s != sig {
+			t.Fatalf("signal was %v, want %v", s, sig)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatalf("timeout waiting for %v", sig)
+	}
 }

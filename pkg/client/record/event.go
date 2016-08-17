@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,12 +26,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/watch"
 
-	"github.com/golang/glog"
 	"net/http"
+
+	"github.com/golang/glog"
 )
 
 const maxTriesPerEvent = 12
@@ -113,7 +114,7 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 	// The default math/rand package functions aren't thread safe, so create a
 	// new Rand object for each StartRecording call.
 	randGen := rand.New(rand.NewSource(time.Now().UnixNano()))
-	eventCorrelator := NewEventCorrelator(util.RealClock{})
+	eventCorrelator := NewEventCorrelator(clock.RealClock{})
 	return eventBroadcaster.StartEventWatcher(
 		func(event *api.Event) {
 			recordToSink(sink, event, eventCorrelator, randGen, eventBroadcaster.sleepDuration)
@@ -242,13 +243,13 @@ func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler fun
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
 func (eventBroadcaster *eventBroadcasterImpl) NewRecorder(source api.EventSource) EventRecorder {
-	return &recorderImpl{source, eventBroadcaster.Broadcaster, util.RealClock{}}
+	return &recorderImpl{source, eventBroadcaster.Broadcaster, clock.RealClock{}}
 }
 
 type recorderImpl struct {
 	source api.EventSource
 	*watch.Broadcaster
-	clock util.Clock
+	clock clock.Clock
 }
 
 func (recorder *recorderImpl) generateEvent(object runtime.Object, timestamp unversioned.Time, eventtype, reason, message string) {

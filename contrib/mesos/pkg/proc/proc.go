@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,6 +84,12 @@ func stateRun(ps *processState, a *scheduledAction) stateFn {
 	close(a.errCh) // signal that action was scheduled
 	func() {
 		// we don't trust clients of this package
+		defer func() {
+			if x := recover(); x != nil {
+				// HandleCrash has already logged this, so
+				// nothing to do.
+			}
+		}()
 		defer runtime.HandleCrash()
 		a.action()
 	}()

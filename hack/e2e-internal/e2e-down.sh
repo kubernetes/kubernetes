@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,4 +29,16 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 prepare-e2e
 
-test-teardown
+if [[ "${FEDERATION:-}" == "true" ]];then
+    source "${KUBE_ROOT}/federation/cluster/common.sh"
+    for zone in ${E2E_ZONES};do
+	# bring up e2e cluster
+	(
+	    set-federation-zone-vars "$zone"
+	    cleanup-federation-api-objects || echo "Couldn't cleanup federation api objects"
+	    test-teardown
+	)
+    done
+else
+    test-teardown
+fi

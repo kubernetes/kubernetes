@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package cmd
 import (
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -27,23 +28,25 @@ import (
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-const (
-	explainExamples = `# Get the documentation of the resource and its fields
-kubectl explain pods
+var (
+	explainExamples = dedent.Dedent(`
+		# Get the documentation of the resource and its fields
+		kubectl explain pods
 
-# Get the documentation of a specific field of a resource
-kubectl explain pods.spec.containers`
+		# Get the documentation of a specific field of a resource
+		kubectl explain pods.spec.containers`)
 
-	explainLong = `Documentation of resources.
+	explainLong = dedent.Dedent(`
+		Documentation of resources.
 
-` + kubectl.PossibleResourceTypes
+		`) + kubectl.PossibleResourceTypes
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
 func NewCmdExplain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
-		Short:   "Documentation of resources.",
+		Short:   "Documentation of resources",
 		Long:    explainLong,
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package fake
 
 import (
 	v1 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/core/v1"
+	restclient "k8s.io/kubernetes/pkg/client/restclient"
 	core "k8s.io/kubernetes/pkg/client/testing/core"
 )
 
@@ -83,4 +84,10 @@ func (c *FakeCore) Services(namespace string) v1.ServiceInterface {
 
 func (c *FakeCore) ServiceAccounts(namespace string) v1.ServiceAccountInterface {
 	return &FakeServiceAccounts{c, namespace}
+}
+
+// GetRESTClient returns a RESTClient that is used to communicate
+// with API server by this client implementation.
+func (c *FakeCore) GetRESTClient() *restclient.RESTClient {
+	return nil
 }

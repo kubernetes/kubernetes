@@ -59,15 +59,17 @@ type pageData struct {
 	NetworkAvailable       bool
 	FsAvailable            bool
 	CustomMetricsAvailable bool
+	SubcontainersAvailable bool
 	Root                   string
 	DockerStatus           []keyVal
 	DockerDriverStatus     []keyVal
-	DockerImages           []manager.DockerImage
+	DockerImages           []info.DockerImage
 }
 
 func init() {
+	containersHtmlTemplate, _ := Asset("pages/assets/html/containers.html")
 	pageTemplate = template.New("containersTemplate").Funcs(funcMap)
-	_, err := pageTemplate.Parse(containersHtmlTemplate)
+	_, err := pageTemplate.Parse(string(containersHtmlTemplate))
 	if err != nil {
 		glog.Fatalf("Failed to parse template: %s", err)
 	}

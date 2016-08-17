@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/proposals/federation.md).
+[here](http://releases.k8s.io/release-1.3/docs/proposals/federation.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -34,7 +34,7 @@ Documentation for other releases can be found at
 
 # Kubernetes Cluster Federation
 
-## (a.k.a. "Ubernetes")
+## (previously nicknamed "Ubernetes")
 
 ## Requirements Analysis and Product Proposal
 
@@ -413,7 +413,7 @@ detail to be added here, but feel free to shoot down the basic DNS
 idea in the mean time.  In addition, some applications rely on private
 networking between clusters for security (e.g. AWS VPC or more
 generally VPN).  It should not be necessary to forsake this in
-order to use Ubernetes, for example by being forced to use public
+order to use Cluster Federation, for example by being forced to use public
 connectivity between clusters.
 
 ## Cross-cluster Scheduling
@@ -546,7 +546,7 @@ prefers the Decoupled Hierarchical model for the reasons stated below).
     here, as each underlying Kubernetes cluster can be scaled
     completely independently w.r.t. scheduling, node state management,
     monitoring, network connectivity etc. It is even potentially
-    feasible to stack "Ubernetes" federated clusters (i.e. create
+    feasible to stack federations of clusters (i.e. create
     federations of federations) should scalability of the independent
     Federation Control Plane become an issue (although the author does
     not envision this being a problem worth solving in the short
@@ -595,7 +595,7 @@ prefers the Decoupled Hierarchical model for the reasons stated below).
 
 ![image](federation-high-level-arch.png)
 
-## Ubernetes API
+## Cluster Federation API
 
 It is proposed that this look a lot like the existing Kubernetes API
 but be explicitly multi-cluster.
@@ -603,7 +603,8 @@ but be explicitly multi-cluster.
 + Clusters become first class objects, which can be registered,
    listed, described, deregistered etc via the API.
 + Compute resources can be explicitly requested in specific clusters,
-   or automatically scheduled to the "best" cluster by Ubernetes (by a
+   or automatically scheduled to the "best" cluster by the Cluster
+   Federation control system (by a
    pluggable Policy Engine).
 + There is a federated equivalent of a replication controller type (or
    perhaps a [deployment](deployment.md)),
@@ -627,14 +628,15 @@ Controllers and related Services accordingly).
 This should ideally be delegated to some external auth system, shared
 by the underlying clusters, to avoid duplication and inconsistency.
 Either that, or we end up with multilevel auth.  Local readonly
-eventually consistent auth slaves in each cluster and in Ubernetes
+eventually consistent auth slaves in each cluster and in the Cluster
+Federation control system
 could potentially cache auth, to mitigate an SPOF auth system.
 
 ## Data consistency, failure and availability characteristics
 
-The services comprising the Ubernetes Control Plane) have to run
+The services comprising the Cluster Federation control plane) have to run
    somewhere.  Several options exist here:
-* For high availability Ubernetes deployments, these
+* For high availability Cluster Federation deployments, these
    services may run in either:
   * a dedicated Kubernetes cluster, not co-located in the same
 	 availability zone with any of the federated clusters (for fault
@@ -672,7 +674,7 @@ does the zookeeper config look like for N=3 across 3 AZs -- and how
 does each replica find the other replicas and how do clients find
 their primary zookeeper replica? And now how do I do a shared, highly
 available redis database?  Use a few common specific use cases like
-this to flesh out the detailed API and semantics of Ubernetes.
+this to flesh out the detailed API and semantics of Cluster Federation.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,8 @@ limitations under the License.
 package cache
 
 import (
-	federation_v1alpha1 "k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	kubeCache "k8s.io/kubernetes/pkg/client/cache"
 )
 
@@ -27,9 +28,37 @@ type StoreToClusterLister struct {
 	kubeCache.Store
 }
 
-func (s *StoreToClusterLister) List() (clusters federation_v1alpha1.ClusterList, err error) {
+func (s *StoreToClusterLister) List() (clusters v1beta1.ClusterList, err error) {
 	for _, m := range s.Store.List() {
-		clusters.Items = append(clusters.Items, *(m.(*federation_v1alpha1.Cluster)))
+		clusters.Items = append(clusters.Items, *(m.(*v1beta1.Cluster)))
 	}
 	return clusters, nil
+}
+
+// ClusterConditionPredicate is a function that indicates whether the given cluster's conditions meet
+// some set of criteria defined by the function.
+type ClusterConditionPredicate func(cluster v1beta1.Cluster) bool
+
+// storeToClusterConditionLister filters and returns nodes matching the given type and status from the store.
+type storeToClusterConditionLister struct {
+	store     kubeCache.Store
+	predicate ClusterConditionPredicate
+}
+
+// ClusterCondition returns a storeToClusterConditionLister
+func (s *StoreToClusterLister) ClusterCondition(predicate ClusterConditionPredicate) storeToClusterConditionLister {
+	return storeToClusterConditionLister{s.Store, predicate}
+}
+
+// List returns a list of clusters that match the conditions defined by the predicate functions in the storeToClusterConditionLister.
+func (s storeToClusterConditionLister) List() (clusters v1beta1.ClusterList, err error) {
+	for _, m := range s.store.List() {
+		cluster := *m.(*v1beta1.Cluster)
+		if s.predicate(cluster) {
+			clusters.Items = append(clusters.Items, cluster)
+		} else {
+			glog.V(5).Infof("Cluster %s matches none of the conditions", cluster.Name)
+		}
+	}
+	return
 }

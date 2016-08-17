@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -156,6 +156,10 @@ func TestUnstructuredGetters(t *testing.T) {
 						"uid":        "2",
 					},
 				},
+				"finalizers": []interface{}{
+					"finalizer.1",
+					"finalizer.2",
+				},
 			},
 		},
 	}
@@ -223,12 +227,16 @@ func TestUnstructuredGetters(t *testing.T) {
 		},
 	}
 	if got, want := refs, expectedOwnerReferences; !reflect.DeepEqual(got, want) {
-		t.Errorf("GetOwnerReference()=%v, want %v", got, want)
+		t.Errorf("GetOwnerReferences()=%v, want %v", got, want)
+	}
+	if got, want := unstruct.GetFinalizers(), []string{"finalizer.1", "finalizer.2"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("GetFinalizers()=%v, want %v", got, want)
 	}
 }
 
 func TestUnstructuredSetters(t *testing.T) {
 	unstruct := runtime.Unstructured{}
+	trueVar := true
 
 	want := runtime.Unstructured{
 		Object: map[string]interface{}{
@@ -255,13 +263,19 @@ func TestUnstructuredSetters(t *testing.T) {
 						"name":       "poda",
 						"apiVersion": "v1",
 						"uid":        "1",
+						"controller": (*bool)(nil),
 					},
 					{
 						"kind":       "Pod",
 						"name":       "podb",
 						"apiVersion": "v1",
 						"uid":        "2",
+						"controller": &trueVar,
 					},
+				},
+				"finalizers": []interface{}{
+					"finalizer.1",
+					"finalizer.2",
 				},
 			},
 		},
@@ -292,9 +306,11 @@ func TestUnstructuredSetters(t *testing.T) {
 			Name:       "podb",
 			APIVersion: "v1",
 			UID:        "2",
+			Controller: &trueVar,
 		},
 	}
 	unstruct.SetOwnerReferences(newOwnerReferences)
+	unstruct.SetFinalizers([]string{"finalizer.1", "finalizer.2"})
 
 	if !reflect.DeepEqual(unstruct, want) {
 		t.Errorf("Wanted: \n%s\n Got:\n%s", want, unstruct)

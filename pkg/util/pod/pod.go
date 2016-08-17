@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 
 	// Handle returned error from wait poll
 	if err == wait.ErrWaitTimeout {
-		err = fmt.Errorf("timed out trying to update pod: %+v", oldPod)
+		err = fmt.Errorf("timed out trying to update pod: %#v", oldPod)
 	}
 	// Ignore the pod not found error, but the pod isn't updated.
 	if errors.IsNotFound(err) {
@@ -86,4 +86,15 @@ func UpdatePodWithRetries(podClient unversionedcore.PodInterface, pod *api.Pod, 
 	// If the error is non-nil the returned pod cannot be trusted; if podUpdated is false, the pod isn't updated;
 	// if the error is nil and podUpdated is true, the returned pod contains the applied update.
 	return pod, podUpdated, err
+}
+
+// Filter uses the input function f to filter the given pod list, and return the filtered pods
+func Filter(podList *api.PodList, f func(api.Pod) bool) []api.Pod {
+	pods := make([]api.Pod, 0)
+	for _, p := range podList.Items {
+		if f(p) {
+			pods = append(pods, p)
+		}
+	}
+	return pods
 }

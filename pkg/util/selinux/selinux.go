@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,12 +16,14 @@ limitations under the License.
 
 package selinux
 
-// chconRunner knows how to chcon a directory.
-type ChconRunner interface {
+// SelinuxContextRunner knows how to chcon of a directory and
+// how to get the selinux context of a file.
+type SelinuxContextRunner interface {
 	SetContext(dir, context string) error
+	Getfilecon(path string) (string, error)
 }
 
-// newChconRunner returns a new chconRunner.
-func NewChconRunner() ChconRunner {
-	return &realChconRunner{}
+// NewSelinuxContextRunner returns a new chconRunner.
+func NewSelinuxContextRunner() SelinuxContextRunner {
+	return &realSelinuxContextRunner{}
 }

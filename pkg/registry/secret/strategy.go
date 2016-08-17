@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ func (strategy) NamespaceScoped() bool {
 	return true
 }
 
-func (strategy) PrepareForCreate(obj runtime.Object) {
+func (strategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
 func (strategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
@@ -62,7 +62,7 @@ func (strategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
-func (strategy) PrepareForUpdate(obj, old runtime.Object) {
+func (strategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 func (strategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
@@ -73,13 +73,13 @@ func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }
 
-func (s strategy) Export(obj runtime.Object, exact bool) error {
+func (s strategy) Export(ctx api.Context, obj runtime.Object, exact bool) error {
 	t, ok := obj.(*api.Secret)
 	if !ok {
 		// unexpected programmer error
 		return fmt.Errorf("unexpected object: %v", obj)
 	}
-	s.PrepareForCreate(obj)
+	s.PrepareForCreate(ctx, obj)
 	if exact {
 		return nil
 	}

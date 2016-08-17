@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/generator"
 	"k8s.io/kubernetes/cmd/libs/go2idl/namer"
 	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+
+	"github.com/golang/glog"
 )
 
 const (
@@ -200,19 +202,19 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 			return fmt.Errorf("regexp `%s` in file %q doesn't compile: %v", r.SelectorRegexp, actualPath, err)
 		}
 		for v := range f.Imports {
-			// fmt.Printf("Checking %v matches %v: %v\n", r.SelectorRegexp, v, re.MatchString(v))
+			glog.V(4).Infof("Checking %v matches %v: %v\n", r.SelectorRegexp, v, re.MatchString(v))
 			if !re.MatchString(v) {
 				continue
 			}
 			for _, forbidden := range r.ForbiddenPrefixes {
-				// fmt.Printf("Checking %v against %v\n", v, forbidden)
+				glog.V(4).Infof("Checking %v against %v\n", v, forbidden)
 				if strings.HasPrefix(v, forbidden) {
 					return fmt.Errorf("import %v has forbidden prefix %v", v, forbidden)
 				}
 			}
 			found := false
 			for _, allowed := range r.AllowedPrefixes {
-				fmt.Printf("Checking %v against %v\n", v, allowed)
+				glog.V(4).Infof("Checking %v against %v\n", v, allowed)
 				if strings.HasPrefix(v, allowed) {
 					found = true
 					break
@@ -224,7 +226,7 @@ func (importRuleFile) VerifyFile(f *generator.File, path string) error {
 		}
 	}
 	if len(rules.Rules) > 0 {
-		fmt.Printf("%v passes rules found in %v\n", path, actualPath)
+		glog.V(2).Infof("%v passes rules found in %v\n", path, actualPath)
 	}
 
 	return nil

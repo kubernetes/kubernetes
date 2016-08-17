@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -165,7 +165,7 @@ func TestDeleteController(t *testing.T) {
 		Request:  simple.Request{Method: "DELETE", Path: testapi.Default.ResourcePath(getRCResourceName(), ns, "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
-	err := c.Setup(t).ReplicationControllers(ns).Delete("foo")
+	err := c.Setup(t).ReplicationControllers(ns).Delete("foo", nil)
 	defer c.Close()
 	c.Validate(t, nil, err)
 }

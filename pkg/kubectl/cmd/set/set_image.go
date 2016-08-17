@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -55,25 +56,27 @@ type ImageOptions struct {
 	ContainerImages        map[string]string
 }
 
-const (
+var (
 	image_resources = `
   pod (po), replicationcontroller (rc), deployment, daemonset (ds), job, replicaset (rs)`
 
-	image_long = `Update existing container image(s) of resources.
+	image_long = dedent.Dedent(`
+		Update existing container image(s) of resources.
 
-Possible resources include (case insensitive):` + image_resources
+		Possible resources include (case insensitive):`) + image_resources
 
-	image_example = `# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
-kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
+	image_example = dedent.Dedent(`
+		# Set a deployment's nginx container image to 'nginx:1.9.1', and its busybox container image to 'busybox'.
+		kubectl set image deployment/nginx busybox=busybox nginx=nginx:1.9.1
 
-# Update all deployments' and rc's nginx container's image to 'nginx:1.9.1'
-kubectl set image deployments,rc nginx=nginx:1.9.1 --all
+		# Update all deployments' and rc's nginx container's image to 'nginx:1.9.1'
+		kubectl set image deployments,rc nginx=nginx:1.9.1 --all
 
-# Update image of all containers of daemonset abc to 'nginx:1.9.1'
-kubectl set image daemonset abc *=nginx:1.9.1
+		# Update image of all containers of daemonset abc to 'nginx:1.9.1'
+		kubectl set image daemonset abc *=nginx:1.9.1
 
-# Print result (in yaml format) of updating nginx container image from local file, without hitting the server 
-kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`
+		# Print result (in yaml format) of updating nginx container image from local file, without hitting the server 
+		kubectl set image -f path/to/file.yaml nginx=nginx:1.9.1 --local -o yaml`)
 )
 
 func NewCmdImage(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -209,9 +212,9 @@ func (o *ImageOptions) Run() error {
 
 		// record this change (for rollout history)
 		if o.Record || cmdutil.ContainsChangeCause(info) {
-			if err := cmdutil.RecordChangeCause(obj, o.ChangeCause); err == nil {
-				if obj, err = resource.NewHelper(info.Client, info.Mapping).Replace(info.Namespace, info.Name, false, obj); err != nil {
-					allErrs = append(allErrs, fmt.Errorf("changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err))
+			if patch, err := cmdutil.ChangeResourcePatch(info, o.ChangeCause); err == nil {
+				if obj, err = resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch); err != nil {
+					fmt.Fprintf(o.Err, "WARNING: changes to %s/%s can't be recorded: %v\n", info.Mapping.Resource, info.Name, err)
 				}
 			}
 		}

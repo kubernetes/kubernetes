@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ func (persistentvolumeStrategy) NamespaceScoped() bool {
 }
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
-func (persistentvolumeStrategy) PrepareForCreate(obj runtime.Object) {
+func (persistentvolumeStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	pv := obj.(*api.PersistentVolume)
 	pv.Status = api.PersistentVolumeStatus{}
 }
@@ -62,7 +62,7 @@ func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
-func (persistentvolumeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (persistentvolumeStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Status = oldPv.Status
@@ -84,7 +84,7 @@ type persistentvolumeStatusStrategy struct {
 var StatusStrategy = persistentvolumeStatusStrategy{Strategy}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
-func (persistentvolumeStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
 	oldPv := old.(*api.PersistentVolume)
 	newPv.Spec = oldPv.Spec

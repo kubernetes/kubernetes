@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,23 +18,10 @@ package e2e_node
 
 import (
 	"flag"
-
-	"k8s.io/kubernetes/pkg/client/restclient"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
-var apiServerAddress = flag.String("api-server-address", "http://127.0.0.1:8080", "Host and port of the api server")
-var nodeName = flag.String("node-name", "", "Name of the node")
+
 var buildServices = flag.Bool("build-services", true, "If true, build local executables")
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
-
-func NewDefaultFramework(baseName string) *framework.Framework {
-	client := client.NewOrDie(&restclient.Config{Host: *apiServerAddress})
-	return framework.NewFramework(baseName, framework.FrameworkOptions{
-		ClientQPS:   100,
-		ClientBurst: 100,
-	}, client)
-}

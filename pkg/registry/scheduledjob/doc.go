@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package scheduledjob provides Registry interface and it's RESTStorage
 // implementation for storing ScheduledJob api objects.
-package scheduledjob
+package scheduledjob // import "k8s.io/kubernetes/pkg/registry/scheduledjob"

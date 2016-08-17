@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -33,43 +36,29 @@ import (
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
 )
 
+type TestParam struct {
+	actualError           error
+	expectingError        bool
+	actualCreated         bool
+	expCreated            bool
+	expStatus             *unversioned.Status
+	testBody              bool
+	testBodyErrorIsNotNil bool
+}
+
 func TestDoRequestSuccess(t *testing.T) {
-	status := &unversioned.Status{Status: unversioned.StatusSuccess}
-	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
-	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   200,
-		ResponseBody: string(expectedBody),
-		T:            t,
-	}
-	testServer := httptest.NewServer(&fakeHandler)
+	testServer, fakeHandler, status := testServerEnv(t, 200)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{
-		Host: testServer.URL,
-		ContentConfig: ContentConfig{
-			GroupVersion:         testapi.Default.GroupVersion(),
-			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		},
-		Username: "user",
-		Password: "pass",
-	})
+
+	c, err := restClient(testServer)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	body, err := c.Get().Prefix("test").Do().Raw()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if fakeHandler.RequestReceived.Header["Authorization"] == nil {
-		t.Errorf("Request is missing authorization header: %#v", fakeHandler.RequestReceived)
-	}
-	statusOut, err := runtime.Decode(testapi.Default.Codec(), body)
-	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
-	}
-	if !reflect.DeepEqual(status, statusOut) {
-		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
-	}
-	fakeHandler.ValidateRequest(t, "/"+testapi.Default.GroupVersion().String()+"/test", "GET", nil)
+
+	testParam := TestParam{actualError: err, expectingError: false, expCreated: true,
+		expStatus: status, testBody: true, testBodyErrorIsNotNil: false}
+	validate(testParam, t, body, fakeHandler)
 }
 
 func TestDoRequestFailed(t *testing.T) {
@@ -88,17 +77,13 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{
-		Host: testServer.URL,
-		ContentConfig: ContentConfig{
-			GroupVersion:         testapi.Default.GroupVersion(),
-			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		},
-	})
+
+	c, err := restClient(testServer)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	body, err := c.Get().Do().Raw()
+
 	if err == nil || body != nil {
 		t.Errorf("unexpected non-error: %#v", body)
 	}
@@ -117,43 +102,122 @@ func TestDoRequestFailed(t *testing.T) {
 }
 
 func TestDoRequestCreated(t *testing.T) {
-	status := &unversioned.Status{Status: unversioned.StatusSuccess}
-	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
-	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   201,
-		ResponseBody: string(expectedBody),
-		T:            t,
-	}
-	testServer := httptest.NewServer(&fakeHandler)
+	testServer, fakeHandler, status := testServerEnv(t, 201)
 	defer testServer.Close()
-	c, err := RESTClientFor(&Config{
-		Host: testServer.URL,
-		ContentConfig: ContentConfig{
-			GroupVersion:         testapi.Default.GroupVersion(),
-			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
-		},
-		Username: "user",
-		Password: "pass",
-	})
+
+	c, err := restClient(testServer)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	created := false
 	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+
+	testParam := TestParam{actualError: err, expectingError: false, expCreated: true,
+		expStatus: status, testBody: false}
+	validate(testParam, t, body, fakeHandler)
+}
+
+func TestDoRequestNotCreated(t *testing.T) {
+	testServer, fakeHandler, expectedStatus := testServerEnv(t, 202)
+	defer testServer.Close()
+	c, err := restClient(testServer)
 	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !created {
-		t.Errorf("Expected object to be created")
+	created := false
+	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	testParam := TestParam{actualError: err, expectingError: false, expCreated: false,
+		expStatus: expectedStatus, testBody: false}
+	validate(testParam, t, body, fakeHandler)
+}
+
+func TestDoRequestAcceptedNoContentReturned(t *testing.T) {
+	testServer, fakeHandler, _ := testServerEnv(t, 204)
+	defer testServer.Close()
+
+	c, err := restClient(testServer)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	created := false
+	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	testParam := TestParam{actualError: err, expectingError: false, expCreated: false,
+		testBody: false}
+	validate(testParam, t, body, fakeHandler)
+}
+
+func TestBadRequest(t *testing.T) {
+	testServer, fakeHandler, _ := testServerEnv(t, 400)
+	defer testServer.Close()
+	c, err := restClient(testServer)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	created := false
+	body, err := c.Get().Prefix("test").Do().WasCreated(&created).Raw()
+	testParam := TestParam{actualError: err, expectingError: true, expCreated: false,
+		testBody: true}
+	validate(testParam, t, body, fakeHandler)
+}
+
+func validate(testParam TestParam, t *testing.T, body []byte, fakeHandler *utiltesting.FakeHandler) {
+	if testParam.expectingError {
+		if testParam.actualError == nil {
+			t.Errorf("Expected error")
+		}
+	}
+	if !testParam.expCreated {
+		if testParam.actualCreated {
+			t.Errorf("Expected object not to be created")
+		}
 	}
 	statusOut, err := runtime.Decode(testapi.Default.Codec(), body)
-	if err != nil {
-		t.Errorf("Unexpected error %#v", err)
+	if testParam.testBody {
+		if testParam.testBodyErrorIsNotNil {
+			if err == nil {
+				t.Errorf("Expected Error")
+			}
+		}
 	}
-	if !reflect.DeepEqual(status, statusOut) {
-		t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", status, statusOut)
+
+	if testParam.expStatus != nil {
+		if !reflect.DeepEqual(testParam.expStatus, statusOut) {
+			t.Errorf("Unexpected mis-match. Expected %#v.  Saw %#v", testParam.expStatus, statusOut)
+		}
 	}
 	fakeHandler.ValidateRequest(t, "/"+testapi.Default.GroupVersion().String()+"/test", "GET", nil)
+
+}
+
+func TestHttpMethods(t *testing.T) {
+	testServer, _, _ := testServerEnv(t, 200)
+	defer testServer.Close()
+	c, _ := restClient(testServer)
+
+	request := c.Post()
+	if request == nil {
+		t.Errorf("Post : Object returned should not be nil")
+	}
+
+	request = c.Get()
+	if request == nil {
+		t.Errorf("Get: Object returned should not be nil")
+	}
+
+	request = c.Put()
+	if request == nil {
+		t.Errorf("Put : Object returned should not be nil")
+	}
+
+	request = c.Delete()
+	if request == nil {
+		t.Errorf("Delete : Object returned should not be nil")
+	}
+
+	request = c.Patch(api.JSONPatchType)
+	if request == nil {
+		t.Errorf("Patch : Object returned should not be nil")
+	}
 }
 
 func TestCreateBackoffManager(t *testing.T) {
@@ -190,4 +254,29 @@ func TestCreateBackoffManager(t *testing.T) {
 		t.Errorf("Backoff should have been 0.")
 	}
 
+}
+
+func testServerEnv(t *testing.T, statusCode int) (*httptest.Server, *utiltesting.FakeHandler, *unversioned.Status) {
+	status := &unversioned.Status{Status: fmt.Sprintf("%s", unversioned.StatusSuccess)}
+	expectedBody, _ := runtime.Encode(testapi.Default.Codec(), status)
+	fakeHandler := utiltesting.FakeHandler{
+		StatusCode:   statusCode,
+		ResponseBody: string(expectedBody),
+		T:            t,
+	}
+	testServer := httptest.NewServer(&fakeHandler)
+	return testServer, &fakeHandler, status
+}
+
+func restClient(testServer *httptest.Server) (*RESTClient, error) {
+	c, err := RESTClientFor(&Config{
+		Host: testServer.URL,
+		ContentConfig: ContentConfig{
+			GroupVersion:         testapi.Default.GroupVersion(),
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		},
+		Username: "user",
+		Password: "pass",
+	})
+	return c, err
 }

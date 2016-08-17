@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ func (s *podReconciler) Reconcile(t *podtask.T) {
 		} else {
 			//TODO(jdef) other errors should probably trigger a retry (w/ backoff).
 			//For now, drop the pod on the floor
-			log.Warning("aborting reconciliation for pod %v: %v", t.Pod.Name, err)
+			log.Warningf("aborting reconciliation for pod %v: %v", t.Pod.Name, err)
 		}
 		return
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package prober
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/url"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -100,12 +102,12 @@ func (pb *prober) probe(probeType probeType, pod *api.Pod, status api.PodStatus,
 		if err != nil {
 			glog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
 			if hasRef {
-				pb.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+				pb.recorder.Eventf(ref, api.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
 			}
 		} else { // result != probe.Success
 			glog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
 			if hasRef {
-				pb.recorder.Eventf(ref, api.EventTypeWarning, kubecontainer.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+				pb.recorder.Eventf(ref, api.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
 			}
 		}
 		return results.Failure, err
@@ -130,7 +132,7 @@ func (pb *prober) runProbeWithRetries(p *api.Probe, pod *api.Pod, status api.Pod
 }
 
 // buildHeaderMap takes a list of HTTPHeader <name, value> string
-// pairs and returns a a populated string->[]string http.Header map.
+// pairs and returns a populated string->[]string http.Header map.
 func buildHeader(headerList []api.HTTPHeader) http.Header {
 	headers := make(http.Header)
 	for _, header := range headerList {
@@ -208,11 +210,16 @@ func findPortByName(container api.Container, portName string) (int, error) {
 
 // formatURL formats a URL from args.  For testability.
 func formatURL(scheme string, host string, port int, path string) *url.URL {
-	return &url.URL{
-		Scheme: scheme,
-		Host:   net.JoinHostPort(host, strconv.Itoa(port)),
-		Path:   path,
+	u, err := url.Parse(path)
+	// Something is busted with the path, but it's too late to reject it. Pass it along as is.
+	if err != nil {
+		u = &url.URL{
+			Path: path,
+		}
 	}
+	u.Scheme = scheme
+	u.Host = net.JoinHostPort(host, strconv.Itoa(port))
+	return u
 }
 
 type execInContainer struct {
@@ -223,7 +230,7 @@ func (p *prober) newExecInContainer(container api.Container, containerID kubecon
 	return execInContainer{func() ([]byte, error) {
 		var buffer bytes.Buffer
 		output := ioutils.WriteCloserWrapper(&buffer)
-		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false)
+		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -241,5 +248,13 @@ func (eic execInContainer) Output() ([]byte, error) {
 }
 
 func (eic execInContainer) SetDir(dir string) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStdin(in io.Reader) {
+	//unimplemented
+}
+
+func (eic execInContainer) SetStdout(out io.Writer) {
 	//unimplemented
 }

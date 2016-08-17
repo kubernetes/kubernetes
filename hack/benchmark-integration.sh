@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,10 +37,10 @@ runTests() {
     KUBE_RACE="-race" \
     KUBE_TEST_API_VERSIONS="v1" \
     KUBE_TIMEOUT="-timeout 10m" \
-    KUBE_TEST_ETCD_PREFIXES="registry"\
+    KUBE_TEST_ETCD_PREFIXES="registry" \
     ETCD_CUSTOM_PREFIX="None" \
     KUBE_TEST_ARGS="${ARGS}" \
-    "${KUBE_ROOT}/hack/test-go.sh" test/integration
+    make test WHAT=test/integration
   cleanup
 }
 

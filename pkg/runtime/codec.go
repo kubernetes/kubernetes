@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,10 +40,10 @@ func NewCodec(e Encoder, d Decoder) Codec {
 }
 
 // Encode is a convenience wrapper for encoding to a []byte from an Encoder
-func Encode(e Encoder, obj Object, overrides ...unversioned.GroupVersion) ([]byte, error) {
+func Encode(e Encoder, obj Object) ([]byte, error) {
 	// TODO: reuse buffer
 	buf := &bytes.Buffer{}
-	if err := e.EncodeToStream(obj, buf, overrides...); err != nil {
+	if err := e.Encode(obj, buf); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -78,14 +78,16 @@ func EncodeOrDie(e Encoder, obj Object) string {
 
 // UseOrCreateObject returns obj if the canonical ObjectKind returned by the provided typer matches gvk, or
 // invokes the ObjectCreator to instantiate a new gvk. Returns an error if the typer cannot find the object.
-func UseOrCreateObject(t Typer, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {
+func UseOrCreateObject(t ObjectTyper, c ObjectCreater, gvk unversioned.GroupVersionKind, obj Object) (Object, error) {
 	if obj != nil {
-		into, _, err := t.ObjectKind(obj)
+		kinds, _, err := t.ObjectKinds(obj)
 		if err != nil {
 			return nil, err
 		}
-		if gvk == *into {
-			return obj, nil
+		for _, kind := range kinds {
+			if gvk == kind {
+				return obj, nil
+			}
 		}
 	}
 	return c.New(gvk)
@@ -98,7 +100,7 @@ type NoopEncoder struct {
 
 var _ Serializer = NoopEncoder{}
 
-func (n NoopEncoder) EncodeToStream(obj Object, w io.Writer, overrides ...unversioned.GroupVersion) error {
+func (n NoopEncoder) Encode(obj Object, w io.Writer) error {
 	return fmt.Errorf("encoding is not allowed for this codec: %v", reflect.TypeOf(n.Decoder))
 }
 
@@ -116,7 +118,7 @@ func (n NoopDecoder) Decode(data []byte, gvk *unversioned.GroupVersionKind, into
 // NewParameterCodec creates a ParameterCodec capable of transforming url values into versioned objects and back.
 func NewParameterCodec(scheme *Scheme) ParameterCodec {
 	return &parameterCodec{
-		typer:     ObjectTyperToTyper(scheme),
+		typer:     scheme,
 		convertor: scheme,
 		creator:   scheme,
 	}
@@ -124,7 +126,7 @@ func NewParameterCodec(scheme *Scheme) ParameterCodec {
 
 // parameterCodec implements conversion to and from query parameters and objects.
 type parameterCodec struct {
-	typer     Typer
+	typer     ObjectTyper
 	convertor ObjectConvertor
 	creator   ObjectCreater
 }
@@ -137,10 +139,11 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 	if len(parameters) == 0 {
 		return nil
 	}
-	targetGVK, _, err := c.typer.ObjectKind(into)
+	targetGVKs, _, err := c.typer.ObjectKinds(into)
 	if err != nil {
 		return err
 	}
+	targetGVK := targetGVKs[0]
 	if targetGVK.GroupVersion() == from {
 		return c.convertor.Convert(&parameters, into)
 	}
@@ -157,10 +160,11 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 // EncodeParameters converts the provided object into the to version, then converts that object to url.Values.
 // Returns an error if conversion is not possible.
 func (c *parameterCodec) EncodeParameters(obj Object, to unversioned.GroupVersion) (url.Values, error) {
-	gvk, _, err := c.typer.ObjectKind(obj)
+	gvks, _, err := c.typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, err
 	}
+	gvk := gvks[0]
 	if to != gvk.GroupVersion() {
 		out, err := c.convertor.ConvertToVersion(obj, to)
 		if err != nil {
@@ -179,9 +183,9 @@ func NewBase64Serializer(s Serializer) Serializer {
 	return &base64Serializer{s}
 }
 
-func (s base64Serializer) EncodeToStream(obj Object, stream io.Writer, overrides ...unversioned.GroupVersion) error {
+func (s base64Serializer) Encode(obj Object, stream io.Writer) error {
 	e := base64.NewEncoder(base64.StdEncoding, stream)
-	err := s.Serializer.EncodeToStream(obj, e, overrides...)
+	err := s.Serializer.Encode(obj, e)
 	e.Close()
 	return err
 }

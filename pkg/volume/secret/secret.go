@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,8 +45,14 @@ type secretPlugin struct {
 
 var _ volume.VolumePlugin = &secretPlugin{}
 
-var wrappedVolumeSpec = volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+func wrappedVolumeSpec() volume.Spec {
+	return volume.Spec{
+		Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+	}
+}
+
+func getPath(uid types.UID, volName string, host volume.VolumeHost) string {
+	return host.GetPodVolumeDir(uid, strings.EscapeQualifiedNameForDisk(secretPluginName), volName)
 }
 
 func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
@@ -54,12 +60,25 @@ func (plugin *secretPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *secretPlugin) Name() string {
+func (plugin *secretPlugin) GetPluginName() string {
 	return secretPluginName
+}
+
+func (plugin *secretPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a Secret volume type")
+	}
+
+	return volumeSource.SecretName, nil
 }
 
 func (plugin *secretPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.Secret != nil
+}
+
+func (plugin *secretPlugin) RequiresRemount() bool {
+	return true
 }
 
 func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
@@ -70,7 +89,7 @@ func (plugin *secretPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts vol
 			plugin,
 			plugin.host.GetMounter(),
 			plugin.host.GetWriter(),
-			volume.NewCachedMetrics(volume.NewMetricsDu(getPathFromHost(plugin.host, pod.UID, spec.Name()))),
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(pod.UID, spec.Name(), plugin.host))),
 		},
 		source: *spec.Volume.Secret,
 		pod:    *pod,
@@ -86,9 +105,21 @@ func (plugin *secretPlugin) NewUnmounter(volName string, podUID types.UID) (volu
 			plugin,
 			plugin.host.GetMounter(),
 			plugin.host.GetWriter(),
-			volume.NewCachedMetrics(volume.NewMetricsDu(getPathFromHost(plugin.host, podUID, volName))),
+			volume.NewCachedMetrics(volume.NewMetricsDu(getPath(podUID, volName, plugin.host))),
 		},
 	}, nil
+}
+
+func (plugin *secretPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	secretVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			Secret: &api.SecretVolumeSource{
+				SecretName: volName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(secretVolume), nil
 }
 
 type secretVolume struct {
@@ -103,11 +134,7 @@ type secretVolume struct {
 var _ volume.Volume = &secretVolume{}
 
 func (sv *secretVolume) GetPath() string {
-	return getPathFromHost(sv.plugin.host, sv.podUID, sv.volName)
-}
-
-func getPathFromHost(host volume.VolumeHost, podUID types.UID, volName string) string {
-	return host.GetPodVolumeDir(podUID, strings.EscapeQualifiedNameForDisk(secretPluginName), volName)
+	return getPath(sv.podUID, sv.volName, sv.plugin.host)
 }
 
 // secretVolumeMounter handles retrieving secrets from the API server
@@ -137,7 +164,7 @@ func (b *secretVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up volume %v for pod %v at %v", b.volName, b.pod.UID, dir)
 
 	// Wrap EmptyDir, let it do the setup.
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec, &b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), &b.pod, *b.opts)
 	if err != nil {
 		return err
 	}
@@ -236,9 +263,21 @@ func (c *secretVolumeUnmounter) TearDownAt(dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec(), c.podUID)
 	if err != nil {
 		return err
 	}
 	return wrapped.TearDownAt(dir)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.SecretVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.SecretVolumeSource
+
+	if spec.Volume != nil && spec.Volume.Secret != nil {
+		volumeSource = spec.Volume.Secret
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

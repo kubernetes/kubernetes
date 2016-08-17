@@ -1,13 +1,12 @@
-# This file should be kept in sync with cluster/images/hyperkube/dashboard-rc.yaml
-# and cluster/gce/coreos/kube-manifests/addons/dashboard/dashboard-controller.yaml
+# This file should be kept in sync with cluster/gce/coreos/kube-manifests/addons/dashboard/dashboard-controller.yaml
 apiVersion: v1
 kind: ReplicationController
 metadata:
-  name: kubernetes-dashboard-v1.0.1
+  name: kubernetes-dashboard-v1.1.1
   namespace: kube-system
   labels:
     k8s-app: kubernetes-dashboard
-    version: v1.0.1
+    version: v1.1.1
     kubernetes.io/cluster-service: "true"
 spec:
   replicas: 1
@@ -17,12 +16,12 @@ spec:
     metadata:
       labels:
         k8s-app: kubernetes-dashboard
-        version: v1.0.1
+        version: v1.1.1
         kubernetes.io/cluster-service: "true"
     spec:
       containers:
       - name: kubernetes-dashboard
-        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.0.1
+        image: gcr.io/google_containers/kubernetes-dashboard-amd64:v1.1.1
         resources:
           # keep request = limit to keep this container in guaranteed class
           limits:

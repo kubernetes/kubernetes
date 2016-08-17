@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
@@ -50,38 +48,31 @@ func TestUpdateEtcdOverrides(t *testing.T) {
 
 	defaultEtcdLocation := []string{"http://127.0.0.1"}
 	for i, test := range testCases {
-		actualConfig := storagebackend.Config{}
-		newStorageFn := func(config storagebackend.Config, codec runtime.Codec) (_ storage.Interface, err error) {
-			actualConfig = config
-			return nil, nil
-		}
-
 		defaultConfig := storagebackend.Config{
 			Prefix:     options.DefaultEtcdPathPrefix,
 			ServerList: defaultEtcdLocation,
 		}
 		storageFactory := NewDefaultStorageFactory(defaultConfig, "", api.Codecs, NewDefaultResourceEncodingConfig(), NewResourceConfig())
-		storageFactory.newStorageFn = newStorageFn
 		storageFactory.SetEtcdLocation(test.resource, test.servers)
 
 		var err error
-		_, err = storageFactory.New(test.resource)
+		config, err := storageFactory.NewConfig(test.resource)
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(actualConfig.ServerList, test.servers) {
-			t.Errorf("%d: expected %v, got %v", i, test.servers, actualConfig.ServerList)
+		if !reflect.DeepEqual(config.ServerList, test.servers) {
+			t.Errorf("%d: expected %v, got %v", i, test.servers, config.ServerList)
 			continue
 		}
 
-		_, err = storageFactory.New(unversioned.GroupResource{Group: api.GroupName, Resource: "unlikely"})
+		config, err = storageFactory.NewConfig(unversioned.GroupResource{Group: api.GroupName, Resource: "unlikely"})
 		if err != nil {
 			t.Errorf("%d: unexpected error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(actualConfig.ServerList, defaultEtcdLocation) {
-			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, actualConfig.ServerList)
+		if !reflect.DeepEqual(config.ServerList, defaultEtcdLocation) {
+			t.Errorf("%d: expected %v, got %v", i, defaultEtcdLocation, config.ServerList)
 			continue
 		}
 

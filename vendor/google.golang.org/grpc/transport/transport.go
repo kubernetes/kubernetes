@@ -63,13 +63,11 @@ type recvMsg struct {
 	err error
 }
 
-func (recvMsg) isItem() bool {
-	return true
-}
+func (*recvMsg) item() {}
 
 // All items in an out of a recvBuffer should be the same type.
 type item interface {
-	isItem() bool
+	item()
 }
 
 // recvBuffer is an unbounded channel of item.
@@ -89,12 +87,14 @@ func newRecvBuffer() *recvBuffer {
 func (b *recvBuffer) put(r item) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.backlog = append(b.backlog, r)
-	select {
-	case b.c <- b.backlog[0]:
-		b.backlog = b.backlog[1:]
-	default:
+	if len(b.backlog) == 0 {
+		select {
+		case b.c <- r:
+			return
+		default:
+		}
 	}
+	b.backlog = append(b.backlog, r)
 }
 
 func (b *recvBuffer) load() {
@@ -299,20 +299,18 @@ func (s *Stream) Read(p []byte) (n int, err error) {
 	return
 }
 
-type key int
-
 // The key to save transport.Stream in the context.
-const streamKey = key(0)
+type streamKey struct{}
 
 // newContextWithStream creates a new context from ctx and attaches stream
 // to it.
 func newContextWithStream(ctx context.Context, stream *Stream) context.Context {
-	return context.WithValue(ctx, streamKey, stream)
+	return context.WithValue(ctx, streamKey{}, stream)
 }
 
 // StreamFromContext returns the stream saved in ctx.
 func StreamFromContext(ctx context.Context) (s *Stream, ok bool) {
-	s, ok = ctx.Value(streamKey).(*Stream)
+	s, ok = ctx.Value(streamKey{}).(*Stream)
 	return
 }
 
@@ -323,6 +321,7 @@ const (
 	reachable transportState = iota
 	unreachable
 	closing
+	draining
 )
 
 // NewServerTransport creates a ServerTransport with conn or non-nil error
@@ -337,9 +336,11 @@ type ConnectOptions struct {
 	UserAgent string
 	// Dialer specifies how to dial a network address.
 	Dialer func(string, time.Duration) (net.Conn, error)
-	// AuthOptions stores the credentials required to setup a client connection and/or issue RPCs.
-	AuthOptions []credentials.Credentials
-	// Timeout specifies the timeout for dialing a client connection.
+	// PerRPCCredentials stores the PerRPCCredentials required to issue RPCs.
+	PerRPCCredentials []credentials.PerRPCCredentials
+	// TransportCredentials stores the Authenticator required to setup a client connection.
+	TransportCredentials credentials.TransportCredentials
+	// Timeout specifies the timeout for dialing a ClientTransport.
 	Timeout time.Duration
 }
 
@@ -352,36 +353,50 @@ func NewClientTransport(target string, opts *ConnectOptions) (ClientTransport, e
 // Options provides additional hints and information for message
 // transmission.
 type Options struct {
-	// Indicate whether it is the last piece for this stream.
+	// Last indicates whether this write is the last piece for
+	// this stream.
 	Last bool
-	// The hint to transport impl whether the data could be buffered for
-	// batching write. Transport impl can feel free to ignore it.
+
+	// Delay is a hint to the transport implementation for whether
+	// the data could be buffered for a batching write. The
+	// Transport implementation may ignore the hint.
 	Delay bool
 }
 
 // CallHdr carries the information of a particular RPC.
 type CallHdr struct {
-	// Host specifies peer host.
+	// Host specifies the peer's host.
 	Host string
+
 	// Method specifies the operation to perform.
 	Method string
-	// RecvCompress specifies the compression algorithm applied on inbound messages.
+
+	// RecvCompress specifies the compression algorithm applied on
+	// inbound messages.
 	RecvCompress string
-	// SendCompress specifies the compression algorithm applied on outbound message.
+
+	// SendCompress specifies the compression algorithm applied on
+	// outbound message.
 	SendCompress string
-	// Flush indicates if new stream command should be sent to the peer without
-	// waiting for the first data. This is a hint though. The transport may modify
-	// the flush decision for performance purpose.
+
+	// Flush indicates whether a new stream command should be sent
+	// to the peer without waiting for the first data. This is
+	// only a hint. The transport may modify the flush decision
+	// for performance purposes.
 	Flush bool
 }
 
-// ClientTransport is the common interface for all gRPC client side transport
+// ClientTransport is the common interface for all gRPC client-side transport
 // implementations.
 type ClientTransport interface {
 	// Close tears down this transport. Once it returns, the transport
 	// should not be accessed any more. The caller must make sure this
 	// is called only once.
 	Close() error
+
+	// GracefulClose starts to tear down the transport. It stops accepting
+	// new RPCs and wait the completion of the pending RPCs.
+	GracefulClose() error
 
 	// Write sends the data for the given stream. A nil stream indicates
 	// the write is to be performed on the transport as a whole.
@@ -404,21 +419,33 @@ type ClientTransport interface {
 	Error() <-chan struct{}
 }
 
-// ServerTransport is the common interface for all gRPC server side transport
+// ServerTransport is the common interface for all gRPC server-side transport
 // implementations.
+//
+// Methods may be called concurrently from multiple goroutines, but
+// Write methods for a given Stream will be called serially.
 type ServerTransport interface {
-	// WriteStatus sends the status of a stream to the client.
-	WriteStatus(s *Stream, statusCode codes.Code, statusDesc string) error
-	// Write sends the data for the given stream.
-	Write(s *Stream, data []byte, opts *Options) error
-	// WriteHeader sends the header metedata for the given stream.
-	WriteHeader(s *Stream, md metadata.MD) error
 	// HandleStreams receives incoming streams using the given handler.
 	HandleStreams(func(*Stream))
+
+	// WriteHeader sends the header metadata for the given stream.
+	// WriteHeader may not be called on all streams.
+	WriteHeader(s *Stream, md metadata.MD) error
+
+	// Write sends the data for the given stream.
+	// Write may not be called on all streams.
+	Write(s *Stream, data []byte, opts *Options) error
+
+	// WriteStatus sends the status of a stream to the client.
+	// WriteStatus is the final call made on a stream and always
+	// occurs.
+	WriteStatus(s *Stream, statusCode codes.Code, statusDesc string) error
+
 	// Close tears down the transport. Once it is called, the transport
 	// should not be accessed any more. All the pending streams and their
 	// handlers will be terminated asynchronously.
 	Close() error
+
 	// RemoteAddr returns the remote network address.
 	RemoteAddr() net.Addr
 }
@@ -448,7 +475,7 @@ func (e ConnectionError) Error() string {
 	return fmt.Sprintf("connection error: desc = %q", e.Desc)
 }
 
-// Define some common ConnectionErrors.
+// ErrConnClosing indicates that the transport is closing.
 var ErrConnClosing = ConnectionError{Desc: "transport is closing"}
 
 // StreamError is an error that only affects one stream within a connection.

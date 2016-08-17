@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -344,7 +344,7 @@ func (s *SchedulerServer) AddStandaloneFlags(fs *pflag.FlagSet) {
 
 func (s *SchedulerServer) AddHyperkubeFlags(fs *pflag.FlagSet) {
 	s.addCoreFlags(fs)
-	fs.StringVar(&s.kmPath, "km-path", s.kmPath, "Location of the km executable, may be a URI or an absolute file path.")
+	fs.StringVar(&s.kmPath, "km-path", s.kmPath, "Location of the km executable, may be a URI or an absolute file path; may be prefixed with 'file://' to specify the path to a pre-installed, agent-local km binary.")
 }
 
 // returns (downloadURI, basename(path))
@@ -390,11 +390,16 @@ func (s *SchedulerServer) prepareExecutorInfo(hks hyperkube.Interface) (*mesos.E
 		return nil, fmt.Errorf("either run this scheduler via km or else --executor-path is required")
 	} else {
 		if strings.Index(s.kmPath, "://") > 0 {
-			// URI could point directly to executable, e.g. hdfs:///km
-			// or else indirectly, e.g. http://acmestorage/tarball.tgz
-			// so we assume that for this case the command will always "km"
-			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(s.kmPath), Executable: proto.Bool(true)})
-			ci.Value = proto.String("./km") // TODO(jdef) extract constant
+			if strings.HasPrefix(s.kmPath, "file://") {
+				// If `kmPath` started with "file://", `km` in agent local path was used.
+				ci.Value = proto.String(strings.TrimPrefix(s.kmPath, "file://"))
+			} else {
+				// URI could point directly to executable, e.g. hdfs:///km
+				// or else indirectly, e.g. http://acmestorage/tarball.tgz
+				// so we assume that for this case the command will always "km"
+				ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(s.kmPath), Executable: proto.Bool(true)})
+				ci.Value = proto.String("./km") // TODO(jdef) extract constant
+			}
 		} else if s.kmPath != "" {
 			uri, kmCmd := s.serveFrameworkArtifact(s.kmPath)
 			ci.Uris = append(ci.Uris, &mesos.CommandInfo_URI{Value: proto.String(uri), Executable: proto.Bool(true)})

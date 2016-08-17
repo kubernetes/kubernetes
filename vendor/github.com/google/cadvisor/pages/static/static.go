@@ -26,14 +26,25 @@ import (
 
 const StaticResource = "/static/"
 
-var staticFiles = map[string]string{
+var bootstrapJs, _ = Asset("pages/assets/js/bootstrap-3.1.1.min.js")
+var containersJs, _ = Asset("pages/assets/js/containers.js")
+var gchartsJs, _ = Asset("pages/assets/js/gcharts.js")
+var googleJsapiJs, _ = Asset("pages/assets/js/google-jsapi.js")
+var jqueryJs, _ = Asset("pages/assets/js/jquery-1.10.2.min.js")
+
+var bootstrapCss, _ = Asset("pages/assets/styles/bootstrap-3.1.1.min.css")
+var bootstrapThemeCss, _ = Asset("pages/assets/styles/bootstrap-theme-3.1.1.min.css")
+var containersCss, _ = Asset("pages/assets/styles/containers.css")
+
+var staticFiles = map[string][]byte{
+	"bootstrap-3.1.1.min.css":       bootstrapCss,
+	"bootstrap-3.1.1.min.js":        bootstrapJs,
+	"bootstrap-theme-3.1.1.min.css": bootstrapThemeCss,
 	"containers.css":                containersCss,
 	"containers.js":                 containersJs,
-	"bootstrap-3.1.1.min.css":       bootstrapCss,
-	"bootstrap-theme-3.1.1.min.css": bootstrapThemeCss,
-	"jquery-1.10.2.min.js":          jqueryJs,
-	"bootstrap-3.1.1.min.js":        bootstrapJs,
+	"gcharts.js":                    gchartsJs,
 	"google-jsapi.js":               googleJsapiJs,
+	"jquery-1.10.2.min.js":          jqueryJs,
 }
 
 func HandleRequest(w http.ResponseWriter, u *url.URL) error {
@@ -54,6 +65,6 @@ func HandleRequest(w http.ResponseWriter, u *url.URL) error {
 		w.Header().Set("Content-Type", contentType)
 	}
 
-	_, err := w.Write([]byte(content))
+	_, err := w.Write(content)
 	return err
 }

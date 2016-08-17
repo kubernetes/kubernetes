@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package daemon contains logic for watching and synchronizing
 // daemons.
-package daemon
+package daemon // import "k8s.io/kubernetes/pkg/controller/daemon"

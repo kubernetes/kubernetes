@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ echo "Kubemark master name: ${MASTER_NAME}"
 detect-master
 
 export KUBE_MASTER_URL="https://${KUBE_MASTER_IP}"
-export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/resources/kubeconfig.loc"
+export KUBECONFIG="${ABSOLUTE_ROOT}/test/kubemark/resources/kubeconfig.kubemark"
 export E2E_MIN_STARTUP_PODS=0
 
 if [[ -z "$@" ]]; then

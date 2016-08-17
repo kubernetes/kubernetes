@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,8 +27,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -679,7 +681,7 @@ Scaling foo-v2 up to 1
 `,
 		},
 		{
-			name:        "1->2 25/25 complex asymetric deployment",
+			name:        "1->2 25/25 complex asymmetric deployment",
 			oldRc:       oldRc(1, 1),
 			newRc:       newRc(0, 2),
 			newRcExists: false,
@@ -810,13 +812,13 @@ Scaling foo-v2 up to 2
 			},
 		}
 		// Set up a mock readiness check which handles the test assertions.
-		updater.getReadyPods = func(oldRc, newRc *api.ReplicationController) (int32, int32, error) {
+		updater.getReadyPods = func(oldRc, newRc *api.ReplicationController, minReadySecondsDeadline int32) (int32, int32, error) {
 			// Return simulated readiness, and throw an error if this call has no
 			// expectations defined.
 			oldReady := next(&oldReady)
 			newReady := next(&newReady)
 			if oldReady == -1 || newReady == -1 {
-				t.Fatalf("unexpected getReadyPods call for:\noldRc: %+v\nnewRc: %+v", oldRc, newRc)
+				t.Fatalf("unexpected getReadyPods call for:\noldRc: %#v\nnewRc: %#v", oldRc, newRc)
 			}
 			return int32(oldReady), int32(newReady), nil
 		}
@@ -860,7 +862,7 @@ func TestUpdate_progressTimeout(t *testing.T) {
 			return nil
 		},
 	}
-	updater.getReadyPods = func(oldRc, newRc *api.ReplicationController) (int32, int32, error) {
+	updater.getReadyPods = func(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error) {
 		// Coerce a timeout by pods never becoming ready.
 		return 0, 0, nil
 	}
@@ -913,7 +915,7 @@ func TestUpdate_assignOriginalAnnotation(t *testing.T) {
 		cleanup: func(oldRc, newRc *api.ReplicationController, config *RollingUpdaterConfig) error {
 			return nil
 		},
-		getReadyPods: func(oldRc, newRc *api.ReplicationController) (int32, int32, error) {
+		getReadyPods: func(oldRc, newRc *api.ReplicationController, minReadySeconds int32) (int32, int32, error) {
 			return 1, 1, nil
 		},
 	}
@@ -1142,20 +1144,27 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 				"delete",
 			},
 		},
-		{
-			name:      "rename",
-			policy:    RenameRollingUpdateCleanupPolicy,
-			responses: []runtime.Object{rcExisting},
-			expected: []string{
-				"get",
-				"update",
-				"get",
-				"get",
-				"delete",
-				"create",
-				"delete",
-			},
-		},
+		//{
+		// This cases is separated to a standalone
+		// TestRollingUpdater_cleanupWithClients_Rename. We have to do this
+		// because the unversioned fake client is unable to delete objects.
+		// TODO: uncomment this case when the unversioned fake client uses
+		// pkg/client/testing/core.
+		//	{
+		//		name:      "rename",
+		//		policy:    RenameRollingUpdateCleanupPolicy,
+		//		responses: []runtime.Object{rcExisting},
+		//		expected: []string{
+		//			"get",
+		//			"update",
+		//			"get",
+		//			"get",
+		//			"delete",
+		//			"create",
+		//			"delete",
+		//		},
+		//	},
+		//},
 	}
 
 	for _, test := range tests {
@@ -1184,6 +1193,39 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			if e, a := test.expected[j], action.GetVerb(); e != a {
 				t.Errorf("%s: unexpected action: expected %s, got %s", test.name, e, a)
 			}
+		}
+	}
+}
+
+// TestRollingUpdater_cleanupWithClients_Rename tests the rename cleanup policy. It's separated to
+// a standalone test because the unversioned fake client is unable to delete
+// objects.
+// TODO: move this test back to TestRollingUpdater_cleanupWithClients
+// when the fake client uses pkg/client/testing/core in the future.
+func TestRollingUpdater_cleanupWithClients_Rename(t *testing.T) {
+	rc := oldRc(2, 2)
+	rcExisting := newRc(1, 3)
+	expectedActions := []string{"delete", "get", "create"}
+	fake := &testclient.Fake{}
+	fake.AddReactor("*", "*", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
+		switch action.(type) {
+		case testclient.CreateAction:
+			return true, nil, nil
+		case testclient.GetAction:
+			return true, nil, errors.NewNotFound(unversioned.GroupResource{}, "")
+		case testclient.DeleteAction:
+			return true, nil, nil
+		}
+		return false, nil, nil
+	})
+
+	err := Rename(fake, rcExisting, rc.Name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for j, action := range fake.Actions() {
+		if e, a := expectedActions[j], action.GetVerb(); e != a {
+			t.Errorf("unexpected action: expected %s, got %s", e, a)
 		}
 	}
 }
@@ -1370,7 +1412,7 @@ func TestUpdateExistingReplicationController(t *testing.T) {
 	}
 }
 
-func TestUpdateWithRetries(t *testing.T) {
+func TestUpdateRcWithRetries(t *testing.T) {
 	codec := testapi.Default.Codec()
 	rc := &api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{Name: "rc",
@@ -1403,8 +1445,8 @@ func TestUpdateWithRetries(t *testing.T) {
 	header := http.Header{}
 	header.Set("Content-Type", runtime.ContentTypeJSON)
 	updates := []*http.Response{
-		{StatusCode: 500, Header: header, Body: objBody(codec, &api.ReplicationController{})},
-		{StatusCode: 500, Header: header, Body: objBody(codec, &api.ReplicationController{})},
+		{StatusCode: 409, Header: header, Body: objBody(codec, &api.ReplicationController{})}, // conflict
+		{StatusCode: 409, Header: header, Body: objBody(codec, &api.ReplicationController{})}, // conflict
 		{StatusCode: 200, Header: header, Body: objBody(codec, &newRc)},
 	}
 	gets := []*http.Response{
@@ -1412,7 +1454,7 @@ func TestUpdateWithRetries(t *testing.T) {
 		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == testapi.Default.ResourcePath("replicationcontrollers", "default", "rc") && m == "PUT":
@@ -1442,8 +1484,8 @@ func TestUpdateWithRetries(t *testing.T) {
 	client := client.NewOrDie(clientConfig)
 	client.Client = fakeClient.Client
 
-	if rc, err := updateWithRetries(
-		client.ReplicationControllers("default"), rc, func(c *api.ReplicationController) {
+	if rc, err := updateRcWithRetries(
+		client, "default", rc, func(c *api.ReplicationController) {
 			c.Spec.Selector["baz"] = "foobar"
 		}); err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -1451,7 +1493,7 @@ func TestUpdateWithRetries(t *testing.T) {
 		t.Errorf("Expected updated rc, got %+v", rc)
 	}
 	if len(updates) != 0 || len(gets) != 0 {
-		t.Errorf("Remaining updates %+v gets %+v", updates, gets)
+		t.Errorf("Remaining updates %#v gets %#v", updates, gets)
 	}
 }
 
@@ -1503,7 +1545,7 @@ func TestAddDeploymentHash(t *testing.T) {
 	seen := sets.String{}
 	updatedRc := false
 	fakeClient := &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			header := http.Header{}
 			header.Set("Content-Type", runtime.ContentTypeJSON)
@@ -1555,7 +1597,8 @@ func TestAddDeploymentHash(t *testing.T) {
 }
 
 func TestRollingUpdater_readyPods(t *testing.T) {
-	mkpod := func(owner *api.ReplicationController, ready bool) *api.Pod {
+	now := unversioned.Date(2016, time.April, 1, 1, 0, 0, 0, time.UTC)
+	mkpod := func(owner *api.ReplicationController, ready bool, readyTime unversioned.Time) *api.Pod {
 		labels := map[string]string{}
 		for k, v := range owner.Spec.Selector {
 			labels[k] = v
@@ -1572,8 +1615,9 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 			Status: api.PodStatus{
 				Conditions: []api.PodCondition{
 					{
-						Type:   api.PodReady,
-						Status: status,
+						Type:               api.PodReady,
+						Status:             status,
+						LastTransitionTime: readyTime,
 					},
 				},
 			},
@@ -1589,6 +1633,11 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 		// pods owned by the rcs; indicate whether they're ready
 		oldPods []bool
 		newPods []bool
+		// specify additional time to wait for deployment to wait on top of the
+		// pod ready time
+		minReadySeconds int32
+		podReadyTimeFn  func() unversioned.Time
+		nowFn           func() unversioned.Time
 	}{
 		{
 			oldRc:    oldRc(4, 4),
@@ -1632,25 +1681,61 @@ func TestRollingUpdater_readyPods(t *testing.T) {
 				false,
 			},
 		},
+		{
+			oldRc:    oldRc(4, 4),
+			newRc:    newRc(4, 4),
+			oldReady: 0,
+			newReady: 0,
+			oldPods: []bool{
+				true,
+			},
+			newPods: []bool{
+				true,
+			},
+			minReadySeconds: 5,
+			nowFn:           func() unversioned.Time { return now },
+		},
+		{
+			oldRc:    oldRc(4, 4),
+			newRc:    newRc(4, 4),
+			oldReady: 1,
+			newReady: 1,
+			oldPods: []bool{
+				true,
+			},
+			newPods: []bool{
+				true,
+			},
+			minReadySeconds: 5,
+			nowFn:           func() unversioned.Time { return unversioned.Time{Time: now.Add(time.Duration(6 * time.Second))} },
+			podReadyTimeFn:  func() unversioned.Time { return now },
+		},
 	}
 
 	for i, test := range tests {
 		t.Logf("evaluating test %d", i)
+		if test.nowFn == nil {
+			test.nowFn = func() unversioned.Time { return now }
+		}
+		if test.podReadyTimeFn == nil {
+			test.podReadyTimeFn = test.nowFn
+		}
 		// Populate the fake client with pods associated with their owners.
 		pods := []runtime.Object{}
 		for _, ready := range test.oldPods {
-			pods = append(pods, mkpod(test.oldRc, ready))
+			pods = append(pods, mkpod(test.oldRc, ready, test.podReadyTimeFn()))
 		}
 		for _, ready := range test.newPods {
-			pods = append(pods, mkpod(test.newRc, ready))
+			pods = append(pods, mkpod(test.newRc, ready, test.podReadyTimeFn()))
 		}
 		client := testclient.NewSimpleFake(pods...)
 
 		updater := &RollingUpdater{
-			ns: "default",
-			c:  client,
+			ns:    "default",
+			c:     client,
+			nowFn: test.nowFn,
 		}
-		oldReady, newReady, err := updater.readyPods(test.oldRc, test.newRc)
+		oldReady, newReady, err := updater.readyPods(test.oldRc, test.newRc, test.minReadySeconds)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

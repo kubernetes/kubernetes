@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
 
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -35,23 +34,23 @@ import (
 )
 
 // getLoadBalancerControllers returns a list of LBCtesters.
-func getLoadBalancerControllers(repoRoot string, client *client.Client) []LBCTester {
+func getLoadBalancerControllers(client *client.Client) []LBCTester {
 	return []LBCTester{
 		&haproxyControllerTester{
 			name:   "haproxy",
-			cfg:    filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "serviceloadbalancer", "haproxyrc.yaml"),
+			cfg:    "test/e2e/testing-manifests/serviceloadbalancer/haproxyrc.yaml",
 			client: client,
 		},
 	}
 }
 
 // getIngManagers returns a list of ingManagers.
-func getIngManagers(repoRoot string, client *client.Client) []*ingManager {
+func getIngManagers(client *client.Client) []*ingManager {
 	return []*ingManager{
 		{
 			name:        "netexec",
-			rcCfgPaths:  []string{filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "serviceloadbalancer", "netexecrc.yaml")},
-			svcCfgPaths: []string{filepath.Join(repoRoot, "test", "e2e", "testing-manifests", "serviceloadbalancer", "netexecsvc.yaml")},
+			rcCfgPaths:  []string{"test/e2e/testing-manifests/serviceloadbalancer/netexecrc.yaml"},
+			svcCfgPaths: []string{"test/e2e/testing-manifests/serviceloadbalancer/netexecsvc.yaml"},
 			svcNames:    []string{},
 			client:      client,
 		},
@@ -137,7 +136,7 @@ func (h *haproxyControllerTester) start(namespace string) (err error) {
 }
 
 func (h *haproxyControllerTester) stop() error {
-	return h.client.ReplicationControllers(h.rcNamespace).Delete(h.rcName)
+	return h.client.ReplicationControllers(h.rcNamespace).Delete(h.rcName, nil)
 }
 
 func (h *haproxyControllerTester) lookup(ingressKey string) string {
@@ -208,7 +207,6 @@ func (s *ingManager) test(path string) error {
 var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer]", func() {
 	// These variables are initialized after framework's beforeEach.
 	var ns string
-	var repoRoot string
 	var client *client.Client
 
 	f := framework.NewDefaultFramework("servicelb")
@@ -216,15 +214,14 @@ var _ = framework.KubeDescribe("ServiceLoadBalancer [Feature:ServiceLoadBalancer
 	BeforeEach(func() {
 		client = f.Client
 		ns = f.Namespace.Name
-		repoRoot = framework.TestContext.RepoRoot
 	})
 
 	It("should support simple GET on Ingress ips", func() {
-		for _, t := range getLoadBalancerControllers(repoRoot, client) {
+		for _, t := range getLoadBalancerControllers(client) {
 			By(fmt.Sprintf("Starting loadbalancer controller %v in namespace %v", t.getName(), ns))
 			Expect(t.start(ns)).NotTo(HaveOccurred())
 
-			for _, s := range getIngManagers(repoRoot, client) {
+			for _, s := range getIngManagers(client) {
 				By(fmt.Sprintf("Starting ingress manager %v in namespace %v", s.getName(), ns))
 				Expect(s.start(ns)).NotTo(HaveOccurred())
 
@@ -268,8 +265,7 @@ func simpleGET(c *http.Client, url, host string) (string, error) {
 func rcFromManifest(fileName string) *api.ReplicationController {
 	var controller api.ReplicationController
 	framework.Logf("Parsing rc from %v", fileName)
-	data, err := ioutil.ReadFile(fileName)
-	Expect(err).NotTo(HaveOccurred())
+	data := framework.ReadOrDie(fileName)
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())
@@ -282,8 +278,7 @@ func rcFromManifest(fileName string) *api.ReplicationController {
 func svcFromManifest(fileName string) *api.Service {
 	var svc api.Service
 	framework.Logf("Parsing service from %v", fileName)
-	data, err := ioutil.ReadFile(fileName)
-	Expect(err).NotTo(HaveOccurred())
+	data := framework.ReadOrDie(fileName)
 
 	json, err := utilyaml.ToJSON(data)
 	Expect(err).NotTo(HaveOccurred())

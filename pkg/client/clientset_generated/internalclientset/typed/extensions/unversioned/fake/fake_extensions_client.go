@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,6 +48,10 @@ func (c *FakeExtensions) ReplicaSets(namespace string) unversioned.ReplicaSetInt
 
 func (c *FakeExtensions) Scales(namespace string) unversioned.ScaleInterface {
 	return &FakeScales{c, namespace}
+}
+
+func (c *FakeExtensions) StorageClasses() unversioned.StorageClassInterface {
+	return &FakeStorageClasses{c}
 }
 
 func (c *FakeExtensions) ThirdPartyResources() unversioned.ThirdPartyResourceInterface {

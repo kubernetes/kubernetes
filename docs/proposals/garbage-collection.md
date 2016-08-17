@@ -2,21 +2,26 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
 
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
+
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/docs/proposals/garbage-collection.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -39,7 +44,6 @@ Documentation for other releases can be found at
   - [Upgrading a cluster to support cascading deletion](#upgrading-a-cluster-to-support-cascading-deletion)
 - [End-to-End Examples](#end-to-end-examples)
   - [Life of a Deployment and its descendants](#life-of-a-deployment-and-its-descendants)
-  - [Life of a ConfigMap](#life-of-a-configmap)
 - [Open Questions](#open-questions)
 - [Considered and Rejected Designs](#considered-and-rejected-designs)
 - [1. Tombstone + GC](#1-tombstone--gc)
@@ -207,7 +211,7 @@ For kubectl, we will keep the kubectl’s cascading deletion logic for one more 
 
 # End-to-End Examples
 
-This section presents two examples of all components working together to enforce the cascading deletion or orphaning.
+This section presents an example of all components working together to enforce the cascading deletion or orphaning.
 
 ## Life of a Deployment and its descendants
 
@@ -238,16 +242,6 @@ This section presents two examples of all components working together to enforce
 11. The API server handles the update of `D1`, because *i)* DeletionTimestamp is non-nil, *ii)*  the DeletionGracePeriodSeconds is zero, and *iii)* the last finalizer is removed from the Finalizers map, API server deletes `D1`.
 12. The Propagator of the GC observes the deletion of `D1`. It deletes `D1` from the DAG. It adds its dependent, replicaset `R1`, to the *Dirty Queue*.
 13. The Garbage Processor of the GC dequeues `R1` from the *Dirty Queue* and skips it, because its OwnerReferences is empty.
-
-## Life of a ConfigMap
-
-1. User creates a ConfigMap `C1`.
-2. User creates a Deployment `D1`, which refers `C1` in the pod template.
-3. The deployment controller has observed the creation of `D1`. It creates replicaset `R1`, which also refer `C1` in the pod template. It then updates `C1`, adding `R1` to the OwnerReferences.
-4. `R1` is deleted with DeleteOptions.OrphanDependents=false, either caused by the cascading deletion of `D1`, or a rolling update of `D1` where `R1` is removed from the deployment revision history.
-5. API server handles the deletion of `R1`, it first removes the "orphan" finalizer from `R1`'s Finalizers map is it's present, then it deletes `R1` from the registry.
-6. The Propagator of the GC observes the deletion of `R1`. It deletes `R1` from the DAG. It adds its dependent objects, including ConfigMap `C1`, to the *dirty queue*.
-7. The Garbage Processor of the GC dequeues `C1` from the *dirty queue*. `C1` may have owner references to other replicasets. If none of its owners exist, the Garbage Processor requests API server to delete `C1`. Otherwise, it does nothing.
 
 # Open Questions
 

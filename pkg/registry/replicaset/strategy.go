@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ func (rsStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a ReplicaSet before creation.
-func (rsStrategy) PrepareForCreate(obj runtime.Object) {
+func (rsStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	rs := obj.(*extensions.ReplicaSet)
 	rs.Status = extensions.ReplicaSetStatus{}
 
@@ -56,7 +56,7 @@ func (rsStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (rsStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (rsStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newRS := obj.(*extensions.ReplicaSet)
 	oldRS := old.(*extensions.ReplicaSet)
 	// update is not allowed to set status
@@ -134,7 +134,7 @@ type rsStatusStrategy struct {
 
 var StatusStrategy = rsStatusStrategy{Strategy}
 
-func (rsStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (rsStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newRS := obj.(*extensions.ReplicaSet)
 	oldRS := old.(*extensions.ReplicaSet)
 	// update is not allowed to set spec

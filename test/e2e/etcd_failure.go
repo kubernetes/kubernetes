@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,7 +44,7 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 			Client:    f.Client,
 			Name:      "baz",
 			Namespace: f.Namespace.Name,
-			Image:     "gcr.io/google_containers/pause-amd64:3.0",
+			Image:     framework.GetPauseImageName(f.Client),
 			Replicas:  1,
 		})).NotTo(HaveOccurred())
 	})
@@ -52,8 +52,8 @@ var _ = framework.KubeDescribe("Etcd failure [Disruptive]", func() {
 	It("should recover from network partition with master", func() {
 		etcdFailTest(
 			f,
-			"sudo iptables -A INPUT -p tcp --destination-port 4001 -j DROP",
-			"sudo iptables -D INPUT -p tcp --destination-port 4001 -j DROP",
+			"sudo iptables -A INPUT -p tcp --destination-port 2379 -j DROP",
+			"sudo iptables -D INPUT -p tcp --destination-port 2379 -j DROP",
 		)
 	})
 

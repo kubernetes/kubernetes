@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,18 +17,25 @@ limitations under the License.
 package api
 
 import (
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // FillObjectMetaSystemFields populates fields that are managed by the system on ObjectMeta.
 func FillObjectMetaSystemFields(ctx Context, meta *ObjectMeta) {
 	meta.CreationTimestamp = unversioned.Now()
-	meta.UID = util.NewUUID()
+	// allows admission controllers to assign a UID earlier in the request processing
+	// to support tracking resources pending creation.
+	uid, found := UIDFrom(ctx)
+	if !found {
+		uid = uuid.NewUUID()
+	}
+	meta.UID = uid
 	meta.SelfLink = ""
 }
 
@@ -64,6 +71,8 @@ func ListMetaFor(obj runtime.Object) (*unversioned.ListMeta, error) {
 	return meta, err
 }
 
+func (obj *ObjectMeta) GetObjectMeta() meta.Object { return obj }
+
 // Namespace implements meta.Object for any object with an ObjectMeta typed field. Allows
 // fast, direct access to metadata fields for API objects.
 func (meta *ObjectMeta) GetNamespace() string                   { return meta.Namespace }
@@ -90,6 +99,8 @@ func (meta *ObjectMeta) GetLabels() map[string]string                 { return m
 func (meta *ObjectMeta) SetLabels(labels map[string]string)           { meta.Labels = labels }
 func (meta *ObjectMeta) GetAnnotations() map[string]string            { return meta.Annotations }
 func (meta *ObjectMeta) SetAnnotations(annotations map[string]string) { meta.Annotations = annotations }
+func (meta *ObjectMeta) GetFinalizers() []string                      { return meta.Finalizers }
+func (meta *ObjectMeta) SetFinalizers(finalizers []string)            { meta.Finalizers = finalizers }
 
 func (meta *ObjectMeta) GetOwnerReferences() []metatypes.OwnerReference {
 	ret := make([]metatypes.OwnerReference, len(meta.OwnerReferences))
@@ -98,6 +109,10 @@ func (meta *ObjectMeta) GetOwnerReferences() []metatypes.OwnerReference {
 		ret[i].Name = meta.OwnerReferences[i].Name
 		ret[i].UID = meta.OwnerReferences[i].UID
 		ret[i].APIVersion = meta.OwnerReferences[i].APIVersion
+		if meta.OwnerReferences[i].Controller != nil {
+			value := *meta.OwnerReferences[i].Controller
+			ret[i].Controller = &value
+		}
 	}
 	return ret
 }
@@ -109,6 +124,10 @@ func (meta *ObjectMeta) SetOwnerReferences(references []metatypes.OwnerReference
 		newReferences[i].Name = references[i].Name
 		newReferences[i].UID = references[i].UID
 		newReferences[i].APIVersion = references[i].APIVersion
+		if references[i].Controller != nil {
+			value := *references[i].Controller
+			newReferences[i].Controller = &value
+		}
 	}
 	meta.OwnerReferences = newReferences
 }

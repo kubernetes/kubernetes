@@ -3,7 +3,8 @@
 The `addon-manager` periodically checks for Kubernetes manifest changes in the `/etc/kubernetes/addons` directory,
 and when there's a new or changed addon, the `addon-manager` automatically `kubectl create`s it.
 
-It supports `ReplicationControllers`, `Deployments`, `DaemonSets`, `Services`, `PersistentVolumes` and `PersistentVolumeClaims`.
+It supports `ReplicationControllers`, `Deployments`, `DaemonSets`, `ConfigMaps`, `Services`, `PersistentVolumes` and
+`PersistentVolumeClaims`.
 
 The `addon-manager` is built for multiple architectures.
 

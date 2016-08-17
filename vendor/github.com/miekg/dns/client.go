@@ -5,6 +5,7 @@ package dns
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/binary"
 	"io"
 	"net"
 	"time"
@@ -28,9 +29,10 @@ type Client struct {
 	Net            string            // if "tcp" or "tcp-tls" (DNS over TLS) a TCP query will be initiated, otherwise an UDP one (default is "" for UDP)
 	UDPSize        uint16            // minimum receive buffer for UDP messages
 	TLSConfig      *tls.Config       // TLS connection configuration
-	DialTimeout    time.Duration     // net.DialTimeout, defaults to 2 seconds
-	ReadTimeout    time.Duration     // net.Conn.SetReadTimeout value for connections, defaults to 2 seconds
-	WriteTimeout   time.Duration     // net.Conn.SetWriteTimeout value for connections, defaults to 2 seconds
+	Timeout        time.Duration     // a cumulative timeout for dial, write and read, defaults to 0 (disabled) - overrides DialTimeout, ReadTimeout and WriteTimeout when non-zero
+	DialTimeout    time.Duration     // net.DialTimeout, defaults to 2 seconds - overridden by Timeout when that value is non-zero
+	ReadTimeout    time.Duration     // net.Conn.SetReadTimeout value for connections, defaults to 2 seconds - overridden by Timeout when that value is non-zero
+	WriteTimeout   time.Duration     // net.Conn.SetWriteTimeout value for connections, defaults to 2 seconds - overridden by Timeout when that value is non-zero
 	TsigSecret     map[string]string // secret(s) for Tsig map[<zonename>]<base64 secret>, zonename must be fully qualified
 	SingleInflight bool              // if true suppress multiple outstanding queries for the same Qname, Qtype and Qclass
 	group          singleflight
@@ -129,6 +131,9 @@ func (c *Client) Exchange(m *Msg, a string) (r *Msg, rtt time.Duration, err erro
 }
 
 func (c *Client) dialTimeout() time.Duration {
+	if c.Timeout != 0 {
+		return c.Timeout
+	}
 	if c.DialTimeout != 0 {
 		return c.DialTimeout
 	}
@@ -170,6 +175,11 @@ func (c *Client) exchange(m *Msg, a string) (r *Msg, rtt time.Duration, err erro
 		}
 	}
 
+	var deadline time.Time
+	if c.Timeout != 0 {
+		deadline = time.Now().Add(c.Timeout)
+	}
+
 	if tls {
 		co, err = DialTimeoutWithTLS(network, a, c.TLSConfig, c.dialTimeout())
 	} else {
@@ -192,12 +202,12 @@ func (c *Client) exchange(m *Msg, a string) (r *Msg, rtt time.Duration, err erro
 	}
 
 	co.TsigSecret = c.TsigSecret
-	co.SetWriteDeadline(time.Now().Add(c.writeTimeout()))
+	co.SetWriteDeadline(deadlineOrTimeout(deadline, c.writeTimeout()))
 	if err = co.WriteMsg(m); err != nil {
 		return nil, 0, err
 	}
 
-	co.SetReadDeadline(time.Now().Add(c.readTimeout()))
+	co.SetReadDeadline(deadlineOrTimeout(deadline, c.readTimeout()))
 	r, err = co.ReadMsg()
 	if err == nil && r.Id != m.Id {
 		err = ErrId
@@ -274,9 +284,11 @@ func (co *Conn) ReadMsgHeader(hdr *Header) ([]byte, error) {
 
 	p = p[:n]
 	if hdr != nil {
-		if _, err = UnpackStruct(hdr, p, 0); err != nil {
+		dh, _, err := unpackMsgHdr(p, 0)
+		if err != nil {
 			return nil, err
 		}
+		*hdr = dh
 	}
 	return p, err
 }
@@ -291,7 +303,7 @@ func tcpMsgLen(t io.Reader) (int, error) {
 	if n != 2 {
 		return 0, ErrShortRead
 	}
-	l, _ := unpackUint16(p, 0)
+	l := binary.BigEndian.Uint16(p)
 	if l == 0 {
 		return 0, ErrShortRead
 	}
@@ -383,7 +395,7 @@ func (co *Conn) Write(p []byte) (n int, err error) {
 			return 0, &Error{err: "message too large"}
 		}
 		l := make([]byte, 2, lp+2)
-		l[0], l[1] = packUint16(uint16(lp))
+		binary.BigEndian.PutUint16(l, uint16(lp))
 		p = append(l, p...)
 		n, err := io.Copy(w, bytes.NewReader(p))
 		return int(n), err
@@ -433,4 +445,11 @@ func DialTimeoutWithTLS(network, address string, tlsConfig *tls.Config, timeout 
 		return nil, err
 	}
 	return conn, nil
+}
+
+func deadlineOrTimeout(deadline time.Time, timeout time.Duration) time.Time {
+	if deadline.IsZero() {
+		return time.Now().Add(timeout)
+	}
+	return deadline
 }

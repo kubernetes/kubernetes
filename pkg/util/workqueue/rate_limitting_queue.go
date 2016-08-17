@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,6 +36,13 @@ type RateLimitingInterface interface {
 func NewRateLimitingQueue(rateLimiter RateLimiter) RateLimitingInterface {
 	return &rateLimitingType{
 		DelayingInterface: NewDelayingQueue(),
+		rateLimiter:       rateLimiter,
+	}
+}
+
+func NewNamedRateLimitingQueue(rateLimiter RateLimiter, name string) RateLimitingInterface {
+	return &rateLimitingType{
+		DelayingInterface: NewNamedDelayingQueue(name),
 		rateLimiter:       rateLimiter,
 	}
 }

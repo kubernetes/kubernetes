@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-"${KUBE_ROOT}/hack/build-go.sh" cmd/kube-apiserver
+make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
 
 function cleanup()
 {
@@ -52,7 +52,7 @@ apiserver=$(kube::util::find-binary "kube-apiserver")
 
 TMP_DIR=$(mktemp -d /tmp/update-swagger-spec.XXXX)
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
-ETCD_PORT=${ETCD_PORT:-4001}
+ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8050}
 API_HOST=${API_HOST:-127.0.0.1}
 KUBELET_PORT=${KUBELET_PORT:-10250}
@@ -74,7 +74,7 @@ APISERVER_PID=$!
 kube::util::wait_for_url "http://127.0.0.1:${API_PORT}/healthz" "apiserver: "
 
 SWAGGER_API_PATH="http://127.0.0.1:${API_PORT}/swaggerapi/"
-DEFAULT_GROUP_VERSIONS="v1 autoscaling/v1 batch/v1 batch/v2alpha1 extensions/v1beta1 apps/v1alpha1 policy/v1alpha1"
+DEFAULT_GROUP_VERSIONS="v1 apps/v1alpha1 authentication.k8s.io/v1beta1 authorization.k8s.io/v1beta1 autoscaling/v1 batch/v1 batch/v2alpha1 extensions/v1beta1 certificates/v1alpha1 policy/v1alpha1 rbac.authorization.k8s.io/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 
 kube::log::status "Updating " ${SWAGGER_ROOT_DIR}
@@ -104,6 +104,7 @@ curl -w "\n" -fs "${SWAGGER_API_PATH}" > "${SWAGGER_ROOT_DIR}/resourceListing.js
 curl -w "\n" -fs "${SWAGGER_API_PATH}version" > "${SWAGGER_ROOT_DIR}/version.json"
 curl -w "\n" -fs "${SWAGGER_API_PATH}api" > "${SWAGGER_ROOT_DIR}/api.json"
 curl -w "\n" -fs "${SWAGGER_API_PATH}apis" > "${SWAGGER_ROOT_DIR}/apis.json"
+curl -w "\n" -fs "${SWAGGER_API_PATH}logs" > "${SWAGGER_ROOT_DIR}/logs.json"
 kube::log::status "SUCCESS"
 
 # ex: ts=2 sw=2 et filetype=sh

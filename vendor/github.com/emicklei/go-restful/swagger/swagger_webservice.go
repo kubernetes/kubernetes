@@ -241,7 +241,7 @@ func (sws SwaggerService) composeDeclaration(ws *restful.WebService, pathPrefix 
 				DataTypeFields:   DataTypeFields{Type: &voidString},
 				Parameters:       []Parameter{},
 				Nickname:         route.Operation,
-				ResponseMessages: composeResponseMessages(route, &decl)}
+				ResponseMessages: composeResponseMessages(route, &decl, &sws.config)}
 
 			operation.Consumes = route.Consumes
 			operation.Produces = route.Produces
@@ -271,7 +271,7 @@ func withoutWildcard(path string) string {
 }
 
 // composeResponseMessages takes the ResponseErrors (if any) and creates ResponseMessages from them.
-func composeResponseMessages(route restful.Route, decl *ApiDeclaration) (messages []ResponseMessage) {
+func composeResponseMessages(route restful.Route, decl *ApiDeclaration, config *Config) (messages []ResponseMessage) {
 	if route.ResponseErrors == nil {
 		return messages
 	}
@@ -294,7 +294,7 @@ func composeResponseMessages(route restful.Route, decl *ApiDeclaration) (message
 			if isCollection {
 				modelName = "array[" + modelName + "]"
 			}
-			modelBuilder{&decl.Models}.addModel(st, "")
+			modelBuilder{Models: &decl.Models, Config: config}.addModel(st, "")
 			// reference the model
 			message.ResponseModel = modelName
 		}
@@ -332,11 +332,11 @@ func detectCollectionType(st reflect.Type) (bool, reflect.Type) {
 // addModelFromSample creates and adds (or overwrites) a Model from a sample resource
 func (sws SwaggerService) addModelFromSampleTo(operation *Operation, isResponse bool, sample interface{}, models *ModelList) {
 	if isResponse {
-		type_, items := asDataType(sample)
+		type_, items := asDataType(sample, &sws.config)
 		operation.Type = type_
 		operation.Items = items
 	}
-	modelBuilder{models}.addModelFrom(sample)
+	modelBuilder{Models: models, Config: &sws.config}.addModelFrom(sample)
 }
 
 func asSwaggerParameter(param restful.ParameterData) Parameter {
@@ -411,7 +411,7 @@ func asParamType(kind int) string {
 	return ""
 }
 
-func asDataType(any interface{}) (*string, *Item) {
+func asDataType(any interface{}, config *Config) (*string, *Item) {
 	// If it's not a collection, return the suggested model name
 	st := reflect.TypeOf(any)
 	isCollection, st := detectCollectionType(st)
@@ -424,7 +424,7 @@ func asDataType(any interface{}) (*string, *Item) {
 	// XXX: This is not very elegant
 	// We create an Item object referring to the given model
 	models := ModelList{}
-	mb := modelBuilder{&models}
+	mb := modelBuilder{Models: &models, Config: config}
 	mb.addModelFrom(any)
 
 	elemTypeName := mb.getElementTypeName(modelName, "", st)

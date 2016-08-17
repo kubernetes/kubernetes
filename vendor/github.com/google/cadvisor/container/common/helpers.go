@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/cadvisor/container"
 	info "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/utils"
 
@@ -200,4 +201,24 @@ func CgroupExists(cgroupPaths map[string]string) bool {
 		}
 	}
 	return false
+}
+
+func ListContainers(name string, cgroupPaths map[string]string, listType container.ListType) ([]info.ContainerReference, error) {
+	containers := make(map[string]struct{})
+	for _, cgroupPath := range cgroupPaths {
+		err := ListDirectories(cgroupPath, name, listType == container.ListRecursive, containers)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Make into container references.
+	ret := make([]info.ContainerReference, 0, len(containers))
+	for cont := range containers {
+		ret = append(ret, info.ContainerReference{
+			Name: cont,
+		})
+	}
+
+	return ret, nil
 }

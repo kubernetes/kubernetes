@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,16 +39,20 @@ import (
 )
 
 func TestNewOIDCAuthProvider(t *testing.T) {
-	cert := path.Join(os.TempDir(), "oidc-cert")
-	key := path.Join(os.TempDir(), "oidc-key")
+	tempDir, err := ioutil.TempDir(os.TempDir(), "oidc_test")
+	if err != nil {
+		t.Fatalf("Cannot make temp dir %v", err)
+	}
+	cert := path.Join(tempDir, "oidc-cert")
+	key := path.Join(tempDir, "oidc-key")
 
 	defer os.Remove(cert)
 	defer os.Remove(key)
+	defer os.Remove(tempDir)
 
 	oidctesting.GenerateSelfSignedCert(t, "127.0.0.1", cert, key)
-	op := oidctesting.NewOIDCProvider(t)
+	op := oidctesting.NewOIDCProvider(t, "")
 	srv, err := op.ServeTLSWithKeyPair(cert, key)
-	op.AddMinimalProviderConfig(srv)
 	if err != nil {
 		t.Fatalf("Cannot start server %v", err)
 	}

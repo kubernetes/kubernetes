@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -246,6 +246,12 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 
 	containersPath := fldPath.Child("containers")
 	for idx, c := range pod.Spec.Containers {
+		idxPath := containersPath.Index(idx)
+		allErrs = append(allErrs, s.hasInvalidHostPort(&c, idxPath)...)
+	}
+
+	containersPath = fldPath.Child("initContainers")
+	for idx, c := range pod.Spec.InitContainers {
 		idxPath := containersPath.Index(idx)
 		allErrs = append(allErrs, s.hasInvalidHostPort(&c, idxPath)...)
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -107,7 +107,7 @@ func (u *unhealthyPetTracker) Get(ps *apps.PetSet, knownPets []*api.Pod) (*pcb, 
 				glog.V(4).Infof("Ignoring healthy pet %v for PetSet %v", p.Name, ps.Name)
 				continue
 			}
-			glog.Infof("No recorded blocking pet, but found unhealty pet %v for PetSet %v", p.Name, ps.Name)
+			glog.Infof("No recorded blocking pet, but found unhealthy pet %v for PetSet %v", p.Name, ps.Name)
 			return &pcb{pod: p, parent: ps}, nil
 		}
 		return nil, nil
@@ -159,10 +159,10 @@ func pcbKeyFunc(obj interface{}) (string, error) {
 	}
 	p, ok := obj.(*pcb)
 	if !ok {
-		return "", fmt.Errorf("not a valid pet control block %+v", p)
+		return "", fmt.Errorf("not a valid pet control block %#v", p)
 	}
 	if p.parent == nil {
-		return "", fmt.Errorf("cannot compute pet control block key without parent pointer %+v", p)
+		return "", fmt.Errorf("cannot compute pet control block key without parent pointer %#v", p)
 	}
 	return controller.KeyFunc(p.parent)
 }

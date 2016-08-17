@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,13 @@ KUBE_OUTPUT_SUBPATH="${KUBE_OUTPUT_SUBPATH:-_output/local}"
 KUBE_OUTPUT="${KUBE_ROOT}/${KUBE_OUTPUT_SUBPATH}"
 KUBE_OUTPUT_BINPATH="${KUBE_OUTPUT}/bin"
 
+# Set no_proxy for localhost if behind a proxy, otherwise, 
+# the connections to localhost in scripts will time out
+export no_proxy=127.0.0.1,localhost
+
+# This is a symlink to binaries for "this platform", e.g. build tools.
+THIS_PLATFORM_BIN="${KUBE_ROOT}/_output/bin"
+
 source "${KUBE_ROOT}/hack/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/util.sh"
 source "${KUBE_ROOT}/cluster/lib/logging.sh"
@@ -34,8 +41,6 @@ kube::log::install_errexit
 source "${KUBE_ROOT}/hack/lib/version.sh"
 source "${KUBE_ROOT}/hack/lib/golang.sh"
 source "${KUBE_ROOT}/hack/lib/etcd.sh"
-
-KUBE_GIT_UPSTREAM="${KUBE_GIT_UPSTREAM:-upstream}"
 
 KUBE_OUTPUT_HOSTBIN="${KUBE_OUTPUT_BINPATH}/$(kube::util::host_platform)"
 

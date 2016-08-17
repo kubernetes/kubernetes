@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,16 +20,20 @@ import "k8s.io/kubernetes/pkg/api"
 
 // CreateNodeNameToInfoMap obtains a list of pods and pivots that list into a map where the keys are node names
 // and the values are the aggregated information for that node.
-func CreateNodeNameToInfoMap(pods []*api.Pod) map[string]*NodeInfo {
+func CreateNodeNameToInfoMap(pods []*api.Pod, nodes []*api.Node) map[string]*NodeInfo {
 	nodeNameToInfo := make(map[string]*NodeInfo)
 	for _, pod := range pods {
 		nodeName := pod.Spec.NodeName
-		nodeInfo, ok := nodeNameToInfo[nodeName]
-		if !ok {
-			nodeInfo = NewNodeInfo()
-			nodeNameToInfo[nodeName] = nodeInfo
+		if _, ok := nodeNameToInfo[nodeName]; !ok {
+			nodeNameToInfo[nodeName] = NewNodeInfo()
 		}
-		nodeInfo.addPod(pod)
+		nodeNameToInfo[nodeName].addPod(pod)
+	}
+	for _, node := range nodes {
+		if _, ok := nodeNameToInfo[node.Name]; !ok {
+			nodeNameToInfo[node.Name] = NewNodeInfo()
+		}
+		nodeNameToInfo[node.Name].SetNode(node)
 	}
 	return nodeNameToInfo
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,8 +49,10 @@ type downwardAPIPlugin struct {
 
 var _ volume.VolumePlugin = &downwardAPIPlugin{}
 
-var wrappedVolumeSpec = volume.Spec{
-	Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+func wrappedVolumeSpec() volume.Spec {
+	return volume.Spec{
+		Volume: &api.Volume{VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: api.StorageMediumMemory}}},
+	}
 }
 
 func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
@@ -58,24 +60,35 @@ func (plugin *downwardAPIPlugin) Init(host volume.VolumeHost) error {
 	return nil
 }
 
-func (plugin *downwardAPIPlugin) Name() string {
+func (plugin *downwardAPIPlugin) GetPluginName() string {
 	return downwardAPIPluginName
+}
+
+func (plugin *downwardAPIPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	volumeSource, _ := getVolumeSource(spec)
+	if volumeSource == nil {
+		return "", fmt.Errorf("Spec does not reference a DownwardAPI volume type")
+	}
+
+	// Return user defined volume name, since this is an ephemeral volume type
+	return spec.Name(), nil
 }
 
 func (plugin *downwardAPIPlugin) CanSupport(spec *volume.Spec) bool {
 	return spec.Volume != nil && spec.Volume.DownwardAPI != nil
 }
 
+func (plugin *downwardAPIPlugin) RequiresRemount() bool {
+	return true
+}
+
 func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opts volume.VolumeOptions) (volume.Mounter, error) {
 	v := &downwardAPIVolume{
 		volName: spec.Name(),
+		items:   spec.Volume.DownwardAPI.Items,
 		pod:     pod,
 		podUID:  pod.UID,
 		plugin:  plugin,
-	}
-	v.fieldReferenceFileNames = make(map[string]string)
-	for _, fileInfo := range spec.Volume.DownwardAPI.Items {
-		v.fieldReferenceFileNames[fileInfo.FieldRef.FieldPath] = path.Clean(fileInfo.Path)
 	}
 	return &downwardAPIVolumeMounter{
 		downwardAPIVolume: v,
@@ -93,13 +106,23 @@ func (plugin *downwardAPIPlugin) NewUnmounter(volName string, podUID types.UID) 
 	}, nil
 }
 
+func (plugin *downwardAPIPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	downwardAPIVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			DownwardAPI: &api.DownwardAPIVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(downwardAPIVolume), nil
+}
+
 // downwardAPIVolume retrieves downward API data and placing them into the volume on the host.
 type downwardAPIVolume struct {
-	volName                 string
-	fieldReferenceFileNames map[string]string
-	pod                     *api.Pod
-	podUID                  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *api.POD and not only types.UID
-	plugin                  *downwardAPIPlugin
+	volName string
+	items   []api.DownwardAPIVolumeFile
+	pod     *api.Pod
+	podUID  types.UID // TODO: remove this redundancy as soon NewUnmounter func will have *api.POD and not only types.UID
+	plugin  *downwardAPIPlugin
 	volume.MetricsNil
 }
 
@@ -133,7 +156,7 @@ func (b *downwardAPIVolumeMounter) SetUp(fsGroup *int64) error {
 func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	glog.V(3).Infof("Setting up a downwardAPI volume %v for pod %v/%v at %v", b.volName, b.pod.Namespace, b.pod.Name, dir)
 	// Wrap EmptyDir. Here we rely on the idempotency of the wrapped plugin to avoid repeatedly mounting
-	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec, b.pod, *b.opts)
+	wrapped, err := b.plugin.host.NewWrapperMounter(b.volName, wrappedVolumeSpec(), b.pod, *b.opts)
 	if err != nil {
 		glog.Errorf("Couldn't setup downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
@@ -173,12 +196,25 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 func (d *downwardAPIVolume) collectData() (map[string][]byte, error) {
 	errlist := []error{}
 	data := make(map[string][]byte)
-	for fieldReference, fileName := range d.fieldReferenceFileNames {
-		if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fieldReference); err != nil {
-			glog.Errorf("Unable to extract field %s: %s", fieldReference, err.Error())
-			errlist = append(errlist, err)
-		} else {
-			data[fileName] = []byte(sortLines(values))
+	for _, fileInfo := range d.items {
+		if fileInfo.FieldRef != nil {
+			if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fileInfo.FieldRef.FieldPath); err != nil {
+				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
+				errlist = append(errlist, err)
+			} else {
+				data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
+			}
+		} else if fileInfo.ResourceFieldRef != nil {
+			containerName := fileInfo.ResourceFieldRef.ContainerName
+			nodeAllocatable, err := d.plugin.host.GetNodeAllocatable()
+			if err != nil {
+				errlist = append(errlist, err)
+			} else if values, err := fieldpath.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, d.pod, containerName, nodeAllocatable); err != nil {
+				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
+				errlist = append(errlist, err)
+			} else {
+				data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
+			}
 		}
 	}
 	return data, utilerrors.NewAggregate(errlist)
@@ -212,7 +248,7 @@ func (c *downwardAPIVolumeUnmounter) TearDownAt(dir string) error {
 	glog.V(3).Infof("Tearing down volume %v for pod %v at %v", c.volName, c.podUID, dir)
 
 	// Wrap EmptyDir, let it do the teardown.
-	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec, c.podUID)
+	wrapped, err := c.plugin.host.NewWrapperUnmounter(c.volName, wrappedVolumeSpec(), c.podUID)
 	if err != nil {
 		return err
 	}
@@ -221,4 +257,16 @@ func (c *downwardAPIVolumeUnmounter) TearDownAt(dir string) error {
 
 func (b *downwardAPIVolumeMounter) getMetaDir() string {
 	return path.Join(b.plugin.host.GetPodPluginDir(b.podUID, utilstrings.EscapeQualifiedNameForDisk(downwardAPIPluginName)), b.volName)
+}
+
+func getVolumeSource(spec *volume.Spec) (*api.DownwardAPIVolumeSource, bool) {
+	var readOnly bool
+	var volumeSource *api.DownwardAPIVolumeSource
+
+	if spec.Volume != nil && spec.Volume.DownwardAPI != nil {
+		volumeSource = spec.Volume.DownwardAPI
+		readOnly = spec.ReadOnly
+	}
+
+	return volumeSource, readOnly
 }

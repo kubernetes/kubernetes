@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -95,6 +95,25 @@ func TestGetServerGroupsWithV1Server(t *testing.T) {
 	}
 }
 
+func TestGetServerGroupsWithBrokenServer(t *testing.T) {
+	for _, statusCode := range []int{http.StatusNotFound, http.StatusForbidden} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			w.WriteHeader(statusCode)
+		}))
+		defer server.Close()
+		client := NewDiscoveryClientForConfigOrDie(&restclient.Config{Host: server.URL})
+		// ServerGroups should not return an error even if server returns Not Found or Forbidden error at all end points
+		apiGroupList, err := client.ServerGroups()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		groupVersions := unversioned.ExtractGroupVersions(apiGroupList)
+		if len(groupVersions) != 0 {
+			t.Errorf("expected empty list, got: %q", groupVersions)
+		}
+	}
+}
+
 func TestGetServerResourcesWithV1Server(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		var obj interface{}
@@ -135,17 +154,17 @@ func TestGetServerResources(t *testing.T) {
 	stable := unversioned.APIResourceList{
 		GroupVersion: "v1",
 		APIResources: []unversioned.APIResource{
-			{"pods", true, "Pod"},
-			{"services", true, "Service"},
-			{"namespaces", false, "Namespace"},
+			{Name: "pods", Namespaced: true, Kind: "Pod"},
+			{Name: "services", Namespaced: true, Kind: "Service"},
+			{Name: "namespaces", Namespaced: false, Kind: "Namespace"},
 		},
 	}
 	beta := unversioned.APIResourceList{
 		GroupVersion: "extensions/v1",
 		APIResources: []unversioned.APIResource{
-			{"deployments", true, "Deployment"},
-			{"ingresses", true, "Ingress"},
-			{"jobs", true, "Job"},
+			{Name: "deployments", Namespaced: true, Kind: "Deployment"},
+			{Name: "ingresses", Namespaced: true, Kind: "Ingress"},
+			{Name: "jobs", Namespaced: true, Kind: "Job"},
 		},
 	}
 	tests := []struct {

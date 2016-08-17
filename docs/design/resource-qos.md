@@ -2,21 +2,26 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
 
 If you are using a released version of Kubernetes, you should
 refer to the docs that go with that version.
+
+<!-- TAG RELEASE_LINK, added by the munger automatically -->
+<strong>
+The latest release of this document can be found
+[here](http://releases.k8s.io/release-1.3/docs/design/resource-qos.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -49,7 +54,7 @@ Borg increased utilization by about 20% when it started allowing use of such non
 
 ## Requests and Limits
 
-For each resource, containers can specify a resource request and limit, `0 <= request <= [Node Allocatable](../proposals/node-allocatable.md)` & `request <= limit <= Infinity`.
+For each resource, containers can specify a resource request and limit, `0 <= request <= `[`Node Allocatable`](../proposals/node-allocatable.md) & `request <= limit <= Infinity`.
 If a pod is successfully scheduled, the container is guaranteed the amount of resources requested.
 Scheduling is based on `requests` and not `limits`.
 The pods and its containers will not be allowed to exceed the specified limit.

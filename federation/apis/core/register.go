@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ const GroupName = ""
 // SchemeGroupVersion is group version used to register these objects
 var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: runtime.APIVersionInternal}
 
-// Unversiond is group version for unversioned API objects
+// Unversioned is group version for unversioned API objects
 // TODO: this should be v1 probably
 var Unversioned = unversioned.GroupVersion{Group: "", Version: "v1"}
 
@@ -52,19 +52,30 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func AddToScheme(scheme *runtime.Scheme) {
-	if err := Scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
-		panic(err)
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
+
+func addKnownTypes(scheme *runtime.Scheme) error {
+	if err := scheme.AddIgnoredConversionType(&unversioned.TypeMeta{}, &unversioned.TypeMeta{}); err != nil {
+		return err
 	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&api.ServiceList{},
 		&api.Service{},
+		&api.Namespace{},
+		&api.NamespaceList{},
 		&api.ListOptions{},
 		&api.DeleteOptions{},
+		&api.Secret{},
+		&api.SecretList{},
+		&api.Event{},
+		&api.EventList{},
 	)
 
 	// Register Unversioned types under their own special group
-	Scheme.AddUnversionedTypes(Unversioned,
+	scheme.AddUnversionedTypes(Unversioned,
 		&unversioned.ExportOptions{},
 		&unversioned.Status{},
 		&unversioned.APIVersions{},
@@ -72,4 +83,5 @@ func AddToScheme(scheme *runtime.Scheme) {
 		&unversioned.APIGroup{},
 		&unversioned.APIResourceList{},
 	)
+	return nil
 }

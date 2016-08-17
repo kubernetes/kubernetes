@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,8 +31,8 @@ const (
 )
 
 func protobufSerializer(scheme *runtime.Scheme) (serializerType, bool) {
-	serializer := protobuf.NewSerializer(scheme, runtime.ObjectTyperToTyper(scheme), contentTypeProtobuf)
-	raw := protobuf.NewRawSerializer(scheme, runtime.ObjectTyperToTyper(scheme), contentTypeProtobuf)
+	serializer := protobuf.NewSerializer(scheme, scheme, contentTypeProtobuf)
+	raw := protobuf.NewRawSerializer(scheme, scheme, contentTypeProtobuf)
 	return serializerType{
 		AcceptContentTypes: []string{contentTypeProtobuf},
 		ContentType:        contentTypeProtobuf,

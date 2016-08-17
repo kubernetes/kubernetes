@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,10 +26,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"runtime"
 
 	"k8s.io/kubernetes/pkg/util"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
+	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 
 	"github.com/spf13/pflag"
@@ -64,7 +64,7 @@ func (hk *HyperKube) FindServer(name string) (*Server, error) {
 	return nil, fmt.Errorf("Server not found: %s", name)
 }
 
-// Servers returns a list of all of the registred servers
+// Servers returns a list of all of the registered servers
 func (hk *HyperKube) Servers() []Server {
 	return hk.servers
 }
@@ -175,8 +175,8 @@ func (hk *HyperKube) Run(args []string) error {
 
 	verflag.PrintAndExitIfRequested()
 
-	util.InitLogs()
-	defer util.FlushLogs()
+	logs.InitLogs()
+	defer logs.FlushLogs()
 
 	err = s.Run(s, s.Flags().Args())
 	if err != nil {
@@ -188,7 +188,6 @@ func (hk *HyperKube) Run(args []string) error {
 
 // RunToExit will run the hyperkube and then call os.Exit with an appropriate exit code.
 func (hk *HyperKube) RunToExit(args []string) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	err := hk.Run(args)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err.Error())

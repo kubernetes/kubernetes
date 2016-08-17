@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -236,7 +238,7 @@ func TestCheckInvalidErr(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		checkErr(test.err, errHandle)
+		checkErr("", test.err, errHandle)
 
 		if errReturned != test.expected {
 			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
@@ -273,7 +275,7 @@ func TestCheckNoResourceMatchError(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		checkErr(test.err, errHandle)
+		checkErr("", test.err, errHandle)
 
 		if errReturned != test.expected {
 			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
@@ -300,5 +302,55 @@ func TestDumpReaderToFile(t *testing.T) {
 	stringData := string(data)
 	if stringData != testString {
 		t.Fatalf("Wrong file content %s != %s", testString, stringData)
+	}
+}
+
+func TestMaybeConvert(t *testing.T) {
+	tests := []struct {
+		input    runtime.Object
+		gv       unversioned.GroupVersion
+		expected runtime.Object
+	}{
+		{
+			input: &api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+			},
+			gv: unversioned.GroupVersion{Group: "", Version: "v1"},
+			expected: &v1.Pod{
+				TypeMeta: unversioned.TypeMeta{
+					APIVersion: "v1",
+					Kind:       "Pod",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name: "foo",
+				},
+			},
+		},
+		{
+			input: &extensions.ThirdPartyResourceData{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: []byte("this is some data"),
+			},
+			expected: &extensions.ThirdPartyResourceData{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: []byte("this is some data"),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		obj, err := MaybeConvertObject(test.input, test.gv, testapi.Default.Converter())
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if !reflect.DeepEqual(test.expected, obj) {
+			t.Errorf("expected:\n%#v\nsaw:\n%#v\n", test.expected, obj)
+		}
 	}
 }

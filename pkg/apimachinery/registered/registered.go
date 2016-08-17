@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -55,6 +55,10 @@ var (
 )
 
 func init() {
+	loadKubeAPIVersions()
+}
+
+func loadKubeAPIVersions() {
 	// Env var KUBE_API_VERSIONS is a comma separated list of API versions that
 	// should be registered in the scheme.
 	kubeAPIVersions := os.Getenv("KUBE_API_VERSIONS")
@@ -68,6 +72,16 @@ func init() {
 			envRequestedVersions = append(envRequestedVersions, gv)
 		}
 	}
+}
+
+// Resets everything to clean room for the start of a test
+func clearForTesting() {
+	registeredVersions = map[unversioned.GroupVersion]struct{}{}
+	thirdPartyGroupVersions = []unversioned.GroupVersion{}
+	enabledVersions = map[unversioned.GroupVersion]struct{}{}
+	groupMetaMap = map[string]*apimachinery.GroupMeta{}
+	envRequestedVersions = []unversioned.GroupVersion{}
+	loadKubeAPIVersions()
 }
 
 // RegisterVersions adds the given group versions to the list of registered group versions.
@@ -207,12 +221,7 @@ func AddThirdPartyAPIGroupVersions(gvs ...unversioned.GroupVersion) []unversione
 	}
 	RegisterVersions(filteredGVs)
 	EnableVersions(filteredGVs...)
-	next := make([]unversioned.GroupVersion, len(gvs))
-	for ix := range filteredGVs {
-		next[ix] = filteredGVs[ix]
-	}
-	thirdPartyGroupVersions = next
-
+	thirdPartyGroupVersions = append(thirdPartyGroupVersions, filteredGVs...)
 	return skippedGVs
 }
 

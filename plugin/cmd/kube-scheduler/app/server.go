@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -76,6 +76,7 @@ func Run(s *options.SchedulerServer) error {
 	}
 	kubeconfig, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil {
+		glog.Errorf("unable to build config from flags: %v", err)
 		return err
 	}
 
@@ -134,6 +135,7 @@ func Run(s *options.SchedulerServer) error {
 
 	id, err := os.Hostname()
 	if err != nil {
+		glog.Errorf("unable to get hostname: %v", err)
 		return err
 	}
 

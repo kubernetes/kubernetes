@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func ToJSON(data []byte) ([]byte, error) {
 // separating individual documents. It first converts the YAML
 // body to JSON, then unmarshals the JSON.
 type YAMLToJSONDecoder struct {
-	scanner *bufio.Scanner
+	reader Reader
 }
 
 // NewYAMLToJSONDecoder decodes YAML documents from the provided
@@ -53,10 +53,9 @@ type YAMLToJSONDecoder struct {
 // the YAML spec) into its own chunk, converting it to JSON via
 // yaml.YAMLToJSON, and then passing it to json.Decoder.
 func NewYAMLToJSONDecoder(r io.Reader) *YAMLToJSONDecoder {
-	scanner := bufio.NewScanner(r)
-	scanner.Split(splitYAMLDocument)
+	reader := bufio.NewReader(r)
 	return &YAMLToJSONDecoder{
-		scanner: scanner,
+		reader: NewYAMLReader(reader),
 	}
 }
 
@@ -64,16 +63,17 @@ func NewYAMLToJSONDecoder(r io.Reader) *YAMLToJSONDecoder {
 // an error. The decoding rules match json.Unmarshal, not
 // yaml.Unmarshal.
 func (d *YAMLToJSONDecoder) Decode(into interface{}) error {
-	if d.scanner.Scan() {
-		data, err := yaml.YAMLToJSON(d.scanner.Bytes())
+	bytes, err := d.reader.Read()
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	if len(bytes) != 0 {
+		data, err := yaml.YAMLToJSON(bytes)
 		if err != nil {
 			return err
 		}
 		return json.Unmarshal(data, into)
-	}
-	err := d.scanner.Err()
-	if err == nil {
-		err = io.EOF
 	}
 	return err
 }
@@ -137,6 +137,7 @@ func (d *YAMLDecoder) Close() error {
 }
 
 const yamlSeparator = "\n---"
+const separator = "---\n"
 
 // splitYAMLDocument is a bufio.SplitFunc for splitting YAML streams into individual documents.
 func splitYAMLDocument(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -220,6 +221,64 @@ func (d *YAMLOrJSONDecoder) Decode(into interface{}) error {
 		}
 	}
 	return err
+}
+
+type Reader interface {
+	Read() ([]byte, error)
+}
+
+type YAMLReader struct {
+	reader Reader
+}
+
+func NewYAMLReader(r *bufio.Reader) *YAMLReader {
+	return &YAMLReader{
+		reader: &LineReader{reader: r},
+	}
+}
+
+// Read returns a full YAML document.
+func (r *YAMLReader) Read() ([]byte, error) {
+	var buffer bytes.Buffer
+	for {
+		line, err := r.reader.Read()
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+
+		if string(line) == separator || err == io.EOF {
+			if buffer.Len() != 0 {
+				return buffer.Bytes(), nil
+			}
+			if err == io.EOF {
+				return nil, err
+			}
+		} else {
+			buffer.Write(line)
+		}
+	}
+}
+
+type LineReader struct {
+	reader *bufio.Reader
+}
+
+// Read returns a single line (with '\n' ended) from the underlying reader.
+// An error is returned iff there is an error with the underlying reader.
+func (r *LineReader) Read() ([]byte, error) {
+	var (
+		isPrefix bool  = true
+		err      error = nil
+		line     []byte
+		buffer   bytes.Buffer
+	)
+
+	for isPrefix && err == nil {
+		line, isPrefix, err = r.reader.ReadLine()
+		buffer.Write(line)
+	}
+	buffer.WriteByte('\n')
+	return buffer.Bytes(), err
 }
 
 // GuessJSONStream scans the provided reader up to size, looking

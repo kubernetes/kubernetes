@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -79,7 +79,9 @@ func (c *Config) buildGlobalOptions() []string {
 // that the fields in the provided config will override the
 // result that get from the rkt api service.
 func (r *Runtime) getConfig(cfg *Config) (*Config, error) {
-	resp, err := r.apisvc.GetInfo(context.Background(), &rktapi.GetInfoRequest{})
+	ctx, cancel := context.WithTimeout(context.Background(), r.requestTimeout)
+	defer cancel()
+	resp, err := r.apisvc.GetInfo(ctx, &rktapi.GetInfoRequest{})
 	if err != nil {
 		return nil, err
 	}

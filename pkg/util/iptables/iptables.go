@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,9 +17,8 @@ limitations under the License.
 package iptables
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"regexp"
 	"strings"
 	"sync"
@@ -60,7 +59,7 @@ type Interface interface {
 	Save(table Table) ([]byte, error)
 	// SaveAll calls `iptables-save`.
 	SaveAll() ([]byte, error)
-	// Restore runs `iptables-restore` passing data through a temporary file.
+	// Restore runs `iptables-restore` passing data through []byte.
 	// table is the Table to restore
 	// data should be formatted like the output of Save()
 	// flush sets the presence of the "--noflush" flag. see: FlushFlag
@@ -335,29 +334,12 @@ func (runner *runner) restoreInternal(args []string, data []byte, flush FlushFla
 	if counters {
 		args = append(args, "--counters")
 	}
-	// create temp file through which to pass data
-	temp, err := ioutil.TempFile("", "kube-temp-iptables-restore-")
-	if err != nil {
-		return err
-	}
-	// make sure we delete the temp file
-	defer os.Remove(temp.Name())
-	// Put the filename at the end of args.
-	// NOTE: the filename must be at the end.
-	// See: https://git.netfilter.org/iptables/commit/iptables-restore.c?id=e6869a8f59d779ff4d5a0984c86d80db70784962
-	args = append(args, temp.Name())
-	if err != nil {
-		return err
-	}
-	// write data to the file
-	_, err = temp.Write(data)
-	temp.Close()
-	if err != nil {
-		return err
-	}
+
 	// run the command and return the output or an error including the output and error
 	glog.V(4).Infof("running iptables-restore %v", args)
-	b, err := runner.exec.Command(cmdIptablesRestore, args...).CombinedOutput()
+	cmd := runner.exec.Command(cmdIptablesRestore, args...)
+	cmd.SetStdin(bytes.NewBuffer(data))
+	b, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%v (%s)", err, b)
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -86,11 +86,50 @@ func fakeFilepathGlob(devicePath string) (globs []string, err error) {
 	return []string{devicePath}, nil
 }
 
+func TestExtractTransportname(t *testing.T) {
+	fakeIscsiadmOutput := []string{
+		"# BEGIN RECORD 2.0-873\n" +
+			"iface.iscsi_ifacename = default\n" +
+			"iface.transport_name = tcp\n" +
+			"iface.initiatorname = <empty>\n" +
+			"# END RECORD",
+		"# BEGIN RECORD 2.0-873\n" +
+			"iface.iscsi_ifacename = default\n" +
+			"iface.transport_name = cxgb4i\n" +
+			"iface.initiatorname = <empty>\n" +
+			"# END RECORD",
+		"# BEGIN RECORD 2.0-873\n" +
+			"iface.iscsi_ifacename = default\n" +
+			"iface.transport_name = <empty>\n" +
+			"iface.initiatorname = <empty>\n" +
+			"# END RECORD",
+		"# BEGIN RECORD 2.0-873\n" +
+			"iface.iscsi_ifacename = default\n" +
+			"iface.initiatorname = <empty>\n" +
+			"# END RECORD"}
+	transportName := extractTransportname(fakeIscsiadmOutput[0])
+	if transportName != "tcp" {
+		t.Errorf("extractTransportname: Could not extract correct iface.transport_name 'tcp', got %s", transportName)
+	}
+	transportName = extractTransportname(fakeIscsiadmOutput[1])
+	if transportName != "cxgb4i" {
+		t.Errorf("extractTransportname: Could not extract correct iface.transport_name 'cxgb4i', got %s", transportName)
+	}
+	transportName = extractTransportname(fakeIscsiadmOutput[2])
+	if transportName != "tcp" {
+		t.Errorf("extractTransportname: Could not extract correct iface.transport_name 'tcp', got %s", transportName)
+	}
+	transportName = extractTransportname(fakeIscsiadmOutput[3])
+	if transportName != "" {
+		t.Errorf("extractTransportname: Could not extract correct iface.transport_name '', got %s", transportName)
+	}
+}
+
 func TestWaitForPathToExist(t *testing.T) {
 	devicePath := []string{"/dev/disk/by-path/ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0",
 		"/dev/disk/by-path/pci-0000:00:00.0-ip-127.0.0.1:3260-iqn.2014-12.com.example:test.tgt00-lun-0"}
 
-	exist := waitForPathToExistInternal(devicePath[0], 1, "default", fakeOsStat, filepath.Glob)
+	exist := waitForPathToExistInternal(devicePath[0], 1, "tcp", fakeOsStat, filepath.Glob)
 	if exist == false {
 		t.Errorf("waitForPathToExist: could not find path %s", devicePath[0])
 	}
@@ -103,7 +142,7 @@ func TestWaitForPathToExist(t *testing.T) {
 	if exist == false {
 		t.Errorf("waitForPathToExist: could not find path %s", devicePath[1])
 	}
-	exist = waitForPathToExistInternal(devicePath[1], 1, "default", os.Stat, fakeFilepathGlob)
+	exist = waitForPathToExistInternal(devicePath[1], 1, "tcp", os.Stat, fakeFilepathGlob)
 	if exist != false {
 		t.Errorf("waitForPathToExist: wrong code path called for %s", devicePath[1])
 	}

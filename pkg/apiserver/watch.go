@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -120,7 +120,7 @@ type WatchServer struct {
 	t timeoutFactory
 }
 
-// Serve serves a series of encoded events via HTTP with Transfer-Encoding: chunked
+// ServeHTTP serves a series of encoded events via HTTP with Transfer-Encoding: chunked
 // or over a websocket connection.
 func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w = httplog.Unlogged(w)
@@ -167,36 +167,45 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
 
+	var unknown runtime.Unknown
+	internalEvent := &versioned.InternalEvent{}
 	buf := &bytes.Buffer{}
+	ch := s.watching.ResultChan()
 	for {
 		select {
 		case <-cn.CloseNotify():
 			return
 		case <-timeoutCh:
 			return
-		case event, ok := <-s.watching.ResultChan():
+		case event, ok := <-ch:
 			if !ok {
 				// End of results.
 				return
 			}
+
 			obj := event.Object
 			s.fixup(obj)
-			if err := s.embeddedEncoder.EncodeToStream(obj, buf); err != nil {
+			if err := s.embeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
 				return
 			}
-			event.Object = &runtime.Unknown{
-				Raw: buf.Bytes(),
-				// ContentType is not required here because we are defaulting to the serializer
-				// type
-			}
-			if err := e.Encode((*versioned.InternalEvent)(&event)); err != nil {
+
+			// ContentType is not required here because we are defaulting to the serializer
+			// type
+			unknown.Raw = buf.Bytes()
+			event.Object = &unknown
+
+			// the internal event will be versioned by the encoder
+			*internalEvent = versioned.InternalEvent(event)
+			if err := e.Encode(internalEvent); err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v (%#v)", err, e))
 				// client disconnect.
 				return
 			}
-			flusher.Flush()
+			if len(ch) == 0 {
+				flusher.Flush()
+			}
 
 			buf.Reset()
 		}
@@ -208,33 +217,38 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	defer ws.Close()
 	done := make(chan struct{})
 	go wsstream.IgnoreReceives(ws, 0)
+
+	var unknown runtime.Unknown
+	internalEvent := &versioned.InternalEvent{}
 	buf := &bytes.Buffer{}
 	streamBuf := &bytes.Buffer{}
+	ch := s.watching.ResultChan()
 	for {
 		select {
 		case <-done:
 			s.watching.Stop()
 			return
-		case event, ok := <-s.watching.ResultChan():
+		case event, ok := <-ch:
 			if !ok {
 				// End of results.
 				return
 			}
 			obj := event.Object
 			s.fixup(obj)
-			if err := s.embeddedEncoder.EncodeToStream(obj, buf); err != nil {
+			if err := s.embeddedEncoder.Encode(obj, buf); err != nil {
 				// unexpected error
 				utilruntime.HandleError(fmt.Errorf("unable to encode watch object: %v", err))
 				return
 			}
-			event.Object = &runtime.Unknown{
-				Raw: buf.Bytes(),
-				// ContentType is not required here because we are defaulting to the serializer
-				// type
-			}
+
+			// ContentType is not required here because we are defaulting to the serializer
+			// type
+			unknown.Raw = buf.Bytes()
+			event.Object = &unknown
+
 			// the internal event will be versioned by the encoder
-			internalEvent := versioned.InternalEvent(event)
-			if err := s.encoder.EncodeToStream(&internalEvent, streamBuf); err != nil {
+			*internalEvent = versioned.InternalEvent(event)
+			if err := s.encoder.Encode(internalEvent, streamBuf); err != nil {
 				// encoding error
 				utilruntime.HandleError(fmt.Errorf("unable to encode event: %v", err))
 				s.watching.Stop()

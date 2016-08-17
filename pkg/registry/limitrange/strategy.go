@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -42,14 +42,14 @@ func (limitrangeStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (limitrangeStrategy) PrepareForCreate(obj runtime.Object) {
+func (limitrangeStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	limitRange := obj.(*api.LimitRange)
 	if len(limitRange.Name) == 0 {
-		limitRange.Name = string(util.NewUUID())
+		limitRange.Name = string(uuid.NewUUID())
 	}
 }
 
-func (limitrangeStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (limitrangeStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 func (limitrangeStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
@@ -78,10 +78,10 @@ func LimitRangeToSelectableFields(limitRange *api.LimitRange) fields.Set {
 	return fields.Set{}
 }
 
-func (limitrangeStrategy) Export(runtime.Object, bool) error {
+func (limitrangeStrategy) Export(api.Context, runtime.Object, bool) error {
 	// Copied from OpenShift exporter
 	// TODO: this needs to be fixed
-	//  limitrange.Strategy.PrepareForCreate(obj)
+	//  limitrange.Strategy.PrepareForCreate(ctx, obj)
 	return nil
 }
 

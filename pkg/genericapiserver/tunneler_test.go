@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -37,32 +37,32 @@ func TestSecondsSinceSync(t *testing.T) {
 	tunneler.lastSync = time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC).Unix()
 
 	// Nano Second. No difference.
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 2, time.UTC))
 	assert.Equal(int64(0), tunneler.SecondsSinceSync())
 
 	// Second
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 2, 1, time.UTC))
 	assert.Equal(int64(1), tunneler.SecondsSinceSync())
 
 	// Minute
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 2, 1, 1, time.UTC))
 	assert.Equal(int64(60), tunneler.SecondsSinceSync())
 
 	// Hour
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 2, 1, 1, 1, time.UTC))
 	assert.Equal(int64(3600), tunneler.SecondsSinceSync())
 
 	// Day
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 2, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(86400), tunneler.SecondsSinceSync())
 
 	// Month
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(2678400), tunneler.SecondsSinceSync())
 
 	// Future Month. Should be -Month.
 	tunneler.lastSync = time.Date(2015, time.February, 1, 1, 1, 1, 1, time.UTC).Unix()
-	tunneler.clock = util.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC))
+	tunneler.clock = clock.NewFakeClock(time.Date(2015, time.January, 1, 1, 1, 1, 1, time.UTC))
 	assert.Equal(int64(-2678400), tunneler.SecondsSinceSync())
 }
 

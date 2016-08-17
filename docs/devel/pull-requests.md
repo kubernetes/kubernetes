@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/devel/pull-requests.md).
+[here](http://releases.k8s.io/release-1.3/docs/devel/pull-requests.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -60,7 +60,7 @@ Either the [on call](on-call-rotations.md) manually or the [github "munger"](htt
 There are several requirements for the submit-queue to work:
 * Author must have signed CLA ("cla: yes" label added to PR)
 * No changes can be made since last lgtm label was applied
-* k8s-bot must have reported the GCE E2E build and test steps passed (Travis, Jenkins unit/integration, Jenkins e2e)
+* k8s-bot must have reported the GCE E2E build and test steps passed (Jenkins unit/integration, Jenkins e2e)
 
 Additionally, for infrequent or new contributors, we require the on call to apply the "ok-to-merge" label manually.  This is gated by the [whitelist](https://github.com/kubernetes/contrib/blob/master/mungegithub/whitelist.txt).
 
@@ -69,8 +69,9 @@ Additionally, for infrequent or new contributors, we require the on call to appl
 The following will save time for both you and your reviewer:
 
 * Enable [pre-commit hooks](development.md#committing-changes-to-your-fork) and verify they pass.
-* Verify `hack/verify-generated-docs.sh` passes.
-* Verify `hack/test-go.sh` passes.
+* Verify `make verify` passes.
+* Verify `make test` passes.
+* Verify `make test-integration` passes.
 
 ## Release Notes
 
@@ -94,9 +95,8 @@ label is required for that non-master PR.
 
 ### Reviewing pre-release notes
 
-**NOTE: THIS TOOLING IS NOT YET AVAILABLE, BUT COMING SOON!**
-
 At any time, you can see what the release notes will look like on any branch.
+(NOTE: This only works on Linux for now)
 
 ```
 $ git pull https://github.com/kubernetes/release
@@ -104,7 +104,7 @@ $ RELNOTES=$PWD/release/relnotes
 $ cd /to/your/kubernetes/repo
 $ $RELNOTES -man # for details on how to use the tool
 # Show release notes from the last release on a branch to HEAD
-$ $RELNOTES --raw --branch=master
+$ $RELNOTES --branch=master
 ```
 
 ## Visual overview

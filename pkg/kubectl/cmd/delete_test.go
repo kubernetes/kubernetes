@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,16 +26,17 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
 
 func TestDeleteObjectByTuple(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
@@ -64,10 +65,10 @@ func TestDeleteObjectByTuple(t *testing.T) {
 func TestDeleteNamedObject(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master-controller" && m == "DELETE":
@@ -96,10 +97,10 @@ func TestDeleteNamedObject(t *testing.T) {
 func TestDeleteObject(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -126,10 +127,10 @@ func TestDeleteObject(t *testing.T) {
 }
 
 func TestDeleteObjectNotFound(t *testing.T) {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -156,10 +157,10 @@ func TestDeleteObjectNotFound(t *testing.T) {
 }
 
 func TestDeleteObjectIgnoreNotFound(t *testing.T) {
-	f, tf, codec := NewAPIFactory()
+	f, tf, _, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -188,7 +189,7 @@ func TestDeleteObjectIgnoreNotFound(t *testing.T) {
 func TestDeleteAllNotFound(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
@@ -196,7 +197,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "GET":
@@ -230,7 +231,7 @@ func TestDeleteAllNotFound(t *testing.T) {
 func TestDeleteAllIgnoreNotFound(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 
 	// Add an item to the list which will result in a 404 on delete
 	svc.Items = append(svc.Items, api.Service{ObjectMeta: api.ObjectMeta{Name: "foo"}})
@@ -238,7 +239,7 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/services" && m == "GET":
@@ -270,10 +271,10 @@ func TestDeleteAllIgnoreNotFound(t *testing.T) {
 func TestDeleteMultipleObject(t *testing.T) {
 	_, svc, rc := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -304,10 +305,10 @@ func TestDeleteMultipleObject(t *testing.T) {
 func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	_, svc, _ := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "DELETE":
@@ -341,10 +342,10 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 
 func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 	_, svc, rc := testData()
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/baz" && m == "DELETE":
@@ -377,10 +378,10 @@ func TestDeleteMultipleResourcesWithTheSameName(t *testing.T) {
 func TestDeleteDirectory(t *testing.T) {
 	_, _, rc := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == "DELETE":
@@ -408,10 +409,10 @@ func TestDeleteDirectory(t *testing.T) {
 func TestDeleteMultipleSelector(t *testing.T) {
 	pods, svc, _ := testData()
 
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/pods" && m == "GET":
@@ -445,5 +446,56 @@ func TestDeleteMultipleSelector(t *testing.T) {
 
 	if buf.String() != "pod/foo\npod/bar\nservice/baz\n" {
 		t.Errorf("unexpected output: %s", buf.String())
+	}
+}
+
+func TestResourceErrors(t *testing.T) {
+	testCases := map[string]struct {
+		args  []string
+		flags map[string]string
+		errFn func(error) bool
+	}{
+		"no args": {
+			args:  []string{},
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "you must provide one or more resources") },
+		},
+		"resources but no selectors": {
+			args: []string{"pods"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, or --all flag specified")
+			},
+		},
+		"multiple resources but no selectors": {
+			args: []string{"pods,deployments"},
+			errFn: func(err error) bool {
+				return strings.Contains(err.Error(), "resource(s) were provided, but no name, label selector, or --all flag specified")
+			},
+		},
+	}
+
+	for k, testCase := range testCases {
+		f, tf, _, _ := NewAPIFactory()
+		tf.Printer = &testPrinter{}
+		tf.Namespace = "test"
+		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+
+		buf := bytes.NewBuffer([]byte{})
+		cmd := NewCmdDelete(f, buf)
+		cmd.SetOutput(buf)
+
+		for k, v := range testCase.flags {
+			cmd.Flags().Set(k, v)
+		}
+		err := RunDelete(f, buf, cmd, testCase.args, &DeleteOptions{})
+		if !testCase.errFn(err) {
+			t.Errorf("%s: unexpected error: %v", k, err)
+			continue
+		}
+		if tf.Printer.(*testPrinter).Objects != nil {
+			t.Errorf("unexpected print to default printer")
+		}
+		if buf.Len() > 0 {
+			t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+		}
 	}
 }

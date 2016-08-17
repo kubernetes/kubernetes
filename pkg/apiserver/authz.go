@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,11 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/pkg/registry/clusterrole"
+	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
+	"k8s.io/kubernetes/pkg/registry/role"
+	"k8s.io/kubernetes/pkg/registry/rolebinding"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
 
@@ -37,8 +42,8 @@ type Attributes struct {
 // It is useful in tests and when using kubernetes in an open manner.
 type alwaysAllowAuthorizer struct{}
 
-func (alwaysAllowAuthorizer) Authorize(a authorizer.Attributes) (err error) {
-	return nil
+func (alwaysAllowAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+	return true, "", nil
 }
 
 func NewAlwaysAllowAuthorizer() authorizer.Authorizer {
@@ -50,12 +55,25 @@ func NewAlwaysAllowAuthorizer() authorizer.Authorizer {
 // It is useful in unit tests to force an operation to be forbidden.
 type alwaysDenyAuthorizer struct{}
 
-func (alwaysDenyAuthorizer) Authorize(a authorizer.Attributes) (err error) {
-	return errors.New("Everything is forbidden.")
+func (alwaysDenyAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+	return false, "Everything is forbidden.", nil
 }
 
 func NewAlwaysDenyAuthorizer() authorizer.Authorizer {
 	return new(alwaysDenyAuthorizer)
+}
+
+// alwaysFailAuthorizer is an implementation of authorizer.Attributes
+// which always says no to an authorization request.
+// It is useful in unit tests to force an operation to fail with error.
+type alwaysFailAuthorizer struct{}
+
+func (alwaysFailAuthorizer) Authorize(a authorizer.Attributes) (authorized bool, reason string, err error) {
+	return false, "", errors.New("Authorization failure.")
+}
+
+func NewAlwaysFailAuthorizer() authorizer.Authorizer {
+	return new(alwaysFailAuthorizer)
 }
 
 const (
@@ -63,15 +81,16 @@ const (
 	ModeAlwaysDeny  string = "AlwaysDeny"
 	ModeABAC        string = "ABAC"
 	ModeWebhook     string = "Webhook"
+	ModeRBAC        string = "RBAC"
 )
 
 // Keep this list in sync with constant list above.
-var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook}
+var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC}
 
 type AuthorizationConfig struct {
 	// Options for ModeABAC
 
-	// Path to a ABAC policy file.
+	// Path to an ABAC policy file.
 	PolicyFile string
 
 	// Options for ModeWebhook
@@ -82,6 +101,16 @@ type AuthorizationConfig struct {
 	WebhookCacheAuthorizedTTL time.Duration
 	// TTL for caching of unauthorized responses from the webhook server.
 	WebhookCacheUnauthorizedTTL time.Duration
+
+	// Options for RBAC
+
+	// User which can bootstrap role policies
+	RBACSuperUser string
+
+	RBACClusterRoleRegistry        clusterrole.Registry
+	RBACClusterRoleBindingRegistry clusterrolebinding.Registry
+	RBACRoleRegistry               role.Registry
+	RBACRoleBindingRegistry        rolebinding.Registry
 }
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
@@ -90,7 +119,7 @@ type AuthorizationConfig struct {
 func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config AuthorizationConfig) (authorizer.Authorizer, error) {
 
 	if len(authorizationModes) == 0 {
-		return nil, errors.New("Atleast one authorization mode should be passed")
+		return nil, errors.New("At least one authorization mode should be passed")
 	}
 
 	var authorizers []authorizer.Authorizer
@@ -126,6 +155,15 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 				return nil, err
 			}
 			authorizers = append(authorizers, webhookAuthorizer)
+		case ModeRBAC:
+			rbacAuthorizer := rbac.New(
+				config.RBACRoleRegistry,
+				config.RBACRoleBindingRegistry,
+				config.RBACClusterRoleRegistry,
+				config.RBACClusterRoleBindingRegistry,
+				config.RBACSuperUser,
+			)
+			authorizers = append(authorizers, rbacAuthorizer)
 		default:
 			return nil, fmt.Errorf("Unknown authorization mode %s specified", authorizationMode)
 		}
@@ -137,6 +175,9 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 	}
 	if !authorizerMap[ModeWebhook] && config.WebhookConfigFile != "" {
 		return nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
+	}
+	if !authorizerMap[ModeRBAC] && config.RBACSuperUser != "" {
+		return nil, errors.New("Cannot specify --authorization-rbac-super-user without mode RBAC")
 	}
 
 	return union.New(authorizers...), nil

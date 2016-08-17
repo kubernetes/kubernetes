@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -84,7 +84,7 @@ type missingVersionErr struct {
 }
 
 // IsMissingVersion returns true if the error indicates that the provided object
-// is missing a 'Versioj' field.
+// is missing a 'Version' field.
 func NewMissingVersionErr(data string) error {
 	return &missingVersionErr{data}
 }

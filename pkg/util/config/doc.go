@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,4 +17,4 @@ limitations under the License.
 // Package config provides utility objects for decoupling sources of configuration and the
 // actual configuration state. Consumers must implement the Merger interface to unify
 // the sources of change into an object.
-package config
+package config // import "k8s.io/kubernetes/pkg/util/config"

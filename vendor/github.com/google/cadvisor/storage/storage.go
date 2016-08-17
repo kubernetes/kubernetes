@@ -16,6 +16,7 @@ package storage
 
 import (
 	"fmt"
+	"sort"
 
 	info "github.com/google/cadvisor/info/v1"
 )
@@ -46,4 +47,13 @@ func New(name string) (StorageDriver, error) {
 		return nil, fmt.Errorf("unknown backend storage driver: %s", name)
 	}
 	return f()
+}
+
+func ListDrivers() []string {
+	drivers := make([]string, 0, len(registeredPlugins))
+	for name := range registeredPlugins {
+		drivers = append(drivers, name)
+	}
+	sort.Strings(drivers)
+	return drivers
 }

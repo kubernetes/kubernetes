@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -49,7 +49,7 @@ var _ = framework.KubeDescribe("ReplicationController", func() {
 // a replication controller. The image serves its hostname
 // which is checked for each replica.
 func ServeImageOrFail(f *framework.Framework, test string, image string) {
-	name := "my-hostname-" + test + "-" + string(util.NewUUID())
+	name := "my-hostname-" + test + "-" + string(uuid.NewUUID())
 	replicas := int32(2)
 
 	// Create a replication controller for a service
@@ -86,7 +86,7 @@ func ServeImageOrFail(f *framework.Framework, test string, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRC(f.Client, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndPods(f.Client, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()

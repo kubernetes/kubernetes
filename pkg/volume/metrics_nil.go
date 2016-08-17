@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,11 +21,12 @@ import "errors"
 var _ MetricsProvider = &MetricsNil{}
 
 // MetricsNil represents a MetricsProvider that does not support returning
-// Metrics.  It serves as a placeholder for Volumes that do not yet support metrics.
+// Metrics.  It serves as a placeholder for Volumes that do not yet support
+// metrics.
 type MetricsNil struct{}
 
-// See MetricsProvider.GetMetrics
 // GetMetrics returns an empty Metrics and an error.
+// See MetricsProvider.GetMetrics
 func (*MetricsNil) GetMetrics() (*Metrics, error) {
 	return &Metrics{}, errors.New("metrics are not supported for MetricsNil Volumes")
 }

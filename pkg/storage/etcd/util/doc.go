@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package util holds generic etcd-related utility functions that any user of ectd might want to
 // use, without pulling in kubernetes-specific code.
-package util
+package util // import "k8s.io/kubernetes/pkg/storage/etcd/util"

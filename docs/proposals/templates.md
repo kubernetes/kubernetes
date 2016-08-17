@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/proposals/templates.md).
+[here](http://releases.k8s.io/release-1.3/docs/proposals/templates.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -274,7 +274,7 @@ which process templates are free to override this value based on user input.
 **Example Template**
 
 Illustration of a template which defines a service and replication controller with parameters to specialized
-the name of the top level objects, the number of replicas, and serveral environment variables defined on the
+the name of the top level objects, the number of replicas, and several environment variables defined on the
 pod template.
 
 ```
@@ -412,7 +412,7 @@ Instead they can invoke the k8s api directly.
 * **/templates** - the REST storage resource for storing and retrieving template objects, scoped within a namespace.
 
 Storing templates within k8s has the benefit of enabling template sharing and securing via the same roles/resources
-that are used to provide access control to other cluster resoures.  It also enables sophisticated service catalog
+that are used to provide access control to other cluster resources.  It also enables sophisticated service catalog
 flows in which selecting a service from a catalog results in a new instantiation of that service.  (This is not the
 only way to implement such a flow, but it does provide a useful level of integration).
 

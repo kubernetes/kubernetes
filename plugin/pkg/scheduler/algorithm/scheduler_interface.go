@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,13 +26,14 @@ import (
 // managed by Kubernetes.
 type SchedulerExtender interface {
 	// Filter based on extender-implemented predicate functions. The filtered list is
-	// expected to be a subset of the supplied list.
-	Filter(pod *api.Pod, nodes *api.NodeList) (filteredNodes *api.NodeList, err error)
+	// expected to be a subset of the supplied list. failedNodesMap optionally contains
+	// the list of failed nodes and failure reasons.
+	Filter(pod *api.Pod, nodes []*api.Node) (filteredNodes []*api.Node, failedNodesMap schedulerapi.FailedNodesMap, err error)
 
 	// Prioritize based on extender-implemented priority functions. The returned scores & weight
 	// are used to compute the weighted score for an extender. The weighted scores are added to
 	// the scores computed  by Kubernetes scheduler. The total scores are used to do the host selection.
-	Prioritize(pod *api.Pod, nodes *api.NodeList) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error)
+	Prioritize(pod *api.Pod, nodes []*api.Node) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error)
 }
 
 // ScheduleAlgorithm is an interface implemented by things that know how to schedule pods

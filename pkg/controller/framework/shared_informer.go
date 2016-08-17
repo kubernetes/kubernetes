@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ type SharedInformer interface {
 	GetController() ControllerInterface
 	Run(stopCh <-chan struct{})
 	HasSynced() bool
+	LastSyncResourceVersion() string
 }
 
 type SharedIndexInformer interface {
@@ -87,6 +88,13 @@ type sharedIndexInformer struct {
 
 	started     bool
 	startedLock sync.Mutex
+
+	// blockDeltas gives a way to stop all event distribution so that a late event handler
+	// can safely join the shared informer.
+	blockDeltas sync.Mutex
+	// stopCh is the channel used to stop the main Run process.  We have to track it so that
+	// late joiners can have a proper stop
+	stopCh <-chan struct{}
 }
 
 // dummyController hides the fact that a SharedInformer is different from a dedicated one
@@ -141,6 +149,7 @@ func (s *sharedIndexInformer) Run(stopCh <-chan struct{}) {
 		s.started = true
 	}()
 
+	s.stopCh = stopCh
 	s.processor.run(stopCh)
 	s.controller.Run(stopCh)
 }
@@ -159,6 +168,16 @@ func (s *sharedIndexInformer) HasSynced() bool {
 		return false
 	}
 	return s.controller.HasSynced()
+}
+
+func (s *sharedIndexInformer) LastSyncResourceVersion() string {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.controller == nil {
+		return ""
+	}
+	return s.controller.reflector.LastSyncResourceVersion()
 }
 
 func (s *sharedIndexInformer) GetStore() cache.Store {
@@ -188,16 +207,38 @@ func (s *sharedIndexInformer) AddEventHandler(handler ResourceEventHandler) erro
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
 
-	if s.started {
-		return fmt.Errorf("informer has already started")
+	if !s.started {
+		listener := newProcessListener(handler)
+		s.processor.listeners = append(s.processor.listeners, listener)
+		return nil
 	}
+
+	// in order to safely join, we have to
+	// 1. stop sending add/update/delete notifications
+	// 2. do a list against the store
+	// 3. send synthetic "Add" events to the new handler
+	// 4. unblock
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
 
 	listener := newProcessListener(handler)
 	s.processor.listeners = append(s.processor.listeners, listener)
+
+	go listener.run(s.stopCh)
+	go listener.pop(s.stopCh)
+
+	items := s.indexer.List()
+	for i := range items {
+		listener.add(addNotification{newObj: items[i]})
+	}
+
 	return nil
 }
 
 func (s *sharedIndexInformer) HandleDeltas(obj interface{}) error {
+	s.blockDeltas.Lock()
+	defer s.blockDeltas.Unlock()
+
 	// from oldest to newest
 	for _, d := range obj.(cache.Deltas) {
 		switch d.Type {
@@ -279,21 +320,30 @@ func (p *processorListener) add(notification interface{}) {
 func (p *processorListener) pop(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 
-	p.lock.Lock()
-	defer p.lock.Unlock()
 	for {
-		for len(p.pendingNotifications) == 0 {
-			// check if we're shutdown
-			select {
-			case <-stopCh:
-				return
-			default:
+		blockingGet := func() (interface{}, bool) {
+			p.lock.Lock()
+			defer p.lock.Unlock()
+
+			for len(p.pendingNotifications) == 0 {
+				// check if we're shutdown
+				select {
+				case <-stopCh:
+					return nil, true
+				default:
+				}
+				p.cond.Wait()
 			}
 
-			p.cond.Wait()
+			nt := p.pendingNotifications[0]
+			p.pendingNotifications = p.pendingNotifications[1:]
+			return nt, false
 		}
-		notification := p.pendingNotifications[0]
-		p.pendingNotifications = p.pendingNotifications[1:]
+
+		notification, stopped := blockingGet()
+		if stopped {
+			return
+		}
 
 		select {
 		case <-stopCh:

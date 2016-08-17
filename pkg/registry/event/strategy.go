@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,10 +42,10 @@ func (eventStrategy) NamespaceScoped() bool {
 	return true
 }
 
-func (eventStrategy) PrepareForCreate(obj runtime.Object) {
+func (eventStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 }
 
-func (eventStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (eventStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 }
 
 func (eventStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {

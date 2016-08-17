@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import (
 )
 
 var alwaysReady = func() bool { return true }
+var emptyNodeName string
 
 func addPods(store cache.Store, namespace string, nPods int, nPorts int, nNotReady int) {
 	for i := 0; i < nPods+nNotReady; i++ {
@@ -101,7 +102,7 @@ func TestSyncEndpointsItemsPreserveNoSelector(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 				Ports:     []api.EndpointPort{{Port: 1000}},
 			}},
 		}})
@@ -133,7 +134,7 @@ func TestCheckLeftoverEndpoints(t *testing.T) {
 					ResourceVersion: "1",
 				},
 				Subsets: []api.EndpointSubset{{
-					Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+					Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 					Ports:     []api.EndpointPort{{Port: 1000}},
 				}},
 			}},
@@ -163,7 +164,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "TCP"}},
 			}},
 		}})
@@ -189,7 +190,7 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
@@ -206,7 +207,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 				Ports:     []api.EndpointPort{{Port: 1000, Protocol: "UDP"}},
 			}},
 		}})
@@ -231,7 +232,7 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "UDP"}},
 		}},
 	})
@@ -269,7 +270,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
@@ -307,7 +308,7 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Subsets: []api.EndpointSubset{{
-			NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 			Ports:             []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
@@ -345,8 +346,8 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Subsets: []api.EndpointSubset{{
-			Addresses:         []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
-			NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.5", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}}},
+			Addresses:         []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}}},
 			Ports:             []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
@@ -363,7 +364,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 				ResourceVersion: "1",
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 				Ports:     []api.EndpointPort{{Port: 1000}},
 			}},
 		}})
@@ -387,7 +388,7 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			ResourceVersion: "1",
 		},
 		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})
@@ -404,7 +405,7 @@ func TestSyncEndpointsItemsPreexistingIdentical(t *testing.T) {
 				Namespace:       ns,
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 				Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 			}},
 		}})
@@ -447,9 +448,9 @@ func TestSyncEndpointsItems(t *testing.T) {
 	endpoints.syncService("other/foo")
 	expectedSubsets := []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{
-			{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
-			{IP: "1.2.3.5", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}},
-			{IP: "1.2.3.6", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2", Namespace: ns}},
+			{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+			{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}},
+			{IP: "1.2.3.6", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2", Namespace: ns}},
 		},
 		Ports: []api.EndpointPort{
 			{Name: "port0", Port: 8080, Protocol: "TCP"},
@@ -494,9 +495,9 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 	endpoints.syncService(ns + "/foo")
 	expectedSubsets := []api.EndpointSubset{{
 		Addresses: []api.EndpointAddress{
-			{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
-			{IP: "1.2.3.5", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}},
-			{IP: "1.2.3.6", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2", Namespace: ns}},
+			{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}},
+			{IP: "1.2.3.5", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod1", Namespace: ns}},
+			{IP: "1.2.3.6", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod2", Namespace: ns}},
 		},
 		Ports: []api.EndpointPort{
 			{Name: "port0", Port: 8080, Protocol: "TCP"},
@@ -528,7 +529,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 				},
 			},
 			Subsets: []api.EndpointSubset{{
-				Addresses: []api.EndpointAddress{{IP: "6.7.8.9"}},
+				Addresses: []api.EndpointAddress{{IP: "6.7.8.9", NodeName: &emptyNodeName}},
 				Ports:     []api.EndpointPort{{Port: 1000}},
 			}},
 		}})
@@ -558,7 +559,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 			Labels:          serviceLabels,
 		},
 		Subsets: []api.EndpointSubset{{
-			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
+			Addresses: []api.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &api.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
 			Ports:     []api.EndpointPort{{Port: 8080, Protocol: "TCP"}},
 		}},
 	})

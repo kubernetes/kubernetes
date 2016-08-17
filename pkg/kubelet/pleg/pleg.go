@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,11 +25,11 @@ type PodLifeCycleEventType string
 const (
 	ContainerStarted PodLifeCycleEventType = "ContainerStarted"
 	ContainerDied    PodLifeCycleEventType = "ContainerDied"
+	ContainerRemoved PodLifeCycleEventType = "ContainerRemoved"
 	// PodSync is used to trigger syncing of a pod when the observed change of
 	// the state of the pod cannot be captured by any single event above.
 	PodSync PodLifeCycleEventType = "PodSync"
 	// Do not use the events below because they are disabled in GenericPLEG.
-	ContainerRemoved PodLifeCycleEventType = "ContainerRemoved"
 	ContainerChanged PodLifeCycleEventType = "ContainerChanged"
 )
 

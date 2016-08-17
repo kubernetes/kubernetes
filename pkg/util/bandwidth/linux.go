@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -255,7 +255,7 @@ func (t *tcShaper) ReconcileInterface() error {
 		return t.initializeInterface()
 	}
 	fields := strings.Split(output, " ")
-	if len(fields) != 12 || fields[1] != "htb" || fields[2] != "1:" {
+	if len(fields) < 12 || fields[1] != "htb" || fields[2] != "1:" {
 		if err := t.deleteInterface(fields[2]); err != nil {
 			return err
 		}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/meta/metatypes"
+	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 var _ meta.Object = &api.ObjectMeta{}
@@ -38,6 +42,14 @@ func TestFillObjectMetaSystemFields(t *testing.T) {
 		t.Errorf("resource.CreationTimestamp is zero")
 	} else if len(resource.UID) == 0 {
 		t.Errorf("resource.UID missing")
+	}
+	// verify we can inject a UID
+	uid := uuid.NewUUID()
+	ctx = api.WithUID(ctx, uid)
+	resource = api.ObjectMeta{}
+	api.FillObjectMetaSystemFields(ctx, &resource)
+	if resource.UID != uid {
+		t.Errorf("resource.UID expected: %v, actual: %v", uid, resource.UID)
 	}
 }
 
@@ -64,6 +76,7 @@ func getObjectMetaAndOwnerReferences() (objectMeta api.ObjectMeta, metaOwnerRefe
 			Name:       references[i].Name,
 			UID:        references[i].UID,
 			APIVersion: references[i].APIVersion,
+			Controller: references[i].Controller,
 		})
 	}
 	if len(references) == 0 {
@@ -94,5 +107,77 @@ func TestAccessOwnerReferences(t *testing.T) {
 	for i := 0; i < fuzzIter; i++ {
 		testGetOwnerReferences(t)
 		testSetOwnerReferences(t)
+	}
+}
+
+func TestAccessorImplementations(t *testing.T) {
+	for _, group := range testapi.Groups {
+		for _, gv := range []unversioned.GroupVersion{*group.GroupVersion(), group.InternalGroupVersion()} {
+			for kind, knownType := range api.Scheme.KnownTypes(gv) {
+				value := reflect.New(knownType)
+				obj := value.Interface()
+				if _, ok := obj.(runtime.Object); !ok {
+					t.Errorf("%v (%v) does not implement runtime.Object", gv.WithKind(kind), knownType)
+				}
+				lm, isLM := obj.(meta.ListMetaAccessor)
+				om, isOM := obj.(meta.ObjectMetaAccessor)
+				switch {
+				case isLM && isOM:
+					t.Errorf("%v (%v) implements ListMetaAccessor and ObjectMetaAccessor", gv.WithKind(kind), knownType)
+					continue
+				case isLM:
+					m := lm.GetListMeta()
+					if m == nil {
+						t.Errorf("%v (%v) returns nil ListMeta", gv.WithKind(kind), knownType)
+						continue
+					}
+					m.SetResourceVersion("102030")
+					if m.GetResourceVersion() != "102030" {
+						t.Errorf("%v (%v) did not preserve resource version", gv.WithKind(kind), knownType)
+						continue
+					}
+					m.SetSelfLink("102030")
+					if m.GetSelfLink() != "102030" {
+						t.Errorf("%v (%v) did not preserve self link", gv.WithKind(kind), knownType)
+						continue
+					}
+				case isOM:
+					m := om.GetObjectMeta()
+					if m == nil {
+						t.Errorf("%v (%v) returns nil ObjectMeta", gv.WithKind(kind), knownType)
+						continue
+					}
+					m.SetResourceVersion("102030")
+					if m.GetResourceVersion() != "102030" {
+						t.Errorf("%v (%v) did not preserve resource version", gv.WithKind(kind), knownType)
+						continue
+					}
+					m.SetSelfLink("102030")
+					if m.GetSelfLink() != "102030" {
+						t.Errorf("%v (%v) did not preserve self link", gv.WithKind(kind), knownType)
+						continue
+					}
+					labels := map[string]string{"a": "b"}
+					m.SetLabels(labels)
+					if !reflect.DeepEqual(m.GetLabels(), labels) {
+						t.Errorf("%v (%v) did not preserve labels", gv.WithKind(kind), knownType)
+						continue
+					}
+				default:
+					if _, ok := obj.(unversioned.ListMetaAccessor); ok {
+						continue
+					}
+					if _, ok := value.Elem().Type().FieldByName("ObjectMeta"); ok {
+						t.Errorf("%v (%v) has ObjectMeta but does not implement ObjectMetaAccessor", gv.WithKind(kind), knownType)
+						continue
+					}
+					if _, ok := value.Elem().Type().FieldByName("ListMeta"); ok {
+						t.Errorf("%v (%v) has ListMeta but does not implement ListMetaAccessor", gv.WithKind(kind), knownType)
+						continue
+					}
+					t.Logf("%v (%v) does not implement ListMetaAccessor or ObjectMetaAccessor", gv.WithKind(kind), knownType)
+				}
+			}
+		}
 	}
 }

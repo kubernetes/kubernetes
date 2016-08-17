@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 package union
 
 import (
-	"errors"
+	"fmt"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/auth/authorizer"
@@ -28,15 +28,14 @@ type mockAuthzHandler struct {
 	err          error
 }
 
-func (mock *mockAuthzHandler) Authorize(a authorizer.Attributes) error {
+func (mock *mockAuthzHandler) Authorize(a authorizer.Attributes) (bool, string, error) {
 	if mock.err != nil {
-		return mock.err
+		return false, "", mock.err
 	}
 	if !mock.isAuthorized {
-		return errors.New("Request unauthorized")
-	} else {
-		return nil
+		return false, "", nil
 	}
+	return true, "", nil
 }
 
 func TestAuthorizationSecondPasses(t *testing.T) {
@@ -44,9 +43,9 @@ func TestAuthorizationSecondPasses(t *testing.T) {
 	handler2 := &mockAuthzHandler{isAuthorized: true}
 	authzHandler := New(handler1, handler2)
 
-	err := authzHandler.Authorize(nil)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	authorized, _, _ := authzHandler.Authorize(nil)
+	if !authorized {
+		t.Errorf("Unexpected authorization failure")
 	}
 }
 
@@ -55,9 +54,9 @@ func TestAuthorizationFirstPasses(t *testing.T) {
 	handler2 := &mockAuthzHandler{isAuthorized: false}
 	authzHandler := New(handler1, handler2)
 
-	err := authzHandler.Authorize(nil)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	authorized, _, _ := authzHandler.Authorize(nil)
+	if !authorized {
+		t.Errorf("Unexpected authorization failure")
 	}
 }
 
@@ -66,7 +65,18 @@ func TestAuthorizationNonePasses(t *testing.T) {
 	handler2 := &mockAuthzHandler{isAuthorized: false}
 	authzHandler := New(handler1, handler2)
 
-	err := authzHandler.Authorize(nil)
+	authorized, _, _ := authzHandler.Authorize(nil)
+	if authorized {
+		t.Errorf("Expected failed authorization")
+	}
+}
+
+func TestAuthorizationError(t *testing.T) {
+	handler1 := &mockAuthzHandler{err: fmt.Errorf("foo")}
+	handler2 := &mockAuthzHandler{err: fmt.Errorf("foo")}
+	authzHandler := New(handler1, handler2)
+
+	_, _, err := authzHandler.Authorize(nil)
 	if err == nil {
 		t.Errorf("Expected error: %v", err)
 	}

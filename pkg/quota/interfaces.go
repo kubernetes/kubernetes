@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -63,4 +63,20 @@ type Evaluator interface {
 type Registry interface {
 	// Evaluators returns the set Evaluator objects registered to a groupKind
 	Evaluators() map[unversioned.GroupKind]Evaluator
+}
+
+// UnionRegistry combines multiple registries.  Order matters because first registry to claim a GroupKind
+// is the "winner"
+type UnionRegistry []Registry
+
+func (r UnionRegistry) Evaluators() map[unversioned.GroupKind]Evaluator {
+	ret := map[unversioned.GroupKind]Evaluator{}
+
+	for i := len(r) - 1; i >= 0; i-- {
+		for k, v := range r[i].Evaluators() {
+			ret[k] = v
+		}
+	}
+
+	return ret
 }

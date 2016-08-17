@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ func stringSetToPointers(in sets.String) []*string {
 	if in == nil {
 		return nil
 	}
-	out := make([]*string, len(in))
+	out := make([]*string, 0, len(in))
 	for k := range in {
 		out = append(out, aws.String(k))
 	}

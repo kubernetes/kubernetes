@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -216,7 +216,7 @@ var _ = framework.KubeDescribe("Addon update", func() {
 	})
 
 	// WARNING: the test is not parallel-friendly!
-	It("should propagate add-on file changes", func() {
+	It("should propagate add-on file changes [Slow]", func() {
 		// This test requires:
 		// - SSH
 		// - master access

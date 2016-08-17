@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/conversion"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -133,11 +132,11 @@ func TestCordon(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 		new_node := &api.Node{}
 		updated := false
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
@@ -219,7 +218,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	rc_anno := make(map[string]string)
-	rc_anno[controller.CreatedByAnnotation] = refJson(t, &rc)
+	rc_anno[api.CreatedByAnnotation] = refJson(t, &rc)
 
 	rc_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -247,7 +246,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	ds_anno := make(map[string]string)
-	ds_anno[controller.CreatedByAnnotation] = refJson(t, &ds)
+	ds_anno[api.CreatedByAnnotation] = refJson(t, &ds)
 
 	ds_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -280,7 +279,7 @@ func TestDrain(t *testing.T) {
 			Namespace:         "default",
 			CreationTimestamp: unversioned.Time{Time: time.Now()},
 			Labels:            labels,
-			Annotations:       map[string]string{controller.CreatedByAnnotation: refJson(t, &job)},
+			Annotations:       map[string]string{api.CreatedByAnnotation: refJson(t, &job)},
 		},
 	}
 
@@ -298,7 +297,7 @@ func TestDrain(t *testing.T) {
 	}
 
 	rs_anno := make(map[string]string)
-	rs_anno[controller.CreatedByAnnotation] = refJson(t, &rs)
+	rs_anno[api.CreatedByAnnotation] = refJson(t, &rs)
 
 	rs_pod := api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -322,6 +321,24 @@ func TestDrain(t *testing.T) {
 		},
 		Spec: api.PodSpec{
 			NodeName: "node",
+		},
+	}
+
+	emptydir_pod := api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:              "bar",
+			Namespace:         "default",
+			CreationTimestamp: unversioned.Time{Time: time.Now()},
+			Labels:            labels,
+		},
+		Spec: api.PodSpec{
+			NodeName: "node",
+			Volumes: []api.Volume{
+				{
+					Name:         "scratch",
+					VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{Medium: ""}},
+				},
+			},
 		},
 	}
 
@@ -407,6 +424,24 @@ func TestDrain(t *testing.T) {
 			expectDelete: true,
 		},
 		{
+			description:  "pod with EmptyDir",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []api.Pod{emptydir_pod},
+			args:         []string{"node", "--force"},
+			expectFatal:  true,
+			expectDelete: false,
+		},
+		{
+			description:  "pod with EmptyDir and --delete-local-data",
+			node:         node,
+			expected:     cordoned_node,
+			pods:         []api.Pod{emptydir_pod},
+			args:         []string{"node", "--force", "--delete-local-data=true"},
+			expectFatal:  false,
+			expectDelete: true,
+		},
+		{
 			description:  "empty node",
 			node:         node,
 			expected:     cordoned_node,
@@ -421,10 +456,10 @@ func TestDrain(t *testing.T) {
 	for _, test := range tests {
 		new_node := &api.Node{}
 		deleted := false
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
 				switch {
@@ -526,7 +561,7 @@ func refJson(t *testing.T, o runtime.Object) string {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, _, codec := NewAPIFactory()
+	_, _, codec, _ := NewAPIFactory()
 	json, err := runtime.Encode(codec, &api.SerializedReference{Reference: *ref})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

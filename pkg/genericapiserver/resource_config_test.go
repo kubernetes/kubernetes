@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -96,4 +96,65 @@ func TestDisabledVersion(t *testing.T) {
 		}
 	}
 
+}
+
+func TestAnyResourcesForGroupEnabled(t *testing.T) {
+	tests := []struct {
+		name      string
+		creator   func() APIResourceConfigSource
+		testGroup string
+
+		expectedResult bool
+	}{
+		{
+			name: "empty",
+			creator: func() APIResourceConfigSource {
+				return NewResourceConfig()
+			},
+			testGroup: "one",
+
+			expectedResult: false,
+		},
+		{
+			name: "present, but disabled",
+			creator: func() APIResourceConfigSource {
+				ret := NewResourceConfig()
+				ret.DisableVersions(unversioned.GroupVersion{Group: "one", Version: "version1"})
+				return ret
+			},
+			testGroup: "one",
+
+			expectedResult: false,
+		},
+		{
+			name: "present, and one version enabled",
+			creator: func() APIResourceConfigSource {
+				ret := NewResourceConfig()
+				ret.DisableVersions(unversioned.GroupVersion{Group: "one", Version: "version1"})
+				ret.EnableVersions(unversioned.GroupVersion{Group: "one", Version: "version2"})
+				return ret
+			},
+			testGroup: "one",
+
+			expectedResult: true,
+		},
+		{
+			name: "present, and one resource",
+			creator: func() APIResourceConfigSource {
+				ret := NewResourceConfig()
+				ret.DisableVersions(unversioned.GroupVersion{Group: "one", Version: "version1"})
+				ret.EnableResources(unversioned.GroupVersionResource{Group: "one", Version: "version2", Resource: "foo"})
+				return ret
+			},
+			testGroup: "one",
+
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range tests {
+		if e, a := tc.expectedResult, tc.creator().AnyResourcesForGroupEnabled(tc.testGroup); e != a {
+			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+		}
+	}
 }

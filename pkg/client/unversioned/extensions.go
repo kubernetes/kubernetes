@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -37,6 +35,7 @@ type ExtensionsInterface interface {
 	ThirdPartyResourceNamespacer
 	ReplicaSetsNamespacer
 	PodSecurityPoliciesInterface
+	StorageClassesInterface
 }
 
 // ExtensionsClient is used to interact with experimental Kubernetes features.
@@ -82,13 +81,17 @@ func (c *ExtensionsClient) ReplicaSets(namespace string) ReplicaSetInterface {
 	return newReplicaSets(c, namespace)
 }
 
+func (c *ExtensionsClient) StorageClasses() StorageClassInterface {
+	return newStorageClasses(c)
+}
+
 // NewExtensions creates a new ExtensionsClient for the given config. This client
 // provides access to experimental Kubernetes features.
 // Features of Extensions group are not supported and may be changed or removed in
 // incompatible ways at any time.
 func NewExtensions(c *restclient.Config) (*ExtensionsClient, error) {
 	config := *c
-	if err := setExtensionsDefaults(&config); err != nil {
+	if err := setGroupDefaults(extensions.GroupName, &config); err != nil {
 		return nil, err
 	}
 	client, err := restclient.RESTClientFor(&config)
@@ -108,31 +111,4 @@ func NewExtensionsOrDie(c *restclient.Config) *ExtensionsClient {
 		panic(err)
 	}
 	return client
-}
-
-func setExtensionsDefaults(config *restclient.Config) error {
-	// if experimental group is not registered, return an error
-	g, err := registered.Group(extensions.GroupName)
-	if err != nil {
-		return err
-	}
-	config.APIPath = defaultAPIPath
-	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
-	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
-	config.GroupVersion = &copyGroupVersion
-	//}
-
-	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
-	config.NegotiatedSerializer = api.Codecs
-	if config.QPS == 0 {
-		config.QPS = 5
-	}
-	if config.Burst == 0 {
-		config.Burst = 10
-	}
-	return nil
 }

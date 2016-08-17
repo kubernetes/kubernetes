@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/validation"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	"k8s.io/kubernetes/pkg/kubelet/qos/util"
+	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -79,8 +79,11 @@ func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) erro
 	allErrs := field.ErrorList{}
 	fldPath := field.NewPath("spec").Child("containers")
 	for i, ctr := range pod.Spec.Containers {
-		idxPath := fldPath.Index(i)
-		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, idxPath.Child("resources"))...)
+		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"))...)
+	}
+	fldPath = field.NewPath("spec").Child("initContainers")
+	for i, ctr := range pod.Spec.InitContainers {
+		allErrs = append(allErrs, validation.ValidateResourceRequirements(&ctr.Resources, fldPath.Index(i).Child("resources"))...)
 	}
 	if len(allErrs) > 0 {
 		return allErrs.ToAggregate()
@@ -92,19 +95,28 @@ func PodConstraintsFunc(required []api.ResourceName, object runtime.Object) erro
 	requiredSet := quota.ToSet(required)
 	missingSet := sets.NewString()
 	for i := range pod.Spec.Containers {
-		requests := pod.Spec.Containers[i].Resources.Requests
-		limits := pod.Spec.Containers[i].Resources.Limits
-		containerUsage := podUsageHelper(requests, limits)
-		containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
-		if !containerSet.Equal(requiredSet) {
-			difference := requiredSet.Difference(containerSet)
-			missingSet.Insert(difference.List()...)
-		}
+		enforcePodContainerConstraints(&pod.Spec.Containers[i], requiredSet, missingSet)
+	}
+	for i := range pod.Spec.InitContainers {
+		enforcePodContainerConstraints(&pod.Spec.InitContainers[i], requiredSet, missingSet)
 	}
 	if len(missingSet) == 0 {
 		return nil
 	}
 	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
+}
+
+// enforcePodContainerConstraints checks for required resources that are not set on this container and
+// adds them to missingSet.
+func enforcePodContainerConstraints(container *api.Container, requiredSet, missingSet sets.String) {
+	requests := container.Resources.Requests
+	limits := container.Resources.Limits
+	containerUsage := podUsageHelper(requests, limits)
+	containerSet := quota.ToSet(quota.ResourceNames(containerUsage))
+	if !containerSet.Equal(requiredSet) {
+		difference := requiredSet.Difference(containerSet)
+		missingSet.Insert(difference.List()...)
+	}
 }
 
 // podUsageHelper can summarize the pod quota usage based on requests and limits
@@ -144,9 +156,17 @@ func PodUsageFunc(object runtime.Object) api.ResourceList {
 	// when we have pod level cgroups, we can just read pod level requests/limits
 	requests := api.ResourceList{}
 	limits := api.ResourceList{}
+
 	for i := range pod.Spec.Containers {
 		requests = quota.Add(requests, pod.Spec.Containers[i].Resources.Requests)
 		limits = quota.Add(limits, pod.Spec.Containers[i].Resources.Limits)
+	}
+	// InitContainers are run sequentially before other containers start, so the highest
+	// init container resource is compared against the sum of app containers to determine
+	// the effective usage for both requests and limits.
+	for i := range pod.Spec.InitContainers {
+		requests = quota.Max(requests, pod.Spec.InitContainers[i].Resources.Requests)
+		limits = quota.Max(limits, pod.Spec.InitContainers[i].Resources.Limits)
 	}
 
 	return podUsageHelper(requests, limits)
@@ -172,16 +192,7 @@ func PodMatchesScopeFunc(scope api.ResourceQuotaScope, object runtime.Object) bo
 }
 
 func isBestEffort(pod *api.Pod) bool {
-	// TODO: when we have request/limits on a pod scope, we need to revisit this
-	for _, container := range pod.Spec.Containers {
-		qosPerResource := util.GetQoS(&container)
-		for _, qos := range qosPerResource {
-			if util.BestEffort == qos {
-				return true
-			}
-		}
-	}
-	return false
+	return qos.GetPodQOS(pod) == qos.BestEffort
 }
 
 func isTerminating(pod *api.Pod) bool {

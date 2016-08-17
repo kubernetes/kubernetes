@@ -2,7 +2,11 @@
 
 package configs
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+	"sync"
+)
 
 const (
 	NEWNET  NamespaceType = "NEWNET"
@@ -12,6 +16,51 @@ const (
 	NEWIPC  NamespaceType = "NEWIPC"
 	NEWUSER NamespaceType = "NEWUSER"
 )
+
+var (
+	nsLock              sync.Mutex
+	supportedNamespaces = make(map[NamespaceType]bool)
+)
+
+// nsToFile converts the namespace type to its filename
+func nsToFile(ns NamespaceType) string {
+	switch ns {
+	case NEWNET:
+		return "net"
+	case NEWNS:
+		return "mnt"
+	case NEWPID:
+		return "pid"
+	case NEWIPC:
+		return "ipc"
+	case NEWUSER:
+		return "user"
+	case NEWUTS:
+		return "uts"
+	}
+	return ""
+}
+
+// IsNamespaceSupported returns whether a namespace is available or
+// not
+func IsNamespaceSupported(ns NamespaceType) bool {
+	nsLock.Lock()
+	defer nsLock.Unlock()
+	supported, ok := supportedNamespaces[ns]
+	if ok {
+		return supported
+	}
+	nsFile := nsToFile(ns)
+	// if the namespace type is unknown, just return false
+	if nsFile == "" {
+		return false
+	}
+	_, err := os.Stat(fmt.Sprintf("/proc/self/ns/%s", nsFile))
+	// a namespace is supported if it exists and we have permissions to read it
+	supported = err == nil
+	supportedNamespaces[ns] = supported
+	return supported
+}
 
 func NamespaceTypes() []NamespaceType {
 	return []NamespaceType{
@@ -35,26 +84,7 @@ func (n *Namespace) GetPath(pid int) string {
 	if n.Path != "" {
 		return n.Path
 	}
-	return fmt.Sprintf("/proc/%d/ns/%s", pid, n.file())
-}
-
-func (n *Namespace) file() string {
-	file := ""
-	switch n.Type {
-	case NEWNET:
-		file = "net"
-	case NEWNS:
-		file = "mnt"
-	case NEWPID:
-		file = "pid"
-	case NEWIPC:
-		file = "ipc"
-	case NEWUSER:
-		file = "user"
-	case NEWUTS:
-		file = "uts"
-	}
-	return file
+	return fmt.Sprintf("/proc/%d/ns/%s", pid, nsToFile(n.Type))
 }
 
 func (n *Namespaces) Remove(t NamespaceType) bool {
@@ -86,4 +116,12 @@ func (n *Namespaces) index(t NamespaceType) int {
 
 func (n *Namespaces) Contains(t NamespaceType) bool {
 	return n.index(t) != -1
+}
+
+func (n *Namespaces) PathOf(t NamespaceType) string {
+	i := n.index(t)
+	if i == -1 {
+		return ""
+	}
+	return (*n)[i].Path
 }

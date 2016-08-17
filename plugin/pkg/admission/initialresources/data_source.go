@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,5 +53,5 @@ func newDataSource(kind string) (dataSource, error) {
 	if kind == "hawkular" {
 		return newHawkularSource(*hawkularConfig)
 	}
-	return nil, fmt.Errorf("Unknown data source %v", kind)
+	return nil, fmt.Errorf("unknown data source %v", kind)
 }

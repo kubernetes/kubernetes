@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,9 +19,10 @@ package scheduler
 import (
 	"bytes"
 	"fmt"
-	"math/rand"
 	"sort"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/golang/glog"
@@ -35,7 +36,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
-type FailedPredicateMap map[string]string
+type FailedPredicateMap map[string][]algorithm.PredicateFailureReason
 
 type FitError struct {
 	Pod              *api.Pod
@@ -48,22 +49,27 @@ var ErrNoNodesAvailable = fmt.Errorf("no nodes available to schedule pods")
 func (f *FitError) Error() string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("pod (%s) failed to fit in any node\n", f.Pod.Name))
-	for node, predicate := range f.FailedPredicates {
-		reason := fmt.Sprintf("fit failure on node (%s): %s\n", node, predicate)
-		buf.WriteString(reason)
+	for node, predicates := range f.FailedPredicates {
+		reasons := make([]string, 0)
+		for _, pred := range predicates {
+			reasons = append(reasons, pred.GetReason())
+		}
+		reasonMsg := fmt.Sprintf("fit failure on node (%s): %s\n", node, strings.Join(reasons, ", "))
+		buf.WriteString(reasonMsg)
 	}
 	return buf.String()
 }
 
 type genericScheduler struct {
-	cache         schedulercache.Cache
-	predicates    map[string]algorithm.FitPredicate
-	prioritizers  []algorithm.PriorityConfig
-	extenders     []algorithm.SchedulerExtender
-	pods          algorithm.PodLister
-	random        *rand.Rand
-	randomLock    sync.Mutex
-	lastNodeIndex uint64
+	cache             schedulercache.Cache
+	predicates        map[string]algorithm.FitPredicate
+	prioritizers      []algorithm.PriorityConfig
+	extenders         []algorithm.SchedulerExtender
+	pods              algorithm.PodLister
+	lastNodeIndexLock sync.Mutex
+	lastNodeIndex     uint64
+
+	cachedNodeInfoMap map[string]*schedulercache.NodeInfo
 }
 
 // Schedule tries to schedule the given pod to one of node in the node list.
@@ -82,23 +88,23 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	if err != nil {
 		return "", err
 	}
-	if len(nodes.Items) == 0 {
+	if len(nodes) == 0 {
 		return "", ErrNoNodesAvailable
 	}
 
 	// Used for all fit and priority funcs.
-	nodeNameToInfo, err := g.cache.GetNodeNameToInfoMap()
+	err = g.cache.UpdateNodeNameToInfoMap(g.cachedNodeInfoMap)
 	if err != nil {
 		return "", err
 	}
 
 	trace.Step("Computing predicates")
-	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, nodeNameToInfo, g.predicates, nodes, g.extenders)
+	filteredNodes, failedPredicateMap, err := findNodesThatFit(pod, g.cachedNodeInfoMap, nodes, g.predicates, g.extenders)
 	if err != nil {
 		return "", err
 	}
 
-	if len(filteredNodes.Items) == 0 {
+	if len(filteredNodes) == 0 {
 		return "", &FitError{
 			Pod:              pod,
 			FailedPredicates: failedPredicateMap,
@@ -106,7 +112,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 	}
 
 	trace.Step("Prioritizing")
-	priorityList, err := PrioritizeNodes(pod, nodeNameToInfo, g.prioritizers, algorithm.FakeNodeLister(filteredNodes), g.extenders)
+	priorityList, err := PrioritizeNodes(pod, g.cachedNodeInfoMap, g.prioritizers, filteredNodes, g.extenders)
 	if err != nil {
 		return "", err
 	}
@@ -116,7 +122,7 @@ func (g *genericScheduler) Schedule(pod *api.Pod, nodeLister algorithm.NodeListe
 }
 
 // selectHost takes a prioritized list of nodes and then picks one
-// randomly from the nodes that had the highest score.
+// in a round-robin manner from the nodes that had the highest score.
 func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList) (string, error) {
 	if len(priorityList) == 0 {
 		return "", fmt.Errorf("empty priorityList")
@@ -126,91 +132,96 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 	maxScore := priorityList[0].Score
 	firstAfterMaxScore := sort.Search(len(priorityList), func(i int) bool { return priorityList[i].Score < maxScore })
 
-	g.randomLock.Lock()
+	g.lastNodeIndexLock.Lock()
 	ix := int(g.lastNodeIndex % uint64(firstAfterMaxScore))
 	g.lastNodeIndex++
-	g.randomLock.Unlock()
+	g.lastNodeIndexLock.Unlock()
 
 	return priorityList[ix].Host, nil
 }
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func findNodesThatFit(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate, nodes api.NodeList, extenders []algorithm.SchedulerExtender) (api.NodeList, FailedPredicateMap, error) {
-	predicateResultLock := sync.Mutex{}
-	filtered := []api.Node{}
+func findNodesThatFit(
+	pod *api.Pod,
+	nodeNameToInfo map[string]*schedulercache.NodeInfo,
+	nodes []*api.Node,
+	predicateFuncs map[string]algorithm.FitPredicate,
+	extenders []algorithm.SchedulerExtender) ([]*api.Node, FailedPredicateMap, error) {
+	var filtered []*api.Node
 	failedPredicateMap := FailedPredicateMap{}
-	errs := []error{}
 
-	checkNode := func(i int) {
-		nodeName := nodes.Items[i].Name
-		fits, failedPredicate, err := podFitsOnNode(pod, nodeNameToInfo[nodeName], predicateFuncs)
+	if len(predicateFuncs) == 0 {
+		filtered = nodes
+	} else {
+		// Create filtered list with enough space to avoid growing it
+		// and allow assigning.
+		filtered = make([]*api.Node, len(nodes))
+		meta := predicates.PredicateMetadata(pod, nodeNameToInfo)
+		errs := []error{}
 
-		predicateResultLock.Lock()
-		defer predicateResultLock.Unlock()
-		if err != nil {
-			errs = append(errs, err)
-			return
+		var predicateResultLock sync.Mutex
+		var filteredLen int32
+		checkNode := func(i int) {
+			nodeName := nodes[i].Name
+			fits, failedPredicates, err := podFitsOnNode(pod, meta, nodeNameToInfo[nodeName], predicateFuncs)
+			if err != nil {
+				predicateResultLock.Lock()
+				errs = append(errs, err)
+				predicateResultLock.Unlock()
+				return
+			}
+			if fits {
+				filtered[atomic.AddInt32(&filteredLen, 1)-1] = nodes[i]
+			} else {
+				predicateResultLock.Lock()
+				failedPredicateMap[nodeName] = failedPredicates
+				predicateResultLock.Unlock()
+			}
 		}
-		if fits {
-			filtered = append(filtered, nodes.Items[i])
-		} else {
-			failedPredicateMap[nodeName] = failedPredicate
+		workqueue.Parallelize(16, len(nodes), checkNode)
+		filtered = filtered[:filteredLen]
+		if len(errs) > 0 {
+			return []*api.Node{}, FailedPredicateMap{}, errors.NewAggregate(errs)
 		}
-	}
-	workqueue.Parallelize(16, len(nodes.Items), checkNode)
-	if len(errs) > 0 {
-		return api.NodeList{}, FailedPredicateMap{}, errors.NewAggregate(errs)
 	}
 
 	if len(filtered) > 0 && len(extenders) != 0 {
 		for _, extender := range extenders {
-			filteredList, err := extender.Filter(pod, &api.NodeList{Items: filtered})
+			filteredList, failedMap, err := extender.Filter(pod, filtered)
 			if err != nil {
-				return api.NodeList{}, FailedPredicateMap{}, err
+				return []*api.Node{}, FailedPredicateMap{}, err
 			}
-			filtered = filteredList.Items
+
+			for failedNodeName, failedMsg := range failedMap {
+				if _, found := failedPredicateMap[failedNodeName]; !found {
+					failedPredicateMap[failedNodeName] = []algorithm.PredicateFailureReason{}
+				}
+				failedPredicateMap[failedNodeName] = append(failedPredicateMap[failedNodeName], predicates.NewFailureReason(failedMsg))
+			}
+			filtered = filteredList
 			if len(filtered) == 0 {
 				break
 			}
 		}
 	}
-	return api.NodeList{Items: filtered}, failedPredicateMap, nil
+	return filtered, failedPredicateMap, nil
 }
 
 // Checks whether node with a given name and NodeInfo satisfies all predicateFuncs.
-func podFitsOnNode(pod *api.Pod, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, string, error) {
+func podFitsOnNode(pod *api.Pod, meta interface{}, info *schedulercache.NodeInfo, predicateFuncs map[string]algorithm.FitPredicate) (bool, []algorithm.PredicateFailureReason, error) {
+	var failedPredicates []algorithm.PredicateFailureReason
 	for _, predicate := range predicateFuncs {
-		fit, err := predicate(pod, info)
+		fit, reasons, err := predicate(pod, meta, info)
 		if err != nil {
-			switch e := err.(type) {
-			case *predicates.InsufficientResourceError:
-				if fit {
-					err := fmt.Errorf("got InsufficientResourceError: %v, but also fit='true' which is unexpected", e)
-					return false, "", err
-				}
-			case *predicates.PredicateFailureError:
-				if fit {
-					err := fmt.Errorf("got PredicateFailureError: %v, but also fit='true' which is unexpected", e)
-					return false, "", err
-				}
-			default:
-				return false, "", err
-			}
+			err := fmt.Errorf("SchedulerPredicates failed due to %v, which is unexpected.", err)
+			return false, []algorithm.PredicateFailureReason{}, err
 		}
 		if !fit {
-			if re, ok := err.(*predicates.InsufficientResourceError); ok {
-				return false, fmt.Sprintf("Insufficient %s", re.ResourceName), nil
-			}
-			if re, ok := err.(*predicates.PredicateFailureError); ok {
-				return false, re.PredicateName, nil
-			} else {
-				err := fmt.Errorf("SchedulerPredicates failed due to %v, which is unexpected.", err)
-				return false, "", err
-			}
+			failedPredicates = append(failedPredicates, reasons...)
 		}
 	}
-	return true, "", nil
+	return len(failedPredicates) == 0, failedPredicates, nil
 }
 
 // Prioritizes the nodes by running the individual priority functions in parallel.
@@ -223,21 +234,21 @@ func PrioritizeNodes(
 	pod *api.Pod,
 	nodeNameToInfo map[string]*schedulercache.NodeInfo,
 	priorityConfigs []algorithm.PriorityConfig,
-	nodeLister algorithm.NodeLister,
+	nodes []*api.Node,
 	extenders []algorithm.SchedulerExtender,
 ) (schedulerapi.HostPriorityList, error) {
-	result := schedulerapi.HostPriorityList{}
+	result := make(schedulerapi.HostPriorityList, 0, len(nodeNameToInfo))
 
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
 	if len(priorityConfigs) == 0 && len(extenders) == 0 {
-		return EqualPriority(pod, nodeNameToInfo, nodeLister)
+		return EqualPriority(pod, nodeNameToInfo, nodes)
 	}
 
 	var (
 		mu             = sync.Mutex{}
 		wg             = sync.WaitGroup{}
-		combinedScores = map[string]int{}
+		combinedScores = make(map[string]int, len(nodeNameToInfo))
 		errs           []error
 	)
 
@@ -252,7 +263,7 @@ func PrioritizeNodes(
 			defer wg.Done()
 			weight := config.Weight
 			priorityFunc := config.Function
-			prioritizedList, err := priorityFunc(pod, nodeNameToInfo, nodeLister)
+			prioritizedList, err := priorityFunc(pod, nodeNameToInfo, nodes)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -273,16 +284,12 @@ func PrioritizeNodes(
 	// wait for all go routines to finish
 	wg.Wait()
 
-	if len(extenders) != 0 && nodeLister != nil {
-		nodes, err := nodeLister.List()
-		if err != nil {
-			return schedulerapi.HostPriorityList{}, err
-		}
+	if len(extenders) != 0 && nodes != nil {
 		for _, extender := range extenders {
 			wg.Add(1)
 			go func(ext algorithm.SchedulerExtender) {
 				defer wg.Done()
-				prioritizedList, weight, err := ext.Prioritize(pod, &nodes)
+				prioritizedList, weight, err := ext.Prioritize(pod, nodes)
 				if err != nil {
 					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
 					return
@@ -307,15 +314,9 @@ func PrioritizeNodes(
 }
 
 // EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-func EqualPriority(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
-	nodes, err := nodeLister.List()
-	if err != nil {
-		glog.Errorf("Failed to list nodes: %v", err)
-		return []schedulerapi.HostPriority{}, err
-	}
-
-	result := []schedulerapi.HostPriority{}
-	for _, node := range nodes.Items {
+func EqualPriority(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
+	result := make(schedulerapi.HostPriorityList, len(nodes))
+	for _, node := range nodes {
 		result = append(result, schedulerapi.HostPriority{
 			Host:  node.Name,
 			Score: 1,
@@ -324,12 +325,12 @@ func EqualPriority(_ *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInf
 	return result, nil
 }
 
-func NewGenericScheduler(cache schedulercache.Cache, predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender, random *rand.Rand) algorithm.ScheduleAlgorithm {
+func NewGenericScheduler(cache schedulercache.Cache, predicates map[string]algorithm.FitPredicate, prioritizers []algorithm.PriorityConfig, extenders []algorithm.SchedulerExtender) algorithm.ScheduleAlgorithm {
 	return &genericScheduler{
-		cache:        cache,
-		predicates:   predicates,
-		prioritizers: prioritizers,
-		extenders:    extenders,
-		random:       random,
+		cache:             cache,
+		predicates:        predicates,
+		prioritizers:      prioritizers,
+		extenders:         extenders,
+		cachedNodeInfoMap: make(map[string]*schedulercache.NodeInfo),
 	}
 }

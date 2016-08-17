@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -204,8 +204,8 @@ func TestResourceListConversion(t *testing.T) {
 		},
 	}
 
-	output := api.ResourceList{}
 	for i, test := range tests {
+		output := api.ResourceList{}
 		err := api.Scheme.Convert(&test.input, &output)
 		if err != nil {
 			t.Fatalf("unexpected error for case %d: %v", i, err)

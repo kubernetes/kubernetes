@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
 )
@@ -57,9 +56,12 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 	}
 	var obj runtime.Object
 	var versioned runtime.Object
-	if registered.IsThirdPartyAPIGroupVersion(gvk.GroupVersion()) {
-		obj, err = runtime.Decode(thirdpartyresourcedata.NewDecoder(nil, gvk.Kind), data)
+	if isThirdParty, gvkOut, err := thirdpartyresourcedata.IsThirdPartyObject(data, gvk); err != nil {
+		return nil, err
+	} else if isThirdParty {
+		obj, err = runtime.Decode(thirdpartyresourcedata.NewDecoder(nil, gvkOut.Kind), data)
 		versioned = obj
+		gvk = gvkOut
 	} else {
 		obj, versioned = versions.Last(), versions.First()
 	}
@@ -96,7 +98,7 @@ func (m *Mapper) InfoForData(data []byte, source string) (*Info, error) {
 // if the object cannot be introspected. Name and namespace will be set into Info
 // if the mapping's MetadataAccessor can retrieve them.
 func (m *Mapper) InfoForObject(obj runtime.Object, preferredGVKs []unversioned.GroupVersionKind) (*Info, error) {
-	groupVersionKinds, err := m.ObjectKinds(obj)
+	groupVersionKinds, _, err := m.ObjectKinds(obj)
 	if err != nil {
 		return nil, fmt.Errorf("unable to get type info from the object %q: %v", reflect.TypeOf(obj), err)
 	}

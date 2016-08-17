@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -37,7 +37,7 @@ func TestTTLExpirationBasic(t *testing.T) {
 				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
 			},
 		},
-		util.RealClock{},
+		clock.RealClock{},
 	)
 	err := ttlStore.Add(testObj)
 	if err != nil {
@@ -71,7 +71,7 @@ func TestReAddExpiredItem(t *testing.T) {
 		},
 	}
 	ttlStore := NewFakeExpirationStore(
-		testStoreKeyFunc, deleteChan, exp, util.RealClock{})
+		testStoreKeyFunc, deleteChan, exp, clock.RealClock{})
 	testKey := "foo"
 	testObj := testStoreObject{id: testKey, val: "bar"}
 	err := ttlStore.Add(testObj)
@@ -133,7 +133,7 @@ func TestTTLList(t *testing.T) {
 				return obj.(*timestampedEntry).obj.(testStoreObject).id, nil
 			},
 		},
-		util.RealClock{},
+		clock.RealClock{},
 	)
 	for _, obj := range testObjs {
 		err := ttlStore.Add(obj)
@@ -167,7 +167,7 @@ func TestTTLPolicy(t *testing.T) {
 	exactlyOnTTL := fakeTime.Add(-ttl)
 	expiredTime := fakeTime.Add(-(ttl + 1))
 
-	policy := TTLPolicy{ttl, util.NewFakeClock(fakeTime)}
+	policy := TTLPolicy{ttl, clock.NewFakeClock(fakeTime)}
 	fakeTimestampedEntry := &timestampedEntry{obj: struct{}{}, timestamp: exactlyOnTTL}
 	if policy.IsExpired(fakeTimestampedEntry) {
 		t.Errorf("TTL cache should not expire entries exactly on ttl")

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,3 +21,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/abac/v0"
 	_ "k8s.io/kubernetes/pkg/apis/abac/v1beta1"
 )
+
+// TODO: this file is totally wrong, it should look like other latest files.
+// lavalamp is in the middle of fixing this code, so wait for the new way of doing things..

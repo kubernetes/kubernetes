@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Makefile for the Docker image gcr.io/google_containers/kube2sky
+# Makefile for the Docker image gcr.io/google_containers/kubedns-<ARCH>
 # MAINTAINER: Tim Hockin <thockin@google.com>
 # If you update this image please bump the tag value before pushing.
 #
 # Usage:
-#   [ARCH=amd64] [TAG=1.0] [REGISTRY=gcr.io/google_containers] [BASEIMAGE=busybox] make container
+#   [ARCH=amd64] [TAG=1.6] [REGISTRY=gcr.io/google_containers] [BASEIMAGE=busybox] make (container|push)
 
 # Default registry, arch and tag. This can be overwritten by arguments to make
 PLATFORM?=linux
 ARCH?=amd64
-TAG?=1.0
+TAG?=1.6
 REGISTRY?=gcr.io/google_containers
 
 GOLANG_VERSION=1.6
-GOARM=6
 KUBE_ROOT=$(shell pwd)/../..
 TEMP_DIR:=$(shell mktemp -d)
 
@@ -48,7 +47,7 @@ all: container
 
 container:
 	# Copy the content in this dir to the temp dir
-	cp $(KUBE_ROOT)/_output/local/bin/$(PLATFORM)/$(ARCH)/kube-dns $(TEMP_DIR)
+	cp $(KUBE_ROOT)/_output/dockerized/bin/$(PLATFORM)/$(ARCH)/kube-dns $(TEMP_DIR)
 	cp $(KUBE_ROOT)/build/kube-dns/Dockerfile $(TEMP_DIR)
 
 	# Replace BASEIMAGE with the real base image

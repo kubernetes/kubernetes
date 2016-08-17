@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,25 +26,25 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = framework.KubeDescribe("Ubernetes Lite", func() {
-	f := framework.NewDefaultFramework("ubernetes-lite")
+var _ = framework.KubeDescribe("Multi-AZ Clusters", func() {
+	f := framework.NewDefaultFramework("multi-az")
 	var zoneCount int
 	var err error
 	image := "gcr.io/google_containers/serve_hostname:v1.4"
 	BeforeEach(func() {
+		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		if zoneCount <= 0 {
 			zoneCount, err = getZoneCount(f.Client)
 			Expect(err).NotTo(HaveOccurred())
 		}
 		By(fmt.Sprintf("Checking for multi-zone cluster.  Zone count = %d", zoneCount))
 		framework.SkipUnlessAtLeast(zoneCount, 2, "Zone count is %d, only run for multi-zone clusters, skipping test")
-		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 		// TODO: SkipUnlessDefaultScheduler() // Non-default schedulers might not spread
 	})
 	It("should spread the pods of a service across zones", func() {
@@ -88,11 +88,16 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 			Containers: []api.Container{
 				{
 					Name:  "test",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Image: framework.GetPauseImageName(f.Client),
 				},
 			},
 		},
 	}
+
+	// Caution: StartPods requires at least one pod to replicate.
+	// Based on the callers, replicas is always positive number: zoneCount >= 0 implies (2*zoneCount)+1 > 0.
+	// Thus, no need to test for it. Once the precondition changes to zero number of replicas,
+	// test for replicaCount > 0. Otherwise, StartPods panics.
 	framework.StartPods(f.Client, replicaCount, f.Namespace.Name, serviceName, *podSpec, false)
 
 	// Wait for all of them to be scheduled
@@ -182,7 +187,7 @@ func checkZoneSpreading(c *client.Client, pods *api.PodList, zoneNames []string)
 
 // Check that the pods comprising a replication controller get spread evenly across available zones
 func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
-	name := "ubelite-spread-rc-" + string(util.NewUUID())
+	name := "ubelite-spread-rc-" + string(uuid.NewUUID())
 	By(fmt.Sprintf("Creating replication controller %s", name))
 	controller, err := f.Client.ReplicationControllers(f.Namespace.Name).Create(&api.ReplicationController{
 		ObjectMeta: api.ObjectMeta{
@@ -214,7 +219,7 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string) {
 	// Cleanup the replication controller when we are done.
 	defer func() {
 		// Resize the replication controller to zero to get rid of pods.
-		if err := framework.DeleteRC(f.Client, f.Namespace.Name, controller.Name); err != nil {
+		if err := framework.DeleteRCAndPods(f.Client, f.Namespace.Name, controller.Name); err != nil {
 			framework.Logf("Failed to cleanup replication controller %v: %v.", controller.Name, err)
 		}
 	}()

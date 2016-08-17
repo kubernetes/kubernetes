@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ OUTPUT_TMP="${KUBE_ROOT}/${TMP_SUBPATH}"
 
 echo "Generating api reference docs at ${OUTPUT_TMP}"
 
-DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1 batch/v1 autoscaling/v1"
+DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1 batch/v1 autoscaling/v1 certificates/v1alpha1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 for ver in $VERSIONS; do
   mkdir -p "${OUTPUT_TMP}/${ver}"
@@ -60,20 +60,20 @@ fi
 
 for ver in $VERSIONS; do
   TMP_IN_HOST="${OUTPUT_TMP_IN_HOST}/${ver}"
-  REGISTER_FILE_URL="https://raw.githubusercontent.com/kubernetes/kubernetes/master/pkg"
   if [[ ${ver} == "v1" ]]; then
-    REGISTER_FILE_URL="${REGISTER_FILE_URL}/api/${ver}/register.go"
+    REGISTER_FILE="${REPO_DIR}/pkg/api/${ver}/register.go"
   else
-    REGISTER_FILE_URL="${REGISTER_FILE_URL}/apis/${ver}/register.go"
+    REGISTER_FILE="${REPO_DIR}/pkg/apis/${ver}/register.go"
   fi
   SWAGGER_JSON_NAME="$(kube::util::gv-to-swagger-name "${ver}")"
 
   docker run ${user_flags} \
     --rm -v "${TMP_IN_HOST}":/output:z \
     -v "${SWAGGER_PATH}":/swagger-source:z \
-    gcr.io/google_containers/gen-swagger-docs:v5 \
-    "${SWAGGER_JSON_NAME}" \
-    "${REGISTER_FILE_URL}"
+    -v "${REGISTER_FILE}":/register.go:z \
+    --net=host -e "https_proxy=${KUBERNETES_HTTPS_PROXY:-}" \
+    gcr.io/google_containers/gen-swagger-docs:v8 \
+    "${SWAGGER_JSON_NAME}"
 done
 
 # Check if we actually changed anything
@@ -95,7 +95,7 @@ while read file; do
 
     # By now, the contents should be normalized and stripped of any
     # auto-managed content.
-    if diff -Bw >/dev/null <(echo "${original}") <(echo "${generated}"); then
+    if diff -B >/dev/null <(echo "${original}") <(echo "${generated}"); then
       # actual contents same, overwrite generated with original.
       cp "${OUTPUT}/${file}" "${OUTPUT_TMP}/${file}"
     fi

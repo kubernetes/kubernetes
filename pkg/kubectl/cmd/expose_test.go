@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -199,6 +199,70 @@ func TestRunExposeService(t *testing.T) {
 			status: 200,
 		},
 		{
+			name: "expose-service-cluster-ip",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "10.10.10.10", "dry-run": "true"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Protocol:   api.ProtocolUDP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector:  map[string]string{"func": "stream"},
+					ClusterIP: "10.10.10.10",
+				},
+			},
+			expected: "service \"foo\" exposed",
+			status:   200,
+		},
+		{
+			name: "expose-headless-service",
+			args: []string{"service", "baz"},
+			ns:   "test",
+			calls: map[string]string{
+				"GET":  "/namespaces/test/services/baz",
+				"POST": "/namespaces/test/services",
+			},
+			input: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "baz", Namespace: "test", ResourceVersion: "12"},
+				Spec: api.ServiceSpec{
+					Selector: map[string]string{"app": "go"},
+				},
+			},
+			flags: map[string]string{"selector": "func=stream", "protocol": "UDP", "port": "14", "name": "foo", "labels": "svc=test", "cluster-ip": "None", "dry-run": "true"},
+			output: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "", Labels: map[string]string{"svc": "test"}},
+				Spec: api.ServiceSpec{
+					Ports: []api.ServicePort{
+						{
+							Protocol:   api.ProtocolUDP,
+							Port:       14,
+							TargetPort: intstr.FromInt(14),
+						},
+					},
+					Selector:  map[string]string{"func": "stream"},
+					ClusterIP: api.ClusterIPNone,
+				},
+			},
+			expected: "service \"foo\" exposed",
+			status:   200,
+		},
+		{
 			name: "expose-from-file",
 			args: []string{},
 			ns:   "test",
@@ -230,10 +294,10 @@ func TestRunExposeService(t *testing.T) {
 		},
 		{
 			name: "truncate-name",
-			args: []string{"pod", "a-name-that-is-toooo-big-for-a-service"},
+			args: []string{"pod", "a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters"},
 			ns:   "test",
 			calls: map[string]string{
-				"GET":  "/namespaces/test/pods/a-name-that-is-toooo-big-for-a-service",
+				"GET":  "/namespaces/test/pods/a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters",
 				"POST": "/namespaces/test/services",
 			},
 			input: &api.Pod{
@@ -241,7 +305,7 @@ func TestRunExposeService(t *testing.T) {
 			},
 			flags: map[string]string{"selector": "svc=frompod", "port": "90", "labels": "svc=frompod", "generator": "service/v2"},
 			output: &api.Service{
-				ObjectMeta: api.ObjectMeta{Name: "a-name-that-is-toooo-big", Namespace: "", Labels: map[string]string{"svc": "frompod"}},
+				ObjectMeta: api.ObjectMeta{Name: "a-name-that-is-toooo-big-for-a-service-because-it-can-only-handle-63-characters", Namespace: "", Labels: map[string]string{"svc": "frompod"}},
 				Spec: api.ServiceSpec{
 					Ports: []api.ServicePort{
 						{
@@ -253,7 +317,7 @@ func TestRunExposeService(t *testing.T) {
 					Selector: map[string]string{"svc": "frompod"},
 				},
 			},
-			expected: "service \"a-name-that-is-toooo-big\" exposed",
+			expected: "service \"a-name-that-is-toooo-big-for-a-service-because-it-can-only-hand\" exposed",
 			status:   200,
 		},
 		{
@@ -366,10 +430,10 @@ func TestRunExposeService(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 		tf.Printer = &kubectl.JSONPrinter{}
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.calls[m] && m == "GET":

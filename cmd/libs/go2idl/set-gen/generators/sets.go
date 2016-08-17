@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ func Packages(_ *generator.Context, arguments *args.GeneratorArgs) generator.Pac
 				// // +genset
 				// or
 				// // +genset=true
-				return types.ExtractCommentTags("+", t.CommentLines)["genset"] == "true"
+				return extractBoolTagOrDie("genset", t.CommentLines) == true
 			}
 			return false
 		},

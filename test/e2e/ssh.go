@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import (
 
 	. "github.com/onsi/ginkgo"
 )
+
+const maxNodes = 100
 
 var _ = framework.KubeDescribe("SSH", func() {
 
@@ -50,17 +52,27 @@ var _ = framework.KubeDescribe("SSH", func() {
 			expectedCode   int
 			expectedError  error
 		}{
-			{`echo "Hello"`, true, "Hello", "", 0, nil},
-			// Same as previous, but useful for test output diagnostics.
+			// Keep this test first - this variant runs on all nodes.
 			{`echo "Hello from $(whoami)@$(hostname)"`, false, "", "", 0, nil},
 			{`echo "foo" | grep "bar"`, true, "", "", 1, nil},
 			{`echo "Out" && echo "Error" >&2 && exit 7`, true, "Out", "Error", 7, nil},
 		}
 
-		// Run commands on all nodes via SSH.
-		for _, testCase := range testCases {
-			By(fmt.Sprintf("SSH'ing to all nodes and running %s", testCase.cmd))
-			for _, host := range hosts {
+		for i, testCase := range testCases {
+			// Only run the first testcase against max 100 nodes. Run
+			// the rest against the first node we find only, since
+			// they're basically testing SSH semantics (and we don't
+			// need to do that against each host in the cluster).
+			nodes := len(hosts)
+			if i > 0 {
+				nodes = 1
+			} else if nodes > maxNodes {
+				nodes = maxNodes
+			}
+			testhosts := hosts[:nodes]
+			By(fmt.Sprintf("SSH'ing to %d nodes and running %s", len(testhosts), testCase.cmd))
+
+			for _, host := range testhosts {
 				result, err := framework.SSH(testCase.cmd, host, framework.TestContext.Provider)
 				stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 				if err != testCase.expectedError {

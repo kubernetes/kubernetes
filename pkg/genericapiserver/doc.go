@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,4 +20,4 @@ limitations under the License.
 // pkg/master and pkg/apiserver) here.
 // We plan to move this package into a separate repo on github once it is done.
 // For more details: https://github.com/kubernetes/kubernetes/issues/2742
-package genericapiserver
+package genericapiserver // import "k8s.io/kubernetes/pkg/genericapiserver"

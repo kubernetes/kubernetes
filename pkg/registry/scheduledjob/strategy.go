@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -44,13 +44,13 @@ func (scheduledJobStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a scheduled job before creation.
-func (scheduledJobStrategy) PrepareForCreate(obj runtime.Object) {
+func (scheduledJobStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	scheduledJob := obj.(*batch.ScheduledJob)
 	scheduledJob.Status = batch.ScheduledJobStatus{}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (scheduledJobStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (scheduledJobStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newScheduledJob := obj.(*batch.ScheduledJob)
 	oldScheduledJob := old.(*batch.ScheduledJob)
 	newScheduledJob.Status = oldScheduledJob.Status
@@ -86,7 +86,7 @@ type scheduledJobStatusStrategy struct {
 
 var StatusStrategy = scheduledJobStatusStrategy{Strategy}
 
-func (scheduledJobStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (scheduledJobStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newJob := obj.(*batch.ScheduledJob)
 	oldJob := old.(*batch.ScheduledJob)
 	newJob.Spec = oldJob.Spec

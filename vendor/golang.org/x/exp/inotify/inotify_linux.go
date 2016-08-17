@@ -144,6 +144,10 @@ func (w *Watcher) RemoveWatch(path string) error {
 		return os.NewSyscallError("inotify_rm_watch", errno)
 	}
 	delete(w.watches, path)
+	// Locking here to protect the read from paths in readEvents.
+	w.mu.Lock()
+	delete(w.paths, int(watch.wd))
+	w.mu.Unlock()
 	return nil
 }
 
@@ -197,17 +201,19 @@ func (w *Watcher) readEvents() {
 			// the "Name" field with a valid filename. We retrieve the path of the watch from
 			// the "paths" map.
 			w.mu.Lock()
-			event.Name = w.paths[int(raw.Wd)]
+			name, ok := w.paths[int(raw.Wd)]
 			w.mu.Unlock()
-			if nameLen > 0 {
-				// Point "bytes" at the first byte of the filename
-				bytes := (*[syscall.PathMax]byte)(unsafe.Pointer(&buf[offset+syscall.SizeofInotifyEvent]))
-				// The filename is padded with NUL bytes. TrimRight() gets rid of those.
-				event.Name += "/" + strings.TrimRight(string(bytes[0:nameLen]), "\000")
+			if ok {
+				event.Name = name
+				if nameLen > 0 {
+					// Point "bytes" at the first byte of the filename
+					bytes := (*[syscall.PathMax]byte)(unsafe.Pointer(&buf[offset+syscall.SizeofInotifyEvent]))
+					// The filename is padded with NUL bytes. TrimRight() gets rid of those.
+					event.Name += "/" + strings.TrimRight(string(bytes[0:nameLen]), "\000")
+				}
+				// Send the event on the events channel
+				w.Event <- event
 			}
-			// Send the event on the events channel
-			w.Event <- event
-
 			// Move to the next event in the buffer
 			offset += syscall.SizeofInotifyEvent + nameLen
 		}

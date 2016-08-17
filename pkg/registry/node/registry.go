@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ func (s *storage) CreateNode(ctx api.Context, node *api.Node) error {
 }
 
 func (s *storage) UpdateNode(ctx api.Context, node *api.Node) error {
-	_, _, err := s.Update(ctx, node)
+	_, _, err := s.Update(ctx, node.Name, rest.DefaultUpdatedObjectInfo(node, api.Scheme))
 	return err
 }
 

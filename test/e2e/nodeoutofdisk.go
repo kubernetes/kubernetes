@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -179,7 +179,7 @@ func createOutOfDiskPod(c *client.Client, ns, name string, milliCPU int64) {
 			Containers: []api.Container{
 				{
 					Name:  "pause",
-					Image: "beta.gcr.io/google_containers/pause-amd64:3.0",
+					Image: framework.GetPauseImageName(c),
 					Resources: api.ResourceRequirements{
 						Requests: api.ResourceList{
 							// Request enough CPU to fit only two pods on a given node.

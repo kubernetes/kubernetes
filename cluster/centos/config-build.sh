@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ RELEASES_DIR=${RELEASES_DIR:-/tmp/downloads}
 FLANNEL_VERSION=${FLANNEL_VERSION:-"0.5.5"}
 
 # Define etcd version to use.
-ETCD_VERSION=${ETCD_VERSION:-"2.2.1"}
+ETCD_VERSION=${ETCD_VERSION:-"3.0.4"}
 
 # Define k8s version to use.
 K8S_VERSION=${K8S_VERSION:-"1.1.1"}

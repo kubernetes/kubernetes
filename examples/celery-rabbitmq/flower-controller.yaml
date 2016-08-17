@@ -15,6 +15,15 @@ spec:
       containers:
       - image: endocode/flower
         name: flower
+        ports:
+        - containerPort: 5555
         resources:
           limits:
             cpu: 100m
+        livenessProbe:
+          httpGet:
+            # Path to probe; should be cheap, but representative of typical behavior
+            path: /
+            port: 5555
+          initialDelaySeconds: 30
+          timeoutSeconds: 1

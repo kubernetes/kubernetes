@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -103,9 +103,9 @@ func TestHelperDelete(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
-			Resp:  test.Resp,
-			Err:   test.HttpErr,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+			Resp:                 test.Resp,
+			Err:                  test.HttpErr,
 		}
 		modifier := &Helper{
 			RESTClient:      client,
@@ -193,9 +193,9 @@ func TestHelperCreate(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
-			Resp:  test.Resp,
-			Err:   test.HttpErr,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+			Resp:                 test.Resp,
+			Err:                  test.HttpErr,
 		}
 		modifier := &Helper{
 			RESTClient:      client,
@@ -273,9 +273,9 @@ func TestHelperGet(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
-			Resp:  test.Resp,
-			Err:   test.HttpErr,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+			Resp:                 test.Resp,
+			Err:                  test.HttpErr,
 		}
 		modifier := &Helper{
 			RESTClient:      client,
@@ -346,9 +346,9 @@ func TestHelperList(t *testing.T) {
 	}
 	for _, test := range tests {
 		client := &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
-			Resp:  test.Resp,
-			Err:   test.HttpErr,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+			Resp:                 test.Resp,
+			Err:                  test.HttpErr,
 		}
 		modifier := &Helper{
 			RESTClient:      client,
@@ -479,10 +479,10 @@ func TestHelperReplace(t *testing.T) {
 	}
 	for i, test := range tests {
 		client := &fake.RESTClient{
-			Client: test.HTTPClient,
-			Codec:  testapi.Default.Codec(),
-			Resp:   test.Resp,
-			Err:    test.HttpErr,
+			Client:               test.HTTPClient,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+			Resp:                 test.Resp,
+			Err:                  test.HttpErr,
 		}
 		modifier := &Helper{
 			RESTClient:      client,

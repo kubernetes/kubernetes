@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,5 +37,22 @@ func TestObjectVersioner(t *testing.T) {
 	}
 	if obj.ResourceVersion != "5" || obj.DeletionTimestamp != nil {
 		t.Errorf("unexpected resource version: %#v", obj)
+	}
+}
+
+func TestCompareResourceVersion(t *testing.T) {
+	five := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "5"}}
+	six := &storagetesting.TestResource{ObjectMeta: api.ObjectMeta{ResourceVersion: "6"}}
+
+	versioner := APIObjectVersioner{}
+
+	if e, a := -1, versioner.CompareResourceVersion(five, six); e != a {
+		t.Errorf("expected %v got %v", e, a)
+	}
+	if e, a := 1, versioner.CompareResourceVersion(six, five); e != a {
+		t.Errorf("expected %v got %v", e, a)
+	}
+	if e, a := 0, versioner.CompareResourceVersion(six, six); e != a {
+		t.Errorf("expected %v got %v", e, a)
 	}
 }

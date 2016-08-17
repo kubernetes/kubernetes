@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,19 +31,13 @@ function prereqs() {
   fi
   kube::build::ensure_docker_daemon_connectivity || return 1
 
-  KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${REPO_DIR:-${KUBE_ROOT}}/go-to-protobuf")
+  KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${REPO_DIR:-${KUBE_ROOT}}")
   KUBE_BUILD_IMAGE_TAG="build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
   KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
   DOCKER_MOUNT_ARGS=(
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/cluster:/go/src/${KUBE_GO_PACKAGE}/cluster"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/cmd:/go/src/${KUBE_GO_PACKAGE}/cmd"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/vendor:/go/src/${KUBE_GO_PACKAGE}/vendor"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/hack:/go/src/${KUBE_GO_PACKAGE}/hack"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/pkg:/go/src/${KUBE_GO_PACKAGE}/pkg"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/federation:/go/src/${KUBE_GO_PACKAGE}/federation"
-    --volume "${REPO_DIR:-${KUBE_ROOT}}/third_party:/go/src/${KUBE_GO_PACKAGE}/third_party"
+    --volume "${REPO_DIR:-${KUBE_ROOT}}:/go/src/${KUBE_GO_PACKAGE}"
     --volume /etc/localtime:/etc/localtime:ro
     --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}"
   )

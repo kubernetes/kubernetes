@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,4 +71,28 @@ func (a APIObjectVersioner) ObjectResourceVersion(obj runtime.Object) (uint64, e
 }
 
 // APIObjectVersioner implements Versioner
-var _ storage.Versioner = APIObjectVersioner{}
+var Versioner storage.Versioner = APIObjectVersioner{}
+
+// CompareResourceVersion compares etcd resource versions.  Outside this API they are all strings,
+// but etcd resource versions are special, they're actually ints, so we can easily compare them.
+func (a APIObjectVersioner) CompareResourceVersion(lhs, rhs runtime.Object) int {
+	lhsVersion, err := Versioner.ObjectResourceVersion(lhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+	rhsVersion, err := Versioner.ObjectResourceVersion(rhs)
+	if err != nil {
+		// coder error
+		panic(err)
+	}
+
+	if lhsVersion == rhsVersion {
+		return 0
+	}
+	if lhsVersion < rhsVersion {
+		return -1
+	}
+
+	return 1
+}

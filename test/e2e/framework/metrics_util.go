@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -42,10 +42,12 @@ const (
 	NodeStartupThreshold = 4 * time.Second
 
 	podStartupThreshold time.Duration = 5 * time.Second
-	// TODO: Decrease the small threshold to 250ms once tests are fixed.
-	apiCallLatencySmallThreshold  time.Duration = 500 * time.Millisecond
-	apiCallLatencyMediumThreshold time.Duration = 500 * time.Millisecond
-	apiCallLatencyLargeThreshold  time.Duration = 1 * time.Second
+	// We are setting 1s threshold for apicalls even in small clusters to avoid flakes.
+	// The problem is that if long GC is happening in small clusters (where we have e.g.
+	// 1-core master machines) and tests are pretty short, it may consume significant
+	// portion of CPU and basically stop all the real work.
+	// Increasing threshold to 1s is within our SLO and should solve this problem.
+	apiCallLatencyThreshold time.Duration = 1 * time.Second
 )
 
 type MetricsForE2E metrics.MetricsCollection
@@ -55,6 +57,10 @@ func (m *MetricsForE2E) filterMetrics() {
 	for _, metric := range InterestingApiServerMetrics {
 		interestingApiServerMetrics[metric] = (*m).ApiServerMetrics[metric]
 	}
+	interestingControllerManagerMetrics := make(metrics.ControllerManagerMetrics)
+	for _, metric := range InterestingControllerManagerMetrics {
+		interestingControllerManagerMetrics[metric] = (*m).ControllerManagerMetrics[metric]
+	}
 	interestingKubeletMetrics := make(map[string]metrics.KubeletMetrics)
 	for kubelet, grabbed := range (*m).KubeletMetrics {
 		interestingKubeletMetrics[kubelet] = make(metrics.KubeletMetrics)
@@ -63,6 +69,7 @@ func (m *MetricsForE2E) filterMetrics() {
 		}
 	}
 	(*m).ApiServerMetrics = interestingApiServerMetrics
+	(*m).ControllerManagerMetrics = interestingControllerManagerMetrics
 	(*m).KubeletMetrics = interestingKubeletMetrics
 }
 
@@ -71,6 +78,12 @@ func (m *MetricsForE2E) PrintHumanReadable() string {
 	for _, interestingMetric := range InterestingApiServerMetrics {
 		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
 		for _, sample := range (*m).ApiServerMetrics[interestingMetric] {
+			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
+		}
+	}
+	for _, interestingMetric := range InterestingControllerManagerMetrics {
+		buf.WriteString(fmt.Sprintf("For %v:\n", interestingMetric))
+		for _, sample := range (*m).ControllerManagerMetrics[interestingMetric] {
 			buf.WriteString(fmt.Sprintf("\t%v\n", metrics.PrintSample(sample)))
 		}
 	}
@@ -100,6 +113,12 @@ var InterestingApiServerMetrics = []string{
 	"etcd_request_cache_add_latencies_summary",
 	"etcd_request_cache_get_latencies_summary",
 	"etcd_request_latencies_summary",
+}
+
+var InterestingControllerManagerMetrics = []string{
+	"garbage_collector_event_processing_latency_microseconds",
+	"garbage_collector_dirty_processing_latency_microseconds",
+	"garbage_collector_orphan_processing_latency_microseconds",
 }
 
 var InterestingKubeletMetrics = []string{
@@ -225,31 +244,9 @@ func readLatencyMetrics(c *client.Client) (APIResponsiveness, error) {
 	return a, err
 }
 
-// Returns threshold for API call depending on the size of the cluster.
-// In general our goal is 1s, but for smaller clusters, we want to enforce
-// smaller limits, to allow noticing regressions.
-func apiCallLatencyThreshold(numNodes int) time.Duration {
-	if numNodes <= 250 {
-		return apiCallLatencySmallThreshold
-	}
-	if numNodes <= 500 {
-		return apiCallLatencyMediumThreshold
-	}
-	return apiCallLatencyLargeThreshold
-}
-
-func listNodesLatencyThreshold(numNodes int) time.Duration {
-	return apiCallLatencyLargeThreshold
-}
-
 // Prints top five summary metrics for request types with latency and returns
 // number of such request types above threshold.
 func HighLatencyRequests(c *client.Client) (int, error) {
-	nodes, err := c.Nodes().List(api.ListOptions{})
-	if err != nil {
-		return 0, err
-	}
-	numNodes := len(nodes.Items)
 	metrics, err := readLatencyMetrics(c)
 	if err != nil {
 		return 0, err
@@ -258,13 +255,8 @@ func HighLatencyRequests(c *client.Client) (int, error) {
 	badMetrics := 0
 	top := 5
 	for _, metric := range metrics.APICalls {
-		threshold := apiCallLatencyThreshold(numNodes)
-		if metric.Verb == "LIST" && metric.Resource == "nodes" {
-			threshold = listNodesLatencyThreshold(numNodes)
-		}
-
 		isBad := false
-		if metric.Latency.Perc99 > threshold {
+		if metric.Latency.Perc99 > apiCallLatencyThreshold {
 			badMetrics++
 			isBad = true
 		}
@@ -417,10 +409,7 @@ func PrettyPrintJSON(metrics interface{}) string {
 
 // extractMetricSamples parses the prometheus metric samples from the input string.
 func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
-	dec, err := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
-	if err != nil {
-		return nil, err
-	}
+	dec := expfmt.NewDecoder(strings.NewReader(metricsBlob), expfmt.FmtText)
 	decoder := expfmt.SampleDecoder{
 		Dec:  dec,
 		Opts: &expfmt.DecodeOptions{},
@@ -429,7 +418,7 @@ func extractMetricSamples(metricsBlob string) ([]*model.Sample, error) {
 	var samples []*model.Sample
 	for {
 		var v model.Vector
-		if err = decoder.Decode(&v); err != nil {
+		if err := decoder.Decode(&v); err != nil {
 			if err == io.EOF {
 				// Expected loop termination condition.
 				return samples, nil

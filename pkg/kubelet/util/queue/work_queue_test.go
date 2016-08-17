@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,12 +21,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-func newTestBasicWorkQueue() (*basicWorkQueue, *util.FakeClock) {
-	fakeClock := util.NewFakeClock(time.Now())
+func newTestBasicWorkQueue() (*basicWorkQueue, *clock.FakeClock) {
+	fakeClock := clock.NewFakeClock(time.Now())
 	wq := &basicWorkQueue{
 		clock: fakeClock,
 		queue: make(map[types.UID]time.Time),

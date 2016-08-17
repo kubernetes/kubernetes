@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,15 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// +build !linux
+// +build !linux,!darwin
 
 package fileutil
 
 import "os"
 
-// Fdatasync is similar to fsync(), but does not flush modified metadata
-// unless that metadata is needed in order to allow a subsequent data retrieval
-// to be correctly handled.
+// Fsync is a wrapper around file.Sync(). Special handling is needed on darwin platform.
+func Fsync(f *os.File) error {
+	return f.Sync()
+}
+
+// Fdatasync is a wrapper around file.Sync(). Special handling is needed on linux platform.
 func Fdatasync(f *os.File) error {
 	return f.Sync()
 }

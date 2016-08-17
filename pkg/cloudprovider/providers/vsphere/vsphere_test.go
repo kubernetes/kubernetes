@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,6 +37,8 @@ func configFromEnv() (cfg VSphereConfig, ok bool) {
 	cfg.Global.Datacenter = os.Getenv("VSPHERE_DATACENTER")
 	cfg.Network.PublicNetwork = os.Getenv("VSPHERE_PUBLIC_NETWORK")
 	cfg.Global.Datastore = os.Getenv("VSPHERE_DATASTORE")
+	cfg.Disk.SCSIControllerType = os.Getenv("VSPHERE_SCSICONTROLLER_TYPE")
+	cfg.Global.WorkingDir = os.Getenv("VSPHERE_WORKING_DIR")
 	if os.Getenv("VSPHERE_INSECURE") != "" {
 		InsecureFlag, err = strconv.ParseBool(os.Getenv("VSPHERE_INSECURE"))
 	} else {
@@ -224,19 +226,19 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Cannot create a new VMDK volume: %v", err)
 	}
 
-	diskID, _, err := vs.AttachDisk(volPath, "")
+	_, _, err = vs.AttachDisk(volPath, "")
 	if err != nil {
 		t.Fatalf("Cannot attach volume(%s) to VM(%s): %v", volPath, srvs[0], err)
 	}
 
-	err = vs.DetachDisk(diskID, "")
+	err = vs.DetachDisk(volPath, "")
 	if err != nil {
-		t.Fatalf("Cannot detach disk(%s) from VM(%s): %v", diskID, srvs[0], err)
+		t.Fatalf("Cannot detach disk(%s) from VM(%s): %v", volPath, srvs[0], err)
 	}
 
 	// todo: Deleting a volume after detach currently not working through API or UI (vSphere)
 	// err = vs.DeleteVolume(volPath)
 	// if err != nil {
-	//  	t.Fatalf("Cannot delete VMDK volume %s: %v", volPath, err)
+	// 	t.Fatalf("Cannot delete VMDK volume %s: %v", volPath, err)
 	// }
 }

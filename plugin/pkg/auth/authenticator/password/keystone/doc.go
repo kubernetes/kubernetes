@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,4 +17,4 @@ limitations under the License.
 // Package keystone provides authentication via keystone.
 // For details about keystone and how to use the plugin, refer to
 // https://github.com/kubernetes/kubernetes.github.io/blob/master/docs/admin/authentication.md
-package keystone
+package keystone // import "k8s.io/kubernetes/plugin/pkg/auth/authenticator/password/keystone"

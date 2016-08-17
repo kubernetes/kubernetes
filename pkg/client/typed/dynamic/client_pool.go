@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,11 @@ package dynamic
 import (
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/runtime/serializer"
 )
 
 // ClientPool manages a pool of dynamic clients.
@@ -77,6 +80,12 @@ func (c *clientPoolImpl) ClientForGroupVersion(groupVersion unversioned.GroupVer
 
 	// we need to make a client
 	conf.GroupVersion = &groupVersion
+
+	if conf.NegotiatedSerializer == nil {
+		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
+	}
+
 	dynamicClient, err := NewClient(conf)
 	if err != nil {
 		return nil, err

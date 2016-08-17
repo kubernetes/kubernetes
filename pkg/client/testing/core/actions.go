@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"path"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -118,21 +119,46 @@ func NewUpdateAction(resource unversioned.GroupVersionResource, namespace string
 	return action
 }
 
-func NewRootPatchAction(resource unversioned.GroupVersionResource, object runtime.Object) PatchActionImpl {
+func NewRootPatchAction(resource unversioned.GroupVersionResource, name string, patch []byte) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
-	action.Object = object
+	action.Name = name
+	action.Patch = patch
 
 	return action
 }
 
-func NewPatchAction(resource unversioned.GroupVersionResource, namespace string, object runtime.Object) PatchActionImpl {
+func NewPatchAction(resource unversioned.GroupVersionResource, namespace string, name string, patch []byte) PatchActionImpl {
 	action := PatchActionImpl{}
 	action.Verb = "patch"
 	action.Resource = resource
 	action.Namespace = namespace
-	action.Object = object
+	action.Name = name
+	action.Patch = patch
+
+	return action
+}
+
+func NewRootPatchSubresourceAction(resource unversioned.GroupVersionResource, name string, patch []byte, subresources ...string) PatchActionImpl {
+	action := PatchActionImpl{}
+	action.Verb = "patch"
+	action.Resource = resource
+	action.Subresource = path.Join(subresources...)
+	action.Name = name
+	action.Patch = patch
+
+	return action
+}
+
+func NewPatchSubresourceAction(resource unversioned.GroupVersionResource, namespace, name string, patch []byte, subresources ...string) PatchActionImpl {
+	action := PatchActionImpl{}
+	action.Verb = "patch"
+	action.Resource = resource
+	action.Subresource = path.Join(subresources...)
+	action.Namespace = namespace
+	action.Name = name
+	action.Patch = patch
 
 	return action
 }
@@ -392,11 +418,16 @@ func (a UpdateActionImpl) GetObject() runtime.Object {
 
 type PatchActionImpl struct {
 	ActionImpl
-	Object runtime.Object
+	Name  string
+	Patch []byte
 }
 
-func (a PatchActionImpl) GetObject() runtime.Object {
-	return a.Object
+func (a PatchActionImpl) GetName() string {
+	return a.Name
+}
+
+func (a PatchActionImpl) GetPatch() []byte {
+	return a.Patch
 }
 
 type DeleteActionImpl struct {

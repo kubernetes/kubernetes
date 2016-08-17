@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package fileutil
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -25,9 +26,10 @@ import (
 )
 
 const (
-	privateFileMode = 0600
-	// owner can make/remove files inside the directory
-	privateDirMode = 0700
+	// PrivateFileMode grants owner to read/write a file.
+	PrivateFileMode = 0600
+	// PrivateDirMode grants owner to make/remove files inside the directory.
+	PrivateDirMode = 0700
 )
 
 var (
@@ -38,7 +40,7 @@ var (
 // to dir. It returns nil if dir is writable.
 func IsDirWriteable(dir string) error {
 	f := path.Join(dir, ".touch")
-	if err := ioutil.WriteFile(f, []byte(""), privateFileMode); err != nil {
+	if err := ioutil.WriteFile(f, []byte(""), PrivateFileMode); err != nil {
 		return err
 	}
 	return os.Remove(f)
@@ -62,11 +64,32 @@ func ReadDir(dirpath string) ([]string, error) {
 // TouchDirAll is similar to os.MkdirAll. It creates directories with 0700 permission if any directory
 // does not exists. TouchDirAll also ensures the given directory is writable.
 func TouchDirAll(dir string) error {
-	err := os.MkdirAll(dir, privateDirMode)
-	if err != nil && err != os.ErrExist {
+	// If path is already a directory, MkdirAll does nothing
+	// and returns nil.
+	err := os.MkdirAll(dir, PrivateDirMode)
+	if err != nil {
+		// if mkdirAll("a/text") and "text" is not
+		// a directory, this will return syscall.ENOTDIR
 		return err
 	}
 	return IsDirWriteable(dir)
+}
+
+// CreateDirAll is similar to TouchDirAll but returns error
+// if the deepest directory was not empty.
+func CreateDirAll(dir string) error {
+	err := TouchDirAll(dir)
+	if err == nil {
+		var ns []string
+		ns, err = ReadDir(dir)
+		if err != nil {
+			return err
+		}
+		if len(ns) != 0 {
+			err = fmt.Errorf("expected %q to be empty, got %q", dir, ns)
+		}
+	}
+	return err
 }
 
 func Exist(name string) bool {

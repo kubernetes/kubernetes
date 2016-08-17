@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Package error describes errors in etcd project. When any change happens,
-// Documentation/errorcode.md needs to be updated correspondingly.
+// Documentation/v2/errorcode.md needs to be updated correspondingly.
 package error
 
 import (

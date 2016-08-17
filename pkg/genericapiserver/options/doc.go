@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,4 +18,4 @@ limitations under the License.
 // server. It takes a minimal set of dependencies and does not reference
 // implementations, in order to ensure it may be reused by multiple components
 // (such as CLI commands that wish to generate or validate config).
-package options
+package options // import "k8s.io/kubernetes/pkg/genericapiserver/options"

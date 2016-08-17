@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,8 +21,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
@@ -40,7 +38,7 @@ func NewREST(opts generic.RESTOptions, group, kind string) *REST {
 	prefix := "/ThirdPartyResourceData/" + group + "/" + strings.ToLower(kind) + "s"
 
 	// We explicitly do NOT do any decoration here yet.
-	storageInterface := opts.Storage
+	storageInterface := generic.NewRawStorage(opts.StorageConfig)
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResourceData{} },
@@ -54,9 +52,7 @@ func NewREST(opts generic.RESTOptions, group, kind string) *REST {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*extensions.ThirdPartyResourceData).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
-			return thirdpartyresourcedata.Matcher(label, field)
-		},
+		PredicateFunc:           thirdpartyresourcedata.Matcher,
 		QualifiedResource:       extensions.Resource("thirdpartyresourcedatas"),
 		DeleteCollectionWorkers: opts.DeleteCollectionWorkers,
 		CreateStrategy:          thirdpartyresourcedata.Strategy,

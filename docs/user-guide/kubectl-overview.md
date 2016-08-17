@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/user-guide/kubectl-overview.md).
+[here](http://releases.k8s.io/release-1.3/docs/user-guide/kubectl-overview.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -45,13 +45,13 @@ Use this overview of the `kubectl` command line interface to help you start runn
   - [Resource types](#resource-types)
   - [Output options](#output-options)
     - [Formatting output](#formatting-output)
-      - [Syntax](#syntax)
+      - [Syntax](#syntax-1)
         - [Example](#example)
       - [Custom columns](#custom-columns)
         - [Examples](#examples)
     - [Sorting list objects](#sorting-list-objects)
-      - [Syntax](#syntax)
-        - [Example](#example)
+      - [Syntax](#syntax-2)
+        - [Example](#example-1)
   - [Examples: Common operations](#examples-common-operations)
   - [Next steps](#next-steps)
 

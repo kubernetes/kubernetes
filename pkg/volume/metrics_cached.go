@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@ import (
 
 var _ MetricsProvider = &cachedMetrics{}
 
-// cachedMetrics represents a MetricsProvider that wraps another provider and caches the result.
+// cachedMetrics represents a MetricsProvider that wraps another provider and
+// caches the result.
 type cachedMetrics struct {
 	wrapped       MetricsProvider
 	resultError   error
@@ -31,13 +32,15 @@ type cachedMetrics struct {
 	once          cacheOnce
 }
 
-// NewCachedMetrics creates a new cachedMetrics wrapping another MetricsProvider and caching the results.
+// NewCachedMetrics creates a new cachedMetrics wrapping another
+// MetricsProvider and caching the results.
 func NewCachedMetrics(provider MetricsProvider) MetricsProvider {
 	return &cachedMetrics{wrapped: provider}
 }
 
+// GetMetrics runs the wrapped metrics provider's GetMetrics methd once and
+// caches the result. Will not cache result if there is an error.
 // See MetricsProvider.GetMetrics
-// Runs GetMetrics Once and caches the result.  Will not cache result if there is an error.
 func (md *cachedMetrics) GetMetrics() (*Metrics, error) {
 	md.once.cache(func() error {
 		md.resultMetrics, md.resultError = md.wrapped.GetMetrics()
@@ -46,13 +49,15 @@ func (md *cachedMetrics) GetMetrics() (*Metrics, error) {
 	return md.resultMetrics, md.resultError
 }
 
-// Copied from sync.Once but we don't want to cache the results if there is an error
+// Copied from sync.Once but we don't want to cache the results if there is an
+// error
 type cacheOnce struct {
 	m    sync.Mutex
 	done uint32
 }
 
-// Copied from sync.Once but we don't want to cache the results if there is an error
+// Copied from sync.Once but we don't want to cache the results if there is an
+// error
 func (o *cacheOnce) cache(f func() error) {
 	if atomic.LoadUint32(&o.done) == 1 {
 		return

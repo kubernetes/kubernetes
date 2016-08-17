@@ -1,12 +1,12 @@
-// Copyright 2014 The Go Authors.
-// See https://code.google.com/p/go/source/browse/CONTRIBUTORS
-// Licensed under the same terms as Go itself:
-// https://code.google.com/p/go/source/browse/LICENSE
+// Copyright 2014 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
 package hpack
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"sync"
 )
@@ -22,33 +22,86 @@ func HuffmanDecode(w io.Writer, v []byte) (int, error) {
 	buf := bufPool.Get().(*bytes.Buffer)
 	buf.Reset()
 	defer bufPool.Put(buf)
+	if err := huffmanDecode(buf, 0, v); err != nil {
+		return 0, err
+	}
+	return w.Write(buf.Bytes())
+}
 
+// HuffmanDecodeToString decodes the string in v.
+func HuffmanDecodeToString(v []byte) (string, error) {
+	buf := bufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer bufPool.Put(buf)
+	if err := huffmanDecode(buf, 0, v); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// ErrInvalidHuffman is returned for errors found decoding
+// Huffman-encoded strings.
+var ErrInvalidHuffman = errors.New("hpack: invalid Huffman-encoded data")
+
+// huffmanDecode decodes v to buf.
+// If maxLen is greater than 0, attempts to write more to buf than
+// maxLen bytes will return ErrStringLength.
+func huffmanDecode(buf *bytes.Buffer, maxLen int, v []byte) error {
 	n := rootHuffmanNode
-	cur, nbits := uint(0), uint8(0)
+	// cur is the bit buffer that has not been fed into n.
+	// cbits is the number of low order bits in cur that are valid.
+	// sbits is the number of bits of the symbol prefix being decoded.
+	cur, cbits, sbits := uint(0), uint8(0), uint8(0)
 	for _, b := range v {
 		cur = cur<<8 | uint(b)
-		nbits += 8
-		for nbits >= 8 {
-			n = n.children[byte(cur>>(nbits-8))]
+		cbits += 8
+		sbits += 8
+		for cbits >= 8 {
+			idx := byte(cur >> (cbits - 8))
+			n = n.children[idx]
+			if n == nil {
+				return ErrInvalidHuffman
+			}
 			if n.children == nil {
+				if maxLen != 0 && buf.Len() == maxLen {
+					return ErrStringLength
+				}
 				buf.WriteByte(n.sym)
-				nbits -= n.codeLen
+				cbits -= n.codeLen
 				n = rootHuffmanNode
+				sbits = cbits
 			} else {
-				nbits -= 8
+				cbits -= 8
 			}
 		}
 	}
-	for nbits > 0 {
-		n = n.children[byte(cur<<(8-nbits))]
-		if n.children != nil || n.codeLen > nbits {
+	for cbits > 0 {
+		n = n.children[byte(cur<<(8-cbits))]
+		if n == nil {
+			return ErrInvalidHuffman
+		}
+		if n.children != nil || n.codeLen > cbits {
 			break
 		}
+		if maxLen != 0 && buf.Len() == maxLen {
+			return ErrStringLength
+		}
 		buf.WriteByte(n.sym)
-		nbits -= n.codeLen
+		cbits -= n.codeLen
 		n = rootHuffmanNode
+		sbits = cbits
 	}
-	return w.Write(buf.Bytes())
+	if sbits > 7 {
+		// Either there was an incomplete symbol, or overlong padding.
+		// Both are decoding errors per RFC 7541 section 5.2.
+		return ErrInvalidHuffman
+	}
+	if mask := uint(1<<cbits - 1); cur&mask != mask {
+		// Trailing bits must be a prefix of EOS per RFC 7541 section 5.2.
+		return ErrInvalidHuffman
+	}
+
+	return nil
 }
 
 type node struct {
@@ -67,10 +120,10 @@ func newInternalNode() *node {
 var rootHuffmanNode = newInternalNode()
 
 func init() {
+	if len(huffmanCodes) != 256 {
+		panic("unexpected size")
+	}
 	for i, code := range huffmanCodes {
-		if i > 255 {
-			panic("too many huffman codes")
-		}
 		addDecoderNode(byte(i), code, huffmanCodeLen[i])
 	}
 }

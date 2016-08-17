@@ -1,0 +1,52 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}
+  namespace: {{.FEDERATION_NAMESPACE}}
+  labels:
+    app: federated-cluster
+spec:
+  template:
+    metadata:
+      name: federation-apiserver
+      labels:
+        app: federated-cluster
+        module: federation-apiserver
+    spec:
+      containers:
+      - name: apiserver
+        image: {{.FEDERATION_APISERVER_IMAGE_REPO}}:{{.FEDERATION_APISERVER_IMAGE_TAG}}
+        command:
+        - /usr/local/bin/federation-apiserver
+        - --bind-address=0.0.0.0
+        - --etcd-servers=http://localhost:2379
+        - --service-cluster-ip-range={{.FEDERATION_SERVICE_CIDR}}
+        - --secure-port=443
+        - --advertise-address={{.FEDERATION_API_HOST}}
+        # TODO: --admission-control values must be set when support is added for each type of control.
+        - --token-auth-file=/srv/kubernetes/known-tokens.csv
+        ports:
+        - containerPort: 443
+          name: https
+        - containerPort: 8080
+          name: local
+        volumeMounts:
+        - name: federation-apiserver-secrets
+          mountPath: /srv/kubernetes/
+          readOnly: true
+      - name: etcd
+        image: quay.io/coreos/etcd:v2.3.3
+        command:
+          - /etcd
+          - --data-dir
+          - /var/etcd/data
+        volumeMounts:
+        - mountPath: /var/etcd
+          name: varetcd
+      volumes:
+      - name: federation-apiserver-secrets
+        secret:
+          secretName: federation-apiserver-secrets
+      - name: varetcd
+        persistentVolumeClaim:
+          claimName: {{.FEDERATION_APISERVER_DEPLOYMENT_NAME}}-etcd-claim

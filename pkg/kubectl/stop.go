@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,10 +28,11 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util"
-	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -201,7 +202,9 @@ func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout 
 			return err
 		}
 	}
-	return rc.Delete(name)
+	falseVar := false
+	deleteOptions := &api.DeleteOptions{OrphanDependents: &falseVar}
+	return rc.Delete(name, deleteOptions)
 }
 
 // TODO(madhusudancs): Implement it when controllerRef is implemented - https://github.com/kubernetes/kubernetes/issues/2210
@@ -273,10 +276,9 @@ func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Durati
 		}
 	}
 
-	if err := rsc.Delete(name, nil); err != nil {
-		return err
-	}
-	return nil
+	falseVar := false
+	deleteOptions := &api.DeleteOptions{OrphanDependents: &falseVar}
+	return rsc.Delete(name, deleteOptions)
 }
 
 func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
@@ -290,7 +292,7 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 	// daemon pods. Once it's done deleting the daemon pods, it's safe to delete
 	// the DaemonSet.
 	ds.Spec.Template.Spec.NodeSelector = map[string]string{
-		string(util.NewUUID()): string(util.NewUUID()),
+		string(uuid.NewUUID()): string(uuid.NewUUID()),
 	}
 	// force update to avoid version conflict
 	ds.ResourceVersion = ""
@@ -378,7 +380,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	// Use observedGeneration to determine if the deployment controller noticed the pause.
 	if err := deploymentutil.WaitForObservedDeployment(func() (*extensions.Deployment, error) {
 		return deployments.Get(name)
-	}, deployment.Generation, 10*time.Millisecond, 1*time.Minute); err != nil {
+	}, deployment.Generation, 1*time.Second, 1*time.Minute); err != nil {
 		return err
 	}
 
@@ -396,9 +398,11 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	errList := []error{}
 	for _, rc := range rsList.Items {
 		if err := rsReaper.Stop(rc.Namespace, rc.Name, timeout, gracePeriod); err != nil {
-			if !errors.IsNotFound(err) {
-				errList = append(errList, err)
+			scaleGetErr, ok := err.(*ScaleError)
+			if errors.IsNotFound(err) || (ok && errors.IsNotFound(scaleGetErr.ActualError)) {
+				continue
 			}
+			errList = append(errList, err)
 		}
 	}
 	if len(errList) > 0 {
@@ -406,7 +410,7 @@ func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Durati
 	}
 
 	// Delete deployment at the end.
-	// Note: We delete deployment at the end so that if removing RSs fails, we atleast have the deployment to retry.
+	// Note: We delete deployment at the end so that if removing RSs fails, we at least have the deployment to retry.
 	return deployments.Delete(name, nil)
 }
 
@@ -423,7 +427,11 @@ func (reaper *DeploymentReaper) updateDeploymentWithRetries(namespace, name stri
 		if deployment, err = deployments.Update(deployment); err == nil {
 			return true, nil
 		}
-		return false, nil
+		// Retry only on update conflict.
+		if errors.IsConflict(err) {
+			return false, nil
+		}
+		return false, err
 	})
 	return deployment, err
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func addConversionFuncs(scheme *runtime.Scheme) {
+func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions to handle the *int32 -> int
 	// conversion. A pointer is useful in the versioned type so we can default
 	// it, but a plain int32 is more convenient in the internal type. These
@@ -37,11 +37,10 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 		Convert_apps_PetSetSpec_To_v1alpha1_PetSetSpec,
 	)
 	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
+		return err
 	}
 
-	err = api.Scheme.AddFieldLabelConversionFunc("apps/v1alpha1", "PetSet",
+	return api.Scheme.AddFieldLabelConversionFunc("apps/v1alpha1", "PetSet",
 		func(label, value string) (string, string, error) {
 			switch label {
 			case "metadata.name", "metadata.namespace", "status.successful":
@@ -49,11 +48,8 @@ func addConversionFuncs(scheme *runtime.Scheme) {
 			default:
 				return "", "", fmt.Errorf("field label not supported: %s", label)
 			}
-		})
-	if err != nil {
-		// If one of the conversion functions is malformed, detect it immediately.
-		panic(err)
-	}
+		},
+	)
 }
 
 func Convert_v1alpha1_PetSetSpec_To_apps_PetSetSpec(in *PetSetSpec, out *apps.PetSetSpec, s conversion.Scope) error {

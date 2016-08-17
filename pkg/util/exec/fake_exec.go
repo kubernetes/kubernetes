@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package exec
 
 import (
 	"fmt"
+	"io"
 )
 
 // A simple scripted Interface type.
@@ -49,6 +50,8 @@ type FakeCmd struct {
 	CombinedOutputCalls  int
 	CombinedOutputLog    [][]string
 	Dirs                 []string
+	Stdin                io.Reader
+	Stdout               io.Writer
 }
 
 func InitFakeCmd(fake *FakeCmd, cmd string, args ...string) Cmd {
@@ -60,6 +63,14 @@ type FakeCombinedOutputAction func() ([]byte, error)
 
 func (fake *FakeCmd) SetDir(dir string) {
 	fake.Dirs = append(fake.Dirs, dir)
+}
+
+func (fake *FakeCmd) SetStdin(in io.Reader) {
+	fake.Stdin = in
+}
+
+func (fake *FakeCmd) SetStdout(out io.Writer) {
+	fake.Stdout = out
 }
 
 func (fake *FakeCmd) CombinedOutput() ([]byte, error) {

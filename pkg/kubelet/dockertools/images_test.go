@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,10 +25,11 @@ import (
 
 func TestImageStatsNoImages(t *testing.T) {
 	fakeDockerClient := NewFakeDockerClientWithVersion("1.2.3", "1.2")
-	isp := &imageStatsProvider{fakeDockerClient}
+	isp := newImageStatsProvider(fakeDockerClient)
 	st, err := isp.ImageStats()
 	as := assert.New(t)
 	as.NoError(err)
+	as.NoError(fakeDockerClient.AssertCalls([]string{"list_images"}))
 	as.Equal(st.TotalStorageBytes, uint64(0))
 }
 
@@ -94,10 +95,240 @@ func TestImageStatsWithImages(t *testing.T) {
 			ID: "busybox-new",
 		},
 	})
-	isp := &imageStatsProvider{fakeDockerClient}
+	isp := newImageStatsProvider(fakeDockerClient)
 	st, err := isp.ImageStats()
 	as := assert.New(t)
 	as.NoError(err)
+	as.NoError(fakeDockerClient.AssertCalls([]string{"list_images", "image_history", "image_history", "image_history"}))
 	const expectedOutput uint64 = 1300
 	as.Equal(expectedOutput, st.TotalStorageBytes, "expected %d, got %d", expectedOutput, st.TotalStorageBytes)
+}
+
+func TestImageStatsWithCachedImages(t *testing.T) {
+	for _, test := range []struct {
+		oldLayers                map[string]*dockertypes.ImageHistory
+		oldImageToLayerIDs       map[string][]string
+		images                   []dockertypes.Image
+		history                  map[string][]dockertypes.ImageHistory
+		expectedCalls            []string
+		expectedLayers           map[string]*dockertypes.ImageHistory
+		expectedImageToLayerIDs  map[string][]string
+		expectedTotalStorageSize uint64
+	}{
+		{
+			// No cache
+			oldLayers:          make(map[string]*dockertypes.ImageHistory),
+			oldImageToLayerIDs: make(map[string][]string),
+			images: []dockertypes.Image{
+				{
+					ID: "busybox",
+				},
+				{
+					ID: "kubelet",
+				},
+			},
+			history: map[string][]dockertypes.ImageHistory{
+				"busybox": {
+					{
+						ID:        "0123456",
+						CreatedBy: "foo",
+						Size:      100,
+					},
+					{
+						ID:        "<missing>",
+						CreatedBy: "baz",
+						Size:      300,
+					},
+				},
+				"kubelet": {
+					{
+						ID:        "1123456",
+						CreatedBy: "foo",
+						Size:      200,
+					},
+					{
+						ID:        "<missing>",
+						CreatedBy: "1baz",
+						Size:      400,
+					},
+				},
+			},
+			expectedCalls: []string{"list_images", "image_history", "image_history"},
+			expectedLayers: map[string]*dockertypes.ImageHistory{
+				"0123456": {
+					ID:        "0123456",
+					CreatedBy: "foo",
+					Size:      100,
+				},
+				"1123456": {
+					ID:        "1123456",
+					CreatedBy: "foo",
+					Size:      200,
+				},
+				"<missing>baz": {
+					ID:        "<missing>",
+					CreatedBy: "baz",
+					Size:      300,
+				},
+				"<missing>1baz": {
+					ID:        "<missing>",
+					CreatedBy: "1baz",
+					Size:      400,
+				},
+			},
+			expectedImageToLayerIDs: map[string][]string{
+				"busybox": {"0123456", "<missing>baz"},
+				"kubelet": {"1123456", "<missing>1baz"},
+			},
+			expectedTotalStorageSize: 1000,
+		},
+		{
+			// Use cache value
+			oldLayers: map[string]*dockertypes.ImageHistory{
+				"0123456": {
+					ID:        "0123456",
+					CreatedBy: "foo",
+					Size:      100,
+				},
+				"<missing>baz": {
+					ID:        "<missing>",
+					CreatedBy: "baz",
+					Size:      300,
+				},
+			},
+			oldImageToLayerIDs: map[string][]string{
+				"busybox": {"0123456", "<missing>baz"},
+			},
+			images: []dockertypes.Image{
+				{
+					ID: "busybox",
+				},
+				{
+					ID: "kubelet",
+				},
+			},
+			history: map[string][]dockertypes.ImageHistory{
+				"busybox": {
+					{
+						ID:        "0123456",
+						CreatedBy: "foo",
+						Size:      100,
+					},
+					{
+						ID:        "<missing>",
+						CreatedBy: "baz",
+						Size:      300,
+					},
+				},
+				"kubelet": {
+					{
+						ID:        "1123456",
+						CreatedBy: "foo",
+						Size:      200,
+					},
+					{
+						ID:        "<missing>",
+						CreatedBy: "1baz",
+						Size:      400,
+					},
+				},
+			},
+			expectedCalls: []string{"list_images", "image_history"},
+			expectedLayers: map[string]*dockertypes.ImageHistory{
+				"0123456": {
+					ID:        "0123456",
+					CreatedBy: "foo",
+					Size:      100,
+				},
+				"1123456": {
+					ID:        "1123456",
+					CreatedBy: "foo",
+					Size:      200,
+				},
+				"<missing>baz": {
+					ID:        "<missing>",
+					CreatedBy: "baz",
+					Size:      300,
+				},
+				"<missing>1baz": {
+					ID:        "<missing>",
+					CreatedBy: "1baz",
+					Size:      400,
+				},
+			},
+			expectedImageToLayerIDs: map[string][]string{
+				"busybox": {"0123456", "<missing>baz"},
+				"kubelet": {"1123456", "<missing>1baz"},
+			},
+			expectedTotalStorageSize: 1000,
+		},
+		{
+			// Unused cache value
+			oldLayers: map[string]*dockertypes.ImageHistory{
+				"0123456": {
+					ID:        "0123456",
+					CreatedBy: "foo",
+					Size:      100,
+				},
+				"<missing>baz": {
+					ID:        "<missing>",
+					CreatedBy: "baz",
+					Size:      300,
+				},
+			},
+			oldImageToLayerIDs: map[string][]string{
+				"busybox": {"0123456", "<missing>baz"},
+			},
+			images: []dockertypes.Image{
+				{
+					ID: "kubelet",
+				},
+			},
+			history: map[string][]dockertypes.ImageHistory{
+				"kubelet": {
+					{
+						ID:        "1123456",
+						CreatedBy: "foo",
+						Size:      200,
+					},
+					{
+						ID:        "<missing>",
+						CreatedBy: "1baz",
+						Size:      400,
+					},
+				},
+			},
+			expectedCalls: []string{"list_images", "image_history"},
+			expectedLayers: map[string]*dockertypes.ImageHistory{
+				"1123456": {
+					ID:        "1123456",
+					CreatedBy: "foo",
+					Size:      200,
+				},
+				"<missing>1baz": {
+					ID:        "<missing>",
+					CreatedBy: "1baz",
+					Size:      400,
+				},
+			},
+			expectedImageToLayerIDs: map[string][]string{
+				"kubelet": {"1123456", "<missing>1baz"},
+			},
+			expectedTotalStorageSize: 600,
+		},
+	} {
+		fakeDockerClient := NewFakeDockerClientWithVersion("1.2.3", "1.2")
+		fakeDockerClient.InjectImages(test.images)
+		fakeDockerClient.InjectImageHistory(test.history)
+		isp := newImageStatsProvider(fakeDockerClient)
+		isp.layers = test.oldLayers
+		isp.imageToLayerIDs = test.oldImageToLayerIDs
+		st, err := isp.ImageStats()
+		as := assert.New(t)
+		as.NoError(err)
+		as.NoError(fakeDockerClient.AssertCalls(test.expectedCalls))
+		as.Equal(test.expectedLayers, isp.layers, "expected %+v, got %+v", test.expectedLayers, isp.layers)
+		as.Equal(test.expectedImageToLayerIDs, isp.imageToLayerIDs, "expected %+v, got %+v", test.expectedImageToLayerIDs, isp.imageToLayerIDs)
+		as.Equal(test.expectedTotalStorageSize, st.TotalStorageBytes, "expected %d, got %d", test.expectedTotalStorageSize, st.TotalStorageBytes)
+	}
 }

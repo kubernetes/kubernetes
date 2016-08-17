@@ -25,6 +25,9 @@ type Monitor struct {
 	// The unique ID for the VIP.
 	ID string
 
+	// Monitor name. Does not have to be unique.
+	Name string
+
 	// Owner of the VIP. Only an administrative user can specify a tenant ID
 	// other than its own.
 	TenantID string `json:"tenant_id" mapstructure:"tenant_id"`

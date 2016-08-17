@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,9 +59,9 @@ func (s *wrappedSerializer) UniversalDeserializer() runtime.Decoder {
 }
 
 func (s *wrappedSerializer) EncoderForVersion(encoder runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
-	return versioning.NewCodec(encoder, nil, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), []unversioned.GroupVersion{gv}, nil)
+	return versioning.NewCodec(encoder, nil, s.scheme, s.scheme, s.scheme, s.scheme, []unversioned.GroupVersion{gv}, nil)
 }
 
 func (s *wrappedSerializer) DecoderToVersion(decoder runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
-	return versioning.NewCodec(nil, decoder, s.scheme, s.scheme, s.scheme, runtime.ObjectTyperToTyper(s.scheme), nil, []unversioned.GroupVersion{gv})
+	return versioning.NewCodec(nil, decoder, s.scheme, s.scheme, s.scheme, s.scheme, nil, []unversioned.GroupVersion{gv})
 }

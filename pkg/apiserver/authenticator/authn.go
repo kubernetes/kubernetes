@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -80,20 +80,26 @@ func New(config AuthenticatorConfig) (authenticator.Request, error) {
 		authenticators = append(authenticators, tokenAuth)
 	}
 
-	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
-		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCGroupsClaim)
-		if err != nil {
-			return nil, err
-		}
-		authenticators = append(authenticators, oidcAuth)
-	}
-
 	if len(config.ServiceAccountKeyFile) > 0 {
 		serviceAccountAuth, err := newServiceAccountAuthenticator(config.ServiceAccountKeyFile, config.ServiceAccountLookup, config.ServiceAccountTokenGetter)
 		if err != nil {
 			return nil, err
 		}
 		authenticators = append(authenticators, serviceAccountAuth)
+	}
+
+	// NOTE(ericchiang): Keep the OpenID Connect after Service Accounts.
+	//
+	// Because both plugins verify JWTs whichever comes first in the union experiences
+	// cache misses for all requests using the other. While the service account plugin
+	// simply returns an error, the OpenID Connect plugin may query the provider to
+	// update the keys, causing performance hits.
+	if len(config.OIDCIssuerURL) > 0 && len(config.OIDCClientID) > 0 {
+		oidcAuth, err := newAuthenticatorFromOIDCIssuerURL(config.OIDCIssuerURL, config.OIDCClientID, config.OIDCCAFile, config.OIDCUsernameClaim, config.OIDCGroupsClaim)
+		if err != nil {
+			return nil, err
+		}
+		authenticators = append(authenticators, oidcAuth)
 	}
 
 	if len(config.KeystoneURL) > 0 {
@@ -156,8 +162,6 @@ func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClai
 		CAFile:        caFile,
 		UsernameClaim: usernameClaim,
 		GroupsClaim:   groupsClaim,
-		MaxRetries:    oidc.DefaultRetries,
-		RetryBackoff:  oidc.DefaultBackoff,
 	})
 	if err != nil {
 		return nil, err

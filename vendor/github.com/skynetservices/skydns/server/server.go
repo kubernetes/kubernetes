@@ -200,7 +200,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 	}
 
 	for zone, ns := range *s.config.stub {
-		if strings.HasSuffix(name, zone) {
+		if strings.HasSuffix(name, "." + zone) || name == zone {
 			metrics.ReportRequestCount(req, metrics.Stub)
 
 			resp := s.ServeDNSStubForward(w, req, ns)
@@ -232,7 +232,7 @@ func (s *server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 		return
 	}
 
-	if q.Qclass != dns.ClassCHAOS && !strings.HasSuffix(name, s.config.Domain) {
+	if q.Qclass != dns.ClassCHAOS && !strings.HasSuffix(name, "." +s.config.Domain) && name != s.config.Domain {
 		metrics.ReportRequestCount(req, metrics.Rec)
 
 		resp := s.ServeDNSForward(w, req)
@@ -431,6 +431,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 		case ip == nil:
 			// Try to resolve as CNAME if it's not an IP, but only if we don't create loops.
 			if q.Name == dns.Fqdn(serv.Host) {
+				logf("CNAME loop detected: %q -> %q", q.Name, q.Name)
 				// x CNAME x is a direct loop, don't add those
 				continue
 			}
@@ -464,7 +465,7 @@ func (s *server) AddressRecords(q dns.Question, name string, previousRecords []d
 			}
 			m1, e1 := s.Lookup(target, q.Qtype, bufsize, dnssec)
 			if e1 != nil {
-				logf("incomplete CNAME chain: %s", e1)
+				logf("incomplete CNAME chain from %q: %s", target, e1)
 				continue
 			}
 			// Len(m1.Answer) > 0 here is well?

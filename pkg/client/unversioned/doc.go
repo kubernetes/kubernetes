@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,4 +54,4 @@ The RESTClient type implements the Kubernetes API conventions (see `docs/devel/a
 for a given API path and is intended for use by consumers implementing their own Kubernetes
 compatible APIs.
 */
-package unversioned
+package unversioned // import "k8s.io/kubernetes/pkg/client/unversioned"

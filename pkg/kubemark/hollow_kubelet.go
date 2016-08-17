@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
 	"k8s.io/kubernetes/pkg/volume/empty_dir"
-	"k8s.io/kubernetes/test/integration"
+	"k8s.io/kubernetes/test/utils"
 
 	"github.com/golang/glog"
 )
@@ -43,10 +43,10 @@ func NewHollowKubelet(
 	dockerClient dockertools.DockerInterface,
 	kubeletPort, kubeletReadOnlyPort int,
 	containerManager cm.ContainerManager,
-	maxPods int,
+	maxPods int, podsPerCore int,
 ) *HollowKubelet {
-	testRootDir := integration.MakeTempDirOrDie("hollow-kubelet.", "")
-	manifestFilePath := integration.MakeTempDirOrDie("manifest", testRootDir)
+	testRootDir := utils.MakeTempDirOrDie("hollow-kubelet.", "")
+	manifestFilePath := utils.MakeTempDirOrDie("manifest", testRootDir)
 	glog.Infof("Using %s as root dir for hollow-kubelet", testRootDir)
 
 	return &HollowKubelet{
@@ -74,6 +74,7 @@ func NewHollowKubelet(
 			5*time.Minute,           /* OutOfDiskTransitionFrequency */
 			5*time.Minute,           /* EvictionPressureTransitionPeriod */
 			maxPods,
+			podsPerCore,
 			containerManager,
 			nil,
 		),

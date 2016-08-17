@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,6 +71,8 @@ type Builder struct {
 	singleResourceType bool
 	continueOnError    bool
 
+	singular bool
+
 	export bool
 
 	schema validation.Schema
@@ -113,6 +115,9 @@ func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...strin
 			}
 			b.URL(defaultHttpGetAttempts, url)
 		default:
+			if !recursive {
+				b.singular = true
+			}
 			b.Path(recursive, s)
 		}
 	}
@@ -328,7 +333,7 @@ func (b *Builder) ResourceTypeOrNameArgs(allowEmptySelector bool, args ...string
 		}
 	case len(args) == 0:
 	default:
-		b.errs = append(b.errs, fmt.Errorf("when passing arguments, must be resource or resource and name"))
+		b.errs = append(b.errs, fmt.Errorf("arguments must consist of a resource or a resource and name"))
 	}
 	return b
 }
@@ -357,7 +362,12 @@ func hasCombinedTypeArgs(args []string) (bool, error) {
 	case hasSlash > 0 && hasSlash == len(args):
 		return true, nil
 	case hasSlash > 0 && hasSlash != len(args):
-		return true, fmt.Errorf("when passing arguments in resource/name form, all arguments must include the resource")
+		baseCmd := "cmd"
+		if len(os.Args) > 0 {
+			baseCmdSlice := strings.Split(os.Args[0], "/")
+			baseCmd = baseCmdSlice[len(baseCmdSlice)-1]
+		}
+		return true, fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. '%s get resource/<resource_name>' instead of '%s get resource resource/<resource_name>'", baseCmd, baseCmd)
 	default:
 		return false, nil
 	}
@@ -546,7 +556,12 @@ func (b *Builder) visitorResult() *Result {
 
 	// visit items specified by resource and name
 	if len(b.resourceTuples) != 0 {
-		isSingular := len(b.resourceTuples) == 1
+		// if b.singular is false, this could be by default, so double-check length
+		// of resourceTuples to determine if in fact it is singular or not
+		isSingular := b.singular
+		if !isSingular {
+			isSingular = len(b.resourceTuples) == 1
+		}
 
 		if len(b.paths) != 0 {
 			return &Result{singular: isSingular, err: fmt.Errorf("when paths, URLs, or stdin is provided as input, you may not specify a resource by arguments as well")}
@@ -678,6 +693,9 @@ func (b *Builder) visitorResult() *Result {
 		return &Result{singular: singular, visitor: visitors, sources: b.paths}
 	}
 
+	if len(b.resources) != 0 {
+		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
+	}
 	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename (%s)", strings.Join(InputExtensions, "|"))}
 }
 

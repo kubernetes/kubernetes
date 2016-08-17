@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,16 +35,19 @@ type PolicyRule struct {
 	// AttributeRestrictions will vary depending on what the Authorizer/AuthorizationAttributeBuilder pair supports.
 	// If the Authorizer does not recognize how to handle the AttributeRestrictions, the Authorizer should report an error.
 	AttributeRestrictions runtime.RawExtension `json:"attributeRestrictions,omitempty" protobuf:"bytes,2,opt,name=attributeRestrictions"`
+
 	// APIGroups is the name of the APIGroup that contains the resources.  If multiple API groups are specified, any action requested against one of
 	// the enumerated resources in any API group will be allowed.
-	APIGroups []string `json:"apiGroups" protobuf:"bytes,3,rep,name=apiGroups"`
+	APIGroups []string `json:"apiGroups,omitempty" protobuf:"bytes,3,rep,name=apiGroups"`
 	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
-	Resources []string `json:"resources" protobuf:"bytes,4,rep,name=resources"`
+	Resources []string `json:"resources,omitempty" protobuf:"bytes,4,rep,name=resources"`
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
 	ResourceNames []string `json:"resourceNames,omitempty" protobuf:"bytes,5,rep,name=resourceNames"`
-	// NonResourceURLsSlice is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
+
+	// NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
 	// This name is intentionally different than the internal type so that the DefaultConvert works nicely and because the ordering may be different.
 	// Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+	// Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
 	NonResourceURLs []string `json:"nonResourceURLs,omitempty" protobuf:"bytes,6,rep,name=nonResourceURLs"`
 }
 
@@ -54,15 +57,16 @@ type Subject struct {
 	// Kind of object being referenced. Values defined by this API group are "User", "Group", and "ServiceAccount".
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string `json:"kind" protobuf:"bytes,1,opt,name=kind"`
-	// APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-	// expected to be API version of this API group. For example "rbac.authorization.k8s.io/v1alpha1".
-	APIVersion string `json:"apiVersion" protobuf:"bytes,2,opt.name=apiVersion"`
+	// APIVersion holds the API group and version of the referenced object.
+	APIVersion string `json:"apiVersion,omitempty" protobuf:"bytes,2,opt.name=apiVersion"`
 	// Name of the object being referenced.
 	Name string `json:"name" protobuf:"bytes,3,opt,name=name"`
 	// Namespace of the referenced object.  If the object kind is non-namespace, such as "User" or "Group", and this value is not empty
 	// the Authorizer should report an error.
 	Namespace string `json:"namespace,omitempty" protobuf:"bytes,4,opt,name=namespace"`
 }
+
+// +genclient=true
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
 type Role struct {
@@ -74,6 +78,8 @@ type Role struct {
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
 
+// +genclient=true
+
 // RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace.
 // It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
 // namespace only have effect in that namespace.
@@ -83,7 +89,7 @@ type RoleBinding struct {
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Subjects holds references to the objects the role applies to.
-	Subjects []Subject `json:"subject" protobuf:"bytes,2,rep,name=subjects"`
+	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
 
 	// RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.
@@ -110,6 +116,9 @@ type RoleList struct {
 	Items []Role `json:"items" protobuf:"bytes,2,rep,name=items"`
 }
 
+// +genclient=true
+// +nonNamespaced=true
+
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 type ClusterRole struct {
 	unversioned.TypeMeta `json:",inline"`
@@ -120,6 +129,9 @@ type ClusterRole struct {
 	Rules []PolicyRule `json:"rules" protobuf:"bytes,2,rep,name=rules"`
 }
 
+// +genclient=true
+// +nonNamespaced=true
+
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
 // and adds who information via Subject.
 type ClusterRoleBinding struct {
@@ -128,7 +140,7 @@ type ClusterRoleBinding struct {
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// Subjects holds references to the objects the role applies to.
-	Subjects []Subject `json:"subject" protobuf:"bytes,2,rep,name=subjects"`
+	Subjects []Subject `json:"subjects" protobuf:"bytes,2,rep,name=subjects"`
 
 	// RoleRef can only reference a ClusterRole in the global namespace.
 	// If the RoleRef cannot be resolved, the Authorizer must return an error.

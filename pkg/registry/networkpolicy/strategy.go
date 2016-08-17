@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,13 +45,13 @@ func (networkPolicyStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of an NetworkPolicy before creation.
-func (networkPolicyStrategy) PrepareForCreate(obj runtime.Object) {
+func (networkPolicyStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	networkPolicy := obj.(*extensions.NetworkPolicy)
 	networkPolicy.Generation = 1
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (networkPolicyStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (networkPolicyStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newNetworkPolicy := obj.(*extensions.NetworkPolicy)
 	oldNetworkPolicy := old.(*extensions.NetworkPolicy)
 

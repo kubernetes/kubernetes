@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,6 @@ package resourcequota
 
 import (
 	"io"
-	"sort"
-	"strings"
 	"time"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
@@ -28,7 +26,6 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/install"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 func init() {
@@ -44,7 +41,7 @@ func init() {
 type quotaAdmission struct {
 	*admission.Handler
 
-	evaluator *quotaEvaluator
+	evaluator Evaluator
 }
 
 type liveLookupEntry struct {
@@ -56,13 +53,13 @@ type liveLookupEntry struct {
 // using the provided registry.  The registry must have the capability to handle group/kinds that
 // are persisted by the server this admission controller is intercepting
 func NewResourceQuota(client clientset.Interface, registry quota.Registry, numEvaluators int, stopCh <-chan struct{}) (admission.Interface, error) {
-	evaluator, err := newQuotaEvaluator(client, registry)
+	quotaAccessor, err := newQuotaAccessor(client)
 	if err != nil {
 		return nil, err
 	}
+	go quotaAccessor.Run(stopCh)
 
-	defer utilruntime.HandleCrash()
-	go evaluator.Run(numEvaluators, stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, registry, nil, numEvaluators, stopCh)
 
 	return &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
@@ -77,47 +74,5 @@ func (q *quotaAdmission) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
-	// if we do not know how to evaluate use for this kind, just ignore
-	evaluators := q.evaluator.registry.Evaluators()
-	evaluator, found := evaluators[a.GetKind().GroupKind()]
-	if !found {
-		return nil
-	}
-
-	// for this kind, check if the operation could mutate any quota resources
-	// if no resources tracked by quota are impacted, then just return
-	op := a.GetOperation()
-	operationResources := evaluator.OperationResources(op)
-	if len(operationResources) == 0 {
-		return nil
-	}
-
-	return q.evaluator.evaluate(a)
-}
-
-// prettyPrint formats a resource list for usage in errors
-// it outputs resources sorted in increasing order
-func prettyPrint(item api.ResourceList) string {
-	parts := []string{}
-	keys := []string{}
-	for key := range item {
-		keys = append(keys, string(key))
-	}
-	sort.Strings(keys)
-	for _, key := range keys {
-		value := item[api.ResourceName(key)]
-		constraint := key + "=" + value.String()
-		parts = append(parts, constraint)
-	}
-	return strings.Join(parts, ",")
-}
-
-// hasUsageStats returns true if for each hard constraint there is a value for its current usage
-func hasUsageStats(resourceQuota *api.ResourceQuota) bool {
-	for resourceName := range resourceQuota.Status.Hard {
-		if _, found := resourceQuota.Status.Used[resourceName]; !found {
-			return false
-		}
-	}
-	return true
+	return q.evaluator.Evaluate(a)
 }

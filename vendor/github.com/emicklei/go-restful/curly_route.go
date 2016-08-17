@@ -11,30 +11,28 @@ type curlyRoute struct {
 	staticCount int
 }
 
-type sortableCurlyRoutes struct {
-	candidates []*curlyRoute
+type sortableCurlyRoutes []curlyRoute
+
+func (s *sortableCurlyRoutes) add(route curlyRoute) {
+	*s = append(*s, route)
 }
 
-func (s *sortableCurlyRoutes) add(route *curlyRoute) {
-	s.candidates = append(s.candidates, route)
-}
-
-func (s *sortableCurlyRoutes) routes() (routes []Route) {
-	for _, each := range s.candidates {
+func (s sortableCurlyRoutes) routes() (routes []Route) {
+	for _, each := range s {
 		routes = append(routes, each.route) // TODO change return type
 	}
 	return routes
 }
 
-func (s *sortableCurlyRoutes) Len() int {
-	return len(s.candidates)
+func (s sortableCurlyRoutes) Len() int {
+	return len(s)
 }
-func (s *sortableCurlyRoutes) Swap(i, j int) {
-	s.candidates[i], s.candidates[j] = s.candidates[j], s.candidates[i]
+func (s sortableCurlyRoutes) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
 }
-func (s *sortableCurlyRoutes) Less(i, j int) bool {
-	ci := s.candidates[i]
-	cj := s.candidates[j]
+func (s sortableCurlyRoutes) Less(i, j int) bool {
+	ci := s[i]
+	cj := s[j]
 
 	// primary key
 	if ci.staticCount < cj.staticCount {

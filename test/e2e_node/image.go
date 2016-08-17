@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,14 +40,14 @@ func NewConformanceImage(containerRuntime string, image string) (ci ConformanceI
 
 //TODO: do not expose kubelet implementation details after we refactor the runtime API.
 func dockerRuntime() kubecontainer.Runtime {
-	dockerClient := dockertools.ConnectToDockerOrDie("")
+	dockerClient := dockertools.ConnectToDockerOrDie("", 0)
 	pm := kubepod.NewBasicPodManager(nil)
 	dm := dockertools.NewDockerManager(
 		dockerClient,
 		nil, nil, nil, pm, nil,
 		"", 0, 0, "",
 		nil, nil, nil, nil, nil, nil, nil,
-		false, nil, true, false, false,
+		false, nil, true, false, false, "",
 	)
 
 	return dm

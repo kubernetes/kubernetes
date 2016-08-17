@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -58,9 +58,9 @@ ensure-local-disks() {
  for ssd in /dev/disk/by-id/google-local-ssd-*; do
     if [ -e "$ssd" ]; then
       ssdnum=`echo $ssd | sed -e 's/\/dev\/disk\/by-id\/google-local-ssd-\([0-9]*\)/\1/'`
-      echo "Formatting and mounting local SSD $ssd to /mnt/ssd$ssdnum"
-      mkdir -p /mnt/ssd$ssdnum
-      /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${ssd}" /mnt/ssd$ssdnum &>/var/log/local-ssd-$ssdnum-mount.log || \
+      echo "Formatting and mounting local SSD $ssd to /mnt/disks/ssd$ssdnum"
+      mkdir -p /mnt/disks/ssd$ssdnum
+      /usr/share/google/safe_format_and_mount -m "mkfs.ext4 -F" "${ssd}" /mnt/disks/ssd$ssdnum &>/var/log/local-ssd-$ssdnum-mount.log || \
       { echo "Local SSD $ssdnum mount failed, review /var/log/local-ssd-$ssdnum-mount.log"; return 1; }
     else
       echo "No local SSD disks found."
@@ -106,7 +106,9 @@ Welcome to Kubernetes ${version}!
 You can find documentation for Kubernetes at:
   http://docs.kubernetes.io/
 
-You can download the build image for this release at:
+The source for this release can be found at:
+  /usr/local/share/doc/kubernetes/kubernetes-src.tar.gz
+Or you can download it at:
   https://storage.googleapis.com/kubernetes-release/release/${version}/kubernetes-src.tar.gz
 
 It is based on the Kubernetes source at:
@@ -164,7 +166,7 @@ download-or-bust() {
     for url in "${urls[@]}"; do
       local file="${url##*/}"
       rm -f "${file}"
-      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 80 --retry 6 --retry-delay 10 "${url}"; then
+      if ! curl -f --ipv4 -Lo "${file}" --connect-timeout 20 --max-time 300 --retry 6 --retry-delay 10 "${url}"; then
         echo "== Failed to download ${url}. Retrying. =="
       elif [[ -n "${hash}" ]] && ! validate-hash "${file}" "${hash}"; then
         echo "== Hash validation of ${url} failed. Retrying. =="
@@ -420,6 +422,7 @@ function create-salt-pillar() {
   mkdir -p /srv/salt-overlay/pillar
   cat <<EOF >/srv/salt-overlay/pillar/cluster-params.sls
 instance_prefix: '$(echo "$INSTANCE_PREFIX" | sed -e "s/'/''/g")'
+node_tags: '$(echo "$NODE_TAGS" | sed -e "s/'/''/g")'
 node_instance_prefix: '$(echo "$NODE_INSTANCE_PREFIX" | sed -e "s/'/''/g")'
 cluster_cidr: '$(echo "$CLUSTER_IP_RANGE" | sed -e "s/'/''/g")'
 allocate_node_cidrs: '$(echo "$ALLOCATE_NODE_CIDRS" | sed -e "s/'/''/g")'
@@ -439,18 +442,22 @@ dns_replicas: '$(echo "$DNS_REPLICAS" | sed -e "s/'/''/g")'
 dns_server: '$(echo "$DNS_SERVER_IP" | sed -e "s/'/''/g")'
 dns_domain: '$(echo "$DNS_DOMAIN" | sed -e "s/'/''/g")'
 admission_control: '$(echo "$ADMISSION_CONTROL" | sed -e "s/'/''/g")'
+storage_backend: '$(echo "$STORAGE_BACKEND" | sed -e "s/'/''/g")'
 network_provider: '$(echo "$NETWORK_PROVIDER" | sed -e "s/'/''/g")'
+prepull_e2e_images: '$(echo "$PREPULL_E2E_IMAGES" | sed -e "s/'/''/g")'
 hairpin_mode: '$(echo "$HAIRPIN_MODE" | sed -e "s/'/''/g")'
 opencontrail_tag: '$(echo "$OPENCONTRAIL_TAG" | sed -e "s/'/''/g")'
 opencontrail_kubernetes_tag: '$(echo "$OPENCONTRAIL_KUBERNETES_TAG")'
 opencontrail_public_subnet: '$(echo "$OPENCONTRAIL_PUBLIC_SUBNET")'
+network_policy_provider: '$(echo "$NETWORK_POLICY_PROVIDER" | sed -e "s/'/''/g")'
 enable_manifest_url: '$(echo "${ENABLE_MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url: '$(echo "${MANIFEST_URL:-}" | sed -e "s/'/''/g")'
 manifest_url_header: '$(echo "${MANIFEST_URL_HEADER:-}" | sed -e "s/'/''/g")'
 num_nodes: $(echo "${NUM_NODES:-}" | sed -e "s/'/''/g")
-master_node: $(echo "${MASTER_NAME:-}" | sed -e "s/'/''/g")
 e2e_storage_test_environment: '$(echo "$E2E_STORAGE_TEST_ENVIRONMENT" | sed -e "s/'/''/g")'
 kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
+initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
+hostname: $(hostname -s)
 EOF
     if [ -n "${KUBELET_PORT:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
@@ -536,13 +543,36 @@ EOF
 node_labels: '$(echo "${NODE_LABELS}" | sed -e "s/'/''/g")'
 EOF
     fi
-    if [[ "${ENABLE_NODE_AUTOSCALER:-false}" == "true" ]]; then
+    if [ -n "${EVICTION_HARD:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
-enable_node_autoscaler: '$(echo "${ENABLE_NODE_AUTOSCALER}" | sed -e "s/'/''/g")'
+eviction_hard: '$(echo "${EVICTION_HARD}" | sed -e "s/'/''/g")'
+EOF
+    fi
+    if [[ "${ENABLE_CLUSTER_AUTOSCALER:-false}" == "true" ]]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+enable_cluster_autoscaler: '$(echo "${ENABLE_CLUSTER_AUTOSCALER}" | sed -e "s/'/''/g")'
 autoscaler_mig_config: '$(echo "${AUTOSCALER_MIG_CONFIG}" | sed -e "s/'/''/g")'
 EOF
     fi
-
+    if [[ "${FEDERATION:-}" == "true" ]]; then
+      local federations_domain_map="${FEDERATIONS_DOMAIN_MAP:-}"
+      if [[ -z "${federations_domain_map}" && -n "${FEDERATION_NAME:-}" && -n "${DNS_ZONE_NAME:-}" ]]; then
+        federations_domain_map="${FEDERATION_NAME}=${DNS_ZONE_NAME}"
+      fi
+      if [[ -n "${federations_domain_map}" ]]; then
+        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+federations_domain_map: '$(echo "- --federations=${federations_domain_map}" | sed -e "s/'/''/g")'
+EOF
+      else
+        cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+federations_domain_map: ''
+EOF
+      fi
+    else
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+federations_domain_map: ''
+EOF
+    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes
@@ -577,14 +607,14 @@ function create-salt-master-auth() {
     if  [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${MASTER_CERT:-}" ]] && [[ ! -z "${MASTER_KEY:-}" ]]; then
       mkdir -p /srv/kubernetes
       (umask 077;
-        echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
-        echo "${MASTER_CERT}" | base64 -d > /srv/kubernetes/server.cert;
-        echo "${MASTER_KEY}" | base64 -d > /srv/kubernetes/server.key;
+        echo "${CA_CERT}" | base64 --decode > /srv/kubernetes/ca.crt;
+        echo "${MASTER_CERT}" | base64 --decode > /srv/kubernetes/server.cert;
+        echo "${MASTER_KEY}" | base64 --decode > /srv/kubernetes/server.key;
         # Kubecfg cert/key are optional and included for backwards compatibility.
         # TODO(roberthbailey): Remove these two lines once GKE no longer requires
         # fetching clients certs from the master VM.
-        echo "${KUBECFG_CERT:-}" | base64 -d > /srv/kubernetes/kubecfg.crt;
-        echo "${KUBECFG_KEY:-}" | base64 -d > /srv/kubernetes/kubecfg.key)
+        echo "${KUBECFG_CERT:-}" | base64 --decode > /srv/kubernetes/kubecfg.crt;
+        echo "${KUBECFG_KEY:-}" | base64 --decode > /srv/kubernetes/kubecfg.key)
     fi
   fi
   if [ ! -e "${BASIC_AUTH_FILE}" ]; then
@@ -643,6 +673,7 @@ users:
 clusters:
 - name: local
   cluster:
+    server: https://kubernetes-master
     certificate-authority-data: ${KUBELET_CA_CERT}
 contexts:
 - context:
@@ -786,8 +817,14 @@ EOF
   fi
 
   if [[ -n "${NODE_INSTANCE_PREFIX:-}" ]]; then
+    if [[ -n "${NODE_TAGS:-}" ]]; then
+      local -r node_tags="${NODE_TAGS}"
+    else
+      local -r node_tags="${NODE_INSTANCE_PREFIX}"
+    fi
     cat <<EOF >>/etc/gce.conf
-node-tags = ${NODE_INSTANCE_PREFIX}
+node-tags = ${NODE_TAGS}
+node-instance-prefix = ${NODE_INSTANCE_PREFIX}
 EOF
     CLOUD_CONFIG=/etc/gce.conf
   fi
@@ -869,6 +906,7 @@ EOF
   fi
 
   env-to-grains "runtime_config"
+  env-to-grains "kube_user"
 }
 
 function salt-node-role() {
@@ -897,6 +935,13 @@ EOF
 function node-docker-opts() {
   if [[ -n "${EXTRA_DOCKER_OPTS-}" ]]; then
     DOCKER_OPTS="${DOCKER_OPTS:-} ${EXTRA_DOCKER_OPTS}"
+  fi
+
+  # Decide whether to enable a docker registry mirror. This is taken from
+  # the "kube-env" metadata value.
+  if [[ -n "${DOCKER_REGISTRY_MIRROR_URL:-}" ]]; then
+    echo "Enable docker registry mirror at: ${DOCKER_REGISTRY_MIRROR_URL}"
+    DOCKER_OPTS="${DOCKER_OPTS:-} --registry-mirror=${DOCKER_REGISTRY_MIRROR_URL}"
   fi
 }
 

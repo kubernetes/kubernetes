@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ type Registry interface {
 }
 
 // callback that is invoked during a walk through a series of live offers,
-// returning with stop=true (or err != nil) if the walk should stop permaturely.
+// returning with stop=true (or err != nil) if the walk should stop prematurely.
 type Walker func(offer Perishable) (stop bool, err error)
 
 type RegistryConfig struct {

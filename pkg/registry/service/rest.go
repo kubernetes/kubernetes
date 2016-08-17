@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -212,15 +212,20 @@ func (*REST) NewList() runtime.Object {
 	return &api.ServiceList{}
 }
 
-func (rs *REST) Update(ctx api.Context, obj runtime.Object) (runtime.Object, bool, error) {
+func (rs *REST) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectInfo) (runtime.Object, bool, error) {
+	oldService, err := rs.registry.GetService(ctx, name)
+	if err != nil {
+		return nil, false, err
+	}
+
+	obj, err := objInfo.UpdatedObject(ctx, oldService)
+	if err != nil {
+		return nil, false, err
+	}
+
 	service := obj.(*api.Service)
 	if !api.ValidNamespace(ctx, &service.ObjectMeta) {
 		return nil, false, errors.NewConflict(api.Resource("services"), service.Namespace, fmt.Errorf("Service.Namespace does not match the provided context"))
-	}
-
-	oldService, err := rs.registry.GetService(ctx, service.Name)
-	if err != nil {
-		return nil, false, err
 	}
 
 	// Copy over non-user fields

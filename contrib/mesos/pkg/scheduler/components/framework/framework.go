@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -548,7 +548,7 @@ func (k *framework) reconcileTerminalTask(driver bindings.SchedulerDriver, taskS
 		//is unrecognized by the master at this point, so KillTask is not guaranteed
 		//to do anything. The underlying driver transport may be able to send a
 		//FrameworkMessage directly to the slave to terminate the task.
-		log.V(2).Info("forwarding TASK_LOST message to executor %v on slave %v", taskStatus.ExecutorId, taskStatus.SlaveId)
+		log.V(2).Infof("forwarding TASK_LOST message to executor %v on slave %v", taskStatus.ExecutorId, taskStatus.SlaveId)
 		data := fmt.Sprintf("%s:%s", messages.TaskLost, task.ID) //TODO(jdef) use a real message type
 		if _, err := driver.SendFrameworkMessage(taskStatus.ExecutorId, taskStatus.SlaveId, data); err != nil {
 			log.Error(err.Error())

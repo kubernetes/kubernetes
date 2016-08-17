@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 // Scaler provides an interface for resources that can be scaled.
@@ -36,7 +38,7 @@ type Scaler interface {
 	// retries in the event of resource version mismatch (if retry is not nil),
 	// and optionally waits until the status of the resource matches newSize (if wait is not nil)
 	Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, wait *RetryParams) error
-	// ScaleSimple does a simple one-shot attempt at scaling - not useful on it's own, but
+	// ScaleSimple does a simple one-shot attempt at scaling - not useful on its own, but
 	// a necessary building block for Scale
 	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error
 }
@@ -81,7 +83,7 @@ type ScaleErrorType int
 const (
 	ScaleGetFailure ScaleErrorType = iota
 	ScaleUpdateFailure
-	ScaleUpdateInvalidFailure
+	ScaleUpdateConflictFailure
 )
 
 // A ScaleError is returned when a scale request passes
@@ -115,11 +117,8 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 		case nil:
 			return true, nil
 		case ScaleError:
-			// if it's invalid we shouldn't keep waiting
-			if e.FailureType == ScaleUpdateInvalidFailure {
-				return false, err
-			}
-			if e.FailureType == ScaleUpdateFailure {
+			// Retry only on update conflicts.
+			if e.FailureType == ScaleUpdateConflictFailure {
 				return false, nil
 			}
 		}
@@ -153,10 +152,9 @@ func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, p
 		}
 	}
 	controller.Spec.Replicas = int32(newSize)
-	// TODO: do retry on 409 errors here?
 	if _, err := scaler.c.ReplicationControllers(namespace).Update(controller); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, controller.ResourceVersion, err}
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, controller.ResourceVersion, err}
 		}
 		return ScaleError{ScaleUpdateFailure, controller.ResourceVersion, err}
 	}
@@ -175,16 +173,27 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
-		rc, err := scaler.c.ReplicationControllers(namespace).Get(name)
+		watchOptions := api.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", name), ResourceVersion: "0"}
+		watcher, err := scaler.c.ReplicationControllers(namespace).Watch(watchOptions)
 		if err != nil {
 			return err
 		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.ControllerHasDesiredReplicas(scaler.c, rc))
+		_, err = watch.Until(waitForReplicas.Timeout, watcher, func(event watch.Event) (bool, error) {
+			if event.Type != watch.Added && event.Type != watch.Modified {
+				return false, nil
+			}
+
+			rc := event.Object.(*api.ReplicationController)
+			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == rc.Spec.Replicas, nil
+		})
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }
@@ -215,10 +224,9 @@ func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, precondition
 		}
 	}
 	rs.Spec.Replicas = int32(newSize)
-	// TODO: do retry on 409 errors here?
 	if _, err := scaler.c.ReplicaSets(namespace).Update(rs); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, rs.ResourceVersion, err}
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, rs.ResourceVersion, err}
 		}
 		return ScaleError{ScaleUpdateFailure, rs.ResourceVersion, err}
 	}
@@ -245,8 +253,11 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		if err != nil {
 			return err
 		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }
@@ -283,8 +294,8 @@ func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 	parallelism := int32(newSize)
 	job.Spec.Parallelism = &parallelism
 	if _, err := scaler.c.Jobs(namespace).Update(job); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, job.ResourceVersion, err}
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, job.ResourceVersion, err}
 		}
 		return ScaleError{ScaleUpdateFailure, job.ResourceVersion, err}
 	}
@@ -311,8 +322,11 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 		if err != nil {
 			return err
 		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.JobHasDesiredParallelism(scaler.c, job))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.JobHasDesiredParallelism(scaler.c, job))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }
@@ -348,8 +362,8 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 	// For now I'm falling back to regular Deployment update operation.
 	deployment.Spec.Replicas = int32(newSize)
 	if _, err := scaler.c.Deployments(namespace).Update(deployment); err != nil {
-		if errors.IsInvalid(err) {
-			return ScaleError{ScaleUpdateInvalidFailure, deployment.ResourceVersion, err}
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, deployment.ResourceVersion, err}
 		}
 		return ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
 	}
@@ -375,8 +389,11 @@ func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, prec
 		if err != nil {
 			return err
 		}
-		return wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout,
-			client.DeploymentHasDesiredReplicas(scaler.c, deployment))
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.DeploymentHasDesiredReplicas(scaler.c, deployment))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,10 +25,12 @@ import (
 	k8serr "k8s.io/kubernetes/pkg/api/errors"
 	storeerr "k8s.io/kubernetes/pkg/api/errors/storage"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/registry/service"
+	"k8s.io/kubernetes/pkg/registry/generic"
+	"k8s.io/kubernetes/pkg/registry/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	"golang.org/x/net/context"
 )
@@ -52,13 +54,14 @@ type Etcd struct {
 	resource unversioned.GroupResource
 }
 
-// Etcd implements allocator.Interface and service.RangeRegistry
+// Etcd implements allocator.Interface and rangeallocation.RangeRegistry
 var _ allocator.Interface = &Etcd{}
-var _ service.RangeRegistry = &Etcd{}
+var _ rangeallocation.RangeRegistry = &Etcd{}
 
 // NewEtcd returns an allocator that is backed by Etcd and can manage
 // persisting the snapshot state of allocation after each allocation is made.
-func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource unversioned.GroupResource, storage storage.Interface) *Etcd {
+func NewEtcd(alloc allocator.Snapshottable, baseKey string, resource unversioned.GroupResource, config *storagebackend.Config) *Etcd {
+	storage := generic.NewRawStorage(config)
 	return &Etcd{
 		alloc:    alloc,
 		storage:  storage,
@@ -165,22 +168,6 @@ func (e *Etcd) tryUpdate(fn func() error) error {
 		}),
 	)
 	return storeerr.InterpretUpdateError(err, e.resource, "")
-}
-
-// Refresh reloads the RangeAllocation from etcd.
-func (e *Etcd) Refresh() (*api.RangeAllocation, error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-
-	existing := &api.RangeAllocation{}
-	if err := e.storage.Get(context.TODO(), e.baseKey, existing, false); err != nil {
-		if storage.IsNotFound(err) {
-			return nil, nil
-		}
-		return nil, storeerr.InterpretGetError(err, e.resource, "")
-	}
-
-	return existing, nil
 }
 
 // Get returns an api.RangeAllocation that represents the current state in

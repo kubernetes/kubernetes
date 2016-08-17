@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,15 +43,6 @@ if [[ -z "$NETWORK_IF_NAME" ]]; then
   NETWORK_IF_NAME=${DEFAULT_NETWORK_IF_NAME}
 fi
 
-function release_not_found() {
-  echo "It looks as if you don't have a compiled version of Kubernetes.  If you" >&2
-  echo "are running from a clone of the git repo, please run 'make quick-release'." >&2
-  echo "Note that this requires having Docker installed.  If you are running " >&2
-  echo "from a release tarball, something is wrong.  Look at " >&2
-  echo "http://kubernetes.io/ for information on how to contact the development team for help." >&2
-  exit 1
-}
-
 # Setup hosts file to support ping by hostname to each node in the cluster from apiserver
 for (( i=0; i<${#NODE_NAMES[@]}; i++)); do
   node=${NODE_NAMES[$i]}
@@ -64,6 +55,7 @@ done
 echo "127.0.0.1 localhost" >> /etc/hosts # enables cmds like 'kubectl get pods' on master.
 echo "$MASTER_IP $MASTER_NAME" >> /etc/hosts
 
+enable-accounting
 prepare-package-manager
 
 # Configure the master network
@@ -118,8 +110,7 @@ if ! which /usr/libexec/cockpit-ws &>/dev/null; then
 
   pushd /etc/yum.repos.d
     curl -OL https://copr.fedorainfracloud.org/coprs/g/cockpit/cockpit-preview/repo/fedora-23/msuchy-cockpit-preview-fedora-23.repo
-    dnf install -y cockpit cockpit-kubernetes
-    dnf update -y docker
+    dnf install -y cockpit cockpit-kubernetes docker socat ethtool
   popd
 
   systemctl enable cockpit.socket

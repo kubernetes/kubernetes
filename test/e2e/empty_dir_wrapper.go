@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package e2e
 
 import (
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	"strconv"
@@ -33,7 +33,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 	f := framework.NewDefaultFramework("emptydir-wrapper")
 
 	It("should becomes running", func() {
-		name := "emptydir-wrapper-test-" + string(util.NewUUID())
+		name := "emptydir-wrapper-test-" + string(uuid.NewUUID())
 		volumeName := "secret-volume"
 		volumeMountPath := "/etc/secret-volume"
 
@@ -52,7 +52,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
-		gitServerPodName := "git-server-" + string(util.NewUUID())
+		gitServerPodName := "git-server-" + string(uuid.NewUUID())
 		containerPort := 8000
 
 		labels := map[string]string{"name": gitServerPodName}
@@ -110,7 +110,7 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: "pod-secrets-" + string(util.NewUUID()),
+				Name: "pod-secrets-" + string(uuid.NewUUID()),
 			},
 			Spec: api.PodSpec{
 				Volumes: []api.Volume{
@@ -152,7 +152,8 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 			},
 		}
 
-		if pod, err = f.Client.Pods(f.Namespace.Name).Create(pod); err != nil {
+		pod, err = f.Client.Pods(f.Namespace.Name).Create(pod)
+		if err != nil {
 			framework.Failf("unable to create pod %v: %v", pod.Name, err)
 		}
 
@@ -175,6 +176,6 @@ var _ = framework.KubeDescribe("EmptyDir wrapper volumes", func() {
 			}
 		}()
 
-		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, f.Namespace.Name))
+		framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
 	})
 })

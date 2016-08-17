@@ -1,7 +1,7 @@
 // +build linux
 
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,16 +19,25 @@ limitations under the License.
 package selinux
 
 import (
+	"fmt"
+
 	"github.com/opencontainers/runc/libcontainer/selinux"
 )
 
-type realChconRunner struct{}
+type realSelinuxContextRunner struct{}
 
-func (_ *realChconRunner) SetContext(dir, context string) error {
+func (_ *realSelinuxContextRunner) SetContext(dir, context string) error {
 	// If SELinux is not enabled, return an empty string
 	if !selinux.SelinuxEnabled() {
 		return nil
 	}
 
 	return selinux.Setfilecon(dir, context)
+}
+
+func (_ *realSelinuxContextRunner) Getfilecon(path string) (string, error) {
+	if !selinux.SelinuxEnabled() {
+		return "", fmt.Errorf("SELinux is not enabled")
+	}
+	return selinux.Getfilecon(path)
 }

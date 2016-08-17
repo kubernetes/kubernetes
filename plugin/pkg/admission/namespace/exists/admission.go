@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,16 +18,16 @@ package exists
 
 import (
 	"io"
-	"time"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+
+	"fmt"
 
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
 func init() {
@@ -41,9 +41,11 @@ func init() {
 // It is useful in deployments that want to enforce pre-declaration of a Namespace resource.
 type exists struct {
 	*admission.Handler
-	client clientset.Interface
-	store  cache.Store
+	client            clientset.Interface
+	namespaceInformer framework.SharedIndexInformer
 }
+
+var _ = admission.WantsInformerFactory(&exists{})
 
 func (e *exists) Admit(a admission.Attributes) (err error) {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
@@ -53,6 +55,10 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 		return nil
 	}
 
+	// we need to wait for our caches to warm
+	if !e.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:      a.GetNamespace(),
@@ -60,7 +66,7 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, exists, err := e.store.Get(namespace)
+	_, exists, err := e.namespaceInformer.GetStore().Get(namespace)
 	if err != nil {
 		return errors.NewInternalError(err)
 	}
@@ -82,24 +88,20 @@ func (e *exists) Admit(a admission.Attributes) (err error) {
 
 // NewExists creates a new namespace exists admission control handler
 func NewExists(c clientset.Interface) admission.Interface {
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	reflector := cache.NewReflector(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return c.Core().Namespaces().List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return c.Core().Namespaces().Watch(options)
-			},
-		},
-		&api.Namespace{},
-		store,
-		5*time.Minute,
-	)
-	reflector.Run()
 	return &exists{
 		client:  c,
-		store:   store,
 		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 	}
+}
+
+func (e *exists) SetInformerFactory(f informers.SharedInformerFactory) {
+	e.namespaceInformer = f.Namespaces().Informer()
+	e.SetReadyFunc(e.namespaceInformer.HasSynced)
+}
+
+func (e *exists) Validate() error {
+	if e.namespaceInformer == nil {
+		return fmt.Errorf("missing namespaceInformer")
+	}
+	return nil
 }

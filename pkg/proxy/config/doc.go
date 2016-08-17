@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,4 +22,4 @@ limitations under the License.
 // to resolve conflicts of any sort. Basic idea is that each configuration source gets a channel
 // from the Config service and pushes updates to it via that channel. Config then keeps track of
 // incremental & replace changes and distributes them to listeners as appropriate.
-package config
+package config // import "k8s.io/kubernetes/pkg/proxy/config"

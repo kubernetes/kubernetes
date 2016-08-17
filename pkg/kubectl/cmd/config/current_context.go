@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
@@ -30,10 +31,12 @@ type CurrentContextOptions struct {
 	ConfigAccess clientcmd.ConfigAccess
 }
 
-const (
-	current_context_long    = `Displays the current-context`
-	current_context_example = `# Display the current-context
-kubectl config current-context`
+var (
+	current_context_long = dedent.Dedent(`
+		Displays the current-context`)
+	current_context_example = dedent.Dedent(`
+		# Display the current-context
+		kubectl config current-context`)
 )
 
 func NewCmdConfigCurrentContext(out io.Writer, configAccess clientcmd.ConfigAccess) *cobra.Command {

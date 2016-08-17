@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"net"
 	"net/http"
 	_ "net/http/pprof"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -38,7 +39,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -46,6 +46,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
+	"k8s.io/kubernetes/pkg/util/resourcecontainer"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
@@ -157,7 +158,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 
 	if config.ResourceContainer != "" {
 		// Run in its own container.
-		if err := util.RunInResourceContainer(config.ResourceContainer); err != nil {
+		if err := resourcecontainer.RunInResourceContainer(config.ResourceContainer); err != nil {
 			glog.Warningf("Failed to start in resource-only container %q: %v", config.ResourceContainer, err)
 		} else {
 			glog.V(2).Infof("Running in resource-only container %q", config.ResourceContainer)
@@ -204,7 +205,7 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 			return nil, fmt.Errorf("Unable to read IPTablesMasqueradeBit from config")
 		}
 
-		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll, int(*config.IPTablesMasqueradeBit), config.ClusterCIDR)
+		proxierIptables, err := iptables.NewProxier(iptInterface, execer, config.IPTablesSyncPeriod.Duration, config.MasqueradeAll, int(*config.IPTablesMasqueradeBit), config.ClusterCIDR, hostname)
 		if err != nil {
 			glog.Fatalf("Unable to create proxier: %v", err)
 		}
@@ -298,9 +299,24 @@ func (s *ProxyServer) Run() error {
 
 	// Tune conntrack, if requested
 	if s.Conntracker != nil {
-		if s.Config.ConntrackMax > 0 {
-			if err := s.Conntracker.SetMax(int(s.Config.ConntrackMax)); err != nil {
-				return err
+		max, err := getConntrackMax(s.Config)
+		if err != nil {
+			return err
+		}
+		if max > 0 {
+			err := s.Conntracker.SetMax(max)
+			if err != nil {
+				if err != readOnlySysFSError {
+					return err
+				}
+				// readOnlySysFSError is caused by a known docker issue (https://github.com/docker/docker/issues/24000),
+				// the only remediation we know is to restart the docker daemon.
+				// Here we'll send an node event with specific reason and message, the
+				// administrator should decide whether and how to handle this issue,
+				// whether to drain the node and restart docker.
+				// TODO(random-liu): Remove this when the docker bug is fixed.
+				const message = "DOCKER RESTART NEEDED (docker issue #24000): /sys is read-only: can't raise conntrack limits, problems may arise later."
+				s.Recorder.Eventf(s.Config.NodeRef, api.EventTypeWarning, err.Error(), message)
 			}
 		}
 		if s.Config.ConntrackTCPEstablishedTimeout.Duration > 0 {
@@ -316,6 +332,18 @@ func (s *ProxyServer) Run() error {
 	// Just loop forever for now...
 	s.Proxier.SyncLoop()
 	return nil
+}
+
+func getConntrackMax(config *options.ProxyServerConfig) (int, error) {
+	if config.ConntrackMax > 0 && config.ConntrackMaxPerCore > 0 {
+		return -1, fmt.Errorf("invalid config: ConntrackMax and ConntrackMaxPerCore are mutually exclusive")
+	}
+	if config.ConntrackMax > 0 {
+		return int(config.ConntrackMax), nil
+	} else if config.ConntrackMaxPerCore > 0 {
+		return (int(config.ConntrackMaxPerCore) * runtime.NumCPU()), nil
+	}
+	return 0, nil
 }
 
 type nodeGetter interface {

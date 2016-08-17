@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package deleter implements the deleter which listens for pod DELETE events
 // from the apiserver and kills tasks for deleted pods.
-package deleter
+package deleter // import "k8s.io/kubernetes/contrib/mesos/pkg/scheduler/components/deleter"

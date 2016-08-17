@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,20 +74,20 @@ echo "Provider: ${KUBERNETES_PROVIDER:-}"
 # List resources related to instances, filtering by the instance prefix if
 # provided.
 gcloud-compute-list instance-templates --regexp="${INSTANCE_PREFIX}.*"
-gcloud-compute-list instance-groups ${ZONE:+"--zone=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
-gcloud-compute-list instances ${ZONE:+"--zone=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
+gcloud-compute-list instance-groups ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
+gcloud-compute-list instances ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
 
 # List disk resources, filterying by instance prefix if provided.
-gcloud-compute-list disks ${ZONE:+"--zone=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
+gcloud-compute-list disks ${ZONE:+"--zones=${ZONE}"} --regexp="${INSTANCE_PREFIX}.*"
 
 # List network resources. We include names starting with "a", corresponding to
 # those that Kubernetes creates.
-gcloud-compute-list addresses ${REGION:+"--region=${REGION}"} --regexp="a.*|${INSTANCE_PREFIX}.*"
+gcloud-compute-list addresses ${REGION:+"--regions=${REGION}"} --regexp="a.*|${INSTANCE_PREFIX}.*"
 # Match either the header or a line with the specified e2e network.
 # This assumes that the network name is the second field in the output.
 GREP_REGEX="^NAME\|^[^ ]\+[ ]\+\(default\|${NETWORK}\) "
 gcloud-compute-list routes --regexp="default.*|${INSTANCE_PREFIX}.*"
 gcloud-compute-list firewall-rules --regexp="default.*|k8s-fw.*|${INSTANCE_PREFIX}.*"
 GREP_REGEX=""
-gcloud-compute-list forwarding-rules ${REGION:+"--region=${REGION}"}
-gcloud-compute-list target-pools ${REGION:+"--region=${REGION}"}
+gcloud-compute-list forwarding-rules ${REGION:+"--regions=${REGION}"}
+gcloud-compute-list target-pools ${REGION:+"--regions=${REGION}"}

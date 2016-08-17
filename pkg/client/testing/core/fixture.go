@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,28 +18,39 @@ package core
 
 import (
 	"fmt"
-	"io/ioutil"
-	"reflect"
-	"strings"
+	"sync"
 
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// ObjectRetriever abstracts the implementation for retrieving or setting generic
-// objects. It is intended to be used to fake calls to a server by returning
-// objects based on their kind and name.
-type ObjectRetriever interface {
-	// Kind should return a resource or a list of resources (depending on the provided kind and
-	// name). It should return an error if the caller should communicate an error to the server.
-	Kind(gvk unversioned.GroupVersionKind, name string) (runtime.Object, error)
-	// Add adds a runtime object for test purposes into this object.
-	Add(runtime.Object) error
+// ObjectTracker keeps track of objects. It is intended to be used to
+// fake calls to a server by returning objects based on their kind,
+// namespace and name.
+type ObjectTracker interface {
+	// Add adds an object to the tracker. If object being added
+	// is a list, its items are added separately.
+	Add(obj runtime.Object) error
+
+	// Get retrieves the object by its kind, namespace and name.
+	Get(gvk unversioned.GroupVersionKind, ns, name string) (runtime.Object, error)
+
+	// Update updates an existing object in the tracker.
+	Update(obj runtime.Object) error
+
+	// List retrieves all objects of a given kind in the given
+	// namespace. Only non-List kinds are accepted.
+	List(gvk unversioned.GroupVersionKind, ns string) (runtime.Object, error)
+
+	// Delete deletes an existing object from the tracker. If object
+	// didn't exist in the tracker prior to deletion, Delete returns
+	// no error.
+	Delete(gvk unversioned.GroupVersionKind, ns, name string) error
 }
 
 // ObjectScheme abstracts the implementation of common operations on objects.
@@ -49,55 +60,78 @@ type ObjectScheme interface {
 	runtime.ObjectTyper
 }
 
-// ObjectReaction returns a ReactionFunc that takes a generic action string of the form
-// <verb>-<resource> or <verb>-<subresource>-<resource> and attempts to return a runtime
-// Object or error that matches the requested action. For instance, list-replicationControllers
-// should attempt to return a list of replication controllers. This method delegates to the
-// ObjectRetriever interface to satisfy retrieval of lists or retrieval of single items.
-// TODO: add support for sub resources
-func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
+// ObjectReaction returns a ReactionFunc that applies core.Action to
+// the given tracker.
+func ObjectReaction(tracker ObjectTracker, mapper meta.RESTMapper) ReactionFunc {
 	return func(action Action) (bool, runtime.Object, error) {
-		resource := action.GetResource()
-		kind, err := mapper.KindFor(resource)
+		ns := action.GetNamespace()
+		gvr := action.GetResource()
+
+		gvk, err := mapper.KindFor(gvr)
+		if err != nil {
+			return false, nil, fmt.Errorf("error getting kind for resource %q: %s", gvr, err)
+		}
+
 		// This is a temporary fix. Because there is no internal resource, so
 		// the caller has no way to express that it expects to get an internal
 		// kind back. A more proper fix will be directly specify the Kind when
 		// build the action.
-		kind.Version = resource.Version
-		if err != nil {
-			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
+		gvk.Version = gvr.Version
+		if len(gvk.Version) == 0 {
+			gvk.Version = runtime.APIVersionInternal
 		}
 
-		// TODO: have mapper return a Kind for a subresource?
-		switch castAction := action.(type) {
-		case ListAction:
-			kind.Kind += "List"
-			resource, err := o.Kind(kind, "")
-			return true, resource, err
+		// Here and below we need to switch on implementation types,
+		// not on interfaces, as some interfaces are identical
+		// (e.g. UpdateAction and CreateAction), so if we use them,
+		// updates and creates end up matching the same case branch.
+		switch action := action.(type) {
 
-		case GetAction:
-			resource, err := o.Kind(kind, castAction.GetName())
-			return true, resource, err
+		case ListActionImpl:
+			obj, err := tracker.List(gvk, ns)
+			return true, obj, err
 
-		case DeleteAction:
-			resource, err := o.Kind(kind, castAction.GetName())
-			return true, resource, err
+		case GetActionImpl:
+			obj, err := tracker.Get(gvk, ns, action.GetName())
+			return true, obj, err
 
-		case CreateAction:
-			accessor, err := meta.Accessor(castAction.GetObject())
+		case CreateActionImpl:
+			objMeta, err := meta.Accessor(action.GetObject())
 			if err != nil {
 				return true, nil, err
 			}
-			resource, err := o.Kind(kind, accessor.GetName())
-			return true, resource, err
-
-		case UpdateAction:
-			accessor, err := meta.Accessor(castAction.GetObject())
+			if action.GetSubresource() == "" {
+				err = tracker.Add(action.GetObject())
+			} else {
+				// TODO: Currently we're handling subresource creation as an update
+				// on the enclosing resource. This works for some subresources but
+				// might not be generic enough.
+				err = tracker.Update(action.GetObject())
+			}
 			if err != nil {
 				return true, nil, err
 			}
-			resource, err := o.Kind(kind, accessor.GetName())
-			return true, resource, err
+			obj, err := tracker.Get(gvk, ns, objMeta.GetName())
+			return true, obj, err
+
+		case UpdateActionImpl:
+			objMeta, err := meta.Accessor(action.GetObject())
+			if err != nil {
+				return true, nil, err
+			}
+			err = tracker.Update(action.GetObject())
+			if err != nil {
+				return true, nil, err
+			}
+			obj, err := tracker.Get(gvk, ns, objMeta.GetName())
+			return true, obj, err
+
+		case DeleteActionImpl:
+			err := tracker.Delete(gvk, ns, action.GetName())
+			if err != nil {
+				return true, nil, err
+			}
+			return true, nil, nil
 
 		default:
 			return false, nil, fmt.Errorf("no reaction implemented for %s", action)
@@ -105,140 +139,277 @@ func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 	}
 }
 
-// AddObjectsFromPath loads the JSON or YAML file containing Kubernetes API resources
-// and adds them to the provided ObjectRetriever.
-func AddObjectsFromPath(path string, o ObjectRetriever, decoder runtime.Decoder) error {
-	data, err := ioutil.ReadFile(path)
+type tracker struct {
+	scheme  ObjectScheme
+	decoder runtime.Decoder
+	lock    sync.RWMutex
+	objects map[unversioned.GroupVersionKind][]runtime.Object
+}
+
+var _ ObjectTracker = &tracker{}
+
+// NewObjectTracker returns an ObjectTracker that can be used to keep track
+// of objects for the fake clientset. Mostly useful for unit tests.
+func NewObjectTracker(scheme ObjectScheme, decoder runtime.Decoder) ObjectTracker {
+	return &tracker{
+		scheme:  scheme,
+		decoder: decoder,
+		objects: make(map[unversioned.GroupVersionKind][]runtime.Object),
+	}
+}
+
+func (t *tracker) List(gvk unversioned.GroupVersionKind, ns string) (runtime.Object, error) {
+	// Heuristic for list kind: original kind + List suffix. Might
+	// not always be true but this tracker has a pretty limited
+	// understanding of the actual API model.
+	listGVK := gvk
+	listGVK.Kind = listGVK.Kind + "List"
+
+	list, err := t.scheme.New(listGVK)
+	if err != nil {
+		return nil, err
+	}
+
+	if !meta.IsListType(list) {
+		return nil, fmt.Errorf("%q is not a list type", listGVK.Kind)
+	}
+
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	objs, ok := t.objects[gvk]
+	if !ok {
+		return list, nil
+	}
+
+	matchingObjs, err := filterByNamespaceAndName(objs, ns, "")
+	if err != nil {
+		return nil, err
+	}
+	if err := meta.SetList(list, matchingObjs); err != nil {
+		return nil, err
+	}
+	if list, err = t.scheme.Copy(list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (t *tracker) Get(gvk unversioned.GroupVersionKind, ns, name string) (runtime.Object, error) {
+	if err := checkNamespace(gvk, ns); err != nil {
+		return nil, err
+	}
+
+	errNotFound := errors.NewNotFound(unversioned.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name)
+
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	objs, ok := t.objects[gvk]
+	if !ok {
+		return nil, errNotFound
+	}
+
+	matchingObjs, err := filterByNamespaceAndName(objs, ns, name)
+	if err != nil {
+		return nil, err
+	}
+	if len(matchingObjs) == 0 {
+		return nil, errNotFound
+	}
+	if len(matchingObjs) > 1 {
+		return nil, fmt.Errorf("more than one object matched gvk %s, ns: %q name: %q", gvk, ns, name)
+	}
+
+	// Only one object should match in the tracker if it works
+	// correctly, as Add/Update methods enforce kind/namespace/name
+	// uniqueness.
+	obj, err := t.scheme.Copy(matchingObjs[0])
+	if err != nil {
+		return nil, err
+	}
+
+	if status, ok := obj.(*unversioned.Status); ok {
+		if status.Details != nil {
+			status.Details.Kind = gvk.Kind
+		}
+		if status.Status != unversioned.StatusSuccess {
+			return nil, &errors.StatusError{ErrStatus: *status}
+		}
+	}
+
+	return obj, nil
+}
+
+func (t *tracker) Add(obj runtime.Object) error {
+	return t.add(obj, false)
+}
+
+func (t *tracker) Update(obj runtime.Object) error {
+	return t.add(obj, true)
+}
+
+func (t *tracker) add(obj runtime.Object, replaceExisting bool) error {
+	if meta.IsListType(obj) {
+		return t.addList(obj, replaceExisting)
+	}
+
+	gvks, _, err := t.scheme.ObjectKinds(obj)
 	if err != nil {
 		return err
 	}
-	data, err = yaml.ToJSON(data)
+	if len(gvks) == 0 {
+		return fmt.Errorf("no registered kinds for %v", obj)
+	}
+
+	t.lock.Lock()
+	defer t.lock.Unlock()
+
+	for _, gvk := range gvks {
+		gr := unversioned.GroupResource{Group: gvk.Group, Resource: gvk.Kind}
+
+		// To avoid the object from being accidentally modified by caller
+		// after it's been added to the tracker, we always store the deep
+		// copy.
+		obj, err = t.scheme.Copy(obj)
+		if err != nil {
+			return err
+		}
+
+		if status, ok := obj.(*unversioned.Status); ok && status.Details != nil {
+			gvk.Kind = status.Details.Kind
+		}
+
+		newMeta, err := meta.Accessor(obj)
+		if err != nil {
+			return err
+		}
+
+		if err := checkNamespace(gvk, newMeta.GetNamespace()); err != nil {
+			return err
+		}
+
+		for i, existingObj := range t.objects[gvk] {
+			oldMeta, err := meta.Accessor(existingObj)
+			if err != nil {
+				return err
+			}
+			if oldMeta.GetNamespace() == newMeta.GetNamespace() && oldMeta.GetName() == newMeta.GetName() {
+				if replaceExisting {
+					t.objects[gvk][i] = obj
+					return nil
+				}
+				return errors.NewAlreadyExists(gr, newMeta.GetName())
+			}
+		}
+
+		if replaceExisting {
+			// Tried to update but no matching object was found.
+			return errors.NewNotFound(gr, newMeta.GetName())
+		}
+
+		t.objects[gvk] = append(t.objects[gvk], obj)
+	}
+
+	return nil
+}
+
+func (t *tracker) addList(obj runtime.Object, replaceExisting bool) error {
+	list, err := meta.ExtractList(obj)
 	if err != nil {
 		return err
 	}
-	obj, err := runtime.Decode(decoder, data)
-	if err != nil {
-		return err
+	errs := runtime.DecodeList(list, t.decoder)
+	if len(errs) > 0 {
+		return errs[0]
 	}
-	if err := o.Add(obj); err != nil {
-		return err
+	for _, obj := range list {
+		err := t.add(obj, replaceExisting)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-type objects struct {
-	types   map[string][]runtime.Object
-	last    map[string]int
-	scheme  ObjectScheme
-	decoder runtime.Decoder
-}
-
-var _ ObjectRetriever = &objects{}
-
-// NewObjects implements the ObjectRetriever interface by introspecting the
-// objects provided to Add() and returning them when the Kind method is invoked.
-// If an api.List object is provided to Add(), each child item is added. If an
-// object is added that is itself a list (PodList, ServiceList) then that is added
-// to the "PodList" kind. If no PodList is added, the retriever will take any loaded
-// Pods and return them in a list. If an api.Status is added, and the Details.Kind field
-// is set, that status will be returned instead (as an error if Status != Success, or
-// as a runtime.Object if Status == Success).  If multiple PodLists are provided, they
-// will be returned in order by the Kind call, and the last PodList will be reused for
-// subsequent calls.
-func NewObjects(scheme ObjectScheme, decoder runtime.Decoder) ObjectRetriever {
-	return objects{
-		types:   make(map[string][]runtime.Object),
-		last:    make(map[string]int),
-		scheme:  scheme,
-		decoder: decoder,
-	}
-}
-
-func (o objects) Kind(kind unversioned.GroupVersionKind, name string) (runtime.Object, error) {
-	if len(kind.Version) == 0 {
-		kind.Version = runtime.APIVersionInternal
-	}
-	empty, err := o.scheme.New(kind)
-	nilValue := reflect.Zero(reflect.TypeOf(empty)).Interface().(runtime.Object)
-
-	arr, ok := o.types[kind.Kind]
-	if !ok {
-		if strings.HasSuffix(kind.Kind, "List") {
-			itemKind := kind.Kind[:len(kind.Kind)-4]
-			arr, ok := o.types[itemKind]
-			if !ok {
-				return empty, nil
-			}
-			out, err := o.scheme.New(kind)
-			if err != nil {
-				return nilValue, err
-			}
-			if err := meta.SetList(out, arr); err != nil {
-				return nilValue, err
-			}
-			if out, err = o.scheme.Copy(out); err != nil {
-				return nilValue, err
-			}
-			return out, nil
-		}
-		return nilValue, errors.NewNotFound(unversioned.GroupResource{Group: kind.Group, Resource: kind.Kind}, name)
-	}
-
-	index := o.last[kind.Kind]
-	if index >= len(arr) {
-		index = len(arr) - 1
-	}
-	if index < 0 {
-		return nilValue, errors.NewNotFound(unversioned.GroupResource{Group: kind.Group, Resource: kind.Kind}, name)
-	}
-	out, err := o.scheme.Copy(arr[index])
-	if err != nil {
-		return nilValue, err
-	}
-	o.last[kind.Kind] = index + 1
-
-	if status, ok := out.(*unversioned.Status); ok {
-		if status.Details != nil {
-			status.Details.Kind = kind.Kind
-		}
-		if status.Status != unversioned.StatusSuccess {
-			return nilValue, &errors.StatusError{ErrStatus: *status}
-		}
-	}
-
-	return out, nil
-}
-
-func (o objects) Add(obj runtime.Object) error {
-	gvk, err := o.scheme.ObjectKind(obj)
-	if err != nil {
+func (t *tracker) Delete(gvk unversioned.GroupVersionKind, ns, name string) error {
+	if err := checkNamespace(gvk, ns); err != nil {
 		return err
 	}
-	kind := gvk.Kind
 
-	switch {
-	case meta.IsListType(obj):
-		if kind != "List" {
-			o.types[kind] = append(o.types[kind], obj)
-		}
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
-		list, err := meta.ExtractList(obj)
+	found := false
+
+	for i, existingObj := range t.objects[gvk] {
+		objMeta, err := meta.Accessor(existingObj)
 		if err != nil {
 			return err
 		}
-		if errs := runtime.DecodeList(list, o.decoder); len(errs) > 0 {
-			return errs[0]
+		if objMeta.GetNamespace() == ns && objMeta.GetName() == name {
+			t.objects[gvk] = append(t.objects[gvk][:i], t.objects[gvk][i+1:]...)
+			found = true
+			break
 		}
-		for _, obj := range list {
-			if err := o.Add(obj); err != nil {
-				return err
+	}
+
+	if found {
+		return nil
+	}
+
+	return errors.NewNotFound(unversioned.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, name)
+}
+
+// filterByNamespaceAndName returns all objects in the collection that
+// match provided namespace and name. Empty namespace matches
+// non-namespaced objects.
+func filterByNamespaceAndName(objs []runtime.Object, ns, name string) ([]runtime.Object, error) {
+	var res []runtime.Object
+
+	for _, obj := range objs {
+		acc, err := meta.Accessor(obj)
+		if err != nil {
+			return nil, err
+		}
+		if ns != "" && acc.GetNamespace() != ns {
+			continue
+		}
+		if name != "" && acc.GetName() != name {
+			continue
+		}
+		res = append(res, obj)
+	}
+
+	return res, nil
+}
+
+// checkNamespace makes sure that the scope of gvk matches ns. It
+// returns an error if namespace is empty but gvk is a namespaced
+// kind, or if ns is non-empty and gvk is a namespaced kind.
+func checkNamespace(gvk unversioned.GroupVersionKind, ns string) error {
+	group, err := registered.Group(gvk.Group)
+	if err != nil {
+		return err
+	}
+	mapping, err := group.RESTMapper.RESTMapping(gvk.GroupKind(), gvk.Version)
+	if err != nil {
+		return err
+	}
+	switch mapping.Scope.Name() {
+	case meta.RESTScopeNameRoot:
+		if ns != "" {
+			return fmt.Errorf("namespace specified for a non-namespaced kind %s", gvk)
+		}
+	case meta.RESTScopeNameNamespace:
+		if ns == "" {
+			// Skipping this check for Events, since
+			// controllers emit events that have no namespace,
+			// even though Event is a namespaced resource.
+			if gvk.Kind != "Event" {
+				return fmt.Errorf("no namespace specified for a namespaced kind %s", gvk)
 			}
 		}
-	default:
-		if status, ok := obj.(*unversioned.Status); ok && status.Details != nil {
-			kind = status.Details.Kind
-		}
-		o.types[kind] = append(o.types[kind], obj)
 	}
 
 	return nil

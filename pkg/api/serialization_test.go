@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"reflect"
@@ -37,8 +38,12 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
+	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -78,6 +83,13 @@ func dataAsString(data []byte) string {
 func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	printer := spew.ConfigState{DisableMethods: true}
 
+	original := item
+	copied, err := api.Scheme.DeepCopy(item)
+	if err != nil {
+		panic(fmt.Sprintf("unable to copy: %v", err))
+	}
+	item = copied.(runtime.Object)
+
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := runtime.Encode(codec, item)
 	if err != nil {
@@ -85,13 +97,18 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 		return
 	}
 
+	if !api.Semantic.DeepEqual(original, item) {
+		t.Errorf("0: %v: encode altered the object, diff: %v", name, diff.ObjectReflectDiff(original, item))
+		return
+	}
+
 	obj2, err := runtime.Decode(codec, data)
 	if err != nil {
-		t.Errorf("0: %v: %v\nCodec: %v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", item))
+		t.Errorf("0: %v: %v\nCodec: %#v\nData: %s\nSource: %#v", name, err, codec, dataAsString(data), printer.Sprintf("%#v", item))
 		panic("failed")
 	}
-	if !api.Semantic.DeepEqual(item, obj2) {
-		t.Errorf("\n1: %v: diff: %v\nCodec: %v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectGoPrintDiff(item, obj2), codec, printer.Sprintf("%#v", item), dataAsString(data), printer.Sprintf("%#v", obj2))
+	if !api.Semantic.DeepEqual(original, obj2) {
+		t.Errorf("\n1: %v: diff: %v\nCodec: %#v\nSource:\n\n%#v\n\nEncoded:\n\n%s\n\nFinal:\n\n%#v", name, diff.ObjectReflectDiff(item, obj2), codec, printer.Sprintf("%#v", item), dataAsString(data), printer.Sprintf("%#v", obj2))
 		return
 	}
 
@@ -101,7 +118,7 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 		return
 	}
 	if !api.Semantic.DeepEqual(item, obj3) {
-		t.Errorf("3: %v: diff: %v\nCodec: %v", name, diff.ObjectDiff(item, obj3), codec)
+		t.Errorf("3: %v: diff: %v\nCodec: %#v", name, diff.ObjectReflectDiff(item, obj3), codec)
 		return
 	}
 }
@@ -128,6 +145,61 @@ func roundTripSame(t *testing.T, group testapi.TestGroup, item runtime.Object, e
 		for _, codec := range codecs {
 			roundTrip(t, codec, item)
 		}
+	}
+}
+
+func Convert_v1beta1_ReplicaSet_to_api_ReplicationController(in *v1beta1.ReplicaSet, out *api.ReplicationController, s conversion.Scope) error {
+	intermediate1 := &extensions.ReplicaSet{}
+	if err := v1beta1.Convert_v1beta1_ReplicaSet_To_extensions_ReplicaSet(in, intermediate1, s); err != nil {
+		return err
+	}
+
+	intermediate2 := &v1.ReplicationController{}
+	if err := v1.Convert_extensions_ReplicaSet_to_v1_ReplicationController(intermediate1, intermediate2, s); err != nil {
+		return err
+	}
+
+	return v1.Convert_v1_ReplicationController_To_api_ReplicationController(intermediate2, out, s)
+}
+
+func TestSetControllerConversion(t *testing.T) {
+	if err := api.Scheme.AddConversionFuncs(Convert_v1beta1_ReplicaSet_to_api_ReplicationController); err != nil {
+		t.Fatal(err)
+	}
+
+	rs := &extensions.ReplicaSet{}
+	rc := &api.ReplicationController{}
+
+	extGroup := testapi.Extensions
+	defaultGroup := testapi.Default
+
+	fuzzInternalObject(t, extGroup.InternalGroupVersion(), rs, rand.Int63())
+
+	t.Logf("rs._internal.extensions -> rs.v1beta1.extensions")
+	data, err := runtime.Encode(extGroup.Codec(), rs)
+	if err != nil {
+		t.Fatalf("unexpected encoding error: %v", err)
+	}
+
+	decoder := api.Codecs.UniversalDecoder(*extGroup.GroupVersion(), *defaultGroup.GroupVersion())
+	if err := versioning.EnableCrossGroupDecoding(decoder, extGroup.GroupVersion().Group, defaultGroup.GroupVersion().Group); err != nil {
+		t.Fatalf("unexpected error while enabling cross-group decoding: %v", err)
+	}
+
+	t.Logf("rs.v1beta1.extensions -> rc._internal")
+	if err := runtime.DecodeInto(decoder, data, rc); err != nil {
+		t.Fatalf("unexpected decoding error: %v", err)
+	}
+
+	t.Logf("rc._internal -> rc.v1")
+	data, err = runtime.Encode(defaultGroup.Codec(), rc)
+	if err != nil {
+		t.Fatalf("unexpected encoding error: %v", err)
+	}
+
+	t.Logf("rc.v1 -> rs._internal.extensions")
+	if err := runtime.DecodeInto(decoder, data, rs); err != nil {
+		t.Fatalf("unexpected decoding error: %v", err)
 	}
 }
 
@@ -160,6 +232,20 @@ var nonRoundTrippableTypes = sets.NewString(
 	// object.
 	"WatchEvent",
 )
+
+var commonKinds = []string{"ListOptions", "DeleteOptions"}
+
+// verify all external group/versions have the common kinds like the ListOptions, DeleteOptions are registered.
+func TestCommonKindsRegistered(t *testing.T) {
+	for _, kind := range commonKinds {
+		for _, group := range testapi.Groups {
+			gv := group.GroupVersion()
+			if _, err := api.Scheme.New(gv.WithKind(kind)); err != nil {
+				t.Error(err)
+			}
+		}
+	}
+}
 
 var nonInternalRoundTrippableTypes = sets.NewString("List", "ListOptions", "ExportOptions")
 var nonRoundTrippableTypesByVersion = map[string][]string{}
@@ -295,7 +381,7 @@ func TestObjectWatchFraming(t *testing.T) {
 
 		// write a single object through the framer and back out
 		obj := &bytes.Buffer{}
-		if err := s.EncodeToStream(v1secret, obj); err != nil {
+		if err := s.Encode(v1secret, obj); err != nil {
 			t.Fatal(err)
 		}
 		out := &bytes.Buffer{}
@@ -317,13 +403,13 @@ func TestObjectWatchFraming(t *testing.T) {
 
 		// write a watch event through and back out
 		obj = &bytes.Buffer{}
-		if err := embedded.EncodeToStream(v1secret, obj); err != nil {
+		if err := embedded.Encode(v1secret, obj); err != nil {
 			t.Fatal(err)
 		}
 		event := &versioned.Event{Type: string(watch.Added)}
 		event.Object.Raw = obj.Bytes()
 		obj = &bytes.Buffer{}
-		if err := s.EncodeToStream(event, obj); err != nil {
+		if err := s.Encode(event, obj); err != nil {
 			t.Fatal(err)
 		}
 		out = &bytes.Buffer{}
@@ -358,6 +444,7 @@ func benchmarkItems() []v1.Pod {
 	for i := range items {
 		var pod api.Pod
 		apiObjectFuzzer.Fuzz(&pod)
+		pod.Spec.InitContainers, pod.Status.InitContainerStatuses = nil, nil
 		out, err := api.Scheme.ConvertToVersion(&pod, v1.SchemeGroupVersion)
 		if err != nil {
 			panic(err)

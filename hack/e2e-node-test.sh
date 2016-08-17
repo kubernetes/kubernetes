@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,19 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script is a vestigial redirection.  Please do not add "real" logic.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/hack/lib/init.sh"
 
-focus=${FOCUS:-""}
-skip=${SKIP:-""}
-
-ginkgo=$(kube::util::find-binary "ginkgo")
-if [[ -z "${ginkgo}" ]]; then
-  echo "You do not appear to have ginkgo built. Try 'make WHAT=vendor/github.com/onsi/ginkgo/ginkgo'"
-  exit 1
+# For help output
+ARGHELP=""
+if [[ -n "${FOCUS:-}" ]]; then
+    ARGHELP="FOCUS='${FOCUS}' "
+fi
+if [[ -n "${SKIP:-}" ]]; then
+    ARGHELP="${ARGHELP}SKIP='${SKIP}'"
 fi
 
-# Provided for backwards compatibility
-"${ginkgo}" --focus=$focus --skip=$skip "${KUBE_ROOT}/test/e2e_node/" -- --alsologtostderr --v 2 --node-name $(hostname) --build-services=true --start-services=true --stop-services=true
-
-exit $?
+echo "NOTE: $0 has been replaced by 'make test-e2e-node'"
+echo
+echo "This script supports a number of parameters passed as environment variables."
+echo "Please see the Makfile for more details."
+echo
+echo "The equivalent of this invocation is: "
+echo "    make test-e2e-node ${ARGHELP}"
+echo
+echo
+make --no-print-directory -C "${KUBE_ROOT}" test-e2e-node FOCUS=${FOCUS:-} SKIP=${SKIP:-}

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,21 +20,29 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/args"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 
-	"strings"
-
 	"github.com/golang/glog"
 	flag "github.com/spf13/pflag"
 )
 
 var (
-	test                   = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
-	inputVersions          = flag.StringSlice("input", []string{"api/", "extensions/", "autoscaling/", "batch/"}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\". Default to \"api/,extensions/,autoscaling/,batch/\"")
+	test          = flag.BoolP("test", "t", false, "set this flag to generate the client code for the testdata")
+	inputVersions = flag.StringSlice("input", []string{
+		"api/",
+		"authentication/",
+		"authorization/",
+		"autoscaling/",
+		"batch/",
+		"certificates/",
+		"extensions/",
+		"rbac/",
+	}, "group/versions that client-gen will generate clients for. At most one version per group is allowed. Specified in the format \"group1/version1,group2/version2...\". Default to \"api/,extensions/,autoscaling/,batch/,rbac/\"")
 	includedTypesOverrides = flag.StringSlice("included-types-overrides", []string{}, "list of group/version/type for which client should be generated. By default, client is generated for all types which have genclient=true in types.go. This overrides that. For each groupVersion in this list, only the types mentioned here will be included. The default check of genclient=true will be used for other group versions.")
 	basePath               = flag.String("input-base", "k8s.io/kubernetes/pkg/apis", "base path to look for the api group. Default to \"k8s.io/kubernetes/pkg/apis\"")
 	clientsetName          = flag.StringP("clientset-name", "n", "internalclientset", "the name of the generated clientset package.")
@@ -59,11 +67,8 @@ func parseGroupVersionType(gvtString string) (gvString string, typeStr string, e
 	length := len(subs)
 	switch length {
 	case 2:
-		// handle legacy api group version.
-		if subs[0] == "api" {
-			return "api/", subs[1], nil
-		}
-		return "", "", invalidFormatErr
+		// gvtString of the form group/type, e.g. api/Service,extensions/ReplicaSet
+		return subs[0] + "/", subs[1], nil
 	case 3:
 		return strings.Join(subs[:length-1], "/"), subs[length-1], nil
 	default:
@@ -182,7 +187,7 @@ func main() {
 			IncludedTypesOverrides:  includedTypesOverrides,
 		}
 
-		fmt.Printf("==arguments: %v\n", arguments)
+		glog.Infof("==arguments: %v\n", arguments)
 	}
 
 	if err := arguments.Execute(

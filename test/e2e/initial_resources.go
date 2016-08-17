@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -67,6 +67,6 @@ func runPod(f *framework.Framework, name, image string) *api.Pod {
 	}
 	createdPod, err := f.Client.Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err)
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, name, f.Namespace.Name))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, createdPod))
 	return createdPod
 }

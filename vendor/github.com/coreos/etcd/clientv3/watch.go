@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,20 +17,23 @@ package clientv3
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	v3rpc "github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-	storagepb "github.com/coreos/etcd/storage/storagepb"
+	mvccpb "github.com/coreos/etcd/mvcc/mvccpb"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
 const (
-	EventTypeDelete = storagepb.DELETE
-	EventTypePut    = storagepb.PUT
+	EventTypeDelete = mvccpb.DELETE
+	EventTypePut    = mvccpb.PUT
+
+	closeSendErrTimeout = 250 * time.Millisecond
 )
 
-type Event storagepb.Event
+type Event mvccpb.Event
 
 type WatchChan <-chan WatchResponse
 
@@ -39,7 +42,7 @@ type Watcher interface {
 	// through the returned channel.
 	// If the watch is slow or the required rev is compacted, the watch request
 	// might be canceled from the server-side and the chan will be closed.
-	// 'opts' can be: 'WithRev' and/or 'WitchPrefix'.
+	// 'opts' can be: 'WithRev' and/or 'WithPrefix'.
 	Watch(ctx context.Context, key string, opts ...OpOption) WatchChan
 
 	// Close closes the watcher and cancels all watch requests.
@@ -57,6 +60,8 @@ type WatchResponse struct {
 	// If the watch failed and the stream was about to close, before the channel is closed,
 	// the channel sends a final response that has Canceled set to true with a non-nil Err().
 	Canceled bool
+
+	closeErr error
 }
 
 // IsCreate returns true if the event tells that the key is newly created.
@@ -71,10 +76,12 @@ func (e *Event) IsModify() bool {
 
 // Err is the error value if this WatchResponse holds an error.
 func (wr *WatchResponse) Err() error {
-	if wr.CompactRevision != 0 {
+	switch {
+	case wr.closeErr != nil:
+		return v3rpc.Error(wr.closeErr)
+	case wr.CompactRevision != 0:
 		return v3rpc.ErrCompacted
-	}
-	if wr.Canceled {
+	case wr.Canceled:
 		return v3rpc.ErrFutureRev
 	}
 	return nil
@@ -87,18 +94,28 @@ func (wr *WatchResponse) IsProgressNotify() bool {
 
 // watcher implements the Watcher interface
 type watcher struct {
-	c      *Client
-	conn   *grpc.ClientConn
+	remote pb.WatchClient
+
+	// mu protects the grpc streams map
+	mu sync.RWMutex
+	// streams holds all the active grpc streams keyed by ctx value.
+	streams map[string]*watchGrpcStream
+}
+
+type watchGrpcStream struct {
+	owner  *watcher
 	remote pb.WatchClient
 
 	// ctx controls internal remote.Watch requests
-	ctx    context.Context
+	ctx context.Context
+	// ctxKey is the key used when looking up this stream's context
+	ctxKey string
 	cancel context.CancelFunc
 
-	// streams holds all active watchers
-	streams map[int64]*watcherStream
 	// mu protects the streams map
 	mu sync.RWMutex
+	// streams holds all active watchers
+	streams map[int64]*watcherStream
 
 	// reqc sends a watch request from Watch() to the main goroutine
 	reqc chan *watchRequest
@@ -108,8 +125,11 @@ type watcher struct {
 	stopc chan struct{}
 	// donec closes to broadcast shutdown
 	donec chan struct{}
-	// errc transmits errors from grpc Recv
+	// errc transmits errors from grpc Recv to the watch stream reconn logic
 	errc chan error
+
+	// the error that closed the watch stream
+	closeErr error
 }
 
 // watchRequest is issued by the subscriber to start a new watcher
@@ -126,6 +146,7 @@ type watchRequest struct {
 
 // watcherStream represents a registered watcher
 type watcherStream struct {
+	// initReq is the request that initiated this request
 	initReq watchRequest
 
 	// outc publishes watch responses to subscriber
@@ -141,15 +162,30 @@ type watcherStream struct {
 }
 
 func NewWatcher(c *Client) Watcher {
-	ctx, cancel := context.WithCancel(context.Background())
-	conn := c.ActiveConnection()
+	return &watcher{
+		remote:  pb.NewWatchClient(c.conn),
+		streams: make(map[string]*watchGrpcStream),
+	}
+}
 
-	w := &watcher{
-		c:      c,
-		conn:   conn,
-		remote: pb.NewWatchClient(conn),
+// never closes
+var valCtxCh = make(chan struct{})
+var zeroTime = time.Unix(0, 0)
 
+// ctx with only the values; never Done
+type valCtx struct{ context.Context }
+
+func (vc *valCtx) Deadline() (time.Time, bool) { return zeroTime, false }
+func (vc *valCtx) Done() <-chan struct{}       { return valCtxCh }
+func (vc *valCtx) Err() error                  { return nil }
+
+func (w *watcher) newWatcherGrpcStream(inctx context.Context) *watchGrpcStream {
+	ctx, cancel := context.WithCancel(&valCtx{inctx})
+	wgs := &watchGrpcStream{
+		owner:   w,
+		remote:  w.remote,
 		ctx:     ctx,
+		ctxKey:  fmt.Sprintf("%v", inctx),
 		cancel:  cancel,
 		streams: make(map[int64]*watcherStream),
 
@@ -159,8 +195,8 @@ func NewWatcher(c *Client) Watcher {
 		donec: make(chan struct{}),
 		errc:  make(chan error, 1),
 	}
-	go w.run()
-	return w
+	go wgs.run()
+	return wgs
 }
 
 // Watch posts a watch request to run() and waits for a new watcher channel
@@ -178,13 +214,41 @@ func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) Watch
 	}
 
 	ok := false
+	ctxKey := fmt.Sprintf("%v", ctx)
+
+	// find or allocate appropriate grpc watch stream
+	w.mu.Lock()
+	if w.streams == nil {
+		// closed
+		w.mu.Unlock()
+		ch := make(chan WatchResponse)
+		close(ch)
+		return ch
+	}
+	wgs := w.streams[ctxKey]
+	if wgs == nil {
+		wgs = w.newWatcherGrpcStream(ctx)
+		w.streams[ctxKey] = wgs
+	}
+	donec := wgs.donec
+	reqc := wgs.reqc
+	w.mu.Unlock()
+
+	// couldn't create channel; return closed channel
+	closeCh := make(chan WatchResponse, 1)
 
 	// submit request
 	select {
-	case w.reqc <- wr:
+	case reqc <- wr:
 		ok = true
 	case <-wr.ctx.Done():
-	case <-w.donec:
+	case <-donec:
+		if wgs.closeErr != nil {
+			closeCh <- WatchResponse{closeErr: wgs.closeErr}
+			break
+		}
+		// retry; may have dropped stream from no ctxs
+		return w.Watch(ctx, key, opts...)
 	}
 
 	// receive channel
@@ -193,26 +257,44 @@ func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) Watch
 		case ret := <-retc:
 			return ret
 		case <-ctx.Done():
-		case <-w.donec:
+		case <-donec:
+			if wgs.closeErr != nil {
+				closeCh <- WatchResponse{closeErr: wgs.closeErr}
+				break
+			}
+			// retry; may have dropped stream from no ctxs
+			return w.Watch(ctx, key, opts...)
 		}
 	}
 
-	// couldn't create channel; return closed channel
-	ch := make(chan WatchResponse)
-	close(ch)
-	return ch
+	close(closeCh)
+	return closeCh
 }
 
-func (w *watcher) Close() error {
-	select {
-	case w.stopc <- struct{}{}:
-	case <-w.donec:
+func (w *watcher) Close() (err error) {
+	w.mu.Lock()
+	streams := w.streams
+	w.streams = nil
+	w.mu.Unlock()
+	for _, wgs := range streams {
+		if werr := wgs.Close(); werr != nil {
+			err = werr
+		}
 	}
-	<-w.donec
-	return <-w.errc
+	return err
 }
 
-func (w *watcher) addStream(resp *pb.WatchResponse, pendingReq *watchRequest) {
+func (w *watchGrpcStream) Close() (err error) {
+	close(w.stopc)
+	<-w.donec
+	select {
+	case err = <-w.errc:
+	default:
+	}
+	return toErr(w.ctx, err)
+}
+
+func (w *watchGrpcStream) addStream(resp *pb.WatchResponse, pendingReq *watchRequest) {
 	if pendingReq == nil {
 		// no pending request; ignore
 		return
@@ -265,27 +347,32 @@ func (w *watcher) addStream(resp *pb.WatchResponse, pendingReq *watchRequest) {
 }
 
 // closeStream closes the watcher resources and removes it
-func (w *watcher) closeStream(ws *watcherStream) {
+func (w *watchGrpcStream) closeStream(ws *watcherStream) {
 	// cancels request stream; subscriber receives nil channel
 	close(ws.initReq.retc)
 	// close subscriber's channel
 	close(ws.outc)
-	// shutdown serveStream
-	close(ws.recvc)
 	delete(w.streams, ws.id)
 }
 
 // run is the root of the goroutines for managing a watcher client
-func (w *watcher) run() {
+func (w *watchGrpcStream) run() {
+	var wc pb.Watch_WatchClient
+	var closeErr error
+
 	defer func() {
+		w.owner.mu.Lock()
+		w.closeErr = closeErr
+		if w.owner.streams != nil {
+			delete(w.owner.streams, w.ctxKey)
+		}
 		close(w.donec)
+		w.owner.mu.Unlock()
 		w.cancel()
 	}()
 
 	// start a stream with the etcd grpc server
-	wc, wcerr := w.newWatchClient()
-	if wcerr != nil {
-		w.errc <- wcerr
+	if wc, closeErr = w.newWatchClient(); closeErr != nil {
 		return
 	}
 
@@ -314,6 +401,18 @@ func (w *watcher) run() {
 				curReqC = w.reqc
 			case pbresp.Canceled:
 				delete(cancelSet, pbresp.WatchId)
+				// shutdown serveStream, if any
+				w.mu.Lock()
+				if ws, ok := w.streams[pbresp.WatchId]; ok {
+					close(ws.recvc)
+					delete(w.streams, ws.id)
+				}
+				numStreams := len(w.streams)
+				w.mu.Unlock()
+				if numStreams == 0 {
+					// don't leak watcher streams
+					return
+				}
 			default:
 				// dispatch to appropriate watch stream
 				if ok := w.dispatchEvent(pbresp); ok {
@@ -334,9 +433,12 @@ func (w *watcher) run() {
 			}
 		// watch client failed to recv; spawn another if possible
 		// TODO report watch client errors from errc?
-		case <-w.errc:
-			if wc, wcerr = w.newWatchClient(); wcerr != nil {
-				w.errc <- wcerr
+		case err := <-w.errc:
+			if toErr(w.ctx, err) == v3rpc.ErrNoLeader {
+				closeErr = err
+				return
+			}
+			if wc, closeErr = w.newWatchClient(); closeErr != nil {
 				return
 			}
 			curReqC = w.reqc
@@ -345,7 +447,6 @@ func (w *watcher) run() {
 			}
 			cancelSet = make(map[int64]struct{})
 		case <-w.stopc:
-			w.errc <- nil
 			return
 		}
 
@@ -365,7 +466,7 @@ func (w *watcher) run() {
 }
 
 // dispatchEvent sends a WatchResponse to the appropriate watcher stream
-func (w *watcher) dispatchEvent(pbresp *pb.WatchResponse) bool {
+func (w *watchGrpcStream) dispatchEvent(pbresp *pb.WatchResponse) bool {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	ws, ok := w.streams[pbresp.WatchId]
@@ -385,7 +486,7 @@ func (w *watcher) dispatchEvent(pbresp *pb.WatchResponse) bool {
 }
 
 // serveWatchClient forwards messages from the grpc stream to run()
-func (w *watcher) serveWatchClient(wc pb.Watch_WatchClient) {
+func (w *watchGrpcStream) serveWatchClient(wc pb.Watch_WatchClient) {
 	for {
 		resp, err := wc.Recv()
 		if err != nil {
@@ -404,7 +505,8 @@ func (w *watcher) serveWatchClient(wc pb.Watch_WatchClient) {
 }
 
 // serveStream forwards watch responses from run() to the subscriber
-func (w *watcher) serveStream(ws *watcherStream) {
+func (w *watchGrpcStream) serveStream(ws *watcherStream) {
+	var closeErr error
 	emptyWr := &WatchResponse{}
 	wrs := []*WatchResponse{}
 	resuming := false
@@ -440,7 +542,7 @@ func (w *watcher) serveStream(ws *watcherStream) {
 				return
 			}
 			// resume up to last seen event if disconnected
-			if resuming {
+			if resuming && wr.Err() == nil {
 				resuming = false
 				// trim events already seen
 				for i := 0; i < len(wr.Events); i++ {
@@ -454,6 +556,7 @@ func (w *watcher) serveStream(ws *watcherStream) {
 					break
 				}
 			}
+			resuming = false
 			// TODO don't keep buffering if subscriber stops reading
 			wrs = append(wrs, wr)
 		case resumeRev := <-ws.resumec:
@@ -468,17 +571,28 @@ func (w *watcher) serveStream(ws *watcherStream) {
 			}
 		case <-w.donec:
 			closing = true
+			closeErr = w.closeErr
 		case <-ws.initReq.ctx.Done():
 			closing = true
 		}
 	}
+
+	// try to send off close error
+	if closeErr != nil {
+		select {
+		case ws.outc <- WatchResponse{closeErr: w.closeErr}:
+		case <-w.donec:
+		case <-time.After(closeSendErrTimeout):
+		}
+	}
+
 	w.mu.Lock()
 	w.closeStream(ws)
 	w.mu.Unlock()
 	// lazily send cancel message if events on missing id
 }
 
-func (w *watcher) newWatchClient() (pb.Watch_WatchClient, error) {
+func (w *watchGrpcStream) newWatchClient() (pb.Watch_WatchClient, error) {
 	ws, rerr := w.resume()
 	if rerr != nil {
 		return nil, rerr
@@ -488,7 +602,7 @@ func (w *watcher) newWatchClient() (pb.Watch_WatchClient, error) {
 }
 
 // resume creates a new WatchClient with all current watchers reestablished
-func (w *watcher) resume() (ws pb.Watch_WatchClient, err error) {
+func (w *watchGrpcStream) resume() (ws pb.Watch_WatchClient, err error) {
 	for {
 		if ws, err = w.openWatchClient(); err != nil {
 			break
@@ -496,31 +610,34 @@ func (w *watcher) resume() (ws pb.Watch_WatchClient, err error) {
 			break
 		}
 	}
-	return ws, err
+	return ws, v3rpc.Error(err)
 }
 
 // openWatchClient retries opening a watchclient until retryConnection fails
-func (w *watcher) openWatchClient() (ws pb.Watch_WatchClient, err error) {
+func (w *watchGrpcStream) openWatchClient() (ws pb.Watch_WatchClient, err error) {
 	for {
-		if ws, err = w.remote.Watch(w.ctx); ws != nil {
-			break
-		} else if isHalted(w.ctx, err) {
+		select {
+		case <-w.stopc:
+			if err == nil {
+				err = context.Canceled
+			}
 			return nil, err
+		default:
 		}
-		newConn, nerr := w.c.retryConnection(w.conn, nil)
-		if nerr != nil {
-			return nil, nerr
+		if ws, err = w.remote.Watch(w.ctx, grpc.FailFast(false)); ws != nil && err == nil {
+			break
 		}
-		w.conn = newConn
-		w.remote = pb.NewWatchClient(w.conn)
+		if isHaltErr(w.ctx, err) {
+			return nil, v3rpc.Error(err)
+		}
 	}
 	return ws, nil
 }
 
 // resumeWatchers rebuilds every registered watcher on a new client
-func (w *watcher) resumeWatchers(wc pb.Watch_WatchClient) error {
-	streams := []*watcherStream{}
+func (w *watchGrpcStream) resumeWatchers(wc pb.Watch_WatchClient) error {
 	w.mu.RLock()
+	streams := make([]*watcherStream, 0, len(w.streams))
 	for _, ws := range w.streams {
 		streams = append(streams, ws)
 	}

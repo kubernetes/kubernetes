@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -102,4 +102,15 @@ func (c *FakeServiceAccounts) Watch(opts api.ListOptions) (watch.Interface, erro
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(serviceaccountsResource, c.ns, opts))
 
+}
+
+// Patch applies the patch and returns the patched serviceAccount.
+func (c *FakeServiceAccounts) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ServiceAccount, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchSubresourceAction(serviceaccountsResource, c.ns, name, data, subresources...), &api.ServiceAccount{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ServiceAccount), err
 }

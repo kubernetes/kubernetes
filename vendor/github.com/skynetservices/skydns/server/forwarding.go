@@ -102,7 +102,7 @@ Redo:
 	r, err := exchangeWithRetry(s.dnsUDPclient, m, s.config.Nameservers[nsid])
 	if err == nil {
 		if r.Rcode != dns.RcodeSuccess {
-			return nil, fmt.Errorf("rcode is not equal to success")
+			return nil, fmt.Errorf("rcode %d is not equal to success", r.Rcode)
 		}
 		// Reset TTLs to rcache TTL to make some of the other code
 		// and the tests not care about TTLs

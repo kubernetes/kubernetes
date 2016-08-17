@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,7 +51,8 @@ type ScaleStatus struct {
 	Selector *unversioned.LabelSelector `json:"selector,omitempty"`
 }
 
-// +genclient=true,noMethods=true
+// +genclient=true
+// +noMethods=true
 
 // represents a scaling request for a resource.
 type Scale struct {
@@ -94,7 +95,8 @@ type CustomMetricCurrentStatusList struct {
 	Items []CustomMetricCurrentStatus `json:"items"`
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // A ThirdPartyResource is a generic representation of a resource, it is used by add-ons and plugins to add new resource
 // types to the API.  It consists of one or more Versions of the api.
@@ -624,7 +626,8 @@ type ReplicaSetStatus struct {
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
-// +genclient=true,nonNamespaced=true
+// +genclient=true
+// +nonNamespaced=true
 
 // PodSecurityPolicy governs the ability to make requests that affect the SecurityContext
 // that will be applied to a pod and container.
@@ -641,7 +644,7 @@ type PodSecurityPolicySpec struct {
 	// Privileged determines if a pod can request to be run as privileged.
 	Privileged bool `json:"privileged,omitempty"`
 	// DefaultAddCapabilities is the default set of capabilities that will be added to the container
-	// unless the pod spec specifically drops the capability.  You may not list a capabiility in both
+	// unless the pod spec specifically drops the capability.  You may not list a capability in both
 	// DefaultAddCapabilities and RequiredDropCapabilities.
 	DefaultAddCapabilities []api.Capability `json:"defaultAddCapabilities,omitempty"`
 	// RequiredDropCapabilities are the capabilities that will be dropped from the container.  These
@@ -884,7 +887,7 @@ type NetworkPolicyPeer struct {
 	// Selects Namespaces using cluster scoped-labels.  This
 	// matches all pods in all namespaces selected by this label selector.
 	// This field follows standard label selector semantics.
-	// If omited, this selector selects no namespaces.
+	// If omitted, this selector selects no namespaces.
 	// If present but empty, this selector selects all namespaces.
 	NamespaceSelector *unversioned.LabelSelector `json:"namespaceSelector,omitempty"`
 }
@@ -895,4 +898,42 @@ type NetworkPolicyList struct {
 	unversioned.ListMeta `json:"metadata,omitempty"`
 
 	Items []NetworkPolicy `json:"items"`
+}
+
+// +genclient=true
+// +nonNamespaced=true
+
+// StorageClass describes a named "class" of storage offered in a cluster.
+// Different classes might map to quality-of-service levels, or to backup policies,
+// or to arbitrary policies determined by the cluster administrators.  Kubernetes
+// itself is unopinionated about what classes represent.  This concept is sometimes
+// called "profiles" in other storage systems.
+// The name of a StorageClass object is significant, and is how users can request a particular class.
+type StorageClass struct {
+	unversioned.TypeMeta `json:",inline"`
+	api.ObjectMeta       `json:"metadata,omitempty"`
+
+	// provisioner is the driver expected to handle this StorageClass.
+	// This is an optionally-prefixed name, like a label key.
+	// For example: "kubernetes.io/gce-pd" or "kubernetes.io/aws-ebs".
+	// This value may not be empty.
+	Provisioner string `json:"provisioner"`
+
+	// parameters holds parameters for the provisioner.
+	// These values are opaque to the  system and are passed directly
+	// to the provisioner.  The only validation done on keys is that they are
+	// not empty.  The maximum number of parameters is
+	// 512, with a cumulative max size of 256K
+	Parameters map[string]string `json:"parameters,omitempty"`
+}
+
+// StorageClassList is a collection of storage classes.
+type StorageClassList struct {
+	unversioned.TypeMeta `json:",inline"`
+	// Standard list metadata
+	// More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata
+	unversioned.ListMeta `json:"metadata,omitempty"`
+
+	// Items is the list of StorageClasses
+	Items []StorageClass `json:"items"`
 }

@@ -1,0 +1,11 @@
+## Version 1.2 (Fri May 27 2016 Tim Hockin <thockin@google.com>)
+ - First Changelog entry
+
+ ## Version 1.3 (Fri June 3 2016 Prashanth.B <beeps@google.com>)
+ - Fixed SRV record lookup (issue #26116)
+
+ ## Version 1.4 (Tue June 21 2016 Nikhil Jindal <nikhiljindal@google.com>)
+ - Initialising nodesStore (issue #27820)
+
+ ## Version 1.5 (Thu June 23 2016 Nikhil Jindal <nikhiljindal@google.com>)
+ - Adding support to return local service (pr #27708)

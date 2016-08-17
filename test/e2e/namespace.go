@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 			Containers: []api.Container{
 				{
 					Name:  "nginx",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Image: framework.GetPauseImageName(f.Client),
 				},
 			},
 		},
@@ -106,7 +106,7 @@ func ensurePodsAreRemovedWhenNamespaceIsDeleted(f *framework.Framework) {
 	Expect(err).NotTo(HaveOccurred())
 
 	By("Waiting for the pod to have running status")
-	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod.Name, pod.Namespace))
+	framework.ExpectNoError(framework.WaitForPodRunningInNamespace(f.Client, pod))
 
 	By("Deleting the namespace")
 	err = f.Client.Namespaces().Delete(namespace.Name)

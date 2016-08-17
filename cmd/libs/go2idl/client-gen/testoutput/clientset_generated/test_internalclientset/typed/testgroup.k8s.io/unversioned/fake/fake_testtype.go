@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ type FakeTestTypes struct {
 	ns   string
 }
 
-var testtypesResource = unversioned.GroupVersionResource{Group: "testgroup", Version: "", Resource: "testtypes"}
+var testtypesResource = unversioned.GroupVersionResource{Group: "testgroup.k8s.io", Version: "", Resource: "testtypes"}
 
 func (c *FakeTestTypes) Create(testType *testgroup_k8s_io.TestType) (result *testgroup_k8s_io.TestType, err error) {
 	obj, err := c.Fake.
@@ -113,4 +113,15 @@ func (c *FakeTestTypes) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(testtypesResource, c.ns, opts))
 
+}
+
+// Patch applies the patch and returns the patched testType.
+func (c *FakeTestTypes) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *testgroup_k8s_io.TestType, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchSubresourceAction(testtypesResource, c.ns, name, data, subresources...), &testgroup_k8s_io.TestType{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*testgroup_k8s_io.TestType), err
 }

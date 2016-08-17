@@ -1,3 +1,5 @@
+# This config should be kept as similar as possible to the one at
+# cluster/addons/gci/fluentd-gcp.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -9,14 +11,14 @@ spec:
   dnsPolicy: Default
   containers:
   - name: fluentd-cloud-logging
-    image: gcr.io/google_containers/fluentd-gcp:1.18
+    image: gcr.io/google_containers/fluentd-gcp:1.21
     resources:
       limits:
         memory: 200Mi
       requests:
         # Any change here should be accompanied by a proportional change in CPU
         # requests of other per-node add-ons (e.g. kube-proxy).
-        cpu: 80m
+        cpu: 100m
         memory: 200Mi
     env:
     - name: FLUENTD_ARGS

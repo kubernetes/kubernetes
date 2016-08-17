@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -139,7 +139,7 @@ var _ = framework.KubeDescribe("ClusterDns [Feature:Example]", func() {
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember
 		// that we cannot wait for the pods to be running because our pods terminate by themselves.
 		for _, ns := range namespaces {
-			err := framework.WaitForPodNotPending(c, ns.Name, frontendPodName)
+			err := framework.WaitForPodNotPending(c, ns.Name, frontendPodName, "")
 			framework.ExpectNoError(err)
 		}
 

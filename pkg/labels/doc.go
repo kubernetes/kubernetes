@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,4 +16,4 @@ limitations under the License.
 
 // Package labels implements a simple label system, parsing and matching
 // selectors with sets of labels.
-package labels
+package labels // import "k8s.io/kubernetes/pkg/labels"

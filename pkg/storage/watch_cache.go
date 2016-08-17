@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/client/cache"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -96,7 +96,7 @@ type watchCache struct {
 	onEvent func(watchCacheEvent)
 
 	// for testing timeouts.
-	clock util.Clock
+	clock clock.Clock
 }
 
 func newWatchCache(capacity int) *watchCache {
@@ -107,7 +107,7 @@ func newWatchCache(capacity int) *watchCache {
 		endIndex:        0,
 		store:           cache.NewStore(cache.MetaNamespaceKeyFunc),
 		resourceVersion: 0,
-		clock:           util.RealClock{},
+		clock:           clock.RealClock{},
 	}
 	wc.cond = sync.NewCond(wc.RLocker())
 	return wc

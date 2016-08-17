@@ -18,7 +18,7 @@ import (
 	"log"
 )
 
-func init() {
+func initHijack() {
 	pkg := NewPackageLogger("log", "")
 	w := packageWriter{pkg}
 	log.SetFlags(0)

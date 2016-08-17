@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package rollout
 import (
 	"io"
 
+	"github.com/renstrom/dedent"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -43,13 +44,15 @@ type UndoOptions struct {
 	Recursive bool
 }
 
-const (
-	undo_long    = `Rollback to a previous rollout.`
-	undo_example = `# Rollback to the previous deployment
-kubectl rollout undo deployment/abc
+var (
+	undo_long = dedent.Dedent(`
+		Rollback to a previous rollout.`)
+	undo_example = dedent.Dedent(`
+		# Rollback to the previous deployment
+		kubectl rollout undo deployment/abc
 
-# Rollback to deployment revision 3
-kubectl rollout undo deployment/abc --to-revision=3`
+		# Rollback to deployment revision 3
+		kubectl rollout undo deployment/abc --to-revision=3`)
 )
 
 func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -57,7 +60,7 @@ func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:     "undo (TYPE NAME | TYPE/NAME) [flags]",
-		Short:   "undoes a previous rollout",
+		Short:   "Undo a previous rollout",
 		Long:    undo_long,
 		Example: undo_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -126,7 +129,7 @@ func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out i
 func (o *UndoOptions) RunUndo() error {
 	allErrs := []error{}
 	for ix, info := range o.Infos {
-		result, err := o.Rollbackers[ix].Rollback(info.Namespace, info.Name, nil, o.ToRevision, info.Object)
+		result, err := o.Rollbackers[ix].Rollback(info.Object, nil, o.ToRevision)
 		if err != nil {
 			allErrs = append(allErrs, cmdutil.AddSourceToErr("undoing", info.Source, err))
 			continue

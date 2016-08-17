@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
@@ -28,7 +29,7 @@ import (
 func TestPodLogValidates(t *testing.T) {
 	etcdStorage, _ := registrytest.NewEtcdStorage(t, "")
 	store := &registry.Store{
-		Storage: etcdStorage,
+		Storage: generic.NewRawStorage(etcdStorage),
 	}
 	logRest := &LogREST{Store: store, KubeletConn: nil}
 

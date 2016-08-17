@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -212,17 +212,17 @@ func TestNodeSelectorRequirementsAsSelector(t *testing.T) {
 			in: []NodeSelectorRequirement{{
 				Key:      "foo",
 				Operator: NodeSelectorOpGt,
-				Values:   []string{"1.1"},
+				Values:   []string{"1"},
 			}},
-			out: mustParse("foo>1.1"),
+			out: mustParse("foo>1"),
 		},
 		{
 			in: []NodeSelectorRequirement{{
 				Key:      "bar",
 				Operator: NodeSelectorOpLt,
-				Values:   []string{"7.1"},
+				Values:   []string{"7"},
 			}},
-			out: mustParse("bar<7.1"),
+			out: mustParse("bar<7"),
 		},
 	}
 
@@ -292,6 +292,102 @@ func TestGetAffinityFromPod(t *testing.T) {
 		}
 		if err != nil && !tc.expectErr {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+	}
+}
+
+func TestGetAvoidPodsFromNode(t *testing.T) {
+	controllerFlag := true
+	testCases := []struct {
+		node        *Node
+		expectValue AvoidPods
+		expectErr   bool
+	}{
+		{
+			node:        &Node{},
+			expectValue: AvoidPods{},
+			expectErr:   false,
+		},
+		{
+			node: &Node{
+				ObjectMeta: ObjectMeta{
+					Annotations: map[string]string{
+						PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+						                            "apiVersion": "v1",
+						                            "kind": "ReplicationController",
+						                            "name": "foo",
+						                            "uid": "abcdef123456",
+						                            "controller": true
+							                }
+							            },
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+					},
+				},
+			},
+			expectValue: AvoidPods{
+				PreferAvoidPods: []PreferAvoidPodsEntry{
+					{
+						PodSignature: PodSignature{
+							PodController: &OwnerReference{
+								APIVersion: "v1",
+								Kind:       "ReplicationController",
+								Name:       "foo",
+								UID:        "abcdef123456",
+								Controller: &controllerFlag,
+							},
+						},
+						Reason:  "some reason",
+						Message: "some message",
+					},
+				},
+			},
+			expectErr: false,
+		},
+		{
+			node: &Node{
+				// Missing end symbol of "podController" and "podSignature"
+				ObjectMeta: ObjectMeta{
+					Annotations: map[string]string{
+						PreferAvoidPodsAnnotationKey: `
+							{
+							    "preferAvoidPods": [
+							        {
+							            "podSignature": {
+							                "podController": {
+							                    "kind": "ReplicationController",
+							                    "apiVersion": "v1"
+							            "reason": "some reason",
+							            "message": "some message"
+							        }
+							    ]
+							}`,
+					},
+				},
+			},
+			expectValue: AvoidPods{},
+			expectErr:   true,
+		},
+	}
+
+	for i, tc := range testCases {
+		v, err := GetAvoidPodsFromNodeAnnotations(tc.node.Annotations)
+		if err == nil && tc.expectErr {
+			t.Errorf("[%v]expected error but got none.", i)
+		}
+		if err != nil && !tc.expectErr {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+		if !reflect.DeepEqual(tc.expectValue, v) {
+			t.Errorf("[%v]expect value %v but got %v with %v", i, tc.expectValue, v, v.PreferAvoidPods[0].PodSignature.PodController.Controller)
 		}
 	}
 }

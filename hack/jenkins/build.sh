@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,8 +36,18 @@ export KUBE_SKIP_CONFIRMATIONS=y
 # Skip gcloud update checking
 export CLOUDSDK_COMPONENT_MANAGER_DISABLE_UPDATE_CHECK=true
 
+# FEDERATION?
+: ${FEDERATION:="false"}
 : ${KUBE_RELEASE_RUN_TESTS:="n"}
-export KUBE_RELEASE_RUN_TESTS
+
+# New kubernetes/release/push-ci-build.sh values
+# RELEASE_INFRA_PUSH=true when we're using kubernetes/release/push-ci-build.sh
+: ${RELEASE_INFRA_PUSH:="false"}
+# SET_NOMOCK_FLAG=true means we're doing full pushes and we pass --nomock to 
+# push-ci-build.sh. This is set to false in the
+# testing jobs and only used in the RELEASE_INFRA_PUSH=true scope below.
+: ${SET_NOMOCK_FLAG:="true"}
+export KUBE_RELEASE_RUN_TESTS RELEASE_INFRA_PUSH FEDERATION SET_NOMOCK_FLAG
 
 # Clean stuff out. Assume the last build left the tree in an odd
 # state.
@@ -54,9 +64,29 @@ git clean -fdx
 # Build
 go run ./hack/e2e.go -v --build
 
-[[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]] || {
-    # Push to GCS
-    ./build/push-ci-build.sh
-}
+# Push to GCS?
+if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
+  echo "Not pushed to GCS..."
+elif ${RELEASE_INFRA_PUSH-}; then
+  readonly release_infra_clone="${WORKSPACE}/_tmp/release.git"
+  mkdir -p ${WORKSPACE}/_tmp
+  git clone https://github.com/kubernetes/release ${release_infra_clone}
+
+  if [[ ! -x ${release_infra_clone}/push-ci-build.sh ]]; then
+    echo "FATAL: Something went wrong." \
+         "${release_infra_clone}/push-ci-build.sh isn't available." \
+         "Exiting..." >&2
+    exit 1
+  fi
+
+  [[ -n "$KUBE_GCS_RELEASE_BUCKET" ]] \
+   && bucket_flag="--bucket=$KUBE_GCS_RELEASE_BUCKET"
+  ${FEDERATION} && federation_flag="--federation"
+  ${SET_NOMOCK_FLAG} && mock_flag="--nomock"
+  ${release_infra_clone}/push-ci-build.sh ${bucket_flag-} ${federation_flag-} \
+                                          ${mock_flag-}
+else
+  ./build/push-ci-build.sh
+fi
 
 sha256sum _output/release-tars/kubernetes*.tar.gz

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,6 +71,24 @@ message Affinity {
   optional PodAntiAffinity podAntiAffinity = 3;
 }
 
+// AttachedVolume describes a volume attached to a node
+message AttachedVolume {
+  // Name of the attached volume
+  optional string name = 1;
+
+  // DevicePath represents the device path where the volume should be avilable
+  optional string devicePath = 2;
+}
+
+// AvoidPods describes pods that should avoid this node. This is the value for a
+// Node annotation with key scheduler.alpha.kubernetes.io/preferAvoidPods and
+// will eventually become a field of NodeStatus.
+message AvoidPods {
+  // Bounded-sized list of signatures of pods that should avoid this node, sorted
+  // in timestamp order from oldest to newest. Size of the slice is unspecified.
+  repeated PreferAvoidPodsEntry preferAvoidPods = 1;
+}
+
 // AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 message AzureFileVolumeSource {
   // the name of secret that contains Azure Storage Account Name and Key
@@ -108,27 +126,27 @@ message Capabilities {
 // Cephfs volumes do not support ownership management or SELinux relabeling.
 message CephFSVolumeSource {
   // Required: Monitors is a collection of Ceph monitors
-  // More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
   repeated string monitors = 1;
 
   // Optional: Used as the mounted root, rather than the full Ceph tree, default is /
   optional string path = 2;
 
   // Optional: User is the rados user name, default is admin
-  // More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
   optional string user = 3;
 
   // Optional: SecretFile is the path to key ring for User, default is /etc/ceph/user.secret
-  // More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
   optional string secretFile = 4;
 
   // Optional: SecretRef is reference to the authentication secret for User, default is empty.
-  // More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
   optional LocalObjectReference secretRef = 5;
 
   // Optional: Defaults to false (read/write). ReadOnly here will force
   // the ReadOnly setting in VolumeMounts.
-  // More info: http://releases.k8s.io/HEAD/examples/cephfs/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/cephfs/README.md#how-to-use-it
   optional bool readOnly = 6;
 }
 
@@ -504,6 +522,10 @@ message DownwardAPIVolumeFile {
 
   // Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
   optional ObjectFieldSelector fieldRef = 2;
+
+  // Selects a resource of the container: only resources limits and requests
+  // (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+  optional ResourceFieldSelector resourceFieldRef = 3;
 }
 
 // DownwardAPIVolumeSource represents a volume containing downward API info.
@@ -535,6 +557,9 @@ message EndpointAddress {
 
   // The Hostname of this endpoint
   optional string hostname = 3;
+
+  // Optional: Node hosting this endpoint. This can be used to determine endpoints local to a node.
+  optional string nodeName = 4;
 
   // Reference to object providing the endpoint.
   optional ObjectReference targetRef = 2;
@@ -641,11 +666,15 @@ message EnvVarSource {
   // Selects a field of the pod; only name and namespace are supported.
   optional ObjectFieldSelector fieldRef = 1;
 
+  // Selects a resource of the container: only resources limits and requests
+  // (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
+  optional ResourceFieldSelector resourceFieldRef = 2;
+
   // Selects a key of a ConfigMap.
-  optional ConfigMapKeySelector configMapKeyRef = 2;
+  optional ConfigMapKeySelector configMapKeyRef = 3;
 
   // Selects a key of a secret in the pod's namespace
-  optional SecretKeySelector secretKeyRef = 3;
+  optional SecretKeySelector secretKeyRef = 4;
 }
 
 // Event is a report of an event somewhere in the cluster.
@@ -827,16 +856,16 @@ message GitRepoVolumeSource {
 // Glusterfs volumes do not support ownership management or SELinux relabeling.
 message GlusterfsVolumeSource {
   // EndpointsName is the endpoint name that details Glusterfs topology.
-  // More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
   optional string endpoints = 1;
 
   // Path is the Glusterfs volume path.
-  // More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
   optional string path = 2;
 
   // ReadOnly here will force the Glusterfs volume to be mounted with read-only permissions.
   // Defaults to false.
-  // More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md#create-a-pod
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
   optional bool readOnly = 3;
 }
 
@@ -1275,6 +1304,7 @@ message NodeStatus {
 
   // NodePhase is the recently observed lifecycle phase of the node.
   // More info: http://releases.k8s.io/HEAD/docs/admin/node.md#node-phase
+  // The field is never populated, and now is deprecated.
   optional string phase = 3;
 
   // Conditions is an array of current observed node conditions.
@@ -1295,6 +1325,12 @@ message NodeStatus {
 
   // List of container images on this node
   repeated ContainerImage images = 8;
+
+  // List of attachable volumes in use (mounted) by the node.
+  repeated string volumesInUse = 9;
+
+  // List of volumes that are attached to the node.
+  repeated AttachedVolume volumesAttached = 10;
 }
 
 // NodeSystemInfo is a set of ids/uuids to uniquely identify the node.
@@ -1453,7 +1489,9 @@ message ObjectMeta {
   map<string, string> annotations = 12;
 
   // List of objects depended by this object. If ALL objects in the list have
-  // been deleted, this object will be garbage collected.
+  // been deleted, this object will be garbage collected. If this object is managed by a controller,
+  // then an entry in this list will point to this controller, with the controller field set to true.
+  // There cannot be more than one managing controller.
   repeated OwnerReference ownerReferences = 13;
 
   // Must be empty before the object is deleted from the registry. Each entry
@@ -1517,6 +1555,9 @@ message OwnerReference {
   // UID of the referent.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids
   optional string uid = 4;
+
+  // If true, this reference points to the managing controller.
+  optional bool controller = 6;
 }
 
 // PersistentVolume (PV) is a storage resource provisioned by an administrator.
@@ -1572,6 +1613,9 @@ message PersistentVolumeClaimSpec {
   // AccessModes contains the desired access modes the volume should have.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes-1
   repeated string accessModes = 1;
+
+  // A label query over volumes to consider for binding.
+  optional k8s.io.kubernetes.pkg.api.unversioned.LabelSelector selector = 4;
 
   // Resources represents the minimum resources the volume should have.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#resources
@@ -1641,7 +1685,7 @@ message PersistentVolumeSource {
 
   // Glusterfs represents a Glusterfs volume that is attached to a host and
   // exposed to the pod. Provisioned by an admin.
-  // More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
   optional GlusterfsVolumeSource glusterfs = 4;
 
   // NFS represents an NFS mount on the host. Provisioned by an admin.
@@ -1649,7 +1693,7 @@ message PersistentVolumeSource {
   optional NFSVolumeSource nfs = 5;
 
   // RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
   optional RBDVolumeSource rbd = 6;
 
   // ISCSI represents an ISCSI Disk resource that is attached to a
@@ -2009,6 +2053,13 @@ message PodSecurityContext {
   optional int64 fsGroup = 5;
 }
 
+// Describes the class of pods that should avoid this node.
+// Exactly one field should be set.
+message PodSignature {
+  // Reference to controller whose pods should avoid this node.
+  optional OwnerReference podController = 1;
+}
+
 // PodSpec is a description of a pod.
 message PodSpec {
   // List of volumes that can be mounted by containers belonging to the pod.
@@ -2058,6 +2109,7 @@ message PodSpec {
 
   // DeprecatedServiceAccount is a depreciated alias for ServiceAccountName.
   // Deprecated: Use serviceAccountName instead.
+  // +k8s:conversion-gen=false
   optional string serviceAccount = 9;
 
   // NodeName is a request to schedule this pod onto a specific node. If it is non-empty,
@@ -2068,14 +2120,17 @@ message PodSpec {
   // Host networking requested for this pod. Use the host's network namespace.
   // If this option is set, the ports that will be used must be specified.
   // Default to false.
+  // +k8s:conversion-gen=false
   optional bool hostNetwork = 11;
 
   // Use the host's pid namespace.
   // Optional: Default to false.
+  // +k8s:conversion-gen=false
   optional bool hostPID = 12;
 
   // Use the host's ipc namespace.
   // Optional: Default to false.
+  // +k8s:conversion-gen=false
   optional bool hostIPC = 13;
 
   // SecurityContext holds pod-level security attributes and common container settings.
@@ -2184,6 +2239,21 @@ message Preconditions {
   optional string uid = 1;
 }
 
+// Describes a class of pods that should avoid this node.
+message PreferAvoidPodsEntry {
+  // The class of pods.
+  optional PodSignature podSignature = 1;
+
+  // Time at which this entry was added to the list.
+  optional k8s.io.kubernetes.pkg.api.unversioned.Time evictionTime = 2;
+
+  // (brief) reason why this entry was added to the list.
+  optional string reason = 3;
+
+  // Human readable message indicating why this entry was added to the list.
+  optional string message = 4;
+}
+
 // An empty preferred scheduling term matches all objects with implicit weight 0
 // (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
 message PreferredSchedulingTerm {
@@ -2226,11 +2296,11 @@ message Probe {
 // RBD volumes support ownership management and SELinux relabeling.
 message RBDVolumeSource {
   // A collection of Ceph monitors.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
   repeated string monitors = 1;
 
   // The rados image name.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
   optional string image = 2;
 
   // Filesystem type of the volume that you want to mount.
@@ -2242,28 +2312,28 @@ message RBDVolumeSource {
 
   // The rados pool name.
   // Default is rbd.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it.
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it.
   optional string pool = 4;
 
   // The rados user name.
   // Default is admin.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
   optional string user = 5;
 
   // Keyring is the path to key ring for RBDUser.
   // Default is /etc/ceph/keyring.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
   optional string keyring = 6;
 
   // SecretRef is name of the authentication secret for RBDUser. If provided
   // overrides keyring.
-  // Default is empty.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
+  // Default is nil.
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
   optional LocalObjectReference secretRef = 7;
 
   // ReadOnly here will force the ReadOnly setting in VolumeMounts.
   // Defaults to false.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md#how-to-use-it
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md#how-to-use-it
   optional bool readOnly = 8;
 }
 
@@ -2345,6 +2415,18 @@ message ReplicationControllerStatus {
   optional int64 observedGeneration = 3;
 }
 
+// ResourceFieldSelector represents container resources (cpu, memory) and their output format
+message ResourceFieldSelector {
+  // Container name: required for volumes, optional for env vars
+  optional string containerName = 1;
+
+  // Required: resource to select
+  optional string resource = 2;
+
+  // Specifies the output format of the exposed resources, defaults to "1"
+  optional k8s.io.kubernetes.pkg.api.resource.Quantity divisor = 3;
+}
+
 // ResourceQuota sets aggregate quota restrictions enforced per namespace
 message ResourceQuota {
   // Standard object's metadata.
@@ -2395,13 +2477,13 @@ message ResourceQuotaStatus {
 // ResourceRequirements describes the compute resource requirements.
 message ResourceRequirements {
   // Limits describes the maximum amount of compute resources allowed.
-  // More info: http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications
+  // More info: http://kubernetes.io/docs/user-guide/compute-resources/
   map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> limits = 1;
 
   // Requests describes the minimum amount of compute resources required.
   // If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
   // otherwise to an implementation-defined value.
-  // More info: http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications
+  // More info: http://kubernetes.io/docs/user-guide/compute-resources/
   map<string, k8s.io.kubernetes.pkg.api.resource.Quantity> requests = 2;
 }
 
@@ -2433,6 +2515,13 @@ message Secret {
   // representing the arbitrary (possibly non-string) data value here.
   // Described in https://tools.ietf.org/html/rfc4648#section-4
   map<string, bytes> data = 2;
+
+  // stringData allows specifying non-binary secret data in string form.
+  // It is provided as a write-only convenience method.
+  // All keys and values are merged into the data field on write, overwriting any existing values.
+  // It is never output when reading from the API.
+  // +k8s:conversion-gen=false
+  map<string, string> stringData = 4;
 
   // Used to facilitate programmatic handling of secret data.
   optional string type = 3;
@@ -2633,7 +2722,7 @@ message ServiceSpec {
 
   // This service will route traffic to pods having labels matching this selector.
   // Label keys and values that must match in order to receive traffic for this service.
-  // If empty, all pods are selected, if not specified, endpoints must be manually specified.
+  // If not specified, endpoints must be manually specified and the system will not automatically manage them.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
   map<string, string> selector = 2;
 
@@ -2665,7 +2754,7 @@ message ServiceSpec {
   // API for compatibility until at least 8/20/2016.  It will be removed from
   // any new API revisions.  If both deprecatedPublicIPs *and* externalIPs are
   // set, deprecatedPublicIPs is used.
-  // +genconversion=false
+  // +k8s:conversion-gen=false
   repeated string deprecatedPublicIPs = 6;
 
   // Supports "ClientIP" and "None". Used to maintain session affinity.
@@ -2681,6 +2770,12 @@ message ServiceSpec {
   // the loadBalancerIP when a load balancer is created.
   // This field will be ignored if the cloud-provider does not support the feature.
   optional string loadBalancerIP = 8;
+
+  // If specified and supported by the platform, this will restrict traffic through the cloud-provider
+  // load-balancer will be restricted to the specified client IPs. This field will be ignored if the
+  // cloud-provider does not support the feature."
+  // More info: http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md
+  repeated string loadBalancerSourceRanges = 9;
 }
 
 // ServiceStatus represents the current status of a service.
@@ -2805,11 +2900,11 @@ message VolumeSource {
 
   // ISCSI represents an ISCSI Disk resource that is attached to a
   // kubelet's host machine and then exposed to the pod.
-  // More info: http://releases.k8s.io/HEAD/examples/iscsi/README.md
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md
   optional ISCSIVolumeSource iscsi = 8;
 
   // Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime.
-  // More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
   optional GlusterfsVolumeSource glusterfs = 9;
 
   // PersistentVolumeClaimVolumeSource represents a reference to a
@@ -2818,7 +2913,7 @@ message VolumeSource {
   optional PersistentVolumeClaimVolumeSource persistentVolumeClaim = 10;
 
   // RBD represents a Rados Block Device mount on the host that shares a pod's lifetime.
-  // More info: http://releases.k8s.io/HEAD/examples/rbd/README.md
+  // More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
   optional RBDVolumeSource rbd = 11;
 
   // FlexVolume represents a generic volume resource that is

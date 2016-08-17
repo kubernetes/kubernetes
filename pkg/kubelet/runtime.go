@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 )
 
 type runtimeState struct {
-	sync.Mutex
+	sync.RWMutex
 	lastBaseRuntimeSync      time.Time
 	baseRuntimeSyncThreshold time.Duration
 	networkError             error
@@ -57,8 +57,8 @@ func (s *runtimeState) setPodCIDR(cidr string) {
 }
 
 func (s *runtimeState) podCIDR() string {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
+	defer s.RUnlock()
 	return s.cidr
 }
 
@@ -69,8 +69,8 @@ func (s *runtimeState) setInitError(err error) {
 }
 
 func (s *runtimeState) errors() []string {
-	s.Lock()
-	defer s.Unlock()
+	s.RLock()
+	defer s.RUnlock()
 	var ret []string
 	if s.initError != nil {
 		ret = append(ret, s.initError.Error())

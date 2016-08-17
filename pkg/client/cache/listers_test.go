@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -97,7 +97,7 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 		store.Add(n)
 	}
 
-	predicate := func(node api.Node) bool {
+	predicate := func(node *api.Node) bool {
 		for _, cond := range node.Status.Conditions {
 			if cond.Type == api.NodeOutOfDisk && cond.Status == api.ConditionTrue {
 				return false
@@ -114,9 +114,9 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	got := make([]string, len(gotNodes.Items))
-	for ix := range gotNodes.Items {
-		got[ix] = gotNodes.Items[ix].Name
+	got := make([]string, len(gotNodes))
+	for ix := range gotNodes {
+		got[ix] = gotNodes[ix].Name
 	}
 	if !want.HasAll(got...) || len(got) != len(want) {
 		t.Errorf("Expected %v, got %v", want, got)
@@ -124,26 +124,56 @@ func TestStoreToNodeConditionLister(t *testing.T) {
 }
 
 func TestStoreToReplicationControllerLister(t *testing.T) {
-	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
-	lister := StoreToReplicationControllerLister{store}
 	testCases := []struct {
-		inRCs      []*api.ReplicationController
-		list       func() ([]api.ReplicationController, error)
-		outRCNames sets.String
-		expectErr  bool
+		description              string
+		inRCs                    []*api.ReplicationController
+		list                     func(StoreToReplicationControllerLister) ([]api.ReplicationController, error)
+		outRCNames               sets.String
+		expectErr                bool
+		onlyIfIndexedByNamespace bool
 	}{
-		// Basic listing with all labels and no selectors
 		{
+			description: "Verify we can search all namespaces",
+			inRCs: []*api.ReplicationController{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
+				},
+			},
+			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+				return lister.ReplicationControllers(api.NamespaceAll).List(labels.Set{}.AsSelector())
+			},
+			outRCNames: sets.NewString("hmm", "foo"),
+		},
+		{
+			description: "Verify we can search a specific namespace",
+			inRCs: []*api.ReplicationController{
+				{
+					ObjectMeta: api.ObjectMeta{Name: "foo", Namespace: "bar"},
+				},
+				{
+					ObjectMeta: api.ObjectMeta{Name: "hmm", Namespace: "hmm"},
+				},
+			},
+			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
+				return lister.ReplicationControllers("hmm").List(labels.Set{}.AsSelector())
+			},
+			outRCNames: sets.NewString("hmm"),
+		},
+		{
+			description: "Basic listing with all labels and no selectors",
 			inRCs: []*api.ReplicationController{
 				{ObjectMeta: api.ObjectMeta{Name: "basic"}},
 			},
-			list: func() ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
 				return lister.List()
 			},
 			outRCNames: sets.NewString("basic"),
 		},
-		// No pod labels
 		{
+			description: "No pod labels",
 			inRCs: []*api.ReplicationController{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
@@ -152,7 +182,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					},
 				},
 			},
-			list: func() ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{Name: "pod1", Namespace: "ns"},
 				}
@@ -161,14 +191,14 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 			outRCNames: sets.NewString(),
 			expectErr:  true,
 		},
-		// No RC selectors
 		{
+			description: "No RC selectors",
 			inRCs: []*api.ReplicationController{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "basic", Namespace: "ns"},
 				},
 			},
-			list: func() ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",
@@ -181,8 +211,8 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 			outRCNames: sets.NewString(),
 			expectErr:  true,
 		},
-		// Matching labels to selectors and namespace
 		{
+			description: "Matching labels to selectors and namespace",
 			inRCs: []*api.ReplicationController{
 				{
 					ObjectMeta: api.ObjectMeta{Name: "foo"},
@@ -197,7 +227,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 					},
 				},
 			},
-			list: func() ([]api.ReplicationController, error) {
+			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
 				pod := &api.Pod{
 					ObjectMeta: api.ObjectMeta{
 						Name:      "pod1",
@@ -207,30 +237,43 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				}
 				return lister.GetPodControllers(pod)
 			},
-			outRCNames: sets.NewString("bar"),
+			outRCNames:               sets.NewString("bar"),
+			onlyIfIndexedByNamespace: true,
 		},
 	}
 	for _, c := range testCases {
-		for _, r := range c.inRCs {
-			store.Add(r)
-		}
+		for _, withIndex := range []bool{true, false} {
+			if c.onlyIfIndexedByNamespace && !withIndex {
+				continue
+			}
+			var store Indexer
+			if withIndex {
+				store = NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
+			} else {
+				store = NewIndexer(MetaNamespaceKeyFunc, Indexers{})
+			}
 
-		gotControllers, err := c.list()
-		if err != nil && c.expectErr {
-			continue
-		} else if c.expectErr {
-			t.Error("Expected error, got none")
-			continue
-		} else if err != nil {
-			t.Errorf("Unexpected error %#v", err)
-			continue
-		}
-		gotNames := make([]string, len(gotControllers))
-		for ix := range gotControllers {
-			gotNames[ix] = gotControllers[ix].Name
-		}
-		if !c.outRCNames.HasAll(gotNames...) || len(gotNames) != len(c.outRCNames) {
-			t.Errorf("Unexpected got controllers %+v expected %+v", gotNames, c.outRCNames)
+			for _, r := range c.inRCs {
+				store.Add(r)
+			}
+
+			gotControllers, err := c.list(StoreToReplicationControllerLister{store})
+			if err != nil && c.expectErr {
+				continue
+			} else if c.expectErr {
+				t.Errorf("(%q, withIndex=%v) Expected error, got none", c.description, withIndex)
+				continue
+			} else if err != nil {
+				t.Errorf("(%q, withIndex=%v) Unexpected error %#v", c.description, withIndex, err)
+				continue
+			}
+			gotNames := make([]string, len(gotControllers))
+			for ix := range gotControllers {
+				gotNames[ix] = gotControllers[ix].Name
+			}
+			if !c.outRCNames.HasAll(gotNames...) || len(gotNames) != len(c.outRCNames) {
+				t.Errorf("(%q, withIndex=%v) Unexpected got controllers %+v expected %+v", c.description, withIndex, gotNames, c.outRCNames)
+			}
 		}
 	}
 }
@@ -645,48 +688,73 @@ func TestStoreToJobLister(t *testing.T) {
 }
 
 func TestStoreToPodLister(t *testing.T) {
-	store := NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc})
-	ids := []string{"foo", "bar", "baz"}
-	for _, id := range ids {
+	// We test with and without a namespace index, because StoreToPodLister has
+	// special logic to work on namespaces even when no namespace index is
+	// present.
+	stores := []Indexer{
+		NewIndexer(MetaNamespaceKeyFunc, Indexers{NamespaceIndex: MetaNamespaceIndexFunc}),
+		NewIndexer(MetaNamespaceKeyFunc, Indexers{}),
+	}
+	for _, store := range stores {
+		ids := []string{"foo", "bar", "baz"}
+		for _, id := range ids {
+			store.Add(&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name:   id,
+					Labels: map[string]string{"name": id},
+				},
+			})
+		}
 		store.Add(&api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name:   id,
-				Labels: map[string]string{"name": id},
+				Name:      "quux",
+				Namespace: api.NamespaceDefault,
+				Labels:    map[string]string{"name": "quux"},
 			},
 		})
-	}
-	spl := StoreToPodLister{store}
+		spl := StoreToPodLister{store}
 
-	for _, id := range ids {
-		got, err := spl.List(labels.Set{"name": id}.AsSelector())
+		// Verify that we can always look up by Namespace.
+		defaultPods, err := spl.Pods(api.NamespaceDefault).List(labels.Set{}.AsSelector())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
-			continue
-		}
-		if e, a := 1, len(got); e != a {
+		} else if e, a := 1, len(defaultPods.Items); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
-			continue
-		}
-		if e, a := id, got[0].Name; e != a {
+		} else if e, a := "quux", defaultPods.Items[0].Name; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
-			continue
 		}
 
-		exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: id}})
+		for _, id := range ids {
+			got, err := spl.List(labels.Set{"name": id}.AsSelector())
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+				continue
+			}
+			if e, a := 1, len(got); e != a {
+				t.Errorf("Expected %v, got %v", e, a)
+				continue
+			}
+			if e, a := id, got[0].Name; e != a {
+				t.Errorf("Expected %v, got %v", e, a)
+				continue
+			}
+
+			exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: id}})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !exists {
+				t.Errorf("exists returned false for %v", id)
+			}
+		}
+
+		exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "qux"}})
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
-		if !exists {
-			t.Errorf("exists returned false for %v", id)
+		if exists {
+			t.Error("Unexpected pod exists")
 		}
-	}
-
-	exists, err := spl.Exists(&api.Pod{ObjectMeta: api.ObjectMeta{Name: "qux"}})
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if exists {
-		t.Error("Unexpected pod exists")
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -197,13 +197,13 @@ type Blah struct {
 	if e, a := types.Struct, blahT.Kind; e != a {
 		t.Errorf("struct kind wrong, wanted %v, got %v", e, a)
 	}
-	if e, a := "Blah is a test.\nA test, I tell you.\n", blahT.CommentLines; e != a {
-		t.Errorf("struct comment wrong, wanted %v, got %v", e, a)
+	if e, a := []string{"Blah is a test.", "A test, I tell you."}, blahT.CommentLines; !reflect.DeepEqual(e, a) {
+		t.Errorf("struct comment wrong, wanted %q, got %q", e, a)
 	}
 	m := types.Member{
 		Name:         "B",
 		Embedded:     false,
-		CommentLines: "B is the second field.\nMultiline comments work.\n",
+		CommentLines: []string{"B is the second field.", "Multiline comments work."},
 		Tags:         `json:"b"`,
 		Type:         types.String,
 	}
@@ -216,7 +216,7 @@ func TestParseSecondClosestCommentLines(t *testing.T) {
 	const fileName = "base/foo/proto/foo.go"
 	testCases := []struct {
 		testFile map[string]string
-		expected string
+		expected []string
 	}{
 		{
 			map[string]string{fileName: `package foo
@@ -229,7 +229,7 @@ type Blah struct {
 	a int
 }
 `},
-			"Blah's SecondClosestCommentLines.\nAnother line.\n",
+			[]string{"Blah's SecondClosestCommentLines.", "Another line."},
 		},
 		{
 			map[string]string{fileName: `package foo
@@ -240,15 +240,15 @@ type Blah struct {
 	a int
 }
 `},
-			"Blah's SecondClosestCommentLines.\nAnother line.\n",
+			[]string{"Blah's SecondClosestCommentLines.", "Another line."},
 		},
 	}
 	for _, test := range testCases {
 		_, u, o := construct(t, test.testFile, namer.NewPublicNamer(0))
 		t.Logf("%#v", o)
 		blahT := u.Type(types.Name{Package: "base/foo/proto", Name: "Blah"})
-		if e, a := test.expected, blahT.SecondClosestCommentLines; e != a {
-			t.Errorf("struct second closest comment wrong, wanted %v, got %v", e, a)
+		if e, a := test.expected, blahT.SecondClosestCommentLines; !reflect.DeepEqual(e, a) {
+			t.Errorf("struct second closest comment wrong, wanted %q, got %q", e, a)
 		}
 	}
 }
@@ -391,8 +391,16 @@ type Interface interface{Method(a, b string) (c, d string)}
 				t.Errorf("type %s not found", n)
 				continue
 			}
-			if e, a := item.k, thisType.Kind; e != a {
-				t.Errorf("%v-%s: type kind wrong, wanted %v, got %v (%#v)", nameIndex, n, e, a, thisType)
+			underlyingType := thisType
+			if item.k != types.Alias && thisType.Kind == types.Alias {
+				underlyingType = thisType.Underlying
+				if underlyingType == nil {
+					t.Errorf("underlying type %s not found", n)
+					continue
+				}
+			}
+			if e, a := item.k, underlyingType.Kind; e != a {
+				t.Errorf("%v-%s: type kind wrong, wanted %v, got %v (%#v)", nameIndex, n, e, a, underlyingType)
 			}
 			if e, a := item.names[nameIndex], namer.Name(thisType); e != a {
 				t.Errorf("%v-%s: Expected %q, got %q", nameIndex, n, e, a)

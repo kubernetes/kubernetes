@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -73,7 +73,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 	pods, err := f.Client.Pods(api.NamespaceSystem).List(options)
 	Expect(err).NotTo(HaveOccurred())
 	for _, pod := range pods.Items {
-		err = framework.WaitForPodRunningInNamespace(f.Client, pod.Name, api.NamespaceSystem)
+		err = framework.WaitForPodRunningInNamespace(f.Client, &pod)
 		Expect(err).NotTo(HaveOccurred())
 	}
 

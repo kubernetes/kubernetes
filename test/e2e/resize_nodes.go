@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,7 +53,7 @@ const (
 	testPort                  = 9376
 )
 
-func ResizeGroup(size int32) error {
+func ResizeGroup(group string, size int32) error {
 	if framework.TestContext.ReportDir != "" {
 		framework.CoreDump(framework.TestContext.ReportDir)
 		defer framework.CoreDump(framework.TestContext.ReportDir)
@@ -62,7 +62,7 @@ func ResizeGroup(size int32) error {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
 		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed", "resize",
-			framework.TestContext.CloudConfig.NodeInstanceGroup, fmt.Sprintf("--size=%v", size),
+			group, fmt.Sprintf("--size=%v", size),
 			"--project="+framework.TestContext.CloudConfig.ProjectID, "--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
 			framework.Logf("Failed to resize node instance group: %v", string(output))
@@ -70,18 +70,39 @@ func ResizeGroup(size int32) error {
 		return err
 	} else if framework.TestContext.Provider == "aws" {
 		client := autoscaling.New(session.New())
-		return awscloud.ResizeInstanceGroup(client, framework.TestContext.CloudConfig.NodeInstanceGroup, int(size))
+		return awscloud.ResizeInstanceGroup(client, group, int(size))
 	} else {
 		return fmt.Errorf("Provider does not support InstanceGroups")
 	}
 }
 
-func groupSize() (int, error) {
+func GetGroupNodes(group string) ([]string, error) {
 	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
 		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
 		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
 		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
-			"list-instances", framework.TestContext.CloudConfig.NodeInstanceGroup, "--project="+framework.TestContext.CloudConfig.ProjectID,
+			"list-instances", group, "--project="+framework.TestContext.CloudConfig.ProjectID,
+			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
+		if err != nil {
+			return nil, err
+		}
+		re := regexp.MustCompile(".*RUNNING")
+		lines := re.FindAllString(string(output), -1)
+		for i, line := range lines {
+			lines[i] = line[:strings.Index(line, " ")]
+		}
+		return lines, nil
+	} else {
+		return nil, fmt.Errorf("provider does not support InstanceGroups")
+	}
+}
+
+func GroupSize(group string) (int, error) {
+	if framework.TestContext.Provider == "gce" || framework.TestContext.Provider == "gke" {
+		// TODO: make this hit the compute API directly instead of shelling out to gcloud.
+		// TODO: make gce/gke implement InstanceGroups, so we can eliminate the per-provider logic
+		output, err := exec.Command("gcloud", "compute", "instance-groups", "managed",
+			"list-instances", group, "--project="+framework.TestContext.CloudConfig.ProjectID,
 			"--zone="+framework.TestContext.CloudConfig.Zone).CombinedOutput()
 		if err != nil {
 			return -1, err
@@ -90,12 +111,12 @@ func groupSize() (int, error) {
 		return len(re.FindAllString(string(output), -1)), nil
 	} else if framework.TestContext.Provider == "aws" {
 		client := autoscaling.New(session.New())
-		instanceGroup, err := awscloud.DescribeInstanceGroup(client, framework.TestContext.CloudConfig.NodeInstanceGroup)
+		instanceGroup, err := awscloud.DescribeInstanceGroup(client, group)
 		if err != nil {
 			return -1, fmt.Errorf("error describing instance group: %v", err)
 		}
 		if instanceGroup == nil {
-			return -1, fmt.Errorf("instance group not found: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+			return -1, fmt.Errorf("instance group not found: %s", group)
 		}
 		return instanceGroup.CurrentSize()
 	} else {
@@ -103,10 +124,10 @@ func groupSize() (int, error) {
 	}
 }
 
-func waitForGroupSize(size int32) error {
+func WaitForGroupSize(group string, size int32) error {
 	timeout := 10 * time.Minute
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
-		currentSize, err := groupSize()
+		currentSize, err := GroupSize(group)
 		if err != nil {
 			framework.Logf("Failed to get node instance group size: %v", err)
 			continue
@@ -346,12 +367,20 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 	var systemPodsNo int32
 	var c *client.Client
 	var ns string
+	ignoreLabels := framework.ImagePullerLabels
+	var group string
+
 	BeforeEach(func() {
 		c = f.Client
 		ns = f.Namespace.Name
-		systemPods, err := c.Pods(api.NamespaceSystem).List(api.ListOptions{})
+		systemPods, err := framework.GetPodsInNamespace(c, ns, ignoreLabels)
 		Expect(err).NotTo(HaveOccurred())
-		systemPodsNo = int32(len(systemPods.Items))
+		systemPodsNo = int32(len(systemPods))
+		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
+			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+		} else {
+			group = framework.TestContext.CloudConfig.NodeInstanceGroup
+		}
 	})
 
 	// Slow issue #13323 (8 min)
@@ -371,7 +400,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			}
 
 			By("restoring the original node instance group size")
-			if err := ResizeGroup(int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
@@ -386,7 +415,7 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 				By("waiting 5 minutes for all dead tunnels to be dropped")
 				time.Sleep(5 * time.Minute)
 			}
-			if err := waitForGroupSize(int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
+			if err := WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
 				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			if err := framework.WaitForClusterSize(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
@@ -395,9 +424,10 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
 			By("waiting for system pods to successfully restart")
-
-			err := framework.WaitForPodsRunningReady(api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout)
+			err := framework.WaitForPodsRunningReady(c, api.NamespaceSystem, systemPodsNo, framework.PodReadyBeforeTimeout, ignoreLabels)
 			Expect(err).NotTo(HaveOccurred())
+			By("waiting for image prepulling pods to complete")
+			framework.WaitForPodsSuccess(c, api.NamespaceSystem, framework.ImagePullerLabels, imagePrePullingTimeout)
 		})
 
 		It("should be able to delete nodes", func() {
@@ -410,9 +440,9 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("decreasing cluster size to %d", replicas-1))
-			err = ResizeGroup(replicas - 1)
+			err = ResizeGroup(group, replicas-1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForGroupSize(replicas - 1)
+			err = WaitForGroupSize(group, replicas-1)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForClusterSize(c, int(replicas-1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())
@@ -434,9 +464,9 @@ var _ = framework.KubeDescribe("Nodes [Disruptive]", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By(fmt.Sprintf("increasing cluster size to %d", replicas+1))
-			err = ResizeGroup(replicas + 1)
+			err = ResizeGroup(group, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
-			err = waitForGroupSize(replicas + 1)
+			err = WaitForGroupSize(group, replicas+1)
 			Expect(err).NotTo(HaveOccurred())
 			err = framework.WaitForClusterSize(c, int(replicas+1), 10*time.Minute)
 			Expect(err).NotTo(HaveOccurred())

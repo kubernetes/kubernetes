@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -250,31 +250,28 @@ func TestTypes(t *testing.T) {
 }
 
 func TestVersionedEncoding(t *testing.T) {
-	s, codec := GetTestScheme()
-	out, err := runtime.Encode(codec, &TestType1{}, unversioned.GroupVersion{Version: "v2"})
+	s, _ := GetTestScheme()
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	encoder, _ := cf.SerializerForFileExtension("json")
+
+	codec := cf.CodecForVersions(encoder, nil, []unversioned.GroupVersion{{Version: "v2"}}, nil)
+	out, err := runtime.Encode(codec, &TestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(out) != `{"myVersionKey":"v2","myKindKey":"TestType1"}`+"\n" {
 		t.Fatal(string(out))
 	}
-	_, err = runtime.Encode(codec, &TestType1{}, unversioned.GroupVersion{Version: "v3"})
+
+	codec = cf.CodecForVersions(encoder, nil, []unversioned.GroupVersion{{Version: "v3"}}, nil)
+	_, err = runtime.Encode(codec, &TestType1{})
 	if err == nil {
 		t.Fatal(err)
 	}
 
-	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
-	encoder, _ := cf.SerializerForFileExtension("json")
-
-	// codec that is unversioned uses the target version
-	unversionedCodec := cf.CodecForVersions(encoder, nil, nil, nil)
-	_, err = runtime.Encode(unversionedCodec, &TestType1{}, unversioned.GroupVersion{Version: "v3"})
-	if err == nil || !runtime.IsNotRegisteredError(err) {
-		t.Fatal(err)
-	}
-
 	// unversioned encode with no versions is written directly to wire
-	out, err = runtime.Encode(unversionedCodec, &TestType1{})
+	codec = cf.CodecForVersions(encoder, nil, nil, nil)
+	out, err = runtime.Encode(codec, &TestType1{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,5 +393,51 @@ func TestBadJSONRejection(t *testing.T) {
 	}
 	if _, err := runtime.Decode(codec, []byte(``)); err == nil {
 		t.Errorf("Did not give error for empty data")
+	}
+}
+
+// Returns a new Scheme set up with the test objects needed by TestDirectCodec.
+func GetDirectCodecTestScheme() *runtime.Scheme {
+	internalGV := unversioned.GroupVersion{Version: runtime.APIVersionInternal}
+	externalGV := unversioned.GroupVersion{Version: "v1"}
+
+	s := runtime.NewScheme()
+	// Ordinarily, we wouldn't add TestType2, but because this is a test and
+	// both types are from the same package, we need to get it into the system
+	// so that converter will match it with ExternalType2.
+	s.AddKnownTypes(internalGV, &TestType1{})
+	s.AddKnownTypes(externalGV, &ExternalTestType1{})
+
+	s.AddUnversionedTypes(externalGV, &unversioned.Status{})
+	return s
+}
+
+func TestDirectCodec(t *testing.T) {
+	s := GetDirectCodecTestScheme()
+	cf := newCodecFactory(s, newSerializersForScheme(s, testMetaFactory{}))
+	serializer, _ := cf.SerializerForFileExtension("json")
+	df := DirectCodecFactory{cf}
+	ignoredGV, err := unversioned.ParseGroupVersion("ignored group/ignored version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	directEncoder := df.EncoderForVersion(serializer, ignoredGV)
+	directDecoder := df.DecoderToVersion(serializer, ignoredGV)
+	out, err := runtime.Encode(directEncoder, &ExternalTestType1{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(out) != `{"myVersionKey":"v1","myKindKey":"ExternalTestType1"}`+"\n" {
+		t.Fatal(string(out))
+	}
+	a, _, err := directDecoder.Decode(out, nil, nil)
+	e := &ExternalTestType1{
+		MyWeirdCustomEmbeddedVersionKindField: MyWeirdCustomEmbeddedVersionKindField{
+			APIVersion: "v1",
+			ObjectKind: "ExternalTestType1",
+		},
+	}
+	if !semantic.DeepEqual(e, a) {
+		t.Fatalf("expect %v, got %v", e, a)
 	}
 }

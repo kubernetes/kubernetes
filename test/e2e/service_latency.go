@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ var _ = framework.KubeDescribe("Service endpoints latency", func() {
 func runServiceLatencies(f *framework.Framework, inParallel, total int) (output []time.Duration, err error) {
 	cfg := framework.RCConfig{
 		Client:       f.Client,
-		Image:        "gcr.io/google_containers/pause-amd64:3.0",
+		Image:        framework.GetPauseImageName(f.Client),
 		Name:         "svc-latency-rc",
 		Namespace:    f.Namespace.Name,
 		Replicas:     1,
@@ -127,7 +127,7 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int) (output 
 	if err := framework.RunRC(cfg); err != nil {
 		return nil, err
 	}
-	defer framework.DeleteRC(f.Client, f.Namespace.Name, cfg.Name)
+	defer framework.DeleteRCAndPods(f.Client, f.Namespace.Name, cfg.Name)
 
 	// Run a single watcher, to reduce the number of API calls we have to
 	// make; this is to minimize the timing error. It's how kube-proxy

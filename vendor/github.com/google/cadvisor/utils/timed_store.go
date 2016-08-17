@@ -58,19 +58,23 @@ func NewTimedStore(age time.Duration, maxItems int) *TimedStore {
 
 // Adds an element to the start of the buffer (removing one from the end if necessary).
 func (self *TimedStore) Add(timestamp time.Time, item interface{}) {
-	// Remove any elements if over our max size.
-	if self.maxItems >= 0 && (len(self.buffer)+1) > self.maxItems {
-		startIndex := len(self.buffer) + 1 - self.maxItems
-		self.buffer = self.buffer[startIndex:]
-	}
-	// Add the new element first and sort. We can then remove an expired element, if required.
-	copied := item
-	self.buffer = append(self.buffer, timedStoreData{
+	data := timedStoreData{
 		timestamp: timestamp,
-		data:      copied,
-	})
+		data:      item,
+	}
+	// Common case: data is added in order.
+	if len(self.buffer) == 0 || !timestamp.Before(self.buffer[len(self.buffer)-1].timestamp) {
+		self.buffer = append(self.buffer, data)
+	} else {
+		// Data is out of order; insert it in the correct position.
+		index := sort.Search(len(self.buffer), func(index int) bool {
+			return self.buffer[index].timestamp.After(timestamp)
+		})
+		self.buffer = append(self.buffer, timedStoreData{}) // Make room to shift the elements
+		copy(self.buffer[index+1:], self.buffer[index:])    // Shift the elements over
+		self.buffer[index] = data
+	}
 
-	sort.Sort(self.buffer)
 	// Remove any elements before eviction time.
 	// TODO(rjnagal): This is assuming that the added entry has timestamp close to now.
 	evictTime := timestamp.Add(-self.age)
@@ -81,6 +85,11 @@ func (self *TimedStore) Add(timestamp time.Time, item interface{}) {
 		self.buffer = self.buffer[index:]
 	}
 
+	// Remove any elements if over our max size.
+	if self.maxItems >= 0 && len(self.buffer) > self.maxItems {
+		startIndex := len(self.buffer) - self.maxItems
+		self.buffer = self.buffer[startIndex:]
+	}
 }
 
 // Returns up to maxResult elements in the specified time period (inclusive).

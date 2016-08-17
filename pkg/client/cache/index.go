@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -54,6 +54,9 @@ func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 		}
 		if len(indexKeys) > 1 {
 			return "", fmt.Errorf("too many keys: %v", indexKeys)
+		}
+		if len(indexKeys) == 0 {
+			return "", fmt.Errorf("unexpected empty indexKeys")
 		}
 		return indexKeys[0], nil
 	}

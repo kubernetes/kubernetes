@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -38,43 +39,45 @@ type ExposeOptions struct {
 	Recursive bool
 }
 
-const (
-	expose_resources = `
-  pod (po), service (svc), replicationcontroller (rc),
-  deployment, replicaset (rs)
-`
+var (
+	expose_resources = dedent.Dedent(`
+		pod (po), service (svc), replicationcontroller (rc),
+		deployment, replicaset (rs)
+	`)
 
-	expose_long = `Expose a resource as a new Kubernetes service.
+	expose_long = dedent.Dedent(`
+		Expose a resource as a new Kubernetes service.
 
-Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
-for that resource as the selector for a new service on the specified port. A deployment or replica set
-will be exposed as a service only if its selector is convertible to a selector that service supports,
-i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
---port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no 
-labels are specified, the new service will re-use the labels from the resource it exposes.
+		Looks up a deployment, service, replica set, replication controller or pod by name and uses the selector
+		for that resource as the selector for a new service on the specified port. A deployment or replica set
+		will be exposed as a service only if its selector is convertible to a selector that service supports,
+		i.e. when the selector contains only the matchLabels component. Note that if no port is specified via
+		--port and the exposed resource has multiple ports, all will be re-used by the new service. Also if no
+		labels are specified, the new service will re-use the labels from the resource it exposes.
 
-Possible resources include (case insensitive):` + expose_resources
+		Possible resources include (case insensitive): `) + expose_resources
 
-	expose_example = `# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
-kubectl expose rc nginx --port=80 --target-port=8000
+	expose_example = dedent.Dedent(`
+		# Create a service for a replicated nginx, which serves on port 80 and connects to the containers on port 8000.
+		kubectl expose rc nginx --port=80 --target-port=8000
 
-# Create a service for a replication controller identified by type and name specified in "nginx-controller.yaml", which serves on port 80 and connects to the containers on port 8000.
-kubectl expose -f nginx-controller.yaml --port=80 --target-port=8000
+		# Create a service for a replication controller identified by type and name specified in "nginx-controller.yaml", which serves on port 80 and connects to the containers on port 8000.
+		kubectl expose -f nginx-controller.yaml --port=80 --target-port=8000
 
-# Create a service for a pod valid-pod, which serves on port 444 with the name "frontend"
-kubectl expose pod valid-pod --port=444 --name=frontend
+		# Create a service for a pod valid-pod, which serves on port 444 with the name "frontend"
+		kubectl expose pod valid-pod --port=444 --name=frontend
 
-# Create a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
-kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
+		# Create a second service based on the above service, exposing the container port 8443 as port 443 with the name "nginx-https"
+		kubectl expose service nginx --port=443 --target-port=8443 --name=nginx-https
 
-# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
-kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
+		# Create a service for a replicated streaming application on port 4100 balancing UDP traffic and named 'video-stream'.
+		kubectl expose rc streamer --port=4100 --protocol=udp --name=video-stream
 
-# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
-kubectl expose rs nginx --port=80 --target-port=8000
+		# Create a service for a replicated nginx using replica set, which serves on port 80 and connects to the containers on port 8000.
+		kubectl expose rs nginx --port=80 --target-port=8000
 
-# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.
-kubectl expose deployment nginx --port=80 --target-port=8000`
+		# Create a service for an nginx deployment, which serves on port 80 and connects to the containers on port 8000.
+		kubectl expose deployment nginx --port=80 --target-port=8000`)
 )
 
 func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -107,7 +110,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	// TODO: remove create-external-load-balancer in code on or after Aug 25, 2016.
 	cmd.Flags().Bool("create-external-load-balancer", false, "If true, create an external load balancer for this service (trumped by --type). Implementation is cloud provider dependent. Default is 'false'.")
 	cmd.Flags().MarkDeprecated("create-external-load-balancer", "use --type=\"LoadBalancer\" instead")
-	cmd.Flags().String("load-balancer-ip", "", "IP to assign to to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
+	cmd.Flags().String("load-balancer-ip", "", "IP to assign to the Load Balancer. If empty, an ephemeral IP will be created and used (cloud-provider specific).")
 	cmd.Flags().String("selector", "", "A label selector to use for this service. Only equality-based selector requirements are supported. If empty (the default) infer the selector from the replication controller or replica set.")
 	cmd.Flags().StringP("labels", "l", "", "Labels to apply to the service created by this call.")
 	cmd.Flags().String("container-port", "", "Synonym for --target-port")
@@ -117,6 +120,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
 	cmd.Flags().String("name", "", "The name for the newly created object.")
 	cmd.Flags().String("session-affinity", "", "If non-empty, set the session affinity for the service to this; legal values: 'None', 'ClientIP'")
+	cmd.Flags().String("cluster-ip", "", "ClusterIP to be assigned to the service. Leave empty to auto-allocate, or set to 'None' to create a headless service.")
 
 	usage := "Filename, directory, or URL to a file identifying the resource to expose a service"
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
@@ -167,8 +171,8 @@ func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []str
 
 		params := kubectl.MakeParams(cmd, names)
 		name := info.Name
-		if len(name) > validation.DNS952LabelMaxLength {
-			name = name[:validation.DNS952LabelMaxLength]
+		if len(name) > validation.DNS1035LabelMaxLength {
+			name = name[:validation.DNS1035LabelMaxLength]
 		}
 		params["default-name"] = name
 

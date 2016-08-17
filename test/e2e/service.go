@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,30 +35,33 @@ import (
 	"k8s.io/kubernetes/pkg/controller/endpoint"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-// Maximum time a kube-proxy daemon on a node is allowed to not
-// notice a Service update, such as type=NodePort.
-// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
-// liberal. Fix tracked in #20567.
-const kubeProxyLagTimeout = 5 * time.Minute
+const (
+	// Maximum time a kube-proxy daemon on a node is allowed to not
+	// notice a Service update, such as type=NodePort.
+	// TODO: This timeout should be O(10s), observed values are O(1m), 5m is very
+	// liberal. Fix tracked in #20567.
+	kubeProxyLagTimeout = 5 * time.Minute
 
-// Maximum time a load balancer is allowed to not respond after creation.
-const loadBalancerLagTimeoutDefault = 2 * time.Minute
+	// Maximum time a load balancer is allowed to not respond after creation.
+	loadBalancerLagTimeoutDefault = 2 * time.Minute
 
-// On AWS there is a delay between ELB creation and serving traffic;
-// a few minutes is typical, so use 10m.
-const loadBalancerLagTimeoutAWS = 10 * time.Minute
+	// On AWS there is a delay between ELB creation and serving traffic;
+	// a few minutes is typical, so use 10m.
+	loadBalancerLagTimeoutAWS = 10 * time.Minute
 
-// How long to wait for a load balancer to be created/modified.
-//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
-const loadBalancerCreateTimeout = 20 * time.Minute
+	// How long to wait for a load balancer to be created/modified.
+	//TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
+	loadBalancerCreateTimeoutDefault = 20 * time.Minute
+	loadBalancerCreateTimeoutLarge   = time.Hour
+)
 
 // This should match whatever the default/configured range is
 var ServiceNodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
@@ -69,9 +72,7 @@ var _ = framework.KubeDescribe("Services", func() {
 	var c *client.Client
 
 	BeforeEach(func() {
-		var err error
-		c, err = framework.LoadClient()
-		Expect(err).NotTo(HaveOccurred())
+		c = f.Client
 	})
 
 	// TODO: We get coverage of TCP/UDP and multi-port services through the DNS test. We should have a simpler test for multi-port TCP here.
@@ -331,8 +332,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 	It("should work after restarting apiserver [Disruptive]", func() {
 		// TODO: use the ServiceTestJig here
-		// TODO: framework.RestartApiserver doesn't work in GKE - fix it and reenable this test.
-		framework.SkipUnlessProviderIs("gce")
+		framework.SkipUnlessProviderIs("gce", "gke")
 
 		ns := f.Namespace.Name
 		numPods, servicePort := 3, 80
@@ -351,7 +351,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 
 		// Restart apiserver
-		if err := framework.RestartApiserver(); err != nil {
+		if err := framework.RestartApiserver(c); err != nil {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
 		if err := framework.WaitForApiserverUp(c); err != nil {
@@ -414,6 +414,11 @@ var _ = framework.KubeDescribe("Services", func() {
 		loadBalancerLagTimeout := loadBalancerLagTimeoutDefault
 		if framework.ProviderIs("aws") {
 			loadBalancerLagTimeout = loadBalancerLagTimeoutAWS
+		}
+		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
+		largeClusterMinNodesNumber := 100
+		if nodes := framework.GetReadySchedulableNodesOrDie(c); len(nodes.Items) > largeClusterMinNodesNumber {
+			loadBalancerCreateTimeout = loadBalancerCreateTimeoutLarge
 		}
 
 		// This test is more monolithic than we'd like because LB turnup can be
@@ -517,7 +522,7 @@ var _ = framework.KubeDescribe("Services", func() {
 
 		By("waiting for the TCP service to have a load balancer")
 		// Wait for the load balancer to be created asynchronously
-		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name)
+		tcpService = jig.WaitForLoadBalancerOrFail(ns1, tcpService.Name, loadBalancerCreateTimeout)
 		jig.SanityCheckService(tcpService, api.ServiceTypeLoadBalancer)
 		if int(tcpService.Spec.Ports[0].NodePort) != tcpNodePort {
 			framework.Failf("TCP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", tcpNodePort, tcpService.Spec.Ports[0].NodePort)
@@ -548,7 +553,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		if loadBalancerSupportsUDP {
 			By("waiting for the UDP service to have a load balancer")
 			// 2nd one should be faster since they ran in parallel.
-			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name)
+			udpService = jig.WaitForLoadBalancerOrFail(ns2, udpService.Name, loadBalancerCreateTimeout)
 			jig.SanityCheckService(udpService, api.ServiceTypeLoadBalancer)
 			if int(udpService.Spec.Ports[0].NodePort) != udpNodePort {
 				framework.Failf("UDP Spec.Ports[0].NodePort changed (%d -> %d) when not expected", udpNodePort, udpService.Spec.Ports[0].NodePort)
@@ -690,7 +695,7 @@ var _ = framework.KubeDescribe("Services", func() {
 			s.Spec.Ports[0].NodePort = 0
 		})
 		// Wait for the load balancer to be destroyed asynchronously
-		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort)
+		tcpService = jig.WaitForLoadBalancerDestroyOrFail(ns1, tcpService.Name, tcpIngressIP, svcPort, loadBalancerCreateTimeout)
 		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
 
 		By("changing UDP service back to type=ClusterIP")
@@ -700,7 +705,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		})
 		if loadBalancerSupportsUDP {
 			// Wait for the load balancer to be destroyed asynchronously
-			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort)
+			udpService = jig.WaitForLoadBalancerDestroyOrFail(ns2, udpService.Name, udpIngressIP, svcPort, loadBalancerCreateTimeout)
 			jig.SanityCheckService(udpService, api.ServiceTypeClusterIP)
 		}
 
@@ -946,12 +951,12 @@ var _ = framework.KubeDescribe("Services", func() {
 		svcName := fmt.Sprintf("%v.%v", serviceName, f.Namespace.Name)
 		By("waiting for endpoints of Service with DNS name " + svcName)
 
-		createExecPodOrFail(f.Client, f.Namespace.Name, "exec")
+		execPodName := createExecPodOrFail(f.Client, f.Namespace.Name, "execpod-")
 		cmd := fmt.Sprintf("wget -qO- %v", svcName)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, kubeProxyLagTimeout, func() (bool, error) {
 			var err error
-			stdout, err = framework.RunHostCmd(f.Namespace.Name, "exec", cmd)
+			stdout, err = framework.RunHostCmd(f.Namespace.Name, execPodName, cmd)
 			if err != nil {
 				framework.Logf("expected un-ready endpoint for Service %v, stdout: %v, err %v", t.name, stdout, err)
 				return false, nil
@@ -1097,13 +1102,14 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 
 // createExecPodOrFail creates a simple busybox pod in a sleep loop used as a
 // vessel for kubectl exec commands.
-func createExecPodOrFail(c *client.Client, ns, name string) {
+// Returns the name of the created pod.
+func createExecPodOrFail(c *client.Client, ns, generateName string) string {
 	framework.Logf("Creating new exec pod")
 	immediate := int64(0)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
-			Name:      name,
-			Namespace: ns,
+			GenerateName: generateName,
+			Namespace:    ns,
 		},
 		Spec: api.PodSpec{
 			TerminationGracePeriodSeconds: &immediate,
@@ -1116,16 +1122,17 @@ func createExecPodOrFail(c *client.Client, ns, name string) {
 			},
 		},
 	}
-	_, err := c.Pods(ns).Create(pod)
+	created, err := c.Pods(ns).Create(pod)
 	Expect(err).NotTo(HaveOccurred())
 	err = wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := c.Pods(pod.Namespace).Get(pod.Name)
+		retrievedPod, err := c.Pods(pod.Namespace).Get(created.Name)
 		if err != nil {
 			return false, nil
 		}
 		return retrievedPod.Status.Phase == api.PodRunning, nil
 	})
 	Expect(err).NotTo(HaveOccurred())
+	return created.Name
 }
 
 func createPodOrFail(c *client.Client, ns, name string, labels map[string]string, containerPorts []api.ContainerPort) {
@@ -1138,8 +1145,8 @@ func createPodOrFail(c *client.Client, ns, name string, labels map[string]string
 		Spec: api.PodSpec{
 			Containers: []api.Container{
 				{
-					Name:  "test",
-					Image: "gcr.io/google_containers/pause-amd64:3.0",
+					Name:  "pause",
+					Image: framework.GetPauseImageName(c),
 					Ports: containerPorts,
 					// Add a dummy environment variable to work around a docker issue.
 					// https://github.com/docker/docker/issues/14203
@@ -1395,7 +1402,7 @@ func startServeHostnameService(c *client.Client, ns, name string, port, replicas
 }
 
 func stopServeHostnameService(c *client.Client, ns, name string) error {
-	if err := framework.DeleteRC(c, ns, name); err != nil {
+	if err := framework.DeleteRCAndPods(c, ns, name); err != nil {
 		return err
 	}
 	if err := c.Services(ns).Delete(name); err != nil {
@@ -1409,8 +1416,7 @@ func stopServeHostnameService(c *client.Client, ns, name string) error {
 // in the cluster. Each pod in the service is expected to echo its name. These
 // names are compared with the given expectedPods list after a sort | uniq.
 func verifyServeHostnameServiceUp(c *client.Client, ns, host string, expectedPods []string, serviceIP string, servicePort int) error {
-	execPodName := "execpod"
-	createExecPodOrFail(c, ns, execPodName)
+	execPodName := createExecPodOrFail(c, ns, "execpod-")
 	defer func() {
 		deletePodOrFail(c, ns, execPodName)
 	}()
@@ -1531,7 +1537,7 @@ func NewServiceTestJig(client *client.Client, name string) *ServiceTestJig {
 	j := &ServiceTestJig{}
 	j.Client = client
 	j.Name = name
-	j.ID = j.Name + "-" + string(util.NewUUID())
+	j.ID = j.Name + "-" + string(uuid.NewUUID())
 	j.Labels = map[string]string{"testid": j.ID}
 
 	return j
@@ -1682,9 +1688,9 @@ func (j *ServiceTestJig) ChangeServiceNodePortOrFail(namespace, name string, ini
 	return service
 }
 
-func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string) *api.Service {
+func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *api.Service {
 	var service *api.Service
-	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", loadBalancerCreateTimeout, name)
+	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Services(namespace).Get(name)
 		if err != nil {
@@ -1696,13 +1702,13 @@ func (j *ServiceTestJig) WaitForLoadBalancerOrFail(namespace, name string) *api.
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediate(framework.Poll, loadBalancerCreateTimeout, pollFunc); err != nil {
+	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
 		framework.Failf("Timeout waiting for service %q to have a load balancer", name)
 	}
 	return service
 }
 
-func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int) *api.Service {
+func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int, timeout time.Duration) *api.Service {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
 		if err := framework.EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
@@ -1711,7 +1717,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 	}()
 
 	var service *api.Service
-	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", loadBalancerCreateTimeout, name)
+	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.Services(namespace).Get(name)
 		if err != nil {
@@ -1723,7 +1729,7 @@ func (j *ServiceTestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string
 		}
 		return false, nil
 	}
-	if err := wait.PollImmediate(framework.Poll, loadBalancerCreateTimeout, pollFunc); err != nil {
+	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
 		framework.Failf("Timeout waiting for service %q to have no load balancer", name)
 	}
 	return service
@@ -1881,7 +1887,7 @@ func NewServerTest(client *client.Client, namespace string, serviceName string) 
 	t.Client = client
 	t.Namespace = namespace
 	t.ServiceName = serviceName
-	t.TestId = t.ServiceName + "-" + string(util.NewUUID())
+	t.TestId = t.ServiceName + "-" + string(uuid.NewUUID())
 	t.Labels = map[string]string{
 		"testid": t.TestId,
 	}
@@ -1970,7 +1976,7 @@ func (t *ServiceTestFixture) Cleanup() []error {
 		// TODO(mikedanese): Wait.
 
 		// Then, delete the RC altogether.
-		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName); err != nil {
+		if err := t.Client.ReplicationControllers(t.Namespace).Delete(rcName, nil); err != nil {
 			errs = append(errs, err)
 		}
 	}

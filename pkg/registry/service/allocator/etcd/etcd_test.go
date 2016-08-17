@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,15 +25,16 @@ import (
 	"k8s.io/kubernetes/pkg/registry/service/allocator"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/storage/storagebackend"
 
 	"golang.org/x/net/context"
 )
 
-func newStorage(t *testing.T) (*Etcd, *etcdtesting.EtcdTestServer, allocator.Interface) {
+func newStorage(t *testing.T) (*Etcd, *etcdtesting.EtcdTestServer, allocator.Interface, *storagebackend.Config) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	mem := allocator.NewAllocationMap(100, "rangeSpecValue")
 	etcd := NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
-	return etcd, server, mem
+	return etcd, server, mem, etcdStorage
 }
 
 func validNewRangeAllocation() *api.RangeAllocation {
@@ -48,7 +49,7 @@ func key() string {
 }
 
 func TestEmpty(t *testing.T) {
-	storage, server, _ := newStorage(t)
+	storage, server, _, _ := newStorage(t)
 	defer server.Terminate(t)
 	if _, err := storage.Allocate(1); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocations at this time") {
 		t.Fatal(err)
@@ -56,7 +57,7 @@ func TestEmpty(t *testing.T) {
 }
 
 func TestStore(t *testing.T) {
-	storage, server, backing := newStorage(t)
+	storage, server, backing, config := newStorage(t)
 	defer server.Terminate(t)
 	if err := storage.storage.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -93,7 +94,7 @@ func TestStore(t *testing.T) {
 	}
 
 	other = allocator.NewAllocationMap(100, "rangeSpecValue")
-	otherStorage := NewEtcd(other, "/ranges/serviceips", api.Resource("serviceipallocations"), storage.storage)
+	otherStorage := NewEtcd(other, "/ranges/serviceips", api.Resource("serviceipallocations"), config)
 	if ok, err := otherStorage.Allocate(2); ok || err != nil {
 		t.Fatal(err)
 	}

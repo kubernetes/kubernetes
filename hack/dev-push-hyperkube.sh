@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2014 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,12 @@
 # This script will build the hyperkube image and push it to the repository
 # referred to by KUBE_DOCKER_REGISTRY and KUBE_DOCKER_OWNER. The image will
 # be given a version tag with the value from KUBE_DOCKER_VERSION.
-
+# e.g. run as: 
+# KUBE_DOCKER_REGISTRY=localhost:5000 KUBE_DOCKER_OWNER=liyi \
+# KUBE_DOCKER_VERSION=1.3.0-dev ./hack/dev-push-hyperkube.sh
+#
+# will build image localhost:5000/liyi/hyperkube-amd64:1.3.0-dev
+ 
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -40,7 +45,7 @@ fi
 
 kube::build::verify_prereqs
 kube::build::build_image
-kube::build::run_build_command hack/build-go.sh cmd/hyperkube
+kube::build::run_build_command make WHAT=cmd/hyperkube
 
 REGISTRY="${KUBE_DOCKER_REGISTRY}/${KUBE_DOCKER_OWNER}" \
 VERSION="${KUBE_DOCKER_VERSION}" \

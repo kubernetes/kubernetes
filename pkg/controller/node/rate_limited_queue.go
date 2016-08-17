@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,14 +21,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/sets"
+
+	"github.com/golang/glog"
 )
 
 // TimedValue is a value that should be processed at a designated time.
 type TimedValue struct {
-	Value     string
+	Value string
+	// UID could be anything that helps identify the value
+	UID       interface{}
 	AddedAt   time.Time
 	ProcessAt time.Time
 }
@@ -148,8 +151,9 @@ func (q *UniqueQueue) Clear() {
 // RateLimitedTimedQueue is a unique item priority queue ordered by the expected next time
 // of execution. It is also rate limited.
 type RateLimitedTimedQueue struct {
-	queue   UniqueQueue
-	limiter flowcontrol.RateLimiter
+	queue       UniqueQueue
+	limiterLock sync.Mutex
+	limiter     flowcontrol.RateLimiter
 }
 
 // Creates new queue which will use given RateLimiter to oversee execution.
@@ -173,10 +177,12 @@ type ActionFunc func(TimedValue) (bool, time.Duration)
 // time to execute the next item in the queue.
 func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	val, ok := q.queue.Head()
+	q.limiterLock.Lock()
+	defer q.limiterLock.Unlock()
 	for ok {
 		// rate limit the queue checking
 		if !q.limiter.TryAccept() {
-			glog.V(10).Info("Try rate limited...")
+			glog.V(10).Infof("Try rate limited for value: %v", val)
 			// Try again later
 			break
 		}
@@ -196,12 +202,13 @@ func (q *RateLimitedTimedQueue) Try(fn ActionFunc) {
 	}
 }
 
-// Adds value to the queue to be processed. Won't add the same value a second time if it was already
-// added and not removed.
-func (q *RateLimitedTimedQueue) Add(value string) bool {
+// Adds value to the queue to be processed. Won't add the same value(comparsion by value) a second time
+// if it was already added and not removed.
+func (q *RateLimitedTimedQueue) Add(value string, uid interface{}) bool {
 	now := now()
 	return q.queue.Add(TimedValue{
 		Value:     value,
+		UID:       uid,
 		AddedAt:   now,
 		ProcessAt: now,
 	})
@@ -215,4 +222,36 @@ func (q *RateLimitedTimedQueue) Remove(value string) bool {
 // Removes all items from the queue
 func (q *RateLimitedTimedQueue) Clear() {
 	q.queue.Clear()
+}
+
+// SwapLimiter safely swaps current limiter for this queue with the passed one if capacities or qps's differ.
+func (q *RateLimitedTimedQueue) SwapLimiter(newQPS float32) {
+	q.limiterLock.Lock()
+	defer q.limiterLock.Unlock()
+	if q.limiter.QPS() == newQPS {
+		return
+	}
+	var newLimiter flowcontrol.RateLimiter
+	if newQPS <= 0 {
+		newLimiter = flowcontrol.NewFakeNeverRateLimiter()
+	} else {
+		newLimiter = flowcontrol.NewTokenBucketRateLimiter(newQPS, evictionRateLimiterBurst)
+	}
+	// If we're currently waiting on limiter, we drain the new one - this is a good approach when Burst value is 1
+	// TODO: figure out if we need to support higher Burst values and decide on the drain logic, should we keep:
+	// - saturation (percentage of used tokens)
+	// - number of used tokens
+	// - number of available tokens
+	// - something else
+	for q.limiter.Saturation() > newLimiter.Saturation() {
+		// Check if we're not using fake limiter
+		previousSaturation := newLimiter.Saturation()
+		newLimiter.TryAccept()
+		// It's a fake limiter
+		if newLimiter.Saturation() == previousSaturation {
+			break
+		}
+	}
+	q.limiter.Stop()
+	q.limiter = newLimiter
 }

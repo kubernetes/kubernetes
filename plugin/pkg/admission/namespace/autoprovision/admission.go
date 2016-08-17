@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,12 +21,13 @@ import (
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/client/cache"
-	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
+	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
 func init() {
@@ -40,9 +41,11 @@ func init() {
 // It is useful in deployments that do not want to restrict creation of a namespace prior to its usage.
 type provision struct {
 	*admission.Handler
-	client clientset.Interface
-	store  cache.Store
+	client            clientset.Interface
+	namespaceInformer framework.SharedIndexInformer
 }
+
+var _ = admission.WantsInformerFactory(&provision{})
 
 func (p *provision) Admit(a admission.Attributes) (err error) {
 	// if we're here, then we've already passed authentication, so we're allowed to do what we're trying to do
@@ -51,7 +54,10 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 	if len(a.GetNamespace()) == 0 || a.GetKind().GroupKind() == api.Kind("Namespace") {
 		return nil
 	}
-
+	// we need to wait for our caches to warm
+	if !p.WaitForReady() {
+		return admission.NewForbidden(a, fmt.Errorf("not yet ready to handle request"))
+	}
 	namespace := &api.Namespace{
 		ObjectMeta: api.ObjectMeta{
 			Name:      a.GetNamespace(),
@@ -59,7 +65,7 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 		},
 		Status: api.NamespaceStatus{},
 	}
-	_, exists, err := p.store.Get(namespace)
+	_, exists, err := p.namespaceInformer.GetStore().Get(namespace)
 	if err != nil {
 		return admission.NewForbidden(a, err)
 	}
@@ -75,28 +81,20 @@ func (p *provision) Admit(a admission.Attributes) (err error) {
 
 // NewProvision creates a new namespace provision admission control handler
 func NewProvision(c clientset.Interface) admission.Interface {
-	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
-	reflector := cache.NewReflector(
-		&cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return c.Core().Namespaces().List(options)
-			},
-			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return c.Core().Namespaces().Watch(options)
-			},
-		},
-		&api.Namespace{},
-		store,
-		0,
-	)
-	reflector.Run()
-	return createProvision(c, store)
-}
-
-func createProvision(c clientset.Interface, store cache.Store) admission.Interface {
 	return &provision{
 		Handler: admission.NewHandler(admission.Create),
 		client:  c,
-		store:   store,
 	}
+}
+
+func (p *provision) SetInformerFactory(f informers.SharedInformerFactory) {
+	p.namespaceInformer = f.Namespaces().Informer()
+	p.SetReadyFunc(p.namespaceInformer.HasSynced)
+}
+
+func (p *provision) Validate() error {
+	if p.namespaceInformer == nil {
+		return fmt.Errorf("missing namespaceInformer")
+	}
+	return nil
 }

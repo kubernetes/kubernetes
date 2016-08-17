@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2014 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,82 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This script is a vestigial redirection.  Please do not add "real" logic.
+
 set -o errexit
 set -o nounset
 set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-source "${KUBE_ROOT}/cluster/lib/util.sh"
 
-SILENT=true
-
-# Excluded checks are always skipped.
-EXCLUDED_CHECKS=(
-  "verify-linkcheck.sh"  # runs in separate Jenkins job once per day due to high network usage
-  )
-
-function is-excluded {
-  if [[ $1 -ef ${BASH_SOURCE} ]]; then
-    return
-  fi
-  for e in ${EXCLUDED_CHECKS[@]}; do
-    if [[ $1 -ef "$KUBE_ROOT/hack/$e" ]]; then
-      return
-    fi
-  done
-  return 1
-}
-
-function run-cmd {
-  if ${SILENT}; then
-    "$@" &> /dev/null
-  else
-    "$@"
-  fi
-}
-
-function run-checks {
-  local -r pattern=$1
-  local -r runner=$2
-
-  for t in $(ls ${pattern})
-  do
-    if is-excluded "${t}" ; then
-      echo "Skipping ${t}"
-      continue
-    fi
-    echo -e "Verifying ${t}"
-    local start=$(date +%s)
-    run-cmd "${runner}" "${t}" && tr=$? || tr=$?
-    local elapsed=$(($(date +%s) - ${start}))
-    if [[ ${tr} -eq 0 ]]; then
-      echo -e "${color_green}SUCCESS${color_norm}  ${t}\t${elapsed}s"
-    else
-      echo -e "${color_red}FAILED${color_norm}   ${t}\t${elapsed}s"
-      ret=1
-    fi
-  done
-}
-
-while getopts ":v" opt; do
-  case ${opt} in
-    v)
-      SILENT=false
-      ;;
-    \?)
-      echo "Invalid flag: -${OPTARG}" >&2
-      exit 1
-      ;;
-  esac
-done
-
-if ${SILENT} ; then
-  echo "Running in the silent mode, run with -v if you want to see script logs."
+# For help output
+ARGHELP=""
+if [[ -n "${KUBE_VERIFY_GIT_BRANCH:-}" ]]; then
+    ARGHELP="BRANCH=${KUBE_VERIFY_GIT_BRANCH}"
 fi
 
-ret=0
-run-checks "${KUBE_ROOT}/hack/verify-*.sh" bash
-run-checks "${KUBE_ROOT}/hack/verify-*.py" python
-exit ${ret}
-
-# ex: ts=2 sw=2 et filetype=sh
+echo "NOTE: $0 has been replaced by 'make verify'"
+echo
+echo "The equivalent of this invocation is: "
+echo "    make verify ${ARGHELP}"
+echo
+echo
+make --no-print-directory -C "${KUBE_ROOT}" verify BRANCH="${KUBE_VERIFY_GIT_BRANCH:-}"

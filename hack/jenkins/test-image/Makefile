@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-all: push
+IMG = gcr.io/google-containers/kubekins-test
+TAG = $(shell date +v%Y%m%d)
 
-TAG = 0.11
+all: build
 
-container:
-	docker build -t gcr.io/google_containers/kubekins-test .
-	docker tag gcr.io/google_containers/kubekins-test gcr.io/google_containers/kubekins-test:$(TAG)
+build:
+	docker build -t $(IMG):$(TAG) .
+	docker tag -f $(IMG):$(TAG) $(IMG):latest
+	@echo Built $(IMG):$(TAG) and tagged with $(IMG):latest
 
-push: container
-	gcloud docker push gcr.io/google_containers/kubekins-test # Push image tagged as latest to repository
-	gcloud docker push gcr.io/google_containers/kubekins-test:$(TAG) # Push version tagged image to repository (since this image is already pushed it will simply create or update version tag)
+push: build
+	gcloud docker push $(IMG):$(TAG)
+	gcloud docker push $(IMG):latest
+	@echo Pushed $(IMG):latest and $(IMG):$(TAG)
 
-clean:

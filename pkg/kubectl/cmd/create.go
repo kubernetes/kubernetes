@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,16 +19,14 @@ package cmd
 import (
 	"fmt"
 	"io"
-	"strings"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
-	"k8s.io/kubernetes/pkg/runtime"
 )
 
 // CreateOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -38,15 +36,17 @@ type CreateOptions struct {
 	Recursive bool
 }
 
-const (
-	create_long = `Create a resource by filename or stdin.
+var (
+	create_long = dedent.Dedent(`
+		Create a resource by filename or stdin.
 
-JSON and YAML formats are accepted.`
-	create_example = `# Create a pod using the data in pod.json.
-kubectl create -f ./pod.json
+		JSON and YAML formats are accepted.`)
+	create_example = dedent.Dedent(`
+		# Create a pod using the data in pod.json.
+		kubectl create -f ./pod.json
 
-# Create a pod based on the JSON passed into stdin.
-cat pod.json | kubectl create -f -`
+		# Create a pod based on the JSON passed into stdin.
+		cat pod.json | kubectl create -f -`)
 )
 
 func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -80,9 +80,12 @@ func NewCmdCreate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 	// create subcommands
 	cmd.AddCommand(NewCmdCreateNamespace(f, out))
+	cmd.AddCommand(NewCmdCreateQuota(f, out))
 	cmd.AddCommand(NewCmdCreateSecret(f, out))
 	cmd.AddCommand(NewCmdCreateConfigMap(f, out))
 	cmd.AddCommand(NewCmdCreateServiceAccount(f, out))
+	cmd.AddCommand(NewCmdCreateService(f, out))
+	cmd.AddCommand(NewCmdCreateDeployment(f, out))
 	return cmd
 }
 
@@ -139,7 +142,7 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		count++
 		shortOutput := cmdutil.GetFlagString(cmd, "output") == "name"
 		if !shortOutput {
-			printObjectSpecificMessage(info.Object, out)
+			f.PrintObjectSpecificMessage(info.Object, out)
 		}
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "created")
 		return nil
@@ -151,37 +154,6 @@ func RunCreate(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *C
 		return fmt.Errorf("no objects passed to create")
 	}
 	return nil
-}
-
-func printObjectSpecificMessage(obj runtime.Object, out io.Writer) {
-	switch obj := obj.(type) {
-	case *api.Service:
-		if obj.Spec.Type == api.ServiceTypeNodePort {
-			msg := fmt.Sprintf(
-				`You have exposed your service on an external port on all nodes in your
-cluster.  If you want to expose this service to the external internet, you may
-need to set up firewall rules for the service port(s) (%s) to serve traffic.
-
-See http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md for more details.
-`,
-				makePortsString(obj.Spec.Ports, true))
-			out.Write([]byte(msg))
-		}
-	}
-}
-
-func makePortsString(ports []api.ServicePort, useNodePort bool) string {
-	pieces := make([]string, len(ports))
-	for ix := range ports {
-		var port int32
-		if useNodePort {
-			port = ports[ix].NodePort
-		} else {
-			port = ports[ix].Port
-		}
-		pieces[ix] = fmt.Sprintf("%s:%d", strings.ToLower(string(ports[ix].Protocol)), port)
-	}
-	return strings.Join(pieces, ",")
 }
 
 // createAndRefresh creates an object from input info and refreshes info with that object
@@ -225,7 +197,11 @@ func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, 
 		return err
 	}
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	gvk, err := typer.ObjectKind(obj)
+	gvks, _, err := typer.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
+	gvk := gvks[0]
 	mapping, err := mapper.RESTMapping(unversioned.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
 	if err != nil {
 		return err

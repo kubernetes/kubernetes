@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import (
 
 func init() {
 	codecsToTest = append(codecsToTest, func(version unversioned.GroupVersion, item runtime.Object) (runtime.Codec, error) {
-		s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/arbitrary.content.type")
+		s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/arbitrary.content.type")
 		return api.Codecs.CodecForVersions(s, s, testapi.ExternalGroupVersions(), nil), nil
 	})
 }
@@ -51,7 +51,7 @@ func TestUniversalDeserializer(t *testing.T) {
 			t.Fatal(mediaType)
 		}
 		buf := &bytes.Buffer{}
-		if err := e.EncodeToStream(expected, buf); err != nil {
+		if err := e.Encode(expected, buf); err != nil {
 			t.Fatalf("%s: %v", mediaType, err)
 		}
 		obj, _, err := d.Decode(buf.Bytes(), &unversioned.GroupVersionKind{Kind: "Pod", Version: "v1"}, nil)
@@ -138,7 +138,7 @@ func BenchmarkEncodeProtobufGeneratedMarshal(b *testing.B) {
 func BenchmarkDecodeCodecToInternalProtobuf(b *testing.B) {
 	items := benchmarkItems()
 	width := len(items)
-	s := protobuf.NewSerializer(api.Scheme, runtime.ObjectTyperToTyper(api.Scheme), "application/arbitrary.content.type")
+	s := protobuf.NewSerializer(api.Scheme, api.Scheme, "application/arbitrary.content.type")
 	encoder := api.Codecs.EncoderForVersion(s, v1.SchemeGroupVersion)
 	var encoded [][]byte
 	for i := range items {

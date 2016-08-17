@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ func fakeClient() ClientMapper {
 func fakeClientWith(testName string, t *testing.T, data map[string]string) ClientMapper {
 	return ClientMapperFunc(func(*meta.RESTMapping) (RESTClient, error) {
 		return &fake.RESTClient{
-			Codec: testapi.Default.Codec(),
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				p := req.URL.Path
 				q := req.URL.RawQuery
@@ -445,6 +445,7 @@ func TestDirectoryBuilder(t *testing.T) {
 	for _, info := range test.Infos {
 		if info.Name == "redis-master" && info.Namespace == "test" && info.Object != nil {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -1231,7 +1232,7 @@ func TestHasNames(t *testing.T) {
 		{
 			args:            []string{"rc/foo", "bar"},
 			expectedHasName: false,
-			expectedError:   fmt.Errorf("when passing arguments in resource/name form, all arguments must include the resource"),
+			expectedError:   fmt.Errorf("there is no need to specify a resource type as a separate argument when passing arguments in resource/name form (e.g. 'resource.test get resource/<resource_name>' instead of 'resource.test get resource resource/<resource_name>'"),
 		},
 	}
 	for _, test := range tests {

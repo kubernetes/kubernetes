@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,18 +37,16 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func AddToScheme(scheme *runtime.Scheme) {
-	addKnownTypes(scheme)
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&SelfSubjectAccessReview{},
 		&SubjectAccessReview{},
 		&LocalSubjectAccessReview{},
 	)
+	return nil
 }
-
-func (obj *LocalSubjectAccessReview) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }
-func (obj *SubjectAccessReview) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
-func (obj *SelfSubjectAccessReview) GetObjectKind() unversioned.ObjectKind  { return &obj.TypeMeta }

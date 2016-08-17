@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -36,27 +37,29 @@ type ScaleOptions struct {
 	Recursive bool
 }
 
-const (
-	scale_long = `Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
+var (
+	scale_long = dedent.Dedent(`
+		Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.
 
-Scale also allows users to specify one or more preconditions for the scale action.
-If --current-replicas or --resource-version is specified, it is validated before the
-scale is attempted, and it is guaranteed that the precondition holds true when the
-scale is sent to the server.`
-	scale_example = `# Scale a replicaset named 'foo' to 3.
-kubectl scale --replicas=3 rs/foo
+		Scale also allows users to specify one or more preconditions for the scale action.
+		If --current-replicas or --resource-version is specified, it is validated before the
+		scale is attempted, and it is guaranteed that the precondition holds true when the
+		scale is sent to the server.`)
+	scale_example = dedent.Dedent(`
+		# Scale a replicaset named 'foo' to 3.
+		kubectl scale --replicas=3 rs/foo
 
-# Scale a resource identified by type and name specified in "foo.yaml" to 3.
-kubectl scale --replicas=3 -f foo.yaml
+		# Scale a resource identified by type and name specified in "foo.yaml" to 3.
+		kubectl scale --replicas=3 -f foo.yaml
 
-# If the deployment named mysql's current size is 2, scale mysql to 3.
-kubectl scale --current-replicas=2 --replicas=3 deployment/mysql
+		# If the deployment named mysql's current size is 2, scale mysql to 3.
+		kubectl scale --current-replicas=2 --replicas=3 deployment/mysql
 
-# Scale multiple replication controllers.
-kubectl scale --replicas=5 rc/foo rc/bar rc/baz
+		# Scale multiple replication controllers.
+		kubectl scale --replicas=5 rc/foo rc/bar rc/baz
 
-# Scale job named 'cron' to 3.
-kubectl scale --replicas=3 job/cron`
+		# Scale job named 'cron' to 3.
+		kubectl scale --replicas=3 job/cron`)
 )
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
@@ -67,7 +70,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Use: "scale [--resource-version=version] [--current-replicas=count] --replicas=COUNT (-f FILENAME | TYPE NAME)",
 		// resize is deprecated
 		Aliases: []string{"resize"},
-		Short:   "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job.",
+		Short:   "Set a new size for a Deployment, ReplicaSet, Replication Controller, or Job",
 		Long:    scale_long,
 		Example: scale_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -81,7 +84,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmd.Flags().Int("current-replicas", -1, "Precondition for current size. Requires that the current size of the resource match this value in order to scale.")
 	cmd.Flags().Int("replicas", -1, "The new desired number of replicas. Required.")
 	cmd.MarkFlagRequired("replicas")
-	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait.")
+	cmd.Flags().Duration("timeout", 0, "The length of time to wait before giving up on a scale operation, zero means don't wait. Any other values should contain a corresponding time unit (e.g. 1s, 2m, 3h).")
 	cmdutil.AddOutputFlagsForMutation(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)

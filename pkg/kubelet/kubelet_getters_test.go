@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ import (
 )
 
 func TestKubeletDirs(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	root := kubelet.rootDirectory
 
@@ -86,7 +86,7 @@ func TestKubeletDirs(t *testing.T) {
 }
 
 func TestKubeletDirsCompat(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	root := kubelet.rootDirectory
 	if err := os.MkdirAll(root, 0750); err != nil {

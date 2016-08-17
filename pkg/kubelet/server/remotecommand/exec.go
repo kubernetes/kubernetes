@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,13 +26,14 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 // Executor knows how to execute a command in a container in a pod.
 type Executor interface {
 	// ExecInContainer executes a command in a container in the pod, copying data
 	// between in/out/err and the container's stdin/stdout/stderr.
-	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool) error
+	ExecInContainer(name string, uid types.UID, container string, cmd []string, in io.Reader, out, err io.WriteCloser, tty bool, resize <-chan term.Size) error
 }
 
 // ServeExec handles requests to execute a command in a container. After
@@ -48,7 +49,7 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 
 	cmd := req.URL.Query()[api.ExecCommandParamm]
 
-	err := executor.ExecInContainer(podName, uid, container, cmd, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty)
+	err := executor.ExecInContainer(podName, uid, container, cmd, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
 	if err != nil {
 		msg := fmt.Sprintf("error executing command in container: %v", err)
 		runtime.HandleError(errors.New(msg))

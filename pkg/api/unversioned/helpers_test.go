@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package unversioned
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/labels"
@@ -75,6 +76,76 @@ func TestLabelSelectorAsSelector(t *testing.T) {
 		}
 		if err != nil && !tc.expectErr {
 			t.Errorf("[%v]did not expect error but got: %v", i, err)
+		}
+		if !reflect.DeepEqual(out, tc.out) {
+			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)
+		}
+	}
+}
+
+func TestLabelSelectorAsMap(t *testing.T) {
+	matchLabels := map[string]string{"foo": "bar"}
+	matchExpressions := func(operator LabelSelectorOperator, values []string) []LabelSelectorRequirement {
+		return []LabelSelectorRequirement{{
+			Key:      "baz",
+			Operator: operator,
+			Values:   values,
+		}}
+	}
+
+	tests := []struct {
+		in        *LabelSelector
+		out       map[string]string
+		errString string
+	}{
+		{in: nil, out: nil},
+		{
+			in:  &LabelSelector{MatchLabels: matchLabels},
+			out: map[string]string{"foo": "bar"},
+		},
+		{
+			in:  &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(LabelSelectorOpIn, []string{"norf"})},
+			out: map[string]string{"foo": "bar", "baz": "norf"},
+		},
+		{
+			in:  &LabelSelector{MatchExpressions: matchExpressions(LabelSelectorOpIn, []string{"norf"})},
+			out: map[string]string{"baz": "norf"},
+		},
+		{
+			in:        &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(LabelSelectorOpIn, []string{"norf", "qux"})},
+			out:       map[string]string{"foo": "bar"},
+			errString: "without a single value cannot be converted",
+		},
+		{
+			in:        &LabelSelector{MatchExpressions: matchExpressions(LabelSelectorOpNotIn, []string{"norf", "qux"})},
+			out:       map[string]string{},
+			errString: "cannot be converted",
+		},
+		{
+			in:        &LabelSelector{MatchLabels: matchLabels, MatchExpressions: matchExpressions(LabelSelectorOpExists, []string{})},
+			out:       map[string]string{"foo": "bar"},
+			errString: "cannot be converted",
+		},
+		{
+			in:        &LabelSelector{MatchExpressions: matchExpressions(LabelSelectorOpDoesNotExist, []string{})},
+			out:       map[string]string{},
+			errString: "cannot be converted",
+		},
+	}
+
+	for i, tc := range tests {
+		out, err := LabelSelectorAsMap(tc.in)
+		if err == nil && len(tc.errString) > 0 {
+			t.Errorf("[%v]expected error but got none.", i)
+			continue
+		}
+		if err != nil && len(tc.errString) == 0 {
+			t.Errorf("[%v]did not expect error but got: %v", i, err)
+			continue
+		}
+		if err != nil && len(tc.errString) > 0 && !strings.Contains(err.Error(), tc.errString) {
+			t.Errorf("[%v]expected error with %q but got: %v", i, tc.errString, err)
+			continue
 		}
 		if !reflect.DeepEqual(out, tc.out) {
 			t.Errorf("[%v]expected:\n\t%+v\nbut got:\n\t%+v", i, tc.out, out)

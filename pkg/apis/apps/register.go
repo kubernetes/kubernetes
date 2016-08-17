@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,10 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-func AddToScheme(scheme *runtime.Scheme) {
-	// Add the API to Scheme.
-	addKnownTypes(scheme)
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
 // GroupName is the group name use in this package
 const GroupName = "apps"
@@ -44,14 +44,12 @@ func Resource(resource string) unversioned.GroupResource {
 }
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	// TODO this will get cleaned up with the scheme types are fixed
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&PetSet{},
 		&PetSetList{},
 		&api.ListOptions{},
 	)
+	return nil
 }
-
-func (obj *PetSet) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *PetSetList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

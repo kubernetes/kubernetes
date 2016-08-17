@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,11 +41,8 @@ func TestSetKubernetesDefaults(t *testing.T) {
 				APIPath: "/api",
 				ContentConfig: restclient.ContentConfig{
 					GroupVersion:         testapi.Default.GroupVersion(),
-					Codec:                testapi.Default.Codec(),
 					NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
 				},
-				QPS:   5,
-				Burst: 10,
 			},
 			false,
 		},
@@ -137,11 +134,15 @@ func TestHelperGetServerAPIVersions(t *testing.T) {
 
 func TestSetsCodec(t *testing.T) {
 	testCases := map[string]struct {
-		Err    bool
-		Prefix string
-		Codec  runtime.Codec
+		Err                  bool
+		Prefix               string
+		NegotiatedSerializer runtime.NegotiatedSerializer
 	}{
-		testapi.Default.GroupVersion().Version: {false, "/api/" + testapi.Default.GroupVersion().Version, testapi.Default.Codec()},
+		testapi.Default.GroupVersion().Version: {
+			Err:                  false,
+			Prefix:               "/api/" + testapi.Default.GroupVersion().Version,
+			NegotiatedSerializer: testapi.Default.NegotiatedSerializer(),
+		},
 		// Add this test back when we fixed config and SetKubernetesDefaults
 		// "invalidVersion":                       {true, "", nil},
 	}
@@ -172,7 +173,7 @@ func TestSetsCodec(t *testing.T) {
 		if e, a := expected.Prefix, versionedPath; e != a {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
-		if e, a := expected.Codec, conf.Codec; !reflect.DeepEqual(e, a) {
+		if e, a := expected.NegotiatedSerializer, conf.NegotiatedSerializer; !reflect.DeepEqual(e, a) {
 			t.Errorf("expected %#v, got %#v", e, a)
 		}
 	}

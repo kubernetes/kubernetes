@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -95,4 +95,14 @@ func (c *FakeComponentStatuses) List(opts api.ListOptions) (result *api.Componen
 func (c *FakeComponentStatuses) Watch(opts api.ListOptions) (watch.Interface, error) {
 	return c.Fake.
 		InvokesWatch(core.NewRootWatchAction(componentstatusesResource, opts))
+}
+
+// Patch applies the patch and returns the patched componentStatus.
+func (c *FakeComponentStatuses) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ComponentStatus, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewRootPatchSubresourceAction(componentstatusesResource, name, data, subresources...), &api.ComponentStatus{})
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ComponentStatus), err
 }

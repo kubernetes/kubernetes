@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -160,6 +160,72 @@ var _ = framework.KubeDescribe("Daemon set [Serial]", func() {
 					},
 					Spec: api.PodSpec{
 						NodeSelector: nodeSelector,
+						Containers: []api.Container{
+							{
+								Name:  dsName,
+								Image: image,
+								Ports: []api.ContainerPort{{ContainerPort: 9376}},
+							},
+						},
+					},
+				},
+			},
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Initially, daemon pods should not be running on any nodes.")
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, complexLabel))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on no nodes")
+
+		By("Change label of node, check that daemon pod is launched.")
+		nodeList := framework.GetReadySchedulableNodesOrDie(f.Client)
+		Expect(len(nodeList.Items)).To(BeNumerically(">", 0))
+		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
+		Expect(err).NotTo(HaveOccurred(), "error setting labels on node")
+		daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
+		Expect(len(daemonSetLabels)).To(Equal(1))
+		err = wait.Poll(dsRetryPeriod, dsRetryTimeout, checkDaemonPodOnNodes(f, complexLabel, []string{newNode.Name}))
+		Expect(err).NotTo(HaveOccurred(), "error waiting for daemon pods to be running on new nodes")
+
+		By("remove the node selector and wait for daemons to be unscheduled")
+		_, err = setDaemonSetNodeLabels(c, nodeList.Items[0].Name, map[string]string{})
+		Expect(err).NotTo(HaveOccurred(), "error removing labels on node")
+		Expect(wait.Poll(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, complexLabel))).
+			NotTo(HaveOccurred(), "error waiting for daemon pod to not be running on nodes")
+
+		By("We should now be able to delete the daemon set.")
+		Expect(c.DaemonSets(ns).Delete(dsName)).NotTo(HaveOccurred())
+
+	})
+
+	It("should run and stop complex daemon with node affinity", func() {
+		complexLabel := map[string]string{daemonsetNameLabel: dsName}
+		nodeSelector := map[string]string{daemonsetColorLabel: "blue"}
+		framework.Logf("Creating daemon with a node affinity %s", dsName)
+		affinity := map[string]string{
+			api.AffinityAnnotationKey: fmt.Sprintf(`
+				{"nodeAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": {
+					"nodeSelectorTerms": [{
+						"matchExpressions": [{
+							"key": "%s",
+							"operator": "In",
+							"values": ["%s"]
+					}]
+				}]
+			}}}`, daemonsetColorLabel, nodeSelector[daemonsetColorLabel]),
+		}
+		_, err := c.DaemonSets(ns).Create(&extensions.DaemonSet{
+			ObjectMeta: api.ObjectMeta{
+				Name: dsName,
+			},
+			Spec: extensions.DaemonSetSpec{
+				Selector: &unversioned.LabelSelector{MatchLabels: complexLabel},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: api.ObjectMeta{
+						Labels:      complexLabel,
+						Annotations: affinity,
+					},
+					Spec: api.PodSpec{
 						Containers: []api.Container{
 							{
 								Name:  dsName,

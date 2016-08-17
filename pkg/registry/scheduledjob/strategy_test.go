@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,13 +41,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 		t.Errorf("ScheduledJob should not allow create on update")
 	}
 
-	validSelector := &unversioned.LabelSelector{
-		MatchLabels: map[string]string{"a": "b"},
-	}
 	validPodTemplateSpec := api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector.MatchLabels,
-		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
 			DNSPolicy:     api.DNSClusterFirst,
@@ -60,19 +54,17 @@ func TestScheduledJobStrategy(t *testing.T) {
 			Namespace: api.NamespaceDefault,
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "* * * * * ?",
+			Schedule:          "* * * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: newBool(true),
+					Template: validPodTemplateSpec,
 				},
 			},
 		},
 	}
 
-	Strategy.PrepareForCreate(scheduledJob)
+	Strategy.PrepareForCreate(ctx, scheduledJob)
 	if len(scheduledJob.Status.Active) != 0 {
 		t.Errorf("ScheduledJob does not allow setting status on create")
 	}
@@ -84,7 +76,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 	updatedScheduledJob := &batch.ScheduledJob{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 		Spec: batch.ScheduledJobSpec{
-			Schedule: "5 5 5 5 * ?",
+			Schedule: "5 5 5 * ?",
 		},
 		Status: batch.ScheduledJobStatus{
 			LastScheduleTime: &now,
@@ -92,7 +84,7 @@ func TestScheduledJobStrategy(t *testing.T) {
 	}
 
 	// ensure we do not change status
-	Strategy.PrepareForUpdate(updatedScheduledJob, scheduledJob)
+	Strategy.PrepareForUpdate(ctx, updatedScheduledJob, scheduledJob)
 	if updatedScheduledJob.Status.Active != nil {
 		t.Errorf("PrepareForUpdate should have preserved prior version status")
 	}
@@ -110,20 +102,14 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 	if StatusStrategy.AllowCreateOnUpdate() {
 		t.Errorf("ScheduledJob should not allow create on update")
 	}
-	validSelector := &unversioned.LabelSelector{
-		MatchLabels: map[string]string{"a": "b"},
-	}
 	validPodTemplateSpec := api.PodTemplateSpec{
-		ObjectMeta: api.ObjectMeta{
-			Labels: validSelector.MatchLabels,
-		},
 		Spec: api.PodSpec{
 			RestartPolicy: api.RestartPolicyOnFailure,
 			DNSPolicy:     api.DNSClusterFirst,
 			Containers:    []api.Container{{Name: "abc", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 		},
 	}
-	oldSchedule := "* * * * * ?"
+	oldSchedule := "* * * * ?"
 	oldScheduledJob := &batch.ScheduledJob{
 		ObjectMeta: api.ObjectMeta{
 			Name:            "myscheduledjob",
@@ -135,9 +121,7 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: newBool(true),
+					Template: validPodTemplateSpec,
 				},
 			},
 		},
@@ -150,13 +134,11 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 			ResourceVersion: "9",
 		},
 		Spec: batch.ScheduledJobSpec{
-			Schedule:          "5 5 5 * * ?",
+			Schedule:          "5 5 * * ?",
 			ConcurrencyPolicy: batch.AllowConcurrent,
 			JobTemplate: batch.JobTemplateSpec{
 				Spec: batch.JobSpec{
-					Selector:       validSelector,
-					Template:       validPodTemplateSpec,
-					ManualSelector: newBool(true),
+					Template: validPodTemplateSpec,
 				},
 			},
 		},
@@ -165,7 +147,7 @@ func TestScheduledJobStatusStrategy(t *testing.T) {
 		},
 	}
 
-	StatusStrategy.PrepareForUpdate(newScheduledJob, oldScheduledJob)
+	StatusStrategy.PrepareForUpdate(ctx, newScheduledJob, oldScheduledJob)
 	if newScheduledJob.Status.LastScheduleTime == nil {
 		t.Errorf("ScheduledJob status updates must allow changes to scheduledJob status")
 	}

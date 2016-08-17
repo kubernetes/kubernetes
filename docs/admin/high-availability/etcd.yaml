@@ -16,9 +16,9 @@ spec:
     - --listen-peer-urls
     - http://${NODE_IP}:2380
     - --advertise-client-urls
-    - http://${NODE_IP}:4001
+    - http://${NODE_IP}:2379
     - --listen-client-urls
-    - http://127.0.0.1:4001
+    - http://127.0.0.1:2379
     - --data-dir
     - /var/etcd/data
     - --discovery
@@ -27,8 +27,8 @@ spec:
     - containerPort: 2380
       hostPort: 2380
       name: serverport
-    - containerPort: 4001
-      hostPort: 4001
+    - containerPort: 2379
+      hostPort: 2379
       name: clientport
     volumeMounts:
     - mountPath: /var/etcd

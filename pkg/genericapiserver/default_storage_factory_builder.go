@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,9 +32,11 @@ import (
 // Merges defaultResourceConfig with the user specified overrides and merges
 // defaultAPIResourceConfig with the corresponding user specified overrides as well.
 func BuildDefaultStorageFactory(storageConfig storagebackend.Config, defaultMediaType string, serializer runtime.StorageSerializer,
-	defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]unversioned.GroupVersion, defaultAPIResourceConfig *ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*DefaultStorageFactory, error) {
+	defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]unversioned.GroupVersion, resourceEncodingOverrides []unversioned.GroupVersionResource,
+	defaultAPIResourceConfig *ResourceConfig, resourceConfigOverrides config.ConfigurationMap) (*DefaultStorageFactory, error) {
 
-	resourceEncodingConfig := mergeResourceEncodingConfigs(defaultResourceEncoding, storageEncodingOverrides)
+	resourceEncodingConfig := mergeGroupEncodingConfigs(defaultResourceEncoding, storageEncodingOverrides)
+	resourceEncodingConfig = mergeResourceEncodingConfigs(resourceEncodingConfig, resourceEncodingOverrides)
 	apiResourceConfig, err := mergeAPIResourceConfigs(defaultAPIResourceConfig, resourceConfigOverrides)
 	if err != nil {
 		return nil, err
@@ -42,8 +44,18 @@ func BuildDefaultStorageFactory(storageConfig storagebackend.Config, defaultMedi
 	return NewDefaultStorageFactory(storageConfig, defaultMediaType, serializer, resourceEncodingConfig, apiResourceConfig), nil
 }
 
-// Merges the given defaultAPIResourceConfig with the given storageEncodingOverrides.
-func mergeResourceEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]unversioned.GroupVersion) *DefaultResourceEncodingConfig {
+// Merges the given defaultResourceConfig with specifc GroupvVersionResource overrides.
+func mergeResourceEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, resourceEncodingOverrides []unversioned.GroupVersionResource) *DefaultResourceEncodingConfig {
+	resourceEncodingConfig := defaultResourceEncoding
+	for _, gvr := range resourceEncodingOverrides {
+		resourceEncodingConfig.SetResourceEncoding(gvr.GroupResource(), gvr.GroupVersion(),
+			unversioned.GroupVersion{Group: gvr.Group, Version: runtime.APIVersionInternal})
+	}
+	return resourceEncodingConfig
+}
+
+// Merges the given defaultResourceConfig with specifc GroupVersion overrides.
+func mergeGroupEncodingConfigs(defaultResourceEncoding *DefaultResourceEncodingConfig, storageEncodingOverrides map[string]unversioned.GroupVersion) *DefaultResourceEncodingConfig {
 	resourceEncodingConfig := defaultResourceEncoding
 	for group, storageEncodingVersion := range storageEncodingOverrides {
 		resourceEncodingConfig.SetVersionEncoding(group, storageEncodingVersion, unversioned.GroupVersion{Group: group, Version: runtime.APIVersionInternal})

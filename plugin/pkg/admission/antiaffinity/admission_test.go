@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,11 @@ limitations under the License.
 package antiaffinity
 
 import (
+	"testing"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"testing"
 )
 
 // ensures the hard PodAntiAffinity is denied if it defines TopologyKey other than kubernetes.io/hostname.
@@ -199,10 +200,20 @@ func TestInterPodAffinityAdmission(t *testing.T) {
 			},
 			errorExpected: true,
 		},
+		{
+			affinity: map[string]string{
+				api.AffinityAnnotationKey: `
+					{"podAntiAffinity": {
+						"thisIsAInvalidAffinity": [{}
+					}}`,
+			},
+			// however, we should not got error here
+			errorExpected: false,
+		},
 	}
 	for _, test := range tests {
 		pod.ObjectMeta.Annotations = test.affinity
-		err := handler.Admit(admission.NewAttributesRecord(&pod, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
+		err := handler.Admit(admission.NewAttributesRecord(&pod, nil, api.Kind("Pod").WithVersion("version"), "foo", "name", api.Resource("pods").WithVersion("version"), "", "ignored", nil))
 
 		if test.errorExpected && err == nil {
 			t.Errorf("Expected error for Anti Affinity %+v but did not get an error", test.affinity)

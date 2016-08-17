@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,13 +38,13 @@ func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
 
-func AddToScheme(scheme *runtime.Scheme) {
-	// Add the API to Scheme.
-	addKnownTypes(scheme)
-}
+var (
+	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
+	AddToScheme   = SchemeBuilder.AddToScheme
+)
 
 // Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) {
+func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Job{},
 		&JobList{},
@@ -53,10 +53,5 @@ func addKnownTypes(scheme *runtime.Scheme) {
 		&ScheduledJobList{},
 		&api.ListOptions{},
 	)
+	return nil
 }
-
-func (obj *Job) GetObjectKind() unversioned.ObjectKind              { return &obj.TypeMeta }
-func (obj *JobList) GetObjectKind() unversioned.ObjectKind          { return &obj.TypeMeta }
-func (obj *JobTemplate) GetObjectKind() unversioned.ObjectKind      { return &obj.TypeMeta }
-func (obj *ScheduledJob) GetObjectKind() unversioned.ObjectKind     { return &obj.TypeMeta }
-func (obj *ScheduledJobList) GetObjectKind() unversioned.ObjectKind { return &obj.TypeMeta }

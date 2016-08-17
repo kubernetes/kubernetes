@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@ limitations under the License.
 */
 
 package storagebackend
+
+import "k8s.io/kubernetes/pkg/runtime"
 
 const (
 	StorageTypeUnset = ""
@@ -40,4 +42,6 @@ type Config struct {
 	// Currently this is only supported in etcd2.
 	// We will drop the cache once using protobuf.
 	DeserializationCacheSize int
+
+	Codec runtime.Codec
 }

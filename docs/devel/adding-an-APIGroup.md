@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/devel/adding-an-APIGroup.md).
+[here](http://releases.k8s.io/release-1.3/docs/devel/adding-an-APIGroup.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -75,12 +75,15 @@ cmd/libs/go2idl/ tool.
 1. Generate conversions and deep-copies:
 
     1. Add your "group/" or "group/version" into
-       cmd/libs/go2idl/{conversion-gen, deep-copy-gen}/main.go;
+       cmd/libs/go2idl/conversion-gen/main.go;
     2. Make sure your pkg/apis/`<group>`/`<version>` directory has a doc.go file
-       with the comment `// +genconversion=true`, to catch the attention of our
-       gen-conversion script.
-    3. Run hack/update-all.sh.
-
+       with the comment `// +k8s:deepcopy-gen=package,register`, to catch the
+       attention of our generation tools.
+    3. Make sure your `pkg/apis/<group>/<version>` directory has a doc.go file
+       with the comment `// +k8s:conversion-gen=<internal-pkg>`, to catch the
+       attention of our generation tools.  For most APIs the only target you
+       need is `k8s.io/kubernetes/pkg/apis/<group>` (your internal API).
+    4. Run hack/update-all.sh.
 
 2. Generate files for Ugorji codec:
 
@@ -116,8 +119,8 @@ pkg/kubectl/cmd/util/factory.go.
 1. Add your group in pkg/api/testapi/testapi.go, then you can access the group
 in tests through testapi.`<group>`;
 
-2. Add your "group/version" to `KUBE_API_VERSIONS` and `KUBE_TEST_API_VERSIONS`
-in hack/test-go.sh.
+2. Add your "group/version" to `KUBE_TEST_API_VERSIONS` in
+   hack/make-rules/test.sh and hack/make-rules/test-integration.sh
 
 TODO: Add a troubleshooting section.
 

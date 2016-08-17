@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -118,7 +118,7 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (unver
 	}
 
 	object := storage.New()
-	fqKinds, err := a.group.Typer.ObjectKinds(object)
+	fqKinds, _, err := a.group.Typer.ObjectKinds(object)
 	if err != nil {
 		return unversioned.GroupVersionKind{}, err
 	}
@@ -233,8 +233,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	var versionedList interface{}
 	if isLister {
 		list := lister.NewList()
-		listGVK, err := a.group.Typer.ObjectKind(list)
-		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(listGVK.Kind))
+		listGVKs, _, err := a.group.Typer.ObjectKinds(list)
+		if err != nil {
+			return nil, err
+		}
+		versionedListPtr, err := a.group.Creater.New(a.group.GroupVersion.WithKind(listGVKs[0].Kind))
 		if err != nil {
 			return nil, err
 		}
@@ -272,10 +275,11 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	)
 	if isGetterWithOptions {
 		getOptions, getSubpath, _ = getterWithOptions.NewGetOptions()
-		getOptionsInternalKind, err = a.group.Typer.ObjectKind(getOptions)
+		getOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(getOptions)
 		if err != nil {
 			return nil, err
 		}
+		getOptionsInternalKind = getOptionsInternalKinds[0]
 		versionedGetOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(getOptionsInternalKind.Kind))
 		if err != nil {
 			return nil, err
@@ -300,12 +304,16 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if isConnecter {
 		connectOptions, connectSubpath, _ = connecter.NewConnectOptions()
 		if connectOptions != nil {
-			connectOptionsInternalKind, err = a.group.Typer.ObjectKind(connectOptions)
+			connectOptionsInternalKinds, _, err := a.group.Typer.ObjectKinds(connectOptions)
 			if err != nil {
 				return nil, err
 			}
 
+			connectOptionsInternalKind = connectOptionsInternalKinds[0]
 			versionedConnectOptions, err = a.group.Creater.New(optionsExternalVersion.WithKind(connectOptionsInternalKind.Kind))
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -390,18 +398,26 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 
 		resourcePath := namespacedPath
 		resourceParams := namespaceParams
+		itemPathPrefix := gpath.Join(a.prefix, scope.ParamName()) + "/"
 		itemPath := namespacedPath + "/{name}"
+		itemPathMiddle := "/" + resource + "/"
 		nameParams := append(namespaceParams, nameParam)
 		proxyParams := append(nameParams, pathParam)
+		itemPathSuffix := ""
 		if hasSubresource {
-			itemPath = itemPath + "/" + subresource
+			itemPathSuffix = "/" + subresource
+			itemPath = itemPath + itemPathSuffix
 			resourcePath = itemPath
 			resourceParams = nameParams
 		}
 		apiResource.Name = path
 		apiResource.Namespaced = true
 		apiResource.Kind = resourceKind
-		namer := scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), false}
+
+		itemPathFn := func(name, namespace string) string {
+			return itemPathPrefix + namespace + itemPathMiddle + name + itemPathSuffix
+		}
+		namer := scopeNaming{scope, a.group.Linker, itemPathFn, false}
 
 		actions = appendIf(actions, action{"LIST", resourcePath, resourceParams, namer}, isLister)
 		actions = appendIf(actions, action{"POST", resourcePath, resourceParams, namer}, isCreater)
@@ -430,7 +446,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		// For ex: LIST all pods in all namespaces by sending a LIST request at /api/apiVersion/pods.
 		// TODO: more strongly type whether a resource allows these actions on "all namespaces" (bulk delete)
 		if !hasSubresource {
-			namer = scopeNaming{scope, a.group.Linker, gpath.Join(a.prefix, itemPath), true}
+			namer = scopeNaming{scope, a.group.Linker, itemPathFn, true}
 			actions = appendIf(actions, action{"LIST", resource, params, namer}, isLister)
 			actions = appendIf(actions, action{"WATCHLIST", "watch/" + resource, params, namer}, allowWatchList)
 		}
@@ -462,6 +478,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		ParameterCodec: a.group.ParameterCodec,
 		Creater:        a.group.Creater,
 		Convertor:      a.group.Convertor,
+		Copier:         a.group.Copier,
 
 		// TODO: This seems wrong for cross-group subresources. It makes an assumption that a subresource and its parent are in the same group version. Revisit this.
 		Resource:    a.group.GroupVersion.WithResource(resource),
@@ -775,7 +792,7 @@ func (n rootScopeNaming) ObjectName(obj runtime.Object) (namespace, name string,
 type scopeNaming struct {
 	scope meta.RESTScope
 	runtime.SelfLinker
-	itemPath      string
+	itemPathFn    func(name, namespace string) string
 	allNamespaces bool
 }
 
@@ -822,9 +839,8 @@ func (n scopeNaming) GenerateLink(req *restful.Request, obj runtime.Object) (pat
 	if len(name) == 0 {
 		return "", "", errEmptyName
 	}
-	path = strings.Replace(n.itemPath, "{name}", name, 1)
-	path = strings.Replace(path, "{"+n.scope.ArgumentName()+"}", namespace, 1)
-	return path, "", nil
+
+	return n.itemPathFn(name, namespace), "", nil
 }
 
 // GenerateListLink returns the appropriate path and query to locate a list by its canonical path.

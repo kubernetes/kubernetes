@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -107,7 +107,7 @@ func (s *KubeletExecutorServer) runExecutor(
 	exec := executor.New(executor.Config{
 		Registry:        registry,
 		APIClient:       apiclient,
-		Docker:          dockertools.ConnectToDockerOrDie(s.DockerEndpoint),
+		Docker:          dockertools.ConnectToDockerOrDie(s.DockerEndpoint, 0),
 		SuicideTimeout:  s.SuicideTimeout,
 		KubeletFinished: kubeletFinished,
 		ExitFunc:        os.Exit,
@@ -190,7 +190,7 @@ func (s *KubeletExecutorServer) runKubelet(
 	}
 
 	// make a separate client for events
-	eventClientConfig.QPS = s.EventRecordQPS
+	eventClientConfig.QPS = float32(s.EventRecordQPS)
 	eventClientConfig.Burst = int(s.EventBurst)
 	kcfg.EventClient, err = clientset.NewForConfig(eventClientConfig)
 	if err != nil {
@@ -209,7 +209,7 @@ func (s *KubeletExecutorServer) runKubelet(
 
 	// create custom cAdvisor interface which return the resource values that Mesos reports
 	ni := <-nodeInfos
-	cAdvisorInterface, err := NewMesosCadvisor(ni.Cores, ni.Mem, s.CAdvisorPort, kcfg.ContainerRuntime)
+	cAdvisorInterface, err := NewMesosCadvisor(ni.Cores, ni.Mem, uint(s.CAdvisorPort), kcfg.ContainerRuntime)
 	if err != nil {
 		return err
 	}

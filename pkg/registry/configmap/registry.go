@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ func (s *storage) CreateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.Con
 }
 
 func (s *storage) UpdateConfigMap(ctx api.Context, cfg *api.ConfigMap) (*api.ConfigMap, error) {
-	obj, _, err := s.Update(ctx, cfg)
+	obj, _, err := s.Update(ctx, cfg.Name, rest.DefaultUpdatedObjectInfo(cfg, api.Scheme))
 	if err != nil {
 		return nil, err
 	}

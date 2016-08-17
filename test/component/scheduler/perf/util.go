@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler"
 	_ "k8s.io/kubernetes/plugin/pkg/scheduler/algorithmprovider"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	e2e "k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -113,7 +114,7 @@ func makePodSpec() api.PodSpec {
 	return api.PodSpec{
 		Containers: []api.Container{{
 			Name:  "pause",
-			Image: "gcr.io/google_containers/pause:1.0",
+			Image: e2e.GetPauseImageNameForHostArch(),
 			Ports: []api.ContainerPort{{ContainerPort: 80}},
 			Resources: api.ResourceRequirements{
 				Limits: api.ResourceList{

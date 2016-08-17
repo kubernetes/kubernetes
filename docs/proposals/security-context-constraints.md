@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/proposals/security-context-constraints.md).
+[here](http://releases.k8s.io/release-1.3/docs/proposals/security-context-constraints.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -180,16 +180,16 @@ type VolumeSecurityPolicy struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/volumes.md#nfs
 	NFS bool `json:"nfs,omitempty"`
 	// ISCSI allows or disallows the use of the ISCSI volume plugin.
-	// More info: http://releases.k8s.io/HEAD/examples/iscsi/README.md
+	// More info: http://releases.k8s.io/HEAD/examples/volumes/iscsi/README.md
 	ISCSI bool `json:"iscsi,omitempty"`
 	// Glusterfs allows or disallows the use of the Glusterfs volume plugin.
-	// More info: http://releases.k8s.io/HEAD/examples/glusterfs/README.md
+	// More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md
 	Glusterfs bool `json:"glusterfs,omitempty"`
 	// PersistentVolumeClaim allows or disallows the use of the PersistentVolumeClaim volume plugin.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims
 	PersistentVolumeClaim bool `json:"persistentVolumeClaim,omitempty"`
 	// RBD allows or disallows the use of the RBD volume plugin.
-	// More info: http://releases.k8s.io/HEAD/examples/rbd/README.md
+	// More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md
 	RBD bool `json:"rbd,omitempty"`
 	// Cinder allows or disallows the use of the Cinder volume plugin.
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md

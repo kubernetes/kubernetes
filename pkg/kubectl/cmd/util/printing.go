@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,9 +30,9 @@ import (
 
 // AddPrinterFlags adds printing related flags to a command (e.g. output format, no headers, template path)
 func AddPrinterFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://releases.k8s.io/HEAD/docs/user-guide/jsonpath.md].")
+	AddOutputFlags(cmd)
 	cmd.Flags().String("output-version", "", "Output the formatted object with the given group version (for ex: 'extensions/v1beta1').")
-	cmd.Flags().Bool("no-headers", false, "When using the default output, don't print headers.")
+	AddNoHeadersFlags(cmd)
 	cmd.Flags().Bool("show-labels", false, "When printing, show all labels as the last column (default hide labels column)")
 	cmd.Flags().String("template", "", "Template string or path to template file to use when -o=go-template, -o=go-template-file. The template format is golang templates [http://golang.org/pkg/text/template/#pkg-overview].")
 	cmd.MarkFlagFilename("template")
@@ -43,6 +43,16 @@ func AddPrinterFlags(cmd *cobra.Command) {
 // AddOutputFlagsForMutation adds output related flags to a command. Used by mutations only.
 func AddOutputFlagsForMutation(cmd *cobra.Command) {
 	cmd.Flags().StringP("output", "o", "", "Output mode. Use \"-o name\" for shorter output (resource/name).")
+}
+
+// AddOutputFlags adds output related flags to a command.
+func AddOutputFlags(cmd *cobra.Command) {
+	cmd.Flags().StringP("output", "o", "", "Output format. One of: json|yaml|wide|name|custom-columns=...|custom-columns-file=...|go-template=...|go-template-file=...|jsonpath=...|jsonpath-file=... See custom columns [http://kubernetes.io/docs/user-guide/kubectl-overview/#custom-columns], golang template [http://golang.org/pkg/text/template/#pkg-overview] and jsonpath template [http://kubernetes.io/docs/user-guide/jsonpath].")
+}
+
+// AddNoHeadersFlags adds no-headers flags to a command.
+func AddNoHeadersFlags(cmd *cobra.Command) {
+	cmd.Flags().Bool("no-headers", false, "When using the default or custom-column output format, don't print headers.")
 }
 
 // PrintSuccess prints message after finishing mutating operations
@@ -111,7 +121,7 @@ func PrinterForCommand(cmd *cobra.Command) (kubectl.ResourcePrinter, bool, error
 		}
 	}
 
-	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile)
+	printer, generic, err := kubectl.GetPrinter(outputFormat, templateFile, GetFlagBool(cmd, "no-headers"))
 	if err != nil {
 		return nil, generic, err
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -231,7 +231,9 @@ func (p *apiServerPetClient) getPVC(pvcName, pvcNamespace string) (*api.Persiste
 	if errors.IsNotFound(err) {
 		found = false
 	}
-	if err != nil || !found {
+	if !found {
+		return nil, found, nil
+	} else if err != nil {
 		return nil, found, err
 	}
 	return pvc, true, nil
@@ -249,7 +251,8 @@ func (p *apiServerPetClient) SyncPVCs(pet *pcb) error {
 	for i, pvc := range pet.pvcs {
 		_, exists, err := p.getPVC(pvc.Name, pet.parent.Namespace)
 		if !exists {
-			if err := p.createPVC(&pet.pvcs[i]); err != nil {
+			var err error
+			if err = p.createPVC(&pet.pvcs[i]); err != nil {
 				errMsg += fmt.Sprintf("Failed to create %v: %v", pvc.Name, err)
 			}
 			p.event(pet.parent, "Create", fmt.Sprintf("pvc: %v", pvc.Name), err)

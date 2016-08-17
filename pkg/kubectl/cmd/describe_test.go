@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,11 +28,11 @@ import (
 // Verifies that schemas that are not in the master tree of Kubernetes can be retrieved via Get.
 func TestDescribeUnknownSchemaObject(t *testing.T) {
 	d := &testDescriber{Output: "test output"}
-	f, tf, codec := NewTestFactory()
+	f, tf, codec, ns := NewTestFactory()
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})},
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &internalType{Name: "foo"})},
 	}
 	tf.Namespace = "non-default"
 	buf := bytes.NewBuffer([]byte{})
@@ -51,11 +51,11 @@ func TestDescribeUnknownSchemaObject(t *testing.T) {
 
 func TestDescribeObject(t *testing.T) {
 	_, _, rc := testData()
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
+		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == "GET":
@@ -84,12 +84,12 @@ func TestDescribeObject(t *testing.T) {
 
 func TestDescribeListObjects(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"
@@ -103,12 +103,12 @@ func TestDescribeListObjects(t *testing.T) {
 
 func TestDescribeObjectShowEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"
@@ -123,12 +123,12 @@ func TestDescribeObjectShowEvents(t *testing.T) {
 
 func TestDescribeObjectSkipEvents(t *testing.T) {
 	pods, _, _ := testData()
-	f, tf, codec := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	d := &testDescriber{Output: "test output"}
 	tf.Describer = d
 	tf.Client = &fake.RESTClient{
-		Codec: codec,
-		Resp:  &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, pods)},
 	}
 
 	tf.Namespace = "test"

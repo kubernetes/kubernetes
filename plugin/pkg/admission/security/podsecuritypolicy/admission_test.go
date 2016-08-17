@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -394,8 +394,11 @@ func TestAdmitHostPorts(t *testing.T) {
 		},
 	}
 
-	for k, v := range tests {
-		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+	for i := 0; i < 2; i++ {
+		for k, v := range tests {
+			v.pod.Spec.Containers, v.pod.Spec.InitContainers = v.pod.Spec.InitContainers, v.pod.Spec.Containers
+			testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+		}
 	}
 }
 
@@ -953,7 +956,7 @@ func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod
 
 	plugin := NewTestAdmission(store, tc)
 
-	attrs := kadmission.NewAttributesRecord(pod, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
+	attrs := kadmission.NewAttributesRecord(pod, nil, kapi.Kind("Pod").WithVersion("version"), "namespace", "", kapi.Resource("pods").WithVersion("version"), "", kadmission.Create, &user.DefaultInfo{})
 	err := plugin.Admit(attrs)
 
 	if shouldPass && err != nil {
@@ -1193,7 +1196,8 @@ func createNamespaceForTest() *kapi.Namespace {
 func createSAForTest() *kapi.ServiceAccount {
 	return &kapi.ServiceAccount{
 		ObjectMeta: kapi.ObjectMeta{
-			Name: "default",
+			Namespace: "default",
+			Name:      "default",
 		},
 	}
 }

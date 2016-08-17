@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,6 +41,8 @@ func TestFormatURL(t *testing.T) {
 	}{
 		{"http", "localhost", 93, "", "http://localhost:93"},
 		{"https", "localhost", 93, "/path", "https://localhost:93/path"},
+		{"http", "localhost", 93, "?foo", "http://localhost:93?foo"},
+		{"https", "localhost", 93, "/path?bar", "https://localhost:93/path?bar"},
 	}
 	for _, test := range testCases {
 		url := formatURL(test.scheme, test.host, test.port, test.path)
@@ -173,16 +175,16 @@ func TestHTTPHeaders(t *testing.T) {
 	}{
 		{[]api.HTTPHeader{}, http.Header{}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"}}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
-			{"X-Muffins-Or-Plumcakes", "Muffins!"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
+			{Name: "X-Muffins-Or-Plumcakes", Value: "Muffins!"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins"},
 			"X-Muffins-Or-Plumcakes": {"Muffins!"}}},
 		{[]api.HTTPHeader{
-			{"X-Muffins-Or-Cupcakes", "Muffins"},
-			{"X-Muffins-Or-Cupcakes", "Cupcakes, too"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Muffins"},
+			{Name: "X-Muffins-Or-Cupcakes", Value: "Cupcakes, too"},
 		}, http.Header{"X-Muffins-Or-Cupcakes": {"Muffins", "Cupcakes, too"}}},
 	}
 	for _, test := range testCases {

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,18 +26,22 @@ import (
 	"github.com/golang/glog"
 	"github.com/skynetservices/skydns/metrics"
 	"github.com/skynetservices/skydns/server"
+	"github.com/spf13/pflag"
+
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	kclientcmd "k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	kdns "k8s.io/kubernetes/pkg/dns"
+	"k8s.io/kubernetes/pkg/version"
 )
 
 type KubeDNSServer struct {
 	// DNS domain name.
 	domain      string
 	healthzPort int
+	dnsPort     int
 	kd          *kdns.KubeDNS
 }
 
@@ -51,7 +55,11 @@ func NewKubeDNSServerDefault(config *options.KubeDNSConfig) *KubeDNSServer {
 		glog.Fatalf("Failed to create a kubernetes client: %v", err)
 	}
 	ks.healthzPort = config.HealthzPort
-	ks.kd = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
+	ks.dnsPort = config.DNSPort
+	ks.kd, err = kdns.NewKubeDNS(kubeClient, config.ClusterDomain, config.Federations)
+	if err != nil {
+		glog.Fatalf("Failed to start kubeDNS: %v", err)
+	}
 	return &ks
 }
 
@@ -83,12 +91,15 @@ func newKubeClient(dnsConfig *options.KubeDNSConfig) (clientset.Interface, error
 		}
 	}
 
-	glog.Infof("Using %s for kubernetes master", config.Host)
-	glog.Infof("Using kubernetes API %v", config.GroupVersion)
+	glog.Infof("Using %s for kubernetes master, kubernetes API: %v", config.Host, config.GroupVersion)
 	return clientset.NewForConfig(config)
 }
 
 func (server *KubeDNSServer) Run() {
+	glog.Infof("%+v", version.Get())
+	pflag.VisitAll(func(flag *pflag.Flag) {
+		glog.Infof("FLAG: --%s=%q", flag.Name, flag.Value)
+	})
 	setupSignalHandlers()
 	server.startSkyDNSServer()
 	server.kd.Start()
@@ -124,13 +135,14 @@ func setupSignalHandlers() {
 }
 
 func (d *KubeDNSServer) startSkyDNSServer() {
-	skydnsConfig := &server.Config{Domain: d.domain, DnsAddr: "0.0.0.0:53"}
+	glog.Infof("Starting SkyDNS server. Listening on port:%d", d.dnsPort)
+	skydnsConfig := &server.Config{Domain: d.domain, DnsAddr: fmt.Sprintf("0.0.0.0:%d", d.dnsPort)}
 	server.SetDefaults(skydnsConfig)
 	s := server.New(d.kd, skydnsConfig)
 	if err := metrics.Metrics(); err != nil {
 		glog.Fatalf("skydns: %s", err)
-	} else {
-		glog.Infof("skydns: metrics enabled on :%s%s", metrics.Port, metrics.Path)
 	}
+	glog.Infof("skydns: metrics enabled on : %s:%s", metrics.Path, metrics.Port)
+
 	go s.Run()
 }

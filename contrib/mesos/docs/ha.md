@@ -155,7 +155,7 @@ K8SM_IMAGE_NAME=haih/k8sm
 git clone https://github.com/mesosphere/kubernetes
 cd kubernetes
 git checkout release-v0.7-v1.1
-KUBERNETES_CONTRIB=mesos build/run.sh hack/build-go.sh
+KUBERNETES_CONTRIB=mesos build/run.sh make
 cd ..
 sudo docker build -t $K8SM_IMAGE_NAME --no-cache .
 EOF

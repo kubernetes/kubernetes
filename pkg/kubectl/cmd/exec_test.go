@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -32,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 type fakeRemoteExecutor struct {
@@ -40,7 +43,7 @@ type fakeRemoteExecutor struct {
 	execErr error
 }
 
-func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool) error {
+func (f *fakeRemoteExecutor) Execute(method string, url *url.URL, config *restclient.Config, stdin io.Reader, stdout, stderr io.Writer, tty bool, terminalSizeQueue term.TerminalSizeQueue) error {
 	f.method = method
 	f.url = url
 	return f.execErr
@@ -64,19 +67,19 @@ func TestPodAndContainer(t *testing.T) {
 			name:          "empty",
 		},
 		{
-			p:             &ExecOptions{PodName: "foo"},
+			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "foo"}},
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "no cmd",
 		},
 		{
-			p:             &ExecOptions{PodName: "foo", ContainerName: "bar"},
+			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "foo", ContainerName: "bar"}},
 			argsLenAtDash: -1,
 			expectError:   true,
 			name:          "no cmd, w/ container",
 		},
 		{
-			p:             &ExecOptions{PodName: "foo"},
+			p:             &ExecOptions{StreamOptions: StreamOptions{PodName: "foo"}},
 			args:          []string{"cmd"},
 			argsLenAtDash: -1,
 			expectedPod:   "foo",
@@ -114,7 +117,7 @@ func TestPodAndContainer(t *testing.T) {
 			name:          "cmd, cmd is behind dash",
 		},
 		{
-			p:                 &ExecOptions{ContainerName: "bar"},
+			p:                 &ExecOptions{StreamOptions: StreamOptions{ContainerName: "bar"}},
 			args:              []string{"foo", "cmd"},
 			argsLenAtDash:     -1,
 			expectedPod:       "foo",
@@ -124,10 +127,10 @@ func TestPodAndContainer(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, _, ns := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec:  codec,
-			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
+			NegotiatedSerializer: ns,
+			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
 		tf.ClientConfig = &restclient.Config{}
@@ -180,9 +183,9 @@ func TestExec(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		f, tf, codec := NewAPIFactory()
+		f, tf, codec, ns := NewAPIFactory()
 		tf.Client = &fake.RESTClient{
-			Codec: codec,
+			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
 				case p == test.podPath && m == "GET":
@@ -205,12 +208,14 @@ func TestExec(t *testing.T) {
 			ex.execErr = fmt.Errorf("exec error")
 		}
 		params := &ExecOptions{
-			PodName:       "foo",
-			ContainerName: "bar",
-			In:            bufIn,
-			Out:           bufOut,
-			Err:           bufErr,
-			Executor:      ex,
+			StreamOptions: StreamOptions{
+				PodName:       "foo",
+				ContainerName: "bar",
+				In:            bufIn,
+				Out:           bufOut,
+				Err:           bufErr,
+			},
+			Executor: ex,
 		}
 		cmd := &cobra.Command{}
 		args := []string{"test", "command"}
@@ -254,5 +259,126 @@ func execPod() *api.Pod {
 		Status: api.PodStatus{
 			Phase: api.PodRunning,
 		},
+	}
+}
+
+func TestSetupTTY(t *testing.T) {
+	stderr := &bytes.Buffer{}
+
+	// test 1 - don't attach stdin
+	o := &StreamOptions{
+		// InterruptParent: ,
+		Stdin: false,
+		In:    &bytes.Buffer{},
+		Out:   &bytes.Buffer{},
+		Err:   stderr,
+		TTY:   true,
+	}
+
+	tty := o.setupTTY()
+
+	if o.In != nil {
+		t.Errorf("don't attach stdin: o.In should be nil")
+	}
+	if tty.In != nil {
+		t.Errorf("don't attach stdin: tty.In should be nil")
+	}
+	if o.TTY {
+		t.Errorf("don't attach stdin: o.TTY should be false")
+	}
+	if tty.Raw {
+		t.Errorf("don't attach stdin: tty.Raw should be false")
+	}
+	if len(stderr.String()) > 0 {
+		t.Errorf("don't attach stdin: stderr wasn't empty: %s", stderr.String())
+	}
+
+	// tests from here on attach stdin
+	// test 2 - don't request a TTY
+	o.Stdin = true
+	o.In = &bytes.Buffer{}
+	o.TTY = false
+
+	tty = o.setupTTY()
+
+	if o.In == nil {
+		t.Errorf("attach stdin, no TTY: o.In should not be nil")
+	}
+	if tty.In != o.In {
+		t.Errorf("attach stdin, no TTY: tty.In should equal o.In")
+	}
+	if o.TTY {
+		t.Errorf("attach stdin, no TTY: o.TTY should be false")
+	}
+	if tty.Raw {
+		t.Errorf("attach stdin, no TTY: tty.Raw should be false")
+	}
+	if len(stderr.String()) > 0 {
+		t.Errorf("attach stdin, no TTY: stderr wasn't empty: %s", stderr.String())
+	}
+
+	// test 3 - request a TTY, but stdin is not a terminal
+	o.Stdin = true
+	o.In = &bytes.Buffer{}
+	o.Err = stderr
+	o.TTY = true
+
+	tty = o.setupTTY()
+
+	if o.In == nil {
+		t.Errorf("attach stdin, TTY, not a terminal: o.In should not be nil")
+	}
+	if tty.In != o.In {
+		t.Errorf("attach stdin, TTY, not a terminal: tty.In should equal o.In")
+	}
+	if o.TTY {
+		t.Errorf("attach stdin, TTY, not a terminal: o.TTY should be false")
+	}
+	if tty.Raw {
+		t.Errorf("attach stdin, TTY, not a terminal: tty.Raw should be false")
+	}
+	if !strings.Contains(stderr.String(), "input is not a terminal") {
+		t.Errorf("attach stdin, TTY, not a terminal: expected 'input is not a terminal' to stderr")
+	}
+
+	// test 4 - request a TTY, stdin is a terminal
+	o.Stdin = true
+	o.In = &bytes.Buffer{}
+	stderr.Reset()
+	o.TTY = true
+
+	overrideStdin := ioutil.NopCloser(&bytes.Buffer{})
+	overrideStdout := &bytes.Buffer{}
+	overrideStderr := &bytes.Buffer{}
+	o.overrideStreams = func() (io.ReadCloser, io.Writer, io.Writer) {
+		return overrideStdin, overrideStdout, overrideStderr
+	}
+
+	o.isTerminalIn = func(tty term.TTY) bool {
+		return true
+	}
+
+	tty = o.setupTTY()
+
+	if o.In != overrideStdin {
+		t.Errorf("attach stdin, TTY, is a terminal: o.In should equal overrideStdin")
+	}
+	if tty.In != o.In {
+		t.Errorf("attach stdin, TTY, is a terminal: tty.In should equal o.In")
+	}
+	if !o.TTY {
+		t.Errorf("attach stdin, TTY, is a terminal: o.TTY should be true")
+	}
+	if !tty.Raw {
+		t.Errorf("attach stdin, TTY, is a terminal: tty.Raw should be true")
+	}
+	if len(stderr.String()) > 0 {
+		t.Errorf("attach stdin, TTY, is a terminal: stderr wasn't empty: %s", stderr.String())
+	}
+	if o.Out != overrideStdout {
+		t.Errorf("attach stdin, TTY, is a terminal: o.Out should equal overrideStdout")
+	}
+	if tty.Out != o.Out {
+		t.Errorf("attach stdin, TTY, is a terminal: tty.Out should equal o.Out")
 	}
 }

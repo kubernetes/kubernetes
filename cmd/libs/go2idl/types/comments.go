@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,29 +19,28 @@ limitations under the License.
 package types
 
 import (
+	"fmt"
 	"strings"
 )
 
 // ExtractCommentTags parses comments for lines of the form:
 //
-//   'marker'+"key1=value1,key2=value2".
+//   'marker' + "key=value".
 //
-// Values are optional; 'true' is the default. If a key is set multiple times,
-// the last one wins.
+// Values are optional; "" is the default.  A tag can be specified more than
+// one time and all values are returned.  If the resulting map has an entry for
+// a key, the value (a slice) is guaranteed to have at least 1 element.
 //
-// Example: if you pass "+" for 'marker', and the following two lines are in
+// Example: if you pass "+" for 'marker', and the following lines are in
 // the comments:
-//   +foo=value1,bar
-//   +foo=value2,baz="frobber"
+//   +foo=value1
+//   +bar
+//   +foo=value2
+//   +baz="qux"
 // Then this function will return:
-//   map[string]string{"foo":"value2", "bar": "true", "baz": "frobber"}
-//
-// TODO: Basically we need to define a standard way of giving instructions to
-// autogenerators in the comments of a type. This is a first iteration of that.
-// TODO: allow multiple values per key?
-func ExtractCommentTags(marker, allLines string) map[string]string {
-	lines := strings.Split(allLines, "\n")
-	out := map[string]string{}
+//   map[string][]string{"foo":{"value1, "value2"}, "bar": {""}, "baz": {"qux"}}
+func ExtractCommentTags(marker string, lines []string) map[string][]string {
+	out := map[string][]string{}
 	for _, line := range lines {
 		line = strings.Trim(line, " ")
 		if len(line) == 0 {
@@ -50,15 +49,34 @@ func ExtractCommentTags(marker, allLines string) map[string]string {
 		if !strings.HasPrefix(line, marker) {
 			continue
 		}
-		pairs := strings.Split(line[len(marker):], ",")
-		for _, p := range pairs {
-			kv := strings.Split(p, "=")
-			if len(kv) == 2 {
-				out[kv[0]] = kv[1]
-			} else if len(kv) == 1 {
-				out[kv[0]] = "true"
-			}
+		// TODO: we could support multiple values per key if we split on spaces
+		kv := strings.SplitN(line[len(marker):], "=", 2)
+		if len(kv) == 2 {
+			out[kv[0]] = append(out[kv[0]], kv[1])
+		} else if len(kv) == 1 {
+			out[kv[0]] = append(out[kv[0]], "")
 		}
 	}
 	return out
+}
+
+// ExtractSingleBoolCommentTag parses comments for lines of the form:
+//
+//   'marker' + "key=value1"
+//
+// If the tag is not found, the default value is returned.  Values are asserted
+// to be boolean ("true" or "false"), and any other value will cause an error
+// to be returned.  If the key has multiple values, the first one will be used.
+func ExtractSingleBoolCommentTag(marker string, key string, defaultVal bool, lines []string) (bool, error) {
+	values := ExtractCommentTags(marker, lines)[key]
+	if values == nil {
+		return defaultVal, nil
+	}
+	if values[0] == "true" {
+		return true, nil
+	}
+	if values[0] == "false" {
+		return false, nil
+	}
+	return false, fmt.Errorf("tag value for %q is not boolean: %q", key, values[0])
 }

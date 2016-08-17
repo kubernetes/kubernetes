@@ -2,7 +2,6 @@ kind: Service
 apiVersion: v1
 metadata:
   name: spark-master
-  namespace: spark-cluster
 spec:
   ports:
     - port: 7077

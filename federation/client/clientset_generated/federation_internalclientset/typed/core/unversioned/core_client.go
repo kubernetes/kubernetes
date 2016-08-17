@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,12 +24,27 @@ import (
 
 type CoreInterface interface {
 	GetRESTClient() *restclient.RESTClient
+	EventsGetter
+	NamespacesGetter
+	SecretsGetter
 	ServicesGetter
 }
 
 // CoreClient is used to interact with features provided by the Core group.
 type CoreClient struct {
 	*restclient.RESTClient
+}
+
+func (c *CoreClient) Events(namespace string) EventInterface {
+	return newEvents(c, namespace)
+}
+
+func (c *CoreClient) Namespaces() NamespaceInterface {
+	return newNamespaces(c)
+}
+
+func (c *CoreClient) Secrets(namespace string) SecretInterface {
+	return newSecrets(c, namespace)
 }
 
 func (c *CoreClient) Services(namespace string) ServiceInterface {

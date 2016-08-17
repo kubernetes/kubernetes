@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package remotecommand
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/pkg/util/term"
 	"k8s.io/kubernetes/pkg/util/wsstream"
 
 	"github.com/golang/glog"
@@ -87,6 +89,8 @@ type context struct {
 	stdoutStream io.WriteCloser
 	stderrStream io.WriteCloser
 	errorStream  io.WriteCloser
+	resizeStream io.ReadCloser
+	resizeChan   chan term.Size
 	tty          bool
 }
 
@@ -118,10 +122,26 @@ func createStreams(req *http.Request, w http.ResponseWriter, supportedStreamProt
 		return nil, false
 	}
 
+	var ctx *context
+	var ok bool
 	if wsstream.IsWebSocketRequest(req) {
-		return createWebSocketStreams(req, w, opts, idleTimeout)
+		ctx, ok = createWebSocketStreams(req, w, opts, idleTimeout)
+	} else {
+		ctx, ok = createHttpStreamStreams(req, w, opts, supportedStreamProtocols, idleTimeout, streamCreationTimeout)
+	}
+	if !ok {
+		return nil, false
 	}
 
+	if ctx.resizeStream != nil {
+		ctx.resizeChan = make(chan term.Size)
+		go handleResizeEvents(ctx.resizeStream, ctx.resizeChan)
+	}
+
+	return ctx, true
+}
+
+func createHttpStreamStreams(req *http.Request, w http.ResponseWriter, opts *options, supportedStreamProtocols []string, idleTimeout, streamCreationTimeout time.Duration) (*context, bool) {
 	protocol, err := httpstream.Handshake(req, w, supportedStreamProtocols)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -148,6 +168,8 @@ func createStreams(req *http.Request, w http.ResponseWriter, supportedStreamProt
 
 	var handler protocolHandler
 	switch protocol {
+	case StreamProtocolV3Name:
+		handler = &v3ProtocolHandler{}
 	case StreamProtocolV2Name:
 		handler = &v2ProtocolHandler{}
 	case "":
@@ -157,7 +179,12 @@ func createStreams(req *http.Request, w http.ResponseWriter, supportedStreamProt
 		handler = &v1ProtocolHandler{}
 	}
 
+	if opts.tty && handler.supportsTerminalResizing() {
+		opts.expectedStreams++
+	}
+
 	expired := time.NewTimer(streamCreationTimeout)
+	defer expired.Stop()
 
 	ctx, err := handler.waitForStreams(streamCh, opts.expectedStreams, expired.C)
 	if err != nil {
@@ -167,6 +194,7 @@ func createStreams(req *http.Request, w http.ResponseWriter, supportedStreamProt
 
 	ctx.conn = conn
 	ctx.tty = opts.tty
+
 	return ctx, true
 }
 
@@ -174,7 +202,60 @@ type protocolHandler interface {
 	// waitForStreams waits for the expected streams or a timeout, returning a
 	// remoteCommandContext if all the streams were received, or an error if not.
 	waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*context, error)
+	// supportsTerminalResizing returns true if the protocol handler supports terminal resizing
+	supportsTerminalResizing() bool
 }
+
+// v3ProtocolHandler implements the V3 protocol version for streaming command execution.
+type v3ProtocolHandler struct{}
+
+func (*v3ProtocolHandler) waitForStreams(streams <-chan streamAndReply, expectedStreams int, expired <-chan time.Time) (*context, error) {
+	ctx := &context{}
+	receivedStreams := 0
+	replyChan := make(chan struct{})
+	stop := make(chan struct{})
+	defer close(stop)
+WaitForStreams:
+	for {
+		select {
+		case stream := <-streams:
+			streamType := stream.Headers().Get(api.StreamType)
+			switch streamType {
+			case api.StreamTypeError:
+				ctx.errorStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			case api.StreamTypeStdin:
+				ctx.stdinStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			case api.StreamTypeStdout:
+				ctx.stdoutStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			case api.StreamTypeStderr:
+				ctx.stderrStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			case api.StreamTypeResize:
+				ctx.resizeStream = stream
+				go waitStreamReply(stream.replySent, replyChan, stop)
+			default:
+				runtime.HandleError(fmt.Errorf("Unexpected stream type: %q", streamType))
+			}
+		case <-replyChan:
+			receivedStreams++
+			if receivedStreams == expectedStreams {
+				break WaitForStreams
+			}
+		case <-expired:
+			// TODO find a way to return the error to the user. Maybe use a separate
+			// stream to report errors?
+			return nil, errors.New("timed out waiting for client to create streams")
+		}
+	}
+
+	return ctx, nil
+}
+
+// supportsTerminalResizing returns true because v3ProtocolHandler supports it
+func (*v3ProtocolHandler) supportsTerminalResizing() bool { return true }
 
 // v2ProtocolHandler implements the V2 protocol version for streaming command execution.
 type v2ProtocolHandler struct{}
@@ -220,6 +301,9 @@ WaitForStreams:
 
 	return ctx, nil
 }
+
+// supportsTerminalResizing returns false because v2ProtocolHandler doesn't support it.
+func (*v2ProtocolHandler) supportsTerminalResizing() bool { return false }
 
 // v1ProtocolHandler implements the V1 protocol version for streaming command execution.
 type v1ProtocolHandler struct{}
@@ -274,4 +358,20 @@ WaitForStreams:
 	}
 
 	return ctx, nil
+}
+
+// supportsTerminalResizing returns false because v1ProtocolHandler doesn't support it.
+func (*v1ProtocolHandler) supportsTerminalResizing() bool { return false }
+
+func handleResizeEvents(stream io.Reader, channel chan<- term.Size) {
+	defer runtime.HandleCrash()
+
+	decoder := json.NewDecoder(stream)
+	for {
+		size := term.Size{}
+		if err := decoder.Decode(&size); err != nil {
+			break
+		}
+		channel <- size
+	}
 }

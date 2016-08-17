@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package thirdpartyresourcedata
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 	"testing"
@@ -26,8 +27,10 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/watch/versioned"
 )
 
 type Foo struct {
@@ -36,6 +39,10 @@ type Foo struct {
 
 	SomeField  string `json:"someField"`
 	OtherField int    `json:"otherField"`
+}
+
+func (*Foo) GetObjectKind() unversioned.ObjectKind {
+	return unversioned.EmptyObjectKind
 }
 
 type FooList struct {
@@ -47,21 +54,37 @@ type FooList struct {
 
 func TestCodec(t *testing.T) {
 	tests := []struct {
+		into      runtime.Object
 		obj       *Foo
 		expectErr bool
 		name      string
 	}{
+		{
+			into: &runtime.VersionedObjects{},
+			obj: &Foo{
+				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				TypeMeta:   unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
+			},
+			expectErr: false,
+			name:      "versioned objects list",
+		},
 		{
 			obj:       &Foo{ObjectMeta: api.ObjectMeta{Name: "bar"}},
 			expectErr: true,
 			name:      "missing kind",
 		},
 		{
-			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar"}, TypeMeta: unversioned.TypeMeta{Kind: "Foo"}},
+			obj: &Foo{
+				ObjectMeta: api.ObjectMeta{Name: "bar"},
+				TypeMeta:   unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
+			},
 			name: "basic",
 		},
 		{
-			obj:  &Foo{ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"}, TypeMeta: unversioned.TypeMeta{Kind: "Foo"}},
+			obj: &Foo{
+				ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "baz"},
+				TypeMeta:   unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
+			},
 			name: "resource version",
 		},
 		{
@@ -70,7 +93,10 @@ func TestCodec(t *testing.T) {
 					Name:              "bar",
 					CreationTimestamp: unversioned.Time{Time: time.Unix(100, 0)},
 				},
-				TypeMeta: unversioned.TypeMeta{Kind: "Foo"},
+				TypeMeta: unversioned.TypeMeta{
+					APIVersion: "company.com/v1",
+					Kind:       "Foo",
+				},
 			},
 			name: "creation time",
 		},
@@ -81,20 +107,31 @@ func TestCodec(t *testing.T) {
 					ResourceVersion: "baz",
 					Labels:          map[string]string{"foo": "bar", "baz": "blah"},
 				},
-				TypeMeta: unversioned.TypeMeta{Kind: "Foo"},
+				TypeMeta: unversioned.TypeMeta{APIVersion: "company.com/v1", Kind: "Foo"},
 			},
 			name: "labels",
 		},
 	}
+	registered.AddThirdPartyAPIGroupVersions(unversioned.GroupVersion{Group: "company.com", Version: "v1"})
 	for _, test := range tests {
 		d := &thirdPartyResourceDataDecoder{kind: "Foo", delegate: testapi.Extensions.Codec()}
-		e := &thirdPartyResourceDataEncoder{kind: "Foo", delegate: testapi.Extensions.Codec()}
+		e := &thirdPartyResourceDataEncoder{gvk: unversioned.GroupVersionKind{
+			Group:   "company.com",
+			Version: "v1",
+			Kind:    "Foo",
+		}, delegate: testapi.Extensions.Codec()}
 		data, err := json.Marshal(test.obj)
 		if err != nil {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
 		}
-		obj, err := runtime.Decode(d, data)
+		var obj runtime.Object
+		if test.into != nil {
+			err = runtime.DecodeInto(d, data, test.into)
+			obj = test.into
+		} else {
+			obj, err = runtime.Decode(d, data)
+		}
 		if err != nil && !test.expectErr {
 			t.Errorf("[%s] unexpected error: %v", test.name, err)
 			continue
@@ -105,8 +142,13 @@ func TestCodec(t *testing.T) {
 			}
 			continue
 		}
-		rsrcObj, ok := obj.(*extensions.ThirdPartyResourceData)
-		if !ok {
+		var rsrcObj *extensions.ThirdPartyResourceData
+		switch o := obj.(type) {
+		case *extensions.ThirdPartyResourceData:
+			rsrcObj = o
+		case *runtime.VersionedObjects:
+			rsrcObj = o.First().(*extensions.ThirdPartyResourceData)
+		default:
 			t.Errorf("[%s] unexpected object: %v", test.name, obj)
 			continue
 		}
@@ -178,4 +220,67 @@ func TestCreater(t *testing.T) {
 		}
 
 	}
+}
+
+func TestEncodeToStreamForInternalEvent(t *testing.T) {
+	e := &thirdPartyResourceDataEncoder{gvk: unversioned.GroupVersionKind{
+		Group:   "company.com",
+		Version: "v1",
+		Kind:    "Foo",
+	}, delegate: testapi.Extensions.Codec()}
+	buf := bytes.NewBuffer([]byte{})
+	expected := &versioned.Event{
+		Type: "Added",
+	}
+	err := e.Encode(&versioned.InternalEvent{
+		Type: "Added",
+	}, buf)
+
+	jBytes, _ := json.Marshal(expected)
+
+	if string(jBytes) == buf.String() {
+		t.Errorf("unexpected encoding expected %s got %s", string(jBytes), buf.String())
+	}
+
+	if err != nil {
+		t.Errorf("unexpected error encoding: %v", err)
+	}
+}
+
+func TestThirdPartyResourceDataListEncoding(t *testing.T) {
+	gv := unversioned.GroupVersion{Group: "stable.foo.faz", Version: "v1"}
+	gvk := gv.WithKind("Bar")
+	e := &thirdPartyResourceDataEncoder{delegate: testapi.Extensions.Codec(), gvk: gvk}
+	subject := &extensions.ThirdPartyResourceDataList{}
+
+	buf := bytes.NewBuffer([]byte{})
+	err := e.Encode(subject, buf)
+	if err != nil {
+		t.Errorf("encoding unexpected error: %v", err)
+	}
+
+	targetOutput := struct {
+		Kind       string               `json:"kind,omitempty"`
+		Items      []json.RawMessage    `json:"items"`
+		Metadata   unversioned.ListMeta `json:"metadata,omitempty"`
+		APIVersion string               `json:"apiVersion,omitempty"`
+	}{}
+	err = json.Unmarshal(buf.Bytes(), &targetOutput)
+
+	if err != nil {
+		t.Errorf("unmarshal unexpected error: %v", err)
+	}
+
+	if expectedKind := gvk.Kind + "List"; expectedKind != targetOutput.Kind {
+		t.Errorf("unexpected kind on list got %s expected %s", targetOutput.Kind, expectedKind)
+	}
+
+	if targetOutput.Metadata != subject.ListMeta {
+		t.Errorf("metadata mismatch %v != %v", targetOutput.Metadata, subject.ListMeta)
+	}
+
+	if targetOutput.APIVersion != gv.String() {
+		t.Errorf("apiversion mismatch %v != %v", targetOutput.APIVersion, gv.String())
+	}
+
 }

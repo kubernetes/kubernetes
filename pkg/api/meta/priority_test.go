@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 package meta
 
 import (
+	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -200,6 +202,107 @@ func TestPriorityRESTMapperKindForErrorHandling(t *testing.T) {
 			continue
 		}
 		if !strings.Contains(actualErr.Error(), tc.err) {
+			t.Errorf("%s: expected %v, got %v", tc.name, tc.err, actualErr)
+		}
+	}
+}
+
+func TestPriorityRESTMapperRESTMapping(t *testing.T) {
+	mapping1 := &RESTMapping{
+		GroupVersionKind: unversioned.GroupVersionKind{Kind: "Foo", Version: "v1alpha1"},
+	}
+	mapping2 := &RESTMapping{
+		GroupVersionKind: unversioned.GroupVersionKind{Kind: "Foo", Version: "v1"},
+	}
+	mapping3 := &RESTMapping{
+		GroupVersionKind: unversioned.GroupVersionKind{Group: "other", Kind: "Foo", Version: "v1"},
+	}
+	allMappers := MultiRESTMapper{
+		fixedRESTMapper{mappings: []*RESTMapping{mapping1}},
+		fixedRESTMapper{mappings: []*RESTMapping{mapping2}},
+		fixedRESTMapper{mappings: []*RESTMapping{mapping3}},
+	}
+	tcs := []struct {
+		name string
+
+		mapper PriorityRESTMapper
+		input  unversioned.GroupKind
+		result *RESTMapping
+		err    error
+	}{
+		{
+			name:   "empty",
+			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{}},
+			input:  unversioned.GroupKind{Kind: "Foo"},
+			err:    &NoKindMatchError{PartialKind: unversioned.GroupVersionKind{Kind: "Foo"}},
+		},
+		{
+			name:   "ignore not found",
+			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{fixedRESTMapper{err: &NoKindMatchError{PartialKind: unversioned.GroupVersionKind{Kind: "IGNORE_THIS"}}}}},
+			input:  unversioned.GroupKind{Kind: "Foo"},
+			err:    &NoKindMatchError{PartialKind: unversioned.GroupVersionKind{Kind: "Foo"}},
+		},
+		{
+			name:   "accept first failure",
+			mapper: PriorityRESTMapper{Delegate: MultiRESTMapper{fixedRESTMapper{err: errors.New("fail on this")}, fixedRESTMapper{mappings: []*RESTMapping{mapping1}}}},
+			input:  unversioned.GroupKind{Kind: "Foo"},
+			err:    errors.New("fail on this"),
+		},
+		{
+			name: "return error for ambiguous",
+			mapper: PriorityRESTMapper{
+				Delegate: allMappers,
+			},
+			input: unversioned.GroupKind{Kind: "Foo"},
+			err: &AmbiguousKindError{
+				PartialKind: unversioned.GroupVersionKind{Kind: "Foo"},
+				MatchingKinds: []unversioned.GroupVersionKind{
+					{Kind: "Foo", Version: "v1alpha1"},
+					{Kind: "Foo", Version: "v1"},
+					{Group: "other", Kind: "Foo", Version: "v1"},
+				},
+			},
+		},
+		{
+			name: "accept only item",
+			mapper: PriorityRESTMapper{
+				Delegate: fixedRESTMapper{mappings: []*RESTMapping{mapping1}},
+			},
+			input:  unversioned.GroupKind{Kind: "Foo"},
+			result: mapping1,
+		},
+		{
+			name: "return single priority",
+			mapper: PriorityRESTMapper{
+				Delegate:     allMappers,
+				KindPriority: []unversioned.GroupVersionKind{{Version: "v1", Kind: AnyKind}, {Version: "v1alpha1", Kind: AnyKind}},
+			},
+			input:  unversioned.GroupKind{Kind: "Foo"},
+			result: mapping2,
+		},
+		{
+			name: "return out of group match",
+			mapper: PriorityRESTMapper{
+				Delegate:     allMappers,
+				KindPriority: []unversioned.GroupVersionKind{{Group: AnyGroup, Version: "v1", Kind: AnyKind}, {Group: "other", Version: AnyVersion, Kind: AnyKind}},
+			},
+			input:  unversioned.GroupKind{Kind: "Foo"},
+			result: mapping3,
+		},
+	}
+
+	for _, tc := range tcs {
+		actualResult, actualErr := tc.mapper.RESTMapping(tc.input)
+		if e, a := tc.result, actualResult; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s: expected %v, got %v", tc.name, e, a)
+		}
+		switch {
+		case tc.err == nil && actualErr == nil:
+		case tc.err == nil:
+			t.Errorf("%s: unexpected error: %v", tc.name, actualErr)
+		case actualErr == nil:
+			t.Errorf("%s: expected error: %v got nil", tc.name, tc.err)
+		case tc.err.Error() != actualErr.Error():
 			t.Errorf("%s: expected %v, got %v", tc.name, tc.err, actualErr)
 		}
 	}

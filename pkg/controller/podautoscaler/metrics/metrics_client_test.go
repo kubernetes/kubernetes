@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -184,10 +184,12 @@ func buildPod(namespace, podName string, podLabels map[string]string, phase api.
 }
 
 func (tc *testCase) verifyResults(t *testing.T, val *float64, timestamp time.Time, err error) {
-	assert.Equal(t, tc.desiredError, err)
 	if tc.desiredError != nil {
+		assert.Error(t, err)
+		assert.Contains(t, fmt.Sprintf("%v", err), fmt.Sprintf("%v", tc.desiredError))
 		return
 	}
+	assert.NoError(t, err)
 	assert.NotNil(t, val)
 	assert.True(t, tc.desiredValue-0.001 < *val)
 	assert.True(t, tc.desiredValue+0.001 > *val)
@@ -426,7 +428,7 @@ func TestCPUEmptyMetricsForOnePod(t *testing.T) {
 	tc := testCase{
 		replicas:           3,
 		targetResource:     "cpu-usage",
-		desiredError:       fmt.Errorf("metrics obtained for 2/3 of pods"),
+		desiredError:       fmt.Errorf("metrics obtained for 2/3 of pods (sample missing pod: test-namespace/test-pod-2)"),
 		reportedPodMetrics: [][]int64{{100}, {300, 400}},
 		useMetricsApi:      true,
 	}
@@ -440,9 +442,9 @@ func TestAggregateSum(t *testing.T) {
 		Items: []heapster.MetricResult{
 			{
 				Metrics: []heapster.MetricPoint{
-					{now, 50, nil},
-					{now.Add(-15 * time.Second), 100, nil},
-					{now.Add(-60 * time.Second), 100000, nil}},
+					{Timestamp: now, Value: 50, FloatValue: nil},
+					{Timestamp: now.Add(-15 * time.Second), Value: 100, FloatValue: nil},
+					{Timestamp: now.Add(-60 * time.Second), Value: 100000, FloatValue: nil}},
 				LatestTimestamp: now,
 			},
 		},
@@ -459,8 +461,8 @@ func TestAggregateSumSingle(t *testing.T) {
 		Items: []heapster.MetricResult{
 			{
 				Metrics: []heapster.MetricPoint{
-					{now, 50, nil},
-					{now.Add(-65 * time.Second), 100000, nil}},
+					{Timestamp: now, Value: 50, FloatValue: nil},
+					{Timestamp: now.Add(-65 * time.Second), Value: 100000, FloatValue: nil}},
 				LatestTimestamp: now,
 			},
 		},

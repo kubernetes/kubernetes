@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,9 @@ import (
 	"testing"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
+	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 )
 
 func TestGetContainerInfo(t *testing.T) {
@@ -33,14 +35,14 @@ func TestGetContainerInfo(t *testing.T) {
 		},
 	}
 
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
 	mockCadvisor := testKubelet.fakeCadvisor
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, nil)
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*kubecontainertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      "qux",
 			Namespace: "ns",
@@ -50,7 +52,7 @@ func TestGetContainerInfo(t *testing.T) {
 					ID:   kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
-		},
+		}},
 	}
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", cadvisorReq)
 	if err != nil {
@@ -69,7 +71,7 @@ func TestGetRawContainerInfoRoot(t *testing.T) {
 			Name: containerPath,
 		},
 	}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -96,7 +98,7 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 			},
 		},
 	}
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
@@ -107,14 +109,14 @@ func TestGetRawContainerInfoSubcontainers(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	if len(result) != 2 {
-		t.Errorf("Expected 2 elements, received: %+v", result)
+		t.Errorf("Expected 2 elements, received: %#v", result)
 	}
 	mockCadvisor.AssertExpectations(t)
 }
 
 func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerID := "ab2cdf"
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	fakeRuntime := testKubelet.fakeRuntime
@@ -122,8 +124,8 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 	containerInfo := cadvisorapi.ContainerInfo{}
 	cadvisorReq := &cadvisorapi.ContainerInfoRequest{}
 	mockCadvisor.On("DockerContainer", containerID, cadvisorReq).Return(containerInfo, cadvisorApiFailure)
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*kubecontainertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "uuid",
 			Name:      "qux",
 			Namespace: "ns",
@@ -132,7 +134,7 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 					ID: kubecontainer.ContainerID{Type: "test", ID: containerID},
 				},
 			},
-		},
+		}},
 	}
 	stats, err := kubelet.GetContainerInfo("qux_ns", "uuid", "foo", cadvisorReq)
 	if stats != nil {
@@ -149,11 +151,11 @@ func TestGetContainerInfoWhenCadvisorFailed(t *testing.T) {
 }
 
 func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	fakeRuntime := testKubelet.fakeRuntime
-	fakeRuntime.PodList = []*kubecontainer.Pod{}
+	fakeRuntime.PodList = []*kubecontainertest.FakePod{}
 
 	stats, _ := kubelet.GetContainerInfo("qux", "", "foo", nil)
 	if stats != nil {
@@ -163,7 +165,7 @@ func TestGetContainerInfoOnNonExistContainer(t *testing.T) {
 }
 
 func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 	fakeRuntime := testKubelet.fakeRuntime
@@ -184,7 +186,7 @@ func TestGetContainerInfoWhenContainerRuntimeFailed(t *testing.T) {
 }
 
 func TestGetContainerInfoWithNoContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
 
@@ -202,12 +204,12 @@ func TestGetContainerInfoWithNoContainers(t *testing.T) {
 }
 
 func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
-	testKubelet := newTestKubelet(t)
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
 	fakeRuntime := testKubelet.fakeRuntime
 	kubelet := testKubelet.kubelet
 	mockCadvisor := testKubelet.fakeCadvisor
-	fakeRuntime.PodList = []*kubecontainer.Pod{
-		{
+	fakeRuntime.PodList = []*kubecontainertest.FakePod{
+		{Pod: &kubecontainer.Pod{
 			ID:        "12345678",
 			Name:      "qux",
 			Namespace: "ns",
@@ -216,6 +218,7 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 					ID: kubecontainer.ContainerID{Type: "test", ID: "fakeID"},
 				},
 			}},
+		},
 	}
 
 	stats, err := kubelet.GetContainerInfo("qux_ns", "", "foo", nil)
@@ -229,4 +232,38 @@ func TestGetContainerInfoWithNoMatchingContainers(t *testing.T) {
 		t.Errorf("non-nil stats when dockertools returned no containers")
 	}
 	mockCadvisor.AssertExpectations(t)
+}
+
+func TestHasDedicatedImageFs(t *testing.T) {
+	testCases := map[string]struct {
+		imageFsInfo cadvisorapiv2.FsInfo
+		rootFsInfo  cadvisorapiv2.FsInfo
+		expected    bool
+	}{
+		"has-dedicated-image-fs": {
+			imageFsInfo: cadvisorapiv2.FsInfo{Device: "123"},
+			rootFsInfo:  cadvisorapiv2.FsInfo{Device: "456"},
+			expected:    true,
+		},
+		"has-unified-image-fs": {
+			imageFsInfo: cadvisorapiv2.FsInfo{Device: "123"},
+			rootFsInfo:  cadvisorapiv2.FsInfo{Device: "123"},
+			expected:    false,
+		},
+	}
+	for testName, testCase := range testCases {
+		testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+		kubelet := testKubelet.kubelet
+		mockCadvisor := testKubelet.fakeCadvisor
+		mockCadvisor.On("Start").Return(nil)
+		mockCadvisor.On("ImagesFsInfo").Return(testCase.imageFsInfo, nil)
+		mockCadvisor.On("RootFsInfo").Return(testCase.rootFsInfo, nil)
+		actual, err := kubelet.HasDedicatedImageFs()
+		if err != nil {
+			t.Errorf("case: %s, unexpected error: %v", testName, err)
+		}
+		if actual != testCase.expected {
+			t.Errorf("case: %s, expected: %v, actual: %v", testName, testCase.expected, actual)
+		}
+	}
 }

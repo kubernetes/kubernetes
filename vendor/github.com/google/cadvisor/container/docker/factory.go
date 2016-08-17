@@ -19,27 +19,27 @@ import (
 	"fmt"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
+	"sync"
 
+	dockertypes "github.com/docker/engine-api/types"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
+	"github.com/google/cadvisor/devicemapper"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/manager/watcher"
+	dockerutil "github.com/google/cadvisor/utils/docker"
 
-	docker "github.com/fsouza/go-dockerclient"
+	docker "github.com/docker/engine-api/client"
 	"github.com/golang/glog"
+	"golang.org/x/net/context"
 )
 
 var ArgDockerEndpoint = flag.String("docker", "unix:///var/run/docker.sock", "docker endpoint")
 
 // The namespace under which Docker aliases are unique.
-var DockerNamespace = "docker"
-
-// Basepath to all container specific information that libcontainer stores.
-// TODO: Deprecate this flag
-var dockerRootDir = flag.String("docker_root", "/var/lib/docker", "Absolute path to the Docker state root directory (default: /var/lib/docker)")
-var dockerRunDir = flag.String("docker_run", "/var/run/docker", "Absolute path to the Docker run directory (default: /var/run/docker)")
+const DockerNamespace = "docker"
 
 // Regexp that identifies docker cgroups, containers started with
 // --cgroup-parent have another prefix than 'docker'
@@ -47,24 +47,30 @@ var dockerCgroupRegexp = regexp.MustCompile(`([a-z0-9]{64})`)
 
 var dockerEnvWhitelist = flag.String("docker_env_metadata_whitelist", "", "a comma-separated list of environment variable keys that needs to be collected for docker containers")
 
-// TODO(vmarmol): Export run dir too for newer Dockers.
-// Directory holding Docker container state information.
-func DockerStateDir() string {
-	return libcontainer.DockerStateDir(*dockerRootDir)
-}
+var (
+	// Basepath to all container specific information that libcontainer stores.
+	dockerRootDir string
 
-const (
-	dockerRootDirKey = "Root Dir"
+	dockerRootDirFlag = flag.String("docker_root", "/var/lib/docker", "DEPRECATED: docker root is read from docker info (this is a fallback, default: /var/lib/docker)")
+
+	dockerRootDirOnce sync.Once
 )
 
 func RootDir() string {
-	return *dockerRootDir
+	dockerRootDirOnce.Do(func() {
+		status, err := Status()
+		if err == nil && status.RootDir != "" {
+			dockerRootDir = status.RootDir
+		} else {
+			dockerRootDir = *dockerRootDirFlag
+		}
+	})
+	return dockerRootDir
 }
 
 type storageDriver string
 
 const (
-	// TODO: Add support for devicemapper storage usage.
 	devicemapperStorageDriver storageDriver = "devicemapper"
 	aufsStorageDriver         storageDriver = "aufs"
 	overlayStorageDriver      storageDriver = "overlay"
@@ -88,6 +94,8 @@ type dockerFactory struct {
 	dockerVersion []int
 
 	ignoreMetrics container.MetricSet
+
+	thinPoolWatcher *devicemapper.ThinPoolWatcher
 }
 
 func (self *dockerFactory) String() string {
@@ -114,6 +122,7 @@ func (self *dockerFactory) NewContainerHandler(name string, inHostNamespace bool
 		metadataEnvs,
 		self.dockerVersion,
 		self.ignoreMetrics,
+		self.thinPoolWatcher,
 	)
 	return
 }
@@ -146,7 +155,7 @@ func (self *dockerFactory) CanHandleAndAccept(name string) (bool, bool, error) {
 	id := ContainerNameToDockerId(name)
 
 	// We assume that if Inspect fails then the container is not known to docker.
-	ctnr, err := self.client.InspectContainer(id)
+	ctnr, err := self.client.ContainerInspect(context.Background(), id)
 	if err != nil || !ctnr.State.Running {
 		return false, canAccept, fmt.Errorf("error inspecting container: %v", err)
 	}
@@ -163,22 +172,29 @@ var (
 	version_re            = regexp.MustCompile(version_regexp_string)
 )
 
-// TODO: switch to a semantic versioning library.
-func parseDockerVersion(full_version_string string) ([]int, error) {
-	matches := version_re.FindAllStringSubmatch(full_version_string, -1)
-	if len(matches) != 1 {
-		return nil, fmt.Errorf("version string \"%v\" doesn't match expected regular expression: \"%v\"", full_version_string, version_regexp_string)
+func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolWatcher, error) {
+	_, err := devicemapper.ThinLsBinaryPresent()
+	if err != nil {
+		return nil, err
 	}
-	version_string_array := matches[0][1:]
-	version_array := make([]int, 3)
-	for index, version_string := range version_string_array {
-		version, err := strconv.Atoi(version_string)
-		if err != nil {
-			return nil, fmt.Errorf("error while parsing \"%v\" in \"%v\"", version_string, full_version_string)
-		}
-		version_array[index] = version
+
+	dockerThinPoolName, err := dockerutil.DockerThinPoolName(*dockerInfo)
+	if err != nil {
+		return nil, err
 	}
-	return version_array, nil
+
+	dockerMetadataDevice, err := dockerutil.DockerMetadataDevice(*dockerInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	thinPoolWatcher, err := devicemapper.NewThinPoolWatcher(dockerThinPoolName, dockerMetadataDevice)
+	if err != nil {
+		return nil, err
+	}
+
+	go thinPoolWatcher.Start()
+	return thinPoolWatcher, nil
 }
 
 // Register root container before running this function!
@@ -196,13 +212,17 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 	// Version already validated above, assume no error here.
 	dockerVersion, _ := parseDockerVersion(dockerInfo.ServerVersion)
 
-	storageDir := dockerInfo.DockerRootDir
-	if storageDir == "" {
-		storageDir = *dockerRootDir
-	}
 	cgroupSubsystems, err := libcontainer.GetCgroupSubsystems()
 	if err != nil {
 		return fmt.Errorf("failed to get cgroup subsystems: %v", err)
+	}
+
+	var thinPoolWatcher *devicemapper.ThinPoolWatcher
+	if storageDriver(dockerInfo.Driver) == devicemapperStorageDriver {
+		thinPoolWatcher, err = startThinPoolWatcher(dockerInfo)
+		if err != nil {
+			glog.Errorf("devicemapper filesystem stats will not be reported: %v", err)
+		}
 	}
 
 	glog.Infof("Registering Docker factory")
@@ -213,10 +233,11 @@ func Register(factory info.MachineInfoFactory, fsInfo fs.FsInfo, ignoreMetrics c
 		fsInfo:             fsInfo,
 		machineInfoFactory: factory,
 		storageDriver:      storageDriver(dockerInfo.Driver),
-		storageDir:         storageDir,
+		storageDir:         RootDir(),
 		ignoreMetrics:      ignoreMetrics,
+		thinPoolWatcher:    thinPoolWatcher,
 	}
 
-	container.RegisterContainerHandlerFactory(f)
+	container.RegisterContainerHandlerFactory(f, []watcher.ContainerWatchSource{watcher.Raw})
 	return nil
 }

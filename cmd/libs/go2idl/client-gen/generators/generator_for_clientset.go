@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -155,14 +155,15 @@ func NewForConfig(c *$.Config|raw$) (*Clientset, error) {
 	var err error
 $range .allGroups$    clientset.$.Group$Client, err =$.PackageName$.NewForConfig(&configShallowCopy)
 	if err!=nil {
-		return &clientset, err
+		return nil, err
 	}
 $end$
 	clientset.DiscoveryClient, err = $.NewDiscoveryClientForConfig|raw$(&configShallowCopy)
 	if err!=nil {
 		glog.Errorf("failed to create the DiscoveryClient: %v", err)
+		return nil, err
 	}
-	return &clientset, err
+	return &clientset, nil
 }
 `
 

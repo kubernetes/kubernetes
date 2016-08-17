@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -100,6 +100,10 @@ func (c *Client) Setup(t *testing.T) *Client {
 		c.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{
 			Host:          c.server.URL,
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
+		})
+		c.RbacClient = client.NewRbacOrDie(&restclient.Config{
+			Host:          c.server.URL,
+			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Rbac.GroupVersion()},
 		})
 
 		c.Clientset = clientset.NewForConfigOrDie(&restclient.Config{Host: c.server.URL})
@@ -220,11 +224,11 @@ func validateFields(a, b string) bool {
 
 func (c *Client) body(t *testing.T, obj runtime.Object, raw *string) *string {
 	if obj != nil {
-		fqKind, err := api.Scheme.ObjectKind(obj)
+		fqKinds, _, err := api.Scheme.ObjectKinds(obj)
 		if err != nil {
 			t.Errorf("unexpected encoding error: %v", err)
 		}
-		groupName := fqKind.GroupVersion().Group
+		groupName := fqKinds[0].GroupVersion().Group
 		if c.ResourceGroup != "" {
 			groupName = c.ResourceGroup
 		}

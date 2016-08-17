@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -153,7 +153,60 @@ func kindMatches(pattern unversioned.GroupVersionKind, kind unversioned.GroupVer
 }
 
 func (m PriorityRESTMapper) RESTMapping(gk unversioned.GroupKind, versions ...string) (mapping *RESTMapping, err error) {
-	return m.Delegate.RESTMapping(gk, versions...)
+	mappings, err := m.Delegate.RESTMappings(gk)
+	if err != nil {
+		return nil, err
+	}
+
+	// any versions the user provides take priority
+	priorities := m.KindPriority
+	if len(versions) > 0 {
+		priorities = make([]unversioned.GroupVersionKind, 0, len(m.KindPriority)+len(versions))
+		for _, version := range versions {
+			gv, err := unversioned.ParseGroupVersion(version)
+			if err != nil {
+				return nil, err
+			}
+			priorities = append(priorities, gv.WithKind(AnyKind))
+		}
+		priorities = append(priorities, m.KindPriority...)
+	}
+
+	remaining := append([]*RESTMapping{}, mappings...)
+	for _, pattern := range priorities {
+		var matching []*RESTMapping
+		for _, m := range remaining {
+			if kindMatches(pattern, m.GroupVersionKind) {
+				matching = append(matching, m)
+			}
+		}
+
+		switch len(matching) {
+		case 0:
+			// if you have no matches, then nothing matched this pattern just move to the next
+			continue
+		case 1:
+			// one match, return
+			return matching[0], nil
+		default:
+			// more than one match, use the matched hits as the list moving to the next pattern.
+			// this way you can have a series of selection criteria
+			remaining = matching
+		}
+	}
+	if len(remaining) == 1 {
+		return remaining[0], nil
+	}
+
+	var kinds []unversioned.GroupVersionKind
+	for _, m := range mappings {
+		kinds = append(kinds, m.GroupVersionKind)
+	}
+	return nil, &AmbiguousKindError{PartialKind: gk.WithVersion(""), MatchingKinds: kinds}
+}
+
+func (m PriorityRESTMapper) RESTMappings(gk unversioned.GroupKind) ([]*RESTMapping, error) {
+	return m.Delegate.RESTMappings(gk)
 }
 
 func (m PriorityRESTMapper) AliasesForResource(alias string) (aliases []string, ok bool) {

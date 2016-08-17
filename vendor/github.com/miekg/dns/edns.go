@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"net"
@@ -17,6 +18,7 @@ const (
 	EDNS0N3U         = 0x7     // NSEC3 Hash Understood
 	EDNS0SUBNET      = 0x8     // client-subnet (RFC6891)
 	EDNS0EXPIRE      = 0x9     // EDNS0 expire
+	EDNS0COOKIE      = 0xa     // EDNS0 Cookie
 	EDNS0SUBNETDRAFT = 0x50fa  // Don't use! Use EDNS0SUBNET
 	EDNS0LOCALSTART  = 0xFDE9  // Beginning of range reserved for local/experimental use (RFC6891)
 	EDNS0LOCALEND    = 0xFFFE  // End of range reserved for local/experimental use (RFC6891)
@@ -56,6 +58,8 @@ func (rr *OPT) String() string {
 			if o.(*EDNS0_SUBNET).DraftOption {
 				s += " (draft)"
 			}
+		case *EDNS0_COOKIE:
+			s += "\n; COOKIE: " + o.String()
 		case *EDNS0_UL:
 			s += "\n; UPDATE LEASE: " + o.String()
 		case *EDNS0_LLQ:
@@ -96,13 +100,16 @@ func (rr *OPT) SetVersion(v uint8) {
 }
 
 // ExtendedRcode returns the EDNS extended RCODE field (the upper 8 bits of the TTL).
-func (rr *OPT) ExtendedRcode() uint8 {
-	return uint8((rr.Hdr.Ttl & 0xFF000000) >> 24)
+func (rr *OPT) ExtendedRcode() int {
+	return int((rr.Hdr.Ttl&0xFF000000)>>24) + 15
 }
 
 // SetExtendedRcode sets the EDNS extended RCODE field.
 func (rr *OPT) SetExtendedRcode(v uint8) {
-	rr.Hdr.Ttl = rr.Hdr.Ttl&0x00FFFFFF | (uint32(v) << 24)
+	if v < RcodeBadVers { // Smaller than 16.. Use the 4 bits you have!
+		return
+	}
+	rr.Hdr.Ttl = rr.Hdr.Ttl&0x00FFFFFF | (uint32(v-15) << 24)
 }
 
 // UDPSize returns the UDP buffer size.
@@ -125,8 +132,7 @@ func (rr *OPT) SetDo() {
 	rr.Hdr.Ttl |= _DO
 }
 
-// EDNS0 defines an EDNS0 Option. An OPT RR can have multiple options appended to
-// it.
+// EDNS0 defines an EDNS0 Option. An OPT RR can have multiple options appended to it.
 type EDNS0 interface {
 	// Option returns the option code for the option.
 	Option() uint16
@@ -207,7 +213,7 @@ func (e *EDNS0_SUBNET) Option() uint16 {
 
 func (e *EDNS0_SUBNET) pack() ([]byte, error) {
 	b := make([]byte, 4)
-	b[0], b[1] = packUint16(e.Family)
+	binary.BigEndian.PutUint16(b[0:], e.Family)
 	b[2] = e.SourceNetmask
 	b[3] = e.SourceScope
 	switch e.Family {
@@ -241,7 +247,7 @@ func (e *EDNS0_SUBNET) unpack(b []byte) error {
 	if len(b) < 4 {
 		return ErrBuf
 	}
-	e.Family, _ = unpackUint16(b, 0)
+	e.Family = binary.BigEndian.Uint16(b)
 	e.SourceNetmask = b[2]
 	e.SourceScope = b[3]
 	switch e.Family {
@@ -283,6 +289,41 @@ func (e *EDNS0_SUBNET) String() (s string) {
 	return
 }
 
+// The Cookie EDNS0 option
+//
+//	o := new(dns.OPT)
+//	o.Hdr.Name = "."
+//	o.Hdr.Rrtype = dns.TypeOPT
+//	e := new(dns.EDNS0_COOKIE)
+//	e.Code = dns.EDNS0COOKIE
+//	e.Cookie = "24a5ac.."
+//	o.Option = append(o.Option, e)
+//
+// The Cookie field consists out of a client cookie (RFC 7873 Section 4), that is
+// always 8 bytes. It may then optionally be followed by the server cookie. The server
+// cookie is of variable length, 8 to a maximum of 32 bytes. In other words:
+//
+//	cCookie := o.Cookie[:16]
+//	sCookie := o.Cookie[16:]
+//
+// There is no guarantee that the Cookie string has a specific length.
+type EDNS0_COOKIE struct {
+	Code   uint16 // Always EDNS0COOKIE
+	Cookie string // Hex-encoded cookie data
+}
+
+func (e *EDNS0_COOKIE) pack() ([]byte, error) {
+	h, err := hex.DecodeString(e.Cookie)
+	if err != nil {
+		return nil, err
+	}
+	return h, nil
+}
+
+func (e *EDNS0_COOKIE) Option() uint16        { return EDNS0COOKIE }
+func (e *EDNS0_COOKIE) unpack(b []byte) error { e.Cookie = hex.EncodeToString(b); return nil }
+func (e *EDNS0_COOKIE) String() string        { return e.Cookie }
+
 // The EDNS0_UL (Update Lease) (draft RFC) option is used to tell the server to set
 // an expiration on an update RR. This is helpful for clients that cannot clean
 // up after themselves. This is a draft RFC and more information can be found at
@@ -306,10 +347,7 @@ func (e *EDNS0_UL) String() string { return strconv.FormatUint(uint64(e.Lease), 
 // Copied: http://golang.org/src/pkg/net/dnsmsg.go
 func (e *EDNS0_UL) pack() ([]byte, error) {
 	b := make([]byte, 4)
-	b[0] = byte(e.Lease >> 24)
-	b[1] = byte(e.Lease >> 16)
-	b[2] = byte(e.Lease >> 8)
-	b[3] = byte(e.Lease)
+	binary.BigEndian.PutUint32(b, e.Lease)
 	return b, nil
 }
 
@@ -317,7 +355,7 @@ func (e *EDNS0_UL) unpack(b []byte) error {
 	if len(b) < 4 {
 		return ErrBuf
 	}
-	e.Lease = uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
+	e.Lease = binary.BigEndian.Uint32(b)
 	return nil
 }
 
@@ -336,21 +374,11 @@ func (e *EDNS0_LLQ) Option() uint16 { return EDNS0LLQ }
 
 func (e *EDNS0_LLQ) pack() ([]byte, error) {
 	b := make([]byte, 18)
-	b[0], b[1] = packUint16(e.Version)
-	b[2], b[3] = packUint16(e.Opcode)
-	b[4], b[5] = packUint16(e.Error)
-	b[6] = byte(e.Id >> 56)
-	b[7] = byte(e.Id >> 48)
-	b[8] = byte(e.Id >> 40)
-	b[9] = byte(e.Id >> 32)
-	b[10] = byte(e.Id >> 24)
-	b[11] = byte(e.Id >> 16)
-	b[12] = byte(e.Id >> 8)
-	b[13] = byte(e.Id)
-	b[14] = byte(e.LeaseLife >> 24)
-	b[15] = byte(e.LeaseLife >> 16)
-	b[16] = byte(e.LeaseLife >> 8)
-	b[17] = byte(e.LeaseLife)
+	binary.BigEndian.PutUint16(b[0:], e.Version)
+	binary.BigEndian.PutUint16(b[2:], e.Opcode)
+	binary.BigEndian.PutUint16(b[4:], e.Error)
+	binary.BigEndian.PutUint64(b[6:], e.Id)
+	binary.BigEndian.PutUint32(b[14:], e.LeaseLife)
 	return b, nil
 }
 
@@ -358,12 +386,11 @@ func (e *EDNS0_LLQ) unpack(b []byte) error {
 	if len(b) < 18 {
 		return ErrBuf
 	}
-	e.Version, _ = unpackUint16(b, 0)
-	e.Opcode, _ = unpackUint16(b, 2)
-	e.Error, _ = unpackUint16(b, 4)
-	e.Id = uint64(b[6])<<56 | uint64(b[6+1])<<48 | uint64(b[6+2])<<40 |
-		uint64(b[6+3])<<32 | uint64(b[6+4])<<24 | uint64(b[6+5])<<16 | uint64(b[6+6])<<8 | uint64(b[6+7])
-	e.LeaseLife = uint32(b[14])<<24 | uint32(b[14+1])<<16 | uint32(b[14+2])<<8 | uint32(b[14+3])
+	e.Version = binary.BigEndian.Uint16(b[0:])
+	e.Opcode = binary.BigEndian.Uint16(b[2:])
+	e.Error = binary.BigEndian.Uint16(b[4:])
+	e.Id = binary.BigEndian.Uint64(b[6:])
+	e.LeaseLife = binary.BigEndian.Uint32(b[14:])
 	return nil
 }
 
@@ -459,7 +486,7 @@ func (e *EDNS0_EXPIRE) unpack(b []byte) error {
 	if len(b) < 4 {
 		return ErrBuf
 	}
-	e.Expire = uint32(b[0])<<24 | uint32(b[1])<<16 | uint32(b[2])<<8 | uint32(b[3])
+	e.Expire = binary.BigEndian.Uint32(b)
 	return nil
 }
 

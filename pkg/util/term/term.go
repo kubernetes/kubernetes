@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,17 +21,22 @@ import (
 	"os"
 
 	"github.com/docker/docker/pkg/term"
+
 	"k8s.io/kubernetes/pkg/util/interrupt"
 )
 
 // SafeFunc is a function to be invoked by TTY.
 type SafeFunc func() error
 
-// TTY helps invoke a function and preserve the state of the terminal, even if the
-// process is terminated during execution.
+// TTY helps invoke a function and preserve the state of the terminal, even if the process is
+// terminated during execution. It also provides support for terminal resizing for remote command
+// execution/attachment.
 type TTY struct {
-	// In is a reader to check for a terminal.
+	// In is a reader representing stdin. It is a required field.
 	In io.Reader
+	// Out is a writer representing stdout. It must be set to support terminal resizing. It is an
+	// optional field.
+	Out io.Writer
 	// Raw is true if the terminal should be set raw.
 	Raw bool
 	// TryDev indicates the TTY should try to open /dev/tty if the provided input
@@ -41,17 +46,28 @@ type TTY struct {
 	// it will be invoked after the terminal state is restored. If it is not provided,
 	// a signal received during the TTY will result in os.Exit(0) being invoked.
 	Parent *interrupt.Handler
+
+	// sizeQueue is set after a call to MonitorSize() and is used to monitor SIGWINCH signals when the
+	// user's terminal resizes.
+	sizeQueue *sizeQueue
 }
 
-// fd returns a file descriptor for a given object.
-type fd interface {
-	Fd() uintptr
-}
-
-// IsTerminal returns true if the provided input is a terminal. Does not check /dev/tty
+// IsTerminalIn returns true if t.In is a terminal. Does not check /dev/tty
 // even if TryDev is set.
-func (t TTY) IsTerminal() bool {
+func (t TTY) IsTerminalIn() bool {
 	return IsTerminal(t.In)
+}
+
+// IsTerminalOut returns true if t.Out is a terminal. Does not check /dev/tty
+// even if TryDev is set.
+func (t TTY) IsTerminalOut() bool {
+	return IsTerminal(t.Out)
+}
+
+// IsTerminal returns whether the passed object is a terminal or not
+func IsTerminal(i interface{}) bool {
+	_, terminal := term.GetFdInfo(i)
+	return terminal
 }
 
 // Safe invokes the provided function and will attempt to ensure that when the
@@ -61,22 +77,16 @@ func (t TTY) IsTerminal() bool {
 // If the input file descriptor is not a TTY and TryDev is true, the /dev/tty file
 // will be opened (if available).
 func (t TTY) Safe(fn SafeFunc) error {
-	in := t.In
+	inFd, isTerminal := term.GetFdInfo(t.In)
 
-	var hasFd bool
-	var inFd uintptr
-	if desc, ok := in.(fd); ok && in != nil {
-		inFd = desc.Fd()
-		hasFd = true
-	}
-	if t.TryDev && (!hasFd || !term.IsTerminal(inFd)) {
+	if !isTerminal && t.TryDev {
 		if f, err := os.Open("/dev/tty"); err == nil {
 			defer f.Close()
 			inFd = f.Fd()
-			hasFd = true
+			isTerminal = term.IsTerminal(inFd)
 		}
 	}
-	if !hasFd || !term.IsTerminal(inFd) {
+	if !isTerminal {
 		return fn()
 	}
 
@@ -90,11 +100,11 @@ func (t TTY) Safe(fn SafeFunc) error {
 	if err != nil {
 		return err
 	}
-	return interrupt.Chain(t.Parent, func() { term.RestoreTerminal(inFd, state) }).Run(fn)
-}
+	return interrupt.Chain(t.Parent, func() {
+		if t.sizeQueue != nil {
+			t.sizeQueue.stop()
+		}
 
-// IsTerminal returns whether the passed io.Reader is a terminal or not
-func IsTerminal(r io.Reader) bool {
-	file, ok := r.(fd)
-	return ok && term.IsTerminal(file.Fd())
+		term.RestoreTerminal(inFd, state)
+	}).Run(fn)
 }

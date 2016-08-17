@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -58,7 +58,7 @@ func TestReplicaSetStrategy(t *testing.T) {
 		},
 	}
 
-	Strategy.PrepareForCreate(rs)
+	Strategy.PrepareForCreate(ctx, rs)
 	if rs.Status.Replicas != 0 {
 		t.Error("ReplicaSet should not allow setting status.replicas on create")
 	}
@@ -73,7 +73,7 @@ func TestReplicaSetStrategy(t *testing.T) {
 	invalidRc := &extensions.ReplicaSet{
 		ObjectMeta: api.ObjectMeta{Name: "bar", ResourceVersion: "4"},
 	}
-	Strategy.PrepareForUpdate(invalidRc, rs)
+	Strategy.PrepareForUpdate(ctx, invalidRc, rs)
 	errs = Strategy.ValidateUpdate(ctx, invalidRc, rs)
 	if len(errs) == 0 {
 		t.Errorf("Expected a validation error")
@@ -128,7 +128,7 @@ func TestReplicaSetStatusStrategy(t *testing.T) {
 			ObservedGeneration: int64(11),
 		},
 	}
-	StatusStrategy.PrepareForUpdate(newRS, oldRS)
+	StatusStrategy.PrepareForUpdate(ctx, newRS, oldRS)
 	if newRS.Status.Replicas != 3 {
 		t.Errorf("ReplicaSet status updates should allow change of replicas: %v", newRS.Status.Replicas)
 	}

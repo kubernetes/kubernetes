@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru"
 
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 
@@ -89,7 +89,7 @@ func (l *limitRanger) Admit(a admission.Attributes) (err error) {
 	}
 	items, err := l.indexer.Index("namespace", key)
 	if err != nil {
-		return admission.NewForbidden(a, fmt.Errorf("Unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
+		return admission.NewForbidden(a, fmt.Errorf("unable to %s %v at this time because there was an error enforcing limit ranges", a.GetOperation(), a.GetResource()))
 	}
 
 	// if there are no items held in our indexer, check our live-lookup LRU, if that misses, do the live lookup to prime it.
@@ -288,13 +288,13 @@ func minConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !reqExists {
-		return fmt.Errorf("Minimum %s usage per %s is %s.  No request is specified.", resourceName, limitType, enforced.String())
+		return fmt.Errorf("minimum %s usage per %s is %s.  No request is specified.", resourceName, limitType, enforced.String())
 	}
 	if observedReqValue < enforcedValue {
-		return fmt.Errorf("Minimum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
+		return fmt.Errorf("minimum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
 	}
 	if limExists && (observedLimValue < enforcedValue) {
-		return fmt.Errorf("Minimum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
+		return fmt.Errorf("minimum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
 	}
 	return nil
 }
@@ -306,13 +306,13 @@ func maxConstraint(limitType api.LimitType, resourceName api.ResourceName, enfor
 	observedReqValue, observedLimValue, enforcedValue := requestLimitEnforcedValues(req, lim, enforced)
 
 	if !limExists {
-		return fmt.Errorf("Maximum %s usage per %s is %s.  No limit is specified.", resourceName, limitType, enforced.String())
+		return fmt.Errorf("maximum %s usage per %s is %s.  No limit is specified.", resourceName, limitType, enforced.String())
 	}
 	if observedLimValue > enforcedValue {
-		return fmt.Errorf("Maximum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
+		return fmt.Errorf("maximum %s usage per %s is %s, but limit is %s.", resourceName, limitType, enforced.String(), lim.String())
 	}
 	if reqExists && (observedReqValue > enforcedValue) {
-		return fmt.Errorf("Maximum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
+		return fmt.Errorf("maximum %s usage per %s is %s, but request is %s.", resourceName, limitType, enforced.String(), req.String())
 	}
 	return nil
 }
@@ -384,7 +384,7 @@ func sum(inputs []api.ResourceList) api.ResourceList {
 	return result
 }
 
-// DefaultLimitRangerActions is the default implementatation of LimitRangerActions.
+// DefaultLimitRangerActions is the default implementation of LimitRangerActions.
 type DefaultLimitRangerActions struct{}
 
 // ensure DefaultLimitRangerActions implements the LimitRangerActions interface.
@@ -432,6 +432,24 @@ func PodLimitFunc(limitRange *api.LimitRange, pod *api.Pod) error {
 		if limitType == api.LimitTypeContainer {
 			for j := range pod.Spec.Containers {
 				container := &pod.Spec.Containers[j]
+				for k, v := range limit.Min {
+					if err := minConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
+					}
+				}
+				for k, v := range limit.Max {
+					if err := maxConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
+					}
+				}
+				for k, v := range limit.MaxLimitRequestRatio {
+					if err := limitRequestRatioConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
+						errs = append(errs, err)
+					}
+				}
+			}
+			for j := range pod.Spec.InitContainers {
+				container := &pod.Spec.InitContainers[j]
 				for k, v := range limit.Min {
 					if err := minConstraint(limitType, k, v, container.Resources.Requests, container.Resources.Limits); err != nil {
 						errs = append(errs, err)

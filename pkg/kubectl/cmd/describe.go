@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,6 +21,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
@@ -39,36 +40,39 @@ type DescribeOptions struct {
 	Recursive bool
 }
 
-const (
-	describe_long = `Show details of a specific resource or group of resources.
+var (
+	describe_long = dedent.Dedent(`
+		Show details of a specific resource or group of resources.
+		This command joins many API calls together to form a detailed description of a
+		given resource or group of resources.
 
-This command joins many API calls together to form a detailed description of a
-given resource or group of resources.
+		$ kubectl describe TYPE NAME_PREFIX
 
-$ kubectl describe TYPE NAME_PREFIX
+		will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
+		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.
 
-will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
-exists, it will output details for every resource that has a name prefixed with NAME_PREFIX
+		`) +
+		kubectl.PossibleResourceTypes
 
-` + kubectl.PossibleResourceTypes
-	describe_example = `# Describe a node
-kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
+	describe_example = dedent.Dedent(`
+		# Describe a node
+		kubectl describe nodes kubernetes-minion-emt8.c.myproject.internal
 
-# Describe a pod
-kubectl describe pods/nginx
+		# Describe a pod
+		kubectl describe pods/nginx
 
-# Describe a pod identified by type and name in "pod.json"
-kubectl describe -f pod.json
+		# Describe a pod identified by type and name in "pod.json"
+		kubectl describe -f pod.json
 
-# Describe all pods
-kubectl describe pods
+		# Describe all pods
+		kubectl describe pods
 
-# Describe pods by label name=myLabel
-kubectl describe po -l name=myLabel
+		# Describe pods by label name=myLabel
+		kubectl describe po -l name=myLabel
 
-# Describe all pods managed by the 'frontend' replication controller (rc-created pods
-# get the name of the rc as a prefix in the pod the name).
-kubectl describe pods frontend`
+		# Describe all pods managed by the 'frontend' replication controller (rc-created pods
+		# get the name of the rc as a prefix in the pod the name).
+		kubectl describe pods frontend`)
 )
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
@@ -94,6 +98,7 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
+	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&describerSettings.ShowEvents, "show-events", true, "If true, display events related to the described object.")
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 	return cmd
@@ -101,9 +106,13 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *DescribeOptions, describerSettings *kubectl.DescriberSettings) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
+	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
+	}
+	if allNamespaces {
+		enforceNamespace = false
 	}
 	if len(args) == 0 && len(options.Filenames) == 0 {
 		fmt.Fprint(out, "You must specify the type of resource to describe. ", valid_resources)
@@ -113,7 +122,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
-		NamespaceParam(cmdNamespace).DefaultNamespace().
+		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
 		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).

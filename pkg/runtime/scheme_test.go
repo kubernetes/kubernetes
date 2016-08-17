@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -354,10 +354,11 @@ func TestUnversionedTypes(t *testing.T) {
 		t.Fatalf("type not unversioned and in scheme: %t %t", unv, ok)
 	}
 
-	kind, err := scheme.ObjectKind(&InternalSimple{})
+	kinds, _, err := scheme.ObjectKinds(&InternalSimple{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	kind := kinds[0]
 	if kind != externalGV.WithKind("InternalSimple") {
 		t.Fatalf("unexpected: %#v", kind)
 	}

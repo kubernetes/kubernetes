@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,10 +19,11 @@ package apiserver
 import (
 	"net/http"
 
+	"time"
+
 	"k8s.io/kubernetes/pkg/probe"
 	httpprober "k8s.io/kubernetes/pkg/probe/http"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
-	"time"
 )
 
 const (

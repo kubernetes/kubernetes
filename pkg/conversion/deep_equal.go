@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 package conversion
 
 import (
-	"k8s.io/kubernetes/third_party/forked/reflect"
+	"k8s.io/kubernetes/third_party/forked/golang/reflect"
 )
 
 // The code for this type must be located in third_party, since it forks from
@@ -26,7 +26,7 @@ type Equalities struct {
 	reflect.Equalities
 }
 
-// For convenience, panics on errrors
+// For convenience, panics on errors
 func EqualitiesOrDie(funcs ...interface{}) Equalities {
 	e := Equalities{reflect.Equalities{}}
 	if err := e.AddFuncs(funcs...); err != nil {

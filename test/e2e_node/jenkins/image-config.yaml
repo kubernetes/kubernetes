@@ -1,0 +1,21 @@
+# To copy an image between projects:
+# `gcloud compute --project <to-project> disks create <image name> --image=https://www.googleapis.com/compute/v1/projects/<from-project>/global/images/<image-name>`
+# `gcloud compute --project <to-project> images create <image-name> --source-disk=<image-name>`
+images:
+  ubuntu-docker9:
+    image: e2e-node-ubuntu-trusty-docker9-v1-image
+    project: kubernetes-node-e2e-images
+  ubuntu-docker10:
+    image: e2e-node-ubuntu-trusty-docker10-v1-image
+    project: kubernetes-node-e2e-images
+  coreos-alpha:
+    image: coreos-alpha-1122-0-0-v20160727
+    project: coreos-cloud
+    metadata: "user-data<test/e2e_node/jenkins/coreos-init.yaml"
+  containervm:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+  gci-family:
+    image_regex: gci-dev-.*
+    project: google-containers
+    metadata: "user-data<test/e2e_node/jenkins/gci-init.yaml"

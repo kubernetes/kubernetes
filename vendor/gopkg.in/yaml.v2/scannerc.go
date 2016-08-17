@@ -1546,7 +1546,7 @@ func yaml_parser_scan_directive(parser *yaml_parser_t, token *yaml_token_t) bool
 		// Unknown directive.
 	} else {
 		yaml_parser_set_scanner_error(parser, "while scanning a directive",
-			start_mark, "found unknown directive name")
+			start_mark, "found uknown directive name")
 		return false
 	}
 

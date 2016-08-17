@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 	"time"
@@ -43,7 +44,7 @@ import (
 )
 
 // NewOIDCProvider provides a bare minimum OIDC IdP Server useful for testing.
-func NewOIDCProvider(t *testing.T) *OIDCProvider {
+func NewOIDCProvider(t *testing.T, issuerPath string) *OIDCProvider {
 	privKey, err := key.GeneratePrivateKey()
 	if err != nil {
 		t.Fatalf("Cannot create OIDC Provider: %v", err)
@@ -51,20 +52,22 @@ func NewOIDCProvider(t *testing.T) *OIDCProvider {
 	}
 
 	op := &OIDCProvider{
-		Mux:     http.NewServeMux(),
-		PrivKey: privKey,
+		Mux:        http.NewServeMux(),
+		PrivKey:    privKey,
+		issuerPath: issuerPath,
 	}
 
-	op.Mux.HandleFunc("/.well-known/openid-configuration", op.handleConfig)
-	op.Mux.HandleFunc("/keys", op.handleKeys)
+	op.Mux.HandleFunc(path.Join(issuerPath, "/.well-known/openid-configuration"), op.handleConfig)
+	op.Mux.HandleFunc(path.Join(issuerPath, "/keys"), op.handleKeys)
 
 	return op
 }
 
 type OIDCProvider struct {
-	Mux     *http.ServeMux
-	PCFG    oidc.ProviderConfig
-	PrivKey *key.PrivateKey
+	Mux        *http.ServeMux
+	PCFG       oidc.ProviderConfig
+	PrivKey    *key.PrivateKey
+	issuerPath string
 }
 
 func (op *OIDCProvider) ServeTLSWithKeyPair(cert, key string) (*httptest.Server, error) {
@@ -77,20 +80,31 @@ func (op *OIDCProvider) ServeTLSWithKeyPair(cert, key string) (*httptest.Server,
 		return nil, fmt.Errorf("Cannot load cert/key pair: %v", err)
 	}
 	srv.StartTLS()
-	return srv, nil
-}
 
-func (op *OIDCProvider) AddMinimalProviderConfig(srv *httptest.Server) {
+	// The issuer's URL is extended by an optional path. This ensures that the plugin can
+	// handle issuers that use a non-root path for discovery (see kubernetes/kubernetes#29749).
+	srv.URL = srv.URL + op.issuerPath
+
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		return nil, err
+	}
+	pathFor := func(p string) *url.URL {
+		u2 := *u // Shallow copy.
+		u2.Path = path.Join(u2.Path, p)
+		return &u2
+	}
+
 	op.PCFG = oidc.ProviderConfig{
-		Issuer:                  MustParseURL(srv.URL),
-		AuthEndpoint:            MustParseURL(srv.URL + "/auth"),
-		TokenEndpoint:           MustParseURL(srv.URL + "/token"),
-		KeysEndpoint:            MustParseURL(srv.URL + "/keys"),
+		Issuer:                  u,
+		AuthEndpoint:            pathFor("/auth"),
+		TokenEndpoint:           pathFor("/token"),
+		KeysEndpoint:            pathFor("/keys"),
 		ResponseTypesSupported:  []string{"code"},
 		SubjectTypesSupported:   []string{"public"},
 		IDTokenSigningAlgValues: []string{"RS256"},
 	}
-
+	return srv, nil
 }
 
 func (op *OIDCProvider) handleConfig(w http.ResponseWriter, req *http.Request) {
@@ -120,14 +134,6 @@ func (op *OIDCProvider) handleKeys(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("Expires", time.Now().Add(time.Hour).Format(time.RFC1123))
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(b)
-}
-
-func MustParseURL(s string) *url.URL {
-	u, err := url.Parse(s)
-	if err != nil {
-		panic(fmt.Errorf("Failed to parse url: %v", err))
-	}
-	return u
 }
 
 // generateSelfSignedCert generates a self-signed cert/key pairs and writes to the certPath/keyPath.

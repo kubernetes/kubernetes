@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -130,12 +130,11 @@ func TestAuthorizeV0(t *testing.T) {
 
 			ResourceRequest: len(tc.NS) > 0 || len(tc.Resource) > 0,
 		}
-		err := a.Authorize(attr)
-		actualAllow := bool(err == nil)
-		if tc.ExpectAllow != actualAllow {
+		authorized, _, _ := a.Authorize(attr)
+		if tc.ExpectAllow != authorized {
 			t.Logf("tc: %v -> attr %v", tc, attr)
 			t.Errorf("%d: Expected allowed=%v but actually allowed=%v\n\t%v",
-				i, tc.ExpectAllow, actualAllow, tc)
+				i, tc.ExpectAllow, authorized, tc)
 		}
 	}
 }
@@ -250,11 +249,10 @@ func TestAuthorizeV1beta1(t *testing.T) {
 			Path:            tc.Path,
 		}
 		// t.Logf("tc %2v: %v -> attr %v", i, tc, attr)
-		err := a.Authorize(attr)
-		actualAllow := bool(err == nil)
-		if tc.ExpectAllow != actualAllow {
+		authorized, _, _ := a.Authorize(attr)
+		if tc.ExpectAllow != authorized {
 			t.Errorf("%d: Expected allowed=%v but actually allowed=%v, for case %+v & %+v",
-				i, tc.ExpectAllow, actualAllow, tc, attr)
+				i, tc.ExpectAllow, authorized, tc, attr)
 		}
 	}
 }

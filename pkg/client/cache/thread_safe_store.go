@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -261,12 +261,13 @@ func (c *threadSafeMap) deleteFromIndices(obj interface{}, key string) error {
 		}
 
 		index := c.indices[name]
+		if index == nil {
+			continue
+		}
 		for _, indexValue := range indexValues {
-			if index != nil {
-				set := index[indexValue]
-				if set != nil {
-					set.Delete(key)
-				}
+			set := index[indexValue]
+			if set != nil {
+				set.Delete(key)
 			}
 		}
 	}

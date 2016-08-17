@@ -1,0 +1,630 @@
+// To regenerate api.pb.go run hack/update-generated-runtime.sh
+syntax = 'proto2';
+
+package runtime;
+
+// Runtime service defines the public APIs for remote container runtimes
+service RuntimeService {
+    // Version returns the runtime name, runtime version and runtime API version
+    rpc Version(VersionRequest) returns (VersionResponse) {}
+
+    // CreatePodSandbox creates a pod-level sandbox.
+    // The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
+    rpc CreatePodSandbox(CreatePodSandboxRequest) returns (CreatePodSandboxResponse) {}
+    // StopPodSandbox stops the running sandbox. If there are any running
+    // containers in the sandbox, they should be forcibly terminated.
+    rpc StopPodSandbox(StopPodSandboxRequest) returns (StopPodSandboxResponse) {}
+    // RemovePodSandbox removes the sandbox. If there are any running containers in the
+    // sandbox, they should be forcibly removed.
+    // It should return success if the sandbox has already been removed.
+    rpc RemovePodSandbox(RemovePodSandboxRequest) returns (RemovePodSandboxResponse) {}
+    // PodSandboxStatus returns the status of the PodSandbox.
+    rpc PodSandboxStatus(PodSandboxStatusRequest) returns (PodSandboxStatusResponse) {}
+    // ListPodSandbox returns a list of SandBox.
+    rpc ListPodSandbox(ListPodSandboxRequest) returns (ListPodSandboxResponse) {}
+
+    // CreateContainer creates a new container in specified PodSandbox
+    rpc CreateContainer(CreateContainerRequest) returns (CreateContainerResponse) {}
+    // StartContainer starts the container.
+    rpc StartContainer(StartContainerRequest) returns (StartContainerResponse) {}
+    // StopContainer stops a running container with a grace period (i.e., timeout).
+    rpc StopContainer(StopContainerRequest) returns (StopContainerResponse) {}
+    // RemoveContainer removes the container. If the container is running, the
+    // container should be forcibly removed.
+    // It should return success if the container has already been removed.
+    rpc RemoveContainer(RemoveContainerRequest) returns (RemoveContainerResponse) {}
+    // ListContainers lists all containers by filters.
+    rpc ListContainers(ListContainersRequest) returns (ListContainersResponse) {}
+    // ContainerStatus returns status of the container.
+    rpc ContainerStatus(ContainerStatusRequest) returns (ContainerStatusResponse) {}
+
+    // Exec executes the command in the container.
+    rpc Exec(stream ExecRequest) returns (stream ExecResponse) {}
+}
+
+// Image service defines the public APIs for managing images
+service ImageService {
+    // ListImages lists existing images.
+    rpc ListImages(ListImagesRequest) returns (ListImagesResponse) {}
+    // ImageStatus returns the status of the image.
+    rpc ImageStatus(ImageStatusRequest) returns (ImageStatusResponse) {}
+    // PullImage pulls an image with authentication config.
+    rpc PullImage(PullImageRequest) returns (PullImageResponse) {}
+    // RemoveImage removes the image.
+    // It should return success if the image has already been removed.
+    rpc RemoveImage(RemoveImageRequest) returns (RemoveImageResponse) {}
+}
+
+message VersionRequest {
+    // The version of kubelet runtime API.
+    optional string version = 1;
+}
+
+message VersionResponse {
+    // The version of the kubelet runtime API.
+    optional string version = 1;
+    // The name of the container runtime.
+    optional string runtime_name = 2;
+    // The version of the container runtime.
+    optional string runtime_version = 3;
+    // The API version of the container runtime.
+    optional string runtime_api_version = 4;
+}
+
+// DNSOption specifies the DNS servers and search domains.
+message DNSOption {
+    // List of DNS servers of the cluster.
+    repeated string servers = 1;
+    // List of DNS search domains of the cluster.
+    repeated string searches = 2;
+}
+
+enum Protocol {
+    TCP = 0;
+    UDP = 1;
+}
+
+// PortMapping specifies the port mapping configurations of sandbox
+message PortMapping {
+    // The name of the port mapping
+    optional string name = 1;
+    // The protocol of the port mapping.
+    optional Protocol protocol = 2;
+    // The port number within the container.
+    optional int32 container_port = 3;
+    // The port number on the host.
+    optional int32 host_port = 4;
+    // The host IP.
+    optional string host_ip = 5;
+}
+
+// Mount specifies the volume mount for the sandbox
+message Mount {
+    // The name of the volume mount.
+    optional string name = 1;
+    // The path of the mount within the container.
+    optional string container_path = 2;
+    // The path of the mount on the host.
+    optional string host_path = 3;
+    // If set, the mount is read-only.
+    optional bool readonly = 4;
+    // If set, the mount needs SELinux relabeling
+    optional bool selinux_relabel = 5;
+}
+
+// NamespaceOption provides options for Linux namespaces.
+message NamespaceOption {
+    // If set, use the host's network namespace.
+    optional bool host_network = 1;
+    // If set, use the host's pid namesapce.
+    optional bool host_pid = 2;
+    // If set, use the host's ipc namespace.
+    optional bool host_ipc = 3;
+}
+
+// LinuxPodSandboxConfig holds platform-specific configuraions for Linux
+// host platforms and Linux-based containers.
+message LinuxPodSandboxConfig {
+    // The parent cgroup of the pod sandbox.
+    // The cgroupfs style syntax will be used, but the container runtime can 
+    // convert it to systemd semantices if needed.
+    optional string cgroup_parent = 1;
+    // The configurations for the sandbox's namespaces.
+    // This will be used only if the PodSandbox uses namespace for isolation.
+    optional NamespaceOption namespace_options = 2;
+}
+
+// PodSandboxConfig holds all the required and optional fields for creating a
+// sandbox.
+message PodSandboxConfig {
+    // The name of the sandbox.
+    optional string name = 1;
+    // The hostname of the sandbox.
+    optional string hostname = 2;
+    // Path to the directory on the host in which container log files are
+    // stored.
+    // By default the log of a container going into the LogDirectory will be
+    // hooked up to STDOUT and STDERR. However, the LogDirectory may contain
+    // binary log files with structured logging data from the individual
+    // containers. For example, the files might be newline separated JSON
+    // structured logs, systemd-journald journal files, gRPC trace files, etc.
+    // E.g.,
+    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+    //     ContainerConfig.LogPath = `containerName_Instance#.log`
+    //
+    // WARNING: Log management and how kubelet should interface with the
+    // container logs are under active discussion in
+    // https://issues.k8s.io/24677. There *may* be future change of direction
+    // for logging as the discussion carries on.
+    optional string log_directory = 3;
+    // The DNS options for the sandbox.
+    optional DNSOption dns_options = 4;
+    // The port mappings for the sandbox.
+    repeated PortMapping port_mappings = 5;
+    // Labels are key value pairs that may be used to scope and select individual resources.
+    map<string, string> labels = 6;
+    // Annotations is an unstructured key value map that may be set by external
+    // tools to store and retrieve arbitrary metadata.
+    map<string, string> annotations = 7;
+    // Optional configurations specific to Linux hosts.
+    optional LinuxPodSandboxConfig linux = 8;
+}
+
+message CreatePodSandboxRequest {
+    // The configuration for creating a PodSandBox.
+    optional PodSandboxConfig config = 1;
+}
+
+message CreatePodSandboxResponse {
+    // The id of the PodSandBox
+    optional string pod_sandbox_id = 1;
+}
+
+message StopPodSandboxRequest {
+    // The id of the PodSandBox
+    optional string pod_sandbox_id = 1;
+}
+
+message StopPodSandboxResponse {}
+
+message RemovePodSandboxRequest {
+    // The id of the PodSandBox
+    optional string pod_sandbox_id = 1;
+}
+
+message RemovePodSandboxResponse {}
+
+message PodSandboxStatusRequest {
+    // The id of the PodSandBox
+    optional string pod_sandbox_id = 1;
+}
+
+// PodSandboxNetworkStatus is the status of the network for a PodSandbox.
+message PodSandboxNetworkStatus {
+    // The IP address of the PodSandbox
+    optional string ip = 1;
+}
+
+// Namespace contains paths to the namespaces.
+message Namespace {
+    // Network is the path to the network namespace.
+    optional string network = 1;
+    // Options is the namespace options for linux namespaces
+    optional NamespaceOption options = 2;
+}
+
+// LinuxSandBoxStatus contains status specific to Linux sandboxes.
+message LinuxPodSandboxStatus {
+    // Namespaces contains paths to the sandbox's namespaces.
+    optional Namespace namespaces = 1;
+}
+
+enum PodSandBoxState {
+    READY = 0;
+    NOTREADY = 1;
+}
+
+// PodSandboxStatus contains the status of the PodSandbox.
+message PodSandboxStatus {
+    // ID of the sandbox.
+    optional string id = 1;
+    // Name of the sandbox
+    optional string name = 2;
+    // State of the sandbox.
+    optional PodSandBoxState state = 3;
+    // Creation timestamp of the sandbox
+    optional int64 created_at = 4;
+    // Network contains network status if network is handled by the runtime.
+    optional PodSandboxNetworkStatus network = 5;
+    // Linux specific status to a pod sandbox.
+    optional LinuxPodSandboxStatus linux = 6;
+    // Labels are key value pairs that may be used to scope and select individual resources.
+    map<string, string> labels = 7;
+    // Annotations is an unstructured key value map that may be set by external
+    // tools to store and retrieve arbitrary metadata.
+    map<string, string> annotations = 8;
+}
+
+message PodSandboxStatusResponse {
+    // The status of the PodSandbox
+    optional PodSandboxStatus status = 1;
+}
+
+// PodSandboxFilter is used to filter a list of PodSandboxes.
+// All those fields are combined with 'AND'
+message PodSandboxFilter {
+    // Name of the sandbox.
+    optional string name = 1;
+    // ID of the sandbox.
+    optional string id = 2;
+    // State of the sandbox.
+    optional PodSandBoxState state = 3;
+    // LabelSelector to select matches.
+    // Only api.MatchLabels is supported for now and the requirements
+    // are ANDed. MatchExpressions is not supported yet.
+    map<string, string> label_selector = 4;
+}
+
+message ListPodSandboxRequest {
+    // PodSandboxFilter to filter a list of PodSandboxes.
+    optional PodSandboxFilter filter = 1;
+}
+
+
+// PodSandbox contains minimal information about a sandbox.
+message PodSandbox {
+    // The id of the PodSandbox
+    optional string id = 1;
+    // The name of the PodSandbox
+    optional string name = 2;
+    // The state of the PodSandbox
+    optional PodSandBoxState state = 3;
+    // Creation timestamps of the sandbox
+    optional int64 created_at = 4;
+    // The labels of the PodSandbox
+    map<string, string> labels = 5;
+}
+
+message ListPodSandboxResponse {
+    // List of PodSandbox
+    repeated PodSandbox items = 1;
+}
+
+// ImageSpec is an internal representation of an image.  Currently, it wraps the
+// value of a Container's Image field (e.g. imageName, imageName:tag, or
+// imageName:digest), but in the future it will include more detailed
+// information about the different image types.
+message ImageSpec {
+    optional string image = 1;
+}
+
+message KeyValue {
+    optional string key = 1;
+    optional string value = 2;
+}
+
+// LinuxContainerResources specifies Linux specific configuration for
+// resources.
+// TODO: Consider using Resources from opencontainers/runtime-spec/specs-go
+// directly.
+message LinuxContainerResources {
+    // CPU CFS (Completely Fair Scheduler) period
+    optional int64 cpu_period = 1;
+    // CPU CFS (Completely Fair Scheduler) quota
+    optional int64 cpu_quota = 2;
+    // CPU shares (relative weight vs. other containers)
+    optional int64 cpu_shares = 3;
+    // Memory limit in bytes
+    optional int64 memory_limit_in_bytes = 4;
+    // OOMScoreAdj adjusts the oom-killer score.
+    optional int64 oom_score_adj = 5;
+}
+
+// SELinuxOption are the labels to be applied to the container.
+message SELinuxOption {
+    optional string user = 1;
+    optional string role = 2;
+    optional string type = 3;
+    optional string level = 4;
+}
+
+// Capability contains the container capabilities to add or drop
+message Capability {
+    // List of capabilities to add.
+    repeated string add_capabilities = 1;
+    // List of capabilities to drop.
+    repeated string drop_capabilities = 2;
+}
+
+// LinuxContainerConfig contains platform-specific configuration for
+// Linux-based containers.
+message LinuxContainerConfig {
+    // Resources specification for the container.
+    optional LinuxContainerResources resources = 1;
+    // Capabilities to add or drop.
+    optional Capability capabilities = 2;
+    // Optional SELinux context to be applied.
+    optional SELinuxOption selinux_options = 3;
+    // User contains the user for the container process.
+    optional LinuxUser user = 4;
+}
+
+message LinuxUser {
+    // uid specifies the user ID the container process has.
+    optional int64 uid = 1;
+    // gid specifies the group ID the container process has.
+    optional int64 gid = 2;
+    // additional_gids specifies additional GIDs the container process has.
+    repeated int64 additional_gids = 3;
+}
+
+message ContainerConfig {
+    // Name of the container.
+    optional string name = 1;
+    // Image to use.
+    optional ImageSpec image = 2;
+    // Command to execute (i.e., entrypoint for docker)
+    repeated string command = 3;
+    // Args for the Command (i.e., command for docker)
+    repeated string args = 4;
+    // Current working directory of the command.
+    optional string working_dir = 5;
+    // List of environment variable to set in the container
+    repeated KeyValue envs = 6;
+    // Mounts specifies mounts for the container
+    repeated Mount mounts = 7;
+    // Labels are key value pairs that may be used to scope and select individual resources.
+    // Label keys are of the form:
+    //     label-key ::= prefixed-name | name
+    //     prefixed-name ::= prefix '/' name
+    //     prefix ::= DNS_SUBDOMAIN
+    //     name ::= DNS_LABEL
+    map<string, string> labels = 8;
+    // Annotations is an unstructured key value map that may be set by external
+    // tools to store and retrieve arbitrary metadata.
+    map<string, string> annotations = 9;
+    // If set, run container in privileged mode.
+    // Processes in privileged containers are essentially equivalent to root on the host.
+    optional bool privileged = 10;
+    // If set, the root filesystem of the container is read-only.
+    optional bool readonly_rootfs = 11;
+    // Path relative to PodSandboxConfig.LogDirectory for container to store
+    // the log (STDOUT and STDERR) on the host.
+    // E.g.,
+    //     PodSandboxConfig.LogDirectory = `/var/log/pods/<podUID>/`
+    //     ContainerConfig.LogPath = `containerName_Instance#.log`
+    //
+    // WARNING: Log management and how kubelet should interface with the
+    // container logs are under active discussion in
+    // https://issues.k8s.io/24677. There *may* be future change of direction
+    // for logging as the discussion carries on.
+    optional string log_path = 12;
+    // The hash of container config
+
+    // Variables for interactive containers, these have very specialized
+    // use-cases (e.g. debugging).
+    // TODO: Determine if we need to continue supporting these fields that are
+    // part of Kubernetes's Container Spec.
+    optional bool stdin = 13;
+    optional bool stdin_once = 14;
+    optional bool tty = 15;
+
+    // Linux contains configuration specific to Linux containers.
+    optional LinuxContainerConfig linux = 16;
+}
+
+message CreateContainerRequest {
+    // The id of the PodSandbox
+    optional string pod_sandbox_id = 1;
+    // The config of the container
+    optional ContainerConfig config = 2;
+    // The config of the PodSandbox
+    optional PodSandboxConfig sandbox_config = 3;
+}
+
+message CreateContainerResponse {
+    // The id of the created container
+    optional string container_id = 1;
+}
+
+message StartContainerRequest {
+    // The id of the container
+    optional string container_id = 1;
+}
+
+message StartContainerResponse {}
+
+message StopContainerRequest {
+    // The id of the container
+    optional string container_id = 1;
+    // Timeout in seconds to stop the container
+    optional int64 timeout = 2;
+}
+
+message StopContainerResponse {}
+
+message RemoveContainerRequest {
+    // The id of the container
+    optional string container_id = 1;
+}
+
+message RemoveContainerResponse {}
+
+enum ContainerState {
+    CREATED = 0;
+    RUNNING = 1;
+    EXITED  = 2;
+    UNKNOWN = 3;
+}
+
+// ContainerFilter is used to filter containers.
+// All those fields are combined with 'AND'
+message ContainerFilter {
+    // Name of the container.
+    optional string name = 1;
+    // ID of the container.
+    optional string id = 2;
+    // State of the contianer.
+    optional ContainerState state = 3;
+    // The id of the pod sandbox
+    optional string pod_sandbox_id = 4;
+    // LabelSelector to select matches.
+    // Only api.MatchLabels is supported for now and the requirements
+    // are ANDed. MatchExpressions is not supported yet.
+    map<string, string> label_selector = 5;
+}
+
+message ListContainersRequest {
+    optional ContainerFilter filter = 1;
+}
+
+// Container provides the runtime information for a container, such as ID, hash,
+// state of the container.
+message Container {
+    // The ID of the container, used by the container runtime to identify
+    // a container.
+    optional string id = 1;
+    // The name of the container
+    optional string name = 2;
+     // The spec of the image
+    optional ImageSpec image = 3;
+    // Reference to the image in use. For most runtimes, this should be an
+    // image ID.
+    optional string image_ref = 4;
+    // State is the state of the container.
+    optional ContainerState state = 5;
+    // Labels are key value pairs that may be used to scope and select individual resources.
+    map<string, string> labels = 6;
+}
+
+message ListContainersResponse {
+    // List of containers
+    repeated Container containers = 1;
+}
+
+message ContainerStatusRequest {
+    // The id of the container
+    optional string container_id = 1;
+}
+
+// ContainerStatus represents the status of a container.
+message ContainerStatus {
+    // ID of the container.
+    optional string id = 1;
+    // Name of the container.
+    optional string name = 2;
+    // Status of the container.
+    optional ContainerState state = 3;
+    // Creation time of the container.
+    optional int64 created_at = 4;
+    // Start time of the container.
+    optional int64 started_at = 5;
+    // Finish time of the container.
+    optional int64 finished_at = 6;
+    // Exit code of the container.
+    optional int32 exit_code = 7;
+     // The spec of the image
+    optional ImageSpec image = 8;
+    // Reference to the image in use. For most runtimes, this should be an
+    // image ID
+    optional string image_ref = 9;
+    // A string explains why container is in such a status.
+    optional string reason = 10;
+    // Labels are key value pairs that may be used to scope and select individual resources.
+    map<string,string> labels = 11;
+    // Annotations is an unstructured key value map.
+    map<string,string> annotations = 12;
+    // Mounts specifies mounts for the container
+    repeated Mount mounts = 13;
+}
+
+message ContainerStatusResponse {
+    // The status of the container
+    optional ContainerStatus status = 1;
+}
+
+message ExecRequest {
+    // The id of the container
+    optional string container_id = 1;
+    // The cmd to execute
+    repeated string cmd = 2;
+    // Whether use tty
+    optional bool tty = 3;
+    // Streaming stdin
+    optional bytes stdin = 4;
+}
+
+message ExecResponse {
+    // Streaming stdout
+    optional bytes stdout = 1;
+    // Streaming stderr
+    optional bytes stderr = 2;
+}
+
+message ImageFilter {
+    // The spec of the image
+    optional ImageSpec image = 1;
+}
+
+message ListImagesRequest {
+    // The filter to list images
+    optional ImageFilter filter = 1;
+}
+
+// Basic information about a container image.
+message Image {
+    // ID of the image.
+    optional string id = 1;
+    // Other names by which this image is known.
+    repeated string repo_tags = 2;
+    // Digests by which this image is known.
+    repeated string repo_digests = 3;
+    // The size of the image in bytes.
+    optional uint64 size = 4;
+}
+
+message ListImagesResponse {
+    // List of images
+    repeated Image images = 1;
+}
+
+message ImageStatusRequest {
+    // The spec of the image
+    optional ImageSpec image = 1;
+}
+
+message ImageStatusResponse {
+    // The status of the image
+    optional Image image = 1;
+}
+
+// AuthConfig contains authorization information for connecting to a registry.
+message AuthConfig {
+    optional string username = 1;
+    optional string password = 2;
+    optional string auth = 3;
+    optional string server_address = 4;
+    // IdentityToken is used to authenticate the user and get
+    // an access token for the registry.
+    optional string identity_token = 5;
+    // RegistryToken is a bearer token to be sent to a registry
+    optional string registry_token = 6;
+}
+
+message PullImageRequest {
+    // The spec of the image
+    optional ImageSpec image = 1;
+    // The auth config for pulling image
+    optional AuthConfig auth = 2;
+    // The config of the PodSandbox, which is used to pull image in PodSandbox context
+    optional PodSandboxConfig sandbox_config = 3;
+}
+
+message PullImageResponse {}
+
+message RemoveImageRequest {
+    // The spec of the image
+    optional ImageSpec image = 1;
+}
+
+message RemoveImageResponse {}

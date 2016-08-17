@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package storage
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -34,6 +35,41 @@ func SimpleUpdate(fn SimpleUpdateFunc) UpdateFunc {
 		out, err := fn(input)
 		return out, nil, err
 	}
+}
+
+// SimpleFilter implements Filter interface.
+type SimpleFilter struct {
+	filterFunc  func(runtime.Object) bool
+	triggerFunc func() []MatchValue
+}
+
+func (s *SimpleFilter) Filter(obj runtime.Object) bool {
+	return s.filterFunc(obj)
+}
+
+func (s *SimpleFilter) Trigger() []MatchValue {
+	return s.triggerFunc()
+}
+
+func NewSimpleFilter(
+	filterFunc func(runtime.Object) bool,
+	triggerFunc func() []MatchValue) Filter {
+	return &SimpleFilter{
+		filterFunc:  filterFunc,
+		triggerFunc: triggerFunc,
+	}
+}
+
+func EverythingFunc(runtime.Object) bool {
+	return true
+}
+
+func NoTriggerFunc() []MatchValue {
+	return nil
+}
+
+func NoTriggerPublisher(runtime.Object) []MatchValue {
+	return nil
 }
 
 // ParseWatchResourceVersion takes a resource version argument and converts it to
@@ -87,4 +123,29 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
 	return prefix + "/" + name, nil
+}
+
+// hasPathPrefix returns true if the string matches pathPrefix exactly, or if is prefixed with pathPrefix at a path segment boundary
+func hasPathPrefix(s, pathPrefix string) bool {
+	// Short circuit if s doesn't contain the prefix at all
+	if !strings.HasPrefix(s, pathPrefix) {
+		return false
+	}
+
+	pathPrefixLength := len(pathPrefix)
+
+	if len(s) == pathPrefixLength {
+		// Exact match
+		return true
+	}
+	if strings.HasSuffix(pathPrefix, "/") {
+		// pathPrefix already ensured a path segment boundary
+		return true
+	}
+	if s[pathPrefixLength:pathPrefixLength+1] == "/" {
+		// The next character in s is a path segment boundary
+		// Check this instead of normalizing pathPrefix to avoid allocating on every call
+		return true
+	}
+	return false
 }

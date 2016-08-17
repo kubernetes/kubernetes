@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -23,8 +23,8 @@ import (
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
 
-func addDefaultingFuncs(scheme *runtime.Scheme) {
-	scheme.AddDefaultingFuncs(
+func addDefaultingFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddDefaultingFuncs(
 		SetDefaults_PodExecOptions,
 		SetDefaults_PodAttachOptions,
 		SetDefaults_ReplicationController,
@@ -47,6 +47,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) {
 		SetDefaults_ObjectFieldSelector,
 		SetDefaults_LimitRangeItem,
 		SetDefaults_ConfigMap,
+		SetDefaults_RBDVolumeSource,
 	)
 }
 
@@ -284,5 +285,17 @@ func defaultHostNetworkPorts(containers *[]Container) {
 				(*containers)[i].Ports[j].HostPort = (*containers)[i].Ports[j].ContainerPort
 			}
 		}
+	}
+}
+
+func SetDefaults_RBDVolumeSource(obj *RBDVolumeSource) {
+	if obj.RBDPool == "" {
+		obj.RBDPool = "rbd"
+	}
+	if obj.RadosUser == "" {
+		obj.RadosUser = "admin"
+	}
+	if obj.Keyring == "" {
+		obj.Keyring = "/etc/ceph/keyring"
 	}
 }

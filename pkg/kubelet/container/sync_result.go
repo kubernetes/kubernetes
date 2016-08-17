@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,24 +29,9 @@ import (
 var ErrCrashLoopBackOff = errors.New("CrashLoopBackOff")
 
 var (
-	// Container image pull failed, kubelet is backing off image pull
-	ErrImagePullBackOff = errors.New("ImagePullBackOff")
-
-	// Unable to inspect image
-	ErrImageInspect = errors.New("ImageInspectError")
-
-	// General image pull error
-	ErrImagePull = errors.New("ErrImagePull")
-
-	// Required Image is absent on host and PullPolicy is NeverPullImage
-	ErrImageNeverPull = errors.New("ErrImageNeverPull")
-
 	// ErrContainerNotFound returned when a container in the given pod with the
 	// given container name was not found, amongst those managed by the kubelet.
 	ErrContainerNotFound = errors.New("no matching container")
-
-	// Get http error when pulling image from registry
-	RegistryUnavailable = errors.New("RegistryUnavailable")
 )
 
 var (

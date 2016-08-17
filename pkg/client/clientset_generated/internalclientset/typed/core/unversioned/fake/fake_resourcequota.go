@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -112,4 +112,15 @@ func (c *FakeResourceQuotas) Watch(opts api.ListOptions) (watch.Interface, error
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(resourcequotasResource, c.ns, opts))
 
+}
+
+// Patch applies the patch and returns the patched resourceQuota.
+func (c *FakeResourceQuotas) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.ResourceQuota, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchSubresourceAction(resourcequotasResource, c.ns, name, data, subresources...), &api.ResourceQuota{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.ResourceQuota), err
 }

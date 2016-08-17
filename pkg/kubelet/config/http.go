@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -49,7 +49,7 @@ func NewSourceURL(url string, header http.Header, nodeName string, period time.D
 		updates:  updates,
 		data:     nil,
 		// Timing out requests leads to retries. This client is only used to
-		// read the the manifest URL passed to kubelet.
+		// read the manifest URL passed to kubelet.
 		client: &http.Client{Timeout: 10 * time.Second},
 	}
 	glog.V(1).Infof("Watching URL %s", url)

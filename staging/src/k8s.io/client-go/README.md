@@ -1,0 +1,9 @@
+This _staging/src/k8s.io/client-go directory is the staging area of the client repo. It contains a versioned client, tools built around the client like the reflector, and all the client dependencies. The content will be periodically published to k8s.io/client-go repo.
+The staged content is copied from the main repo, i.e., k8s.io/kubernetes, with directory rearrangement and necessary rewritings. To sync the content with the latest code in your local k8s.io/kubernetes, you need to run `godep restore` in k8s root directory, then run _staging/src/k8s.io/client-go/copy.sh.
+vendor/k8s.io/client-go is a symlink pointing to this staging area, so to use the packages in the staging area, you can import it as "vendor/client-go/<package-name>", as if the client were vendored. The client will be vendored from k8s.io/client-go for real after the test matrix is converted to vendor k8s components.
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/_staging/src/k8s.io/client-go/README.md?pixel)]()
+
+
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/staging/src/k8s.io/client-go/README.md?pixel)]()

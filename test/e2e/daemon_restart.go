@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -187,7 +187,7 @@ func getContainerRestarts(c *client.Client, ns string, labelSelector labels.Sele
 var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	f := framework.NewDefaultFramework("daemonrestart")
-	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(util.NewUUID())
+	rcName := "daemonrestart" + strconv.Itoa(numPods) + "-" + string(uuid.NewUUID())
 	labelSelector := labels.Set(map[string]string{"name": rcName}).AsSelector()
 	existingPods := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	var ns string
@@ -199,8 +199,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	BeforeEach(func() {
 		// These tests require SSH
-		// TODO(11834): Enable this test in GKE once experimental API there is switched on
-		framework.SkipUnlessProviderIs("gce", "aws")
+		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		ns = f.Namespace.Name
 
 		// All the restart tests need an rc and a watch on pods of the rc.
@@ -209,7 +208,7 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 			Client:      f.Client,
 			Name:        rcName,
 			Namespace:   ns,
-			Image:       "gcr.io/google_containers/pause-amd64:3.0",
+			Image:       framework.GetPauseImageName(f.Client),
 			Replicas:    numPods,
 			CreatedPods: &[]*api.Pod{},
 		}
@@ -252,6 +251,8 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	It("Controller Manager should not create/delete replicas across restart", func() {
 
+		// Requires master ssh access.
+		framework.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
 			framework.GetMasterHost(), "kube-controller", ports.ControllerManagerPort, restartPollInterval, restartTimeout)
 		restarter.restart()
@@ -281,6 +282,8 @@ var _ = framework.KubeDescribe("DaemonRestart [Disruptive]", func() {
 
 	It("Scheduler should continue assigning pods to nodes across restart", func() {
 
+		// Requires master ssh access.
+		framework.SkipUnlessProviderIs("gce", "aws")
 		restarter := NewRestartConfig(
 			framework.GetMasterHost(), "kube-scheduler", ports.SchedulerPort, restartPollInterval, restartTimeout)
 

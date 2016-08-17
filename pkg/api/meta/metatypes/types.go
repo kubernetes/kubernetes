@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,4 +26,5 @@ type OwnerReference struct {
 	Kind       string
 	UID        types.UID
 	Name       string
+	Controller *bool
 }

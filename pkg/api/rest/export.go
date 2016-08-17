@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ limitations under the License.
 package rest
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -24,5 +25,5 @@ import (
 type RESTExportStrategy interface {
 	// Export strips fields that can not be set by the user.  If 'exact' is false
 	// fields specific to the cluster are also stripped
-	Export(obj runtime.Object, exact bool) error
+	Export(ctx api.Context, obj runtime.Object, exact bool) error
 }

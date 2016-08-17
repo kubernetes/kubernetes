@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -124,12 +124,12 @@ const (
 // RecommendedAuthOverrideFlags is a convenience method to return recommended flag names prefixed with a string of your choosing
 func RecommendedAuthOverrideFlags(prefix string) AuthOverrideFlags {
 	return AuthOverrideFlags{
-		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS."},
-		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS."},
-		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server."},
-		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation."},
-		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server."},
-		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server."},
+		ClientCertificate: FlagInfo{prefix + FlagCertFile, "", "", "Path to a client certificate file for TLS"},
+		ClientKey:         FlagInfo{prefix + FlagKeyFile, "", "", "Path to a client key file for TLS"},
+		Token:             FlagInfo{prefix + FlagBearerToken, "", "", "Bearer token for authentication to the API server"},
+		Impersonate:       FlagInfo{prefix + FlagImpersonate, "", "", "Username to impersonate for the operation"},
+		Username:          FlagInfo{prefix + FlagUsername, "", "", "Username for basic authentication to the API server"},
+		Password:          FlagInfo{prefix + FlagPassword, "", "", "Password for basic authentication to the API server"},
 	}
 }
 
@@ -138,8 +138,8 @@ func RecommendedClusterOverrideFlags(prefix string) ClusterOverrideFlags {
 	return ClusterOverrideFlags{
 		APIServer:             FlagInfo{prefix + FlagAPIServer, "", "", "The address and port of the Kubernetes API server"},
 		APIVersion:            FlagInfo{prefix + FlagAPIVersion, "", "", "DEPRECATED: The API version to use when talking to the server"},
-		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority."},
-		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure."},
+		CertificateAuthority:  FlagInfo{prefix + FlagCAFile, "", "", "Path to a cert. file for the certificate authority"},
+		InsecureSkipTLSVerify: FlagInfo{prefix + FlagInsecure, "", "false", "If true, the server's certificate will not be checked for validity. This will make your HTTPS connections insecure"},
 	}
 }
 
@@ -158,7 +158,7 @@ func RecommendedContextOverrideFlags(prefix string) ContextOverrideFlags {
 	return ContextOverrideFlags{
 		ClusterName:  FlagInfo{prefix + FlagClusterName, "", "", "The name of the kubeconfig cluster to use"},
 		AuthInfoName: FlagInfo{prefix + FlagAuthInfoName, "", "", "The name of the kubeconfig user to use"},
-		Namespace:    FlagInfo{prefix + FlagNamespace, "", "", "If present, the namespace scope for this CLI request."},
+		Namespace:    FlagInfo{prefix + FlagNamespace, "", "", "If present, the namespace scope for this CLI request"},
 	}
 }
 

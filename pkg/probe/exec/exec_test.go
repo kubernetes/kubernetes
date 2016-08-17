@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package exec
 
 import (
 	"fmt"
+	"io"
 	"testing"
 
 	"k8s.io/kubernetes/pkg/probe"
@@ -38,6 +39,10 @@ func (f *FakeCmd) Output() ([]byte, error) {
 }
 
 func (f *FakeCmd) SetDir(dir string) {}
+
+func (f *FakeCmd) SetStdin(in io.Reader) {}
+
+func (f *FakeCmd) SetStdout(out io.Writer) {}
 
 type fakeExitError struct {
 	exited     bool

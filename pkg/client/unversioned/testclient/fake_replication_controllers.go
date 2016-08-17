@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ func (c *FakeReplicationControllers) UpdateStatus(controller *api.ReplicationCon
 	return obj.(*api.ReplicationController), err
 }
 
-func (c *FakeReplicationControllers) Delete(name string) error {
+func (c *FakeReplicationControllers) Delete(name string, options *api.DeleteOptions) error {
 	_, err := c.Fake.Invokes(NewDeleteAction("replicationcontrollers", c.Namespace, name), &api.ReplicationController{})
 	return err
 }

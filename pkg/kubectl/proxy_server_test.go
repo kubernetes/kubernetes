@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,7 +62,34 @@ func TestAccept(t *testing.T) {
 			acceptPaths:  DefaultPathAcceptRE,
 			rejectPaths:  DefaultPathRejectRE,
 			acceptHosts:  DefaultHostAcceptRE,
-			path:         "/api/v1/pods/foo/exec",
+			path:         "/api/v1/namespaces/default/pods/foo",
+			host:         "localhost",
+			method:       "GET",
+			expectAccept: true,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/namespaces/default/pods/attachfoo",
+			host:         "localhost",
+			method:       "GET",
+			expectAccept: true,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/namespaces/default/pods/execfoo",
+			host:         "localhost",
+			method:       "GET",
+			expectAccept: true,
+		},
+		{
+			acceptPaths:  DefaultPathAcceptRE,
+			rejectPaths:  DefaultPathRejectRE,
+			acceptHosts:  DefaultHostAcceptRE,
+			path:         "/api/v1/namespaces/default/pods/foo/exec",
 			host:         "127.0.0.1",
 			method:       "GET",
 			expectAccept: false,
@@ -71,7 +98,7 @@ func TestAccept(t *testing.T) {
 			acceptPaths:  DefaultPathAcceptRE,
 			rejectPaths:  DefaultPathRejectRE,
 			acceptHosts:  DefaultHostAcceptRE,
-			path:         "/api/v1/pods/foo/attach",
+			path:         "/api/v1/namespaces/default/pods/foo/attach",
 			host:         "127.0.0.1",
 			method:       "GET",
 			expectAccept: false,
@@ -125,7 +152,7 @@ func TestAccept(t *testing.T) {
 			acceptPaths:  DefaultPathAcceptRE,
 			rejectPaths:  DefaultPathRejectRE,
 			acceptHosts:  DefaultHostAcceptRE,
-			path:         "/api/v1/pods/somepod",
+			path:         "/api/v1/namespaces/default/pods/somepod",
 			host:         "localhost",
 			method:       "PUT",
 			expectAccept: false,
@@ -134,7 +161,7 @@ func TestAccept(t *testing.T) {
 			acceptPaths:  DefaultPathAcceptRE,
 			rejectPaths:  DefaultPathRejectRE,
 			acceptHosts:  DefaultHostAcceptRE,
-			path:         "/api/v1/pods/somepod",
+			path:         "/api/v1/namespaces/default/pods/somepod",
 			host:         "localhost",
 			method:       "PATCH",
 			expectAccept: false,

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -425,7 +425,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.nodePort = int(servicePort.NodePort)
 			info.sessionAffinityType = service.Spec.SessionAffinity
-			glog.V(4).Infof("info: %+v", info)
+			glog.V(4).Infof("info: %#v", info)
 
 			err = proxier.openPortal(serviceName, info)
 			if err != nil {
@@ -447,6 +447,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 			if err != nil {
 				glog.Errorf("Failed to stop service %q: %v", name, err)
 			}
+			proxier.loadBalancer.DeleteService(name)
 		}
 	}
 }

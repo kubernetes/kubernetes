@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -33,12 +33,12 @@ func NewCmdConfig(pathOptions *clientcmd.PathOptions, out io.Writer) *cobra.Comm
 
 	cmd := &cobra.Command{
 		Use:   "config SUBCOMMAND",
-		Short: "config modifies kubeconfig files",
-		Long: `config modifies kubeconfig files using subcommands like "kubectl config set current-context my-context"
+		Short: "Modify kubeconfig files",
+		Long: `Modify kubeconfig files using subcommands like "kubectl config set current-context my-context"
 
 The loading order follows these rules:
 1. If the --` + pathOptions.ExplicitFileFlag + ` flag is set, then only that file is loaded.  The flag may only be set once and no merging takes place.
-2. If $` + pathOptions.EnvVar + ` environment variable is set, then it is used a list of paths (normal path delimitting rules for your system).  These paths are merged together.  When a value is modified, it is modified in the file that defines the stanza.  When a value is created, it is created in the first file that exists.  If no files in the chain exist, then it creates the last file in the list.
+2. If $` + pathOptions.EnvVar + ` environment variable is set, then it is used a list of paths (normal path delimitting rules for your system).  These paths are merged.  When a value is modified, it is modified in the file that defines the stanza.  When a value is created, it is created in the first file that exists.  If no files in the chain exist, then it creates the last file in the list.
 3. Otherwise, ` + path.Join("${HOME}", pathOptions.GlobalFileSubpath) + ` is used and no merging takes place.
 `,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -57,6 +57,7 @@ The loading order follows these rules:
 	cmd.AddCommand(NewCmdConfigUnset(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigCurrentContext(out, pathOptions))
 	cmd.AddCommand(NewCmdConfigUseContext(out, pathOptions))
+	cmd.AddCommand(NewCmdConfigGetContexts(out, pathOptions))
 
 	return cmd
 }

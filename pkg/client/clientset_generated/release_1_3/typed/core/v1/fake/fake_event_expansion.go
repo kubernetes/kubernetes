@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,11 +51,11 @@ func (c *FakeEvents) UpdateWithEventNamespace(event *v1.Event) (*v1.Event, error
 	return obj.(*v1.Event), err
 }
 
-// Patch patches an existing event. Returns the copy of the event the server returns, or an error.
-func (c *FakeEvents) Patch(event *v1.Event, data []byte) (*v1.Event, error) {
-	action := core.NewRootPatchAction(eventsResource, event)
+// PatchWithEventNamespace patches an existing event. Returns the copy of the event the server returns, or an error.
+func (c *FakeEvents) PatchWithEventNamespace(event *v1.Event, data []byte) (*v1.Event, error) {
+	action := core.NewRootPatchAction(eventsResource, event.Name, data)
 	if c.ns != "" {
-		action = core.NewPatchAction(eventsResource, c.ns, event)
+		action = core.NewPatchAction(eventsResource, c.ns, event.Name, data)
 	}
 	obj, err := c.Fake.Invokes(action, event)
 	if obj == nil {

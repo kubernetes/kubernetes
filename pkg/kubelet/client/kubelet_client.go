@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 
 	rt := http.DefaultTransport
 	if config.Dial != nil || tlsConfig != nil {
-		rt = utilnet.SetTransportDefaults(&http.Transport{
+		rt = utilnet.SetOldTransportDefaults(&http.Transport{
 			Dial:            config.Dial,
 			TLSClientConfig: tlsConfig,
 		})

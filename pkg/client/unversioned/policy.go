@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,8 +17,6 @@ limitations under the License.
 package unversioned
 
 import (
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
@@ -38,7 +36,7 @@ func (c *PolicyClient) PodDisruptionBudgets(namespace string) PodDisruptionBudge
 
 func NewPolicy(c *restclient.Config) (*PolicyClient, error) {
 	config := *c
-	if err := setPolicyDefaults(&config); err != nil {
+	if err := setGroupDefaults(policy.GroupName, &config); err != nil {
 		return nil, err
 	}
 	client, err := restclient.RESTClientFor(&config)
@@ -54,30 +52,4 @@ func NewPolicyOrDie(c *restclient.Config) *PolicyClient {
 		panic(err)
 	}
 	return client
-}
-
-func setPolicyDefaults(config *restclient.Config) error {
-	g, err := registered.Group(policy.GroupName)
-	if err != nil {
-		return err
-	}
-	config.APIPath = defaultAPIPath
-	if config.UserAgent == "" {
-		config.UserAgent = restclient.DefaultKubernetesUserAgent()
-	}
-	// TODO: Unconditionally set the config.Version, until we fix the config.
-	//if config.Version == "" {
-	copyGroupVersion := g.GroupVersion
-	config.GroupVersion = &copyGroupVersion
-	//}
-
-	config.Codec = api.Codecs.LegacyCodec(*config.GroupVersion)
-	config.NegotiatedSerializer = api.Codecs
-	if config.QPS == 0 {
-		config.QPS = 5
-	}
-	if config.Burst == 0 {
-		config.Burst = 10
-	}
-	return nil
 }

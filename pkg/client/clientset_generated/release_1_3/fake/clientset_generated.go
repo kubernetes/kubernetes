@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	v1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/autoscaling/v1"
+	fakev1autoscaling "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/autoscaling/v1/fake"
+	v1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/batch/v1"
+	fakev1batch "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/batch/v1/fake"
 	v1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/core/v1"
 	fakev1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3/typed/extensions/v1beta1"
@@ -31,9 +35,12 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// Clientset returns a clientset that will respond with the provided objects
+// NewSimpleClientset returns a clientset that will respond with the provided objects.
+// It's backed by a very simple object tracker that processes creates, updates and deletions as-is,
+// without applying any validations and/or defaults. It shouldn't be considered a replacement
+// for a real clientset and is mostly useful in simple unit tests.
 func NewSimpleClientset(objects ...runtime.Object) *Clientset {
-	o := core.NewObjects(api.Scheme, api.Codecs.UniversalDecoder())
+	o := core.NewObjectTracker(api.Scheme, api.Codecs.UniversalDecoder())
 	for _, obj := range objects {
 		if err := o.Add(obj); err != nil {
 			panic(err)
@@ -69,4 +76,14 @@ func (c *Clientset) Core() v1core.CoreInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return &fakev1beta1extensions.FakeExtensions{Fake: &c.Fake}
+}
+
+// Autoscaling retrieves the AutoscalingClient
+func (c *Clientset) Autoscaling() v1autoscaling.AutoscalingInterface {
+	return &fakev1autoscaling.FakeAutoscaling{Fake: &c.Fake}
+}
+
+// Batch retrieves the BatchClient
+func (c *Clientset) Batch() v1batch.BatchInterface {
+	return &fakev1batch.FakeBatch{Fake: &c.Fake}
 }

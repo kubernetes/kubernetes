@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	batchv1 "k8s.io/kubernetes/pkg/apis/batch/v1"
+	batchv2alpha1 "k8s.io/kubernetes/pkg/apis/batch/v2alpha1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation"
@@ -392,6 +393,104 @@ func (JobV1) Generate(genericParams map[string]interface{}) (runtime.Object, err
 	}
 
 	return &job, nil
+}
+
+type ScheduledJobV2Alpha1 struct{}
+
+func (ScheduledJobV2Alpha1) ParamNames() []GeneratorParam {
+	return []GeneratorParam{
+		{"labels", false},
+		{"default-name", false},
+		{"name", true},
+		{"image", true},
+		{"port", false},
+		{"hostport", false},
+		{"stdin", false},
+		{"leave-stdin-open", false},
+		{"tty", false},
+		{"command", false},
+		{"args", false},
+		{"env", false},
+		{"requests", false},
+		{"limits", false},
+		{"restart", false},
+		{"schedule", true},
+	}
+}
+
+func (ScheduledJobV2Alpha1) Generate(genericParams map[string]interface{}) (runtime.Object, error) {
+	args, err := getArgs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	envs, err := getV1Envs(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	params, err := getParams(genericParams)
+	if err != nil {
+		return nil, err
+	}
+
+	name, err := getName(params)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := getLabels(params, true, name)
+	if err != nil {
+		return nil, err
+	}
+
+	podSpec, err := makeV1PodSpec(params, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = updateV1PodContainers(params, args, envs, podSpec); err != nil {
+		return nil, err
+	}
+
+	leaveStdinOpen, err := GetBool(params, "leave-stdin-open", false)
+	if err != nil {
+		return nil, err
+	}
+	podSpec.Containers[0].StdinOnce = !leaveStdinOpen && podSpec.Containers[0].Stdin
+
+	if err := updateV1PodPorts(params, podSpec); err != nil {
+		return nil, err
+	}
+
+	restartPolicy := v1.RestartPolicy(params["restart"])
+	if len(restartPolicy) == 0 {
+		restartPolicy = v1.RestartPolicyNever
+	}
+	podSpec.RestartPolicy = restartPolicy
+
+	scheduledJob := batchv2alpha1.ScheduledJob{
+		ObjectMeta: v1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: batchv2alpha1.ScheduledJobSpec{
+			Schedule:          params["schedule"],
+			ConcurrencyPolicy: batchv2alpha1.AllowConcurrent,
+			JobTemplate: batchv2alpha1.JobTemplateSpec{
+				Spec: batchv2alpha1.JobSpec{
+					Template: v1.PodTemplateSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Labels: labels,
+						},
+						Spec: *podSpec,
+					},
+				},
+			},
+		},
+	}
+
+	return &scheduledJob, nil
 }
 
 type BasicReplicationController struct{}
@@ -827,7 +926,7 @@ func (BasicPod) Generate(genericParams map[string]interface{}) (runtime.Object, 
 }
 
 func parseEnvs(envArray []string) ([]api.EnvVar, error) {
-	envs := []api.EnvVar{}
+	envs := make([]api.EnvVar, 0, len(envArray))
 	for _, env := range envArray {
 		pos := strings.Index(env, "=")
 		if pos == -1 {
@@ -835,7 +934,10 @@ func parseEnvs(envArray []string) ([]api.EnvVar, error) {
 		}
 		name := env[:pos]
 		value := env[pos+1:]
-		if len(name) == 0 || !validation.IsCIdentifier(name) || len(value) == 0 {
+		if len(name) == 0 {
+			return nil, fmt.Errorf("invalid env: %v", env)
+		}
+		if len(validation.IsCIdentifier(name)) != 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := api.EnvVar{Name: name, Value: value}
@@ -853,7 +955,7 @@ func parseV1Envs(envArray []string) ([]v1.EnvVar, error) {
 		}
 		name := env[:pos]
 		value := env[pos+1:]
-		if len(name) == 0 || !validation.IsCIdentifier(name) || len(value) == 0 {
+		if len(name) == 0 || len(validation.IsCIdentifier(name)) != 0 {
 			return nil, fmt.Errorf("invalid env: %v", env)
 		}
 		envVar := v1.EnvVar{Name: name, Value: value}

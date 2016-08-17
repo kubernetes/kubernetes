@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ type NodeInterface interface {
 	Create(node *api.Node) (*api.Node, error)
 	List(opts api.ListOptions) (*api.NodeList, error)
 	Delete(name string) error
+	DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error
 	Update(*api.Node) (*api.Node, error)
 	UpdateStatus(*api.Node) (*api.Node, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
@@ -74,6 +75,16 @@ func (c *nodes) Get(name string) (*api.Node, error) {
 // Delete deletes an existing node.
 func (c *nodes) Delete(name string) error {
 	return c.r.Delete().Resource(c.resourceName()).Name(name).Do().Error()
+}
+
+// DeleteCollection deletes a collection of nodes.
+func (c *nodes) DeleteCollection(options *api.DeleteOptions, listOptions api.ListOptions) error {
+	return c.r.Delete().
+		Resource(c.resourceName()).
+		VersionedParams(&listOptions, api.ParameterCodec).
+		Body(options).
+		Do().
+		Error()
 }
 
 // Update updates an existing node.

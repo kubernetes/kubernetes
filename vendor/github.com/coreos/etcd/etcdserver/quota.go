@@ -1,4 +1,4 @@
-// Copyright 2016 CoreOS, Inc.
+// Copyright 2016 The etcd Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ package etcdserver
 
 import (
 	pb "github.com/coreos/etcd/etcdserver/etcdserverpb"
-	"github.com/coreos/etcd/storage/backend"
+	"github.com/coreos/etcd/mvcc/backend"
 )
 
 // Quota represents an arbitrary quota against arbitrary requests. Each request
@@ -50,20 +50,20 @@ const (
 )
 
 func NewBackendQuota(s *EtcdServer) Quota {
-	if s.cfg.QuotaBackendBytes < 0 {
+	if s.Cfg.QuotaBackendBytes < 0 {
 		// disable quotas if negative
 		plog.Warningf("disabling backend quota")
 		return &passthroughQuota{}
 	}
-	if s.cfg.QuotaBackendBytes == 0 {
+	if s.Cfg.QuotaBackendBytes == 0 {
 		// use default size if no quota size given
 		return &backendQuota{s, backend.DefaultQuotaBytes}
 	}
-	if s.cfg.QuotaBackendBytes > backend.MaxQuotaBytes {
-		plog.Warningf("backend quota %v exceeds maximum quota %v; using maximum", s.cfg.QuotaBackendBytes, backend.MaxQuotaBytes)
+	if s.Cfg.QuotaBackendBytes > backend.MaxQuotaBytes {
+		plog.Warningf("backend quota %v exceeds maximum quota %v; using maximum", s.Cfg.QuotaBackendBytes, backend.MaxQuotaBytes)
 		return &backendQuota{s, backend.MaxQuotaBytes}
 	}
-	return &backendQuota{s, s.cfg.QuotaBackendBytes}
+	return &backendQuota{s, s.Cfg.QuotaBackendBytes}
 }
 
 func (b *backendQuota) Available(v interface{}) bool {
@@ -86,7 +86,7 @@ func (b *backendQuota) Cost(v interface{}) int {
 
 func costPut(r *pb.PutRequest) int { return kvOverhead + len(r.Key) + len(r.Value) }
 
-func costTxnReq(u *pb.RequestUnion) int {
+func costTxnReq(u *pb.RequestOp) int {
 	r := u.GetRequestPut()
 	if r == nil {
 		return 0

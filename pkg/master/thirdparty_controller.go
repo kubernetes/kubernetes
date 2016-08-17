@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,9 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	expapi "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apiserver"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/registry/thirdpartyresourcedata"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -29,6 +31,19 @@ import (
 )
 
 const thirdpartyprefix = "/apis"
+
+// dynamicLister is used to list resources for dynamic third party
+// apis. It implements the apiserver.APIResourceLister interface
+type dynamicLister struct {
+	m    *Master
+	path string
+}
+
+func (d dynamicLister) ListAPIResources() []unversioned.APIResource {
+	return d.m.getExistingThirdPartyResources(d.path)
+}
+
+var _ apiserver.APIResourceLister = &dynamicLister{}
 
 func makeThirdPartyPath(group string) string {
 	if len(group) == 0 {
@@ -44,13 +59,14 @@ func getThirdPartyGroupName(path string) string {
 // resourceInterface is the interface for the parts of the master that know how to add/remove
 // third party resources.  Extracted into an interface for injection for testing.
 type resourceInterface interface {
-	// Remove a third party resource based on the RESTful path for that resource
+	// Remove a third party resource based on the RESTful path for that resource, the path is <api-group-path>/<resource-plural-name>
 	RemoveThirdPartyResource(path string) error
 	// Install a third party resource described by 'rsrc'
 	InstallThirdPartyResource(rsrc *expapi.ThirdPartyResource) error
 	// Is a particular third party resource currently installed?
 	HasThirdPartyResource(rsrc *expapi.ThirdPartyResource) (bool, error)
-	// List all currently installed third party resources
+	// List all currently installed third party resources, the returned
+	// names are of the form <api-group-path>/<resource-plural-name>
 	ListThirdPartyResources() []string
 }
 

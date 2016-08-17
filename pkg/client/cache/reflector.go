@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,8 +69,6 @@ type Reflector struct {
 	resyncPeriod time.Duration
 	// now() returns current time - exposed for testing purposes
 	now func() time.Time
-	// nextResync is approximate time of next resync (0 if not scheduled)
-	nextResync time.Time
 	// lastSyncResourceVersion is the resource version token last
 	// observed when doing a sync with the underlying store
 	// it is thread safe, but not synchronized with the underlying store
@@ -164,7 +162,7 @@ func hasPackage(file string, ignoredPackages []string) bool {
 	return false
 }
 
-// trimPackagePrefix reduces dulpicate values off the front of a package name.
+// trimPackagePrefix reduces duplicate values off the front of a package name.
 func trimPackagePrefix(file string) string {
 	if l := strings.LastIndex(file, "k8s.io/kubernetes/pkg/"); l >= 0 {
 		return file[l+len("k8s.io/kubernetes/"):]
@@ -234,14 +232,12 @@ var (
 // required, and a cleanup function.
 func (r *Reflector) resyncChan() (<-chan time.Time, func() bool) {
 	if r.resyncPeriod == 0 {
-		r.nextResync = time.Time{}
 		return neverExitWatch, func() bool { return false }
 	}
 	// The cleanup function is required: imagine the scenario where watches
 	// always fail so we end up listing frequently. Then, if we don't
 	// manually stop the timer, we could end up with many timers active
 	// concurrently.
-	r.nextResync = r.now().Add(r.resyncPeriod)
 	t := time.NewTimer(r.resyncPeriod)
 	return t.C, t.Stop
 }
@@ -285,7 +281,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 			case <-stopCh:
 				return
 			}
-			glog.V(4).Infof("%s: next resync planned for %#v, forcing now", r.name, r.nextResync)
+			glog.V(4).Infof("%s: forcing resync", r.name)
 			if err := r.store.Resync(); err != nil {
 				resyncerrc <- err
 				return

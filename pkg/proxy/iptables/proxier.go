@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import (
 	"encoding/base32"
 	"fmt"
 	"net"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -65,7 +64,8 @@ const kubeNodePortsChain utiliptables.Chain = "KUBE-NODEPORTS"
 const kubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
 
 // the mark-for-masquerade chain
-const kubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
+// TODO: let kubelet manage this chain. Other component should just assume it exists and use it.
+const KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
 // the mark we apply to traffic needing SNAT
 // TODO(thockin): Remove this for v1.3 or v1.4.
@@ -163,6 +163,7 @@ type Proxier struct {
 	masqueradeMark string
 	exec           utilexec.Interface
 	clusterCIDR    string
+	hostname       string
 }
 
 type localPort struct {
@@ -188,7 +189,7 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if err := utilsysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
@@ -197,15 +198,8 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
 	// are connected to a Linux bridge (but not SDN bridges).  Until most
 	// plugins handle this, log when config is missing
-	warnBrNetfilter := false
-	if _, err := os.Stat("/sys/module/br_netfilter"); os.IsNotExist(err) {
-		warnBrNetfilter = true
-	}
 	if val, err := utilsysctl.GetSysctl(sysctlBridgeCallIptables); err == nil && val != 1 {
-		warnBrNetfilter = true
-	}
-	if warnBrNetfilter {
-		glog.Infof("missing br-netfilter module or unset br-nf-call-iptables; proxy may not work as intended")
+		glog.Infof("missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
 	}
 
 	// Generate the masquerade mark to use for SNAT rules.
@@ -225,6 +219,7 @@ func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod 
 		masqueradeMark: masqueradeMark,
 		exec:           exec,
 		clusterCIDR:    clusterCIDR,
+		hostname:       hostname,
 	}, nil
 }
 
@@ -270,12 +265,12 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 		glog.Errorf("Failed to execute iptables-save for %s: %v", utiliptables.TableNAT, err)
 		encounteredError = true
 	} else {
-		existingNATChains := getChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+		existingNATChains := utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
 		natChains := bytes.NewBuffer(nil)
 		natRules := bytes.NewBuffer(nil)
 		writeLine(natChains, "*nat")
 		// Start with chains we know we need to remove.
-		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, kubeMarkMasqChain} {
+		for _, chain := range []utiliptables.Chain{kubeServicesChain, kubeNodePortsChain, kubePostroutingChain, KubeMarkMasqChain} {
 			if _, found := existingNATChains[chain]; found {
 				chainString := string(chain)
 				writeLine(natChains, existingNATChains[chain]) // flush
@@ -698,7 +693,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingFilterChains = getChainLines(utiliptables.TableFilter, iptablesSaveRaw)
+		existingFilterChains = utiliptables.GetChainLines(utiliptables.TableFilter, iptablesSaveRaw)
 	}
 
 	existingNATChains := make(map[utiliptables.Chain]string)
@@ -706,7 +701,7 @@ func (proxier *Proxier) syncProxyRules() {
 	if err != nil { // if we failed to get any rules
 		glog.Errorf("Failed to execute iptables-save, syncing all rules: %v", err)
 	} else { // otherwise parse the output
-		existingNATChains = getChainLines(utiliptables.TableNAT, iptablesSaveRaw)
+		existingNATChains = utiliptables.GetChainLines(utiliptables.TableNAT, iptablesSaveRaw)
 	}
 
 	filterChains := bytes.NewBuffer(nil)
@@ -723,27 +718,27 @@ func (proxier *Proxier) syncProxyRules() {
 	if chain, ok := existingFilterChains[kubeServicesChain]; ok {
 		writeLine(filterChains, chain)
 	} else {
-		writeLine(filterChains, makeChainLine(kubeServicesChain))
+		writeLine(filterChains, utiliptables.MakeChainLine(kubeServicesChain))
 	}
 	if chain, ok := existingNATChains[kubeServicesChain]; ok {
 		writeLine(natChains, chain)
 	} else {
-		writeLine(natChains, makeChainLine(kubeServicesChain))
+		writeLine(natChains, utiliptables.MakeChainLine(kubeServicesChain))
 	}
 	if chain, ok := existingNATChains[kubeNodePortsChain]; ok {
 		writeLine(natChains, chain)
 	} else {
-		writeLine(natChains, makeChainLine(kubeNodePortsChain))
+		writeLine(natChains, utiliptables.MakeChainLine(kubeNodePortsChain))
 	}
 	if chain, ok := existingNATChains[kubePostroutingChain]; ok {
 		writeLine(natChains, chain)
 	} else {
-		writeLine(natChains, makeChainLine(kubePostroutingChain))
+		writeLine(natChains, utiliptables.MakeChainLine(kubePostroutingChain))
 	}
-	if chain, ok := existingNATChains[kubeMarkMasqChain]; ok {
+	if chain, ok := existingNATChains[KubeMarkMasqChain]; ok {
 		writeLine(natChains, chain)
 	} else {
-		writeLine(natChains, makeChainLine(kubeMarkMasqChain))
+		writeLine(natChains, utiliptables.MakeChainLine(KubeMarkMasqChain))
 	}
 
 	// Install the kubernetes-specific postrouting rules. We use a whole chain for
@@ -760,7 +755,7 @@ func (proxier *Proxier) syncProxyRules() {
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
 	writeLine(natRules, []string{
-		"-A", string(kubeMarkMasqChain),
+		"-A", string(KubeMarkMasqChain),
 		"-j", "MARK", "--set-xmark", proxier.masqueradeMark,
 	}...)
 
@@ -779,7 +774,7 @@ func (proxier *Proxier) syncProxyRules() {
 		if chain, ok := existingNATChains[svcChain]; ok {
 			writeLine(natChains, chain)
 		} else {
-			writeLine(natChains, makeChainLine(svcChain))
+			writeLine(natChains, utiliptables.MakeChainLine(svcChain))
 		}
 		activeNATChains[svcChain] = true
 
@@ -792,10 +787,10 @@ func (proxier *Proxier) syncProxyRules() {
 			"--dport", fmt.Sprintf("%d", svcInfo.port),
 		}
 		if proxier.masqueradeAll {
-			writeLine(natRules, append(args, "-j", string(kubeMarkMasqChain))...)
+			writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 		}
 		if len(proxier.clusterCIDR) > 0 {
-			writeLine(natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(kubeMarkMasqChain))...)
+			writeLine(natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
 		}
 		writeLine(natRules, append(args, "-j", string(svcChain))...)
 
@@ -833,7 +828,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"--dport", fmt.Sprintf("%d", svcInfo.port),
 			}
 			// We have to SNAT packets to external IPs.
-			writeLine(natRules, append(args, "-j", string(kubeMarkMasqChain))...)
+			writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 
 			// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
 			// nor from a local process to be forwarded to the service.
@@ -860,7 +855,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"--dport", fmt.Sprintf("%d", svcInfo.port),
 				}
 				// We have to SNAT packets from external IPs.
-				writeLine(natRules, append(args, "-j", string(kubeMarkMasqChain))...)
+				writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 				writeLine(natRules, append(args, "-j", string(svcChain))...)
 			}
 		}
@@ -896,7 +891,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"--dport", fmt.Sprintf("%d", svcInfo.nodePort),
 			}
 			// Nodeports need SNAT.
-			writeLine(natRules, append(args, "-j", string(kubeMarkMasqChain))...)
+			writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
 			// Jump to the service chain.
 			writeLine(natRules, append(args, "-j", string(svcChain))...)
 		}
@@ -927,7 +922,7 @@ func (proxier *Proxier) syncProxyRules() {
 			if chain, ok := existingNATChains[utiliptables.Chain(endpointChain)]; ok {
 				writeLine(natChains, chain)
 			} else {
-				writeLine(natChains, makeChainLine(endpointChain))
+				writeLine(natChains, utiliptables.MakeChainLine(endpointChain))
 			}
 			activeNATChains[endpointChain] = true
 		}
@@ -975,7 +970,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// TODO: if we grow logic to get this node's pod CIDR, we can use it.
 			writeLine(natRules, append(args,
 				"-s", fmt.Sprintf("%s/32", strings.Split(endpoints[i], ":")[0]),
-				"-j", string(kubeMarkMasqChain))...)
+				"-j", string(KubeMarkMasqChain))...)
 
 			// Update client-affinity lists.
 			if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
@@ -1055,92 +1050,6 @@ func (proxier *Proxier) syncProxyRules() {
 // Join all words with spaces, terminate with newline and write to buf.
 func writeLine(buf *bytes.Buffer, words ...string) {
 	buf.WriteString(strings.Join(words, " ") + "\n")
-}
-
-// return an iptables-save/restore formatted chain line given a Chain
-func makeChainLine(chain utiliptables.Chain) string {
-	return fmt.Sprintf(":%s - [0:0]", chain)
-}
-
-// getChainLines parses a table's iptables-save data to find chains in the table.
-// It returns a map of iptables.Chain to string where the string is the chain line from the save (with counters etc).
-func getChainLines(table utiliptables.Table, save []byte) map[utiliptables.Chain]string {
-	chainsMap := make(map[utiliptables.Chain]string)
-	tablePrefix := "*" + string(table)
-	readIndex := 0
-	// find beginning of table
-	for readIndex < len(save) {
-		line, n := readLine(readIndex, save)
-		readIndex = n
-		if strings.HasPrefix(line, tablePrefix) {
-			break
-		}
-	}
-	// parse table lines
-	for readIndex < len(save) {
-		line, n := readLine(readIndex, save)
-		readIndex = n
-		if len(line) == 0 {
-			continue
-		}
-		if strings.HasPrefix(line, "COMMIT") || strings.HasPrefix(line, "*") {
-			break
-		} else if strings.HasPrefix(line, "#") {
-			continue
-		} else if strings.HasPrefix(line, ":") && len(line) > 1 {
-			chain := utiliptables.Chain(strings.SplitN(line[1:], " ", 2)[0])
-			chainsMap[chain] = line
-		}
-	}
-	return chainsMap
-}
-
-func readLine(readIndex int, byteArray []byte) (string, int) {
-	currentReadIndex := readIndex
-
-	// consume left spaces
-	for currentReadIndex < len(byteArray) {
-		if byteArray[currentReadIndex] == ' ' {
-			currentReadIndex++
-		} else {
-			break
-		}
-	}
-
-	// leftTrimIndex stores the left index of the line after the line is left-trimmed
-	leftTrimIndex := currentReadIndex
-
-	// rightTrimIndex stores the right index of the line after the line is right-trimmed
-	// it is set to -1 since the correct value has not yet been determined.
-	rightTrimIndex := -1
-
-	for ; currentReadIndex < len(byteArray); currentReadIndex++ {
-		if byteArray[currentReadIndex] == ' ' {
-			// set rightTrimIndex
-			if rightTrimIndex == -1 {
-				rightTrimIndex = currentReadIndex
-			}
-		} else if (byteArray[currentReadIndex] == '\n') || (currentReadIndex == (len(byteArray) - 1)) {
-			// end of line or byte buffer is reached
-			if currentReadIndex <= leftTrimIndex {
-				return "", currentReadIndex + 1
-			}
-			// set the rightTrimIndex
-			if rightTrimIndex == -1 {
-				rightTrimIndex = currentReadIndex
-				if currentReadIndex == (len(byteArray)-1) && (byteArray[currentReadIndex] != '\n') {
-					// ensure that the last character is part of the returned string,
-					// unless the last character is '\n'
-					rightTrimIndex = currentReadIndex + 1
-				}
-			}
-			return string(byteArray[leftTrimIndex:rightTrimIndex]), currentReadIndex + 1
-		} else {
-			// unset rightTrimIndex
-			rightTrimIndex = -1
-		}
-	}
-	return "", currentReadIndex
 }
 
 func isLocalIP(ip string) (bool, error) {

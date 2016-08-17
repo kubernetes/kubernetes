@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,8 +29,9 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient"
+	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/runtime"
-	deploymentutil "k8s.io/kubernetes/pkg/util/deployment"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func TestReplicationControllerStop(t *testing.T) {
@@ -69,7 +70,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
+			ExpectedActions: []string{"get", "list", "get", "update", "watch", "delete"},
 		},
 		{
 			Name: "NoOverlapping",
@@ -107,7 +108,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "get", "get", "delete"},
+			ExpectedActions: []string{"get", "list", "get", "update", "watch", "delete"},
 		},
 		{
 			Name: "OverlappingError",
@@ -242,9 +243,20 @@ func TestReplicationControllerStop(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		copiedForWatch, err := api.Scheme.Copy(test.Objs[0])
+		if err != nil {
+			t.Fatalf("%s unexpected error: %v", test.Name, err)
+		}
 		fake := testclient.NewSimpleFake(test.Objs...)
+		fakeWatch := watch.NewFake()
+		fake.PrependWatchReactor("replicationcontrollers", testclient.DefaultWatchReactor(fakeWatch, nil))
+
+		go func() {
+			fakeWatch.Add(copiedForWatch)
+		}()
+
 		reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}
-		err := reaper.Stop(ns, name, 0, nil)
+		err = reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
 			continue

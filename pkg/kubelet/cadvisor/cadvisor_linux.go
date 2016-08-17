@@ -1,7 +1,7 @@
 // +build cgo,linux
 
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/golang/glog"
@@ -53,10 +52,21 @@ const defaultHousekeepingInterval = 10 * time.Second
 const allowDynamicHousekeeping = true
 
 func init() {
-	// Override the default cAdvisor housekeeping interval.
-	if f := flag.Lookup("housekeeping_interval"); f != nil {
-		f.DefValue = defaultHousekeepingInterval.String()
-		f.Value.Set(f.DefValue)
+	// Override cAdvisor flag defaults.
+	flagOverrides := map[string]string{
+		// Override the default cAdvisor housekeeping interval.
+		"housekeeping_interval": defaultHousekeepingInterval.String(),
+		// Disable event storage by default.
+		"event_storage_event_limit": "default=0",
+		"event_storage_age_limit":   "default=0",
+	}
+	for name, defaultValue := range flagOverrides {
+		if f := flag.Lookup(name); f != nil {
+			f.DefValue = defaultValue
+			f.Value.Set(defaultValue)
+		} else {
+			glog.Errorf("Expected cAdvisor flag %q not found", name)
+		}
 	}
 }
 
@@ -68,7 +78,7 @@ func New(port uint, runtime string) (Interface, error) {
 	}
 
 	// Create and start the cAdvisor container manager.
-	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisorMetrics.MetricSet{cadvisorMetrics.NetworkTcpUsageMetrics: struct{}{}})
+	m, err := manager.New(memory.New(statsCacheDuration, nil), sysFs, maxHousekeepingInterval, allowDynamicHousekeeping, cadvisorMetrics.MetricSet{cadvisorMetrics.NetworkTcpUsageMetrics: struct{}{}}, http.DefaultClient)
 	if err != nil {
 		return nil, err
 	}
@@ -98,18 +108,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 		return err
 	}
 
-	re := regexp.MustCompile(`^k8s_(?P<kubernetes_container_name>[^_\.]+)[^_]+_(?P<kubernetes_pod_name>[^_]+)_(?P<kubernetes_namespace>[^_]+)`)
-	reCaptureNames := re.SubexpNames()
-	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", func(name string) map[string]string {
-		extraLabels := map[string]string{}
-		matches := re.FindStringSubmatch(name)
-		for i, match := range matches {
-			if len(reCaptureNames[i]) > 0 {
-				extraLabels[re.SubexpNames()[i]] = match
-			}
-		}
-		return extraLabels
-	})
+	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", nil)
 
 	// Only start the http server if port > 0
 	if port > 0 {

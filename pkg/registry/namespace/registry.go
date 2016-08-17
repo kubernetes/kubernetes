@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ func (s *storage) CreateNamespace(ctx api.Context, namespace *api.Namespace) err
 }
 
 func (s *storage) UpdateNamespace(ctx api.Context, namespace *api.Namespace) error {
-	_, _, err := s.Update(ctx, namespace)
+	_, _, err := s.Update(ctx, namespace.Name, rest.DefaultUpdatedObjectInfo(namespace, api.Scheme))
 	return err
 }
 

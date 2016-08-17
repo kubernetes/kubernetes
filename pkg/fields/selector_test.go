@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -185,13 +185,14 @@ func TestRequiresExactMatch(t *testing.T) {
 		Found bool
 	}{
 		"empty set":                 {Set{}.AsSelector(), "test", "", false},
-		"nil andTerm":               {andTerm(nil), "test", "", false},
 		"empty hasTerm":             {&hasTerm{}, "test", "", false},
 		"skipped hasTerm":           {&hasTerm{"a", "b"}, "test", "", false},
 		"valid hasTerm":             {&hasTerm{"test", "b"}, "test", "b", true},
 		"valid hasTerm no value":    {&hasTerm{"test", ""}, "test", "", true},
 		"valid notHasTerm":          {&notHasTerm{"test", "b"}, "test", "", false},
 		"valid notHasTerm no value": {&notHasTerm{"test", ""}, "test", "", false},
+		"nil andTerm":               {andTerm(nil), "test", "", false},
+		"empty andTerm":             {andTerm{}, "test", "", false},
 		"nested andTerm":            {andTerm{andTerm{}}, "test", "", false},
 		"nested andTerm matches":    {andTerm{&hasTerm{"test", "b"}}, "test", "b", true},
 		"andTerm with non-match":    {andTerm{&hasTerm{}, &hasTerm{"test", "b"}}, "test", "b", true},

@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/federation/apis/federation"
-	"k8s.io/kubernetes/federation/apis/federation/v1alpha1"
+	"k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -77,7 +77,7 @@ func TestInterfacesFor(t *testing.T) {
 }
 
 func TestRESTMapper(t *testing.T) {
-	gv := v1alpha1.SchemeGroupVersion
+	gv := v1beta1.SchemeGroupVersion
 	clusterGVK := gv.WithKind("Cluster")
 
 	if gvk, err := registered.GroupOrDie(federation.GroupName).RESTMapper.KindFor(gv.WithResource("clusters")); err != nil || gvk != clusterGVK {

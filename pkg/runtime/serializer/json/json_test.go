@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -41,7 +41,7 @@ func (d *testDecodable) GroupVersionKind() unversioned.GroupVersionKind       { 
 func TestDecode(t *testing.T) {
 	testCases := []struct {
 		creater runtime.ObjectCreater
-		typer   runtime.Typer
+		typer   runtime.ObjectTyper
 		yaml    bool
 		pretty  bool
 
@@ -260,6 +260,13 @@ type mockTyper struct {
 	err error
 }
 
-func (t *mockTyper) ObjectKind(obj runtime.Object) (*unversioned.GroupVersionKind, bool, error) {
-	return t.gvk, false, t.err
+func (t *mockTyper) ObjectKinds(obj runtime.Object) ([]unversioned.GroupVersionKind, bool, error) {
+	if t.gvk == nil {
+		return nil, false, t.err
+	}
+	return []unversioned.GroupVersionKind{*t.gvk}, false, t.err
+}
+
+func (t *mockTyper) Recognizes(_ unversioned.GroupVersionKind) bool {
+	return false
 }

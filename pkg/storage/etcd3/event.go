@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ package etcd3
 
 import (
 	"github.com/coreos/etcd/clientv3"
-	"github.com/coreos/etcd/storage/storagepb"
+	"github.com/coreos/etcd/mvcc/mvccpb"
 )
 
 type event struct {
@@ -29,7 +29,7 @@ type event struct {
 	isCreated bool
 }
 
-func parseKV(kv *storagepb.KeyValue) *event {
+func parseKV(kv *mvccpb.KeyValue) *event {
 	return &event{
 		key:       string(kv.Key),
 		value:     kv.Value,

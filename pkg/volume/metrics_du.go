@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,8 +26,9 @@ import (
 
 var _ MetricsProvider = &metricsDu{}
 
-// metricsDu represents a MetricsProvider that calculates the used and available
-// Volume space by executing the "du" command and gathering filesystem info for the Volume path.
+// metricsDu represents a MetricsProvider that calculates the used and
+// available Volume space by executing the "du" command and gathering
+// filesystem info for the Volume path.
 type metricsDu struct {
 	// the directory path the volume is mounted to.
 	path string
@@ -38,9 +39,9 @@ func NewMetricsDu(path string) MetricsProvider {
 	return &metricsDu{path}
 }
 
-// See MetricsProvider.GetMetrics
 // GetMetrics calculates the volume usage and device free space by executing "du"
 // and gathering filesystem info for the Volume path.
+// See MetricsProvider.GetMetrics
 func (md *metricsDu) GetMetrics() (*Metrics, error) {
 	metrics := &Metrics{}
 	if md.path == "" {
@@ -70,9 +71,10 @@ func (md *metricsDu) runDu(metrics *Metrics) error {
 	return nil
 }
 
-// getFsInfo writes metrics.Capacity and metrics.Available from the filesystem info
+// getFsInfo writes metrics.Capacity and metrics.Available from the filesystem
+// info
 func (md *metricsDu) getFsInfo(metrics *Metrics) error {
-	available, capacity, err := util.FsInfo(md.path)
+	available, capacity, _, err := util.FsInfo(md.path)
 	if err != nil {
 		return fmt.Errorf("Failed to get FsInfo due to error %v", err)
 	}

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -58,6 +58,8 @@ type Object interface {
 	SetLabels(labels map[string]string)
 	GetAnnotations() map[string]string
 	SetAnnotations(annotations map[string]string)
+	GetFinalizers() []string
+	SetFinalizers(finalizers []string)
 	GetOwnerReferences() []metatypes.OwnerReference
 	SetOwnerReferences([]metatypes.OwnerReference)
 }
@@ -71,20 +73,10 @@ type ListMetaAccessor interface {
 // List lets you work with list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
 // not support that field will be a no-op and return a default value.
-type List interface {
-	GetResourceVersion() string
-	SetResourceVersion(version string)
-	GetSelfLink() string
-	SetSelfLink(selfLink string)
-}
+type List unversioned.List
 
 // Type exposes the type and APIVersion of versioned or internal API objects.
-type Type interface {
-	GetAPIVersion() string
-	SetAPIVersion(version string)
-	GetKind() string
-	SetKind(kind string)
-}
+type Type unversioned.Type
 
 // MetadataAccessor lets you work with object and list metadata from any of the versioned or
 // internal API objects. Attempting to set or retrieve a field on an object that does
@@ -181,7 +173,10 @@ type RESTMapper interface {
 	// ResourcesFor takes a partial resource and returns back the list of potential resource in priority order
 	ResourcesFor(input unversioned.GroupVersionResource) ([]unversioned.GroupVersionResource, error)
 
+	// RESTMapping identifies a preferred resource mapping for the provided group kind.
 	RESTMapping(gk unversioned.GroupKind, versions ...string) (*RESTMapping, error)
+	// RESTMappings returns all resource mappings for the provided group kind.
+	RESTMappings(gk unversioned.GroupKind) ([]*RESTMapping, error)
 
 	AliasesForResource(resource string) ([]string, bool)
 	ResourceSingularizer(resource string) (singular string, err error)

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@ import (
 // and always return nil.
 func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 	aaa := NewAlwaysAllowAuthorizer()
-	if result := aaa.Authorize(nil); result != nil {
-		t.Errorf("AlwaysAllowAuthorizer.Authorize did not return nil. (%s)", result)
+	if authorized, _, _ := aaa.Authorize(nil); !authorized {
+		t.Errorf("AlwaysAllowAuthorizer.Authorize did not authorize successfully.")
 	}
 }
 
@@ -33,7 +33,7 @@ func TestNewAlwaysAllowAuthorizer(t *testing.T) {
 // and always return an error as everything is forbidden.
 func TestNewAlwaysDenyAuthorizer(t *testing.T) {
 	ada := NewAlwaysDenyAuthorizer()
-	if result := ada.Authorize(nil); result == nil {
+	if authorized, _, _ := ada.Authorize(nil); authorized {
 		t.Errorf("AlwaysDenyAuthorizer.Authorize returned nil instead of error.")
 	}
 }
@@ -83,7 +83,7 @@ func TestNewAuthorizerFromAuthorizationConfig(t *testing.T) {
 			msg:     "should have errored when Authorization Policy File is used without ModeABAC",
 		},
 		{
-			// Atleast one authorizationMode is necessary
+			// At least one authorizationMode is necessary
 			modes:   []string{},
 			config:  AuthorizationConfig{PolicyFile: examplePolicyFile},
 			wantErr: true,

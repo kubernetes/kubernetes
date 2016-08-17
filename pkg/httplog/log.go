@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ type passthroughLogger struct{}
 
 // Addf logs info immediately.
 func (passthroughLogger) Addf(format string, data ...interface{}) {
-	glog.InfoDepth(1, fmt.Sprintf(format, data...))
+	glog.V(2).Info(fmt.Sprintf(format, data...))
 }
 
 // DefaultStacktracePred is the default implementation of StacktracePred.
@@ -210,7 +210,7 @@ func (rl *respLogger) recordStatus(status int) {
 	rl.statusRecorded = true
 	if rl.logStacktracePred(status) {
 		// Only log stacks for errors
-		stack := make([]byte, 2048)
+		stack := make([]byte, 50*1024)
 		stack = stack[:runtime.Stack(stack, false)]
 		rl.statusStack = "\n" + string(stack)
 	} else {

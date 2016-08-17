@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
@@ -104,43 +105,46 @@ func fatal(msg string) {
 // This method is generic to the command in use and may be used by non-Kubectl
 // commands.
 func CheckErr(err error) {
-	checkErr(err, fatalErrHandler)
+	checkErr("", err, fatalErrHandler)
 }
 
-func checkErr(err error, handleErr func(string)) {
+// checkErrWithPrefix works like CheckErr, but adds a caller-defined prefix to non-nil errors
+func checkErrWithPrefix(prefix string, err error) {
+	checkErr(prefix, err, fatalErrHandler)
+}
+
+func checkErr(pref string, err error, handleErr func(string)) {
 	if err == nil {
 		return
 	}
 
 	if errors.IsInvalid(err) {
 		details := err.(*errors.StatusError).Status().Details
-		prefix := fmt.Sprintf("The %s %q is invalid.\n", details.Kind, details.Name)
+		prefix := fmt.Sprintf("%sThe %s %q is invalid.\n", pref, details.Kind, details.Name)
 		errs := statusCausesToAggrError(details.Causes)
 		handleErr(MultilineError(prefix, errs))
 	}
 
-	if meta.IsNoResourceMatchError(err) {
-		noMatch := err.(*meta.NoResourceMatchError)
-
+	if noMatch, ok := err.(*meta.NoResourceMatchError); ok {
 		switch {
 		case len(noMatch.PartialResource.Group) > 0 && len(noMatch.PartialResource.Version) > 0:
-			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Group, noMatch.PartialResource.Version))
+			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q and version %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Group, noMatch.PartialResource.Version))
 		case len(noMatch.PartialResource.Group) > 0:
-			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Group))
+			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Group))
 		case len(noMatch.PartialResource.Version) > 0:
-			handleErr(fmt.Sprintf("the server doesn't have a resource type %q in version %q", noMatch.PartialResource.Resource, noMatch.PartialResource.Version))
+			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in version %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Version))
 		default:
-			handleErr(fmt.Sprintf("the server doesn't have a resource type %q", noMatch.PartialResource.Resource))
+			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q", pref, noMatch.PartialResource.Resource))
 		}
 		return
 	}
 
 	// handle multiline errors
 	if clientcmd.IsConfigurationInvalid(err) {
-		handleErr(MultilineError("Error in configuration: ", err))
+		handleErr(MultilineError(fmt.Sprintf("%sError in configuration: ", pref), err))
 	}
 	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
-		handleErr(MultipleErrors("", agg.Errors()))
+		handleErr(MultipleErrors(pref, agg.Errors()))
 	}
 
 	msg, ok := StandardErrorMessage(err)
@@ -150,7 +154,7 @@ func checkErr(err error, handleErr func(string)) {
 			msg = fmt.Sprintf("error: %s", msg)
 		}
 	}
-	handleErr(msg)
+	handleErr(fmt.Sprintf("%s%s", pref, msg))
 }
 
 func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {
@@ -333,7 +337,7 @@ func AddValidateFlags(cmd *cobra.Command) {
 }
 
 func AddRecursiveFlag(cmd *cobra.Command, value *bool) {
-	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "If true, process directory recursively.")
+	cmd.Flags().BoolVarP(value, "recursive", "R", *value, "Process the directory used in -f, --filename recursively. Useful when you want to manage related manifests organized within the same directory.")
 }
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.
@@ -359,7 +363,7 @@ func ReadConfigDataFromReader(reader io.Reader, source string) ([]byte, error) {
 	}
 
 	if len(data) == 0 {
-		return nil, fmt.Errorf(`Read from %s but no data found`, source)
+		return nil, fmt.Errorf("Read from %s but no data found", source)
 	}
 
 	return data, nil
@@ -431,7 +435,7 @@ func UpdateObject(info *resource.Info, codec runtime.Codec, updateFn func(runtim
 
 // AddCmdRecordFlag adds --record flag to command
 func AddRecordFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation.")
+	cmd.Flags().Bool("record", false, "Record current kubectl command in the resource annotation. If set to false, do not record the command. If set to true, record the command. If not set, default to updating the existing annotation value only if one already exists.")
 }
 
 func GetRecordFlag(cmd *cobra.Command) bool {
@@ -485,9 +489,13 @@ func ContainsChangeCause(info *resource.Info) bool {
 
 // ShouldRecord checks if we should record current change cause
 func ShouldRecord(cmd *cobra.Command, info *resource.Info) bool {
-	return GetRecordFlag(cmd) || ContainsChangeCause(info)
+	return GetRecordFlag(cmd) || (ContainsChangeCause(info) && !cmd.Flags().Changed("record"))
 }
 
+// GetThirdPartyGroupVersions returns the thirdparty "group/versions"s and
+// resources supported by the server. A user may delete a thirdparty resource
+// when this function is running, so this function may return a "NotFound" error
+// due to the race.
 func GetThirdPartyGroupVersions(discovery discovery.DiscoveryInterface) ([]unversioned.GroupVersion, []unversioned.GroupVersionKind, error) {
 	result := []unversioned.GroupVersion{}
 	gvks := []unversioned.GroupVersionKind{}
@@ -593,4 +601,16 @@ func ParsePairs(pairArgs []string, pairType string, supportRemove bool) (newPair
 	}
 
 	return
+}
+
+// MaybeConvertObject attempts to convert an object to a specific group/version.  If the object is
+// a third party resource it is simply passed through.
+func MaybeConvertObject(obj runtime.Object, gv unversioned.GroupVersion, converter runtime.ObjectConvertor) (runtime.Object, error) {
+	switch obj.(type) {
+	case *extensions.ThirdPartyResourceData:
+		// conversion is not supported for 3rd party objects
+		return obj, nil
+	default:
+		return converter.ConvertToVersion(obj, gv)
+	}
 }

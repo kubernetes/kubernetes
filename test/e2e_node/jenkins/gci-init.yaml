@@ -1,0 +1,9 @@
+#cloud-config
+
+runcmd:
+  - mount /tmp /tmp -o remount,exec,suid
+  - etcd_version=v2.2.5
+  - curl -L https://github.com/coreos/etcd/releases/download/${etcd_version}/etcd-${etcd_version}-linux-amd64.tar.gz -o /tmp/etcd.tar.gz
+  - tar xzvf /tmp/etcd.tar.gz -C /tmp
+  - cp  /tmp/etcd-${etcd_version}-linux-amd64/etcd* /tmp/
+  - rm -rf /tmp/etcd-${etcd_version}-linux-amd64/

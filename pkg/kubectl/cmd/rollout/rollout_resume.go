@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package rollout
 import (
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/meta"
@@ -42,15 +43,17 @@ type ResumeConfig struct {
 	Recursive bool
 }
 
-const (
-	resume_long = `Resume a paused resource
+var (
+	resume_long = dedent.Dedent(`
+		Resume a paused resource
 
-Paused resources will not be reconciled by a controller. By resuming a
-resource, we allow it to be reconciled again.
-Currently only deployments support being resumed.`
+		Paused resources will not be reconciled by a controller. By resuming a
+		resource, we allow it to be reconciled again.
+		Currently only deployments support being resumed.`)
 
-	resume_example = `# Resume an already paused deployment
-kubectl rollout resume deployment/nginx`
+	resume_example = dedent.Dedent(`
+		# Resume an already paused deployment
+		kubectl rollout resume deployment/nginx`)
 )
 
 func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {

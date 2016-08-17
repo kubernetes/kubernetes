@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -70,11 +70,10 @@ func main() {
 	// Override defaults. These are Kubernetes specific input and output
 	// locations.
 	arguments.InputDirs = []string{
-		"k8s.io/kubernetes/pkg/",
-		"k8s.io/kubernetes/cmd/",
-		"k8s.io/kubernetes/plugin/",
+		"k8s.io/kubernetes/pkg/...",
+		"k8s.io/kubernetes/cmd/...",
+		"k8s.io/kubernetes/plugin/...",
 	}
-	arguments.Recursive = true
 	// arguments.VerifyOnly = true
 
 	if err := arguments.Execute(
@@ -85,5 +84,5 @@ func main() {
 		glog.Errorf("Error: %v", err)
 		os.Exit(1)
 	}
-	glog.Info("Completed successfully.")
+	glog.V(2).Info("Completed successfully.")
 }

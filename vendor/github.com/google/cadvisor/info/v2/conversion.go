@@ -24,18 +24,18 @@ import (
 
 func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
 	var result []MachineFsStats
-	for _, stat := range fsStats {
+	for i := range fsStats {
+		stat := fsStats[i]
 		readDuration := time.Millisecond * time.Duration(stat.ReadTime)
 		writeDuration := time.Millisecond * time.Duration(stat.WriteTime)
 		ioDuration := time.Millisecond * time.Duration(stat.IoTime)
 		weightedDuration := time.Millisecond * time.Duration(stat.WeightedIoTime)
-		result = append(result, MachineFsStats{
-			Device:     stat.Device,
-			Type:       stat.Type,
-			Capacity:   &stat.Limit,
-			Usage:      &stat.Usage,
-			Available:  &stat.Available,
-			InodesFree: &stat.InodesFree,
+		machineFsStat := MachineFsStats{
+			Device:    stat.Device,
+			Type:      stat.Type,
+			Capacity:  &stat.Limit,
+			Usage:     &stat.Usage,
+			Available: &stat.Available,
 			DiskStats: DiskStats{
 				ReadsCompleted:     &stat.ReadsCompleted,
 				ReadsMerged:        &stat.ReadsMerged,
@@ -49,7 +49,11 @@ func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
 				IoDuration:         &ioDuration,
 				WeightedIoDuration: &weightedDuration,
 			},
-		})
+		}
+		if stat.HasInodes {
+			machineFsStat.InodesFree = &stat.InodesFree
+		}
+		result = append(result, machineFsStat)
 	}
 	return result
 }
@@ -57,7 +61,8 @@ func machineFsStatsFromV1(fsStats []v1.FsStats) []MachineFsStats {
 func MachineStatsFromV1(cont *v1.ContainerInfo) []MachineStats {
 	var stats []MachineStats
 	var last *v1.ContainerStats
-	for _, val := range cont.Stats {
+	for i := range cont.Stats {
+		val := cont.Stats[i]
 		stat := MachineStats{
 			Timestamp: val.Timestamp,
 		}
@@ -206,7 +211,8 @@ func InstCpuStats(last, cur *v1.ContainerStats) (*CpuInstStats, error) {
 			return 0, fmt.Errorf("cumulative stats decrease")
 		}
 		valueDelta := curValue - lastValue
-		return (valueDelta * 1e9) / timeDeltaNs, nil
+		// Use float64 to keep precision
+		return uint64(float64(valueDelta) / float64(timeDeltaNs) * 1e9), nil
 	}
 	total, err := convertToRate(last.Cpu.Usage.Total, cur.Cpu.Usage.Total)
 	if err != nil {
@@ -267,58 +273,4 @@ func ContainerSpecFromV1(specV1 *v1.ContainerSpec, aliases []string, namespace s
 	specV2.Aliases = aliases
 	specV2.Namespace = namespace
 	return specV2
-}
-
-func instCpuStats(last, cur *v1.ContainerStats) (*CpuInstStats, error) {
-	if last == nil {
-		return nil, nil
-	}
-	if !cur.Timestamp.After(last.Timestamp) {
-		return nil, fmt.Errorf("container stats move backwards in time")
-	}
-	if len(last.Cpu.Usage.PerCpu) != len(cur.Cpu.Usage.PerCpu) {
-		return nil, fmt.Errorf("different number of cpus")
-	}
-	timeDelta := cur.Timestamp.Sub(last.Timestamp)
-	if timeDelta <= 100*time.Millisecond {
-		return nil, fmt.Errorf("time delta unexpectedly small")
-	}
-	// Nanoseconds to gain precision and avoid having zero seconds if the
-	// difference between the timestamps is just under a second
-	timeDeltaNs := uint64(timeDelta.Nanoseconds())
-	convertToRate := func(lastValue, curValue uint64) (uint64, error) {
-		if curValue < lastValue {
-			return 0, fmt.Errorf("cumulative stats decrease")
-		}
-		valueDelta := curValue - lastValue
-		return (valueDelta * 1e9) / timeDeltaNs, nil
-	}
-	total, err := convertToRate(last.Cpu.Usage.Total, cur.Cpu.Usage.Total)
-	if err != nil {
-		return nil, err
-	}
-	percpu := make([]uint64, len(last.Cpu.Usage.PerCpu))
-	for i := range percpu {
-		var err error
-		percpu[i], err = convertToRate(last.Cpu.Usage.PerCpu[i], cur.Cpu.Usage.PerCpu[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	user, err := convertToRate(last.Cpu.Usage.User, cur.Cpu.Usage.User)
-	if err != nil {
-		return nil, err
-	}
-	system, err := convertToRate(last.Cpu.Usage.System, cur.Cpu.Usage.System)
-	if err != nil {
-		return nil, err
-	}
-	return &CpuInstStats{
-		Usage: CpuInstUsage{
-			Total:  total,
-			PerCpu: percpu,
-			User:   user,
-			System: system,
-		},
-	}, nil
 }

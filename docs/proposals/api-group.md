@@ -2,15 +2,15 @@
 
 <!-- BEGIN STRIP_FOR_RELEASE -->
 
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
-<img src="http://kubernetes.io/img/warning.png" alt="WARNING"
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
      width="25" height="25">
 
 <h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
@@ -21,7 +21,7 @@ refer to the docs that go with that version.
 <!-- TAG RELEASE_LINK, added by the munger automatically -->
 <strong>
 The latest release of this document can be found
-[here](http://releases.k8s.io/release-1.2/docs/proposals/api-group.md).
+[here](http://releases.k8s.io/release-1.3/docs/proposals/api-group.md).
 
 Documentation for other releases can be found at
 [releases.k8s.io](http://releases.k8s.io).
@@ -105,7 +105,7 @@ Documentation for other releases can be found at
 
     Types in the unversioned package will not have the APIVersion field, but may retain the Kind field.
 
-    For backward compatibility, when hanlding the Status, the server will encode it to v1 if the client expects the Status to be encoded in v1, otherwise the server will send the unversioned#Status. If an error occurs before the version can be determined, the server will send the unversioned#Status.
+    For backward compatibility, when handling the Status, the server will encode it to v1 if the client expects the Status to be encoded in v1, otherwise the server will send the unversioned#Status. If an error occurs before the version can be determined, the server will send the unversioned#Status.
 
   * non-top-level common API objects:
 

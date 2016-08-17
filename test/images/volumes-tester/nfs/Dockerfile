@@ -1,4 +1,4 @@
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,4 +23,5 @@ RUN chmod 644 /tmp/index.html
 # expose mountd 20048/tcp and nfsd 2049/tcp
 EXPOSE 2049/tcp 20048/tcp
 
-ENTRYPOINT ["/usr/local/bin/run_nfs.sh", "/exports", "/"]
+ENTRYPOINT ["/usr/local/bin/run_nfs.sh"]
+CMD ["/exports", "/"]

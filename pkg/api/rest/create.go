@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ type RESTCreateStrategy interface {
 	// the object.  For example: remove fields that are not to be persisted,
 	// sort order-insensitive list fields, etc.  This should not remove fields
 	// whose presence would be considered a validation error.
-	PrepareForCreate(obj runtime.Object)
+	PrepareForCreate(ctx api.Context, obj runtime.Object)
 	// Validate is invoked after default fields in the object have been filled in before
 	// the object is persisted.  This method should not mutate the object.
 	Validate(ctx api.Context, obj runtime.Object) field.ErrorList
@@ -67,7 +67,7 @@ func BeforeCreate(strategy RESTCreateStrategy, ctx api.Context, obj runtime.Obje
 	}
 	objectMeta.DeletionTimestamp = nil
 	objectMeta.DeletionGracePeriodSeconds = nil
-	strategy.PrepareForCreate(obj)
+	strategy.PrepareForCreate(ctx, obj)
 	api.FillObjectMetaSystemFields(ctx, objectMeta)
 	api.GenerateName(strategy, objectMeta)
 
@@ -112,11 +112,11 @@ func objectMetaAndKind(typer runtime.ObjectTyper, obj runtime.Object) (*api.Obje
 	if err != nil {
 		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
 	}
-	kind, err := typer.ObjectKind(obj)
+	kinds, _, err := typer.ObjectKinds(obj)
 	if err != nil {
 		return nil, unversioned.GroupVersionKind{}, errors.NewInternalError(err)
 	}
-	return objectMeta, kind, nil
+	return objectMeta, kinds[0], nil
 }
 
 // NamespaceScopedStrategy has a method to tell if the object must be in a namespace.

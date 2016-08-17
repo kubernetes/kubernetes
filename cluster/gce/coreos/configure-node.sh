@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors All rights reserved.
+# Copyright 2015 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@ function configure-kube-apiserver() {
   echo "Configuring kube-apiserver"
   
   # Wait for etcd to be up.
-  wait-url-up http://127.0.0.1:4001/version
+  wait-url-up http://127.0.0.1:2379/version
 
   touch /var/log/kube-apiserver.log
 
@@ -119,7 +119,7 @@ function wait-url-up() {
   done
 }
 
-# Configure addon yamls, and run salt/kube-addons/kube-addon.sh
+# Configure addon yamls, and run salt/kube-addons/kube-addons.sh
 function configure-master-addons() {
   echo "Configuring master addons"
 
@@ -160,6 +160,10 @@ function configure-master-addons() {
     CLUSTER_REGISTRY_DISK_SIZE=$(convert-bytes-gce-kube "${CLUSTER_REGISTRY_DISK_SIZE}")
     evaluate-manifests-dir ${MANIFESTS_DIR}/addons/registry  ${addon_dir}/registry
   fi
+
+  if [[ "${ENABLE_NODE_PROBLEM_DETECTOR}" == "true" ]]; then
+    evaluate-manifests-dir ${MANIFESTS_DIR}/addons/node-problem-detector  ${addon_dir}/node-problem-detector
+  fi
 }
 
 function configure-master-components() {
@@ -169,8 +173,8 @@ function configure-master-components() {
   configure-kube-apiserver
   configure-kube-scheduler
   configure-kube-controller-manager
-  configure-addon-manager
   configure-master-addons
+  configure-addon-manager
 }
 
 # TODO(yifan): Merge this with mount-master-pd() in configure-vm.sh
@@ -239,14 +243,14 @@ function create-salt-master-auth() {
     if  [[ ! -z "${CA_CERT:-}" ]] && [[ ! -z "${MASTER_CERT:-}" ]] && [[ ! -z "${MASTER_KEY:-}" ]]; then
       mkdir -p /srv/kubernetes
       (umask 077;
-        echo "${CA_CERT}" | base64 -d > /srv/kubernetes/ca.crt;
-        echo "${MASTER_CERT}" | base64 -d > /srv/kubernetes/server.cert;
-        echo "${MASTER_KEY}" | base64 -d > /srv/kubernetes/server.key;
+        echo "${CA_CERT}" | base64 --decode > /srv/kubernetes/ca.crt;
+        echo "${MASTER_CERT}" | base64 --decode > /srv/kubernetes/server.cert;
+        echo "${MASTER_KEY}" | base64 --decode > /srv/kubernetes/server.key;
         # Kubecfg cert/key are optional and included for backwards compatibility.
         # TODO(roberthbailey): Remove these two lines once GKE no longer requires
         # fetching clients certs from the master VM.
-        echo "${KUBECFG_CERT:-}" | base64 -d > /srv/kubernetes/kubecfg.crt;
-        echo "${KUBECFG_KEY:-}" | base64 -d > /srv/kubernetes/kubecfg.key)
+        echo "${KUBECFG_CERT:-}" | base64 --decode > /srv/kubernetes/kubecfg.crt;
+        echo "${KUBECFG_KEY:-}" | base64 --decode > /srv/kubernetes/kubecfg.key)
     fi
   fi
   if [ ! -e "${BASIC_AUTH_FILE}" ]; then
@@ -296,10 +300,10 @@ function load-docker-images() {
   done
 }
 
-
-# TODO(yifan): Making this function more generic for other runtimes.
 function load-master-components-images() {
-  echo "Loading docker images for master components"
+  echo "Loading images for master components"
+  export RKT_BIN=/opt/rkt/rkt
+  export DOCKER2ACI_BIN=/opt/docker2aci/docker2aci
   ${SALT_DIR}/install.sh ${KUBE_BIN_TAR}
   ${SALT_DIR}/salt/kube-master-addons/kube-master-addons.sh
 
@@ -308,7 +312,6 @@ function load-master-components-images() {
   KUBE_CONTROLLER_MANAGER_DOCKER_TAG=$(cat ${KUBE_BIN_DIR}/kube-controller-manager.docker_tag)
   KUBE_SCHEDULER_DOCKER_TAG=$(cat ${KUBE_BIN_DIR}/kube-scheduler.docker_tag)
 }
-
 
 ##########
 #  main  #

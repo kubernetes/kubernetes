@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ func (daemonSetStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears the status of a daemon set before creation.
-func (daemonSetStrategy) PrepareForCreate(obj runtime.Object) {
+func (daemonSetStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
 	daemonSet := obj.(*extensions.DaemonSet)
 	daemonSet.Status = extensions.DaemonSetStatus{}
 
@@ -53,7 +53,7 @@ func (daemonSetStrategy) PrepareForCreate(obj runtime.Object) {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (daemonSetStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (daemonSetStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
 
@@ -132,7 +132,7 @@ type daemonSetStatusStrategy struct {
 
 var StatusStrategy = daemonSetStatusStrategy{Strategy}
 
-func (daemonSetStatusStrategy) PrepareForUpdate(obj, old runtime.Object) {
+func (daemonSetStatusStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
 	newDaemonSet := obj.(*extensions.DaemonSet)
 	oldDaemonSet := old.(*extensions.DaemonSet)
 	newDaemonSet.Spec = oldDaemonSet.Spec

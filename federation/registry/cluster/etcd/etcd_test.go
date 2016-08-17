@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,9 +30,9 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, federation.GroupName)
+	storageConfig, server := registrytest.NewEtcdStorage(t, federation.GroupName)
 	restOptions := generic.RESTOptions{
-		Storage:                 etcdStorage,
+		StorageConfig:           storageConfig,
 		Decorator:               generic.UndecoratedStorage,
 		DeleteCollectionWorkers: 1}
 	storage, _ := NewREST(restOptions)
@@ -87,7 +87,9 @@ func TestUpdate(t *testing.T) {
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
 			object := obj.(*federation.Cluster)
-			object.Spec.Credential = "bar"
+			object.Spec.SecretRef = &api.LocalObjectReference{
+				Name: "bar",
+			}
 			return object
 		},
 	)

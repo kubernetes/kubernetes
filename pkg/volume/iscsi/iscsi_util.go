@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors All rights reserved.
+Copyright 2015 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -35,15 +36,15 @@ import (
 type StatFunc func(string) (os.FileInfo, error)
 type GlobFunc func(string) ([]string, error)
 
-func waitForPathToExist(devicePath string, maxRetries int, deviceInterface string) bool {
+func waitForPathToExist(devicePath string, maxRetries int, deviceTransport string) bool {
 	// This makes unit testing a lot easier
-	return waitForPathToExistInternal(devicePath, maxRetries, deviceInterface, os.Stat, filepath.Glob)
+	return waitForPathToExistInternal(devicePath, maxRetries, deviceTransport, os.Stat, filepath.Glob)
 }
 
-func waitForPathToExistInternal(devicePath string, maxRetries int, deviceInterface string, osStat StatFunc, filepathGlob GlobFunc) bool {
+func waitForPathToExistInternal(devicePath string, maxRetries int, deviceTransport string, osStat StatFunc, filepathGlob GlobFunc) bool {
 	for i := 0; i < maxRetries; i++ {
 		var err error
-		if deviceInterface == "default" {
+		if deviceTransport == "tcp" {
 			_, err = osStat(devicePath)
 		} else {
 			fpath, _ := filepathGlob(devicePath)
@@ -99,12 +100,25 @@ func (util *ISCSIUtil) MakeGlobalPDName(iscsi iscsiDisk) string {
 
 func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 	var devicePath string
-	if b.iface == "default" {
+	var iscsiTransport string
+
+	out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "iface", "-I", b.iface, "-o", "show"})
+	if err != nil {
+		glog.Errorf("iscsi: could not read iface %s error: %s", b.iface, string(out))
+		return err
+	}
+
+	iscsiTransport = extractTransportname(string(out))
+
+	if iscsiTransport == "" {
+		glog.Errorf("iscsi: could not find transport name in iface %s", b.iface)
+		return errors.New(fmt.Sprintf("Could not parse iface file for %s", b.iface))
+	} else if iscsiTransport == "tcp" {
 		devicePath = strings.Join([]string{"/dev/disk/by-path/ip", b.portal, "iscsi", b.iqn, "lun", b.lun}, "-")
 	} else {
 		devicePath = strings.Join([]string{"/dev/disk/by-path/pci", "*", "ip", b.portal, "iscsi", b.iqn, "lun", b.lun}, "-")
 	}
-	exist := waitForPathToExist(devicePath, 1, b.iface)
+	exist := waitForPathToExist(devicePath, 1, iscsiTransport)
 	if exist == false {
 		// discover iscsi target
 		out, err := b.plugin.execCommand("iscsiadm", []string{"-m", "discovery", "-t", "sendtargets", "-p", b.portal, "-I", b.iface})
@@ -118,7 +132,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) error {
 			glog.Errorf("iscsi: failed to attach disk:Error: %s (%v)", string(out), err)
 			return err
 		}
-		exist = waitForPathToExist(devicePath, 10, b.iface)
+		exist = waitForPathToExist(devicePath, 10, iscsiTransport)
 		if !exist {
 			return errors.New("Could not attach disk: Timeout after 10s")
 		}
@@ -182,6 +196,23 @@ func (util *ISCSIUtil) DetachDisk(c iscsiDiskUnmounter, mntPath string) error {
 		}
 	}
 	return nil
+}
+
+func extractTransportname(ifaceOutput string) (iscsiTransport string) {
+	re := regexp.MustCompile(`iface.transport_name = (.*)\n`)
+
+	rex_output := re.FindStringSubmatch(ifaceOutput)
+	if rex_output != nil {
+		iscsiTransport = rex_output[1]
+	} else {
+		return ""
+	}
+
+	// While iface.transport_name is a required parameter, handle it being unspecified anyways
+	if iscsiTransport == "<empty>" {
+		iscsiTransport = "tcp"
+	}
+	return iscsiTransport
 }
 
 func extractDeviceAndPrefix(mntPath string) (string, string, error) {

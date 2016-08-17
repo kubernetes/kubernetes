@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright 2016 The Kubernetes Authors All rights reserved.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,13 +17,15 @@
 from subprocess import check_output
 import yaml
 
-out = check_output(['juju', 'status', 'kubernetes', '--format=yaml'])
+
+cmd = ['juju', 'run', '--application', 'kubernetes', '--format=yaml', 'is-leader']
+out = check_output(cmd)
 try:
     parsed_output = yaml.safe_load(out)
-    model = parsed_output['services']['kubernetes']['units']
-    for unit in model:
-        if 'workload-status' in model[unit].keys():
-            if 'leader' in model[unit]['workload-status']['message']:
-                print(unit)
+    for unit in parsed_output:
+        standard_out = unit['Stdout'].rstrip()
+        unit_id = unit['UnitId']
+        if 'True' in standard_out:
+            print(unit_id)
 except:
     pass

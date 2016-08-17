@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@ const (
 	GroupKind          = "Group"
 	ServiceAccountKind = "ServiceAccount"
 	UserKind           = "User"
+
+	UserAll = "*"
 )
 
 // PolicyRule holds information that describes a policy rule, but does not contain information
@@ -48,14 +50,17 @@ type PolicyRule struct {
 	AttributeRestrictions runtime.Object
 	// APIGroups is the name of the APIGroup that contains the resources.
 	// If multiple API groups are specified, any action requested against one of the enumerated resources in any API group will be allowed.
+
 	APIGroups []string
 	// Resources is a list of resources this rule applies to.  ResourceAll represents all resources.
 	Resources []string
 	// ResourceNames is an optional white list of names that the rule applies to.  An empty set means that everything is allowed.
 	ResourceNames []string
+
 	// NonResourceURLs is a set of partial urls that a user should have access to.  *s are allowed, but only as the full, final step in the path
 	// If an action is not a resource API request, then the URL is split on '/' and is checked against the NonResourceURLs to look for a match.
 	// Since non-resource URLs are not namespaced, this field is only applicable for ClusterRoles referenced from a ClusterRoleBinding.
+	// Rules can either apply to API resources (such as "pods" or "secrets") or non-resource URL paths (such as "/api"),  but not both.
 	NonResourceURLs []string
 }
 
@@ -66,7 +71,7 @@ type Subject struct {
 	// If the Authorizer does not recognized the kind value, the Authorizer should report an error.
 	Kind string
 	// APIVersion holds the API group and version of the referenced object. For non-object references such as "Group" and "User" this is
-	// expected to be API version of this API group. For example "rbac.authorization.k8s.io/v1alpha1".
+	// expected to be API version of this API group. For example "rbac/v1alpha1".
 	APIVersion string
 	// Name of the object being referenced.
 	Name string
@@ -74,6 +79,8 @@ type Subject struct {
 	// the Authorizer should report an error.
 	Namespace string
 }
+
+// +genclient=true
 
 // Role is a namespaced, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding.
 type Role struct {
@@ -84,6 +91,8 @@ type Role struct {
 	// Rules holds all the PolicyRules for this Role
 	Rules []PolicyRule
 }
+
+// +genclient=true
 
 // RoleBinding references a role, but does not contain it.  It can reference a Role in the same namespace or a ClusterRole in the global namespace.
 // It adds who information via Subjects and namespace information by which namespace it exists in.  RoleBindings in a given
@@ -120,6 +129,9 @@ type RoleList struct {
 	Items []Role
 }
 
+// +genclient=true
+// +nonNamespaced=true
+
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 type ClusterRole struct {
 	unversioned.TypeMeta
@@ -129,6 +141,9 @@ type ClusterRole struct {
 	// Rules holds all the PolicyRules for this ClusterRole
 	Rules []PolicyRule
 }
+
+// +genclient=true
+// +nonNamespaced=true
 
 // ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace,
 // and adds who information via Subject.

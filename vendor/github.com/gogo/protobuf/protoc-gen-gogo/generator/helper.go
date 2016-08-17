@@ -31,9 +31,8 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"strings"
-
 	"path"
+	"strings"
 
 	"github.com/gogo/protobuf/gogoproto"
 	"github.com/gogo/protobuf/proto"
@@ -211,25 +210,6 @@ func (g *Generator) GetOneOfFieldName(message *Descriptor, field *descriptor.Fie
 	return fieldname
 }
 
-func GetMap(file *descriptor.FileDescriptorProto, field *descriptor.FieldDescriptorProto) *descriptor.DescriptorProto {
-	if !field.IsMessage() {
-		return nil
-	}
-	typeName := strings.TrimPrefix(field.GetTypeName(), "."+file.GetPackage()+".")
-	if strings.Contains(typeName, "Map") && !strings.HasSuffix(typeName, "Entry") {
-		typeName += "." + CamelCase(field.GetName()) + "Entry"
-	}
-	return file.GetMessage(typeName)
-}
-
-func IsMap(file *descriptor.FileDescriptorProto, field *descriptor.FieldDescriptorProto) bool {
-	msg := GetMap(file, field)
-	if msg == nil {
-		return false
-	}
-	return msg.GetOptions().GetMapEntry()
-}
-
 func (g *Generator) IsMap(field *descriptor.FieldDescriptorProto) bool {
 	if !field.IsMessage() {
 		return false
@@ -322,7 +302,6 @@ func (g *Generator) GeneratePlugin(p Plugin) {
 	for _, file := range g.genFiles {
 		genFileMap[file] = true
 	}
-	i := 0
 	for _, file := range g.allFiles {
 		g.Reset()
 		g.writeOutput = genFileMap[file]
@@ -330,10 +309,10 @@ func (g *Generator) GeneratePlugin(p Plugin) {
 		if !g.writeOutput {
 			continue
 		}
-		g.Response.File[i] = new(plugin.CodeGeneratorResponse_File)
-		g.Response.File[i].Name = proto.String(goFileName(*file.Name))
-		g.Response.File[i].Content = proto.String(g.String())
-		i++
+		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
+			Name:    proto.String(file.goFileName()),
+			Content: proto.String(g.String()),
+		})
 	}
 }
 
@@ -447,6 +426,7 @@ func FileName(file *FileDescriptor) string {
 	fname := path.Base(file.FileDescriptorProto.GetName())
 	fname = strings.Replace(fname, ".proto", "", -1)
 	fname = strings.Replace(fname, "-", "_", -1)
+	fname = strings.Replace(fname, ".", "_", -1)
 	return CamelCase(fname)
 }
 

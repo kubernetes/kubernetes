@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -102,4 +102,15 @@ func (c *FakePodTemplates) Watch(opts api.ListOptions) (watch.Interface, error) 
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(podtemplatesResource, c.ns, opts))
 
+}
+
+// Patch applies the patch and returns the patched podTemplate.
+func (c *FakePodTemplates) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *api.PodTemplate, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchSubresourceAction(podtemplatesResource, c.ns, name, data, subresources...), &api.PodTemplate{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*api.PodTemplate), err
 }

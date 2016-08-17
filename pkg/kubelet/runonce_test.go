@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -38,9 +38,12 @@ import (
 	podtest "k8s.io/kubernetes/pkg/kubelet/pod/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/clock"
 	utiltesting "k8s.io/kubernetes/pkg/util/testing"
+	"k8s.io/kubernetes/pkg/volume"
+	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 )
 
 func TestRunOnce(t *testing.T) {
@@ -73,18 +76,33 @@ func TestRunOnce(t *testing.T) {
 		containerRefManager: kubecontainer.NewRefManager(),
 		podManager:          podManager,
 		os:                  &containertest.FakeOS{},
-		volumeManager:       newVolumeManager(),
 		diskSpaceManager:    diskSpaceManager,
 		containerRuntime:    fakeRuntime,
 		reasonCache:         NewReasonCache(),
-		clock:               util.RealClock{},
+		clock:               clock.RealClock{},
 		kubeClient:          &fake.Clientset{},
 		hostname:            testKubeletHostname,
 		nodeName:            testKubeletHostname,
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 
-	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone)
+	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
+	kb.volumePluginMgr, err =
+		NewInitializedVolumePluginMgr(kb, []volume.VolumePlugin{plug})
+	if err != nil {
+		t.Fatalf("failed to initialize VolumePluginMgr: %v", err)
+	}
+	kb.volumeManager, err = volumemanager.NewVolumeManager(
+		true,
+		kb.hostname,
+		kb.podManager,
+		kb.kubeClient,
+		kb.volumePluginMgr,
+		fakeRuntime,
+		kb.mounter,
+		kb.getPodsDir())
+
+	kb.networkPlugin, _ = network.InitNetworkPlugin([]network.NetworkPlugin{}, "", nettest.NewFakeHost(nil), componentconfig.HairpinNone, kb.nonMasqueradeCIDR)
 	// TODO: Factor out "StatsProvider" from Kubelet so we don't have a cyclic dependency
 	volumeStatsAggPeriod := time.Second * 10
 	kb.resourceAnalyzer = stats.NewResourceAnalyzer(kb, volumeStatsAggPeriod, kb.containerRuntime)
@@ -97,7 +115,7 @@ func TestRunOnce(t *testing.T) {
 	fakeKillPodFunc := func(pod *api.Pod, podStatus api.PodStatus, gracePeriodOverride *int64) error {
 		return nil
 	}
-	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, kb.recorder, nodeRef, kb.clock)
+	evictionManager, evictionAdmitHandler, err := eviction.NewManager(kb.resourceAnalyzer, eviction.Config{}, fakeKillPodFunc, nil, kb.recorder, nodeRef, kb.clock)
 	if err != nil {
 		t.Fatalf("failed to initialize eviction manager: %v", err)
 	}
@@ -123,7 +141,7 @@ func TestRunOnce(t *testing.T) {
 	}
 	podManager.SetPods(pods)
 	// The original test here is totally meaningless, because fakeruntime will always return an empty podStatus. While
-	// the originial logic of isPodRunning happens to return true when podstatus is empty, so the test can always pass.
+	// the original logic of isPodRunning happens to return true when podstatus is empty, so the test can always pass.
 	// Now the logic in isPodRunning is changed, to let the test pass, we set the podstatus directly in fake runtime.
 	// This is also a meaningless test, because the isPodRunning will also always return true after setting this. However,
 	// because runonce is never used in kubernetes now, we should deprioritize the cleanup work.

@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 //
-// diskManager interface and diskSetup/TearDown functions abtract commonly used procedures to setup a block volume
+// diskManager interface and diskSetup/TearDown functions abstract commonly used procedures to setup a block volume
 // rbd volume implements diskManager, calls diskSetup when creating a volume, and calls diskTearDown inside volume unmounter.
 // TODO: consolidate, refactor, and share diskManager among iSCSI, GCE PD, and RBD
 //

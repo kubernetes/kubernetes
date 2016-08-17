@@ -1,7 +1,7 @@
 // +build !linux,!darwin
 
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,8 +26,8 @@ import (
 )
 
 // FSInfo unsupported returns 0 values for available and capacity and an error.
-func FsInfo(path string) (int64, int64, error) {
-	return 0, 0, errors.New("FsInfo not supported for this build.")
+func FsInfo(path string) (int64, int64, int64, error) {
+	return 0, 0, 0, errors.New("FsInfo not supported for this build.")
 }
 
 func Du(path string) (*resource.Quantity, error) {

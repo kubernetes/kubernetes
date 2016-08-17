@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -113,4 +113,15 @@ func (c *FakeHorizontalPodAutoscalers) Watch(opts api.ListOptions) (watch.Interf
 	return c.Fake.
 		InvokesWatch(core.NewWatchAction(horizontalpodautoscalersResource, c.ns, opts))
 
+}
+
+// Patch applies the patch and returns the patched horizontalPodAutoscaler.
+func (c *FakeHorizontalPodAutoscalers) Patch(name string, pt api.PatchType, data []byte, subresources ...string) (result *autoscaling.HorizontalPodAutoscaler, err error) {
+	obj, err := c.Fake.
+		Invokes(core.NewPatchSubresourceAction(horizontalpodautoscalersResource, c.ns, name, data, subresources...), &autoscaling.HorizontalPodAutoscaler{})
+
+	if obj == nil {
+		return nil, err
+	}
+	return obj.(*autoscaling.HorizontalPodAutoscaler), err
 }

@@ -1,5 +1,0 @@
-language: bash
-
-script:
-    - echo "Travis is disabled on master. See issue 23611."
-    - echo "https://github.com/kubernetes/kubernetes/issues/23611"

@@ -25,6 +25,11 @@
     },
     {
       "Effect": "Allow",
+      "Action": ["route53:*"],
+      "Resource": ["*"]
+    },
+    {
+      "Effect": "Allow",
       "Action": [
         "ecr:GetAuthorizationToken",
         "ecr:BatchCheckLayerAvailability",

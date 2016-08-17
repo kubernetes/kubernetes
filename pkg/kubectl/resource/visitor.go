@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors All rights reserved.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -207,10 +207,6 @@ func ValidateSchema(data []byte, schema validation.Schema) error {
 	if schema == nil {
 		return nil
 	}
-	data, err := yaml.ToJSON(data)
-	if err != nil {
-		return fmt.Errorf("error converting to YAML: %v", err)
-	}
 	if err := schema.ValidateBytes(data); err != nil {
 		return fmt.Errorf("error validating data: %v; %s", err, stopValidateMessage)
 	}
@@ -259,7 +255,7 @@ func readHttpWithRetries(get httpget, duration time.Duration, u string, attempts
 
 		// Error - Set the error condition from the StatusCode
 		if statusCode != 200 {
-			err = fmt.Errorf("unable to read URL %q, server reported %d %s", u, statusCode, status)
+			err = fmt.Errorf("unable to read URL %q, server reported %s, status code=%d", u, status, statusCode)
 		}
 
 		if statusCode >= 500 && statusCode < 600 {
@@ -431,7 +427,7 @@ func FileVisitorForSTDIN(mapper *Mapper, schema validation.Schema) Visitor {
 }
 
 // ExpandPathsToFileVisitors will return a slice of FileVisitors that will handle files from the provided path.
-// After FileVisitors open the files, they will pass a io.Reader to a StreamVisitor to do the reading. (stdin
+// After FileVisitors open the files, they will pass an io.Reader to a StreamVisitor to do the reading. (stdin
 // is also taken care of). Paths argument also accepts a single file, and will return a single visitor
 func ExpandPathsToFileVisitors(mapper *Mapper, paths string, recursive bool, extensions []string, schema validation.Schema) ([]Visitor, error) {
 	var visitors []Visitor
