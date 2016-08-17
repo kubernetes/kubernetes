@@ -51,6 +51,7 @@ docs/man/man1/kubectl-get.1
 docs/man/man1/kubectl-label.1
 docs/man/man1/kubectl-logs.1
 docs/man/man1/kubectl-namespace.1
+docs/man/man1/kubectl-options.1
 docs/man/man1/kubectl-patch.1
 docs/man/man1/kubectl-port-forward.1
 docs/man/man1/kubectl-proxy.1
@@ -120,6 +121,7 @@ docs/user-guide/kubectl/kubectl_get.md
 docs/user-guide/kubectl/kubectl_label.md
 docs/user-guide/kubectl/kubectl_logs.md
 docs/user-guide/kubectl/kubectl_namespace.md
+docs/user-guide/kubectl/kubectl_options.md
 docs/user-guide/kubectl/kubectl_patch.md
 docs/user-guide/kubectl/kubectl_port-forward.md
 docs/user-guide/kubectl/kubectl_proxy.md
@@ -164,6 +166,7 @@ docs/yaml/kubectl/kubectl_get.yaml
 docs/yaml/kubectl/kubectl_label.yaml
 docs/yaml/kubectl/kubectl_logs.yaml
 docs/yaml/kubectl/kubectl_namespace.yaml
+docs/yaml/kubectl/kubectl_options.yaml
 docs/yaml/kubectl/kubectl_patch.yaml
 docs/yaml/kubectl/kubectl_port-forward.yaml
 docs/yaml/kubectl/kubectl_proxy.yaml
