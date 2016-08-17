@@ -2012,6 +2012,7 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_extensions_PodSecurityPolicySp
 		return err
 	}
 	out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+	out.HostUser = in.HostUser
 	return nil
 }
 
@@ -2071,6 +2072,7 @@ func autoConvert_extensions_PodSecurityPolicySpec_To_v1beta1_PodSecurityPolicySp
 	}
 	out.HostPID = in.HostPID
 	out.HostIPC = in.HostIPC
+	out.HostUser = in.HostUser
 	if err := Convert_extensions_SELinuxStrategyOptions_To_v1beta1_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, s); err != nil {
 		return err
 	}

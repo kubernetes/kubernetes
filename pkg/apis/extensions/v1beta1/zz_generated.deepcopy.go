@@ -1141,6 +1141,7 @@ func DeepCopy_v1beta1_PodSecurityPolicySpec(in interface{}, out interface{}, c *
 			return err
 		}
 		out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+		out.HostUser = in.HostUser
 		return nil
 	}
 }
