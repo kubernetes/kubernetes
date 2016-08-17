@@ -88,6 +88,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_DaemonEndpoint_To_v1_DaemonEndpoint,
 		Convert_v1_DeleteOptions_To_api_DeleteOptions,
 		Convert_api_DeleteOptions_To_v1_DeleteOptions,
+		Convert_v1_DockerVolumeSource_To_api_DockerVolumeSource,
+		Convert_api_DockerVolumeSource_To_v1_DockerVolumeSource,
 		Convert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile,
 		Convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile,
 		Convert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource,
@@ -1420,6 +1422,26 @@ func autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, ou
 
 func Convert_api_DeleteOptions_To_v1_DeleteOptions(in *api.DeleteOptions, out *DeleteOptions, s conversion.Scope) error {
 	return autoConvert_api_DeleteOptions_To_v1_DeleteOptions(in, out, s)
+}
+
+func autoConvert_v1_DockerVolumeSource_To_api_DockerVolumeSource(in *DockerVolumeSource, out *api.DockerVolumeSource, s conversion.Scope) error {
+	out.Driver = in.Driver
+	out.Options = in.Options
+	return nil
+}
+
+func Convert_v1_DockerVolumeSource_To_api_DockerVolumeSource(in *DockerVolumeSource, out *api.DockerVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_DockerVolumeSource_To_api_DockerVolumeSource(in, out, s)
+}
+
+func autoConvert_api_DockerVolumeSource_To_v1_DockerVolumeSource(in *api.DockerVolumeSource, out *DockerVolumeSource, s conversion.Scope) error {
+	out.Driver = in.Driver
+	out.Options = in.Options
+	return nil
+}
+
+func Convert_api_DockerVolumeSource_To_v1_DockerVolumeSource(in *api.DockerVolumeSource, out *DockerVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_DockerVolumeSource_To_v1_DockerVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *DownwardAPIVolumeFile, out *api.DownwardAPIVolumeFile, s conversion.Scope) error {
@@ -6729,6 +6751,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.VsphereVolume = nil
 	}
+	if in.DockerVolume != nil {
+		in, out := &in.DockerVolume, &out.DockerVolume
+		*out = new(api.DockerVolumeSource)
+		if err := Convert_v1_DockerVolumeSource_To_api_DockerVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.DockerVolume = nil
+	}
 	return nil
 }
 
@@ -6916,6 +6947,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 		}
 	} else {
 		out.VsphereVolume = nil
+	}
+	if in.DockerVolume != nil {
+		in, out := &in.DockerVolume, &out.DockerVolume
+		*out = new(DockerVolumeSource)
+		if err := Convert_api_DockerVolumeSource_To_v1_DockerVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.DockerVolume = nil
 	}
 	return nil
 }
