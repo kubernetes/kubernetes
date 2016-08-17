@@ -70,6 +70,7 @@ import (
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
+	"k8s.io/kubernetes/pkg/controller/volume/snapshot"
 	"k8s.io/kubernetes/pkg/healthz"
 	quotainstall "k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
@@ -453,6 +454,19 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Fatalf("Failed to start attach/detach controller: %v", attachDetachControllerErr)
 	}
 	go attachDetachController.Run(wait.NeverStop)
+	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
+
+	snapshotController, snapshotControllerErr :=
+		snapshot.NewSnapshotController(
+			clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "snapshot-controller")),
+			sharedInformers.PersistentVolumeClaims().Informer(),
+			sharedInformers.PersistentVolumes().Informer(),
+			cloud,
+			ProbeAttachableVolumePlugins(s.VolumeConfiguration))
+	if snapshotControllerErr != nil {
+		glog.Fatalf("Failed to start snapshot controller: %v", snapshotControllerErr)
+	}
+	go snapshotController.Run(wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	groupVersion = "certificates/v1alpha1"
