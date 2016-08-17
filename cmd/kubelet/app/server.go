@@ -456,8 +456,8 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 }
 
 // bootstrapClientCert will request a client cert for kubelet if '--bootstrapKubeconfig'
-// is non-empty and no client certificate is available in kubeconfig.
-// On success, the result certificate and key file will be stored on tmpfs (default to /var/run/kubernetes/),
+// is non-empty and no client certificates is available in kubeconfig.
+// On success, the result certificate and key file will be stored in /var/run/kubernetes/
 // and the kubeconfig will point to those files.
 // If '--bootstrapKubeconfig' is set but kubeconfig file doesn't exist, then the function will fail.
 // TODO(yifan): Figure out how to deal with the situation when there is no kubeconfig.
@@ -480,7 +480,7 @@ func bootstrapClientCert(s *options.KubeletServer) error {
 		return nil
 	}
 
-	authInfo.ClientCertificate, authInfo.ClientKey, err = getCertFromAPIServer(s, authInfo.ClientCertificate, authInfo.ClientKey)
+	authInfo.ClientCertificate, authInfo.ClientKey, err = getClientCertAndKey(s, authInfo.ClientCertificate, authInfo.ClientKey)
 	if err != nil {
 		return fmt.Errorf("unable to get cert from API server: %v", err)
 	}
@@ -534,39 +534,16 @@ func containsSufficientTLSInfo(authInfo *clientcmdapi.AuthInfo) bool {
 	return false
 }
 
-// getCertFromAPIServer will:
+// getClientCertAndKey will:
 // (1) Create a restful client for doing the certificate signing request.
-// (2) Generate key pair and certificate signing request.
-//     The private key is stored to the given path.
-// (3) Send request to API server and watch for the issued certificate.
-// (4) Once (3) succeeds, dump the certificate to the given path.
-// On failure, the key and the certificate file will be cleaned up.
-// If the certfile or keyfile is empty, then it will use the default path, respectively:
+// (2) Read existing key data from existingKeyPath if possible.
+// (3) Pass 'requestClientCertificate()' the CSR client, existing key data, and node name to
+//     request for client certificate from the API server.
+// (4) Once (3) succeeds, dump the certificate and key data to the given paths.
+// On failure, the the certificate and key file will be cleaned up.
+// If the existingCertPath or existingKeyPath is empty, then the function will use the default path, respectively:
 // /var/run/kubernetes/kubelet-client.crt, /var/run/kubernetes/kubelet-client.key.
-func getCertFromAPIServer(s *options.KubeletServer, certfile, keyfile string) (certPath, keyPath string, err error) {
-	certPath, keyPath = certfile, keyfile
-
-	// Cleanup keyfile and certfile.
-	defer func() {
-		if err != nil {
-			// Clean up cert and key.
-			if rmErr := os.Remove(certPath); rmErr != nil {
-				glog.Warningf("Failed to clean up TLS cert file %q: %v", certPath, rmErr)
-			}
-			if rmErr := os.Remove(keyPath); rmErr != nil {
-				glog.Warningf("Failed to clean up TLS private key file %q: %v", keyPath, rmErr)
-			}
-		}
-	}()
-
-	if certPath == "" {
-		certPath = defaultKubeletClientCertificateFile
-	}
-
-	if keyPath == "" {
-		keyPath = defaultKubeletClientKeyFile
-	}
-
+func getClientCertFromAPIServer(s *options.KubeletServer, existingCertPath, existingKeyPath string) (certFile, keyFile string, err error) {
 	// (1).
 	clientConfig, err := kubeconfigClientConfig(s.BootstrapKubeconfig, s.APIServerList)
 	if err != nil {
@@ -576,64 +553,84 @@ func getCertFromAPIServer(s *options.KubeletServer, certfile, keyfile string) (c
 	if err != nil {
 		return "", "", fmt.Errorf("unable to create certificates signing request client: %v", err)
 	}
+	csrClient := client.CertificateSigningRequest()
 
 	// (2).
-	nodeName, err := instances.CurrentNodeName(nodeutil.GetHostname(s.HostnameOverride))
-	if err != nil {
-		return fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+	certPath, keyPath = existingCertPath, existingKeyPath
+	if certPath == "" {
+		certPath = defaultKubeletClientCertificateFile
 	}
+	if keyPath == "" {
+		keyPath = defaultKubeletClientKeyFile
 
-	var ips []net.IP
-	nodeIP := net.ParseIP(s.NodeIP)
-	if nodeIP != nil {
-		ips = []net.IP{nodeIP}
 	}
-
-	req, err := utilcertificates.NewCertificateRequest(keyPath, &pkix.Name{
-		Organization: []string{"system:nodes"},
-		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
-	}, []string{nodeName}, ips)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to generate certificate request: %v", err)
+	existingKeyData, err := ioutil.ReadFile(keyPath)
+	if err != nil && !os.IsNotExist(err) {
+		return "", "", fmt.Errorf("unable to read key file %q: %v", keyPath, err)
 	}
 
 	// (3).
-	certificate, err := requestCertificate(client, req, 3600) // Make a default timeout = 3600s
+	nodeName, err := instances.CurrentNodeName(nodeutil.GetHostname(s.HostnameOverride))
+	if err != nil {
+		return "", "", fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+	}
+	certData, keyData, err := requestClientCertificate(csrClient, existingKeyData, nodeName)
 	if err != nil {
 		return "", "", fmt.Errorf("unable to request certificate from API server: %v", err)
 	}
 
 	// (4).
-	if err = crypto.WriteCertToPath(certPath, certificate); err != nil {
-		return "", "", fmt.Errorf("unable to write certificate file: %v", err)
+	if err = crypto.WriteCertToPath(certPath, certData); err != nil {
+		return "", "", fmt.Errorf("unable to write certificate file %q: %v", certPath, err)
+	}
+	if err = crypto.WriteKeyToPath(keyPath, keyData); err != nil {
+		if err := os.Rmove(certPath); err != nil {
+			glog.Warningf("Cannot clean up the certificate file %q: %v", certPath, err)
+		}
+		return "", "", fmt.Errorf("unable to write key file %q: %v", keyPath, err)
 	}
 
 	return certPath, keyPath, nil
 }
 
-// requestCertificate sends the certificate signing request to API server and watches the object's status.
-// It returns the API server's issued certificate (pem-encoded) on success.
-// If there is any errors, or the watch timeouts, it returns an error.
-func requestCertificate(client unversionedcertificates.CertificateSigningRequestsGetter, request []byte, defaultTimeoutSeconds int64) (certificate []byte, err error) {
-	req, err := client.CertificateSigningRequests().Create(&certificates.CertificateSigningRequest{
+// requestClientCertificate will create a certificate signing request and send it to API server,
+// then it will watch the object's status, once approved by API server, it will return the API
+// server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
+// it will return an error.
+// If the existingKeyData is empty, a new private key will be generated to create the certificate
+// signing request.
+func requestClientCertificate(client unversionedcertificates.CertificateSigningRequestInterface, existingKeyData []byte, nodeName string) (certData []byte, keyData []byte, err error) {
+	subject := &pkix.Name{
+		Organization: []string{"system:nodes"},
+		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
+	}
+
+	csr, keyData, err := utilcertificates.NewCertificateRequest(existingKeyData, subject, nil, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("unable to generate certificate request: %v", err)
+	}
+
+	req, err := client.Create(&certificates.CertificateSigningRequest{
 		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
 		ObjectMeta: api.ObjectMeta{GenerateName: "csr-"},
 
 		// Username, UID, Groups will be injected by API server.
-		Spec: certificates.CertificateSigningRequestSpec{Request: request},
+		Spec: certificates.CertificateSigningRequestSpec{Request: csr},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("cannot create certificate signing request: %v", err)
+		return nil, nil, fmt.Errorf("cannot create certificate signing request: %v", err)
 
 	}
 
-	resultCh, err := client.CertificateSigningRequests().Watch(api.ListOptions{
+	// Make a default timeout = 3600s
+	defaultTimeoutSeconds = 3600
+	resultCh, err := client.Watch(api.ListOptions{
 		Watch:          true,
 		TimeoutSeconds: &defaultTimeoutSeconds,
 		// Label and field selector are not used now.
 	})
 	if err != nil {
-		return nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
+		return nil, nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
 	}
 
 	var status certificates.CertificateSigningRequestStatus
@@ -652,16 +649,16 @@ func requestCertificate(client unversionedcertificates.CertificateSigningRequest
 			status = event.Object.(*certificates.CertificateSigningRequest).Status
 			for _, c := range status.Conditions {
 				if c.Type == certificates.CertificateDenied {
-					return nil, fmt.Errorf("certificate signing request is not approved: %v, %v", c.Reason, c.Message)
+					return nil, nil, fmt.Errorf("certificate signing request is not approved: %v, %v", c.Reason, c.Message)
 				}
 				if c.Type == certificates.CertificateApproved && status.Certificate != nil {
-					return status.Certificate, nil
+					return status.Certificate, keyData, nil
 				}
 			}
 		}
 	}
 
-	return nil, fmt.Errorf("watch channel closed")
+	return nil, nil, fmt.Errorf("watch channel closed")
 }
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
