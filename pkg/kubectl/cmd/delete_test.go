@@ -145,9 +145,8 @@ func TestDeleteObjectNotFound(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"},
-	}
+	options := &DeleteOptions{}
+	options.Filenames = []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml"}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	err := RunDelete(f, buf, cmd, []string{}, options)
@@ -325,9 +324,8 @@ func TestDeleteMultipleObjectContinueOnMissing(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdDelete(f, buf)
-	options := &DeleteOptions{
-		Filenames: []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"},
-	}
+	options := &DeleteOptions{}
+	options.Filenames = []string{"../../../examples/guestbook/legacy/redis-master-controller.yaml", "../../../examples/guestbook/frontend-service.yaml"}
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
 	err := RunDelete(f, buf, cmd, []string{}, options)

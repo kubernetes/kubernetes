@@ -33,13 +33,6 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 )
 
-// DescribeOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type DescribeOptions struct {
-	Filenames []string
-	Recursive bool
-}
-
 var (
 	describe_long = dedent.Dedent(`
 		Show details of a specific resource or group of resources.
@@ -76,7 +69,7 @@ var (
 )
 
 func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &DescribeOptions{}
+	options := &resource.FilenameOptions{}
 	describerSettings := &kubectl.DescriberSettings{}
 
 	validArgs := kubectl.DescribableResources()
@@ -94,9 +87,8 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		ValidArgs:  validArgs,
 		ArgAliases: argAliases,
 	}
-	usage := "Filename, directory, or URL to a file containing the resource to describe"
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	usage := "containing the resource to describe"
+	cmdutil.AddFilenameRecursiveFlags(cmd, options, usage)
 	cmd.Flags().StringP("selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().Bool("all-namespaces", false, "If present, list the requested object(s) across all namespaces. Namespace in current context is ignored even if specified with --namespace.")
 	cmd.Flags().BoolVar(&describerSettings.ShowEvents, "show-events", true, "If true, display events related to the described object.")
@@ -104,7 +96,7 @@ func NewCmdDescribe(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *DescribeOptions, describerSettings *kubectl.DescriberSettings) error {
+func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *resource.FilenameOptions, describerSettings *kubectl.DescriberSettings) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -114,7 +106,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	if allNamespaces {
 		enforceNamespace = false
 	}
-	if len(args) == 0 && len(options.Filenames) == 0 {
+	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		fmt.Fprint(out, "You must specify the type of resource to describe. ", valid_resources)
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
@@ -123,7 +115,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().AllNamespaces(allNamespaces).
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(true, args...).
 		Flatten().
