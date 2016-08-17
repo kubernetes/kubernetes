@@ -223,6 +223,8 @@ func formatURL(scheme string, host string, port int, path string) *url.URL {
 }
 
 type execInContainer struct {
+	// run executes a command in a container. Combined stdout and stderr output is always returned. An
+	// error is returned if one occurred.
 	run func() ([]byte, error)
 }
 
@@ -231,11 +233,10 @@ func (p *prober) newExecInContainer(container api.Container, containerID kubecon
 		var buffer bytes.Buffer
 		output := ioutils.WriteCloserWrapper(&buffer)
 		err := p.runner.ExecInContainer(containerID, cmd, nil, output, output, false, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		return buffer.Bytes(), nil
+		// Even if err is non-nil, there still may be output (e.g. the exec wrote to stdout or stderr but
+		// the command returned a nonzero exit code). Therefore, always return the output along with the
+		// error.
+		return buffer.Bytes(), err
 	}}
 }
 
