@@ -53,11 +53,7 @@ make build do=destroy
     12. `destroy`: destroy-federation + destroy-clusters
     13. `redeploy-federation`: just redeploys the federation components.
 
-2. Add a `release` phase to run as part of Kubernetes release process
-   that copies only a part of the `build.sh` script that's relevant to
-   the users into the release.
-
-3. Continue with `destroy` phase even in the face of errors.
+2. Continue with `destroy` phase even in the face of errors.
 
    The bash script sets `set -e errexit` which causes the script to exit
    at the very first error. This should be the default mode for deploying
