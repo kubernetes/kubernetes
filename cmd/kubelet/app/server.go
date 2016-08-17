@@ -30,7 +30,6 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -88,7 +87,7 @@ import (
 )
 
 const (
-	defaultKubeletClientCertificateFile = "/var/run/kubernetes/kubelet-client.srt"
+	defaultKubeletClientCertificateFile = "/var/run/kubernetes/kubelet-client.crt"
 	defaultKubeletClientKeyFile         = "/var/run/kubernetes/kubelet-client.key"
 )
 
@@ -543,7 +542,7 @@ func containsSufficientTLSInfo(authInfo *clientcmdapi.AuthInfo) bool {
 // (4) Once (3) succeeds, dump the certificate to the given path.
 // On failure, the key and the certificate file will be cleaned up.
 // If the certfile or keyfile is empty, then it will use the default path, respectively:
-// /var/run/kubernetes/kubelet-client.srt, /var/run/kubernetes/kubelet-client.key.
+// /var/run/kubernetes/kubelet-client.crt, /var/run/kubernetes/kubelet-client.key.
 func getCertFromAPIServer(s *options.KubeletServer, certfile, keyfile string) (certPath, keyPath string, err error) {
 	certPath, keyPath = certfile, keyfile
 
@@ -562,16 +561,10 @@ func getCertFromAPIServer(s *options.KubeletServer, certfile, keyfile string) (c
 
 	if certPath == "" {
 		certPath = defaultKubeletClientCertificateFile
-		if err := os.MkdirAll(filepath.Dir(certPath), 0644); err != nil {
-			return "", "", fmt.Errorf("unable to create dir for certificate file: %v", err)
-		}
 	}
 
 	if keyPath == "" {
 		keyPath = defaultKubeletClientKeyFile
-		if err := os.MkdirAll(filepath.Dir(keyPath), 0644); err != nil {
-			return "", "", fmt.Errorf("unable to create dir for key file: %v", err)
-		}
 	}
 
 	// (1).
@@ -585,7 +578,10 @@ func getCertFromAPIServer(s *options.KubeletServer, certfile, keyfile string) (c
 	}
 
 	// (2).
-	hostname := nodeutil.GetHostname(s.HostnameOverride)
+	nodeName, err := instances.CurrentNodeName(nodeutil.GetHostname(s.HostnameOverride))
+	if err != nil {
+		return fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+	}
 
 	var ips []net.IP
 	nodeIP := net.ParseIP(s.NodeIP)
@@ -593,7 +589,10 @@ func getCertFromAPIServer(s *options.KubeletServer, certfile, keyfile string) (c
 		ips = []net.IP{nodeIP}
 	}
 
-	req, err := utilcertificates.NewCertificateRequest(keyPath, &pkix.Name{CommonName: hostname}, []string{hostname}, ips)
+	req, err := utilcertificates.NewCertificateRequest(keyPath, &pkix.Name{
+		Organization: []string{"system:nodes"},
+		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
+	}, []string{nodeName}, ips)
 	if err != nil {
 		return "", "", fmt.Errorf("unable to generate certificate request: %v", err)
 	}

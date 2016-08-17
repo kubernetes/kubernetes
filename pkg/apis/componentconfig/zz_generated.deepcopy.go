@@ -205,6 +205,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.TLSCertFile = in.TLSCertFile
 		out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
 		out.CertDirectory = in.CertDirectory
+		out.BootstrapKubeconfig = in.BootstrapKubeconfig
 		out.HostnameOverride = in.HostnameOverride
 		out.PodInfraContainerImage = in.PodInfraContainerImage
 		out.DockerEndpoint = in.DockerEndpoint
