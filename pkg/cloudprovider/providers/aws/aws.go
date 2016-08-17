@@ -305,7 +305,6 @@ type CloudConfig struct {
 		//local VPC subnet (so load balancers can access it). E.g. 10.82.0.0/16 30000-32000.
 		DisableSecurityGroupIngress bool
 
-<<<<<<< HEAD
 		//This flag enables the automatic shared security group ingress creation.
 		//Please check below to see the full mappings from flags to behavior
 		EnableSharedSecurityGroupIngress bool
@@ -314,7 +313,6 @@ type CloudConfig struct {
 		//DisableSecurityGroupIngres=false, EnableSharedSecurityGroupIngress=true: insert shared security group ingress for nodes
 		//DisableSecurityGroupIngres=true, EnableSharedSecurityGroupIngress=false: not inserting any ingress rules
 		//DisableSecurityGroupIngress=true, EnableSharedSecurityGroupIngress=true: error
-=======
 		//During the instantiation of an new AWS cloud provider, the detected region
 		//is validated against a known set of regions.
 		//
@@ -325,7 +323,6 @@ type CloudConfig struct {
 		//yourself in an non-AWS cloud and open an issue, please indicate that in the
 		//issue body.
 		DisableStrictZoneCheck bool
->>>>>>> 7b762fb34b97cd5cab42871bc76e645540762a36
 	}
 }
 
