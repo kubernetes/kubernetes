@@ -196,7 +196,10 @@ func (d *downwardAPIVolume) collectData() (map[string][]byte, error) {
 			}
 		} else if fileInfo.ResourceFieldRef != nil {
 			containerName := fileInfo.ResourceFieldRef.ContainerName
-			if values, err := fieldpath.ExtractResourceValueByContainerName(fileInfo.ResourceFieldRef, d.pod, containerName); err != nil {
+			nodeAllocatable, err := d.plugin.host.GetNodeAllocatable()
+			if err != nil {
+				errlist = append(errlist, err)
+			} else if values, err := fieldpath.ExtractResourceValueByContainerNameAndNodeAllocatable(fileInfo.ResourceFieldRef, d.pod, containerName, nodeAllocatable); err != nil {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
 				errlist = append(errlist, err)
 			} else {

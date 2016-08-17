@@ -207,6 +207,9 @@ type VolumeHost interface {
 	// mounts correctly. It will be replaced and expanded on by future
 	// SecurityContext work.
 	GetRootContext() string
+
+	// Returns node allocatable
+	GetNodeAllocatable() (api.ResourceList, error)
 }
 
 // VolumePluginMgr tracks registered plugins.

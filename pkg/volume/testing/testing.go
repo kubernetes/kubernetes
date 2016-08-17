@@ -127,6 +127,10 @@ func (f *fakeVolumeHost) GetRootContext() string {
 	return f.rootContext
 }
 
+func (f *fakeVolumeHost) GetNodeAllocatable() (api.ResourceList, error) {
+	return api.ResourceList{}, nil
+}
+
 func ProbeVolumePlugins(config VolumeConfig) []VolumePlugin {
 	if _, ok := config.OtherAttributes["fake-property"]; ok {
 		return []VolumePlugin{
