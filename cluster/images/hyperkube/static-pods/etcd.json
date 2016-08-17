@@ -13,8 +13,8 @@
         "image": "gcr.io/google_containers/etcd-ARCH:3.0.4",
         "command": [
                 "/usr/local/bin/etcd",
-                "--listen-client-urls=http://127.0.0.1:4001",
-                "--advertise-client-urls=http://127.0.0.1:4001",
+                "--listen-client-urls=http://127.0.0.1:2379",
+                "--advertise-client-urls=http://127.0.0.1:2379",
                 "--data-dir=/var/etcd/data"
         ],
         "volumeMounts": [

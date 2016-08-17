@@ -71,9 +71,9 @@ var benchmarkPod api.Pod = api.Pod{
 				Command: []string{
 					"/usr/local/bin/etcd",
 					"--addr",
-					"127.0.0.1:4001",
+					"127.0.0.1:2379",
 					"--bind-addr",
-					"127.0.0.1:4001",
+					"127.0.0.1:2379",
 					"--data-dir",
 					"/var/etcd/data",
 				},
@@ -86,8 +86,8 @@ var benchmarkPod api.Pod = api.Pod{
 					},
 					{
 						Name:          "clientport",
-						HostPort:      4001,
-						ContainerPort: 4001,
+						HostPort:      2379,
+						ContainerPort: 2379,
 						Protocol:      "TCP",
 					},
 				},

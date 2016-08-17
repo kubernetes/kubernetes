@@ -29,13 +29,13 @@ import (
 
 // If you need to start an etcd instance by hand, you also need to insert a key
 // for this check to pass (*any* key will do, eg:
-//curl -L http://127.0.0.1:4001/v2/keys/message -XPUT -d value="Hello world").
+//curl -L http://127.0.0.1:2379/v2/keys/message -XPUT -d value="Hello world").
 func init() {
 	RequireEtcd()
 }
 
 func GetEtcdURLFromEnv() string {
-	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:4001")
+	url := env.GetEnvAsStringOrFallback("KUBE_INTEGRATION_ETCD_URL", "http://127.0.0.1:2379")
 	glog.V(4).Infof("Using KUBE_INTEGRATION_ETCD_URL=%q", url)
 	return url
 }

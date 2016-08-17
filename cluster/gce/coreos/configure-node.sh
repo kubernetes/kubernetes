@@ -88,7 +88,7 @@ function configure-kube-apiserver() {
   echo "Configuring kube-apiserver"
   
   # Wait for etcd to be up.
-  wait-url-up http://127.0.0.1:4001/version
+  wait-url-up http://127.0.0.1:2379/version
 
   touch /var/log/kube-apiserver.log
 
