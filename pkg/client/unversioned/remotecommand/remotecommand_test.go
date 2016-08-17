@@ -247,7 +247,7 @@ func TestStream(t *testing.T) {
 			}
 
 			conf := &restclient.Config{
-				Hosts: []string{server.URL},
+				Host: server.URL,
 			}
 			e, err := NewExecutor(conf, "POST", req.URL())
 			if err != nil {

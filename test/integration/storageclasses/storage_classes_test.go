@@ -40,7 +40,7 @@ func TestStorageClasses(t *testing.T) {
 	_, s := framework.RunAMaster(nil)
 	defer s.Close()
 
-	client := client.NewOrDie(&restclient.Config{Hosts: []string{s.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	ns := framework.CreateTestingNamespace("storageclass", s, t)
 	defer framework.DeleteTestingNamespace(ns, s, t)

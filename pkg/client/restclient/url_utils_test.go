@@ -41,7 +41,7 @@ func TestValidatesHostParameter(t *testing.T) {
 		{[]string{"host/server"}, "", "", true},
 	}
 	for i, testCase := range testCases {
-		basepaths, versionedAPIPath, err := DefaultServerURL(testCase.Hosts, testCase.APIPath, *testapi.Default.GroupVersion(), false)
+		basepaths, versionedAPIPath, err := DefaultServerURLsForHosts(testCase.Hosts, testCase.APIPath, *testapi.Default.GroupVersion(), false)
 		switch {
 		case err == nil && testCase.Err:
 			t.Errorf("expected error but was nil")

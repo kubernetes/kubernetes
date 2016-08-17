@@ -42,7 +42,7 @@ func TestDynamicClient(t *testing.T) {
 
 	gv := testapi.Default.GroupVersion()
 	config := &restclient.Config{
-		Hosts:         []string{s.URL},
+		Host:          s.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: gv},
 	}
 

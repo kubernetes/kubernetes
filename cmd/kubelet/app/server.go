@@ -553,7 +553,7 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		authConfig.Host = s.APIServerList[0]
+		authConfig.AlternateHosts = s.APIServerList
 		clientConfig = &authConfig
 	}
 	return clientConfig, nil

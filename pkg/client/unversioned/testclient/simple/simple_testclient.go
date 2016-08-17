@@ -83,30 +83,30 @@ func (c *Client) Setup(t *testing.T) *Client {
 	c.server = httptest.NewServer(c.handler)
 	if c.Client == nil {
 		c.Client = client.NewOrDie(&restclient.Config{
-			Hosts:         []string{c.server.URL},
+			Host:          c.server.URL,
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()},
 		})
 
 		// TODO: caesarxuchao: hacky way to specify version of Experimental client.
 		// We will fix this by supporting multiple group versions in Config
 		c.AutoscalingClient = client.NewAutoscalingOrDie(&restclient.Config{
-			Hosts:         []string{c.server.URL},
+			Host:          c.server.URL,
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Autoscaling.GroupVersion()},
 		})
 		c.BatchClient = client.NewBatchOrDie(&restclient.Config{
-			Hosts:         []string{c.server.URL},
+			Host:          c.server.URL,
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Batch.GroupVersion()},
 		})
 		c.ExtensionsClient = client.NewExtensionsOrDie(&restclient.Config{
-			Hosts:         []string{c.server.URL},
+			Host:          c.server.URL,
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Extensions.GroupVersion()},
 		})
 		c.RbacClient = client.NewRbacOrDie(&restclient.Config{
-			Hosts:         []string{c.server.URL},
+			Host:          c.server.URL,
 			ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Rbac.GroupVersion()},
 		})
 
-		c.Clientset = clientset.NewForConfigOrDie(&restclient.Config{Hosts: []string{c.server.URL}})
+		c.Clientset = clientset.NewForConfigOrDie(&restclient.Config{Host: c.server.URL})
 	}
 	c.QueryValidator = map[string]func(string, string) bool{}
 	return c

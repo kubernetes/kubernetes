@@ -98,9 +98,9 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 
 	clientConfig := &restclient.Config{}
 
-	clientConfig.Hosts = configClusterInfo.Servers
-	if len(configClusterInfo.Servers) == 0 && configClusterInfo.Server != "" {
-		clientConfig.Hosts = []string{configClusterInfo.Server}
+	clientConfig.AlternateHosts = configClusterInfo.Servers
+	if configClusterInfo.Server != "" {
+		clientConfig.Host = configClusterInfo.Server
 	}
 
 	if len(configAuthInfo.Impersonate) > 0 {
