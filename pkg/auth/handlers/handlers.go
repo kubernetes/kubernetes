@@ -17,7 +17,9 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -25,6 +27,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/auth/authenticator"
+	"k8s.io/kubernetes/pkg/auth/user"
 )
 
 var (
@@ -62,10 +65,27 @@ func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator
 			}
 
 			authenticatedUserCounter.WithLabelValues(compressUsername(user.GetName())).Inc()
+			setAuthenticationInfo(w, user)
 
 			handler.ServeHTTP(w, req)
 		}),
 	)
+}
+
+// set the "Authentication-Info" header for a response.
+func setAuthenticationInfo(w http.ResponseWriter, userInfo user.Info) {
+	// Requirements for quoting these values is defined in RFC 7235 (which links to RFC 7230).
+	// We use the strconv package because it encompasses the requirements, including escaping
+	// inner quotes, spaces, and non-printable characters.
+	//
+	// QuoteToASCII because non-ASCII HTTP headers aren't guarenteed to work with many clients.
+	//
+	// https://tools.ietf.org/html/rfc7235#section-2.1
+	// https://tools.ietf.org/html/rfc7230#section-3.2.6
+	username := strconv.QuoteToASCII(userInfo.GetName())
+	uid := strconv.QuoteToASCII(userInfo.GetUID())
+
+	w.Header().Set("Authentication-Info", fmt.Sprintf("username=%s, uid=%s", username, uid))
 }
 
 func Unauthorized(supportsBasicAuth bool) http.HandlerFunc {
