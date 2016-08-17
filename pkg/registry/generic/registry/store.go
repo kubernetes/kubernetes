@@ -445,29 +445,49 @@ var (
 	errEmptiedFinalizers = fmt.Errorf("emptied finalizers")
 )
 
-// return if we need to update the finalizers of the object, and the desired list of finalizers
-func shouldUpdateFinalizers(accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
-	if options == nil || options.OrphanDependents == nil {
-		return false, accessor.GetFinalizers()
+// shouldUpdateFinalizers returns if we need to update the finalizers of the
+// object, and the desired list of finalizers.
+// When deciding whether to add the OrphanDependent finalizer, factors in the
+// order of highest to lowest priority are: options.OrphanDependents, existing
+// finalizers of the object, e.DeleteStrategy.DefaultGarbageCollectionPolicy.
+func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
+	shouldOrphan := false
+	// Get default orphan policy from this REST object type
+	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
+		if gcStrategy.DefaultGarbageCollectionPolicy() == rest.OrphanDependents {
+			shouldOrphan = true
+		}
 	}
-	shouldOrphan := *options.OrphanDependents
-	alreadyOrphan := false
+	// If a finalizer is set in the object, it overrides the default
+	hasOrphanFinalizer := false
 	finalizers := accessor.GetFinalizers()
-	newFinalizers = make([]string, 0, len(finalizers))
 	for _, f := range finalizers {
 		if f == api.FinalizerOrphan {
-			alreadyOrphan = true
-			if !shouldOrphan {
+			shouldOrphan = true
+			hasOrphanFinalizer = true
+			break
+		}
+		// TODO: update this when we add a finalizer indicating a preference for the other behavior
+	}
+	// If an explicit policy was set at deletion time, that overrides both
+	if options != nil && options.OrphanDependents != nil {
+		shouldOrphan = *options.OrphanDependents
+	}
+	if shouldOrphan && !hasOrphanFinalizer {
+		finalizers = append(finalizers, api.FinalizerOrphan)
+		return true, finalizers
+	}
+	if !shouldOrphan && hasOrphanFinalizer {
+		var newFinalizers []string
+		for _, f := range finalizers {
+			if f == api.FinalizerOrphan {
 				continue
 			}
+			newFinalizers = append(newFinalizers, f)
 		}
-		newFinalizers = append(newFinalizers, f)
+		return true, newFinalizers
 	}
-	if shouldOrphan && !alreadyOrphan {
-		newFinalizers = append(newFinalizers, api.FinalizerOrphan)
-	}
-	shouldUpdate = shouldOrphan != alreadyOrphan
-	return shouldUpdate, newFinalizers
+	return false, finalizers
 }
 
 // markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the
@@ -560,7 +580,7 @@ func (e *Store) updateForGracefulDeletionAndFinalizers(ctx api.Context, name, ke
 			if err != nil {
 				return nil, err
 			}
-			shouldUpdate, newFinalizers := shouldUpdateFinalizers(existingAccessor, options)
+			shouldUpdate, newFinalizers := shouldUpdateFinalizers(e, existingAccessor, options)
 			if shouldUpdate {
 				existingAccessor.SetFinalizers(newFinalizers)
 			}
@@ -654,7 +674,7 @@ func (e *Store) Delete(ctx api.Context, name string, options *api.DeleteOptions)
 			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletion(ctx, name, key, options, preconditions, obj)
 		}
 	} else {
-		shouldUpdateFinalizers, _ := shouldUpdateFinalizers(accessor, options)
+		shouldUpdateFinalizers, _ := shouldUpdateFinalizers(e, accessor, options)
 		// TODO: remove the check, because we support no-op updates now.
 		if graceful || pendingFinalizers || shouldUpdateFinalizers {
 			err, ignoreNotFound, deleteImmediately, out, lastExisting = e.updateForGracefulDeletionAndFinalizers(ctx, name, key, options, preconditions, obj)

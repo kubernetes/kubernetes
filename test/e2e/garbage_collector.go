@@ -168,7 +168,7 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		gatherMetrics(f)
 	})
 
-	It("[Feature:GarbageCollector] should orphan pods created by rc", func() {
+	It("[Feature:GarbageCollector] should orphan pods created by rc if delete options say so", func() {
 		clientSet := f.Clientset_1_3
 		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
@@ -195,6 +195,53 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		}
 		By("delete the rc")
 		deleteOptions := getOrphanOptions()
+		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
+		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
+			framework.Failf("failed to delete the rc: %v", err)
+		}
+		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			pods, err := podClient.List(api.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list pods: %v", err)
+			}
+			if e, a := int(*(rc.Spec.Replicas)), len(pods.Items); e != a {
+				return false, fmt.Errorf("expect %d pods, got %d pods", e, a)
+			}
+			return false, nil
+		}); err != nil && err != wait.ErrWaitTimeout {
+			framework.Failf("%v", err)
+		}
+		gatherMetrics(f)
+	})
+
+	It("[Feature:GarbageCollector] should orphan pods created by rc if deleteOptions.OrphanDependents is nil", func() {
+		clientSet := f.Clientset_1_3
+		rcClient := clientSet.Core().ReplicationControllers(f.Namespace.Name)
+		podClient := clientSet.Core().Pods(f.Namespace.Name)
+		rcName := "simpletest.rc"
+		rc := newOwnerRC(f, rcName)
+		By("create the rc")
+		rc, err := rcClient.Create(rc)
+		if err != nil {
+			framework.Failf("Failed to create replication controller: %v", err)
+		}
+		// wait for rc to create some pods
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			rc, err := rcClient.Get(rc.Name)
+			if err != nil {
+				return false, fmt.Errorf("Failed to get rc: %v", err)
+			}
+			if rc.Status.Replicas == *rc.Spec.Replicas {
+				return true, nil
+			} else {
+				return false, nil
+			}
+		}); err != nil {
+			framework.Failf("failed to wait for the rc.Status.Replicas to reach rc.Spec.Replicas: %v", err)
+		}
+		By("delete the rc")
+		deleteOptions := &api.DeleteOptions{}
 		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
