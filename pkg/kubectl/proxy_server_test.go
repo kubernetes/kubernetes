@@ -318,7 +318,7 @@ func TestPathHandling(t *testing.T) {
 	}
 
 	cc := &restclient.Config{
-		Hosts: []string{ts.URL},
+		Host: ts.URL,
 	}
 
 	for _, item := range table {
