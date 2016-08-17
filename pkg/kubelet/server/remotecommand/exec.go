@@ -60,7 +60,7 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 	if err != nil {
 		if exitErr, ok := err.(utilexec.ExitError); ok && exitErr.Exited() {
 			rc := exitErr.ExitStatus()
-			ctx.writeStatus(&apierrors.StatusError{unversioned.Status{
+			ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
 				Status: unversioned.StatusFailure,
 				Reason: NonZeroExitCodeReason,
 				Details: &unversioned.StatusDetails{
@@ -79,7 +79,7 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 			ctx.writeStatus(apierrors.NewInternalError(err))
 		}
 	} else {
-		ctx.writeStatus(&apierrors.StatusError{unversioned.Status{
+		ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
 			Status: unversioned.StatusSuccess,
 		}})
 	}

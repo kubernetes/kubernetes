@@ -52,7 +52,7 @@ func ServeAttach(w http.ResponseWriter, req *http.Request, attacher Attacher, po
 		runtime.HandleError(err)
 		ctx.writeStatus(apierrors.NewInternalError(err))
 	} else {
-		ctx.writeStatus(&apierrors.StatusError{unversioned.Status{
+		ctx.writeStatus(&apierrors.StatusError{ErrStatus: unversioned.Status{
 			Status: unversioned.StatusSuccess,
 		}})
 	}
