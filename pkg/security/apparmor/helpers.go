@@ -27,6 +27,8 @@ import (
 const (
 	// The prefix to an annotation key specifying a container profile.
 	ContainerAnnotationKeyPrefix = "container.apparmor.security.alpha.kubernetes.io/"
+	// The annotation key specifying the default AppArmor profile.
+	DefaultProfileAnnotationKey = "apparmor.security.alpha.kubernetes.io/defaultProfileName"
 	// The annotation key specifying the allowed AppArmor profiles.
 	AllowedProfilesAnnotationKey = "apparmor.security.alpha.kubernetes.io/allowedProfileNames"
 

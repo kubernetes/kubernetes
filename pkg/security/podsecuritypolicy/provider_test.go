@@ -368,7 +368,7 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		"failInvalidAppArmor": {
 			pod:           failInvalidAppArmorPod,
 			psp:           failAppArmorPSP,
-			expectedError: "localhost/foo is not an allowed profile. Allowed values: [runtime/default]",
+			expectedError: "localhost/foo is not an allowed profile. Allowed values: \"runtime/default\"",
 		},
 		"failPrivPSP": {
 			pod:           failPrivPod,

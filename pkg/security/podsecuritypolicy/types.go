@@ -59,7 +59,7 @@ type StrategyFactory interface {
 type ProviderStrategies struct {
 	RunAsUserStrategy         user.RunAsUserStrategy
 	SELinuxStrategy           selinux.SELinuxStrategy
-	AppArmorStrategy          apparmor.AppArmorStrategy
+	AppArmorStrategy          apparmor.Strategy
 	FSGroupStrategy           group.GroupStrategy
 	SupplementalGroupStrategy group.GroupStrategy
 	CapabilitiesStrategy      capabilities.Strategy
