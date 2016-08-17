@@ -949,7 +949,9 @@ func TestSetApp(t *testing.T) {
 
 	tests := []struct {
 		container        *api.Container
-		opts             *kubecontainer.RunContainerOptions
+		mountPoints      []appctypes.MountPoint
+		containerPorts   []appctypes.Port
+		envs             []kubecontainer.EnvVar
 		ctx              *api.SecurityContext
 		podCtx           *api.PodSecurityContext
 		supplementalGids []int64
@@ -959,7 +961,9 @@ func TestSetApp(t *testing.T) {
 		// Nothing should change, but the "User" and "Group" should be filled.
 		{
 			container:        &api.Container{},
-			opts:             &kubecontainer.RunContainerOptions{},
+			mountPoints:      []appctypes.MountPoint{},
+			containerPorts:   []appctypes.Port{},
+			envs:             []kubecontainer.EnvVar{},
 			ctx:              nil,
 			podCtx:           nil,
 			supplementalGids: nil,
@@ -969,8 +973,10 @@ func TestSetApp(t *testing.T) {
 
 		// error verifying non-root.
 		{
-			container: &api.Container{},
-			opts:      &kubecontainer.RunContainerOptions{},
+			container:      &api.Container{},
+			mountPoints:    []appctypes.MountPoint{},
+			containerPorts: []appctypes.Port{},
+			envs:           []kubecontainer.EnvVar{},
 			ctx: &api.SecurityContext{
 				RunAsNonRoot: &runAsNonRootTrue,
 				RunAsUser:    &rootUser,
@@ -986,7 +992,9 @@ func TestSetApp(t *testing.T) {
 			container: &api.Container{
 				Args: []string{"foo"},
 			},
-			opts:             &kubecontainer.RunContainerOptions{},
+			mountPoints:      []appctypes.MountPoint{},
+			containerPorts:   []appctypes.Port{},
+			envs:             []kubecontainer.EnvVar{},
 			ctx:              nil,
 			podCtx:           nil,
 			supplementalGids: nil,
@@ -1025,16 +1033,14 @@ func TestSetApp(t *testing.T) {
 					Requests: api.ResourceList{"cpu": resource.MustParse("5m"), "memory": resource.MustParse("5M")},
 				},
 			},
-			opts: &kubecontainer.RunContainerOptions{
-				Envs: []kubecontainer.EnvVar{
-					{Name: "env-bar", Value: "foo"},
-				},
-				Mounts: []kubecontainer.Mount{
-					{Name: "mnt-bar", ContainerPath: "/mnt-bar", ReadOnly: true},
-				},
-				PortMappings: []kubecontainer.PortMapping{
-					{Name: "port-bar", Protocol: api.ProtocolTCP, ContainerPort: 1234},
-				},
+			mountPoints: []appctypes.MountPoint{
+				{Name: *appctypes.MustACName("mnt-bar"), Path: "/mnt-bar", ReadOnly: true},
+			},
+			containerPorts: []appctypes.Port{
+				{Name: *appctypes.MustACName("port-bar"), Protocol: "TCP", Port: 1234},
+			},
+			envs: []kubecontainer.EnvVar{
+				{Name: "env-bar", Value: "foo"},
 			},
 			ctx: &api.SecurityContext{
 				Capabilities: &api.Capabilities{
@@ -1088,17 +1094,15 @@ func TestSetApp(t *testing.T) {
 					Requests: api.ResourceList{"memory": resource.MustParse("5M")},
 				},
 			},
-			opts: &kubecontainer.RunContainerOptions{
-				Envs: []kubecontainer.EnvVar{
-					{Name: "env-foo", Value: "foo"},
-					{Name: "env-bar", Value: "bar"},
-				},
-				Mounts: []kubecontainer.Mount{
-					{Name: "mnt-foo", ContainerPath: "/mnt-bar", ReadOnly: true},
-				},
-				PortMappings: []kubecontainer.PortMapping{
-					{Name: "port-foo", Protocol: api.ProtocolTCP, ContainerPort: 1234},
-				},
+			mountPoints: []appctypes.MountPoint{
+				{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: true},
+			},
+			containerPorts: []appctypes.Port{
+				{Name: *appctypes.MustACName("port-foo"), Protocol: "TCP", Port: 1234},
+			},
+			envs: []kubecontainer.EnvVar{
+				{Name: "env-foo", Value: "foo"},
+				{Name: "env-bar", Value: "bar"},
 			},
 			ctx: &api.SecurityContext{
 				Capabilities: &api.Capabilities{
@@ -1124,7 +1128,7 @@ func TestSetApp(t *testing.T) {
 					{Name: "env-bar", Value: "bar"},
 				},
 				MountPoints: []appctypes.MountPoint{
-					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-bar", ReadOnly: true},
+					{Name: *appctypes.MustACName("mnt-foo"), Path: "/mnt-foo", ReadOnly: true},
 				},
 				Ports: []appctypes.Port{
 					{Name: *appctypes.MustACName("port-foo"), Protocol: "TCP", Port: 1234},
@@ -1142,7 +1146,11 @@ func TestSetApp(t *testing.T) {
 	for i, tt := range tests {
 		testCaseHint := fmt.Sprintf("test case #%d", i)
 		img := baseImageManifest(t)
-		err := setApp(img, tt.container, tt.opts, tt.ctx, tt.podCtx, tt.supplementalGids)
+
+		err := setApp(img, tt.container,
+			tt.mountPoints, tt.containerPorts, tt.envs,
+			tt.ctx, tt.podCtx, tt.supplementalGids)
+
 		if err == nil && tt.err != nil || err != nil && tt.err == nil {
 			t.Errorf("%s: expect %v, saw %v", testCaseHint, tt.err, err)
 		}

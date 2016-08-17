@@ -342,6 +342,8 @@ type EnvVar struct {
 
 type Mount struct {
 	// Name of the volume mount.
+	// TODO(yifan): Remove this field, as this is not representing the unique name of the mount,
+	// but the volume name only.
 	Name string
 	// Path of the mount within the container.
 	ContainerPath string
