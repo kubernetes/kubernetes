@@ -58,6 +58,8 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
+	// OverlapAnnotation marks deployments with overlapping selector with other deployments
+	OverlapAnnotation = "deployment.kubernetes.io/overlap-with"
 )
 
 // MaxRevision finds the highest revision in the replica sets
