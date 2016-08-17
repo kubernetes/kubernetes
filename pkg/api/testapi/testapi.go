@@ -15,6 +15,12 @@ limitations under the License.
 */
 
 // Package testapi provides a helper for retrieving the KUBE_TEST_API environment variable.
+//
+// TODO(lavalamp): this package is a huge disaster at the moment. I intend to
+// refactor. All code currently using this package should change:
+// 1. Declare your own registered.APIGroupRegistrationManager in your own test code.
+// 2. Import the relevant install packages.
+// 3. Register the types you need, from the announced.APIGroupAnnouncementManager.
 package testapi
 
 import (
