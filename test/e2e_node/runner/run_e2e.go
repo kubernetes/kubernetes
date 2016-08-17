@@ -502,9 +502,11 @@ func getComputeClient() (*compute.Service, error) {
 }
 
 func deleteInstance(image string) {
-	_, err := computeService.Instances.Delete(*project, *zone, imageToInstanceName(image)).Do()
+	instanceName := imageToInstanceName(image)
+	glog.Infof("Deleting instance %q", instanceName)
+	_, err := computeService.Instances.Delete(*project, *zone, instanceName).Do()
 	if err != nil {
-		glog.Infof("Error deleting instance %s", imageToInstanceName(image))
+		glog.Errorf("Error deleting instance %q: %v", instanceName, err)
 	}
 }
 

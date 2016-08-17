@@ -82,12 +82,14 @@ func GetHostnameOrIp(hostname string) string {
 // the binaries k8s required for node e2e tests
 func CreateTestArchive() (string, error) {
 	// Build the executables
-	buildGo()
+	if err := buildGo(); err != nil {
+		return "", fmt.Errorf("failed to build the depedencies: %v", err)
+	}
 
 	// Make sure we can find the newly built binaries
 	buildOutputDir, err := getK8sBuildOutputDir()
 	if err != nil {
-		glog.Fatalf("Failed to locate kubernetes build output directory %v", err)
+		return "", fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}
 
 	ginkgoTest := filepath.Join(buildOutputDir, "e2e_node.test")

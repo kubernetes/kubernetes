@@ -101,7 +101,7 @@ func TestE2eNode(t *testing.T) {
 // Setup the kubelet on the node
 var _ = SynchronizedBeforeSuite(func() []byte {
 	if *buildServices {
-		buildGo()
+		Expect(buildGo()).To(Succeed())
 	}
 	if framework.TestContext.NodeName == "" {
 		hostname, err := os.Hostname()
