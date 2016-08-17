@@ -385,7 +385,7 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 
 		// If we have a GroupVersionKind on the list, prioritize that when asking for info on the objects contained in the list
 		var preferredGVKs []unversioned.GroupVersionKind
-		if info.Mapping != nil && !info.Mapping.GroupVersionKind.IsEmpty() {
+		if info.Mapping != nil && !info.Mapping.GroupVersionKind.Empty() {
 			preferredGVKs = append(preferredGVKs, info.Mapping.GroupVersionKind)
 		}
 

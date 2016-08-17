@@ -183,7 +183,7 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, e
 		if !ok {
 			continue
 		}
-		if singular.IsEmpty() {
+		if singular.Empty() {
 			singular = currSingular
 			continue
 		}
@@ -193,7 +193,7 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, e
 		}
 	}
 
-	if singular.IsEmpty() {
+	if singular.Empty() {
 		return resourceType, fmt.Errorf("no singular of resource %v has been defined", resourceType)
 	}
 
