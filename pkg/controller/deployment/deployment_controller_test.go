@@ -203,7 +203,7 @@ func (f *fixture) run(deploymentName string) {
 	c.rsStoreSynced = alwaysReady
 	c.podStoreSynced = alwaysReady
 	for _, d := range f.dStore {
-		c.dStore.Store.Add(d)
+		c.dStore.Indexer.Add(d)
 	}
 	for _, rs := range f.rsStore {
 		c.rsStore.Store.Add(rs)
@@ -275,7 +275,7 @@ func TestDeploymentController_dontSyncDeploymentsWithEmptyPodSelector(t *testing
 	d := newDeployment(1, nil)
 	empty := unversioned.LabelSelector{}
 	d.Spec.Selector = &empty
-	controller.dStore.Store.Add(d)
+	controller.dStore.Indexer.Add(d)
 	// We expect the deployment controller to not take action here since it's configuration
 	// is invalid, even though no replicasets exist that match it's selector.
 	controller.syncDeployment(fmt.Sprintf("%s/%s", d.ObjectMeta.Namespace, d.ObjectMeta.Name))
