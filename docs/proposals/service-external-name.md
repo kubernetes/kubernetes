@@ -29,11 +29,11 @@ Documentation for other releases can be found at
 
 # Service externalName
 
-Author: Tim Hockin (@thockin), Rodrigo Campos (@rata)
+Author: Tim Hockin (@thockin), Rodrigo Campos (@rata), Rudi C (@therc)
 
-Date: July 2016
+Date: August 2016
 
-Status: Waiting LGTM
+Status: Implementation in progress
 
 # Goal
 

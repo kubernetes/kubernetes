@@ -90,6 +90,7 @@ type KubeDNS struct {
 
 	// stores DNS records for the domain.
 	// A Records and SRV Records for (regular) services and headless Services.
+	// CNAME Records for ExternalName Services.
 	cache *TreeCache
 
 	// TODO(nikhiljindal): Remove this. It can be recreated using clusterIPServiceMap.
@@ -241,6 +242,11 @@ func assertIsService(obj interface{}) (*kapi.Service, bool) {
 func (kd *KubeDNS) newService(obj interface{}) {
 	if service, ok := assertIsService(obj); ok {
 		glog.V(4).Infof("Add/Updated for service %v", service.Name)
+		// ExternalName services are a special kind that return CNAME records
+		if service.Spec.Type == kapi.ServiceTypeExternalName {
+			kd.newExternalNameService(service)
+			return
+		}
 		// if ClusterIP is not set, a DNS entry should not be created
 		if !kapi.IsServiceIPSet(service) {
 			kd.newHeadlessService(service)
@@ -259,8 +265,11 @@ func (kd *KubeDNS) removeService(obj interface{}) {
 		kd.cacheLock.Lock()
 		defer kd.cacheLock.Unlock()
 		kd.cache.deletePath(subCachePath...)
-		delete(kd.reverseRecordMap, s.Spec.ClusterIP)
-		delete(kd.clusterIPServiceMap, s.Spec.ClusterIP)
+		// ExternalName services have no IP
+		if s.Spec.ClusterIP != kapi.ClusterIPNone {
+			delete(kd.reverseRecordMap, s.Spec.ClusterIP)
+			delete(kd.clusterIPServiceMap, s.Spec.ClusterIP)
+		}
 	}
 }
 
@@ -431,6 +440,22 @@ func (kd *KubeDNS) newHeadlessService(service *kapi.Service) error {
 	return nil
 }
 
+// Generates skydns records for a headless service.
+func (kd *KubeDNS) newExternalNameService(service *kapi.Service) {
+	// Create a CNAME record for the service's ExternalName.
+	// Format is as follows:
+	// For a service x, with pods a and b create DNS records,
+	// a.x.ns.domain. and, b.x.ns.domain.
+	// TODO: TTL?
+	recordValue, recordLabel := getSkyMsg(service.Spec.ExternalName, 0)
+	cachePath := (append(kd.domainPath, serviceSubdomain, service.Namespace, service.Name))
+	kd.cacheLock.Lock()
+	defer kd.cacheLock.Unlock()
+	fqdn := kd.fqdn(service)
+	glog.V(2).Infof("newExternalNameService: storing key %s with value %v as %s under %v", recordLabel, recordValue, fqdn, cachePath)
+	kd.cache.setEntry(recordLabel, recordValue, fqdn, cachePath...)
+}
+
 // Records responds with DNS records that match the given name, in a format
 // understood by the skydns server. If "exact" is true, a single record
 // matching the given name is returned, otherwise all records stored under
@@ -532,7 +557,7 @@ func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Servic
 	kd.cacheLock.RLock()
 	defer kd.cacheLock.RUnlock()
 	records := kd.cache.getValuesForPathWithWildcards(path...)
-	glog.V(2).Infof("Received %d records from cache", len(records))
+	glog.V(2).Infof("Received %d records for %v from cache", len(records), path)
 	for _, val := range records {
 		retval = append(retval, *val)
 	}
