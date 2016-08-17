@@ -171,8 +171,12 @@ message PodSandboxConfig {
 }
 
 message CreatePodSandboxRequest {
+    // A unique token accompanying the request to allow idempotency. A server
+    // accepting this message SHOULD ensure that if two requests have the same
+    // request_id value, they respond with the same pod_sandbox_id both times.
+    optional string request_id = 1;
     // The configuration for creating a PodSandBox.
-    optional PodSandboxConfig config = 1;
+    optional PodSandboxConfig config = 2;
 }
 
 message CreatePodSandboxResponse {
@@ -414,12 +418,16 @@ message ContainerConfig {
 }
 
 message CreateContainerRequest {
+    // A unique token accompanying the request to allow idempotency. A server
+    // accepting this message SHOULD ensure that if two requests have the same
+    // request_id value, they respond with the same container_id both times.
+    optional string request_id = 1;
     // The id of the PodSandbox
-    optional string pod_sandbox_id = 1;
+    optional string pod_sandbox_id = 2;
     // The config of the container
-    optional ContainerConfig config = 2;
+    optional ContainerConfig config = 3;
     // The config of the PodSandbox
-    optional PodSandboxConfig sandbox_config = 3;
+    optional PodSandboxConfig sandbox_config = 4;
 }
 
 message CreateContainerResponse {

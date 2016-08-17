@@ -21,10 +21,12 @@ import (
 	"time"
 
 	"fmt"
+
 	"github.com/golang/glog"
 	"google.golang.org/grpc"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 // RemoteRuntimeService is a gRPC implementation of internalApi.RuntimeService.
@@ -69,8 +71,10 @@ func (r *RemoteRuntimeService) CreatePodSandbox(config *runtimeApi.PodSandboxCon
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
+	uid := uuid.NewUUID() // TODO, use poduid instead, either here or as the responsibility of the server implementation
 	resp, err := r.runtimeClient.CreatePodSandbox(ctx, &runtimeApi.CreatePodSandboxRequest{
-		Config: config,
+		RequestId: &uid,
+		Config:    config,
 	})
 	if err != nil {
 		glog.Errorf("CreatePodSandbox from runtime service failed: %v", err)
@@ -151,7 +155,9 @@ func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runt
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
+	uid := uuid.NewUUID()
 	resp, err := r.runtimeClient.CreateContainer(ctx, &runtimeApi.CreateContainerRequest{
+		RequestId:     &uid,
 		PodSandboxId:  &podSandBoxID,
 		Config:        config,
 		SandboxConfig: sandboxConfig,
