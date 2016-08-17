@@ -139,6 +139,11 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 		sc.SELinuxOptions = seLinux
 	}
 
+	annotations, err := s.strategies.AppArmorStrategy.Generate(annotations, container)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	if sc.Privileged == nil {
 		priv := false
 		sc.Privileged = &priv
@@ -220,6 +225,7 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	sc := container.SecurityContext
 	allErrs = append(allErrs, s.strategies.RunAsUserStrategy.Validate(pod, container)...)
 	allErrs = append(allErrs, s.strategies.SELinuxStrategy.Validate(pod, container)...)
+	allErrs = append(allErrs, s.strategies.AppArmorStrategy.Validate(pod, container)...)
 
 	if !s.psp.Spec.Privileged && *sc.Privileged {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("privileged"), *sc.Privileged, "Privileged containers are not allowed"))
