@@ -332,16 +332,16 @@ func (jm *JobController) syncJob(key string) error {
 	}
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(jobKey)
 	selector, _ := unversioned.LabelSelectorAsSelector(job.Spec.Selector)
-	podList, err := jm.podStore.Pods(job.Namespace).List(selector)
+	pods, err := jm.podStore.Pods(job.Namespace).List(selector)
 	if err != nil {
 		glog.Errorf("Error getting pods for job %q: %v", key, err)
 		jm.queue.Add(key)
 		return err
 	}
 
-	activePods := controller.FilterActivePods(podList.Items)
+	activePods := controller.FilterActivePods(pods)
 	active := int32(len(activePods))
-	succeeded, failed := getStatus(podList.Items)
+	succeeded, failed := getStatus(pods)
 	conditions := len(job.Status.Conditions)
 	if job.Status.StartTime == nil {
 		now := unversioned.Now()
@@ -450,7 +450,7 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 }
 
 // getStatus returns no of succeeded and failed pods running a job
-func getStatus(pods []api.Pod) (succeeded, failed int32) {
+func getStatus(pods []*api.Pod) (succeeded, failed int32) {
 	succeeded = int32(filterPods(pods, api.PodSucceeded))
 	failed = int32(filterPods(pods, api.PodFailed))
 	return
@@ -458,6 +458,7 @@ func getStatus(pods []api.Pod) (succeeded, failed int32) {
 
 // manageJob is the core method responsible for managing the number of running
 // pods according to what is specified in the job.Spec.
+// Does NOT modify <activePods>.
 func (jm *JobController) manageJob(activePods []*api.Pod, succeeded int32, job *batch.Job) int32 {
 	var activeLock sync.Mutex
 	active := int32(len(activePods))
@@ -550,7 +551,7 @@ func (jm *JobController) updateJobStatus(job *batch.Job) error {
 }
 
 // filterPods returns pods based on their phase.
-func filterPods(pods []api.Pod, phase api.PodPhase) int {
+func filterPods(pods []*api.Pod, phase api.PodPhase) int {
 	result := 0
 	for i := range pods {
 		if phase == pods[i].Status.Phase {

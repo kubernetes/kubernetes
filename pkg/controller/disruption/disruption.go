@@ -377,16 +377,16 @@ func (dc *DisruptionController) getPodsForPdb(pdb *policy.PodDisruptionBudget) (
 	if err != nil {
 		return []*api.Pod{}, err
 	}
-	podList, err := dc.podLister.Pods(pdb.Namespace).List(sel)
+	pods, err := dc.podLister.Pods(pdb.Namespace).List(sel)
 	if err != nil {
 		return []*api.Pod{}, err
 	}
-	pods := []*api.Pod{}
-	for i := range podList.Items {
-		pod := podList.Items[i]
-		pods = append(pods, &pod)
+	// TODO: Do we need to copy here?
+	result := make([]*api.Pod, 0, len(pods))
+	for i := range pods {
+		result = append(result, &(*pods[i]))
 	}
-	return pods, nil
+	return result, nil
 }
 
 func (dc *DisruptionController) worker() {
