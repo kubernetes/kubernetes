@@ -34,15 +34,14 @@ import (
 // ImageOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ImageOptions struct {
-	Mapper      meta.RESTMapper
-	Typer       runtime.ObjectTyper
-	Infos       []*resource.Info
-	Encoder     runtime.Encoder
-	Selector    string
-	Out         io.Writer
-	Err         io.Writer
-	Filenames   []string
-	Recursive   bool
+	Mapper   meta.RESTMapper
+	Typer    runtime.ObjectTyper
+	Infos    []*resource.Info
+	Encoder  runtime.Encoder
+	Selector string
+	Out      io.Writer
+	Err      io.Writer
+	resource.CommonOptions
 	ShortOutput bool
 	All         bool
 	Record      bool
@@ -130,7 +129,7 @@ func (o *ImageOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []s
 	builder := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, o.CommonOptions).
 		Flatten()
 	if !o.Local {
 		builder = builder.

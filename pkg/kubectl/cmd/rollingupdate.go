@@ -207,7 +207,7 @@ func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, arg
 		request := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 			Schema(schema).
 			NamespaceParam(cmdNamespace).DefaultNamespace().
-			FilenameParam(enforceNamespace, false, filename).
+			FilenameParam(enforceNamespace, resource.CommonOptions{[]string{filename}, false}).
 			Do()
 		obj, err := request.Object()
 		if err != nil {

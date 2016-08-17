@@ -38,9 +38,8 @@ type ResumeConfig struct {
 	Typer        runtime.ObjectTyper
 	Infos        []*resource.Info
 
-	Out       io.Writer
-	Filenames []string
-	Recursive bool
+	Out io.Writer
+	resource.CommonOptions
 }
 
 var (
@@ -100,7 +99,7 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 
 	r := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, o.CommonOptions).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().

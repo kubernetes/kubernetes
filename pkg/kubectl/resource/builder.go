@@ -102,7 +102,9 @@ func (b *Builder) Schema(schema validation.Schema) *Builder {
 // will cause an error.
 // If ContinueOnError() is set prior to this method, objects on the path that are not
 // recognized will be ignored (but logged at V(2)).
-func (b *Builder) FilenameParam(enforceNamespace, recursive bool, paths ...string) *Builder {
+func (b *Builder) FilenameParam(enforceNamespace bool, commonOptions CommonOptions) *Builder {
+	recursive := commonOptions.Recursive
+	paths := commonOptions.Filenames
 	for _, s := range paths {
 		switch {
 		case s == "-":

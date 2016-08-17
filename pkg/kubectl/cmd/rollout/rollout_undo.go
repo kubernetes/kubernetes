@@ -39,9 +39,8 @@ type UndoOptions struct {
 	Infos       []*resource.Info
 	ToRevision  int64
 
-	Out       io.Writer
-	Filenames []string
-	Recursive bool
+	Out io.Writer
+	resource.CommonOptions
 }
 
 var (
@@ -100,7 +99,7 @@ func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out i
 
 	r := resource.NewBuilder(o.Mapper, o.Typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
+		FilenameParam(enforceNamespace, o.CommonOptions).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().

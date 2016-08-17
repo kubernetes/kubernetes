@@ -40,8 +40,7 @@ import (
 // LabelOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type LabelOptions struct {
-	Filenames []string
-	Recursive bool
+	resource.CommonOptions
 }
 
 var (
@@ -210,7 +209,7 @@ func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 	b := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options.CommonOptions).
 		SelectorParam(selector).
 		ResourceTypeOrNameArgs(all, resources...).
 		Flatten().

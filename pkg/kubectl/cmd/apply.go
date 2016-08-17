@@ -38,8 +38,7 @@ import (
 // ApplyOptions stores cmd.Flag values for apply.  As new fields are added,
 // add them here instead of referencing the cmd.Flags()
 type ApplyOptions struct {
-	Filenames []string
-	Recursive bool
+	resource.CommonOptions
 }
 
 const (
@@ -119,7 +118,7 @@ func RunApply(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *Ap
 		Schema(schema).
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options.CommonOptions).
 		Flatten().
 		Do()
 	err = r.Err()
