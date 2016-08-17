@@ -30,6 +30,8 @@ import (
 // API conventions.
 type RESTDeleteStrategy interface {
 	runtime.ObjectTyper
+	// Orphan returns when the object is deleted, by default, whether its dependents should be orphaned or deleted.
+	Orphan() bool
 }
 
 // RESTGracefulDeleteStrategy must be implemented by the registry that supports
