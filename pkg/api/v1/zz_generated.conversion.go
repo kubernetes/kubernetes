@@ -5562,6 +5562,7 @@ func autoConvert_api_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(i
 func autoConvert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStatus(in *ReplicationControllerStatus, out *api.ReplicationControllerStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
+	out.ReadyReplicas = in.ReadyReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
@@ -5573,6 +5574,7 @@ func Convert_v1_ReplicationControllerStatus_To_api_ReplicationControllerStatus(i
 func autoConvert_api_ReplicationControllerStatus_To_v1_ReplicationControllerStatus(in *api.ReplicationControllerStatus, out *ReplicationControllerStatus, s conversion.Scope) error {
 	out.Replicas = in.Replicas
 	out.FullyLabeledReplicas = in.FullyLabeledReplicas
+	out.ReadyReplicas = in.ReadyReplicas
 	out.ObservedGeneration = in.ObservedGeneration
 	return nil
 }
