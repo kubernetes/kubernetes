@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -224,6 +224,68 @@ var _ = framework.KubeDescribe("Services", func() {
 		deletePodOrFail(c, ns, podname2)
 		delete(names, podname2)
 		validateEndpointsOrFail(c, ns, serviceName, PortsByPodName{})
+	})
+
+	It("should preserve source IP while using services", func() {
+		// TODO: verify source IP preservation for LoadBalancer type services when applicable
+
+		serviceName := "sourceip-test"
+		ns := f.Namespace.Name
+
+		By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		jig := NewServiceTestJig(c, serviceName)
+		servicePort := 8080
+		tcpService := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
+		jig.SanityCheckService(tcpService, api.ServiceTypeClusterIP)
+		defer func() {
+			By("Cleaning up the sourceip test service")
+			err := c.Services(ns).Delete(serviceName)
+			Expect(err).NotTo(HaveOccurred())
+		}()
+		serviceIp := tcpService.Spec.ClusterIP
+		framework.Logf("service cluster ip from spec [%s]", serviceIp)
+
+		By("Picking multiple nodes")
+		nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+
+		if len(nodes.Items) == 1 {
+			framework.Skipf("The test requires two Ready nodes on %s, but found just one.", framework.TestContext.Provider)
+		}
+
+		node1 := nodes.Items[0]
+		node2 := nodes.Items[1]
+
+		By("Creating a webserver pod be part of the TCP service which echoes back source ip")
+		serverPodName := "echoserver-sourceip"
+		jig.launchEchoserverPod(f, node1.Name, serverPodName)
+		defer func() {
+			By("Cleaning up the echo server pod")
+			if err := f.Client.Pods(ns).Delete(serverPodName, nil); err != nil {
+				framework.Logf("Failed to delete pod %s: %v", serverPodName, err)
+			}
+		}()
+
+		By("Creating a host exec pod")
+		hostExecPodName := "hostexec-sourceip"
+		hostExec := launchHostExecPodOnNode(f.Client, ns, node2.Name, hostExecPodName)
+		podClient := f.Client.Pods(ns)
+		hostExecPod, err := podClient.Get(hostExecPodName)
+		ExpectNoError(err)
+		hostExecIp := hostExecPod.Status.PodIP
+		framework.Logf("hostExec pod ip [%s]", hostExecIp)
+
+		By("Getting echo response from service")
+		cmd := fmt.Sprintf(`wget -T 30 %s:%d && cat index.html | grep client_address | cut -f 2 -d "="`, serviceIp, servicePort)
+		sourceIp, err := framework.RunHostCmd(hostExec.Namespace, hostExec.Name, cmd)
+		if err != nil {
+			framework.Failf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, hostExec.Namespace, hostExec.Name, err, sourceIp)
+		}
+		// the stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed
+		sourceIp = strings.TrimSpace(sourceIp)
+		framework.Logf("Echoed source ip [%s]", sourceIp)
+
+		By("Verifying the preserved source ip")
+		Expect(sourceIp).To(Equal(hostExecIp))
 	})
 
 	It("should be able to up and down services", func() {
@@ -1545,8 +1607,8 @@ func NewServiceTestJig(client *client.Client, name string) *ServiceTestJig {
 
 // newServiceTemplate returns the default api.Service template for this jig, but
 // does not actually create the Service.  The default Service has the same name
-// as the jig and exposes port 80.
-func (j *ServiceTestJig) newServiceTemplate(namespace string, proto api.Protocol) *api.Service {
+// as the jig and exposes the given port.
+func (j *ServiceTestJig) newServiceTemplate(namespace string, proto api.Protocol, port int32) *api.Service {
 	service := &api.Service{
 		ObjectMeta: api.ObjectMeta{
 			Namespace: namespace,
@@ -1558,7 +1620,7 @@ func (j *ServiceTestJig) newServiceTemplate(namespace string, proto api.Protocol
 			Ports: []api.ServicePort{
 				{
 					Protocol: proto,
-					Port:     80,
+					Port:     port,
 				},
 			},
 		},
@@ -1566,11 +1628,26 @@ func (j *ServiceTestJig) newServiceTemplate(namespace string, proto api.Protocol
 	return service
 }
 
+// CreateTCPServiceWithPort creates a new TCP Service with given port based on the
+// jig's defaults. Callers can provide a function to tweak the Service object before
+// it is created.
+func (j *ServiceTestJig) CreateTCPServiceWithPort(namespace string, tweak func(svc *api.Service), port int32) *api.Service {
+	svc := j.newServiceTemplate(namespace, api.ProtocolTCP, port)
+	if tweak != nil {
+		tweak(svc)
+	}
+	result, err := j.Client.Services(namespace).Create(svc)
+	if err != nil {
+		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
+	}
+	return result
+}
+
 // CreateTCPServiceOrFail creates a new TCP Service based on the jig's
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
 func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc *api.Service)) *api.Service {
-	svc := j.newServiceTemplate(namespace, api.ProtocolTCP)
+	svc := j.newServiceTemplate(namespace, api.ProtocolTCP, 80)
 	if tweak != nil {
 		tweak(svc)
 	}
@@ -1585,7 +1662,7 @@ func (j *ServiceTestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
 func (j *ServiceTestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc *api.Service)) *api.Service {
-	svc := j.newServiceTemplate(namespace, api.ProtocolUDP)
+	svc := j.newServiceTemplate(namespace, api.ProtocolUDP, 80)
 	if tweak != nil {
 		tweak(svc)
 	}
@@ -1990,4 +2067,47 @@ func (t *ServiceTestFixture) Cleanup() []error {
 	}
 
 	return errs
+}
+
+// launchEchoserverPod launches a pod serving http on port 8080 to act
+// as the target for source IP preservation checks. The client's source ip would
+// be echoed back by the web server.
+func (j *ServiceTestJig) launchEchoserverPod(f *framework.Framework, nodeName, podName string) {
+	containerName := fmt.Sprintf("%s-container", podName)
+	port := 8080
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Name:   podName,
+			Labels: j.Labels,
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  containerName,
+					Image: "gcr.io/google_containers/echoserver:1.4",
+					Ports: []api.ContainerPort{{ContainerPort: int32(port)}},
+				},
+			},
+			NodeName:      nodeName,
+			RestartPolicy: api.RestartPolicyNever,
+		},
+	}
+	By(fmt.Sprintf("Creating echo server pod %q in namespace %q", pod.Name, f.Namespace.Name))
+	podClient := f.Client.Pods(f.Namespace.Name)
+	_, err := podClient.Create(pod)
+	framework.ExpectNoError(err)
+	framework.ExpectNoError(f.WaitForPodRunning(podName))
+	By(fmt.Sprintf("Echo server pod %q in namespace %q running", pod.Name, f.Namespace.Name))
+}
+
+// LaunchHostExecPod launches a hostexec pod in the given namespace and node
+// waits until it's Running
+func launchHostExecPodOnNode(client *client.Client, ns, nodeName, podName string) *api.Pod {
+	hostExecPod := framework.NewHostExecPodSpec(ns, podName)
+	hostExecPod.Spec.NodeName = nodeName
+	pod, err := client.Pods(ns).Create(hostExecPod)
+	framework.ExpectNoError(err)
+	err = framework.WaitForPodRunningInNamespace(client, pod)
+	framework.ExpectNoError(err)
+	return pod
 }
