@@ -211,6 +211,7 @@ insecure-bind-address
 insecure-port
 insecure-skip-tls-verify
 instance-name-prefix
+iptables-drop-bit
 iptables-masquerade-bit
 iptables-sync-period
 ir-data-source
@@ -269,6 +270,7 @@ lock-file
 log-flush-frequency
 long-running-request-regexp
 low-diskspace-threshold-mb
+make-iptables-util-chains
 make-symlinks
 manifest-url
 manifest-url-header

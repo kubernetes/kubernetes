@@ -374,6 +374,18 @@ type KubeletConfiguration struct {
 	// manage attachment/detachment of volumes scheduled to this node, and
 	// disables kubelet from executing any attach/detach operations
 	EnableControllerAttachDetach bool `json:"enableControllerAttachDetach"`
+	// If true, Kubelet ensures a set of iptables rules are present on host.
+	// These rules will serve as utility for various components, e.g. kube-proxy.
+	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
+	MakeIPTablesUtilChains bool `json:"makeIPTablesUtilChains"`
+	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
+	// Values must be within the range [0, 31].
+	// Warning: Please match the value of corresponding parameter in kube-proxy
+	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
+	IPTablesMasqueradeBit int32 `json:"iptablesMasqueradeBit"`
+	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
+	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
+	IPTablesDropBit int32 `json:"iptablesDropBit"`
 }
 
 type KubeSchedulerConfiguration struct {

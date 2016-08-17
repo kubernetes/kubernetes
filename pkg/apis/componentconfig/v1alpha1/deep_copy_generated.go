@@ -30,6 +30,7 @@ func init() {
 	if err := api.Scheme.AddGeneratedDeepCopyFuncs(
 		DeepCopy_v1alpha1_KubeProxyConfiguration,
 		DeepCopy_v1alpha1_KubeSchedulerConfiguration,
+		DeepCopy_v1alpha1_KubeletConfiguration,
 		DeepCopy_v1alpha1_LeaderElectionConfiguration,
 	); err != nil {
 		// if one of the deep copy functions is malformed, detect it immediately.
@@ -103,6 +104,301 @@ func DeepCopy_v1alpha1_KubeSchedulerConfiguration(in KubeSchedulerConfiguration,
 	out.FailureDomains = in.FailureDomains
 	if err := DeepCopy_v1alpha1_LeaderElectionConfiguration(in.LeaderElection, &out.LeaderElection, c); err != nil {
 		return err
+	}
+	return nil
+}
+
+func DeepCopy_v1alpha1_KubeletConfiguration(in KubeletConfiguration, out *KubeletConfiguration, c *conversion.Cloner) error {
+	if err := unversioned.DeepCopy_unversioned_TypeMeta(in.TypeMeta, &out.TypeMeta, c); err != nil {
+		return err
+	}
+	out.PodManifestPath = in.PodManifestPath
+	if err := unversioned.DeepCopy_unversioned_Duration(in.SyncFrequency, &out.SyncFrequency, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_Duration(in.FileCheckFrequency, &out.FileCheckFrequency, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_Duration(in.HTTPCheckFrequency, &out.HTTPCheckFrequency, c); err != nil {
+		return err
+	}
+	out.ManifestURL = in.ManifestURL
+	out.ManifestURLHeader = in.ManifestURLHeader
+	if in.EnableServer != nil {
+		in, out := in.EnableServer, &out.EnableServer
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.EnableServer = nil
+	}
+	out.Address = in.Address
+	out.Port = in.Port
+	out.ReadOnlyPort = in.ReadOnlyPort
+	out.TLSCertFile = in.TLSCertFile
+	out.TLSPrivateKeyFile = in.TLSPrivateKeyFile
+	out.CertDirectory = in.CertDirectory
+	out.HostnameOverride = in.HostnameOverride
+	out.PodInfraContainerImage = in.PodInfraContainerImage
+	out.DockerEndpoint = in.DockerEndpoint
+	out.RootDirectory = in.RootDirectory
+	out.SeccompProfileRoot = in.SeccompProfileRoot
+	if in.AllowPrivileged != nil {
+		in, out := in.AllowPrivileged, &out.AllowPrivileged
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.AllowPrivileged = nil
+	}
+	if in.HostNetworkSources != nil {
+		in, out := in.HostNetworkSources, &out.HostNetworkSources
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.HostNetworkSources = nil
+	}
+	if in.HostPIDSources != nil {
+		in, out := in.HostPIDSources, &out.HostPIDSources
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.HostPIDSources = nil
+	}
+	if in.HostIPCSources != nil {
+		in, out := in.HostIPCSources, &out.HostIPCSources
+		*out = make([]string, len(in))
+		copy(*out, in)
+	} else {
+		out.HostIPCSources = nil
+	}
+	if in.RegistryPullQPS != nil {
+		in, out := in.RegistryPullQPS, &out.RegistryPullQPS
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.RegistryPullQPS = nil
+	}
+	out.RegistryBurst = in.RegistryBurst
+	if in.EventRecordQPS != nil {
+		in, out := in.EventRecordQPS, &out.EventRecordQPS
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.EventRecordQPS = nil
+	}
+	out.EventBurst = in.EventBurst
+	if in.EnableDebuggingHandlers != nil {
+		in, out := in.EnableDebuggingHandlers, &out.EnableDebuggingHandlers
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.EnableDebuggingHandlers = nil
+	}
+	if err := unversioned.DeepCopy_unversioned_Duration(in.MinimumGCAge, &out.MinimumGCAge, c); err != nil {
+		return err
+	}
+	out.MaxPerPodContainerCount = in.MaxPerPodContainerCount
+	if in.MaxContainerCount != nil {
+		in, out := in.MaxContainerCount, &out.MaxContainerCount
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.MaxContainerCount = nil
+	}
+	out.CAdvisorPort = in.CAdvisorPort
+	out.HealthzPort = in.HealthzPort
+	out.HealthzBindAddress = in.HealthzBindAddress
+	if in.OOMScoreAdj != nil {
+		in, out := in.OOMScoreAdj, &out.OOMScoreAdj
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.OOMScoreAdj = nil
+	}
+	if in.RegisterNode != nil {
+		in, out := in.RegisterNode, &out.RegisterNode
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.RegisterNode = nil
+	}
+	out.ClusterDomain = in.ClusterDomain
+	out.MasterServiceNamespace = in.MasterServiceNamespace
+	out.ClusterDNS = in.ClusterDNS
+	if err := unversioned.DeepCopy_unversioned_Duration(in.StreamingConnectionIdleTimeout, &out.StreamingConnectionIdleTimeout, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_Duration(in.NodeStatusUpdateFrequency, &out.NodeStatusUpdateFrequency, c); err != nil {
+		return err
+	}
+	if err := unversioned.DeepCopy_unversioned_Duration(in.ImageMinimumGCAge, &out.ImageMinimumGCAge, c); err != nil {
+		return err
+	}
+	if in.ImageGCHighThresholdPercent != nil {
+		in, out := in.ImageGCHighThresholdPercent, &out.ImageGCHighThresholdPercent
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.ImageGCHighThresholdPercent = nil
+	}
+	if in.ImageGCLowThresholdPercent != nil {
+		in, out := in.ImageGCLowThresholdPercent, &out.ImageGCLowThresholdPercent
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.ImageGCLowThresholdPercent = nil
+	}
+	out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
+	if err := unversioned.DeepCopy_unversioned_Duration(in.VolumeStatsAggPeriod, &out.VolumeStatsAggPeriod, c); err != nil {
+		return err
+	}
+	out.NetworkPluginName = in.NetworkPluginName
+	out.NetworkPluginDir = in.NetworkPluginDir
+	out.VolumePluginDir = in.VolumePluginDir
+	out.CloudProvider = in.CloudProvider
+	out.CloudConfigFile = in.CloudConfigFile
+	out.KubeletCgroups = in.KubeletCgroups
+	out.RuntimeCgroups = in.RuntimeCgroups
+	out.SystemCgroups = in.SystemCgroups
+	out.CgroupRoot = in.CgroupRoot
+	if in.CgroupsPerQOS != nil {
+		in, out := in.CgroupsPerQOS, &out.CgroupsPerQOS
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.CgroupsPerQOS = nil
+	}
+	out.ContainerRuntime = in.ContainerRuntime
+	if err := unversioned.DeepCopy_unversioned_Duration(in.RuntimeRequestTimeout, &out.RuntimeRequestTimeout, c); err != nil {
+		return err
+	}
+	out.RktPath = in.RktPath
+	out.RktAPIEndpoint = in.RktAPIEndpoint
+	out.RktStage1Image = in.RktStage1Image
+	if in.LockFilePath != nil {
+		in, out := in.LockFilePath, &out.LockFilePath
+		*out = new(string)
+		**out = *in
+	} else {
+		out.LockFilePath = nil
+	}
+	out.ExitOnLockContention = in.ExitOnLockContention
+	if in.ConfigureCBR0 != nil {
+		in, out := in.ConfigureCBR0, &out.ConfigureCBR0
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.ConfigureCBR0 = nil
+	}
+	out.HairpinMode = in.HairpinMode
+	out.BabysitDaemons = in.BabysitDaemons
+	out.MaxPods = in.MaxPods
+	out.NvidiaGPUs = in.NvidiaGPUs
+	out.DockerExecHandlerName = in.DockerExecHandlerName
+	out.PodCIDR = in.PodCIDR
+	out.ResolverConfig = in.ResolverConfig
+	if in.CPUCFSQuota != nil {
+		in, out := in.CPUCFSQuota, &out.CPUCFSQuota
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.CPUCFSQuota = nil
+	}
+	if in.Containerized != nil {
+		in, out := in.Containerized, &out.Containerized
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.Containerized = nil
+	}
+	out.MaxOpenFiles = in.MaxOpenFiles
+	if in.ReconcileCIDR != nil {
+		in, out := in.ReconcileCIDR, &out.ReconcileCIDR
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.ReconcileCIDR = nil
+	}
+	if in.RegisterSchedulable != nil {
+		in, out := in.RegisterSchedulable, &out.RegisterSchedulable
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.RegisterSchedulable = nil
+	}
+	out.ContentType = in.ContentType
+	if in.KubeAPIQPS != nil {
+		in, out := in.KubeAPIQPS, &out.KubeAPIQPS
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.KubeAPIQPS = nil
+	}
+	out.KubeAPIBurst = in.KubeAPIBurst
+	if in.SerializeImagePulls != nil {
+		in, out := in.SerializeImagePulls, &out.SerializeImagePulls
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.SerializeImagePulls = nil
+	}
+	out.ExperimentalFlannelOverlay = in.ExperimentalFlannelOverlay
+	if err := unversioned.DeepCopy_unversioned_Duration(in.OutOfDiskTransitionFrequency, &out.OutOfDiskTransitionFrequency, c); err != nil {
+		return err
+	}
+	out.NodeIP = in.NodeIP
+	if in.NodeLabels != nil {
+		in, out := in.NodeLabels, &out.NodeLabels
+		*out = make(map[string]string)
+		for key, val := range in {
+			(*out)[key] = val
+		}
+	} else {
+		out.NodeLabels = nil
+	}
+	out.NonMasqueradeCIDR = in.NonMasqueradeCIDR
+	out.EnableCustomMetrics = in.EnableCustomMetrics
+	if in.EvictionHard != nil {
+		in, out := in.EvictionHard, &out.EvictionHard
+		*out = new(string)
+		**out = *in
+	} else {
+		out.EvictionHard = nil
+	}
+	out.EvictionSoft = in.EvictionSoft
+	out.EvictionSoftGracePeriod = in.EvictionSoftGracePeriod
+	if err := unversioned.DeepCopy_unversioned_Duration(in.EvictionPressureTransitionPeriod, &out.EvictionPressureTransitionPeriod, c); err != nil {
+		return err
+	}
+	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
+	out.EvictionMinimumReclaim = in.EvictionMinimumReclaim
+	out.PodsPerCore = in.PodsPerCore
+	if in.EnableControllerAttachDetach != nil {
+		in, out := in.EnableControllerAttachDetach, &out.EnableControllerAttachDetach
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.EnableControllerAttachDetach = nil
+	}
+	if in.MakeIPTablesUtilChains != nil {
+		in, out := in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains
+		*out = new(bool)
+		**out = *in
+	} else {
+		out.MakeIPTablesUtilChains = nil
+	}
+	if in.IPTablesMasqueradeBit != nil {
+		in, out := in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.IPTablesMasqueradeBit = nil
+	}
+	if in.IPTablesDropBit != nil {
+		in, out := in.IPTablesDropBit, &out.IPTablesDropBit
+		*out = new(int32)
+		**out = *in
+	} else {
+		out.IPTablesDropBit = nil
 	}
 	return nil
 }

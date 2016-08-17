@@ -324,6 +324,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in KubeletConfiguration, out 
 	out.EvictionMaxPodGracePeriod = in.EvictionMaxPodGracePeriod
 	out.PodsPerCore = in.PodsPerCore
 	out.EnableControllerAttachDetach = in.EnableControllerAttachDetach
+	out.MakeIPTablesUtilChains = in.MakeIPTablesUtilChains
+	out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
+	out.IPTablesDropBit = in.IPTablesDropBit
 	return nil
 }
 
