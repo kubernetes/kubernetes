@@ -104,7 +104,7 @@ func init() {
 }
 ```
 
-A **plug-in** must be added to the imports in [plugins.go](https://github.com/kubernetes/kubernetes/blob/master/cmd/kube-apiserver/app/plugins.go)
+A **plug-in** must be added to the imports in [plugins.go](../../cmd/kube-apiserver/app/plugins.go)
 
 ```go
   // Admission policies
