@@ -87,6 +87,7 @@ func TestImpersonationFilter(t *testing.T) {
 		impersonationUserExtras map[string][]string
 		expectedUser            user.Info
 		expectedCode            int
+		expectedAuthInfo        string // expected value of "Impersionation-Auth-Info" response header
 	}{
 		{
 			name: "not-impersonating",
@@ -158,7 +159,8 @@ func TestImpersonationFilter(t *testing.T) {
 				Groups: []string{"some-group"},
 				Extra:  map[string][]string{},
 			},
-			expectedCode: http.StatusOK,
+			expectedCode:     http.StatusOK,
+			expectedAuthInfo: `username="system:admin", uid=""`,
 		},
 		{
 			name: "disallowed-userextra-1",
@@ -218,7 +220,8 @@ func TestImpersonationFilter(t *testing.T) {
 				Groups: []string{},
 				Extra:  map[string][]string{"scopes": {"scope-a", "scope-b"}},
 			},
-			expectedCode: http.StatusOK,
+			expectedCode:     http.StatusOK,
+			expectedAuthInfo: `username="system:admin", uid=""`,
 		},
 		{
 			name: "allowed-users-impersonation",
@@ -232,7 +235,8 @@ func TestImpersonationFilter(t *testing.T) {
 				Groups: []string{},
 				Extra:  map[string][]string{},
 			},
-			expectedCode: http.StatusOK,
+			expectedCode:     http.StatusOK,
+			expectedAuthInfo: `username="tester", uid=""`,
 		},
 		{
 			name: "disallowed-impersonating",
@@ -260,7 +264,8 @@ func TestImpersonationFilter(t *testing.T) {
 				Groups: []string{"system:serviceaccounts", "system:serviceaccounts:foo"},
 				Extra:  map[string][]string{},
 			},
-			expectedCode: http.StatusOK,
+			expectedCode:     http.StatusOK,
+			expectedAuthInfo: `username="system:serviceaccount:foo:default", uid=""`,
 		},
 	}
 
@@ -336,12 +341,15 @@ func TestImpersonationFilter(t *testing.T) {
 		}
 		if resp.StatusCode != tc.expectedCode {
 			t.Errorf("%s: expected %v, actual %v", tc.name, tc.expectedCode, resp.StatusCode)
-			continue
 		}
 
 		if !reflect.DeepEqual(actualUser, tc.expectedUser) {
 			t.Errorf("%s: expected %#v, actual %#v", tc.name, tc.expectedUser, actualUser)
-			continue
+		}
+
+		gotAuthInfo := resp.Header.Get(authInfoImpersonationHeader)
+		if gotAuthInfo != tc.expectedAuthInfo {
+			t.Errorf("%s: expected %q, actual %q", tc.name, tc.expectedAuthInfo, gotAuthInfo)
 		}
 	}
 }

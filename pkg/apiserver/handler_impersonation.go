@@ -118,6 +118,7 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 			Groups: groups,
 			Extra:  userExtra,
 		}
+		setAuthInfo(w, newUser, authInfoImpersonationHeader)
 		requestContextMapper.Update(req, api.WithUser(ctx, newUser))
 
 		oldUser, _ := api.UserFrom(ctx)
