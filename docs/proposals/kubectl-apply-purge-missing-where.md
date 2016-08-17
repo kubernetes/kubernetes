@@ -14,7 +14,7 @@ The primary driver for this use-case is to be able to manage cluster add-ons usi
 
 Use labels as a de-facto way of grouping resources for the purpose of _purging_ (removing) resources which no longer exist.
 
-Introduce an optional `--purge-missing-where <label-selector>` flag to `kubectl apply`, which will allow a user to automatically purge resources which:
+Introduce an optional `--purge-missing-where <label-selector>` flag to `kubectl apply`, which, as well as creating and updating API objects (as `kubectl apply` already does) will also purge (delete) resources which:
 
 * match the given label selector
 * do not exist in the provided files
