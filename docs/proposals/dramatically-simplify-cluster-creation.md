@@ -197,6 +197,7 @@ Unable to join mesh network. Check your token.
 
 1. [TLS bootstrapping](https://github.com/kubernetes/features/issues/43) - so that kubeadm can mint credentials for kubelets and users
 
+    * Requires [#25764](https://github.com/kubernetes/kubernetes/pull/25764) and auto-signing [#30153](https://github.com/kubernetes/kubernetes/pull/30153) but does not require [#30094](https://github.com/kubernetes/kubernetes/pull/30094).
     * @philips, @gtank & @yifan-gu
 
 1. Fix for [#30515](https://github.com/kubernetes/kubernetes/issues/30515) - so that kubeadm can install a kubeconfig which kubelet then picks up
