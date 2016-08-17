@@ -156,6 +156,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 }
 
 func (ic *IngressController) Run(stopChan <-chan struct{}) {
+     	glog.Infof("Starting Ingress Controller")
 	go ic.ingressInformerController.Run(stopChan)
 	ic.ingressFederatedInformer.Start()
 	go func() {
