@@ -45,6 +45,7 @@ func StorageWithCacher(
 		ResourcePrefix:       resourcePrefix,
 		NewListFunc:          newListFunc,
 		TriggerPublisherFunc: triggerFunc,
+		Codec:                storageConfig.Codec,
 	}
 	if scopeStrategy.NamespaceScoped() {
 		cacherConfig.KeyFunc = func(obj runtime.Object) (string, error) {
