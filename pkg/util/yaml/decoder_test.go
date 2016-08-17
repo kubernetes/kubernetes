@@ -140,7 +140,7 @@ stuff: 1
 	if err == nil {
 		t.Fatal("expected error with yaml: prefix, got no error")
 	}
-	fmt.Printf("err: %s", err.Error())
+	fmt.Printf("err: %s\n", err.Error())
 	if !strings.HasPrefix(err.Error(), "yaml: line 1:") {
 		t.Fatalf("expected %q to have 'yaml: line 1:' prefix", err.Error())
 	}
