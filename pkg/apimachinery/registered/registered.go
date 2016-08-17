@@ -35,7 +35,14 @@ var (
 	DefaultAPIRegistrationManager = NewOrDie(os.Getenv("KUBE_API_VERSIONS"))
 )
 
-// APIRegistrationManager
+// APIRegistrationManager provides the concept of what API groups are enabled.
+//
+// TODO: currently, it also provides a "registered" concept. But it's wrong to
+// have both concepts in the same object. Therefore the "announced" package is
+// going to take over the registered concept. After all the install packages
+// are switched to using the announce package instead of this package, then we
+// can combine the registered/enabled concepts in this object. Simplifying this
+// isn't easy right now because there are so many callers of this package.
 type APIRegistrationManager struct {
 	// registeredGroupVersions stores all API group versions for which RegisterGroup is called.
 	registeredVersions map[unversioned.GroupVersion]struct{}
