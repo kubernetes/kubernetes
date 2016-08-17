@@ -19,11 +19,11 @@ package eviction
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/golang/glog"
-
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
@@ -169,18 +169,47 @@ func parseThresholdStatement(statement string) (Threshold, error) {
 		return Threshold{}, fmt.Errorf(unsupportedEvictionSignal, signal)
 	}
 
-	quantity, err := resource.ParseQuantity(parts[1])
+	quantityValue := parts[1]
+	if strings.HasSuffix(quantityValue, "%") {
+		percentage, err := parsePercentage(quantityValue)
+		if err != nil {
+			return Threshold{}, err
+		}
+		if percentage <= 0 {
+			return Threshold{}, fmt.Errorf("eviction percentage threshold %v must be positive: %s", signal, quantityValue)
+		}
+		return Threshold{
+			Signal:   signal,
+			Operator: operator,
+			Value: ThresholdValue{
+				Percentage: percentage,
+			},
+		}, nil
+	} else {
+		quantity, err := resource.ParseQuantity(quantityValue)
+		if err != nil {
+			return Threshold{}, err
+		}
+		if quantity.Sign() < 0 || quantity.IsZero() {
+			return Threshold{}, fmt.Errorf("eviction threshold %v must be positive: %s", signal, &quantity)
+		}
+		return Threshold{
+			Signal:   signal,
+			Operator: operator,
+			Value: ThresholdValue{
+				Quantity: &quantity,
+			},
+		}, nil
+	}
+}
+
+// parsePercentage parses a string representing a percentage value
+func parsePercentage(input string) (float32, error) {
+	value, err := strconv.ParseFloat(strings.TrimRight(input, "%"), 32)
 	if err != nil {
-		return Threshold{}, err
+		return 0, err
 	}
-	if quantity.Sign() < 0 {
-		return Threshold{}, fmt.Errorf("eviction threshold %v cannot be negative: %s", signal, &quantity)
-	}
-	return Threshold{
-		Signal:   signal,
-		Operator: operator,
-		Value:    &quantity,
-	}, nil
+	return float32(value) / 100, nil
 }
 
 // parseGracePeriods parses the grace period statements
@@ -329,7 +358,15 @@ func podMemoryUsage(podStats statsapi.PodStats) (api.ResourceList, error) {
 
 // formatThreshold formats a threshold for logging.
 func formatThreshold(threshold Threshold) string {
-	return fmt.Sprintf("threshold(signal=%v, operator=%v, value=%v, gracePeriod=%v)", threshold.Signal, threshold.Value.String(), threshold.Operator, threshold.GracePeriod)
+	return fmt.Sprintf("threshold(signal=%v, operator=%v, value=%v, gracePeriod=%v)", threshold.Signal, formatThresholdValue(threshold.Value), threshold.Operator, threshold.GracePeriod)
+}
+
+// formatThresholdValue formats a thresholdValue for logging.
+func formatThresholdValue(value ThresholdValue) string {
+	if value.Quantity != nil {
+		return value.Quantity.String()
+	}
+	return fmt.Sprintf("%f%%", value.Percentage*float32(100))
 }
 
 // cachedStatsFunc returns a statsFunc based on the provided pod stats.
@@ -532,15 +569,24 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 	// build an evaluation context for current eviction signals
 	result := signalObservations{}
 
-	if memory := summary.Node.Memory; memory != nil && memory.AvailableBytes != nil {
-		result[SignalMemoryAvailable] = resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI)
+	if memory := summary.Node.Memory; memory != nil && memory.AvailableBytes != nil && memory.WorkingSetBytes != nil {
+		result[SignalMemoryAvailable] = signalObservation{
+			available: resource.NewQuantity(int64(*memory.AvailableBytes), resource.BinarySI),
+			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
+		}
 	}
-	if nodeFs := summary.Node.Fs; nodeFs != nil && nodeFs.AvailableBytes != nil {
-		result[SignalNodeFsAvailable] = resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI)
+	if nodeFs := summary.Node.Fs; nodeFs != nil && nodeFs.AvailableBytes != nil && nodeFs.CapacityBytes != nil {
+		result[SignalNodeFsAvailable] = signalObservation{
+			available: resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI),
+			capacity:  resource.NewQuantity(int64(*nodeFs.CapacityBytes), resource.BinarySI),
+		}
 	}
 	if summary.Node.Runtime != nil {
-		if imageFs := summary.Node.Runtime.ImageFs; imageFs != nil && imageFs.AvailableBytes != nil {
-			result[SignalImageFsAvailable] = resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI)
+		if imageFs := summary.Node.Runtime.ImageFs; imageFs != nil && imageFs.AvailableBytes != nil && imageFs.CapacityBytes != nil {
+			result[SignalImageFsAvailable] = signalObservation{
+				available: resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
+			}
 		}
 	}
 	return result, statsFunc, nil
@@ -558,12 +604,12 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 		}
 		// determine if we have met the specified threshold
 		thresholdMet := false
-		quantity := threshold.Value.Copy()
+		quantity := getThresholdQuantity(threshold.Value, observed.capacity)
 		// if enforceMinReclaim is specified, we compare relative to value - minreclaim
 		if enforceMinReclaim && threshold.MinReclaim != nil {
 			quantity.Add(*threshold.MinReclaim)
 		}
-		thresholdResult := quantity.Cmp(*observed)
+		thresholdResult := quantity.Cmp(*observed.available)
 		switch threshold.Operator {
 		case OpLessThan:
 			thresholdMet = thresholdResult > 0
@@ -573,6 +619,14 @@ func thresholdsMet(thresholds []Threshold, observations signalObservations, enfo
 		}
 	}
 	return results
+}
+
+// getThresholdQuantity returns the expected quantity value for a thresholdValue
+func getThresholdQuantity(value ThresholdValue, capacity *resource.Quantity) *resource.Quantity {
+	if value.Quantity != nil {
+		return value.Quantity.Copy()
+	}
+	return resource.NewQuantity(int64(float64(capacity.Value())*float64(value.Percentage)), resource.BinarySI)
 }
 
 // thresholdsFirstObservedAt merges the input set of thresholds with the previous observation to determine when active set of thresholds were initially met.
@@ -678,11 +732,25 @@ func mergeThresholds(inputsA []Threshold, inputsB []Threshold) []Threshold {
 // hasThreshold returns true if the threshold is in the input list
 func hasThreshold(inputs []Threshold, item Threshold) bool {
 	for _, input := range inputs {
-		if input.GracePeriod == item.GracePeriod && input.Operator == item.Operator && input.Signal == item.Signal && input.Value.Cmp(*item.Value) == 0 {
+		if input.GracePeriod == item.GracePeriod && input.Operator == item.Operator && input.Signal == item.Signal && compareThresholdValue(input.Value, item.Value) {
 			return true
 		}
 	}
 	return false
+}
+
+// compareThresholdValue returns true if the two thresholdValue objects are logically the same
+func compareThresholdValue(a ThresholdValue, b ThresholdValue) bool {
+	if a.Quantity != nil {
+		if b.Quantity == nil {
+			return false
+		}
+		return a.Quantity.Cmp(*b.Quantity) == 0
+	}
+	if b.Quantity != nil {
+		return false
+	}
+	return a.Percentage == b.Percentage
 }
 
 // getStarvedResources returns the set of resources that are starved based on thresholds met.
