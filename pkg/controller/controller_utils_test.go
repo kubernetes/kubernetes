@@ -287,7 +287,11 @@ func TestActivePodFiltering(t *testing.T) {
 		expectedNames.Insert(pod.Name)
 	}
 
-	got := FilterActivePods(podList.Items)
+	var podPointers []*api.Pod
+	for i := range podList.Items {
+		podPointers = append(podPointers, &podList.Items[i])
+	}
+	got := FilterActivePods(podPointers)
 	gotNames := sets.NewString()
 	for _, pod := range got {
 		gotNames.Insert(pod.Name)

@@ -59,7 +59,7 @@ func (m *PodControllerRefManager) Classify(pods []*api.Pod) (
 	controlledDoesNotMatch []*api.Pod) {
 	for i := range pods {
 		pod := pods[i]
-		if !IsPodActive(*pod) {
+		if !IsPodActive(pod) {
 			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
 				pod.Namespace, pod.Name, pod.Status.Phase, pod.DeletionTimestamp)
 			continue

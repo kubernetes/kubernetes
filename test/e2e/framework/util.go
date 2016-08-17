@@ -3166,7 +3166,7 @@ func waitForPodsInactive(ps *PodStore, interval, timeout time.Duration) error {
 	return wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pods := ps.List()
 		for _, pod := range pods {
-			if controller.IsPodActive(*pod) {
+			if controller.IsPodActive(pod) {
 				return false, nil
 			}
 		}
