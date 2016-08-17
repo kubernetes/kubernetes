@@ -28,7 +28,7 @@ FE="1"                # amount of Web server
 LG="1"                # amount of load generators
 SLAVE="1"             # amount of redis slaves 
 TEST="1"              # 0 = Don't run tests, 1 = Do run tests.
-NS="default"       # namespace
+NS="k8petstore"       # namespace
 
 kubectl="${1:-$kubectl}"
 VERSION="${2:-$VERSION}"
@@ -40,6 +40,30 @@ TEST="${7:-$TEST}"      # 0 = Don't run tests, 1 = Do run tests.
 NS="${8:-$NS}"          # namespace
 
 echo "Running w/ args: kubectl $kubectl version $VERSION sec $_SECONDS fe $FE lg $LG slave $SLAVE test $TEST NAMESPACE $NS"
+
+function create_ns {
+
+case "$NS" in
+"default" )
+    ;;
+"kube-system" )
+    ;;
+* )
+cat << EOF > ns.json
+{
+  "apiVersion": "v1",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "$NS"
+  }
+}
+EOF
+
+$kubectl create -f ns.json
+
+esac
+}
+
 function create { 
 
 cat << EOF > fe-rc.json
@@ -216,6 +240,9 @@ cat << EOF > slave-rc.json
   }
 }
 EOF
+
+create_ns
+
 $kubectl create -f rm.json --namespace=$NS
 $kubectl create -f rm-s.json --namespace=$NS
 sleep 3 # precaution to prevent fe from spinning up too soon.
