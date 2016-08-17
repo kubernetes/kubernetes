@@ -34,6 +34,7 @@ import (
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/property"
 	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 	"golang.org/x/net/context"
 
@@ -54,6 +55,9 @@ const (
 	SCSIControllerDeviceLimit = 15
 	SCSIDeviceSlots           = 16
 	SCSIReservedSlot          = 7
+	DefaultAdapterType        = "lsiLogic"
+	DefaultDiskType           = "thin"
+	VolDir                    = "kubevols"
 )
 
 // Controller types that are currently supported for hot attach of disks
@@ -66,6 +70,7 @@ var supportedSCSIControllerType = []string{"lsilogic-sas", "pvscsi"}
 var ErrNoDiskUUIDFound = errors.New("No disk UUID found")
 var ErrNoDiskIDFound = errors.New("No vSphere disk ID found")
 var ErrNoDevicesFound = errors.New("No devices found")
+var ErrFileAlreadyExist = errors.New("File requested already exist")
 
 // VSphere is an implementation of cloud provider Interface for VSphere.
 type VSphere struct {
@@ -905,8 +910,22 @@ func (vs *VSphere) CreateVolume(name string, size int, tags *map[string]string) 
 	dc, err := f.Datacenter(ctx, vs.cfg.Global.Datacenter)
 	f.SetDatacenter(dc)
 
+	if (*tags)["adapterType"] == "" {
+		(*tags)["adapterType"] = DefaultAdapterType
+	}
+	if (*tags)["diskType"] == "" {
+		(*tags)["diskType"] = DefaultDiskType
+	}
+
+	kubevolsdir := "[" + vs.cfg.Global.Datastore + "] " + VolDir + "/"
+	err = mkdirInDatastore(c, dc, kubevolsdir, false)
+	if err != nil && err != ErrFileAlreadyExist {
+		glog.Errorf("Cannot create dir %#v. err %s", kubevolsdir, err)
+		return "", err
+	}
+
 	// Create a virtual disk manager
-	vmDiskPath := "[" + vs.cfg.Global.Datastore + "] " + name + ".vmdk"
+	vmDiskPath := kubevolsdir + name + ".vmdk"
 	virtualDiskManager := object.NewVirtualDiskManager(c.Client)
 
 	// Create specification for new virtual disk
@@ -961,4 +980,26 @@ func (vs *VSphere) DeleteVolume(vmDiskPath string) error {
 	}
 
 	return task.Wait(ctx)
+}
+
+func mkdirInDatastore(c *govmomi.Client, dc *object.Datacenter, path string, createParents bool) error {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	fileManger := object.NewFileManager(c.Client)
+	err := fileManger.MakeDirectory(ctx, path, dc, createParents)
+	if err != nil {
+		if soap.IsSoapFault(err) {
+			soapFault := soap.ToSoapFault(err)
+			if _, ok := soapFault.VimFault().(types.FileAlreadyExists); ok {
+				if createParents {
+					return nil
+				} else {
+					return ErrFileAlreadyExist
+				}
+			}
+		}
+	}
+	return err
 }
