@@ -23,12 +23,17 @@ import (
 )
 
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
-func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP string) (*runtimeApi.PodSandboxConfig, error) {
-	sandboxName := buildSandboxName(pod)
+func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP string, attempt uint32) (*runtimeApi.PodSandboxConfig, error) {
 	// TODO: deprecating podsandbox resource requirements in favor of the pod level cgroup
 	// Refer https://github.com/kubernetes/kubernetes/issues/29871
+	podUID := string(pod.UID)
 	podSandboxConfig := &runtimeApi.PodSandboxConfig{
-		Name:        &sandboxName,
+		Metadata: &runtimeApi.PodSandboxMetadata{
+			Name:      &pod.Name,
+			Namespace: &pod.Namespace,
+			Uid:       &podUID,
+			Attempt:   &attempt,
+		},
 		Labels:      newPodLabels(pod),
 		Annotations: newPodAnnotations(pod),
 	}
