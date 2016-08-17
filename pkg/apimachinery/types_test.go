@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors All rights reserved.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,12 +28,12 @@ func TestAdd(t *testing.T) {
 			Group:   "test",
 			Version: "v1",
 		},
-		GroupVersions: []unversioned.GroupVersion{{"test", "v1"}},
+		GroupVersions: []unversioned.GroupVersion{{Group: "test", Version: "v1"}},
 	}
 
-	gm.AddVersion(unversioned.GroupVersion{"test", "v1"}, nil)
+	gm.AddVersionInterfaces(unversioned.GroupVersion{Group: "test", Version: "v1"}, nil)
 	if e, a := 1, len(gm.InterfacesByVersion); e != a {
-		t.Errorf("expected %v, got %v")
+		t.Errorf("expected %v, got %v", e, a)
 	}
 
 	// GroupVersions is unchanged

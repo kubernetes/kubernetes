@@ -58,7 +58,7 @@ type GroupMeta struct {
 	InterfacesByVersion map[unversioned.GroupVersion]*meta.VersionInterfaces
 }
 
-// InterfacesFor returns the default Codec and ResourceVersioner for a given version
+// DefaultInterfacesFor returns the default Codec and ResourceVersioner for a given version
 // string, or an error if the version is not known.
 // TODO: Remove the "Default" prefix.
 func (gm *GroupMeta) DefaultInterfacesFor(version unversioned.GroupVersion) (*meta.VersionInterfaces, error) {
@@ -68,10 +68,12 @@ func (gm *GroupMeta) DefaultInterfacesFor(version unversioned.GroupVersion) (*me
 	return nil, fmt.Errorf("unsupported storage version: %s (valid: %v)", version, gm.GroupVersions)
 }
 
-// Adds the given version to the group. Only call during init, after that
-// GroupMeta objects should be immutable. Not thread safe.
+// AddVersionInterfaces adds the given version to the group. Only call during
+// init, after that GroupMeta objects should be immutable. Not thread safe.
 // (If you use this, be sure to set .InterfacesFor = .DefaultInterfacesFor)
-func (gm *GroupMeta) AddVersion(version unversioned.GroupVersion, interfaces *meta.VersionInterfaces) error {
+// TODO: remove the "Interfaces" suffix and make this also maintain the
+// .GroupVersions member.
+func (gm *GroupMeta) AddVersionInterfaces(version unversioned.GroupVersion, interfaces *meta.VersionInterfaces) error {
 	if e, a := gm.GroupVersion.Group, version.Group; a != e {
 		return fmt.Errorf("got a version in group %v, but am in group %v", a, e)
 	}
@@ -79,6 +81,13 @@ func (gm *GroupMeta) AddVersion(version unversioned.GroupVersion, interfaces *me
 		gm.InterfacesByVersion = make(map[unversioned.GroupVersion]*meta.VersionInterfaces)
 	}
 	gm.InterfacesByVersion[version] = interfaces
-	gm.GroupVersions = append(gm.GroupVersions, version)
-	return nil
+
+	// TODO: refactor to make the below error not possible, this function
+	// should *set* GroupVersions rather than depend on it.
+	for _, v := range gm.GroupVersions {
+		if v == version {
+			return nil
+		}
+	}
+	return fmt.Errorf("added a version interface without the corresponding version %v being in the list %#v", version, gm.GroupVersions)
 }
