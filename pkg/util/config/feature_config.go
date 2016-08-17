@@ -17,13 +17,27 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
 )
 
+const (
+	// known keys
+	enableAllAlphaFeatures = "enableAllAlphaFeatures"
+)
+
+var featureDefaults = map[string]bool{
+	enableAllAlphaFeatures: false,
+}
+
 type FeatureConfig interface {
 	ConfigurationMap() ConfigurationMap
 	AddFlag(fs *pflag.FlagSet)
+	GetEnableAllAlphaFeatures() (bool, error)
 	// TODO: Define accessors for each non-API alpha feature.
 }
 
@@ -40,10 +54,14 @@ func NewFeatureConfig() FeatureConfig {
 
 func (f *featureConfig) Set(value string) error {
 	err := f.configMap.Set(value)
-	if err == nil {
-		glog.Infof("feature config: %s", f.String())
+	if err != nil {
+		return err
 	}
-	return err
+	if _, err := f.GetEnableAllAlphaFeatures(); err != nil {
+		return err
+	}
+	glog.Infof("feature config: %s", f.String())
+	return nil
 }
 
 func (f *featureConfig) String() string {
@@ -67,10 +85,32 @@ func (f *featureConfig) ConfigurationMap() ConfigurationMap {
 	return output
 }
 
+// GetEnableAllAlphaFeatures returns value for enableAllAlphaFeatures.
+func (f *featureConfig) GetEnableAllAlphaFeatures() (bool, error) {
+	return parseFeatureConfigValue(*f.configMap, enableAllAlphaFeatures, featureDefaults[enableAllAlphaFeatures])
+}
+
+func parseFeatureConfigValue(configMap ConfigurationMap, key string, defaultValue bool) (bool, error) {
+	v, ok := configMap[key]
+	if ok && v != "" {
+		boolValue, err := strconv.ParseBool(v)
+		if err != nil {
+			return false, fmt.Errorf("invalid value of %s: %s, err: %v", key, v, err)
+		}
+		return boolValue, nil
+	}
+	return defaultValue, nil
+}
+
 // AddFlag adds a flag for setting global feature config to the
 // specified FlagSet.
 func (f *featureConfig) AddFlag(fs *pflag.FlagSet) {
 	// TODO: List keys in usage string for each feature that has an accessor defined
+	var known []string
+	for key, defaultValue := range featureDefaults {
+		known = append(known, fmt.Sprintf("%s=true|false (default=%t)", key, defaultValue))
+	}
 	fs.Var(f, "feature-config", ""+
-		"A set of key=value pairs that describe feature configuration for alpha/experimental features.")
+		"A set of key=value pairs that describe feature configuration for alpha/experimental features. "+
+		"Keys include "+strings.Join(known, ", "))
 }

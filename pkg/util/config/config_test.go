@@ -17,8 +17,12 @@ limitations under the License.
 package config
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
+
+	"github.com/spf13/pflag"
 )
 
 func TestConfigurationChannels(t *testing.T) {
@@ -117,4 +121,35 @@ func TestBroadcaster(t *testing.T) {
 	b.Notify("test")
 	<-ch
 	<-ch
+}
+
+func TestFeatureConfigFlag(t *testing.T) {
+	tests := []struct {
+		args        []string
+		enableAlpha bool
+		parseError  error
+	}{
+		{[]string{"--feature-config=enableFooBarBaz=maybeidk"}, false, nil},
+		{[]string{"--feature-config=enableAllAlphaFeatures=false,enableBlue=false"}, false, nil},
+		{[]string{"--feature-config=enableAllAlphaFeatures=false,enableRed=true"}, false, nil},
+		{[]string{"--feature-config=enableAllAlphaFeatures=true"}, true, nil},
+		{[]string{"--feature-config=enableAllAlphaFeatures=banana"}, false, fmt.Errorf("invalid value of enableAllAlphaFeatures")},
+	}
+	for i, test := range tests {
+		fs := pflag.NewFlagSet("testfeatureconfigflag", pflag.ContinueOnError)
+		f := NewFeatureConfig()
+		f.AddFlag(fs)
+
+		err := fs.Parse(test.args)
+		if test.parseError != nil {
+			if !strings.Contains(err.Error(), test.parseError.Error()) {
+				t.Errorf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)
+			}
+		} else if err != nil {
+			t.Errorf("%d: Parse() Expected nil, Got %v", i, err)
+		}
+		if alpha, _ := f.GetEnableAllAlphaFeatures(); alpha != test.enableAlpha {
+			t.Errorf("%d: GetEnableAllAlphaFeatures() expected %v, got %v", i, test.enableAlpha, alpha)
+		}
+	}
 }
