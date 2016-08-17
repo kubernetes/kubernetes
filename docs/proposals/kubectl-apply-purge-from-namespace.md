@@ -12,92 +12,35 @@ The primary driver for this use-case is to be able to manage cluster add-ons usi
 
 ## Proposed Solution
 
-In a "simplest possible idea first" approach, this proposal suggests that we reuse namespaces as a de-facto way of grouping resources for the purpose of _purging_ (removing) resources which no longer exist.
+Use labels as a de-facto way of grouping resources for the purpose of _purging_ (removing) resources which no longer exist.
 
-Most add-ons reside in `kube-system` namespace, therefore for add-ons, an implementation based on namespaces would be reasonable.
-The benefit of this is that no new abstraction (such as a new way of grouping resources) is required for this use-case.
+Introduce an optional `--purge-missing <label-selector>` flag to `kubectl apply`, which will allow a user to automatically purge resources which:
 
-Therefore, the proposal is to introduce an optional `--purge-from-namespace` flag to `kubectl apply`, which will allow a user to automatically purge resources from the given namespace, if they haven't been explicitly declared in files that are arguments to the same `kubectl apply` invocation.
-
-All resources referred to must be explicitly labelled with one non-default namespace in order for the `--purge-from-namespace` argument to succeed.
-
-This flag will require `--namespace`, and will not accept namespaces set in the input resource definitions.
-
-There shall exist a well-known annotation (`kubectl.kubernetes.io/purge-from-namespace=false`) that can be used to exclude some resource(s) from being purged.
-
-The goal here is to avoid a negative user experience where the user accidentally deletes all the resources in some other namespace just because they accidentally refer to (e.g.) a single resource in some other namespace.
+* match the given label selector
+* do not exist in the provided files
+* were created with `kubectl apply` (means: have annotation `kubectl.kubernetes.io/last-applied-configuration`)
 
 ## Managing Add-ons
 
-Let's first consider the add-ons use case.
+Let's consider the add-ons use case.
 
-There exists a `/etc/kubernetes/addons` directory with some number of files. All resources declared in those files belong to the same namespace (`kube-system`), which is set explicitly in each of the resources.
+For example, it should be possible to install and upgrade Weave Net on Kubernetes with:
 
-When `kubectl apply --purge-from-namespace -f /etc/kubernetes/addons` runs for the first time all the resources will be created.
+```
+kubectl apply -f --purge-missing 'weave-net' \
+    https://raw.githubusercontent.com/weaveworks/weave-kube/master/weave-daemonset.yaml
+```
 
-Eventually some new files appear in `/etc/kubernetes/addons` and some are modified.
+Observe that the resulting API objects have label `weave-net`.
 
-Subsequent invocations of `kubectl apply --purge-from-namespace -f /etc/kubernetes/addons` result in new resources being created and modified resources being updated.
-
-When user deletes some of the files or resources within files from `/etc/kubernetes/addons`, `kubectl apply --purge-from-namespace` would ensure the resources that were referenced in the deleted files are deleted, based on the assumption that `/etc/kubernetes/addons` represents all resources that are supposed to be present in `kube-system` namespace.
-
+If `weave-daemonset.yaml` later changes and some of the API objects are removed, re-running this command will be sufficient to purge (clean up) any left-over resources.
 
 ## Managing Any Other Application
 
-It should be possible to apply the same approach to any other applications, with the assumption that single application occupies a namespace of its own.
+It should be possible to apply the same approach to any other applications, with the assumption that a single application can be uniquely labelled by the user.
 
-The usage may look like this:
-
-```
-kubectl apply --purge-from-namespace -f https://example.com/myapp.json
-```
-
-Given resources in `myapp.json` set their namespaces explicitly, resource that are no longer in this file would be purged, if no longer defined.
+The usage may look like this (assuming the user uses the convention of labelling apps with the `app` label):
 
 ```
-kubectl apply --purge-from-namespace -f https://example.com/myapp-part1.json -f https://example.com/myapp-part2.json
+kubectl apply --purge-missing 'app=myapp' -f https://example.com/myapp.json
 ```
-
-If `myapp-part1.json` and `myapp-part2.json` are in the same namespaces and it is explicitly defined, removing either of the URLs from the invocations arguments will result in all the resources that URL has defined to be purged.
-
-## Flag Discovery User Experience
-
-As stated above, the `--purge-from-namespace` flag shouldn't be enabled by default, however it should be discoverable.
-
-So, if a `kubectl apply` command is run without `--purge-from-namespace`, and the referenced files are all in the same namespace, then the command could output something like:
-
-```
-$ kubectl apply -f resources.yaml
-Updating ServiceA...
-Updating ServiceB...
-Updating DeploymentA...
-The following resources in namespace `foo` are not referenced in the files you provided:
-
-    DeploymentB
-    ServiceC
-
-You can automatically delete them, if you wish, using:
-
-    kubectl apply --purge-from-namespace -f resources.yaml
-
-$ kubectl apply --purge-from-namespace -f resources.yaml
-Updating ServiceA...
-Updating ServiceB...
-Updating DeploymentA...
-Deleting DeploymentB...
-Deleting ServiceC...
-Done!
-```
-
-If there are > 5 resources which match, we could just list the first 5.
-
-If no namespace, or conflicting namespaces are provided in the resource file(s), this output would not be shown.
-
-# Alternatives Considered
-
-A new Kubernetes API-level concept `VersionedApplySet` could record all the `kubectl apply` commands that were ever executed against a cluster.
-This would allow deletions to be automatically detected and applied between invocations of `kubectl apply` without the onus of having to put resources into namespaces.
-
-Also, a more general concept of `NamedList` could be considered, and may of some use in other areas, however that's quite close to the idea of namespaces, excpet that it wouldn't have any isolation properties.
-
-This adds complexity, since a new Kubernetes API object type would need to be invented.
