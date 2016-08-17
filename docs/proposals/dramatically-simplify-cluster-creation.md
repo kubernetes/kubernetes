@@ -2,9 +2,9 @@
 
 Luke Marsden & many others in [SIG-cluster-lifecycle](https://github.com/kubernetes/community/tree/master/sig-cluster-lifecycle).
 
-10th August 2016
+17th August 2016
 
-*This proposal aims to capture the latest consensus and proposed plan of action of SIG-cluster-lifecycle. It should satisfy the first bullet point [required by the feature description](https://github.com/kubernetes/features/issues/11).*
+*This proposal aims to capture the latest consensus and plan of action of SIG-cluster-lifecycle. It should satisfy the first bullet point [required by the feature description](https://github.com/kubernetes/features/issues/11).*
 
 See also: [this presentation to community hangout on 4th August 2016](https://docs.google.com/presentation/d/17xrFxrTwqrK-MJk0f2XCjfUPagljG7togXHcC39p0sM/edit?ts=57a33e24#slide=id.g158d2ee41a_0_76)
 
@@ -42,6 +42,8 @@ What's more, once we've radically improved the user experience of 2 and 3, it wi
 
 **_In time to be an alpha feature in Kubernetes 1.4._**
 
+Note: the current plan is to deliver `kubeadm` which implements these stories as "alpha" packages built from master (after the 1.4 feature freeze), but which are capable of installing a Kubernetes 1.4 cluster.
+
 * *Install*: As a potential Kubernetes user, I can deploy a Kubernetes 1.4 cluster on a handful of computers running Linux and Docker by typing two commands on each of those computers. The process is so simple that it becomes obvious to me how to easily automate it if I so wish.
 
 * *Pre-flight check*: If any of the computers don't have working dependencies installed (e.g. bad version of Docker, too-old Linux kernel), I am informed early on and given clear instructions on how to fix it so that I can keep trying until it works.
@@ -69,20 +71,40 @@ We will introduce a new binary, kubeadm, which ships with the Kubernetes OS pack
 
 ```
 laptop$ kubeadm --help
+kubeadm: bootstrap a secure kubernetes cluster easily.
 
-kubeadm: bootstrap a kubernetes cluster.
+    /==========================================================\
+    | KUBEADM IS ALPHA, DO NOT USE IT FOR PRODUCTION CLUSTERS! |
+    |                                                          |
+    | But, please try it out! Give us feedback at:             |
+    | https://github.com/kubernetes/kubernetes/issues          |
+    | and at-mention @kubernetes/sig-cluster-lifecycle         |
+    \==========================================================/
 
-Global options:
+Example usage:
 
-    --discovery    Discovery mechanism to use. Choose from: gossip,
-                   out-of-band. Default: gossip.
+    Create a two-machine cluster with one master (which controls the cluster),
+    and one node (where workloads, like pods and containers run).
 
-Subcommands:
-    init master    Run this on the first server you deploy onto.
+    On the first machine
+    ====================
+    master# kubeadm init master
+    Your token is: <token>
 
-    join node      Run this on other servers to join an existing cluster.
+    On the second machine
+    =====================
+    node# kubeadm join node --token=<token> <ip-of-master>
 
-    user create    Create user and fetch authentication config for them.
+Usage:
+  kubeadm [command]
+
+Available Commands:
+  init        Run this on the first server you deploy onto.
+  join        Run this on other servers to join an existing cluster.
+  user        Get initial admin credentials for a cluster.
+  manual      Advanced, less-automated functionality, for power users.
+
+Use "kubeadm [command] --help" for more information about a command.
 ```
 
 ### Install
@@ -171,51 +193,47 @@ node# kubeadm join --token=GARBAGE node <master-ip>
 Unable to join mesh network. Check your token.
 ```
 
-## Work streams – critical path
+## Work streams – critical path – must have in 1.4 before feature freeze
+
+1. [TLS bootstrapping](https://github.com/kubernetes/features/issues/43) - so that kubeadm can mint credentials for kubelets and users
+
+    * @philips, @gtank & @yifan-gu
+
+1. Fix for [#30515](https://github.com/kubernetes/kubernetes/issues/30515) - so that kubeadm can install a kubeconfig which kubelet then picks up
+
+    * @smarterclayton
 
 1. [Debs](https://github.com/kubernetes/release/pull/35) and [RPMs](https://github.com/kubernetes/release/pull/50) (and binaries?) - so that kubernetes can be installed in the first place
 
-    * Mike & Devan
+    * @mikedanese & @dgoodwin
 
-2. [Cluster bootstrap with gossip](https://github.com/kubernetes/kubernetes/pull/30361) - so that we can implement the simple UX with no dependencies
+## Work streams – can land after 1.4 feature freeze and get bundled into "alpha" kubeadm packages
 
-    * Luke & Ilya
+1. [kubeadm implementation](https://github.com/lukemarsden/kubernetes/tree/kubeadm-scaffolding) - the kubeadm CLI itself
 
-3. [TLS bootstrapping](https://github.com/kubernetes/features/issues/43) - so that the gossip bootstrap can provide ca-cert and address of API server to the TLS bootstrapping process, and have the kubelets bootstrap from there
+    * @lukemarsden & @errordeveloper
 
-    * Brandon, George Tankersley & Yifan Gu?
+1. [Implementation of JWS server](https://github.com/jbeda/kubernetes/blob/discovery-api/docs/proposals/super-simple-discovery-api.md#method-jws-token) from [#30707](https://github.com/kubernetes/kubernetes/pull/30707) - so that we can implement the simple UX with no dependencies
 
-4. Documentation - so that new users can see this in 1.4 (even if it’s caveated with alpha/experimental labels and flags all over it)
+    * @jbeda & @philips?
 
-    * Luke
+1. Documentation - so that new users can see this in 1.4 (even if it’s caveated with alpha/experimental labels and flags all over it)
+
+    * @lukemarsden
+
+1. `kubeadm` alpha packages
+
+    * @lukemarsden, @mikedanese, @dgoodwin
 
 ### Nice to have
 
-5. [Kubectl apply --purge](https://github.com/kubernetes/kubernetes/pull/29551) - so that addons can be maintained using k8s infrastructure
+1. [Kubectl apply --purge](https://github.com/kubernetes/kubernetes/pull/29551) - so that addons can be maintained using k8s infrastructure
 
-    * Luke & Ilya
+    * @lukemarsden & @errordeveloper
 
-6. [Dynamic Kubelet Settings](https://github.com/kubernetes/kubernetes/issues/27980) - so that kubeadm command can manage kubelet that is already running by rewriting its componentconfig and having it automatically reload its config
+## kubeadm implementation plan
 
-    * Michael Taufen
-
-7. [Pre-flight checks](https://github.com/kubernetes/kubernetes/issues/26093) - so that kube(let) can bail if basic dependencies are not met
-
-    * Lucas Käldström
-
-## Prototype of UX (old)
-
-Ilya and Luke at Weaveworks have prototyped the desired user experience listed described in the "Top-down view" section. This prototype is called kube-alpha for lack of a better name. It is currently living in [Ilya's fork of kubernetes-anywhere](https://github.com/errordeveloper/kubernetes-anywhere/tree/kube-alpha/phase2/kube-alpha).
-
-Run dev-init.sh and then dev.sh on a machine with docker-machine installed and you'll get guided through the current prototype UX for installing a 2-node Kubernetes cluster on two Docker Machine VMs.
-
-The purpose of this prototype is to demonstrate that the desired UX is possible and to enable discussion around it. The prototype is written in Golang because the final version will need to be integrated into the kubelet.
-
-The techniques used in the prototype are not intended to be final!
-
-Experimenting in this way allows us to start fleshing out the Golang interfaces that will make sense to provide for different implementations of e.g. discovery.
-
-Ultimately, this project should aim to implement one or more implementations of these interfaces, including exactly one reasonable default.
+TODO
 
 ## See also
 
