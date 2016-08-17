@@ -56,8 +56,6 @@ const (
 	StoreSyncedPollPeriod = 100 * time.Millisecond
 	// MaxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
 	MaxRetries = 5
-	// OverlapAnnotation marks deployments with overlapping selector with other deployments
-	OverlapAnnotation = "deployment.kubernetes.io/overlap-with"
 )
 
 // DeploymentController is responsible for synchronizing Deployment objects stored
@@ -462,19 +460,22 @@ func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deploym
 }
 
 func (dc *DeploymentController) markDeploymentOverlap(deployment, withDeployment extensions.Deployment) error {
-	if deployment.Annotations[OverlapAnnotation] == withDeployment.Name {
+	if deployment.Annotations[util.OverlapAnnotation] == withDeployment.Name {
 		return nil
 	}
-	deployment.Annotations[OverlapAnnotation] = withDeployment.Name
+	if deployment.Annotations == nil {
+		deployment.Annotations = make(map[string]string)
+	}
+	deployment.Annotations[util.OverlapAnnotation] = withDeployment.Name
 	_, err := dc.client.Extensions().Deployments(deployment.Namespace).Update(&deployment)
 	return err
 }
 
 func (dc *DeploymentController) clearDeploymentOverlap(deployment extensions.Deployment) error {
-	if len(deployment.Annotations[OverlapAnnotation]) == 0 {
+	if len(deployment.Annotations[util.OverlapAnnotation]) == 0 {
 		return nil
 	}
-	delete(deployment.Annotations, OverlapAnnotation)
+	delete(deployment.Annotations, util.OverlapAnnotation)
 	_, err := dc.client.Extensions().Deployments(deployment.Namespace).Update(&deployment)
 	return err
 }
