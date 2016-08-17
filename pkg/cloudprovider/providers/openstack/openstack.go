@@ -238,6 +238,16 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 }
 
 func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.Server, error) {
+	// try to read from local file (cloud-init) or metadata server first
+	id, err := readInstanceID()
+	if err == nil {
+		server, err := servers.Get(client, id).Extract()
+		if err == nil {
+			return server, nil
+		}
+	}
+
+	// less reliable lookup by name, requires nodeName and instance name to be the same.
 	opts := servers.ListOpts{
 		Name:   fmt.Sprintf("^%s$", regexp.QuoteMeta(name)),
 		Status: "ACTIVE",
@@ -246,7 +256,7 @@ func getServerByName(client *gophercloud.ServiceClient, name string) (*servers.S
 
 	serverList := make([]servers.Server, 0, 1)
 
-	err := pager.EachPage(func(page pagination.Page) (bool, error) {
+	err = pager.EachPage(func(page pagination.Page) (bool, error) {
 		s, err := servers.ExtractServers(page)
 		if err != nil {
 			return false, err
