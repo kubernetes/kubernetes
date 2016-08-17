@@ -499,6 +499,11 @@ func (c *PrometheusCollector) Collect(ch chan<- prometheus.Metric) {
 	c.errors.Collect(ch)
 }
 
+const (
+	containerLabelPrefix = "container_label_"
+	containerEnvPrefix   = "container_env_"
+)
+
 func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric) {
 	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
@@ -529,11 +534,11 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 		}
 
 		for k, v := range container.Spec.Labels {
-			baseLabels = append(baseLabels, sanitizeLabelName(k))
+			baseLabels = append(baseLabels, sanitizeLabelName(containerLabelPrefix+k))
 			baseLabelValues = append(baseLabelValues, v)
 		}
 		for k, v := range container.Spec.Envs {
-			baseLabels = append(baseLabels, sanitizeLabelName(k))
+			baseLabels = append(baseLabels, sanitizeLabelName(containerEnvPrefix+k))
 			baseLabelValues = append(baseLabelValues, v)
 		}
 
