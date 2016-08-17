@@ -714,6 +714,7 @@ var (
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
 	VsphereVolume         FSType = "vsphereVolume"
+	DockerVolume          FSType = "dockerVolume"
 	All                   FSType = "*"
 )
 

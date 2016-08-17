@@ -325,6 +325,16 @@ func (DeleteOptions) SwaggerDoc() map[string]string {
 	return map_DeleteOptions
 }
 
+var map_DockerVolumeSource = map[string]string{
+	"":        "DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.",
+	"driver":  "Driver is the name of the driver to use for this volume.",
+	"options": "Optional: Extra command options if any.",
+}
+
+func (DockerVolumeSource) SwaggerDoc() map[string]string {
+	return map_DockerVolumeSource
+}
+
 var map_DownwardAPIVolumeFile = map[string]string{
 	"":                 "DownwardAPIVolumeFile represents information to create the file containing the pod field",
 	"path":             "Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
@@ -1744,6 +1754,7 @@ var map_VolumeSource = map[string]string{
 	"azureFile":     "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"configMap":     "ConfigMap represents a configMap that should populate this volume",
 	"vsphereVolume": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"dockerVolume":  "DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

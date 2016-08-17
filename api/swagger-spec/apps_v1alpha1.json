@@ -1413,6 +1413,10 @@
      "vsphereVolume": {
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
+     "dockerVolume": {
+      "$ref": "v1.DockerVolumeSource",
+      "description": "DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup."
      }
     }
    },
@@ -1953,6 +1957,23 @@
      "fsType": {
       "type": "string",
       "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     }
+    }
+   },
+   "v1.DockerVolumeSource": {
+    "id": "v1.DockerVolumeSource",
+    "description": "DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.",
+    "required": [
+     "driver"
+    ],
+    "properties": {
+     "driver": {
+      "type": "string",
+      "description": "Driver is the name of the driver to use for this volume."
+     },
+     "options": {
+      "type": "object",
+      "description": "Optional: Extra command options if any."
      }
     }
    },

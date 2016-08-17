@@ -515,6 +515,15 @@ message DeleteOptions {
   optional bool orphanDependents = 3;
 }
 
+// DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.
+message DockerVolumeSource {
+  // Driver is the name of the driver to use for this volume.
+  optional string driver = 1;
+
+  // Optional: Extra command options if any.
+  map<string, string> options = 2;
+}
+
 // DownwardAPIVolumeFile represents information to create the file containing the pod field
 message DownwardAPIVolumeFile {
   // Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
@@ -2945,6 +2954,9 @@ message VolumeSource {
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 20;
+
+  // DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.
+  optional DockerVolumeSource dockerVolume = 21;
 }
 
 // Represents a vSphere volume resource.

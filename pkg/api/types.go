@@ -233,6 +233,8 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
+	// DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.
+	DockerVolume *DockerVolumeSource `json:"dockerVolume,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -758,6 +760,14 @@ type ConfigMapVolumeSource struct {
 	// the volume setup will error. Paths must be relative and may not contain
 	// the '..' path or start with '..'.
 	Items []KeyToPath `json:"items,omitempty"`
+}
+
+// DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.
+type DockerVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	Driver string `json:"driver"`
+	// Optional: Extra command options if any.
+	Options map[string]string `json:"options,omitempty"`
 }
 
 // Maps a string key to a path within a volume.

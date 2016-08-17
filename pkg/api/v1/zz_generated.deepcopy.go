@@ -62,6 +62,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ContainerStatus, InType: reflect.TypeOf(&ContainerStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DaemonEndpoint, InType: reflect.TypeOf(&DaemonEndpoint{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DeleteOptions, InType: reflect.TypeOf(&DeleteOptions{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DockerVolumeSource, InType: reflect.TypeOf(&DockerVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DownwardAPIVolumeFile, InType: reflect.TypeOf(&DownwardAPIVolumeFile{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_DownwardAPIVolumeSource, InType: reflect.TypeOf(&DownwardAPIVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_EmptyDirVolumeSource, InType: reflect.TypeOf(&EmptyDirVolumeSource{})},
@@ -728,6 +729,24 @@ func DeepCopy_v1_DeleteOptions(in interface{}, out interface{}, c *conversion.Cl
 			**out = **in
 		} else {
 			out.OrphanDependents = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_DockerVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*DockerVolumeSource)
+		out := out.(*DockerVolumeSource)
+		out.Driver = in.Driver
+		if in.Options != nil {
+			in, out := &in.Options, &out.Options
+			*out = make(map[string]string)
+			for key, val := range *in {
+				(*out)[key] = val
+			}
+		} else {
+			out.Options = nil
 		}
 		return nil
 	}
@@ -3555,6 +3574,15 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			**out = **in
 		} else {
 			out.VsphereVolume = nil
+		}
+		if in.DockerVolume != nil {
+			in, out := &in.DockerVolume, &out.DockerVolume
+			*out = new(DockerVolumeSource)
+			if err := DeepCopy_v1_DockerVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.DockerVolume = nil
 		}
 		return nil
 	}

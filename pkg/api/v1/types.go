@@ -277,6 +277,8 @@ type VolumeSource struct {
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,19,opt,name=configMap"`
 	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
+	// DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.
+	DockerVolume *DockerVolumeSource `json:"dockerVolume,omitempty" protobuf:"bytes,21,opt,name=dockerVolume"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -869,6 +871,14 @@ type ConfigMapVolumeSource struct {
 	// the volume setup will error. Paths must be relative and may not contain
 	// the '..' path or start with '..'.
 	Items []KeyToPath `json:"items,omitempty" protobuf:"bytes,2,rep,name=items"`
+}
+
+// DockerVolume represents a volume that is backed by a Docker volume plugin. This depends on the plugin being already properly setup.
+type DockerVolumeSource struct {
+	// Driver is the name of the driver to use for this volume.
+	Driver string `json:"driver" protobuf:"bytes,1,opt,name=driver"`
+	// Optional: Extra command options if any.
+	Options map[string]string `json:"options,omitempty" protobuf:"bytes,2,rep,name=options"`
 }
 
 // Maps a string key to a path within a volume.
