@@ -19,6 +19,7 @@ package prober
 import (
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"reflect"
 	"testing"
@@ -29,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/probe"
 	"k8s.io/kubernetes/pkg/util/intstr"
+	"k8s.io/kubernetes/pkg/util/term"
 )
 
 func TestFormatURL(t *testing.T) {
@@ -272,6 +274,102 @@ func TestProbe(t *testing.T) {
 			}
 			if test.expectedResult != result {
 				t.Errorf("[%s] Expected result to be %v but was %v", testID, test.expectedResult, result)
+			}
+		}
+	}
+}
+
+type fakeContainerCommandRunner struct {
+	// what to return
+	stdoutData string
+	stderrData string
+	err        error
+
+	// actual values when invoked
+	containerID kubecontainer.ContainerID
+	cmd         []string
+	stdin       io.Reader
+	tty         bool
+	resize      <-chan term.Size
+}
+
+func (f *fakeContainerCommandRunner) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
+	// record invoked values
+	f.containerID = containerID
+	f.cmd = cmd
+	f.stdin = stdin
+	f.tty = tty
+	f.resize = resize
+
+	// this isn't 100% foolproof as a bug in a real ContainerCommandRunner where it fails to copy to stdout/stderr wouldn't be caught by this test
+	fmt.Fprint(stdout, f.stdoutData)
+	fmt.Fprint(stdout, f.stderrData)
+
+	return f.err
+}
+
+func (f *fakeContainerCommandRunner) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
+	panic("not implemented")
+}
+
+func TestNewExecInContainer(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{
+			name: "no error",
+			err:  nil,
+		},
+		{
+			name: "error - make sure we get output",
+			err:  errors.New("bad"),
+		},
+	}
+
+	for _, test := range tests {
+		runner := &fakeContainerCommandRunner{
+			stdoutData: "foo",
+			stderrData: "bar",
+			err:        test.err,
+		}
+		prober := &prober{
+			runner: runner,
+		}
+
+		container := api.Container{}
+		containerID := kubecontainer.ContainerID{Type: "docker", ID: "containerID"}
+		cmd := []string{"/foo", "bar"}
+		exec := prober.newExecInContainer(container, containerID, cmd)
+
+		actual, err := exec.CombinedOutput()
+		if e, a := containerID, runner.containerID; e != a {
+			t.Errorf("%s: container id: expected %v, got %v", test.name, e, a)
+		}
+		if e, a := cmd, runner.cmd; !reflect.DeepEqual(e, a) {
+			t.Errorf("%s: cmd: expected %v, got %v", test.name, e, a)
+		}
+		if runner.stdin != nil {
+			t.Errorf("%s: stdin: expected nil, got %v", test.name, runner.stdin)
+		}
+		if runner.tty {
+			t.Errorf("%s: tty: expected false", test.name)
+		}
+		if runner.resize != nil {
+			t.Errorf("%s: resize chan: expected nil, got %v", test.name, runner.resize)
+		}
+		if e, a := "foobar", string(actual); e != a {
+			t.Errorf("%s: output: expected %q, got %q", test.name, e, a)
+		}
+		if test.err != nil {
+			if err == nil {
+				t.Errorf("%s: error: expected %v, got nil", test.name, test.err)
+			} else if err != test.err {
+				t.Errorf("%s: error: expected %v, got %v", test.name, test.err, err)
+			}
+		} else {
+			if err != nil {
+				t.Errorf("%s: error: expected nil, got %v", test.name, err)
 			}
 		}
 	}
