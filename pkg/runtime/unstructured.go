@@ -188,7 +188,7 @@ func (UnstructuredObjectConverter) Convert(in, out, context interface{}) error {
 }
 
 func (UnstructuredObjectConverter) ConvertToVersion(in Object, target GroupVersioner) (Object, error) {
-	if kind := in.GetObjectKind().GroupVersionKind(); !kind.IsEmpty() {
+	if kind := in.GetObjectKind().GroupVersionKind(); !kind.Empty() {
 		gvk, ok := target.KindForGroupVersionKinds([]unversioned.GroupVersionKind{kind})
 		if !ok {
 			// TODO: should this be a typed error?

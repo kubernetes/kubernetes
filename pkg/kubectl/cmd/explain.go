@@ -84,7 +84,7 @@ func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	if fullySpecifiedGVR != nil {
 		gvk, _ = mapper.KindFor(*fullySpecifiedGVR)
 	}
-	if gvk.IsEmpty() {
+	if gvk.Empty() {
 		gvk, err = mapper.KindFor(groupResource.WithVersion(""))
 		if err != nil {
 			return err

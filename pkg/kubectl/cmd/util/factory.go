@@ -1270,10 +1270,10 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 		if err != nil {
 			return nil, err
 		}
-		if version.IsEmpty() && mapping != nil {
+		if version.Empty() && mapping != nil {
 			version = mapping.GroupVersionKind.GroupVersion()
 		}
-		if version.IsEmpty() {
+		if version.Empty() {
 			return nil, fmt.Errorf("you must specify an output-version when using this output format")
 		}
 
