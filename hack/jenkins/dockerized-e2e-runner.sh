@@ -30,6 +30,7 @@ mkdir -p "${HOST_ARTIFACTS_DIR}"
 : ${JENKINS_GCE_SSH_PUBLIC_KEY_FILE:='/var/lib/jenkins/gce_keys/google_compute_engine.pub'}
 
 env \
+  -u GOROOT \
   -u HOME \
   -u KUBEKINS_SERVICE_ACCOUNT_FILE \
   -u PATH \
@@ -62,5 +63,4 @@ docker run --rm=true -i \
   -e "WORKSPACE=/workspace" \
   ${KUBEKINS_SERVICE_ACCOUNT_FILE:+-e "KUBEKINS_SERVICE_ACCOUNT_FILE=/service-account.json"} \
   "${docker_extra_args[@]:+${docker_extra_args[@]}}" \
-  gcr.io/google_containers/kubekins-test:go1.6.3-docker1.9.1-rev3 \
-  bash -c "bash <(curl -fsS --retry 3 --keepalive-time 2 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh')"
+  gcr.io/google_containers/kubekins-e2e:v20160817
