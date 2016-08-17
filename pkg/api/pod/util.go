@@ -35,6 +35,9 @@ const (
 	// If there is a headless service named "my-web-service" in the same namespace as the pod, then,
 	// <hostname>.my-web-service.<namespace>.svc.<cluster domain>" would be resolved by the cluster DNS Server.
 	PodSubdomainAnnotation = "pod.beta.kubernetes.io/subdomain"
+	// The annotation value is a string specyfing the petset index.
+	// It's applied during creating the pod by petset.
+	PodPetSetIndexAnnotation = "pod.beta.kubernetes.io/petset-index"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
