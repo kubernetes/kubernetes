@@ -22,30 +22,37 @@ import (
 )
 
 type URLProvider interface {
+	// Returns currently selected URL
 	Get() *url.URL
+	// Select any other url, it is upto implementation to provide any
+	// health checking/load balancing, it might be as simple as iterator
 	Next() *url.URL
 }
 
 type RoundRobinProvider struct {
 	sync.RWMutex
-	urls    []*url.URL
 	current int
+	urls    []*url.URL
 }
 
 func (p *RoundRobinProvider) Get() *url.URL {
-	p.RLock()
-	defer p.RUnlock()
+	p.Lock()
+	defer p.Unlock()
+	if len(p.urls)-1 < p.current {
+		return nil
+	}
 	return p.urls[p.current]
 }
 
 func (p *RoundRobinProvider) Next() *url.URL {
-	p.RLock()
-	defer p.RUnlock()
+	// Iterate over all available URLs without any health checking
+	p.Lock()
 	if p.current >= len(p.urls)-1 {
 		p.current = 0
 	} else {
 		p.current++
 	}
+	p.Unlock()
 	return p.Get()
 }
 

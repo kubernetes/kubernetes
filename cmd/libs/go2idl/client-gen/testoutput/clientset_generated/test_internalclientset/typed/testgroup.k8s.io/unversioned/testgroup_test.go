@@ -57,7 +57,7 @@ func (c *DecoratedSimpleClient) Setup(t *testing.T) *DecoratedSimpleClient {
 	c.simpleClient.Setup(t)
 	url := c.simpleClient.ServerURL()
 	c.TestgroupClient = NewForConfigOrDie(&restclient.Config{
-		Hosts: []string{url},
+		Host: url,
 	})
 	return c
 }

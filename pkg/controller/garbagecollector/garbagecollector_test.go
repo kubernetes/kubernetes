@@ -100,7 +100,7 @@ func (f *fakeActionHandler) ServeHTTP(response http.ResponseWriter, request *htt
 func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request)) (*httptest.Server, *restclient.Config) {
 	srv := httptest.NewServer(http.HandlerFunc(handler))
 	config := &restclient.Config{
-		Hosts: []string{srv.URL},
+		Host: srv.URL,
 	}
 	return srv, config
 }

@@ -38,7 +38,7 @@ func TestPodUpdateActiveDeadlineSeconds(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	client := client.NewOrDie(&restclient.Config{
-		Hosts:         []string{s.URL},
+		Host:          s.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	var (
@@ -158,7 +158,7 @@ func TestPodReadOnlyFilesystem(t *testing.T) {
 	defer framework.DeleteTestingNamespace(ns, s, t)
 
 	client := client.NewOrDie(&restclient.Config{
-		Hosts:         []string{s.URL},
+		Host:          s.URL,
 		ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	pod := &api.Pod{

@@ -154,8 +154,11 @@ func (ms *MinionServer) launchProxyServer() {
 	if ms.proxyKubeconfig != "" {
 		args = append(args, fmt.Sprintf("--kubeconfig=%s", ms.proxyKubeconfig))
 	}
-	if len(ms.clientConfig.Hosts) > 0 {
-		args = append(args, fmt.Sprintf("--master=%s", strings.Join(ms.clientConfig.Hosts, ",")))
+	if ms.clientConfig.Host != "" {
+		args = append(args, fmt.Sprintf("--master=%s", ms.clientConfig.Host))
+	}
+	if len(ms.clientConfig.AlternateHosts) > 0 {
+		args = append(args, fmt.Sprintf("--api-servers=%s", strings.Join(ms.clientConfig.AlternateHosts, ",")))
 	}
 	if ms.KubeletExecutorServer.HostnameOverride != "" {
 		args = append(args, fmt.Sprintf("--hostname-override=%s", ms.KubeletExecutorServer.HostnameOverride))

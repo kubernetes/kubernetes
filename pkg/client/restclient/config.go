@@ -45,11 +45,12 @@ const (
 // Config holds the common attributes that can be passed to a Kubernetes client on
 // initialization.
 type Config struct {
-	// Hosts must be a slice of host strings, host:port pairs, or a URLs to the base of the
-	// apiservers. If a URL is given then the (optional) Path of that URL represents a prefix
-	// that must be appended to all request URIs used to access the apiserver. This allows a
-	// frontend proxy to easily relocate all of the apiserver endpoints.
-	Hosts []string
+	// Host must be a host string, a host:port pair, or a URL to the base of the apiserver.
+	// If a URL is given then the (optional) Path of that URL represents a prefix that must
+	// be appended to all request URIs used to access the apiserver. This allows a frontend
+	// proxy to easily relocate all of the apiserver endpoints.
+	Host string
+
 	// APIPath is a sub-path that points to an API root.
 	APIPath string
 	// Prefix is the sub path of the server. If not specified, the client will set
@@ -112,6 +113,9 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	// Hosts must be a slice of strings, with properties of Host
+	AlternateHosts []string
 }
 
 // TLSClientConfig contains settings to enable transport layer security
@@ -150,6 +154,22 @@ type ContentConfig struct {
 	// NegotiatedSerializer is used for obtaining encoders and decoders for multiple
 	// supported media types.
 	NegotiatedSerializer runtime.NegotiatedSerializer
+}
+
+// Returns Host and AlternateHosts as a single slice, without duplicates
+func (c *Config) AllHosts() []string {
+	var hosts []string
+	if c.Host != "" {
+		hosts = append(hosts, c.Host)
+	}
+	if len(c.AlternateHosts) > 0 {
+		for _, host := range c.AlternateHosts {
+			if host != c.Host {
+				hosts = append(hosts, host)
+			}
+		}
+	}
+	return hosts
 }
 
 // RESTClientFor returns a RESTClient that satisfies the requested attributes on a client Config
@@ -268,7 +288,7 @@ func InClusterConfig() (*Config, error) {
 	}
 
 	return &Config{
-		Hosts:           []string{"https://" + net.JoinHostPort(host, port)},
+		Host:            "https://" + net.JoinHostPort(host, port),
 		BearerToken:     string(token),
 		TLSClientConfig: tlsClientConfig,
 	}, nil
@@ -283,7 +303,7 @@ func InClusterConfig() (*Config, error) {
 // still possible.
 func IsConfigTransportTLS(config Config) bool {
 	hosts, _, err := defaultServerUrlFor(&config)
-	if err != nil {
+	if err != nil || len(hosts) == 0 {
 		return false
 	}
 	for _, host := range hosts {

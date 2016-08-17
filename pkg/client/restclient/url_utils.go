@@ -27,32 +27,42 @@ import (
 // DefaultServerURL converts a host, host:port, or URL string to the default base server API path
 // to use with a Client at a given API version following the standard conventions for a
 // Kubernetes API.
-
-func DefaultServerURL(hosts []string, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) ([]*url.URL, string, error) {
-	hostURLs := []*url.URL{}
-	for _, host := range hosts {
-		if host == "" {
-			return nil, "", fmt.Errorf("host must be a URL or a host:port pair")
+func DefaultServerURL(host string, defaultTLS bool) (*url.URL, error) {
+	if host == "" {
+		return nil, fmt.Errorf("host must be a URL or a host:port pair")
+	}
+	base := host
+	hostURL, err := url.Parse(base)
+	if err != nil {
+		return nil, err
+	}
+	if hostURL.Scheme == "" {
+		scheme := "http://"
+		if defaultTLS {
+			scheme = "https://"
 		}
-		base := host
-		hostURL, err := url.Parse(base)
+		hostURL, err = url.Parse(scheme + base)
+		if err != nil {
+			return nil, err
+		}
+		if hostURL.Path != "" && hostURL.Path != "/" {
+			return nil, fmt.Errorf("host must be a URL or a host:port pair: %q", base)
+		}
+
+	}
+	return hostURL, nil
+
+}
+
+func DefaultServerURLsForHosts(hosts []string, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) ([]*url.URL, string, error) {
+	var hostsURLs []*url.URL
+
+	for _, host := range hosts {
+		hostURL, err := DefaultServerURL(host, defaultTLS)
 		if err != nil {
 			return nil, "", err
 		}
-		if hostURL.Scheme == "" {
-			scheme := "http://"
-			if defaultTLS {
-				scheme = "https://"
-			}
-			hostURL, err = url.Parse(scheme + base)
-			if err != nil {
-				return nil, "", err
-			}
-			if hostURL.Path != "" && hostURL.Path != "/" {
-				return nil, "", fmt.Errorf("host must be a URL or a host:port pair: %q", base)
-			}
-		}
-		hostURLs = append(hostURLs, hostURL)
+		hostsURLs = append(hostsURLs, hostURL)
 	}
 
 	// hostURL.Path is optional; a non-empty Path is treated as a prefix that is to be applied to
@@ -73,7 +83,7 @@ func DefaultServerURL(hosts []string, apiPath string, groupVersion unversioned.G
 		versionedAPIPath = path.Join(versionedAPIPath, groupVersion.Version)
 	}
 
-	return hostURLs, versionedAPIPath, nil
+	return hostsURLs, versionedAPIPath, nil
 }
 
 // defaultServerUrlFor is shared between IsConfigTransportTLS and RESTClientFor. It
@@ -84,13 +94,8 @@ func defaultServerUrlFor(config *Config) ([]*url.URL, string, error) {
 	hasCA := len(config.CAFile) != 0 || len(config.CAData) != 0
 	hasCert := len(config.CertFile) != 0 || len(config.CertData) != 0
 	defaultTLS := hasCA || hasCert || config.Insecure
-	hosts := []string{"localhost"}
-	if len(config.Hosts) > 0 {
-		hosts = config.Hosts
-	}
-
 	if config.GroupVersion != nil {
-		return DefaultServerURL(hosts, config.APIPath, *config.GroupVersion, defaultTLS)
+		return DefaultServerURLsForHosts(config.AllHosts(), config.APIPath, *config.GroupVersion, defaultTLS)
 	}
-	return DefaultServerURL(hosts, config.APIPath, unversioned.GroupVersion{}, defaultTLS)
+	return DefaultServerURLsForHosts(config.AllHosts(), config.APIPath, unversioned.GroupVersion{}, defaultTLS)
 }
