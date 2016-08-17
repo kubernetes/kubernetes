@@ -34,9 +34,10 @@ import (
 type KubeletServer struct {
 	componentconfig.KubeletConfiguration
 
-	AuthPath      util.StringFlag // Deprecated -- use KubeConfig instead
-	KubeConfig    util.StringFlag
-	APIServerList []string
+	AuthPath            util.StringFlag // Deprecated -- use KubeConfig instead
+	KubeConfig          util.StringFlag
+	BootstrapKubeconfig string
+	APIServerList       []string
 
 	RunOnce bool
 
