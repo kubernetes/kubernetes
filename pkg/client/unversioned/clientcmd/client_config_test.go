@@ -304,11 +304,13 @@ func TestCreateCleanWithPrefix(t *testing.T) {
 		cleanConfig.Server = tc.server
 		config.Clusters["clean"] = cleanConfig
 
-		clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{}, nil)
+		clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
+			ClusterDefaults: DefaultCluster,
+		}, nil)
 
 		clientConfig, err := clientBuilder.ClientConfig()
 		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
+			t.Fatalf("Unexpected error: %v", err)
 		}
 
 		matchStringArg(tc.host, clientConfig.Host, t)
@@ -321,7 +323,7 @@ func TestCreateCleanDefault(t *testing.T) {
 
 	clientConfig, err := clientBuilder.ClientConfig()
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
@@ -329,14 +331,42 @@ func TestCreateCleanDefault(t *testing.T) {
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
 
-func TestCreateMissingContext(t *testing.T) {
+func TestCreateCleanDefaultCluster(t *testing.T) {
+	config := createValidTestConfig()
+	clientBuilder := NewDefaultClientConfig(*config, &ConfigOverrides{
+		ClusterDefaults: DefaultCluster,
+	})
+
+	clientConfig, err := clientBuilder.ClientConfig()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+
+	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
+	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
+	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
+}
+
+func TestCreateMissingContextNoDefault(t *testing.T) {
 	const expectedErrorContains = "Context was not found for specified context"
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{}, nil)
 
+	_, err := clientBuilder.ClientConfig()
+	if err == nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+}
+func TestCreateMissingContext(t *testing.T) {
+	const expectedErrorContains = "Context was not found for specified context"
+	config := createValidTestConfig()
+	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{
+		ClusterDefaults: DefaultCluster,
+	}, nil)
+
 	clientConfig, err := clientBuilder.ClientConfig()
 	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+		t.Fatalf("Unexpected error: %v", err)
 	}
 
 	expectedConfig := &restclient.Config{Host: clientConfig.Host}
@@ -344,7 +374,6 @@ func TestCreateMissingContext(t *testing.T) {
 	if !reflect.DeepEqual(expectedConfig, clientConfig) {
 		t.Errorf("Expected %#v, got %#v", expectedConfig, clientConfig)
 	}
-
 }
 
 func matchBoolArg(expected, got bool, t *testing.T) {
