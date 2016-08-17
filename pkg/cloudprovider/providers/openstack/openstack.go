@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
-	"strings"
 	"time"
 
 	"gopkg.in/gcfg.v1"
@@ -90,9 +89,10 @@ type LoadBalancerOpts struct {
 
 // OpenStack is an implementation of cloud provider Interface for OpenStack.
 type OpenStack struct {
-	provider *gophercloud.ProviderClient
-	region   string
-	lbOpts   LoadBalancerOpts
+	provider         *gophercloud.ProviderClient
+	region           string
+	availabilityZone string
+	lbOpts           LoadBalancerOpts
 	// InstanceID of the server where this OpenStack object is instantiated.
 	localInstanceID string
 }
@@ -151,69 +151,60 @@ func readConfig(config io.Reader) (Config, error) {
 	return cfg, err
 }
 
-// parseMetadataUUID reads JSON from OpenStack metadata server and parses
-// instance ID out of it.
-func parseMetadataUUID(jsonData []byte) (string, error) {
-	// We should receive an object with { 'uuid': '<uuid>' } and couple of other
-	// properties (which we ignore).
+// parseMetadata reads JSON from OpenStack metadata server and parses
+// instance ID and availability zone out of it.
+func parseMetadata(jsonData []byte) (string, string, error) {
+	// We should receive an object with { 'uuid': '<uuid>', 'availability_zone': '<az>' } and
+	// couple of other properties (which we ignore).
 
-	obj := struct{ UUID string }{}
+	obj := struct {
+		UUID             string `json:"uuid"`
+		AvailabilityZone string `json:"availability_zone"`
+	}{}
 	err := json.Unmarshal(jsonData, &obj)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	uuid := obj.UUID
+	availabilityZone := obj.AvailabilityZone
+
 	if uuid == "" {
 		err = fmt.Errorf("cannot parse OpenStack metadata, got empty uuid")
-		return "", err
+		return "", "", err
 	}
 
-	return uuid, nil
+	return uuid, availabilityZone, nil
 }
 
-func readInstanceID() (string, error) {
-	// Try to find instance ID on the local filesystem (created by cloud-init)
-	const instanceIDFile = "/var/lib/cloud/data/instance-id"
-	idBytes, err := ioutil.ReadFile(instanceIDFile)
-	if err == nil {
-		instanceID := string(idBytes)
-		instanceID = strings.TrimSpace(instanceID)
-		glog.V(3).Infof("Got instance id from %s: %s", instanceIDFile, instanceID)
-		if instanceID != "" {
-			return instanceID, nil
-		}
-		// Fall through with empty instanceID and try metadata server.
-	}
-	glog.V(5).Infof("Cannot read %s: '%v', trying metadata server", instanceIDFile, err)
-
+func readInstanceMetaData() (string, string, error) {
 	// Try to get JSON from metdata server.
 	resp, err := http.Get(metadataUrl)
 	if err != nil {
 		glog.V(3).Infof("Cannot read %s: %v", metadataUrl, err)
-		return "", err
+		return "", "", err
 	}
 
 	if resp.StatusCode != 200 {
 		err = fmt.Errorf("got unexpected status code when reading metadata from %s: %s", metadataUrl, resp.Status)
 		glog.V(3).Infof("%v", err)
-		return "", err
+		return "", "", err
 	}
 
 	defer resp.Body.Close()
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		glog.V(3).Infof("Cannot get HTTP response body from %s: %v", metadataUrl, err)
-		return "", err
+		return "", "", err
 	}
-	instanceID, err := parseMetadataUUID(bodyBytes)
+	instanceID, availabilityZone, err := parseMetadata(bodyBytes)
 	if err != nil {
 		glog.V(3).Infof("Cannot parse instance ID from metadata from %s: %v", metadataUrl, err)
-		return "", err
+		return "", "", err
 	}
 
 	glog.V(3).Infof("Got instance id from %s: %s", metadataUrl, instanceID)
-	return instanceID, nil
+	return instanceID, availabilityZone, nil
 }
 
 func newOpenStack(cfg Config) (*OpenStack, error) {
@@ -222,16 +213,17 @@ func newOpenStack(cfg Config) (*OpenStack, error) {
 		return nil, err
 	}
 
-	id, err := readInstanceID()
+	id, availabilityZone, err := readInstanceMetaData()
 	if err != nil {
 		return nil, err
 	}
 
 	os := OpenStack{
-		provider:        provider,
-		region:          cfg.Global.Region,
-		lbOpts:          cfg.LoadBalancer,
-		localInstanceID: id,
+		provider:         provider,
+		region:           cfg.Global.Region,
+		availabilityZone: availabilityZone,
+		lbOpts:           cfg.LoadBalancer,
+		localInstanceID:  id,
 	}
 
 	return &os, nil
@@ -433,9 +425,12 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	return os, true
 }
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
-	glog.V(1).Infof("Current zone is %v", os.region)
+	glog.V(1).Infof("Current region is %v, az is %s", os.region, os.availabilityZone)
 
-	return cloudprovider.Zone{Region: os.region}, nil
+	return cloudprovider.Zone{
+		FailureDomain: os.availabilityZone,
+		Region:        os.region,
+	}, nil
 }
 
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
