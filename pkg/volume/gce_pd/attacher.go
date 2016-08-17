@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 type gcePersistentDiskAttacher struct {
@@ -51,6 +52,11 @@ func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 		host:     plugin.host,
 		gceDisks: gceCloud,
 	}, nil
+}
+
+func (plugin *gcePersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	mounter := plugin.host.GetMounter()
+	return mount.GetMountRefs(mounter, deviceMountPath)
 }
 
 // Attach checks with the GCE cloud provider if the specified volume is already
@@ -239,7 +245,7 @@ func (detacher *gcePersistentDiskDetacher) WaitForDetach(devicePath string, time
 		select {
 		case <-ticker.C:
 			glog.V(5).Infof("Checking device %q is detached.", devicePath)
-			if pathExists, err := pathExists(devicePath); err != nil {
+			if pathExists, err := volumeutil.PathExists(devicePath); err != nil {
 				return fmt.Errorf("Error checking if device path exists: %v", err)
 			} else if !pathExists {
 				return nil
@@ -251,5 +257,5 @@ func (detacher *gcePersistentDiskDetacher) WaitForDetach(devicePath string, time
 }
 
 func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
-	return unmountPDAndRemoveGlobalPath(deviceMountPath, detacher.host.GetMounter())
+	return volumeutil.UnmountPath(deviceMountPath, detacher.host.GetMounter())
 }

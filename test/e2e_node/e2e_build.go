@@ -37,11 +37,11 @@ var buildTargets = []string{
 	"vendor/github.com/onsi/ginkgo/ginkgo",
 }
 
-func buildGo() {
+func buildGo() error {
 	glog.Infof("Building k8s binaries...")
 	k8sRoot, err := getK8sRootDir()
 	if err != nil {
-		glog.Fatalf("Failed to locate kubernetes root directory %v.", err)
+		return fmt.Errorf("failed to locate kubernetes root directory %v.", err)
 	}
 	targets := strings.Join(buildTargets, " ")
 	cmd := exec.Command("make", "-C", k8sRoot, fmt.Sprintf("WHAT=%s", targets))
@@ -49,8 +49,9 @@ func buildGo() {
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
 	if err != nil {
-		glog.Fatalf("Failed to build go packages %v\n", err)
+		return fmt.Errorf("failed to build go packages %v\n", err)
 	}
+	return nil
 }
 
 func getK8sBin(bin string) (string, error) {

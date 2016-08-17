@@ -138,6 +138,18 @@ func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volu
 	return plugin.newProvisionerFunc(options, plugin.host)
 }
 
+func (plugin *hostPathPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	hostPathVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			HostPath: &api.HostPathVolumeSource{
+				Path: volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(hostPathVolume), nil
+}
+
 func newRecycler(pvName string, spec *volume.Spec, host volume.VolumeHost, config volume.VolumeConfig) (volume.Recycler, error) {
 	if spec.PersistentVolume == nil || spec.PersistentVolume.Spec.HostPath == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.HostPath is nil")

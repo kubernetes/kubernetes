@@ -240,7 +240,7 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 	}
 
 	// Apply resource options.
-	setSandboxResources(c.GetResources(), hc)
+	setSandboxResources(hc)
 
 	// Set security options.
 	hc.SecurityOpt = []string{getSeccompOpts()}
@@ -248,10 +248,7 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 	return createConfig
 }
 
-func setSandboxResources(_ *runtimeApi.PodSandboxResources, hc *dockercontainer.HostConfig) {
-	// Ignore the resource requests and limits for now and just use the docker
-	// defaults.
-	// TODO: apply resource limits based on the configuration.
+func setSandboxResources(hc *dockercontainer.HostConfig) {
 	hc.Resources = dockercontainer.Resources{
 		MemorySwap: -1, // Always disable memory swap.
 		CPUShares:  defaultSandboxCPUshares,

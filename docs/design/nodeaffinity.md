@@ -69,7 +69,7 @@ an Intel CPU" or, in a multi-zone cluster, "run this pod on a node in zone Z."
 some of the properties that a node might publish as labels, which affinity
 expressions can match against.) They do *not* allow a pod to request to schedule
 (or not schedule) on a node based on what other pods are running on the node.
-That feature is called "inter-pod topological affinity/anti-afinity" and is
+That feature is called "inter-pod topological affinity/anti-affinity" and is
 described [here](https://github.com/kubernetes/kubernetes/pull/18265).
 
 ## API

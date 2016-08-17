@@ -38,7 +38,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 
 	newListFunc := func() runtime.Object { return &extensions.PodSecurityPolicyList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.PodSecurityPolicies),
 		&extensions.PodSecurityPolicy{},
 		prefix,

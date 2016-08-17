@@ -372,7 +372,7 @@ binary | sha1 hash | md5 hash
 
 ### Experimental Features
 
-* An alpha implementation of the the TLS bootstrap API described in docs/proposals/kubelet-tls-bootstrap.md. ([#25562](https://github.com/kubernetes/kubernetes/pull/25562), [@gtank](https://github.com/gtank))
+* An alpha implementation of the TLS bootstrap API described in docs/proposals/kubelet-tls-bootstrap.md. ([#25562](https://github.com/kubernetes/kubernetes/pull/25562), [@gtank](https://github.com/gtank))
 
 ### Action Required
 

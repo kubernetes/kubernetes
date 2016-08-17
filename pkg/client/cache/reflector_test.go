@@ -286,14 +286,14 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 		{
 			list: mkList("1"),
 			events: []watch.Event{
-				{watch.Added, mkPod("foo", "2")},
-				{watch.Added, mkPod("bar", "3")},
+				{Type: watch.Added, Object: mkPod("foo", "2")},
+				{Type: watch.Added, Object: mkPod("bar", "3")},
 			},
 		}, {
 			list: mkList("3", mkPod("foo", "2"), mkPod("bar", "3")),
 			events: []watch.Event{
-				{watch.Deleted, mkPod("foo", "4")},
-				{watch.Added, mkPod("qux", "5")},
+				{Type: watch.Deleted, Object: mkPod("foo", "4")},
+				{Type: watch.Added, Object: mkPod("qux", "5")},
 			},
 		}, {
 			listErr: fmt.Errorf("a list error"),
@@ -303,7 +303,7 @@ func TestReflectorListAndWatchWithErrors(t *testing.T) {
 		}, {
 			list: mkList("5", mkPod("bar", "3"), mkPod("qux", "5")),
 			events: []watch.Event{
-				{watch.Added, mkPod("baz", "6")},
+				{Type: watch.Added, Object: mkPod("baz", "6")},
 			},
 		}, {
 			list: mkList("6", mkPod("bar", "3"), mkPod("qux", "5"), mkPod("baz", "6")),

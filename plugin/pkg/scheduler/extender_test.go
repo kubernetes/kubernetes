@@ -170,7 +170,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 	}{
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{EqualPriority, 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -185,7 +185,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{EqualPriority, 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -200,7 +200,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{EqualPriority, 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{truePredicateExtender},
@@ -215,7 +215,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{EqualPriority, 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates: []fitPredicate{machine2PredicateExtender},
@@ -230,7 +230,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{EqualPriority, 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -244,7 +244,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{EqualPriority, 1}},
+			prioritizers: []algorithm.PriorityConfig{{Function: EqualPriority, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -263,7 +263,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]algorithm.FitPredicate{"true": truePredicate},
-			prioritizers: []algorithm.PriorityConfig{{machine2Prioritizer, 20}},
+			prioritizers: []algorithm.PriorityConfig{{Function: machine2Prioritizer, Weight: 20}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},

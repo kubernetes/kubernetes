@@ -248,7 +248,8 @@ func newTestKubeletWithImageList(
 		fakeKubeClient,
 		kubelet.volumePluginMgr,
 		fakeRuntime,
-		kubelet.mounter)
+		kubelet.mounter,
+		kubelet.getPodsDir())
 	if err != nil {
 		t.Fatalf("failed to initialize volume manager: %v", err)
 	}
@@ -404,8 +405,7 @@ func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
 		},
 	})
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -474,8 +474,7 @@ func TestVolumeUnmountAndDetachControllerDisabled(t *testing.T) {
 		},
 	})
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -603,8 +602,7 @@ func TestVolumeAttachAndMountControllerEnabled(t *testing.T) {
 		},
 	})
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -697,8 +695,7 @@ func TestVolumeUnmountAndDetachControllerEnabled(t *testing.T) {
 		},
 	})
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -856,8 +853,7 @@ func TestPodVolumesExist(t *testing.T) {
 		},
 	}
 
-	stopCh := make(chan struct{})
-	go kubelet.volumeManager.Run(stopCh)
+	stopCh := runVolumeManager(kubelet)
 	defer func() {
 		close(stopCh)
 	}()
@@ -945,32 +941,32 @@ func TestMakeVolumeMounts(t *testing.T) {
 
 	expectedMounts := []kubecontainer.Mount{
 		{
-			"disk",
-			"/etc/hosts",
-			"/mnt/disk",
-			false,
-			false,
+			Name:           "disk",
+			ContainerPath:  "/etc/hosts",
+			HostPath:       "/mnt/disk",
+			ReadOnly:       false,
+			SELinuxRelabel: false,
 		},
 		{
-			"disk",
-			"/mnt/path3",
-			"/mnt/disk",
-			true,
-			false,
+			Name:           "disk",
+			ContainerPath:  "/mnt/path3",
+			HostPath:       "/mnt/disk",
+			ReadOnly:       true,
+			SELinuxRelabel: false,
 		},
 		{
-			"disk4",
-			"/mnt/path4",
-			"/mnt/host",
-			false,
-			false,
+			Name:           "disk4",
+			ContainerPath:  "/mnt/path4",
+			HostPath:       "/mnt/host",
+			ReadOnly:       false,
+			SELinuxRelabel: false,
 		},
 		{
-			"disk5",
-			"/mnt/path5",
-			"/var/lib/kubelet/podID/volumes/empty/disk5",
-			false,
-			false,
+			Name:           "disk5",
+			ContainerPath:  "/mnt/path5",
+			HostPath:       "/var/lib/kubelet/podID/volumes/empty/disk5",
+			ReadOnly:       false,
+			SELinuxRelabel: false,
 		},
 	}
 	if !reflect.DeepEqual(mounts, expectedMounts) {
@@ -3938,4 +3934,10 @@ func simulateVolumeInUseUpdate(
 			return
 		}
 	}
+}
+
+func runVolumeManager(kubelet *Kubelet) chan struct{} {
+	stopCh := make(chan struct{})
+	go kubelet.volumeManager.Run(kubelet.sourcesReady, stopCh)
+	return stopCh
 }

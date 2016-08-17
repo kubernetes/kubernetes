@@ -296,10 +296,10 @@ func testCoreResourceList(t *testing.T) {
 	// Verify namespaces.
 	found = findResource(apiResourceList.APIResources, "namespaces")
 	assert.NotNil(t, found)
-	assert.True(t, found.Namespaced)
+	assert.False(t, found.Namespaced)
 	found = findResource(apiResourceList.APIResources, "namespaces/status")
 	assert.NotNil(t, found)
-	assert.True(t, found.Namespaced)
+	assert.False(t, found.Namespaced)
 
 	// Verify events.
 	found = findResource(apiResourceList.APIResources, "events")

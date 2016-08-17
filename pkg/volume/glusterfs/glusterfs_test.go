@@ -217,7 +217,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 		},
 		Subsets: []api.EndpointSubset{{
 			Addresses: []api.EndpointAddress{{IP: "127.0.0.1"}},
-			Ports:     []api.EndpointPort{{"foo", 80, api.ProtocolTCP}},
+			Ports:     []api.EndpointPort{{Name: "foo", Port: 80, Protocol: api.ProtocolTCP}},
 		}},
 	}
 

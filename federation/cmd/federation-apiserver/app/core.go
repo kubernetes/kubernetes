@@ -18,6 +18,14 @@ package app
 
 import (
 	"github.com/golang/glog"
+
+	// HACK to ensure that rest mapper from pkg/api is registered for groupName="".
+	// This is required because both pkg/api/install and federation/apis/core/install
+	// are installing their respective groupMeta at the same groupName.
+	// federation/apis/core/install has only a subset of resources and hence if it gets registered first, then installation of v1 API fails in pkg/master.
+	// TODO(nikhiljindal): Fix this by ensuring that pkg/api/install and federation/apis/core/install do not conflict with each other.
+	_ "k8s.io/kubernetes/pkg/api/install"
+
 	"k8s.io/kubernetes/federation/apis/core"
 	_ "k8s.io/kubernetes/federation/apis/core/install"
 	"k8s.io/kubernetes/federation/apis/core/v1"

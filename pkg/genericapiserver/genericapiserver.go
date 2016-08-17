@@ -449,7 +449,7 @@ func (s *GenericAPIServer) init(c *Config) {
 	}
 
 	if c.EnableLogsSupport {
-		apiserver.InstallLogsSupport(s.MuxHelper)
+		apiserver.InstallLogsSupport(s.MuxHelper, s.HandlerContainer)
 	}
 	if c.EnableUISupport {
 		ui.InstallSupport(s.MuxHelper, s.enableSwaggerSupport && s.enableSwaggerUI)

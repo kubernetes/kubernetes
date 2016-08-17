@@ -47,6 +47,7 @@ if [[ "${JENKINS_ENABLE_DOCKER_IN_DOCKER:-}" =~ ^[yY]$ ]]; then
     )
 fi
 
+echo "Starting..."
 docker run --rm=true -i \
   -v "${WORKSPACE}/_artifacts":/workspace/_artifacts \
   -v /etc/localtime:/etc/localtime:ro \

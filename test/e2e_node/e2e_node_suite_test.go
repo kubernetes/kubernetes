@@ -45,41 +45,30 @@ import (
 	"github.com/onsi/ginkgo/config"
 	more_reporters "github.com/onsi/ginkgo/reporters"
 	. "github.com/onsi/gomega"
+	"github.com/spf13/pflag"
 )
 
-var e2es *e2eService
-
-// context is the test context shared by all parallel nodes.
-// Originally we setup the test environment and initialize global variables
-// in BeforeSuite, and then used the global variables in the test.
-// However, after we make the test parallel, ginkgo will run all tests
-// in several parallel test nodes. And for each test node, the BeforeSuite
-// and AfterSuite will be run.
-// We don't want to start services (kubelet, apiserver and etcd) for all
-// parallel nodes, but we do want to set some globally shared variable which
-// could be used in test.
-// We have to use SynchronizedBeforeSuite to achieve that. The first
-// function of SynchronizedBeforeSuite is only called once, and the second
-// function is called in each parallel test node. The result returned by
-// the first function will be the parameter of the second function.
-// So we'll start all services and initialize the shared context in the first
-// function, and propagate the context to all parallel test nodes in the
-// second function.
-// Notice no lock is needed for shared context, because context should only be
-// initialized in the first function in SynchronizedBeforeSuite. After that
-// it should never be modified.
-var context SharedContext
+var e2es *E2EServices
 
 var prePullImages = flag.Bool("prepull-images", true, "If true, prepull images so image pull failures do not cause test failures.")
+var runServicesMode = flag.Bool("run-services-mode", false, "If true, only run services (etcd, apiserver) in current process, and not run test.")
 
 func init() {
 	framework.RegisterCommonFlags()
 	framework.RegisterNodeFlags()
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	// Mark the run-services-mode flag as hidden to prevent user from using it.
+	pflag.CommandLine.MarkHidden("run-services-mode")
 }
 
 func TestE2eNode(t *testing.T) {
-	flag.Parse()
-
+	pflag.Parse()
+	if *runServicesMode {
+		// If run-services-mode is specified, only run services in current process.
+		RunE2EServices()
+		return
+	}
+	// If run-services-mode is not specified, run test.
 	rand.Seed(time.Now().UTC().UnixNano())
 	RegisterFailHandler(Fail)
 	reporters := []Reporter{}
@@ -101,8 +90,10 @@ func TestE2eNode(t *testing.T) {
 // Setup the kubelet on the node
 var _ = SynchronizedBeforeSuite(func() []byte {
 	if *buildServices {
-		buildGo()
+		Expect(buildGo()).To(Succeed())
 	}
+
+	// Initialize node name here, so that the following code can get right node name.
 	if framework.TestContext.NodeName == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -110,7 +101,6 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		}
 		framework.TestContext.NodeName = hostname
 	}
-
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
 	// This helps with debugging test flakes since it is hard to tell when a test failure is due to image pulling.
 	if *prePullImages {
@@ -124,11 +114,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// We should mask locksmithd when provisioning the machine.
 	maskLocksmithdOnCoreos()
 
-	shared := &SharedContext{}
 	if *startServices {
-		e2es = newE2eService(framework.TestContext.NodeName, framework.TestContext.CgroupsPerQOS, framework.TestContext.EvictionHard, shared)
-		if err := e2es.start(); err != nil {
-			Fail(fmt.Sprintf("Unable to start node services.\n%v", err))
+		e2es = NewE2EServices()
+		if err := e2es.Start(); err != nil {
+			glog.Fatalf("Unable to start node services: %v", err)
 		}
 		glog.Infof("Node services started.  Running tests...")
 	} else {
@@ -136,33 +125,31 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	}
 
 	glog.Infof("Starting namespace controller")
+	// TODO(random-liu): Move namespace controller into namespace services.
 	startNamespaceController()
 
 	// Reference common test to make the import valid.
 	commontest.CurrentSuite = commontest.NodeE2E
 
-	// Share the node name with the other test nodes.
-	shared.NodeName = framework.TestContext.NodeName
-	data, err := json.Marshal(shared)
-	Expect(err).NotTo(HaveOccurred())
-
+	data, err := json.Marshal(&framework.TestContext.NodeTestContextType)
+	if err != nil {
+		glog.Fatalf("Failed to serialize node test context: %v", err)
+	}
 	return data
 }, func(data []byte) {
-	// Set the shared context got from the synchronized initialize function
-	shared := &SharedContext{}
-	Expect(json.Unmarshal(data, shared)).To(Succeed())
-	context = *shared
-
-	framework.TestContext.NodeName = shared.NodeName
+	// The node test context is updated in the first function, update it on every test node.
+	err := json.Unmarshal(data, &framework.TestContext.NodeTestContextType)
+	if err != nil {
+		glog.Fatalf("Failed to deserialize node test context: %v", err)
+	}
 })
 
 // Tear down the kubelet on the node
 var _ = SynchronizedAfterSuite(func() {}, func() {
 	if e2es != nil {
-		e2es.getLogFiles()
 		if *startServices && *stopServices {
 			glog.Infof("Stopping node services...")
-			e2es.stop()
+			e2es.Stop()
 		}
 	}
 

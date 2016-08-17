@@ -38,7 +38,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST) {
 
 	newListFunc := func() runtime.Object { return &autoscaling.HorizontalPodAutoscalerList{} }
 	storageInterface := opts.Decorator(
-		opts.Storage,
+		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.HorizontalPodAutoscalers),
 		&autoscaling.HorizontalPodAutoscaler{},
 		prefix,

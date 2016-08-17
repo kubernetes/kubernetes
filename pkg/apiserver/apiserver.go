@@ -58,6 +58,10 @@ type Mux interface {
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
 }
 
+type APIResourceLister interface {
+	ListAPIResources() []unversioned.APIResource
+}
+
 // APIGroupVersion is a helper for exposing rest.Storage objects as http.Handlers via go-restful
 // It handles URLs of the form:
 // /${storage_key}[/${object_name}]
@@ -104,6 +108,10 @@ type APIGroupVersion struct {
 	// the subresource. The key of this map should be the path of the subresource. The keys here should
 	// match the keys in the Storage map above for subresources.
 	SubresourceGroupVersionKind map[string]unversioned.GroupVersionKind
+
+	// ResourceLister is an interface that knows how to list resources
+	// for this API Group.
+	ResourceLister APIResourceLister
 }
 
 type ProxyDialerFunc func(network, addr string) (net.Conn, error)
@@ -116,6 +124,17 @@ const (
 	MaxTimeoutSecs = 600
 )
 
+// staticLister implements the APIResourceLister interface
+type staticLister struct {
+	list []unversioned.APIResource
+}
+
+func (s staticLister) ListAPIResources() []unversioned.APIResource {
+	return s.list
+}
+
+var _ APIResourceLister = &staticLister{}
+
 // InstallREST registers the REST handlers (storage, watch, proxy and redirect) into a restful Container.
 // It is expected that the provided path root prefix will serve all operations. Root MUST NOT end
 // in a slash.
@@ -123,7 +142,11 @@ func (g *APIGroupVersion) InstallREST(container *restful.Container) error {
 	installer := g.newInstaller()
 	ws := installer.NewWebService()
 	apiResources, registrationErrors := installer.Install(ws)
-	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, apiResources)
+	lister := g.ResourceLister
+	if lister == nil {
+		lister = staticLister{apiResources}
+	}
+	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
 	container.Add(ws)
 	return utilerrors.NewAggregate(registrationErrors)
 }
@@ -147,7 +170,11 @@ func (g *APIGroupVersion) UpdateREST(container *restful.Container) error {
 		return apierrors.NewInternalError(fmt.Errorf("unable to find an existing webservice for prefix %s", installer.prefix))
 	}
 	apiResources, registrationErrors := installer.Install(ws)
-	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, apiResources)
+	lister := g.ResourceLister
+	if lister == nil {
+		lister = staticLister{apiResources}
+	}
+	AddSupportedResourcesWebService(g.Serializer, ws, g.GroupVersion, lister)
 	return utilerrors.NewAggregate(registrationErrors)
 }
 
@@ -181,11 +208,28 @@ func InstallVersionHandler(mux Mux, container *restful.Container) {
 	container.Add(versionWS)
 }
 
-// InstallLogsSupport registers the APIServer log support function into a mux.
-func InstallLogsSupport(mux Mux) {
-	// TODO: use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
+// InstallLogsSupport registers the APIServer's `/logs` into a mux.
+func InstallLogsSupport(mux Mux, container *restful.Container) {
+	// use restful: ws.Route(ws.GET("/logs/{logpath:*}").To(fileHandler))
 	// See github.com/emicklei/go-restful/blob/master/examples/restful-serve-static.go
-	mux.Handle("/logs/", http.StripPrefix("/logs/", http.FileServer(http.Dir("/var/log/"))))
+	ws := new(restful.WebService)
+	ws.Path("/logs")
+	ws.Doc("get log files")
+	ws.Route(ws.GET("/{logpath:*}").To(logFileHandler))
+	ws.Route(ws.GET("/").To(logFileListHandler))
+
+	container.Add(ws)
+}
+
+func logFileHandler(req *restful.Request, resp *restful.Response) {
+	logdir := "/var/log"
+	actual := path.Join(logdir, req.PathParameter("logpath"))
+	http.ServeFile(resp.ResponseWriter, req.Request, actual)
+}
+
+func logFileListHandler(req *restful.Request, resp *restful.Response) {
+	logdir := "/var/log"
+	http.ServeFile(resp.ResponseWriter, req.Request, logdir)
 }
 
 // TODO: needs to perform response type negotiation, this is probably the wrong way to recover panics
@@ -336,7 +380,7 @@ func AddGroupWebService(s runtime.NegotiatedSerializer, container *restful.Conta
 
 // Adds a service to return the supported resources, E.g., a such web service
 // will be registered at /apis/extensions/v1.
-func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful.WebService, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) {
+func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful.WebService, groupVersion unversioned.GroupVersion, lister APIResourceLister) {
 	ss := s
 	if keepUnversioned(groupVersion.Group) {
 		// Because in release 1.1, /apis/extensions/v1beta1 returns response
@@ -344,7 +388,7 @@ func AddSupportedResourcesWebService(s runtime.NegotiatedSerializer, ws *restful
 		// keep the response backwards compatible.
 		ss = StripVersionNegotiatedSerializer{s}
 	}
-	resourceHandler := SupportedResourcesHandler(ss, groupVersion, apiResources)
+	resourceHandler := SupportedResourcesHandler(ss, groupVersion, lister)
 	ws.Route(ws.GET("/").To(resourceHandler).
 		Doc("get available resources").
 		Operation("getAPIResources").
@@ -381,9 +425,9 @@ func GroupHandler(s runtime.NegotiatedSerializer, group unversioned.APIGroup) re
 }
 
 // SupportedResourcesHandler returns a handler which will list the provided resources as available.
-func SupportedResourcesHandler(s runtime.NegotiatedSerializer, groupVersion unversioned.GroupVersion, apiResources []unversioned.APIResource) restful.RouteFunction {
+func SupportedResourcesHandler(s runtime.NegotiatedSerializer, groupVersion unversioned.GroupVersion, lister APIResourceLister) restful.RouteFunction {
 	return func(req *restful.Request, resp *restful.Response) {
-		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: apiResources})
+		writeNegotiated(s, unversioned.GroupVersion{}, resp.ResponseWriter, req.Request, http.StatusOK, &unversioned.APIResourceList{GroupVersion: groupVersion.String(), APIResources: lister.ListAPIResources()})
 	}
 }
 

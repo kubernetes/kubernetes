@@ -26,6 +26,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/util"
 )
 
@@ -33,12 +34,11 @@ import (
 // Set to true if the wrong build tags are set (see validate_disabled.go).
 var isDisabledBuild bool
 
-// Interface for validating that a pod with with an AppArmor profile can be run by a Node.
-type Validator interface {
-	Validate(pod *api.Pod) error
-}
+const (
+	rejectReason = "AppArmor"
+)
 
-func NewValidator(runtime string) Validator {
+func NewValidator(runtime string) lifecycle.PodAdmitHandler {
 	if err := validateHost(runtime); err != nil {
 		return &validator{validateHostErr: err}
 	}
@@ -58,7 +58,21 @@ type validator struct {
 	appArmorFS      string
 }
 
-func (v *validator) Validate(pod *api.Pod) error {
+// TODO(timstclair): Refactor the PodAdmitInterface to return a (Admit, Reason Message) rather than
+// the PodAdmitResult struct so that the interface can be implemented without importing lifecycle.
+func (v *validator) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
+	err := v.validate(attrs.Pod)
+	if err == nil {
+		return lifecycle.PodAdmitResult{Admit: true}
+	}
+	return lifecycle.PodAdmitResult{
+		Admit:   false,
+		Reason:  rejectReason,
+		Message: fmt.Sprintf("Cannot enforce AppArmor: %v", err),
+	}
+}
+
+func (v *validator) validate(pod *api.Pod) error {
 	if !isRequired(pod) {
 		return nil
 	}
@@ -94,7 +108,7 @@ func validateHost(runtime string) error {
 	}
 
 	// Check kernel support.
-	if !isAppArmorEnabled() {
+	if !IsAppArmorEnabled() {
 		return errors.New("AppArmor is not enabled on the host")
 	}
 
@@ -192,11 +206,11 @@ func getAppArmorFS() (string, error) {
 	return "", errors.New("securityfs not found")
 }
 
-// isAppArmorEnabled returns true if apparmor is enabled for the host.
+// IsAppArmorEnabled returns true if apparmor is enabled for the host.
 // This function is forked from
 // https://github.com/opencontainers/runc/blob/1a81e9ab1f138c091fe5c86d0883f87716088527/libcontainer/apparmor/apparmor.go
 // to avoid the libapparmor dependency.
-func isAppArmorEnabled() bool {
+func IsAppArmorEnabled() bool {
 	if _, err := os.Stat("/sys/kernel/security/apparmor"); err == nil && os.Getenv("container") == "" {
 		if _, err = os.Stat("/sbin/apparmor_parser"); err == nil {
 			buf, err := ioutil.ReadFile("/sys/module/apparmor/parameters/enabled")

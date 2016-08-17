@@ -165,6 +165,18 @@ func (plugin *rbdPlugin) newUnmounterInternal(volName string, podUID types.UID, 
 	}, nil
 }
 
+func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	rbdVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			RBD: &api.RBDVolumeSource{
+				CephMonitors: []string{},
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(rbdVolume), nil
+}
+
 type rbd struct {
 	volName  string
 	podUID   types.UID
