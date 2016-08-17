@@ -81,6 +81,21 @@ parameters:
 * `type`: `pd-standard` or `pd-ssd`. Default: `pd-ssd`
 * `zone`: GCE zone. If not specified, a random zone in the same region as controller-manager will be chosen.
 
+#### OpenStack Cinder
+
+```yaml
+kind: StorageClass
+apiVersion: extensions/v1beta1
+metadata:
+  name: slow
+provisioner: kubernetes.io/cinder
+parameters:
+  type: slow_type
+  availability: nova
+
+* `type`: VolumeType created in Cinder. Default is empty.
+* `availability`: Availability Zone. Default is empty.
+
 ### User provisioning requests
 
 Users request dynamically provisioned storage by including a storage class in their `PersistentVolumeClaim`.
