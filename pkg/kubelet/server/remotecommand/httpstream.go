@@ -25,6 +25,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/util/httpstream"
 	"k8s.io/kubernetes/pkg/util/httpstream/spdy"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -88,7 +90,7 @@ type context struct {
 	stdinStream  io.ReadCloser
 	stdoutStream io.WriteCloser
 	stderrStream io.WriteCloser
-	writeError   func(message string, rc *int) error
+	writeStatus  func(status *apierrors.StatusError) error
 	resizeStream io.ReadCloser
 	resizeChan   chan term.Size
 	tty          bool
@@ -225,7 +227,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(api.StreamType)
 			switch streamType {
 			case api.StreamTypeError:
-				ctx.writeError = v4WriteErrorFunc(stream) // write json errors
+				ctx.writeStatus = v4WriteStatusFunc(stream) // write json errors
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			case api.StreamTypeStdin:
 				ctx.stdinStream = stream
@@ -276,7 +278,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(api.StreamType)
 			switch streamType {
 			case api.StreamTypeError:
-				ctx.writeError = v1WriteErrorFunc(stream)
+				ctx.writeStatus = v1WriteStatusFunc(stream)
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			case api.StreamTypeStdin:
 				ctx.stdinStream = stream
@@ -327,7 +329,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(api.StreamType)
 			switch streamType {
 			case api.StreamTypeError:
-				ctx.writeError = v1WriteErrorFunc(stream)
+				ctx.writeStatus = v1WriteStatusFunc(stream)
 				go waitStreamReply(stream.replySent, replyChan, stop)
 			case api.StreamTypeStdin:
 				ctx.stdinStream = stream
@@ -375,7 +377,7 @@ WaitForStreams:
 			streamType := stream.Headers().Get(api.StreamType)
 			switch streamType {
 			case api.StreamTypeError:
-				ctx.writeError = v1WriteErrorFunc(stream)
+				ctx.writeStatus = v1WriteStatusFunc(stream)
 
 				// This defer statement shouldn't be here, but due to previous refactoring, it ended up in
 				// here. This is what 1.0.x kubelets do, so we're retaining that behavior. This is fixed in
@@ -430,29 +432,21 @@ func handleResizeEvents(stream io.Reader, channel chan<- term.Size) {
 	}
 }
 
-func v1WriteErrorFunc(stream io.WriteCloser) func(msg string, rc *int) error {
-	return func(msg string, rc *int) error {
-		_, err := stream.Write([]byte(msg))
+func v1WriteStatusFunc(stream io.WriteCloser) func(status *apierrors.StatusError) error {
+	return func(status *apierrors.StatusError) error {
+		if status.Status().Status == unversioned.StatusSuccess {
+			return nil // send error messages
+		}
+		_, err := stream.Write([]byte(status.Error()))
 		return err
 	}
 }
 
-// V4ExitErrorMessage objects are marshaled as json in the error channel.
-type V4ExitErrorMessage struct {
-	// Message is the actual human readable text error message.
-	Message string `json:"message"`
-
-	// ExitCode is the process exit code.
-	ExitCode *int `json:"exitcode,omitempty"`
-}
-
-func v4WriteErrorFunc(stream io.WriteCloser) func(msg string, rc *int) error {
-	return func(msg string, rc *int) error {
-		m := V4ExitErrorMessage{
-			Message:  msg,
-			ExitCode: rc,
-		}
-		bs, err := json.Marshal(&m)
+// v4WriteStatusFunc returns a WriteStatusFunc that marshals a given api Status
+// as json in the error channel.
+func v4WriteStatusFunc(stream io.WriteCloser) func(status *apierrors.StatusError) error {
+	return func(status *apierrors.StatusError) error {
+		bs, err := json.Marshal(status.Status())
 		if err != nil {
 			return err
 		}

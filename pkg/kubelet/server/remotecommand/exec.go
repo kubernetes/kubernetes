@@ -17,17 +17,23 @@ limitations under the License.
 package remotecommand
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/types"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
+)
+
+const (
+	NonZeroExitCodeReason = unversioned.StatusReason("NonZeroExitCode")
+	ExitCodeCauseType     = unversioned.CauseType("ExitCode")
 )
 
 // Executor knows how to execute a command in a container in a pod.
@@ -52,16 +58,29 @@ func ServeExec(w http.ResponseWriter, req *http.Request, executor Executor, podN
 
 	err := executor.ExecInContainer(podName, uid, container, cmd, ctx.stdinStream, ctx.stdoutStream, ctx.stderrStream, ctx.tty, ctx.resizeChan)
 	if err != nil {
-		msg := fmt.Sprintf("error executing command in container: %v", err)
-		var rc *int
-		if exitErr, ok := err.(utilexec.ExitError); ok {
-			msg = exitErr.Error()
-			if exitErr.Exited() {
-				c := exitErr.ExitStatus()
-				rc = &c
-			}
+		if exitErr, ok := err.(utilexec.ExitError); ok && exitErr.Exited() {
+			rc := exitErr.ExitStatus()
+			ctx.writeStatus(&apierrors.StatusError{unversioned.Status{
+				Status: unversioned.StatusFailure,
+				Reason: NonZeroExitCodeReason,
+				Details: &unversioned.StatusDetails{
+					Causes: []unversioned.StatusCause{
+						{
+							Type:    ExitCodeCauseType,
+							Message: fmt.Sprintf("%d", rc),
+						},
+					},
+				},
+				Message: fmt.Sprintf("command terminated with non-zero exit code: %v", exitErr),
+			}})
+		} else {
+			err = fmt.Errorf("error executing command in container: %v", err)
+			runtime.HandleError(err)
+			ctx.writeStatus(apierrors.NewInternalError(err))
 		}
-		runtime.HandleError(errors.New(msg))
-		ctx.writeError(msg, rc)
+	} else {
+		ctx.writeStatus(&apierrors.StatusError{unversioned.Status{
+			Status: unversioned.StatusSuccess,
+		}})
 	}
 }

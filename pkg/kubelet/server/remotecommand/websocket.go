@@ -123,9 +123,9 @@ func createWebSocketStreams(req *http.Request, w http.ResponseWriter, opts *opti
 
 	switch negotiatedProtocol {
 	case v4BinaryWebsocketProtocol, v4Base64WebsocketProtocol:
-		ctx.writeError = v4WriteErrorFunc(streams[errorChannel])
+		ctx.writeStatus = v4WriteStatusFunc(streams[errorChannel])
 	default:
-		ctx.writeError = v1WriteErrorFunc(streams[errorChannel])
+		ctx.writeStatus = v1WriteStatusFunc(streams[errorChannel])
 	}
 
 	return ctx, true

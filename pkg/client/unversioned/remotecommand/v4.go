@@ -20,8 +20,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/util/exec"
 )
@@ -76,16 +78,36 @@ func (p *streamProtocolV4) stream(conn streamCreator) error {
 type errorDecoderV4 struct{}
 
 func (d *errorDecoderV4) decode(message []byte) error {
-	m := remotecommand.V4ExitErrorMessage{}
-	err := json.Unmarshal(message, &m)
+	status := unversioned.Status{}
+	err := json.Unmarshal(message, &status)
 	if err != nil {
 		return fmt.Errorf("error stream protocol error: %v in %q", err, string(message))
 	}
-	if m.ExitCode == nil {
-		return fmt.Errorf(m.Message)
+	if status.Status == unversioned.StatusSuccess {
+		return nil
 	}
-	return exec.CodeExitError{
-		Err:  errors.New(m.Message),
-		Code: *m.ExitCode,
+	if status.Reason == remotecommand.NonZeroExitCodeReason {
+		if status.Details == nil {
+			return errors.New("error stream protocol error: details must be set")
+		}
+		for i := range status.Details.Causes {
+			c := &status.Details.Causes[i]
+			if c.Type != remotecommand.ExitCodeCauseType {
+				continue
+			}
+
+			rc, err := strconv.ParseUint(c.Message, 10, 8)
+			if err != nil {
+				return fmt.Errorf("error stream protocol error: invalid exit code value %q", c.Message)
+			}
+			return exec.CodeExitError{
+				Err:  fmt.Errorf("command terminated with exit code %d", rc),
+				Code: int(rc),
+			}
+		}
+
+		return fmt.Errorf("error stream protocol error: no %s cause given", remotecommand.ExitCodeCauseType)
 	}
+
+	return fmt.Errorf(status.Message)
 }
