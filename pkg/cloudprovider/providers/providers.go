@@ -18,6 +18,7 @@ package cloudprovider
 
 import (
 	// Cloud providers
+	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aliyun"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/aws"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/azure"
 	_ "k8s.io/kubernetes/pkg/cloudprovider/providers/cloudstack"
