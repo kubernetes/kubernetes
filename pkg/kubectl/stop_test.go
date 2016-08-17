@@ -316,7 +316,7 @@ func TestReplicaSetStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			ExpectedActions: []string{"get", "get", "update", "get", "get", "delete"},
+			ExpectedActions: []string{"get", "get", "update", "watch", "delete"},
 		},
 		{
 			Name: "NoOverlapping",
@@ -357,16 +357,25 @@ func TestReplicaSetStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			ExpectedActions: []string{"get", "get", "update", "get", "get", "delete"},
+			ExpectedActions: []string{"get", "get", "update", "watch", "delete"},
 		},
 		// TODO: Implement tests for overlapping replica sets, similar to replication controllers,
 		// when the overlapping checks are implemented for replica sets.
 	}
 
 	for _, test := range tests {
+		watchedObj, err := api.Scheme.Copy(test.Objs[0])
+		if err != nil {
+			t.Fatalf("%s unexpected error: %v", test.Name, err)
+		}
 		fake := testclient.NewSimpleFake(test.Objs...)
+		fakeWatch := watch.NewFake()
+		fake.PrependWatchReactor("replicasets", testclient.DefaultWatchReactor(fakeWatch, nil))
+		go func() {
+			fakeWatch.Add(watchedObj)
+		}()
 		reaper := ReplicaSetReaper{fake, time.Millisecond, time.Millisecond}
-		err := reaper.Stop(ns, name, 0, nil)
+		err = reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
 			continue
@@ -432,7 +441,7 @@ func TestJobStop(t *testing.T) {
 			},
 			StopError: nil,
 			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
-				"get:jobs", "get:jobs", "list:pods", "delete:jobs"},
+				"watch:jobs", "list:pods", "delete:jobs"},
 		},
 		{
 			Name: "JobWithDeadPods",
@@ -479,14 +488,23 @@ func TestJobStop(t *testing.T) {
 			},
 			StopError: nil,
 			ExpectedActions: []string{"get:jobs", "get:jobs", "update:jobs",
-				"get:jobs", "get:jobs", "list:pods", "delete:pods", "delete:jobs"},
+				"watch:jobs", "list:pods", "delete:pods", "delete:jobs"},
 		},
 	}
 
 	for _, test := range tests {
+		watchedObj, err := api.Scheme.Copy(test.Objs[0])
+		if err != nil {
+			t.Fatalf("%s unexpected error: %v", test.Name, err)
+		}
 		fake := testclient.NewSimpleFake(test.Objs...)
+		fakeWatch := watch.NewFake()
+		fake.PrependWatchReactor("jobs", testclient.DefaultWatchReactor(fakeWatch, nil))
+		go func() {
+			fakeWatch.Add(watchedObj)
+		}()
 		reaper := JobReaper{fake, time.Millisecond, time.Millisecond}
-		err := reaper.Stop(ns, name, 0, nil)
+		err = reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
 			continue
@@ -526,6 +544,15 @@ func TestDeploymentStop(t *testing.T) {
 		},
 	}
 	template := deploymentutil.GetNewReplicaSetTemplate(&deployment)
+	replicaSet := extensions.ReplicaSet{
+		ObjectMeta: api.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: extensions.ReplicaSetSpec{
+			Template: template,
+		},
+	}
 	tests := []struct {
 		Name            string
 		Objs            []runtime.Object
@@ -558,29 +585,31 @@ func TestDeploymentStop(t *testing.T) {
 			Objs: []runtime.Object{
 				&deployment, // GET
 				&extensions.ReplicaSetList{ // LIST
-					Items: []extensions.ReplicaSet{
-						{
-							ObjectMeta: api.ObjectMeta{
-								Name:      name,
-								Namespace: ns,
-							},
-							Spec: extensions.ReplicaSetSpec{
-								Template: template,
-							},
-						},
-					},
+					Items: []extensions.ReplicaSet{replicaSet},
 				},
 			},
 			StopError: nil,
 			ExpectedActions: []string{"get:deployments", "update:deployments",
 				"get:deployments", "list:replicasets", "get:replicasets",
-				"get:replicasets", "update:replicasets", "get:replicasets",
-				"get:replicasets", "delete:replicasets", "delete:deployments"},
+				"get:replicasets", "update:replicasets", "watch:replicasets",
+				"delete:replicasets", "delete:deployments"},
 		},
 	}
 
 	for _, test := range tests {
 		fake := testclient.NewSimpleFake(test.Objs...)
+		if len(test.Objs) > 1 {
+			watchedRs, err := api.Scheme.Copy(test.Objs[1])
+			if err != nil {
+				t.Fatalf("%s unexpected error: %v", test.Name, err)
+			}
+			fakeWatch := watch.NewFake()
+			fake.PrependWatchReactor("replicasets", testclient.DefaultWatchReactor(fakeWatch, nil))
+			go func() {
+				watchedRsList := watchedRs.(*extensions.ReplicaSetList)
+				fakeWatch.Add(&watchedRsList.Items[0])
+			}()
+		}
 		reaper := DeploymentReaper{fake, time.Millisecond, time.Millisecond}
 		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
