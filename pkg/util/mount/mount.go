@@ -51,6 +51,10 @@ type Interface interface {
 	GetDeviceNameFromMount(mountPath, pluginDir string) (string, error)
 }
 
+// Compile-time check to ensure all Mounter implementations satisfy
+// the mount interface
+var _ Interface = &Mounter{}
+
 // This represents a single line in /proc/mounts or /etc/fstab.
 type MountPoint struct {
 	Device string
