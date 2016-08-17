@@ -899,6 +899,7 @@ func Convert_api_ConfigMapList_To_v1_ConfigMapList(in *api.ConfigMapList, out *C
 }
 
 func autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *ConfigMapVolumeSource, out *api.ConfigMapVolumeSource, s conversion.Scope) error {
+	SetDefaults_ConfigMapVolumeSource(in)
 	if err := Convert_v1_LocalObjectReference_To_api_LocalObjectReference(&in.LocalObjectReference, &out.LocalObjectReference, s); err != nil {
 		return err
 	}
@@ -913,6 +914,7 @@ func autoConvert_v1_ConfigMapVolumeSource_To_api_ConfigMapVolumeSource(in *Confi
 	} else {
 		out.Items = nil
 	}
+	out.DefaultMode = in.DefaultMode
 	return nil
 }
 
@@ -935,6 +937,7 @@ func autoConvert_api_ConfigMapVolumeSource_To_v1_ConfigMapVolumeSource(in *api.C
 	} else {
 		out.Items = nil
 	}
+	out.DefaultMode = in.DefaultMode
 	return nil
 }
 
@@ -1442,6 +1445,7 @@ func autoConvert_v1_DownwardAPIVolumeFile_To_api_DownwardAPIVolumeFile(in *Downw
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	out.Mode = in.Mode
 	return nil
 }
 
@@ -1469,6 +1473,7 @@ func autoConvert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.D
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	out.Mode = in.Mode
 	return nil
 }
 
@@ -1477,6 +1482,7 @@ func Convert_api_DownwardAPIVolumeFile_To_v1_DownwardAPIVolumeFile(in *api.Downw
 }
 
 func autoConvert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource(in *DownwardAPIVolumeSource, out *api.DownwardAPIVolumeSource, s conversion.Scope) error {
+	SetDefaults_DownwardAPIVolumeSource(in)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
 		*out = make([]api.DownwardAPIVolumeFile, len(*in))
@@ -1488,6 +1494,7 @@ func autoConvert_v1_DownwardAPIVolumeSource_To_api_DownwardAPIVolumeSource(in *D
 	} else {
 		out.Items = nil
 	}
+	out.DefaultMode = in.DefaultMode
 	return nil
 }
 
@@ -1507,6 +1514,7 @@ func autoConvert_api_DownwardAPIVolumeSource_To_v1_DownwardAPIVolumeSource(in *a
 	} else {
 		out.Items = nil
 	}
+	out.DefaultMode = in.DefaultMode
 	return nil
 }
 
@@ -2420,6 +2428,7 @@ func Convert_api_ISCSIVolumeSource_To_v1_ISCSIVolumeSource(in *api.ISCSIVolumeSo
 func autoConvert_v1_KeyToPath_To_api_KeyToPath(in *KeyToPath, out *api.KeyToPath, s conversion.Scope) error {
 	out.Key = in.Key
 	out.Path = in.Path
+	out.Mode = in.Mode
 	return nil
 }
 
@@ -2430,6 +2439,7 @@ func Convert_v1_KeyToPath_To_api_KeyToPath(in *KeyToPath, out *api.KeyToPath, s 
 func autoConvert_api_KeyToPath_To_v1_KeyToPath(in *api.KeyToPath, out *KeyToPath, s conversion.Scope) error {
 	out.Key = in.Key
 	out.Path = in.Path
+	out.Mode = in.Mode
 	return nil
 }
 
@@ -5971,6 +5981,7 @@ func Convert_api_SecretList_To_v1_SecretList(in *api.SecretList, out *SecretList
 }
 
 func autoConvert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolumeSource, out *api.SecretVolumeSource, s conversion.Scope) error {
+	SetDefaults_SecretVolumeSource(in)
 	out.SecretName = in.SecretName
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
@@ -5983,6 +5994,7 @@ func autoConvert_v1_SecretVolumeSource_To_api_SecretVolumeSource(in *SecretVolum
 	} else {
 		out.Items = nil
 	}
+	out.DefaultMode = in.DefaultMode
 	return nil
 }
 
@@ -6003,6 +6015,7 @@ func autoConvert_api_SecretVolumeSource_To_v1_SecretVolumeSource(in *api.SecretV
 	} else {
 		out.Items = nil
 	}
+	out.DefaultMode = in.DefaultMode
 	return nil
 }
 
