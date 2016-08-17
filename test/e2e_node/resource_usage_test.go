@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 	Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
-				pods: 10,
+				podsNr: 10,
 				cpuLimits: framework.ContainersCPUSummary{
 					stats.SystemContainerKubelet: {0.50: 0.25, 0.95: 0.30},
 					stats.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
@@ -82,10 +82,10 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 
-			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.pods), func() {
+			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr), func() {
 				runResourceUsageTest(f, rc, itArg)
 				// Log and verify resource usage
-				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, true)
+				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, itArg.getTestName(), true)
 			})
 		}
 	})
@@ -93,32 +93,36 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 	Context("regular resource usage tracking [Benchmark]", func() {
 		rTests := []resourceTest{
 			{
-				pods: 10,
+				podsNr: 10,
 			},
 			{
-				pods: 35,
+				podsNr: 35,
 			},
 			{
-				pods: 105,
+				podsNr: 105,
 			},
 		}
 
 		for _, testArg := range rTests {
 			itArg := testArg
 
-			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.pods), func() {
+			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr), func() {
 				runResourceUsageTest(f, rc, itArg)
 				// Log and verify resource usage
-				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, true)
+				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, itArg.getTestName(), true)
 			})
 		}
 	})
 })
 
 type resourceTest struct {
-	pods      int
+	podsNr    int
 	cpuLimits framework.ContainersCPUSummary
 	memLimits framework.ResourceUsagePerContainer
+}
+
+func (rt *resourceTest) getTestName() string {
+	return fmt.Sprintf("resource_%d", rt.podsNr)
 }
 
 // runResourceUsageTest runs the resource usage test
@@ -136,7 +140,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	defer rc.Stop()
 
 	By("Creating a batch of Pods")
-	pods := newTestPods(testArg.pods, ImageRegistry[pauseImage], "test_pod")
+	pods := newTestPods(testArg.podsNr, ImageRegistry[pauseImage], "test_pod")
 	f.PodClient().CreateBatch(pods)
 
 	// wait for a while to let the node be steady
@@ -168,9 +172,9 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	logPods(f.Client)
 }
 
-// printAndVerifyResource prints the resource usage as perf data and verifies whether resource usage satisfies the limit.
-func printAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits framework.ContainersCPUSummary,
-	memLimits framework.ResourceUsagePerContainer, isVerify bool) {
+// logAndVerifyResource prints the resource usage as perf data and verifies whether resource usage satisfies the limit.
+func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimits framework.ContainersCPUSummary,
+	memLimits framework.ResourceUsagePerContainer, testName string, isVerify bool) {
 	nodeName := framework.TestContext.NodeName
 
 	// Obtain memory PerfData
@@ -189,8 +193,16 @@ func printAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLi
 	cpuSummaryPerNode[nodeName] = cpuSummary
 
 	// Print resource usage
-	framework.PrintPerfData(framework.ResourceUsageToPerfData(usagePerNode))
-	framework.PrintPerfData(framework.CPUUsageToPerfData(cpuSummaryPerNode))
+	framework.PrintPerfData(framework.ResourceUsageToPerfDataWithLabels(usagePerNode,
+		map[string]string{
+			"datatype": "resource",
+			"test":     testName,
+		}))
+	framework.PrintPerfData(framework.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode,
+		map[string]string{
+			"datatype": "resource",
+			"test":     testName,
+		}))
 
 	// Verify resource usage
 	if isVerify {
