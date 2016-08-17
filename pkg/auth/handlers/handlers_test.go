@@ -118,3 +118,84 @@ func TestAuthenticateRequestError(t *testing.T) {
 		t.Fatalf("contextMapper should have no stored requests: %v", contextMapper)
 	}
 }
+
+type mockAuthenticator struct {
+	user user.Info
+}
+
+func (m *mockAuthenticator) AuthenticateRequest(req *http.Request) (user.Info, bool, error) {
+	if m.user == nil {
+		return nil, false, nil
+	}
+	return m.user, true, nil
+}
+
+func TestAuthenticationInfoHeader(t *testing.T) {
+	a := new(mockAuthenticator)
+
+	auth, err := NewRequestAuthenticator(
+		api.NewRequestContextMapper(),
+		a,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t.Error("unexpected call to failed handler")
+			w.Write([]byte(`{}`))
+		}),
+
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte(`{}`))
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		user       user.Info
+		wantHeader string
+	}{
+		{
+			user:       &user.DefaultInfo{},
+			wantHeader: `username="", uid=""`,
+		},
+		{
+			user: &user.DefaultInfo{
+				Name: "jane",
+				UID:  "42",
+			},
+			wantHeader: `username="jane", uid="42"`,
+		},
+		{
+			user: &user.DefaultInfo{
+				Name: `foo"bar`, // Ensure values are properly escaped
+				UID:  "42",
+			},
+			wantHeader: `username="foo\"bar", uid="42"`,
+		},
+		{
+			user: &user.DefaultInfo{
+				Name: "Schrödinger",
+				UID:  "",
+			},
+			wantHeader: `username="Schr\u00f6dinger", uid=""`,
+		},
+		{
+			user: &user.DefaultInfo{
+				Name: "\n",
+				UID:  "",
+			},
+			wantHeader: `username="\n", uid=""`,
+		},
+	}
+
+	for _, test := range tests {
+		a.user = test.user
+
+		rr := httptest.NewRecorder()
+		auth.ServeHTTP(rr, &http.Request{})
+
+		authInfo := rr.Header().Get("Authentication-Info")
+		if test.wantHeader != authInfo {
+			t.Errorf("expected Authentication-Info=%q, got=%q", test.wantHeader, authInfo)
+		}
+	}
+}

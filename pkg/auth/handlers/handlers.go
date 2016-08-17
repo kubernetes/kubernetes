@@ -17,7 +17,9 @@ limitations under the License.
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/golang/glog"
@@ -63,7 +65,9 @@ func NewRequestAuthenticator(mapper api.RequestContextMapper, auth authenticator
 
 			authenticatedUserCounter.WithLabelValues(compressUsername(user.GetName())).Inc()
 
-			handler.ServeHTTP(w, req)
+			rw := newAuthInfoResponseWriter(w, req, mapper)
+
+			handler.ServeHTTP(rw, req)
 		}),
 	)
 }
@@ -106,4 +110,131 @@ func compressUsername(username string) string {
 	default:
 		return "other"
 	}
+}
+
+// newAuthInfoResponseWriter returns HTTP middleware that writes the user associated
+// with a request to the "Authentication-Info" response header once the request has
+// been completed.
+func newAuthInfoResponseWriter(w http.ResponseWriter, r *http.Request, mapper api.RequestContextMapper) http.ResponseWriter {
+	return responseWriterFor(w, &authInfoResponseWriter{w, r, mapper, false})
+}
+
+type authInfoResponseWriter struct {
+	http.ResponseWriter
+
+	req    *http.Request
+	mapper api.RequestContextMapper
+
+	wroteHeader bool
+}
+
+// setAuthInfo sets the "Authentication-Info" header for the underlying response.
+func (rw *authInfoResponseWriter) setAuthInfo() {
+	ctx, ok := rw.mapper.Get(rw.req)
+	if !ok {
+		return
+	}
+	userInfo, ok := api.UserFrom(ctx)
+	if !ok {
+		return
+	}
+
+	// Requirements for quoting these values is defined in RFC 7235 (which links to RFC 7230).
+	// We use the strconv package because it encompasses the requirements, including escaping
+	// inner quotes, spaces, and non-printable characters.
+	//
+	// QuoteToASCII differs from the normal "%q" formatter by escaping unicode characters to valid
+	// ASCII. Use this because non-ASCII HTTP headers aren't guarenteed to work with many HTTP clients.
+	//
+	// QuoteToASCII example: https://play.golang.org/p/B1jyPZGXlN
+	//
+	// Relevant RFCs:
+	//   https://tools.ietf.org/html/rfc7615 ("Authentication-Info" header)
+	//   https://tools.ietf.org/html/rfc7235#section-2.1 (format of auth params)
+	//   https://tools.ietf.org/html/rfc7230#section-3.2.6 ("quoted-string" format)
+	username := strconv.QuoteToASCII(userInfo.GetName())
+	uid := strconv.QuoteToASCII(userInfo.GetUID())
+
+	rw.Header().Set("Authentication-Info", fmt.Sprintf("username=%s, uid=%s", username, uid))
+}
+
+func (rw *authInfoResponseWriter) Write(p []byte) (int, error) {
+	if !rw.wroteHeader {
+		// Per the net/http docs, the first call to Write should trigger a call to
+		// WriteHeader if it hasn't already been set.
+		rw.WriteHeader(http.StatusOK)
+	}
+	return rw.ResponseWriter.Write(p)
+}
+
+func (rw *authInfoResponseWriter) WriteHeader(code int) {
+	rw.setAuthInfo()
+	rw.ResponseWriter.WriteHeader(code)
+	rw.wroteHeader = true
+}
+
+// responseWriter for returns a ResponseWriter that implements all special net/http interfaces
+// (CloseNotifier, Flusher, and Hijacker) that the underlying ResponseWriter implements.
+// The middleware ResponseWriter is used to implement all the normal ResponseWriter functions.
+func responseWriterFor(underlying, middleware http.ResponseWriter) http.ResponseWriter {
+	cn, c := underlying.(http.CloseNotifier)
+	fl, f := underlying.(http.Flusher)
+	hi, h := underlying.(http.Hijacker)
+
+	w := middleware
+	type implements struct {
+		closeNotifier bool
+		flusher       bool
+		hijacker      bool
+	}
+	// TODO(ericchiang): Generate this and compose the map outside the func.
+	return map[implements]http.ResponseWriter{
+		{true, true, true}:   cfhResponseWriter{cn, fl, hi, w},
+		{true, true, false}:  cfResponseWriter{cn, fl, w},
+		{true, false, true}:  chResponseWriter{cn, hi, w},
+		{false, true, true}:  fhResponseWriter{fl, hi, w},
+		{true, false, false}: cResponseWriter{cn, w},
+		{false, true, false}: fResponseWriter{fl, w},
+		{false, false, true}: hResponseWriter{hi, w},
+	}[implements{c, f, h}]
+}
+
+type cfhResponseWriter struct {
+	http.CloseNotifier
+	http.Flusher
+	http.Hijacker
+	http.ResponseWriter
+}
+
+type cfResponseWriter struct {
+	http.CloseNotifier
+	http.Flusher
+	http.ResponseWriter
+}
+
+type chResponseWriter struct {
+	http.CloseNotifier
+	http.Hijacker
+	http.ResponseWriter
+}
+
+type fhResponseWriter struct {
+	http.Flusher
+	http.Hijacker
+	http.ResponseWriter
+}
+
+type cResponseWriter struct {
+	http.CloseNotifier
+	http.ResponseWriter
+}
+
+type fResponseWriter struct {
+	http.Flusher
+	http.ResponseWriter
+}
+
+type hResponseWriter struct {
+	http.Hijacker
+	http.ResponseWriter
 }
