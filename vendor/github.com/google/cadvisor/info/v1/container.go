@@ -266,7 +266,7 @@ type LoadStats struct {
 // CPU usage time statistics.
 type CpuUsage struct {
 	// Total CPU usage.
-	// Units: nanoseconds
+	// Unit: nanoseconds.
 	Total uint64 `json:"total"`
 
 	// Per CPU/core usage of the container.
@@ -274,17 +274,31 @@ type CpuUsage struct {
 	PerCpu []uint64 `json:"per_cpu_usage,omitempty"`
 
 	// Time spent in user space.
-	// Unit: nanoseconds
+	// Unit: nanoseconds.
 	User uint64 `json:"user"`
 
 	// Time spent in kernel space.
-	// Unit: nanoseconds
+	// Unit: nanoseconds.
 	System uint64 `json:"system"`
+}
+
+// Cpu Completely Fair Scheduler statistics.
+type CpuCFS struct {
+	// Total number of elapsed enforcement intervals.
+	Periods uint64 `json:"periods"`
+
+	// Total number of times tasks in the cgroup have been throttled.
+	ThrottledPeriods uint64 `json:"throttled_periods"`
+
+	// Total time duration for which tasks in the cgroup have been throttled.
+	// Unit: nanoseconds.
+	ThrottledTime uint64 `json:"throttled_time"`
 }
 
 // All CPU usage metrics are cumulative from the creation of the container
 type CpuStats struct {
 	Usage CpuUsage `json:"usage"`
+	CFS   CpuCFS   `json:"cfs"`
 	// Smoothed average of number of runnable threads x 1000.
 	// We multiply by thousand to avoid using floats, but preserving precision.
 	// Load is smoothed over the last 10 seconds. Instantaneous value can be read
@@ -323,6 +337,10 @@ type MemoryStats struct {
 	// hugepages).
 	// Units: Bytes.
 	RSS uint64 `json:"rss"`
+
+	// The amount of swap currently used by the processes in this cgroup
+	// Units: Bytes.
+	Swap uint64 `json:"swap"`
 
 	// The amount of working set memory, this includes recently accessed memory,
 	// dirty memory, and kernel memory. Working set is <= "usage".
