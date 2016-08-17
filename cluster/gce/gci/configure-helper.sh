@@ -978,6 +978,16 @@ function start-lb-controller {
   fi
 }
 
+# Starts rescheduler.
+function start-rescheduler {
+  if [[ "${ENABLE_RESCHEDULER:-}" == "true" ]]; then
+    echo "Starting Rescheduler"
+    prepare-log-file /var/log/rescheduler.log
+    cp "${KUBE_HOME}/kube-manifests/kubernetes/gci-trusty/rescheduler.manifest" \
+       /etc/kubernetes/manifests/
+  fi
+}
+
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
   local -r version="$(/usr/bin/kubelet --version=true | cut -f2 -d " ")"
@@ -1052,6 +1062,7 @@ if [[ "${KUBERNETES_MASTER:-}" == "true" ]]; then
   start-kube-addons
   start-cluster-autoscaler
   start-lb-controller
+  start-rescheduler
 else
   start-kube-proxy
   # Kube-registry-proxy.

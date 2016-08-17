@@ -192,6 +192,7 @@ script
 	start_kube_scheduler
 	start_kube_addons
 	start_cluster_autoscaler
+	start_rescheduler
 	reset_motd
 } 2>&1 | logger --priority daemon.info -t ${UPSTART_JOB}
 end script
