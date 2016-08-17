@@ -43,6 +43,9 @@ const (
 	defaultRktAPIServiceEndpoint = "localhost:15441"
 
 	AutoDetectCloudProvider = "auto-detect"
+
+	defaultIPTablesMasqueradeBit = 14
+	defaultIPTablesDropBit       = 15
 )
 
 var zeroDuration = unversioned.Duration{}
@@ -336,6 +339,17 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	}
 	if obj.KubeReserved == nil {
 		obj.KubeReserved = make(map[string]string)
+	}
+	if obj.MakeIPTablesUtilChains == nil {
+		obj.MakeIPTablesUtilChains = boolVar(true)
+	}
+	if obj.IPTablesMasqueradeBit == nil {
+		temp := int32(defaultIPTablesMasqueradeBit)
+		obj.IPTablesMasqueradeBit = &temp
+	}
+	if obj.IPTablesDropBit == nil {
+		temp := int32(defaultIPTablesDropBit)
+		obj.IPTablesDropBit = &temp
 	}
 }
 
