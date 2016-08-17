@@ -1148,13 +1148,17 @@ func TestPrintPod(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	printer := HumanReadablePrinter{hiddenObjNum: 0}
 	for _, test := range tests {
-		printPod(&test.pod, buf, PrintOptions{false, false, false, false, true, false, false, "", []string{}})
+		printer.printPod(&test.pod, buf, PrintOptions{false, false, false, false, true, false, false, "", []string{}})
 		// We ignore time
 		if !strings.HasPrefix(buf.String(), test.expect) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
+	}
+	if printer.hiddenObjNum > 0 {
+		t.Fatalf("Expected hidden pods: 0, got: %d", printer.hiddenObjNum)
 	}
 }
 
@@ -1241,13 +1245,17 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	printer := HumanReadablePrinter{hiddenObjNum: 0}
 	for _, test := range tests {
-		printPod(&test.pod, buf, PrintOptions{false, false, false, false, false, false, false, "", []string{}})
+		printer.printPod(&test.pod, buf, PrintOptions{false, false, false, false, false, false, false, "", []string{}})
 		// We ignore time
 		if !strings.HasPrefix(buf.String(), test.expect) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
+	}
+	if printer.hiddenObjNum != 2 {
+		t.Fatalf("Expected hidden pods: 2, got: %d", printer.hiddenObjNum)
 	}
 }
 
@@ -1301,13 +1309,17 @@ func TestPrintPodWithLabels(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	printer := HumanReadablePrinter{hiddenObjNum: 0}
 	for _, test := range tests {
-		printPod(&test.pod, buf, PrintOptions{false, false, false, false, false, false, false, "", test.labelColumns})
+		printer.printPod(&test.pod, buf, PrintOptions{false, false, false, false, false, false, false, "", test.labelColumns})
 		// We ignore time
 		if !strings.HasPrefix(buf.String(), test.startsWith) || !strings.HasSuffix(buf.String(), test.endsWith) {
 			t.Fatalf("Expected to start with: %s and end with: %s, but got: %s", test.startsWith, test.endsWith, buf.String())
 		}
 		buf.Reset()
+	}
+	if printer.hiddenObjNum > 0 {
+		t.Fatalf("Expected hidden pods: 0, got: %d", printer.hiddenObjNum)
 	}
 }
 
@@ -1507,12 +1519,17 @@ func TestPrintPodShowLabels(t *testing.T) {
 	}
 
 	buf := bytes.NewBuffer([]byte{})
+	printer := HumanReadablePrinter{hiddenObjNum: 0}
+
 	for _, test := range tests {
-		printPod(&test.pod, buf, PrintOptions{false, false, false, false, false, test.showLabels, false, "", []string{}})
+		printer.printPod(&test.pod, buf, PrintOptions{false, false, false, false, false, test.showLabels, false, "", []string{}})
 		// We ignore time
 		if !strings.HasPrefix(buf.String(), test.startsWith) || !strings.HasSuffix(buf.String(), test.endsWith) {
 			t.Fatalf("Expected to start with: %s and end with: %s, but got: %s", test.startsWith, test.endsWith, buf.String())
 		}
 		buf.Reset()
+	}
+	if printer.hiddenObjNum > 0 {
+		t.Fatalf("Expected hidden pods: 0, got: %d", printer.hiddenObjNum)
 	}
 }

@@ -44,6 +44,9 @@ var (
 
 		`) + kubectl.PossibleResourceTypes + dedent.Dedent(`
 
+		This command will hide resources that have completed. For instance, pods that are in the Succeeded or Failed phases.
+		You can see the full results for any resource by providing the '--show-all' flag.
+
 		By specifying the output as 'template' and providing a Go template as the value
 		of the --template flag, you can filter the attributes of the fetched resource(s).`)
 	get_example = dedent.Dedent(`
@@ -74,7 +77,7 @@ var (
 
 // NewCmdGet creates a command object for the generic "get" action, which
 // retrieves one or more resources from a server.
-func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra.Command {
 	options := &GetOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -94,7 +97,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Long:    get_long,
 		Example: get_example,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunGet(f, out, cmd, args, options)
+			err := RunGet(f, out, errOut, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
 		SuggestFor: []string{"list", "ps"},
@@ -118,7 +121,7 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
-func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
+func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
@@ -177,7 +180,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
-
 		obj, err := r.Object()
 		if err != nil {
 			return err
@@ -203,6 +205,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			if err := printer.PrintObj(obj, out); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
+			printer.FinishPrint(errOut, mapping.Resource)
 		}
 
 		// print watched changes
@@ -218,7 +221,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 				first = false
 				return nil
 			}
-			return printer.PrintObj(e.Object, out)
+			err := printer.PrintObj(e.Object, out)
+			if err == nil {
+				printer.FinishPrint(errOut, mapping.Resource)
+			}
+			return err
 		})
 		return nil
 	}
@@ -265,6 +272,10 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err != nil {
 			return err
 		}
+		res := ""
+		if len(infos) > 0 {
+			res = infos[0].ResourceMapping().Resource
+		}
 
 		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
 		if err != nil {
@@ -274,6 +285,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 		if err := printer.PrintObj(obj, out); err != nil {
 			allErrs = append(allErrs, err)
 		}
+		printer.FinishPrint(errOut, res)
 		return utilerrors.NewAggregate(allErrs)
 	}
 
@@ -322,7 +334,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 	printer = nil
 	var lastMapping *meta.RESTMapping
 	w := kubectl.GetNewTabWriter(out)
-	defer w.Flush()
 
 	if mustPrintWithKinds(objs, infos, sorter) {
 		showKind = true
@@ -339,6 +350,10 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			original = infos[ix].Object
 		}
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
+			if printer != nil {
+				w.Flush()
+				printer.FinishPrint(errOut, lastMapping.Resource)
+			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
 				allErrs = append(allErrs, err)
@@ -374,6 +389,10 @@ func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string
 			allErrs = append(allErrs, err)
 			continue
 		}
+	}
+	w.Flush()
+	if printer != nil {
+		printer.FinishPrint(errOut, lastMapping.Resource)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
