@@ -31,6 +31,7 @@ import (
 	"os"
 
 	"k8s.io/kubernetes/pkg/apis/certificates"
+	"k8s.io/kubernetes/pkg/util/crypto"
 )
 
 // ParseCertificateRequestObject extracts the CSR from the API object and decodes it.
@@ -71,7 +72,7 @@ func NewCertificateRequest(keyFile string, subject *pkix.Name, dnsSANs []string,
 			Bytes: derBytes,
 		}
 
-		err = ioutil.WriteFile(keyFile, pem.EncodeToMemory(pemBlock), os.FileMode(0600))
+		err = crypto.WriteKeyToPath(keyFile, pem.EncodeToMemory(pemBlock))
 		if err != nil {
 			return nil, err
 		}
