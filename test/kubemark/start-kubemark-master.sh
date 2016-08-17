@@ -31,8 +31,8 @@ fi
 sudo docker run --net=host -v /var/etcd/data:/var/etcd/data -d \
 	gcr.io/google_containers/etcd:3.0.4 /usr/local/bin/etcd \
 	--listen-peer-urls http://127.0.0.1:2380 \
-	--advertise-client-urls=http://127.0.0.1:4001 \
-	--listen-client-urls=http://0.0.0.0:4001 \
+	--advertise-client-urls=http://127.0.0.1:2379 \
+	--listen-client-urls=http://0.0.0.0:2379 \
 	--data-dir=/var/etcd/data
 
 # Increase the allowed number of open file descriptors
@@ -44,7 +44,7 @@ kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 $(cat scheduler_fla
 
 kubernetes/server/bin/kube-apiserver \
 	--address=0.0.0.0 \
-	--etcd-servers=http://127.0.0.1:4001 \
+	--etcd-servers=http://127.0.0.1:2379 \
 	--etcd-servers-overrides=/events#${EVENT_STORE_URL} \
 	--tls-cert-file=/srv/kubernetes/server.cert \
 	--tls-private-key-file=/srv/kubernetes/server.key \

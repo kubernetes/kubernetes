@@ -88,7 +88,7 @@ func TestRun(t *testing.T) {
 	s.InsecurePort = insecurePort
 	_, ipNet, _ := net.ParseCIDR("10.10.10.0/24")
 	s.ServiceClusterIPRange = *ipNet
-	s.StorageConfig.ServerList = []string{"http://localhost:4001"}
+	s.StorageConfig.ServerList = []string{"http://localhost:2379"}
 	go func() {
 		if err := Run(s); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)

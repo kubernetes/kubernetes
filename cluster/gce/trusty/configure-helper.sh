@@ -452,7 +452,7 @@ start_etcd_servers() {
     rm -f /etc/init.d/etcd
   fi
   prepare_log_file /var/log/etcd.log
-  prepare_etcd_manifest "" "4001" "2380" "200m" "etcd.manifest"
+  prepare_etcd_manifest "" "2379" "2380" "200m" "etcd.manifest"
 
   prepare_log_file /var/log/etcd-events.log
   prepare_etcd_manifest "-events" "4002" "2381" "100m" "etcd-events.manifest"
@@ -508,7 +508,7 @@ start_kube_apiserver() {
   params="${APISERVER_TEST_ARGS:-} ${API_SERVER_TEST_LOG_LEVEL:-"--v=2"} ${CLOUD_CONFIG_OPT}"
   params="${params} --cloud-provider=gce"
   params="${params} --address=127.0.0.1"
-  params="${params} --etcd-servers=http://127.0.0.1:4001"
+  params="${params} --etcd-servers=http://127.0.0.1:2379"
   params="${params} --tls-cert-file=/etc/srv/kubernetes/server.cert"
   params="${params} --tls-private-key-file=/etc/srv/kubernetes/server.key"
   params="${params} --secure-port=443"
