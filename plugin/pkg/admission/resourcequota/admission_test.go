@@ -36,7 +36,6 @@ import (
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/quota/install"
 	"k8s.io/kubernetes/pkg/runtime"
-	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
@@ -152,7 +151,6 @@ func TestAdmissionIgnoresSubresources(t *testing.T) {
 	go quotaAccessor.Run(stopCh)
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -196,7 +194,6 @@ func TestAdmitBelowQuotaLimit(t *testing.T) {
 	go quotaAccessor.Run(stopCh)
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -372,7 +369,6 @@ func TestAdmitExceedQuotaLimit(t *testing.T) {
 	go quotaAccessor.Run(stopCh)
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -416,7 +412,6 @@ func TestAdmitEnforceQuotaConstraints(t *testing.T) {
 	go quotaAccessor.Run(stopCh)
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -470,7 +465,6 @@ func TestAdmitPodInNamespaceWithoutQuota(t *testing.T) {
 	go quotaAccessor.Run(stopCh)
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -536,7 +530,6 @@ func TestAdmitBelowTerminatingQuotaLimit(t *testing.T) {
 	go quotaAccessor.Run(stopCh)
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -641,7 +634,6 @@ func TestAdmitBelowBestEffortQuotaLimit(t *testing.T) {
 	go quotaAccessor.Run(stopCh)
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -733,7 +725,6 @@ func TestAdmitBestEffortQuotaLimitIgnoresBurstable(t *testing.T) {
 	go quotaAccessor.Run(stopCh)
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -852,7 +843,6 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
 	evaluator.(*quotaEvaluator).registry = registry
 
-	defer utilruntime.HandleCrash()
 	handler := &quotaAdmission{
 		Handler:   admission.NewHandler(admission.Create, admission.Update),
 		evaluator: evaluator,
@@ -869,5 +859,44 @@ func TestAdmissionSetsMissingNamespace(t *testing.T) {
 	}
 	if newPod.Namespace != namespace {
 		t.Errorf("Got unexpected pod namespace: %q != %q", newPod.Namespace, namespace)
+	}
+}
+
+// TestAdmitWhenUnrelatedResourceExceedsQuota verifies that if resource X exceeds quota, it does not prohibit resource Y from admission.
+func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceServices: resource.MustParse("3"),
+				api.ResourcePods:     resource.MustParse("4"),
+			},
+			Used: api.ResourceList{
+				api.ResourceServices: resource.MustParse("4"),
+				api.ResourcePods:     resource.MustParse("1"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota)
+
+	// create a pod that should pass existing quota
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
 	}
 }
