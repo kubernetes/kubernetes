@@ -926,3 +926,43 @@ func TestAdmitRejectsNegativeUsage(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 }
+
+// TestAdmitWhenUnrelatedResourceExceedsQuota verifies that if resource X exceeds quota, it does not prohibit resource Y from admission.
+func TestAdmitWhenUnrelatedResourceExceedsQuota(t *testing.T) {
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceServices: resource.MustParse("3"),
+				api.ResourcePods:     resource.MustParse("4"),
+			},
+			Used: api.ResourceList{
+				api.ResourceServices: resource.MustParse("4"),
+				api.ResourcePods:     resource.MustParse("1"),
+			},
+		},
+	}
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
+
+	defer utilruntime.HandleCrash()
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota)
+
+	// create a pod that should pass existing quota
+	newPod := validPod("allowed-pod", 1, getResourceRequirements(getResourceList("", ""), getResourceList("", "")))
+	err := handler.Admit(admission.NewAttributesRecord(newPod, nil, api.Kind("Pod").WithVersion("version"), newPod.Namespace, newPod.Name, api.Resource("pods").WithVersion("version"), "", admission.Create, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+}
