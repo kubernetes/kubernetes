@@ -49,13 +49,9 @@ type StoreToPodLister struct {
 // Please note that selector is filtering among the pods that have gotten into
 // the store; there may have been some filtering that already happened before
 // that.
-//
-// TODO: converge on the interface in pkg/client.
+// We explicitly don't return api.PodList, to avoid expensive allocations, which
+// in most cases are unnecessary.
 func (s *StoreToPodLister) List(selector labels.Selector) (pods []*api.Pod, err error) {
-	// TODO: it'd be great to just call
-	// s.Pods(api.NamespaceAll).List(selector), however then we'd have to
-	// remake the list.Items as a []*api.Pod. So leave this separate for
-	// now.
 	for _, m := range s.Indexer.List() {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
@@ -78,14 +74,14 @@ type storePodsNamespacer struct {
 // Please note that selector is filtering among the pods that have gotten into
 // the store; there may have been some filtering that already happened before
 // that.
-func (s storePodsNamespacer) List(selector labels.Selector) (api.PodList, error) {
-	pods := api.PodList{}
-
+// We explicitly don't return api.PodList, to avoid expensive allocations, which
+// in most cases are unnecessary.
+func (s storePodsNamespacer) List(selector labels.Selector) (pods []*api.Pod, err error) {
 	if s.namespace == api.NamespaceAll {
 		for _, m := range s.indexer.List() {
 			pod := m.(*api.Pod)
 			if selector.Matches(labels.Set(pod.Labels)) {
-				pods.Items = append(pods.Items, *pod)
+				pods = append(pods, pod)
 			}
 		}
 		return pods, nil
@@ -99,7 +95,7 @@ func (s storePodsNamespacer) List(selector labels.Selector) (api.PodList, error)
 		for _, m := range s.indexer.List() {
 			pod := m.(*api.Pod)
 			if s.namespace == pod.Namespace && selector.Matches(labels.Set(pod.Labels)) {
-				pods.Items = append(pods.Items, *pod)
+				pods = append(pods, pod)
 			}
 		}
 		return pods, nil
@@ -107,7 +103,7 @@ func (s storePodsNamespacer) List(selector labels.Selector) (api.PodList, error)
 	for _, m := range items {
 		pod := m.(*api.Pod)
 		if selector.Matches(labels.Set(pod.Labels)) {
-			pods.Items = append(pods.Items, *pod)
+			pods = append(pods, pod)
 		}
 	}
 	return pods, nil

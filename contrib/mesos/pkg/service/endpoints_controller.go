@@ -292,8 +292,9 @@ func (e *endpointController) syncService(key string) {
 
 	subsets := []api.EndpointSubset{}
 	containerPortAnnotations := map[string]string{} // by <HostIP>:<Port>
-	for i := range pods.Items {
-		pod := &pods.Items[i]
+	for i := range pods {
+		// TODO: Do we need to copy here?
+		pod := &(*pods[i])
 
 		for i := range service.Spec.Ports {
 			servicePort := &service.Spec.Ports[i]

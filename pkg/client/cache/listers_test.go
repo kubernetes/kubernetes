@@ -718,9 +718,9 @@ func TestStoreToPodLister(t *testing.T) {
 		defaultPods, err := spl.Pods(api.NamespaceDefault).List(labels.Set{}.AsSelector())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
-		} else if e, a := 1, len(defaultPods.Items); e != a {
+		} else if e, a := 1, len(defaultPods); e != a {
 			t.Errorf("Expected %v, got %v", e, a)
-		} else if e, a := "quux", defaultPods.Items[0].Name; e != a {
+		} else if e, a := "quux", defaultPods[0].Name; e != a {
 			t.Errorf("Expected %v, got %v", e, a)
 		}
 
