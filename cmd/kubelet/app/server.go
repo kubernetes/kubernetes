@@ -347,8 +347,10 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 
 	if kcfg == nil {
 		var kubeClient, eventClient *clientset.Clientset
-		if err := bootstrapClientCert(s); err != nil {
-			return err
+		if s.BootstrapKubeconfig != "" {
+			if err := bootstrapClientCert(s); err != nil {
+				return err
+			}
 		}
 
 		clientConfig, err := CreateAPIServerClientConfig(s)
@@ -455,29 +457,35 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	return nil
 }
 
-// bootstrapClientCert will request a client cert for kubelet if '--bootstrapKubeconfig'
-// is non-empty and no client certificates is available in kubeconfig.
-// On success, the result certificate and key file will be stored in /var/run/kubernetes/
-// and the kubeconfig will point to those files.
-// If '--bootstrapKubeconfig' is set but kubeconfig file doesn't exist, then the function will fail.
-// TODO(yifan): Figure out how to deal with the situation when there is no kubeconfig.
+// bootstrapClientCert will request a client cert for kubelet.
+// If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used
+// to request a client certificate from the API server.
+// On success, a kubeconfig file referencing the generated key and obtained certificate is
+// written to the path specified by --kubeconfig.
+// The certificate and key file will be stored in /var/run/kubernetes/.
 func bootstrapClientCert(s *options.KubeletServer) error {
-	if s.BootstrapKubeconfig == "" {
-		return nil
-	}
-
+	// Check the if --kubeconfig already has sufficient TLS client info.
 	kcfg, err := (&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()}).Load()
-	if err != nil {
-		return fmt.Errorf("unable to load kubeconfig: %v", err)
+	if err == nil {
+		authInfo, err := getCurrentContextAuthInfo(kcfg)
+		if err == nil {
+			if containsSufficientTLSInfo(authInfo) {
+				return nil
+			}
+		}
 	}
 
+	// At this point, we need to use the bootstrap kubeconfig to generate TLS client cert, key, and a kubeconfig
+	// to stored in --kubeconfig.
+	glog.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
+
+	kcfg, err = (&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.BootstrapKube.Value()}).Load()
+	if err != nil {
+		return fmt.Errorf("unable to load boostrap kubeconfig: %v", err)
+	}
 	authInfo, err := getCurrentContextAuthInfo(kcfg)
 	if err != nil {
-		return fmt.Errorf("unable to get auth info from kubeconfig: %v", err)
-	}
-
-	if containsSufficientTLSInfo(authInfo) {
-		return nil
+		return fmt.Errorf("unable to load auth info in bootstrap kubeconfig: %v", err)
 	}
 
 	authInfo.ClientCertificate, authInfo.ClientKey, err = getClientCertAndKey(s, authInfo.ClientCertificate, authInfo.ClientKey)
