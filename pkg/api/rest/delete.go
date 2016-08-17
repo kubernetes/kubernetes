@@ -30,8 +30,20 @@ import (
 // API conventions.
 type RESTDeleteStrategy interface {
 	runtime.ObjectTyper
-	// Orphan returns when the object is deleted, by default, whether its dependents should be orphaned or deleted.
-	Orphan() bool
+}
+
+type GarbageCollectionBehavior string
+
+const (
+	CascadingDelete GarbageCollectionBehavior = "CascadingDeletion"
+	Orphan          GarbageCollectionBehavior = "Orphan"
+)
+
+// GarbageCollectionDeleteStrategy must be implemented by the registry that wants to
+// orphan dependents by default.
+type GarbageCollectionDeleteStrategy interface {
+	// DefaultGarbageCollectionBehavior returns the default garbage collection behavior.
+	DefaultGarbageCollectionBehavior() GarbageCollectionBehavior
 }
 
 // RESTGracefulDeleteStrategy must be implemented by the registry that supports

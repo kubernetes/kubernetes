@@ -21,6 +21,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/batch/validation"
@@ -39,6 +40,12 @@ type jobStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
 var Strategy = jobStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// DefaultGarbageCollectionBehavior returns Orphan because that's the default
+// behavior before the server-side garbage collection is implemented.
+func (jobStrategy) DefaultGarbageCollectionBehavior() rest.GarbageCollectionBehavior {
+	return rest.Orphan
+}
 
 // NamespaceScoped returns true because all jobs need to be within a namespace.
 func (jobStrategy) NamespaceScoped() bool {
