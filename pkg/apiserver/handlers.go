@@ -32,9 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
-	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/httplog"
-	"k8s.io/kubernetes/pkg/serviceaccount"
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/sets"
 )
@@ -460,75 +458,6 @@ func (r *requestAttributeGetter) GetAttribs(req *http.Request) authorizer.Attrib
 	attribs.Name = requestInfo.Name
 
 	return &attribs
-}
-
-func WithImpersonation(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		requestedSubject := req.Header.Get("Impersonate-User")
-		if len(requestedSubject) == 0 {
-			handler.ServeHTTP(w, req)
-			return
-		}
-
-		ctx, exists := requestContextMapper.Get(req)
-		if !exists {
-			forbidden(w, req)
-			return
-		}
-		requestor, exists := api.UserFrom(ctx)
-		if !exists {
-			forbidden(w, req)
-			return
-		}
-
-		actingAsAttributes := &authorizer.AttributesRecord{
-			User:            requestor,
-			Verb:            "impersonate",
-			APIGroup:        api.GroupName,
-			Resource:        "users",
-			Name:            requestedSubject,
-			ResourceRequest: true,
-		}
-		if namespace, name, err := serviceaccount.SplitUsername(requestedSubject); err == nil {
-			actingAsAttributes.Resource = "serviceaccounts"
-			actingAsAttributes.Namespace = namespace
-			actingAsAttributes.Name = name
-		}
-
-		authorized, reason, err := a.Authorize(actingAsAttributes)
-		if err != nil {
-			internalError(w, req, err)
-			return
-		}
-		if !authorized {
-			glog.V(4).Infof("Forbidden: %#v, Reason: %s", req.RequestURI, reason)
-			forbidden(w, req)
-			return
-		}
-
-		switch {
-		case strings.HasPrefix(requestedSubject, serviceaccount.ServiceAccountUsernamePrefix):
-			namespace, name, err := serviceaccount.SplitUsername(requestedSubject)
-			if err != nil {
-				forbidden(w, req)
-				return
-			}
-			requestContextMapper.Update(req, api.WithUser(ctx, serviceaccount.UserInfo(namespace, name, "")))
-
-		default:
-			newUser := &user.DefaultInfo{
-				Name: requestedSubject,
-			}
-			requestContextMapper.Update(req, api.WithUser(ctx, newUser))
-		}
-
-		newCtx, _ := requestContextMapper.Get(req)
-		oldUser, _ := api.UserFrom(ctx)
-		newUser, _ := api.UserFrom(newCtx)
-		httplog.LogOf(req, w).Addf("%v is acting as %v", oldUser, newUser)
-
-		handler.ServeHTTP(w, req)
-	})
 }
 
 // WithAuthorizationCheck passes all authorized requests on to handler, and returns a forbidden error otherwise.
