@@ -443,7 +443,7 @@ func GetKubeletDockerContainers(client DockerInterface, allContainers bool) ([]*
 		// Skip containers that we didn't create to allow users to manually
 		// spin up their own containers if they want.
 		if !strings.HasPrefix(container.Names[0], "/"+containerNamePrefix+"_") {
-			glog.V(3).Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
+			glog.V(5).Infof("Docker Container: %s is not managed by kubelet.", container.Names[0])
 			continue
 		}
 		result = append(result, container)
