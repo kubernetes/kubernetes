@@ -29,7 +29,8 @@ import (
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientset "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	//kubeclientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
-	planner "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset/planner"
+
+	scheduler "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset/scheduler"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
@@ -57,14 +58,6 @@ var (
 	clusterAvailableDelay   = 20 * time.Second
 	clusterUnavailableDelay = 60 * time.Second
 )
-
-func encodeScheduleResult(scheduleResult map[string]int64) string {
-	var scheduleResultStrings []string
-	for clusterName, replicas := range scheduleResult {
-		scheduleResultStrings = append(scheduleResultStrings, clusterName+":"+strconv.FormatInt(replicas, 10))
-	}
-	return strings.Join(scheduleResultStrings, "/")
-}
 
 func decodeScheduleResult(scheduleResultString string) (map[string]int64, error) {
 	var scheduleResult = make(map[string]int64)
@@ -98,19 +91,6 @@ func scheduleResultFromAnnotation(frs *extensionsv1.ReplicaSet) (scheduleResult 
 	return
 }
 
-func scheduleResultToAnnotation(frs *extensionsv1.ReplicaSet, scheduleResult map[string]int64) {
-	accessor, err := meta.Accessor(frs)
-	if err != nil {
-		panic(err) // should never happen
-	}
-	anno := accessor.GetAnnotations()
-	if anno == nil {
-		anno = make(map[string]string)
-	}
-	anno[ExpectedReplicasAnnotation] = encodeScheduleResult(scheduleResult)
-	accessor.SetAnnotations(anno)
-}
-
 func backoff(trial int64) time.Duration {
 	if trial > 12 {
 		return 12 * 5 * time.Second
@@ -123,7 +103,7 @@ type ReplicaSetItem struct {
 }
 
 type ReplicaSetController struct {
-	planner *planner.Planner
+	scheduler *scheduler.Scheduler
 
 	fedClient fedclientset.Interface
 
@@ -144,7 +124,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		replicasetDeliverer: fedutil.NewDelayingDeliverer(),
 		clusterDeliverer:    fedutil.NewDelayingDeliverer(),
 		replicasetWorkQueue: workqueue.New(),
-		planner: planner.NewPlanner(&fed.FederatedReplicaSetPreferences{
+		scheduler: scheduler.NewScheduler(&fed.FederatedReplicaSetPreferences{
 			Clusters: map[string]fed.ClusterReplicaSetPreferences{
 				"*": {Weight: 1},
 			},
@@ -285,25 +265,6 @@ func (frsc *ReplicaSetController) worker() {
 	}
 }
 
-func (frsc *ReplicaSetController) schedule(replicas int32, clusters []*fedv1.Cluster,
-	expected map[string]int64, actual map[string]int64) map[string]int64 {
-	// TODO: integrate real scheduler
-	var clusterNames []string
-	for _, cluster := range clusters {
-		clusterNames = append(clusterNames, cluster.Name)
-	}
-	scheduleResult := frsc.planner.Plan(int64(replicas), clusterNames)
-	result := make(map[string]int64)
-	for clusterName := range expected {
-		result[clusterName] = 0
-	}
-	for clusterName, replicas := range scheduleResult {
-		result[clusterName] = replicas
-	}
-
-	return result
-}
-
 func (frsc *ReplicaSetController) reconcileReplicaSet(key string, trial int64) error {
 	if !frsc.isSynced() {
 		frsc.replicasetDeliverer.DeliverAfter(key, ReplicaSetItem{trial: trial}, clusterAvailableDelay)
@@ -326,19 +287,10 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string, trial int64) e
 
 	frs := obj.(*extensionsv1.ReplicaSet)
 
-	scheduleResult, found, err := scheduleResultFromAnnotation(frs)
-
-	if !found || err != nil { // unscheduled or schedule result missing or corrupted
-		clusters, err := frsc.fedInformer.GetReadyClusters()
-		if err != nil {
-			return err
-		}
-		scheduleResult = frsc.schedule(*frs.Spec.Replicas, clusters, nil, nil)
-		scheduleResultToAnnotation(frs, scheduleResult)
-		frs, err = frsc.fedClient.Extensions().ReplicaSets(frs.Namespace).Update(frs)
-		if err != nil {
-			return err
-		}
+	scheduleResult := frsc.scheduler.ScheduleFromAnnotation(frs)
+	frs, err = frsc.fedClient.Extensions().ReplicaSets(frs.Namespace).Update(frs)
+	if err != nil {
+		return err
 	}
 
 	var totalReplicas int64 = 0
@@ -347,11 +299,8 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string, trial int64) e
 	}
 	if int32(totalReplicas) != *frs.Spec.Replicas {
 		// replicas don't match, re-schedule
-		clusters, err := frsc.fedInformer.GetReadyClusters()
-		if err != nil {
-			return err
-		}
-		scheduleResult = frsc.schedule(*frs.Spec.Replicas, clusters, scheduleResult, nil)
+		clusters, _ := frsc.fedInformer.GetReadyClusters()
+		scheduleResult = frsc.scheduler.Schedule(frs, clusters)
 	}
 
 	glog.Infof("Start syncing local replicaset %v", scheduleResult)

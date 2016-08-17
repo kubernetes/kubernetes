@@ -90,7 +90,7 @@ func Run(s *options.CMServer) error {
 		glog.Errorf("unable to register configz: %s", err)
 	}
 	// Create the config to talk to federation-apiserver.
-	kubeconfigGetter := util.KubeconfigGetterForSecret(KubeconfigSecretName)
+	kubeconfigGetter := util.KubeconfigGetterForSecret("")
 	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
 	if err != nil || restClientCfg == nil {
 		// Retry with the deprecated name in 1.4.
