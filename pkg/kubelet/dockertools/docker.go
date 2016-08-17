@@ -166,24 +166,19 @@ func matchImageTagOrSHA(inspected dockertypes.ImageInspect, image string) bool {
 		// No Tag or SHA specified, so just return what we have
 		return true
 	}
-	if isTagged {
-		hostname, _ := dockerref.SplitHostname(named)
-		// Check the RepoTags for an exact match
-		for _, tag := range inspected.RepoTags {
-			// Deal with image with hostname specified
-			if len(hostname) > 0 {
-				if strings.HasSuffix(image, tag) {
-					return true
-				}
 
-			} else {
-				if tag == image {
-					// We found a specific tag that we were looking for
-					return true
-				}
+	if isTagged {
+		// Check the RepoTags for a match.
+		for _, tag := range inspected.RepoTags {
+			// An image name (without the tag/digest) can be [hostname '/'] component ['/' component]*
+			// Because either the RepoTag or the name *may* contain the
+			// hostname or not, we only check for the suffix match.
+			if strings.HasSuffix(image, tag) || strings.HasSuffix(tag, image) {
+				return true
 			}
 		}
 	}
+
 	if isDigested {
 		algo := digest.Digest().Algorithm().String()
 		sha := digest.Digest().Hex()
