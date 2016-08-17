@@ -134,11 +134,29 @@ message LinuxPodSandboxConfig {
     optional NamespaceOption namespace_options = 2;
 }
 
+// PodSandboxMetadata holds all necessary information for building the sandbox name.
+// The container runtime is encouraged to expose the metadata associated with the
+// PodSandbox in its user interface for better user experience. E.g., runtime can
+// construct a unique PodSandboxName based on the metadata.
+message PodSandboxMetadata {
+    // The pod name of the sandbox. Same as the pod name in the PodSpec.
+    optional string name = 1;
+    // The pod uid of the sandbox. Same as the pod UID in the PodSpec.
+    optional string uid = 2;
+    // The pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
+    optional string namespace = 3;
+    // The attempt number of creating the sandbox.
+    optional uint32 attempt = 4;
+}
+
 // PodSandboxConfig holds all the required and optional fields for creating a
 // sandbox.
 message PodSandboxConfig {
-    // The name of the sandbox.
-    optional string name = 1;
+    // The metadata of the sandbox. This information will uniquely identify
+    // the sandbox, and the runtime should leverage this to ensure correct
+    // operation. The runtime may also use this information to improve UX, such
+    // as by constructing a readable name.
+    optional PodSandboxMetadata metadata = 1;
     // The hostname of the sandbox.
     optional string hostname = 2;
     // Path to the directory on the host in which container log files are
@@ -228,8 +246,8 @@ enum PodSandBoxState {
 message PodSandboxStatus {
     // ID of the sandbox.
     optional string id = 1;
-    // Name of the sandbox
-    optional string name = 2;
+    // Metadata of the sandbox.
+    optional PodSandboxMetadata metadata = 2;
     // State of the sandbox.
     optional PodSandBoxState state = 3;
     // Creation timestamp of the sandbox
@@ -275,8 +293,8 @@ message ListPodSandboxRequest {
 message PodSandbox {
     // The id of the PodSandbox
     optional string id = 1;
-    // The name of the PodSandbox
-    optional string name = 2;
+    // Metadata of the sandbox
+    optional PodSandboxMetadata metadata = 2;
     // The state of the PodSandbox
     optional PodSandBoxState state = 3;
     // Creation timestamps of the sandbox
@@ -358,9 +376,26 @@ message LinuxUser {
     repeated int64 additional_gids = 3;
 }
 
-message ContainerConfig {
-    // Name of the container.
+// ContainerMetadata holds all necessary information for building the container
+// name. The container runtime is encouraged to expose the metadata in its user
+// interface for better user experience. E.g., runtime can construct a unique
+// container name based on the metadata. Note that (name, attempt) is unique
+// within a sandbox for the entire lifetime of the sandbox.
+message ContainerMetadata {
+    // The name of the container. Same as the container name in the PodSpec.
     optional string name = 1;
+    // The attempt number of creating the container.
+    optional uint32 attempt = 2;
+}
+
+// ContainerConfig holds all the required and optional fields for creating a
+// container.
+message ContainerConfig {
+    // The metadata of the container. This information will uniquely identify
+    // the container, and the runtime should leverage this to ensure correct
+    // operation. The runtime may also use this information to improve UX, such
+    // as by constructing a readable name.
+    optional ContainerMetadata metadata = 1 ;
     // Image to use.
     optional ImageSpec image = 2;
     // Command to execute (i.e., entrypoint for docker)
@@ -484,8 +519,8 @@ message Container {
     // The ID of the container, used by the container runtime to identify
     // a container.
     optional string id = 1;
-    // The name of the container
-    optional string name = 2;
+    // The metadata of the container.
+    optional ContainerMetadata metadata = 2;
      // The spec of the image
     optional ImageSpec image = 3;
     // Reference to the image in use. For most runtimes, this should be an
@@ -514,8 +549,8 @@ message ContainerStatusRequest {
 message ContainerStatus {
     // ID of the container.
     optional string id = 1;
-    // Name of the container.
-    optional string name = 2;
+    // Metadata of the container.
+    optional ContainerMetadata metadata = 2;
     // Status of the container.
     optional ContainerState state = 3;
     // Creation time of the container.

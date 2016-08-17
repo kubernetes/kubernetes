@@ -33,12 +33,8 @@ var (
 )
 
 type FakePodSandbox struct {
-	// PodSandbox contains minimal information about a sandbox.
-	runtimeApi.PodSandbox
-
-	// Annotations is an unstructured key value map that may be set by external
-	// tools to store and retrieve arbitrary metadata.
-	Annotations map[string]string
+	// PodSandboxStatus contains the runtime information for a sandbox.
+	runtimeApi.PodSandboxStatus
 }
 
 type FakeContainer struct {
@@ -75,7 +71,7 @@ func (r *FakeRuntimeService) SetFakeContainers(containers []*FakeContainer) {
 
 	r.Containers = make(map[string]*FakeContainer)
 	for _, c := range containers {
-		containerID := c.GetName()
+		containerID := c.GetId()
 		r.Containers[containerID] = c
 	}
 
@@ -110,19 +106,19 @@ func (r *FakeRuntimeService) CreatePodSandbox(config *runtimeApi.PodSandboxConfi
 	r.Called = append(r.Called, "CreatePodSandbox")
 
 	// PodSandboxID should be randomized for real container runtime, but here just use
-	// sandbox's name for easily making fake sandboxes.
-	podSandboxID := config.GetName()
+	// fixed name from BuildSandboxName() for easily making fake sandboxes.
+	podSandboxID := BuildSandboxName(config.Metadata)
 	createdAt := time.Now().Unix()
 	readyState := runtimeApi.PodSandBoxState_READY
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
-		PodSandbox: runtimeApi.PodSandbox{
-			Id:        &podSandboxID,
-			Name:      config.Name,
-			State:     &readyState,
-			CreatedAt: &createdAt,
-			Labels:    config.Labels,
+		PodSandboxStatus: runtimeApi.PodSandboxStatus{
+			Id:          &podSandboxID,
+			Metadata:    config.Metadata,
+			State:       &readyState,
+			CreatedAt:   &createdAt,
+			Labels:      config.Labels,
+			Annotations: config.Annotations,
 		},
-		Annotations: config.Annotations,
 	}
 
 	return podSandboxID, nil
@@ -169,7 +165,7 @@ func (r *FakeRuntimeService) PodSandboxStatus(podSandboxID string) (*runtimeApi.
 
 	return &runtimeApi.PodSandboxStatus{
 		Id:        &podSandboxID,
-		Name:      s.Name,
+		Metadata:  s.Metadata,
 		CreatedAt: s.CreatedAt,
 		State:     s.State,
 		Network: &runtimeApi.PodSandboxNetworkStatus{
@@ -192,7 +188,7 @@ func (r *FakeRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter)
 			if filter.Id != nil && filter.GetId() != id {
 				continue
 			}
-			if filter.Name != nil && filter.GetName() != s.GetName() {
+			if filter.Name != nil && filter.GetName() != s.Metadata.GetName() {
 				continue
 			}
 			if filter.State != nil && filter.GetState() != s.GetState() {
@@ -205,7 +201,7 @@ func (r *FakeRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter)
 
 		result = append(result, &runtimeApi.PodSandbox{
 			Id:        s.Id,
-			Name:      s.Name,
+			Metadata:  s.Metadata,
 			State:     s.State,
 			CreatedAt: s.CreatedAt,
 			Labels:    s.Labels,
@@ -222,15 +218,15 @@ func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtim
 	r.Called = append(r.Called, "CreateContainer")
 
 	// ContainerID should be randomized for real container runtime, but here just use
-	// container's name for easily making fake containers.
-	containerID := config.GetName()
+	// fixed BuildContainerName() for easily making fake containers.
+	containerID := BuildContainerName(config.Metadata)
 	createdAt := time.Now().Unix()
 	createdState := runtimeApi.ContainerState_CREATED
 	imageRef := config.Image.GetImage()
 	r.Containers[containerID] = &FakeContainer{
 		ContainerStatus: runtimeApi.ContainerStatus{
 			Id:          &containerID,
-			Name:        config.Name,
+			Metadata:    config.Metadata,
 			Image:       config.Image,
 			ImageRef:    &imageRef,
 			CreatedAt:   &createdAt,
@@ -308,7 +304,7 @@ func (r *FakeRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter) 
 			if filter.Id != nil && filter.GetId() != s.GetId() {
 				continue
 			}
-			if filter.Name != nil && filter.GetName() != s.GetName() {
+			if filter.Name != nil && filter.GetName() != s.Metadata.GetName() {
 				continue
 			}
 			if filter.PodSandboxId != nil && filter.GetPodSandboxId() != s.SandboxID {
@@ -324,7 +320,7 @@ func (r *FakeRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter) 
 
 		result = append(result, &runtimeApi.Container{
 			Id:       s.Id,
-			Name:     s.Name,
+			Metadata: s.Metadata,
 			State:    s.State,
 			Image:    s.Image,
 			ImageRef: s.ImageRef,
@@ -348,7 +344,7 @@ func (r *FakeRuntimeService) ContainerStatus(containerID string) (*runtimeApi.Co
 
 	return &runtimeApi.ContainerStatus{
 		Id:          c.Id,
-		Name:        c.Name,
+		Metadata:    c.Metadata,
 		State:       c.State,
 		CreatedAt:   c.CreatedAt,
 		Image:       c.Image,

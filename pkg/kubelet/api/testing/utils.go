@@ -16,6 +16,20 @@ limitations under the License.
 
 package testing
 
+import (
+	"fmt"
+
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+)
+
+func BuildContainerName(metadata *runtimeApi.ContainerMetadata) string {
+	return fmt.Sprintf("%s_%d", metadata.GetName(), metadata.GetAttempt())
+}
+
+func BuildSandboxName(metadata *runtimeApi.PodSandboxMetadata) string {
+	return fmt.Sprintf("%s_%s_%s_%d", metadata.GetName(), metadata.GetNamespace(), metadata.GetUid(), metadata.GetAttempt())
+}
+
 func filterInLabels(filter, labels map[string]string) bool {
 	for k, v := range filter {
 		if value, ok := labels[k]; ok {
