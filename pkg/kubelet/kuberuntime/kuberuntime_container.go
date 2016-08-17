@@ -19,6 +19,7 @@ package kuberuntime
 import (
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"path"
 
@@ -42,19 +43,18 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		return nil, err
 	}
 
-	_, containerName, cid := buildContainerName(pod, container)
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
-	containerLogsPath := getContainerLogsPath(containerName, pod.UID)
+	containerLogsPath := getContainerLogsPath(container.Name, pod.UID)
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
 	config := &runtimeApi.ContainerConfig{
-		Name:        &containerName,
+		Name:        &container.Name,
 		Image:       &runtimeApi.ImageSpec{Image: &container.Image},
 		Command:     command,
 		Args:        args,
 		WorkingDir:  &container.WorkingDir,
 		Labels:      newContainerLabels(container, pod),
 		Annotations: newContainerAnnotations(container, pod, restartCount),
-		Mounts:      makeMounts(cid, opts, container, podHasSELinuxLabel),
+		Mounts:      makeMounts(opts, container, podHasSELinuxLabel),
 		LogPath:     &containerLogsPath,
 		Stdin:       &container.Stdin,
 		StdinOnce:   &container.StdinOnce,
@@ -150,7 +150,7 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *api.
 }
 
 // makeMounts generates container volume mounts for kubelet runtime api.
-func makeMounts(cid string, opts *kubecontainer.RunContainerOptions, container *api.Container, podHasSELinuxLabel bool) []*runtimeApi.Mount {
+func makeMounts(opts *kubecontainer.RunContainerOptions, container *api.Container, podHasSELinuxLabel bool) []*runtimeApi.Mount {
 	volumeMounts := []*runtimeApi.Mount{}
 
 	for idx := range opts.Mounts {
@@ -173,8 +173,9 @@ func makeMounts(cid string, opts *kubecontainer.RunContainerOptions, container *
 	// mount the file before actually starting the container.
 	if opts.PodContainerDir != "" && len(container.TerminationMessagePath) != 0 {
 		// Because the PodContainerDir contains pod uid and container name which is unique enough,
-		// here we just add an unique container id to make the path unique for different instances
+		// here we just add a random id to make the path unique for different instances
 		// of the same container.
+		cid := makeUID()
 		containerLogPath := path.Join(opts.PodContainerDir, cid)
 		fs, err := os.Create(containerLogPath)
 		if err != nil {
@@ -189,6 +190,11 @@ func makeMounts(cid string, opts *kubecontainer.RunContainerOptions, container *
 	}
 
 	return volumeMounts
+}
+
+// makeUID returns a randomly generated string.
+func makeUID() string {
+	return fmt.Sprintf("%08x", rand.Uint32())
 }
 
 // AttachContainer attaches to the container's console
