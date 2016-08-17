@@ -35,6 +35,9 @@ const (
 
 	// Termination grace period
 	defaultSandboxGracePeriod int = 10
+
+	// Used to distinguish a sandbox from a container in the name.
+	sandboxNamePrefix = "POD"
 )
 
 // CreatePodSandbox creates a pod-level sandbox.
@@ -193,7 +196,7 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{
-		Name: c.GetName(),
+		Name: buildSandboxName(c.GetName()),
 		Config: &dockercontainer.Config{
 			Hostname: c.GetHostname(),
 			// TODO: Handle environment variables.

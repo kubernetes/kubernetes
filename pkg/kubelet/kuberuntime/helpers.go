@@ -19,21 +19,13 @@ package kuberuntime
 import (
 	"fmt"
 	"math/rand"
-	"strconv"
-	"strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 const (
-	// kubePrefix is used to identify the containers/sandboxes on the node managed by kubelet
-	kubePrefix = "k8s"
-	// kubeSandboxNamePrefix is used to keep sandbox name consistent with old podInfraContainer name
-	kubeSandboxNamePrefix = "POD"
-
 	// Taken from lmctfy https://github.com/google/lmctfy/blob/master/lmctfy/controllers/cpu_controller.cc
 	minShares     = 2
 	sharesPerCPU  = 1024
@@ -44,67 +36,26 @@ const (
 	minQuotaPeriod = 1000
 )
 
-// buildSandboxName creates a name which can be reversed to identify sandbox full name
+// buildSandboxName returns a string used to idenfity a sandbox.
 func buildSandboxName(pod *api.Pod) string {
-	_, sandboxName, _ := buildKubeGenericName(pod, kubeSandboxNamePrefix)
-	return sandboxName
+	return fmt.Sprintf("%s",
+		pod.Name,
+		pod.Namespace,
+	)
 }
 
-// parseSandboxName unpacks a sandbox full name, returning the pod name, namespace and uid
-func parseSandboxName(name string) (string, string, string, error) {
-	podName, podNamespace, podUID, _, _, err := parseContainerName(name)
-	if err != nil {
-		return "", "", "", err
-	}
-
-	return podName, podNamespace, podUID, nil
-}
-
-// buildContainerName creates a name which can be reversed to identify container name.
-// This function returns stable name, unique name and an unique id.
-func buildContainerName(pod *api.Pod, container *api.Container) (string, string, string) {
-	// kubelet uses hash to determine whether an existing container matches the desired spec.
-	containerName := container.Name + "." + strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	return buildKubeGenericName(pod, containerName)
-}
-
-// buildKubeGenericName creates a name which can be reversed to identify container/sandbox name.
-// This function returns stable name, unique name and an unique id.
-func buildKubeGenericName(pod *api.Pod, containerName string) (string, string, string) {
-	stableName := fmt.Sprintf("%s_%s_%s_%s_%s",
-		kubePrefix,
+// buildContainerName returns a string used to idenfity a container.
+func buildContainerName(pod *api.Pod, containerName string) string {
+	return fmt.Sprintf("%s_%s_%s",
 		containerName,
 		pod.Name,
 		pod.Namespace,
-		string(pod.UID),
 	)
-	UID := fmt.Sprintf("%08x", rand.Uint32())
-	return stableName, fmt.Sprintf("%s_%s", stableName, UID), UID
 }
 
-// parseContainerName unpacks a container name, returning the pod name, namespace, UID and container name
-func parseContainerName(name string) (podName, podNamespace, podUID, containerName string, hash uint64, err error) {
-	parts := strings.Split(name, "_")
-	if len(parts) == 0 || parts[0] != kubePrefix {
-		err = fmt.Errorf("failed to parse container name %q into parts", name)
-		return "", "", "", "", 0, err
-	}
-	if len(parts) < 6 {
-		glog.Warningf("Found a container with the %q prefix, but too few fields (%d): %q", kubePrefix, len(parts), name)
-		err = fmt.Errorf("container name %q has fewer parts than expected %v", name, parts)
-		return "", "", "", "", 0, err
-	}
-
-	nameParts := strings.Split(parts[1], ".")
-	containerName = nameParts[0]
-	if len(nameParts) > 1 {
-		hash, err = strconv.ParseUint(nameParts[1], 16, 32)
-		if err != nil {
-			glog.Warningf("Invalid container hash %q in container %q", nameParts[1], name)
-		}
-	}
-
-	return parts[2], parts[3], parts[4], containerName, hash, nil
+// makeUID returns a randomly generated string.
+func makeUID() string {
+	return fmt.Sprintf("%08x", rand.Uint32())
 }
 
 // toRuntimeProtocol converts api.Protocol to runtimeApi.Protocol

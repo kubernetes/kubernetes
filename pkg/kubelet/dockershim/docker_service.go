@@ -44,9 +44,14 @@ const (
 	// or a regular container.
 	// TODO: This is not backward compatible with older containers. We will
 	// need to add filtering based on names.
+	// TODO: We may need to return a full list of containers for image garbage
+	// collection. Maybe we should only use the sandbox label.
 	containerTypeLabelKey       = "io.kubernetes.docker.type"
 	containerTypeLabelSandbox   = "podsandbox"
 	containerTypeLabelContainer = "container"
+
+	// To ensure backwardc compatibility, prefix the container name with "k8s"
+	kubeNamePrefix = "k8s"
 )
 
 func NewDockerSevice(client dockertools.DockerInterface) DockerLegacyService {
