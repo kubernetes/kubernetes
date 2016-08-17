@@ -431,7 +431,7 @@ func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deploym
 	//  way to handle this is by querying the store for all deployments that this deployment
 	// overlaps, as well as all deployments that overlap this deployments, and sorting them.
 
-	// Relist all deployment for overlaps, and avoid syncing the old overlapping ones
+	// Relist all deployment for overlaps, and avoid syncing the newer overlapping ones (only sync the oldest one)
 	deployments, err := dc.dStore.List()
 	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
 	if err != nil {
