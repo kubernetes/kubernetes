@@ -26,6 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+// CommonOptions is used mostly in pkg/kubectl/cmd/*.go
+type CommonOptions struct {
+	Filenames []string
+	Recursive bool
+}
+
 // Helper provides methods for retrieving or mutating a RESTful
 // resource.
 type Helper struct {

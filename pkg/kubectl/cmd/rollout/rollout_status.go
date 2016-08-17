@@ -32,8 +32,7 @@ import (
 // StatusOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type StatusOptions struct {
-	Filenames []string
-	Recursive bool
+	resource.CommonOptions
 }
 
 var (
@@ -77,7 +76,7 @@ func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []str
 
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options.CommonOptions).
 		ResourceTypeOrNameArgs(true, args...).
 		SingleResourceType().
 		Latest().

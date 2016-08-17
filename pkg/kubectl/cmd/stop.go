@@ -30,8 +30,7 @@ import (
 // StopOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type StopOptions struct {
-	Filenames []string
-	Recursive bool
+	resource.CommonOptions
 }
 
 var (
@@ -95,7 +94,7 @@ func RunStop(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Write
 		ContinueOnError().
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(false, args...).
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options.CommonOptions).
 		SelectorParam(cmdutil.GetFlagString(cmd, "selector")).
 		SelectAllParam(cmdutil.GetFlagBool(cmd, "all")).
 		Flatten().

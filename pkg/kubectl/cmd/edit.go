@@ -82,8 +82,7 @@ var (
 // EditOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type EditOptions struct {
-	Filenames []string
-	Recursive bool
+	resource.CommonOptions
 }
 
 var errExit = fmt.Errorf("exit directly")
@@ -165,7 +164,7 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options.CommonOptions).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Flatten().
