@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
+	"k8s.io/kubernetes/pkg/util/maps"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -67,7 +68,7 @@ func NewSimpleProvider(psp *extensions.PodSecurityPolicy, namespace string, stra
 //
 // NOTE: this method works on a copy of the PodSecurityContext.  It is up to the caller to
 // apply the PSC if validation passes.
-func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, error) {
+func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurityContext, map[string]string, error) {
 	var sc *api.PodSecurityContext = nil
 	if pod.Spec.SecurityContext != nil {
 		// work with a copy
@@ -76,11 +77,12 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	} else {
 		sc = &api.PodSecurityContext{}
 	}
+	annotations := maps.CopySS(pod.Annotations)
 
 	if len(sc.SupplementalGroups) == 0 {
 		supGroups, err := s.strategies.SupplementalGroupStrategy.Generate(pod)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.SupplementalGroups = supGroups
 	}
@@ -88,7 +90,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.FSGroup == nil {
 		fsGroup, err := s.strategies.FSGroupStrategy.GenerateSingle(pod)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.FSGroup = fsGroup
 	}
@@ -96,12 +98,12 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 	if sc.SELinuxOptions == nil {
 		seLinux, err := s.strategies.SELinuxStrategy.Generate(pod, nil)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.SELinuxOptions = seLinux
 	}
 
-	return sc, nil
+	return sc, annotations, nil
 }
 
 // Create a SecurityContext based on the given constraints.  If a setting is already set on the
@@ -110,7 +112,7 @@ func (s *simpleProvider) CreatePodSecurityContext(pod *api.Pod) (*api.PodSecurit
 //
 // NOTE: this method works on a copy of the SC of the container.  It is up to the caller to apply
 // the SC if validation passes.
-func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, error) {
+func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container *api.Container) (*api.SecurityContext, map[string]string, error) {
 	var sc *api.SecurityContext = nil
 	if container.SecurityContext != nil {
 		// work with a copy of the original
@@ -119,10 +121,12 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	} else {
 		sc = &api.SecurityContext{}
 	}
+	annotations := maps.CopySS(pod.Annotations)
+
 	if sc.RunAsUser == nil {
 		uid, err := s.strategies.RunAsUserStrategy.Generate(pod, container)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.RunAsUser = uid
 	}
@@ -130,7 +134,7 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 	if sc.SELinuxOptions == nil {
 		seLinux, err := s.strategies.SELinuxStrategy.Generate(pod, container)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		sc.SELinuxOptions = seLinux
 	}
@@ -150,7 +154,7 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 
 	caps, err := s.strategies.CapabilitiesStrategy.Generate(pod, container)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	sc.Capabilities = caps
 
@@ -161,7 +165,7 @@ func (s *simpleProvider) CreateContainerSecurityContext(pod *api.Pod, container 
 		sc.ReadOnlyRootFilesystem = &readOnlyRootFS
 	}
 
-	return sc, nil
+	return sc, annotations, nil
 }
 
 // Ensure a pod's SecurityContext is in compliance with the given constraints.
