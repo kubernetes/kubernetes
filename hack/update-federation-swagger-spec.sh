@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Script to fetch latest swagger spec.
-# Puts the updated spec at api/swagger-spec/
+# Script to fetch latest swagger spec from federation-apiserver
+# Puts the updated spec at federation/apis/swagger-spec/
 
 set -o errexit
 set -o nounset
@@ -28,12 +28,12 @@ hack/update-generated-swagger-docs.sh first.
 __EOF__
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-SWAGGER_ROOT_DIR="${KUBE_ROOT}/api/swagger-spec"
+SWAGGER_ROOT_DIR="${KUBE_ROOT}/federation/apis/swagger-spec"
 source "${KUBE_ROOT}/hack/lib/init.sh"
 
 kube::golang::setup_env
 
-make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
+make -C "${KUBE_ROOT}" WHAT="cmd/hyperkube"
 
 function cleanup()
 {
@@ -48,9 +48,6 @@ trap cleanup EXIT SIGINT
 
 kube::golang::setup_env
 
-apiserver=$(kube::util::find-binary "kube-apiserver")
-
-TMP_DIR=$(mktemp -d /tmp/update-swagger-spec.XXXX)
 ETCD_HOST=${ETCD_HOST:-127.0.0.1}
 ETCD_PORT=${ETCD_PORT:-2379}
 API_PORT=${API_PORT:-8050}
@@ -58,22 +55,21 @@ API_HOST=${API_HOST:-127.0.0.1}
 
 kube::etcd::start
 
-# Start kube-apiserver
-kube::log::status "Starting kube-apiserver"
-"${KUBE_OUTPUT_HOSTBIN}/kube-apiserver" \
+# Start federation-apiserver
+kube::log::status "Starting federation-apiserver"
+sudo -E "${KUBE_OUTPUT_HOSTBIN}/hyperkube" federation-apiserver \
   --insecure-bind-address="${API_HOST}" \
   --bind-address="${API_HOST}" \
   --insecure-port="${API_PORT}" \
   --etcd-servers="http://${ETCD_HOST}:${ETCD_PORT}" \
   --advertise-address="10.10.10.10" \
-  --cert-dir="${TMP_DIR}/certs" \
-  --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-api-server.log 2>&1 &
+  --service-cluster-ip-range="10.0.0.0/24" >/tmp/swagger-federation-api-server.log 2>&1 &
 APISERVER_PID=$!
 
-kube::util::wait_for_url "${API_HOST}:${API_PORT}/healthz" "apiserver: "
+kube::util::wait_for_url "${API_HOST}:${API_PORT}/" "apiserver: "
 
 SWAGGER_API_PATH="${API_HOST}:${API_PORT}/swaggerapi/"
-DEFAULT_GROUP_VERSIONS="v1 apps/v1alpha1 authentication.k8s.io/v1beta1 authorization.k8s.io/v1beta1 autoscaling/v1 batch/v1 batch/v2alpha1 extensions/v1beta1 certificates/v1alpha1 policy/v1alpha1 rbac.authorization.k8s.io/v1alpha1"
+DEFAULT_GROUP_VERSIONS="v1 extensions/v1beta1 federation/v1beta1"
 VERSIONS=${VERSIONS:-$DEFAULT_GROUP_VERSIONS}
 
 kube::log::status "Updating " ${SWAGGER_ROOT_DIR}
