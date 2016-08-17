@@ -520,7 +520,7 @@ message DownwardAPIVolumeFile {
   // Required: Path is  the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'
   optional string path = 1;
 
-  // Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.
+  // Selects a field of the pod: only annotations, labels, name and namespace are supported.
   optional ObjectFieldSelector fieldRef = 2;
 
   // Selects a resource of the container: only resources limits and requests
@@ -771,6 +771,15 @@ message FCVolumeSource {
   optional bool readOnly = 4;
 }
 
+// FlexVolumeOptionsItem represents information to create an option containing the pod field
+message FlexVolumeOptionsItem {
+  // Required: Name is the name of the option field.
+  optional string name = 1;
+
+  // Selects a field of the pod: only annotations, labels, name and namespace are supported.
+  optional ObjectFieldSelector fieldRef = 2;
+}
+
 // FlexVolume represents a generic volume resource that is
 // provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
 message FlexVolumeSource {
@@ -795,6 +804,9 @@ message FlexVolumeSource {
 
   // Optional: Extra command options if any.
   map<string, string> options = 5;
+
+  // Optional: Items is a list of pod manifest's fields which could be passed to the plugin.
+  repeated FlexVolumeOptionsItem optionsItems = 6;
 }
 
 // Represents a Flocker volume mounted by the Flocker agent.
