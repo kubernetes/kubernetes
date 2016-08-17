@@ -78,7 +78,7 @@ func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create provider %v", err)
 	}
-	sc, err := provider.CreatePodSecurityContext(pod)
+	sc, _, err := provider.CreatePodSecurityContext(pod)
 	if err != nil {
 		t.Fatalf("unable to create psc %v", err)
 	}
@@ -148,7 +148,7 @@ func TestCreateContainerSecurityContextNonmutating(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to create provider %v", err)
 	}
-	sc, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[0])
+	sc, _, err := provider.CreateContainerSecurityContext(pod, &pod.Spec.Containers[0])
 	if err != nil {
 		t.Fatalf("unable to create container security context %v", err)
 	}
@@ -698,7 +698,7 @@ func TestGenerateContainerSecurityContextReadOnlyRootFS(t *testing.T) {
 			t.Errorf("%s unable to create provider %v", k, err)
 			continue
 		}
-		sc, err := provider.CreateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0])
+		sc, _, err := provider.CreateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0])
 		if err != nil {
 			t.Errorf("%s unable to create container security context %v", k, err)
 			continue
