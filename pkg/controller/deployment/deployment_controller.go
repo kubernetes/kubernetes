@@ -56,6 +56,8 @@ const (
 	StoreSyncedPollPeriod = 100 * time.Millisecond
 	// MaxRetries is the number of times a deployment will be retried before it is dropped out of the queue.
 	MaxRetries = 5
+	// OverlapAnnotation marks deployments with overlapping selector with other deployments
+	OverlapAnnotation = "deployment.kubernetes.io/overlap-with"
 )
 
 // DeploymentController is responsible for synchronizing Deployment objects stored
@@ -438,8 +440,13 @@ func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deploym
 		glog.Errorf("Deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
 		return
 	}
+	overlapping := false
 	for _, d := range deployments {
 		if !selector.Empty() && selector.Matches(labels.Set(d.Spec.Template.Labels)) && d.UID != deployment.UID {
+			overlapping = true
+			dc.markDeploymentOverlap(*deployment, d)
+			dc.markDeploymentOverlap(d, *deployment)
+			// skip syncing this one if older overlapping one is found
 			shouldSkip := d.CreationTimestamp.Before(deployment.CreationTimestamp)
 			if shouldSkip {
 				glog.Errorf("Found deployment %s/%s has overlapping selector with deployment %s/%s, skip syncing it", deployment.Namespace, deployment.Name, d.Namespace, d.Name)
@@ -448,7 +455,28 @@ func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deploym
 			glog.Errorf("Found deployment %s/%s has overlapping selector with deployment %s/%s", deployment.Namespace, deployment.Name, d.Namespace, d.Name)
 		}
 	}
+	if !overlapping {
+		dc.clearDeploymentOverlap(*deployment)
+	}
 	dc.queue.Add(key)
+}
+
+func (dc *DeploymentController) markDeploymentOverlap(deployment, withDeployment extensions.Deployment) error {
+	if deployment.Annotations[OverlapAnnotation] == withDeployment.Name {
+		return nil
+	}
+	deployment.Annotations[OverlapAnnotation] = withDeployment.Name
+	_, err := dc.client.Extensions().Deployments(deployment.Namespace).Update(&deployment)
+	return err
+}
+
+func (dc *DeploymentController) clearDeploymentOverlap(deployment extensions.Deployment) error {
+	if len(deployment.Annotations[OverlapAnnotation]) == 0 {
+		return nil
+	}
+	delete(deployment.Annotations, OverlapAnnotation)
+	_, err := dc.client.Extensions().Deployments(deployment.Namespace).Update(&deployment)
+	return err
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
