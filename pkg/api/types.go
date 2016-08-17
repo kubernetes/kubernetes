@@ -130,7 +130,6 @@ type ObjectMeta struct {
 	// The prefix is optional.  If the prefix is not specified, the key is assumed to be private
 	// to the user.  Other system components that wish to use labels must specify a prefix.  The
 	// "kubernetes.io/" prefix is reserved for use by kubernetes components.
-	// TODO: replace map[string]string with labels.LabelSet type
 	Labels map[string]string `json:"labels,omitempty"`
 
 	// Annotations are unstructured key value data stored with a resource that may be set by
