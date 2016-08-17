@@ -25,6 +25,8 @@ import (
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 // TopNodeOptions contains all the options for running the top-node cli command.
@@ -95,6 +97,12 @@ func (o *TopNodeOptions) Validate() error {
 	if len(o.ResourceName) > 0 && len(o.Selector) > 0 {
 		return errors.New("only one of NAME or --selector can be provided")
 	}
+	if len(o.Selector) > 0 {
+		_, err := labels.Parse(o.Selector)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -103,5 +111,36 @@ func (o TopNodeOptions) RunTopNode() error {
 	if err != nil {
 		return err
 	}
-	return o.Printer.PrintNodeMetrics(metrics)
+
+	selector := labels.Everything()
+	if len(o.Selector) > 0 {
+		selector, err = labels.Parse(o.Selector)
+		if err != nil {
+			return err
+		}
+	}
+	var nodes []api.Node
+	if len(o.ResourceName) > 0 {
+		node, err := o.Client.Nodes().Get(o.ResourceName)
+		if err != nil {
+			return err
+		}
+		nodes = append(nodes, *node)
+	} else {
+		nodeList, err := o.Client.Nodes().List(api.ListOptions{
+			LabelSelector: selector,
+		})
+		if err != nil {
+			return err
+		}
+		nodes = append(nodes, nodeList.Items...)
+	}
+
+	allocatable := make(map[string]api.ResourceList)
+
+	for _, n := range nodes {
+		allocatable[n.Name] = n.Status.Allocatable
+	}
+
+	return o.Printer.PrintNodeMetrics(metrics, allocatable)
 }
