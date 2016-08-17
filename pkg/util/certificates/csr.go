@@ -26,12 +26,9 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"os"
 
 	"k8s.io/kubernetes/pkg/apis/certificates"
-	"k8s.io/kubernetes/pkg/util/crypto"
 )
 
 // ParseCertificateRequestObject extracts the CSR from the API object and decodes it.
@@ -50,49 +47,42 @@ func ParseCertificateRequestObject(obj *certificates.CertificateSigningRequest) 
 }
 
 // NewCertificateRequest generates a PEM-encoded CSR using the supplied private
-// key file, subject, and SANs. If the private key file does not exist, it generates a
-// new ECDSA P256 key to use and writes it to the keyFile path.
-func NewCertificateRequest(keyFile string, subject *pkix.Name, dnsSANs []string, ipSANs []net.IP) ([]byte, error) {
+// key data, subject, and SANs. If the private key data is empty, it generates a
+// new ECDSA P256 key to use and returns it together with the CSR data.
+func NewCertificateRequest(keyData []byte, subject *pkix.Name, dnsSANs []string, ipSANs []net.IP) (csr []byte, keyData []byte, err error) {
 	var privateKey interface{}
+	var privateKeyPemBlock *pem.Block
 
-	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+	if len(keyData) == 0 {
 		privateKey, err = ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		ecdsaKey := privateKey.(*ecdsa.PrivateKey)
 		derBytes, err := x509.MarshalECPrivateKey(ecdsaKey)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		pemBlock := &pem.Block{
+		privateKeyPemBlock = &pem.Block{
 			Type:  "EC PRIVATE KEY",
 			Bytes: derBytes,
 		}
-
-		err = crypto.WriteKeyToPath(keyFile, pem.EncodeToMemory(pemBlock))
+	} else {
+		privateKeyPemBlock, err = pem.Decode(keyData)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
-	keyBytes, err := ioutil.ReadFile(keyFile)
-	if err != nil {
-		return nil, err
-	}
-
-	var block *pem.Block
 	var sigType x509.SignatureAlgorithm
 
-	block, _ = pem.Decode(keyBytes)
-
-	switch block.Type {
+	switch privateKeyPemBlock.Type {
 	case "EC PRIVATE KEY":
-		privateKey, err = x509.ParseECPrivateKey(block.Bytes)
+		privateKey, err = x509.ParseECPrivateKey(privateKeyPemBlock.Bytes)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		ecdsaKey := privateKey.(*ecdsa.PrivateKey)
 		switch ecdsaKey.Curve.Params().BitSize {
@@ -104,9 +94,9 @@ func NewCertificateRequest(keyFile string, subject *pkix.Name, dnsSANs []string,
 			sigType = x509.ECDSAWithSHA256
 		}
 	case "RSA PRIVATE KEY":
-		privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
+		privateKey, err = x509.ParsePKCS1PrivateKey(privateKeyPemBlock.Bytes)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		rsaKey := privateKey.(*rsa.PrivateKey)
 		keySize := rsaKey.N.BitLen()
@@ -119,7 +109,7 @@ func NewCertificateRequest(keyFile string, subject *pkix.Name, dnsSANs []string,
 			sigType = x509.SHA256WithRSA
 		}
 	default:
-		return nil, fmt.Errorf("unsupported key type: %s", block.Type)
+		return nil, nil, fmt.Errorf("unsupported key type: %s", privateKeyPemBlock.Type)
 	}
 
 	template := &x509.CertificateRequest{
@@ -131,13 +121,13 @@ func NewCertificateRequest(keyFile string, subject *pkix.Name, dnsSANs []string,
 
 	csr, err := x509.CreateCertificateRequest(cryptorand.Reader, template, privateKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	pemBlock := &pem.Block{
+	csrPemBlock := &pem.Block{
 		Type:  "CERTIFICATE REQUEST",
 		Bytes: csr,
 	}
 
-	return pem.EncodeToMemory(pemBlock), nil
+	return pem.EncodeToMemory(csrPemBlock), pem.EncodeToMemory(privateKeyPemBlock), nil
 }
