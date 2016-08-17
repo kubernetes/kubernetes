@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -49,6 +50,10 @@ import (
 var (
 	ErrCloudInstance        = errors.New("cloud provider doesn't support instances.")
 	gracefulDeletionVersion = version.MustParse("v1.1.0")
+
+	// The minimum kubelet version for which the nodecontroller
+	// can safely flip pod.Status to NotReady.
+	podStatusReconciliationVersion = version.MustParse("v1.2.0")
 )
 
 const (
@@ -490,7 +495,7 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Report node event.
 			if currentReadyCondition.Status != api.ConditionTrue && observedReadyCondition.Status == api.ConditionTrue {
 				recordNodeStatusChange(nc.recorder, node, "NodeNotReady")
-				if err = markAllPodsNotReady(nc.kubeClient, node.Name); err != nil {
+				if err = markAllPodsNotReady(nc.kubeClient, node); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
 				}
 			}
