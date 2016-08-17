@@ -63,6 +63,10 @@ if ! gsutil ls gs:// | grep -q "gs://${bucket_name}/"; then
 else
   V=2 kube::log::status "Bucket already exists"
 fi
+
+# Make all files in the bucket publicly readable
+gsutil acl ch -u AllUsers:R gs://${bucket_name}
+
 # Path for e2e-node test results
 GCS_JOBS_PATH="gs://${bucket_name}/logs/e2e-node"
 
@@ -106,9 +110,11 @@ if gsutil ls "${GCS_JOBS_PATH}" | grep -q "${BUILD_STAMP}"; then
 fi
 
 results=$(find ${ARTIFACTS} -type d -name "results")
-if [[ $results != "" && $results != "${ARTIFACTS}/results" && $results != $ARTIFACTS ]]; then
-  mv $results $ARTIFACTS
-fi
+for result in $(find ${ARTIFACTS} -type d -name "results"); do
+  if [[ $result != "" && $result != "${ARTIFACTS}/results" && $result != $ARTIFACTS ]]; then
+    mv $result/* $ARTIFACTS
+  fi
+done
 
 # Upload log files
 for upload_attempt in $(seq 3); do

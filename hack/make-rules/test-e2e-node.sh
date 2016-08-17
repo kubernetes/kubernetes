@@ -79,6 +79,10 @@ fi
 
 if [ $remote = true ] ; then
   # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
+  if [[ $gubernator = true && -d "${artifacts}" ]]; then
+    rm -r ${artifacts}
+  fi
+
   if [ ! -d "${artifacts}" ]; then
     echo "Creating artifacts directory at ${artifacts}"
     mkdir -p ${artifacts}
