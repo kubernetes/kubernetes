@@ -64,19 +64,6 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Parse()
 
-	cwd, err := os.Getwd()
-	if err != nil {
-		log.Fatalf("Could not get pwd: %v", err)
-	}
-	acwd, err := filepath.Abs(cwd)
-	if err != nil {
-		log.Fatalf("Failed to convert to an absolute path: %v", err)
-	}
-	if !strings.Contains(filepath.Base(acwd), "kubernetes") {
-		// TODO(fejta): cd up into  the kubernetes directory
-		log.Fatalf("Must run from kubernetes directory: %v", cwd)
-	}
-
 	if *isup {
 		status := 1
 		if IsUp() {
