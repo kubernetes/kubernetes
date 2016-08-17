@@ -1089,12 +1089,12 @@ type Capabilities struct {
 // ResourceRequirements describes the compute resource requirements.
 type ResourceRequirements struct {
 	// Limits describes the maximum amount of compute resources allowed.
-	// More info: http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications
+	// More info: http://kubernetes.io/docs/user-guide/compute-resources/
 	Limits ResourceList `json:"limits,omitempty" protobuf:"bytes,1,rep,name=limits,casttype=ResourceList,castkey=ResourceName"`
 	// Requests describes the minimum amount of compute resources required.
 	// If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
 	// otherwise to an implementation-defined value.
-	// More info: http://releases.k8s.io/HEAD/docs/design/resources.md#resource-specifications
+	// More info: http://kubernetes.io/docs/user-guide/compute-resources/
 	Requests ResourceList `json:"requests,omitempty" protobuf:"bytes,2,rep,name=requests,casttype=ResourceList,castkey=ResourceName"`
 }
 
