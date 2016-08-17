@@ -38,9 +38,6 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	f := newDockerFilter(&opts.Filter)
 
 	if filter != nil {
-		if filter.Name != nil {
-			f.Add("name", filter.GetName())
-		}
 		if filter.Id != nil {
 			f.Add("id", filter.GetId())
 		}
@@ -66,6 +63,13 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	// Convert docker to runtime api containers.
 	result := []*runtimeApi.Container{}
 	for _, c := range containers {
+		if len(filter.GetName()) > 0 {
+			_, _, _, containerName, err := parseContainerName(c.Names[0])
+			if err != nil || containerName != filter.GetName() {
+				continue
+			}
+		}
+
 		result = append(result, toRuntimeAPIContainer(&c))
 	}
 	return result, nil
@@ -94,7 +98,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		image = iSpec.GetImage()
 	}
 	createConfig := dockertypes.ContainerCreateConfig{
-		Name: config.GetName(),
+		Name: buildContainerName(sandboxConfig, config),
 		Config: &dockercontainer.Config{
 			// TODO: set User.
 			Hostname:   sandboxConfig.GetHostname(),

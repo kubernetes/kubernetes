@@ -140,9 +140,6 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	opts.Filter = dockerfilters.NewArgs()
 	f := newDockerFilter(&opts.Filter)
 	if filter != nil {
-		if filter.Name != nil {
-			f.Add("name", filter.GetName())
-		}
 		if filter.Id != nil {
 			f.Add("id", filter.GetId())
 		}
@@ -176,6 +173,13 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 	// Convert docker containers to runtime api sandboxes.
 	result := []*runtimeApi.PodSandbox{}
 	for _, c := range containers {
+		if len(filter.GetName()) > 0 {
+			sandboxName, _, _, err := parseSandboxName(c.Names[0])
+			if err != nil || sandboxName != filter.GetName() {
+				continue
+			}
+		}
+
 		s := toRuntimeAPISandbox(&c)
 		if filterOutReadySandboxes && s.GetState() == runtimeApi.PodSandBoxState_READY {
 			continue
@@ -193,7 +197,7 @@ func makeSandboxDockerConfig(c *runtimeApi.PodSandboxConfig, image string) *dock
 
 	hc := &dockercontainer.HostConfig{}
 	createConfig := &dockertypes.ContainerCreateConfig{
-		Name: c.GetName(),
+		Name: buildSandboxName(c),
 		Config: &dockercontainer.Config{
 			Hostname: c.GetHostname(),
 			// TODO: Handle environment variables.
