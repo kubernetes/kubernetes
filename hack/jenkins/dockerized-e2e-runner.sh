@@ -35,6 +35,7 @@ env \
   -u PATH \
   -u PWD \
   -u WORKSPACE \
+  -u GOROOT \
   >${WORKSPACE}/env.list
 
 docker_extra_args=()
@@ -47,6 +48,7 @@ if [[ "${JENKINS_ENABLE_DOCKER_IN_DOCKER:-}" =~ ^[yY]$ ]]; then
     )
 fi
 
+echo "Starting..."
 docker run --rm=true -i \
   -v "${WORKSPACE}/_artifacts":/workspace/_artifacts \
   -v /etc/localtime:/etc/localtime:ro \
@@ -61,5 +63,4 @@ docker run --rm=true -i \
   -e "WORKSPACE=/workspace" \
   ${KUBEKINS_SERVICE_ACCOUNT_FILE:+-e "KUBEKINS_SERVICE_ACCOUNT_FILE=/service-account.json"} \
   "${docker_extra_args[@]:+${docker_extra_args[@]}}" \
-  gcr.io/google_containers/kubekins-test:go1.6.3-docker1.9.1-rev3 \
-  bash -c "bash <(curl -fsS --retry 3 --keepalive-time 2 'https://raw.githubusercontent.com/kubernetes/kubernetes/master/hack/jenkins/e2e-runner.sh')"
+  gcr.io/google-containers/kubekins-e2e:v20160810

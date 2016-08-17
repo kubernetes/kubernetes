@@ -12,18 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMG = gcr.io/google-containers/kubekins-test
+IMG = gcr.io/google-containers/kubekins-e2e
 TAG = $(shell date +v%Y%m%d)
 
-all: build
+e2e:
+	cp ../../e2e.go .
 
-build:
+e2e-runner:
+	cp ../e2e-runner.sh .
+
+sh2ju:
+	cp ../../../third_party/forked/shell2junit/sh2ju.sh .
+
+upload-to-gcs.sh:
+	cp ../upload-to-gcs.sh .
+
+clean:
+	rm -rf e2e.go e2e-runner.sh sh2ju.sh upload-to-gcs.sh
+
+all: push
+
+build: e2e e2e-runner sh2ju upload-to-gcs
 	docker build -t $(IMG):$(TAG) .
 	docker tag -f $(IMG):$(TAG) $(IMG):latest
-	@echo Built $(IMG):$(TAG) and tagged with $(IMG):latest
+	@echo Built $(IMG):$(TAG) and tagged with latest
 
 push: build
 	gcloud docker push $(IMG):$(TAG)
 	gcloud docker push $(IMG):latest
-	@echo Pushed $(IMG):latest and $(IMG):$(TAG)
-
+	@echo Pushed $(IMG) with :latest and :$(TAG) tags
