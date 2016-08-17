@@ -67,14 +67,24 @@ type TestContextType struct {
 	CreateTestingNS CreateTestingNSFn
 	// If set to true test will dump data about the namespace in which test was running.
 	DumpLogsOnFailure bool
+	// If the garbage collector is enabled in the kube-apiserver and kube-controller-manager.
+	GarbageCollectorEnabled bool
+	// Node e2e specific test context
+	NodeTestContextType
+}
+
+// NodeTestContextType is part of TestContextType, it is shared by all node e2e test.
+type NodeTestContextType struct {
 	// Name of the node to run tests on (node e2e suite only).
 	NodeName string
+	// DisableKubenet disables kubenet when starting kubelet.
+	DisableKubenet bool
 	// Whether to enable the QoS Cgroup Hierarchy or not
 	CgroupsPerQOS bool
 	// The hard eviction thresholds
 	EvictionHard string
-	// If the garbage collector is enabled in the kube-apiserver and kube-controller-manager.
-	GarbageCollectorEnabled bool
+	// ManifestPath is the static pod manifest path.
+	ManifestPath string
 }
 
 type CloudConfig struct {
@@ -112,7 +122,6 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.Host, "host", "http://127.0.0.1:8080", "The host, or apiserver, to connect to")
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
-	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", false, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")
 }
 
 // Register flags specific to the cluster e2e test suite.
@@ -149,11 +158,16 @@ func RegisterClusterFlags() {
 	flag.StringVar(&TestContext.UpgradeTarget, "upgrade-target", "ci/latest", "Version to upgrade to (e.g. 'release/stable', 'release/latest', 'ci/latest', '0.19.1', '0.19.1-669-gabac8c8') if doing an upgrade test.")
 	flag.StringVar(&TestContext.PrometheusPushGateway, "prom-push-gateway", "", "The URL to prometheus gateway, so that metrics can be pushed during e2es and scraped by prometheus. Typically something like 127.0.0.1:9091.")
 	flag.BoolVar(&TestContext.CleanStart, "clean-start", false, "If true, purge all namespaces except default and system before running tests. This serves to Cleanup test namespaces from failed/interrupted e2e runs in a long-lived cluster.")
+	flag.BoolVar(&TestContext.GarbageCollectorEnabled, "garbage-collector-enabled", false, "Set to true if the garbage collector is enabled in the kube-apiserver and kube-controller-manager, then some tests will rely on the garbage collector to delete dependent resources.")
 }
 
 // Register flags specific to the node e2e test suite.
 func RegisterNodeFlags() {
 	flag.StringVar(&TestContext.NodeName, "node-name", "", "Name of the node to run tests on (node e2e suite only).")
+	// TODO(random-liu): Remove kubelet related flags when we move the kubelet start logic out of the test.
+	// TODO(random-liu): Find someway to get kubelet configuration, and automatic config and filter test based on the configuration.
+	flag.BoolVar(&TestContext.DisableKubenet, "disable-kubenet", false, "If true, start kubelet without kubenet. (default false)")
 	flag.BoolVar(&TestContext.CgroupsPerQOS, "cgroups-per-qos", false, "Enable creation of QoS cgroup hierarchy, if true top level QoS and pod cgroups are created.")
 	flag.StringVar(&TestContext.EvictionHard, "eviction-hard", "memory.available<250Mi", "The hard eviction thresholds. If set, pods get evicted when the specified resources drop below the thresholds.")
+	flag.StringVar(&TestContext.ManifestPath, "manifest-path", "", "The path to the static pod manifest file.")
 }
