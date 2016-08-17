@@ -683,12 +683,11 @@ func maxContainerRestarts(pod *api.Pod) int {
 }
 
 // FilterActivePods returns pods that have not terminated.
-func FilterActivePods(pods []api.Pod) []*api.Pod {
+func FilterActivePods(pods []*api.Pod) []*api.Pod {
 	var result []*api.Pod
-	for i := range pods {
-		p := pods[i]
-		if IsPodActive(p) {
-			result = append(result, &p)
+	for _, p := range pods {
+		if IsPodActive(*p) {
+			result = append(result, p)
 		} else {
 			glog.V(4).Infof("Ignoring inactive pod %v/%v in state %v, deletion time %v",
 				p.Namespace, p.Name, p.Status.Phase, p.DeletionTimestamp)

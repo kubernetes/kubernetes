@@ -458,9 +458,11 @@ func (dsc *DaemonSetsController) getNodesToDaemonPods(ds *extensions.DaemonSet) 
 	if err != nil {
 		return nodeToDaemonPods, err
 	}
-	for i := range daemonPods.Items {
-		nodeName := daemonPods.Items[i].Spec.NodeName
-		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], &daemonPods.Items[i])
+	for i := range daemonPods {
+		// TODO: Do we need to copy here?
+		daemonPod := &(*daemonPods[i])
+		nodeName := daemonPod.Spec.NodeName
+		nodeToDaemonPods[nodeName] = append(nodeToDaemonPods[nodeName], daemonPod)
 	}
 	return nodeToDaemonPods, nil
 }

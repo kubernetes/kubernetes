@@ -458,6 +458,7 @@ func (rsc *ReplicaSetController) worker() {
 }
 
 // manageReplicas checks and updates replicas for the given ReplicaSet.
+// Does NOT modify <filteredPods>.
 func (rsc *ReplicaSetController) manageReplicas(filteredPods []*api.Pod, rs *extensions.ReplicaSet) {
 	diff := len(filteredPods) - int(rs.Spec.Replicas)
 	rsKey, err := controller.KeyFunc(rs)
@@ -593,19 +594,21 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 		return err
 	}
 
+	// NOTE: filteredPods are pointing to objects from cache - if you need to
+	// modify them, you need to copy it first.
 	// TODO: Do the List and Filter in a single pass, or use an index.
 	var filteredPods []*api.Pod
 	if rsc.garbageCollectorEnabled {
 		// list all pods to include the pods that don't match the rs`s selector
 		// anymore but has the stale controller ref.
-		podList, err := rsc.podStore.Pods(rs.Namespace).List(labels.Everything())
+		pods, err := rsc.podStore.Pods(rs.Namespace).List(labels.Everything())
 		if err != nil {
 			glog.Errorf("Error getting pods for rs %q: %v", key, err)
 			rsc.queue.Add(key)
 			return err
 		}
 		cm := controller.NewPodControllerRefManager(rsc.podControl, rs.ObjectMeta, selector, getRSKind())
-		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(podList.Items)
+		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
 		for _, pod := range matchesNeedsController {
 			err := cm.AdoptPod(pod)
 			// continue to next pod if adoption fails.
@@ -636,13 +639,13 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 			return aggregate
 		}
 	} else {
-		podList, err := rsc.podStore.Pods(rs.Namespace).List(selector)
+		pods, err := rsc.podStore.Pods(rs.Namespace).List(selector)
 		if err != nil {
 			glog.Errorf("Error getting pods for rs %q: %v", key, err)
 			rsc.queue.Add(key)
 			return err
 		}
-		filteredPods = controller.FilterActivePods(podList.Items)
+		filteredPods = controller.FilterActivePods(pods)
 	}
 
 	if rsNeedsSync && rs.DeletionTimestamp == nil {
