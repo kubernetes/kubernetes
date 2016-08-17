@@ -59,7 +59,7 @@ func init() {
 	}
 }
 
-func newOIDCAuthProvider(_ []string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
+func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.AuthProviderConfigPersister) (restclient.AuthProvider, error) {
 	issuer := cfg[cfgIssuerUrl]
 	if issuer == "" {
 		return nil, fmt.Errorf("Must provide %s", cfgIssuerUrl)

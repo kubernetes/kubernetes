@@ -73,7 +73,7 @@ func TestSubjectAccessReview(t *testing.T) {
 		t.Fatalf("error in bringing up the master: %v", err)
 	}
 
-	clientset := clientset.NewForConfigOrDie(&restclient.Config{Hosts: []string{s.URL}, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 
 	tests := []struct {
 		name           string

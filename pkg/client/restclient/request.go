@@ -261,8 +261,13 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.pathPrefix = path.Join(r.urlProvider.Get().Path, path.Join(segments...))
-	if len(segments) == 1 && (len(r.urlProvider.Get().Path) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
+	baseUrl := r.urlProvider.Get()
+	prefix := "/"
+	if baseUrl != nil {
+		prefix = baseUrl.Path
+	}
+	r.pathPrefix = path.Join(prefix, path.Join(segments...))
+	if len(segments) == 1 && (len(prefix) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
 		// preserve any trailing slashes for legacy behavior
 		r.pathPrefix += "/"
 	}
@@ -688,10 +693,10 @@ func (r *Request) Watch() (watch.Interface, error) {
 // It also handles corner cases for incomplete/invalid request data.
 func updateURLMetrics(req *Request, resp *http.Response, err error) {
 	url := "none"
-	if req.urlProvider.Get() != nil {
-		url = req.urlProvider.Get().Host
+	baseUrl := req.urlProvider.Get()
+	if baseUrl != nil {
+		url = baseUrl.Host
 	}
-
 	// If we have an error (i.e. apiserver down) we report that as a metric label.
 	if err != nil {
 		metrics.RequestResult.Increment(err.Error(), req.verb, url)
@@ -818,9 +823,8 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		if err != nil {
 			if r.urlProvider.Next() == initialUrl {
 				return err
-			} else {
-				continue
 			}
+			continue
 		}
 
 		done := func() bool {

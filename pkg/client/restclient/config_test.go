@@ -34,13 +34,13 @@ func TestIsConfigTransportTLS(t *testing.T) {
 		},
 		{
 			Config: &Config{
-				Hosts: []string{"https://localhost"},
+				Host: "https://localhost",
 			},
 			TransportTLS: true,
 		},
 		{
 			Config: &Config{
-				Hosts: []string{"localhost"},
+				Host: "localhost",
 				TLSClientConfig: TLSClientConfig{
 					CertFile: "foo",
 				},
@@ -49,7 +49,7 @@ func TestIsConfigTransportTLS(t *testing.T) {
 		},
 		{
 			Config: &Config{
-				Hosts: []string{"///:://localhost"},
+				Host: "///:://localhost",
 				TLSClientConfig: TLSClientConfig{
 					CertFile: "foo",
 				},
@@ -58,8 +58,21 @@ func TestIsConfigTransportTLS(t *testing.T) {
 		},
 		{
 			Config: &Config{
-				Hosts:    []string{"1.2.3.4:567"},
+				Host:     "1.2.3.4:567",
 				Insecure: true,
+			},
+			TransportTLS: true,
+		},
+		{
+			Config: &Config{
+				Host:           "https://localhost",
+				AlternateHosts: []string{"https://10.10.0.2", "https://10.10.0.3"},
+			},
+			TransportTLS: true,
+		},
+		{
+			Config: &Config{
+				AlternateHosts: []string{"https://10.10.0.2", "https://10.10.0.3"},
 			},
 			TransportTLS: true,
 		},
@@ -87,13 +100,13 @@ func TestSetKubernetesDefaultsUserAgent(t *testing.T) {
 }
 
 func TestRESTClientRequires(t *testing.T) {
-	if _, err := RESTClientFor(&Config{Hosts: []string{"127.0.0.1"}, ContentConfig: ContentConfig{NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Hosts: []string{"127.0.0.1"}, ContentConfig: ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}); err == nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}); err == nil {
 		t.Errorf("unexpected non-error")
 	}
-	if _, err := RESTClientFor(&Config{Hosts: []string{"127.0.0.1"}, ContentConfig: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}}); err != nil {
+	if _, err := RESTClientFor(&Config{Host: "127.0.0.1", ContentConfig: ContentConfig{GroupVersion: testapi.Default.GroupVersion(), NegotiatedSerializer: testapi.Default.NegotiatedSerializer()}}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
