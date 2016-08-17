@@ -14,7 +14,7 @@ The primary driver for this use-case is to be able to manage cluster add-ons usi
 
 Use labels as a de-facto way of grouping resources for the purpose of _purging_ (removing) resources which no longer exist.
 
-Introduce an optional `--purge-missing <label-selector>` flag to `kubectl apply`, which will allow a user to automatically purge resources which:
+Introduce an optional `--purge-missing-where <label-selector>` flag to `kubectl apply`, which will allow a user to automatically purge resources which:
 
 * match the given label selector
 * do not exist in the provided files
@@ -27,7 +27,7 @@ Let's consider the add-ons use case.
 For example, it should be possible to install and upgrade Weave Net on Kubernetes with:
 
 ```
-kubectl apply -f --purge-missing 'weave-net' \
+kubectl apply -f --purge-missing-where 'weave-net' \
     https://raw.githubusercontent.com/weaveworks/weave-kube/master/weave-daemonset.yaml
 ```
 
@@ -42,5 +42,5 @@ It should be possible to apply the same approach to any other applications, with
 The usage may look like this (assuming the user uses the convention of labelling apps with the `app` label):
 
 ```
-kubectl apply --purge-missing 'app=myapp' -f https://example.com/myapp.json
+kubectl apply --purge-missing-where 'app=myapp' -f https://example.com/myapp.json
 ```
