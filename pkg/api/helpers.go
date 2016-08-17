@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
 
@@ -379,20 +380,20 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 	}
 	selector := labels.NewSelector()
 	for _, expr := range nsm {
-		var op labels.Operator
+		var op selection.Operator
 		switch expr.Operator {
 		case NodeSelectorOpIn:
-			op = labels.InOperator
+			op = selection.InOperator
 		case NodeSelectorOpNotIn:
-			op = labels.NotInOperator
+			op = selection.NotInOperator
 		case NodeSelectorOpExists:
-			op = labels.ExistsOperator
+			op = selection.ExistsOperator
 		case NodeSelectorOpDoesNotExist:
-			op = labels.DoesNotExistOperator
+			op = selection.DoesNotExistOperator
 		case NodeSelectorOpGt:
-			op = labels.GreaterThanOperator
+			op = selection.GreaterThanOperator
 		case NodeSelectorOpLt:
-			op = labels.LessThanOperator
+			op = selection.LessThanOperator
 		default:
 			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
 		}

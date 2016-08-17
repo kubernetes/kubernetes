@@ -14,17 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package fields
+package selection
 
-import "k8s.io/kubernetes/pkg/selection"
+// Operator represents a key/field's relationship to value(s).
+// See labels.Requirement and fields.Requirement for more details.
+type Operator string
 
-// Requirements is AND of all requirements.
-type Requirements []Requirement
-
-// Requirement contains a field, a value, and an operator that relates the field and value.
-// This is currently for reading internal selection information of field selector.
-type Requirement struct {
-	Operator selection.Operator
-	Field    string
-	Value    string
-}
+const (
+	DoesNotExistOperator Operator = "!"
+	EqualsOperator       Operator = "="
+	DoubleEqualsOperator Operator = "=="
+	InOperator           Operator = "in"
+	NotEqualsOperator    Operator = "!="
+	NotInOperator        Operator = "notin"
+	ExistsOperator       Operator = "exists"
+	GreaterThanOperator  Operator = "gt"
+	LessThanOperator     Operator = "lt"
+)

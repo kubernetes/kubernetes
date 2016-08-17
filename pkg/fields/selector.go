@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/selection"
 )
 
 // Selector represents a field selector.
@@ -43,7 +43,7 @@ type Selector interface {
 
 	// Requirements converts this interface to Requirements to expose
 	// more detailed selection information.
-	Requirements() []Requirement
+	Requirements() Requirements
 
 	// String returns a human readable string that represents this selector.
 	String() string
@@ -81,10 +81,10 @@ func (t *hasTerm) Transform(fn TransformFunc) (Selector, error) {
 	return &hasTerm{field, value}, nil
 }
 
-func (t *hasTerm) Requirements() []Requirement {
+func (t *hasTerm) Requirements() Requirements {
 	return []Requirement{{
 		Field:    t.field,
-		Operator: labels.EqualsOperator,
+		Operator: selection.EqualsOperator,
 		Value:    t.value,
 	}}
 }
@@ -117,10 +117,10 @@ func (t *notHasTerm) Transform(fn TransformFunc) (Selector, error) {
 	return &notHasTerm{field, value}, nil
 }
 
-func (t *notHasTerm) Requirements() []Requirement {
+func (t *notHasTerm) Requirements() Requirements {
 	return []Requirement{{
 		Field:    t.field,
-		Operator: labels.NotEqualsOperator,
+		Operator: selection.NotEqualsOperator,
 		Value:    t.value,
 	}}
 }
@@ -179,7 +179,7 @@ func (t andTerm) Transform(fn TransformFunc) (Selector, error) {
 	return andTerm(next), nil
 }
 
-func (t andTerm) Requirements() []Requirement {
+func (t andTerm) Requirements() Requirements {
 	reqs := make([]Requirement, 0, len(t))
 	for _, s := range []Selector(t) {
 		rs := s.Requirements()
