@@ -28,13 +28,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// HistoryOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
-// referencing the cmd.Flags()
-type HistoryOptions struct {
-	Filenames []string
-	Recursive bool
-}
-
 var (
 	history_long = dedent.Dedent(`
 		View previous rollout revisions and configurations.`)
@@ -47,7 +40,7 @@ var (
 )
 
 func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
-	options := &HistoryOptions{}
+	options := &resource.FilenameOptions{}
 
 	validArgs := []string{"deployment"}
 	argAliases := kubectl.ResourceAliases(validArgs)
@@ -65,14 +58,13 @@ func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().Int64("revision", 0, "See the details, including podTemplate of the revision specified")
-	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
-	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
-	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
+	usage := "identifying the resource to get from a server."
+	cmdutil.AddFilenameOptionFlags(cmd, options, usage)
 	return cmd
 }
 
-func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *HistoryOptions) error {
-	if len(args) == 0 && len(options.Filenames) == 0 {
+func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *resource.FilenameOptions) error {
+	if len(args) == 0 && cmdutil.IsFilenameEmpty(options.Filenames) {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}
 	revision := cmdutil.GetFlagInt64(cmd, "revision")
@@ -86,7 +78,7 @@ func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []st
 
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(cmdNamespace).DefaultNamespace().
-		FilenameParam(enforceNamespace, options.Recursive, options.Filenames...).
+		FilenameParam(enforceNamespace, options).
 		ResourceTypeOrNameArgs(true, args...).
 		ContinueOnError().
 		Latest().
