@@ -293,6 +293,8 @@ type fakeContainerCommandRunner struct {
 	resize      <-chan term.Size
 }
 
+var _ kubecontainer.ContainerCommandRunner = &fakeContainerCommandRunner{}
+
 func (f *fakeContainerCommandRunner) ExecInContainer(containerID kubecontainer.ContainerID, cmd []string, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) error {
 	// record invoked values
 	f.containerID = containerID
@@ -342,7 +344,7 @@ func TestNewExecInContainer(t *testing.T) {
 		cmd := []string{"/foo", "bar"}
 		exec := prober.newExecInContainer(container, containerID, cmd)
 
-		actual, err := exec.CombinedOutput()
+		actualOutput, err := exec.CombinedOutput()
 		if e, a := containerID, runner.containerID; e != a {
 			t.Errorf("%s: container id: expected %v, got %v", test.name, e, a)
 		}
@@ -358,19 +360,11 @@ func TestNewExecInContainer(t *testing.T) {
 		if runner.resize != nil {
 			t.Errorf("%s: resize chan: expected nil, got %v", test.name, runner.resize)
 		}
-		if e, a := "foobar", string(actual); e != a {
+		if e, a := "foobar", string(actualOutput); e != a {
 			t.Errorf("%s: output: expected %q, got %q", test.name, e, a)
 		}
-		if test.err != nil {
-			if err == nil {
-				t.Errorf("%s: error: expected %v, got nil", test.name, test.err)
-			} else if err != test.err {
-				t.Errorf("%s: error: expected %v, got %v", test.name, test.err, err)
-			}
-		} else {
-			if err != nil {
-				t.Errorf("%s: error: expected nil, got %v", test.name, err)
-			}
+		if e, a := fmt.Sprintf("%v", test.err), fmt.Sprintf("%v", err); e != a {
+			t.Errorf("%s: error: expected %s, got %s", e, a)
 		}
 	}
 }

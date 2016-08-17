@@ -223,6 +223,8 @@ func formatURL(scheme string, host string, port int, path string) *url.URL {
 }
 
 type execInContainer struct {
+	// run executes a command in a container. Combined stdout and stderr output is always returned. An
+	// error is returned if one occurred.
 	run func() ([]byte, error)
 }
 
