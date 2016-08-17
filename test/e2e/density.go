@@ -395,9 +395,6 @@ var _ = framework.KubeDescribe("Density", func() {
 		masters, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
 		nodeCount = len(nodes.Items)
 		Expect(nodeCount).NotTo(BeZero())
-		if nodeCount == 30 {
-			f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
-		}
 
 		nodeCpuCapacity = nodes.Items[0].Status.Allocatable.Cpu().MilliValue()
 		nodeMemCapacity = nodes.Items[0].Status.Allocatable.Memory().Value()
@@ -450,6 +447,7 @@ var _ = framework.KubeDescribe("Density", func() {
 		switch testArg.podsPerNode {
 		case 30:
 			name = "[Feature:Performance] " + name
+			f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
 		case 95:
 			name = "[Feature:HighDensityPerformance]" + name
 		default:
