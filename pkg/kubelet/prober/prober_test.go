@@ -364,7 +364,7 @@ func TestNewExecInContainer(t *testing.T) {
 			t.Errorf("%s: output: expected %q, got %q", test.name, e, a)
 		}
 		if e, a := fmt.Sprintf("%v", test.err), fmt.Sprintf("%v", err); e != a {
-			t.Errorf("%s: error: expected %s, got %s", e, a)
+			t.Errorf("%s: error: expected %s, got %s", test.name, e, a)
 		}
 	}
 }
