@@ -110,7 +110,7 @@ func IsTestFailed(err error) bool {
 	return isErrCode(err, ErrCodeResourceVersionConflicts)
 }
 
-// IsInvalidUID returns true if and only if err is invalid UID error
+// IsInvalidObj returns true if and only if err is invalid error
 func IsInvalidObj(err error) bool {
 	return isErrCode(err, ErrCodeInvalidObj)
 }
