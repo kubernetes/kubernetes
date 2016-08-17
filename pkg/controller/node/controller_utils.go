@@ -209,7 +209,15 @@ func (nc *NodeController) maybeDeleteTerminatingPod(obj interface{}) {
 
 // update ready status of all pods running on given node from master
 // return true if success
-func markAllPodsNotReady(kubeClient clientset.Interface, nodeName string) error {
+func markAllPodsNotReady(kubeClient clientset.Interface, node *api.Node) error {
+	// Don't set pods to NotReady if the kubelet is running a version that
+	// doesn't understand how to correct readiness.
+	// TODO: Remove this check when we no longer guarantee backward compatibility
+	// with node versions < 1.2.0.
+	if nodeRunningOutdatedKubelet(node) {
+		return nil
+	}
+	nodeName := node.Name
 	glog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
 	opts := api.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName)}
 	pods, err := kubeClient.Core().Pods(api.NamespaceAll).List(opts)
@@ -241,6 +249,23 @@ func markAllPodsNotReady(kubeClient clientset.Interface, nodeName string) error 
 		return nil
 	}
 	return fmt.Errorf("%v", strings.Join(errMsg, "; "))
+}
+
+// nodeRunningOutdatedKubelet returns true if the kubeletVersion reported
+// in the nodeInfo of the given node is "outdated", meaning < 1.2.0.
+// Older versions were inflexible and modifying pod.Status directly through
+// the apiserver would result in unexpected outcomes.
+func nodeRunningOutdatedKubelet(node *api.Node) bool {
+	v, err := version.Parse(node.Status.NodeInfo.KubeletVersion)
+	if err != nil {
+		glog.Errorf("couldn't parse version %q of node %v", node.Status.NodeInfo.KubeletVersion, err)
+		return true
+	}
+	if podStatusReconciliationVersion.GT(v) {
+		glog.Infof("Node %v running kubelet at (%v) which is less than the minimum version that allows nodecontroller to mark pods NotReady (%v).", node.Name, v, podStatusReconciliationVersion)
+		return true
+	}
+	return false
 }
 
 func nodeExistsInCloudProvider(cloud cloudprovider.Interface, nodeName string) (bool, error) {
