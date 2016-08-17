@@ -53,8 +53,6 @@ const (
 	cadvisorPort      = 8090
 	// housekeeping interval of Cadvisor (second)
 	houseKeepingInterval = 1
-	// TODO(coufon): be consistent with perf_util.go version (not exposed)
-	currentTimeSeriesVersion = "v1"
 )
 
 var (
@@ -426,39 +424,22 @@ type ResourceSeries struct {
 	Units                map[string]string `json:"unit"`
 }
 
-// Time series of resource usage per container
-type ResourceSeriesPerContainer struct {
-	Data    map[string]*ResourceSeries `json:"data"`
-	Labels  map[string]string          `json:"labels"`
-	Version string                     `json:"version"`
-}
-
 // GetResourceSeriesWithLabels gets the time series of resource usage of each container.
-// TODO(coufon): the labels are to be re-defined based on benchmark dashboard.
-func (r *ResourceCollector) GetResourceSeriesWithLabels(labels map[string]string) *ResourceSeriesPerContainer {
-	seriesPerContainer := &ResourceSeriesPerContainer{
-		Data: map[string]*ResourceSeries{},
-		Labels: map[string]string{
-			"node": framework.TestContext.NodeName,
-		},
-		Version: currentTimeSeriesVersion,
-	}
+func (r *ResourceCollector) GetResourceTimeSeries() map[string]*ResourceSeries {
+	resourceSeries := make(map[string]*ResourceSeries)
 	for key, name := range systemContainers {
 		newSeries := &ResourceSeries{Units: map[string]string{
 			"cpu":    "mCPU",
 			"memory": "MB",
 		}}
-		seriesPerContainer.Data[key] = newSeries
+		resourceSeries[key] = newSeries
 		for _, usage := range r.buffers[name] {
 			newSeries.Timestamp = append(newSeries.Timestamp, usage.Timestamp.UnixNano())
 			newSeries.CPUUsageInMilliCores = append(newSeries.CPUUsageInMilliCores, int64(usage.CPUUsageInCores*1000))
 			newSeries.MemoryRSSInMegaBytes = append(newSeries.MemoryRSSInMegaBytes, int64(float64(usage.MemoryUsageInBytes)/(1024*1024)))
 		}
 	}
-	for k, v := range labels {
-		seriesPerContainer.Labels[k] = v
-	}
-	return seriesPerContainer
+	return resourceSeries
 }
 
 // Code for getting container name of docker, copied from pkg/kubelet/cm/container_manager_linux.go
