@@ -76,14 +76,13 @@ readonly LOCAL_OUTPUT_IMAGE_STAGING="${LOCAL_OUTPUT_ROOT}/images"
 # This is a symlink to binaries for "this platform" (e.g. build tools).
 readonly THIS_PLATFORM_BIN="${LOCAL_OUTPUT_ROOT}/bin"
 
-readonly REMOTE_OUTPUT_ROOT="/go/src/${KUBE_GO_PACKAGE}/_output"
+readonly REMOTE_ROOT="/go/src/${KUBE_GO_PACKAGE}"
+readonly REMOTE_OUTPUT_ROOT="${REMOTE_ROOT}/_output"
 readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
 readonly DOCKER_MOUNT_ARGS_BASE=(
-  # where the container build will drop output
-  --volume "${LOCAL_OUTPUT_BINPATH}:${REMOTE_OUTPUT_BINPATH}"
   # timezone
   --volume /etc/localtime:/etc/localtime:ro
 )
@@ -168,6 +167,7 @@ function kube::build::verify_prereqs() {
   KUBE_BUILD_IMAGE_TAG="build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
   KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
+  KUBE_RSYNC_CONTAINER_NAME="kube-rsync-${KUBE_ROOT_HASH}"
   KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
   DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
   LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
@@ -186,7 +186,7 @@ function kube::build::docker_available_on_osx() {
     kube::log::status "No docker host is set. Checking options for setting one..."
     if [[ -z "$(which docker-machine)" ]]; then
       kube::log::status "It looks like you're running Mac OS X, yet neither Docker for Mac or docker-machine can be found."
-      kube::log::status "See: https://docs.docker.com/machine/ for installation instructions."
+      kube::log::status "See: https://docs.docker.com/engine/installation/mac/ for installation instructions."
       return 1
     elif [[ -n "$(which docker-machine)" ]]; then
       kube::build::prepare_docker_machine
@@ -363,7 +363,9 @@ function kube::build::docker_image_exists() {
 
   # We cannot just specify the IMAGE here as `docker images` doesn't behave as
   # expected.  See: https://github.com/docker/docker/issues/8048
-  "${DOCKER[@]}" images | grep -Eq "^(\S+/)?${1}\s+${2}\s+"
+  # Also we cannot use the `-q` option on grep as it causes pipefail to trigger.
+  # See http://stackoverflow.com/questions/19120263/why-exit-code-141-with-grep-q
+  "${DOCKER[@]}" images | grep -E "^(\S+/)?${1}\s+${2}\s+" > /dev/null
 }
 
 # Takes $1 and computes a short has for it. Useful for unique tag generation
@@ -462,30 +464,20 @@ function kube::build::build_image_built() {
   kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
 }
 
-# The set of source targets to include in the kube-build image
-function kube::build::source_targets() {
-  local targets=(
-      $(find . -mindepth 1 -maxdepth 1 -not \(        \
-          \( -path ./_\* -o -path ./.git\* \) -prune  \
-        \))
-  )
-  echo "${targets[@]}"
-}
-
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
-  kube::build::ensure_tar
-
   mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
-  "${TAR}" czf "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-source.tar.gz" $(kube::build::source_targets)
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-version-defs"
 
   cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+  cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
   kube::build::update_dockerfile
 
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
+
+  kube::build::sync_to_container
 }
 
 # Build a docker image from a Dockerfile.
@@ -550,14 +542,37 @@ function kube::build::ensure_data_container() {
     # We want this to run as root to be able to chown, so non-root users can
     # later use the result as a data container.  This run both creates the data
     # container and chowns the GOPATH.
+    #
+    # The data container creates volumes for all of the directories that store
+    # intermediates for the Go build. This enables incremental builds across
+    # Docker sessions. The *_cgo paths are re-compiled versions of the go std
+    # libraries for true static building.
     local -ra docker_cmd=(
       "${DOCKER[@]}" run
+      --volume "${REMOTE_ROOT}"   # white-out the whole output dir
+      --volume /usr/local/go/pkg/linux_386_cgo
+      --volume /usr/local/go/pkg/linux_amd64_cgo
+      --volume /usr/local/go/pkg/linux_arm_cgo
+      --volume /usr/local/go/pkg/linux_arm64_cgo
+      --volume /usr/local/go/pkg/linux_ppc64le_cgo
+      --volume /usr/local/go/pkg/darwin_amd64_cgo
+      --volume /usr/local/go/pkg/darwin_386_cgo
+      --volume /usr/local/go/pkg/windows_amd64_cgo
+      --volume /usr/local/go/pkg/windows_386_cgo
       --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
       --hostname "${HOSTNAME}"
-      --volume "${REMOTE_OUTPUT_ROOT}"   # white-out the whole output dir
-      --volume "${REMOTE_OUTPUT_GOPATH}" # make a non-root owned mountpoint
       "${KUBE_BUILD_IMAGE}"
-      chown -R $(id -u).$(id -g) "${REMOTE_OUTPUT_ROOT}"
+      chown -R $(id -u).$(id -g)
+        "${REMOTE_ROOT}"
+        /usr/local/go/pkg/linux_386_cgo
+        /usr/local/go/pkg/linux_amd64_cgo
+        /usr/local/go/pkg/linux_arm_cgo
+        /usr/local/go/pkg/linux_arm64_cgo
+        /usr/local/go/pkg/linux_ppc64le_cgo
+        /usr/local/go/pkg/darwin_amd64_cgo
+        /usr/local/go/pkg/darwin_386_cgo
+        /usr/local/go/pkg/windows_amd64_cgo
+        /usr/local/go/pkg/windows_386_cgo
     )
     "${docker_cmd[@]}"
   fi
@@ -566,18 +581,48 @@ function kube::build::ensure_data_container() {
 # Run a command in the kube-build image.  This assumes that the image has
 # already been built.  This will sync out all output data from the build.
 function kube::build::run_build_command() {
-  kube::log::status "Running build command...."
-  [[ $# != 0 ]] || { echo "Invalid input - please specify a command to run." >&2; return 4; }
+  kube::log::status "Running build command..."
+  kube::build::run_build_command_ex "${KUBE_BUILD_CONTAINER_NAME}" -- "$@"
+}
 
+# Run a command in the kube-build image.  This assumes that the image has
+# already been built.  This will sync out all output data from the build.
+#
+# Arguments are in the form of
+#  <container name> <extra docker args> -- <command>
+function kube::build::run_build_command_ex() {
   kube::build::ensure_data_container
   kube::build::prepare_output
 
+  [[ $# != 0 ]] || { echo "Invalid input - please specify a the container name." >&2; return 4; }
+  local container_name="${1}"
+  shift
+
   local -a docker_run_opts=(
-    "--name=${KUBE_BUILD_CONTAINER_NAME}"
+    "--name=${container_name}"
     "--user=$(id -u):$(id -g)"
     "--hostname=${HOSTNAME}"
     "${DOCKER_MOUNT_ARGS[@]}"
   )
+
+  [[ $# != 0 ]] || { echo "Invalid input - please specify docker arguments followed by --." >&2; return 4; }
+  # Everything before "--" is an arg to docker
+  until [ -z "${1-}" ] ; do
+    if [[ "$1" == "--" ]]; then
+      shift
+      break
+    fi
+    docker_run_opts+=("$1")
+    shift
+  done
+
+  # Everything after "--" is the command to run
+  [[ $# != 0 ]] || { echo "Invalid input - please specify a command to run." >&2; return 4; }
+  local -a cmd=()
+  until [ -z "${1-}" ] ; do
+    cmd+=("$1")
+    shift
+  done
 
   if [ -n "${KUBERNETES_CONTRIB:-}" ]; then
     docker_run_opts+=(-e "KUBERNETES_CONTRIB=${KUBERNETES_CONTRIB}")
@@ -604,70 +649,56 @@ function kube::build::run_build_command() {
 
   # Clean up container from any previous run
   kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
-  "${docker_cmd[@]}" "$@"
+  "${docker_cmd[@]}" "${cmd[@]}"
   kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
 }
 
-# Test if the output directory is remote (and can only be accessed through
-# docker) or if it is "local" and we can access the output without going through
-# docker.
-function kube::build::is_output_remote() {
-  rm -f "${LOCAL_OUTPUT_SUBPATH}/test_for_remote"
-  kube::build::run_build_command touch "${REMOTE_OUTPUT_BINPATH}/test_for_remote"
+function kube::build::start_rsyncd_container() {
+  kube::build::stop_rsyncd_container
+  kube::build::run_build_command_ex \
+    "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:8730:8730 -d \
+    -- /rsyncd.sh >/dev/null
+}
 
-  [[ ! -e "${LOCAL_OUTPUT_BINPATH}/test_for_remote" ]]
+function kube::build::stop_rsyncd_container() {
+  kube::build::destroy_container "${KUBE_RSYNC_CONTAINER_NAME}"
+}
+
+# This will launch rsyncd in a container and then sync the source tree to the
+# container over the local network.
+function kube::build::sync_to_container() {
+  kube::log::status "Syncing sources to container"
+
+  kube::build::start_rsyncd_container
+
+  rsync \
+    --filter='- /.git/' \
+    --filter='- /.make/' \
+    --filter='- /_output/' \
+    --filter='- /' \
+    --prune-empty-dirs \
+    -ap \
+    "${KUBE_ROOT}/" rsync://localhost:8730/k8s/
+
+  kube::build::stop_rsyncd_container
 }
 
 # If the Docker server is remote, copy the results back out.
 function kube::build::copy_output() {
-  if kube::build::is_output_remote; then
-    # At time of this code, docker cp does not work when copying from a volume.
-    # As a workaround, the binaries are first copied to a local filesystem,
-    # /tmp, then docker cp'd to the local binaries output directory.
-    # The fix for the volume bug has been accepted and once it's widely
-    # deployed the code below should be simplified to a simple docker cp
-    # Bug: https://github.com/docker/docker/pull/8509
-    local -a docker_run_opts=(
-      "--name=${KUBE_BUILD_CONTAINER_NAME}"
-      "--user=$(id -u):$(id -g)"
-      "${DOCKER_MOUNT_ARGS[@]}"
-      -d
-    )
+  kube::log::status "Syncing out of container"
 
-    local -ra docker_cmd=(
-      "${DOCKER[@]}" run "${docker_run_opts[@]}" "${KUBE_BUILD_IMAGE}"
-    )
+  kube::build::start_rsyncd_container
 
-    kube::log::status "Syncing back _output/dockerized/bin directory from remote Docker"
-    rm -rf "${LOCAL_OUTPUT_BINPATH}"
-    mkdir -p "${LOCAL_OUTPUT_BINPATH}"
-    rm -f "${THIS_PLATFORM_BIN}"
-    ln -s "${LOCAL_OUTPUT_BINPATH}" "${THIS_PLATFORM_BIN}"
+  rsync \
+    --prune-empty-dirs \
+    --filter='+ /_output/dockerized/bin/**' \
+    --filter='+ zz_generated.*' \
+    --filter='+ */' \
+    --filter='- /**' \
+    -ap \
+    rsync://localhost:8730/k8s/ "${KUBE_ROOT}"
 
-    kube::build::destroy_container "${KUBE_BUILD_CONTAINER_NAME}"
-    "${docker_cmd[@]}" bash -c "cp -r ${REMOTE_OUTPUT_BINPATH} /tmp/bin;touch /tmp/finished;rm /tmp/bin/test_for_remote;/bin/sleep 600" > /dev/null 2>&1
-
-    # Wait until binaries have finished coppying
-    count=0
-    while true;do
-      if "${DOCKER[@]}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/finished" "${LOCAL_OUTPUT_BINPATH}" > /dev/null 2>&1;then
-        "${DOCKER[@]}" cp "${KUBE_BUILD_CONTAINER_NAME}:/tmp/bin" "${LOCAL_OUTPUT_SUBPATH}"
-        break;
-      fi
-
-      let count=count+1
-      if [[ $count -eq 60 ]]; then
-        # break after 5m
-        kube::log::error "Timed out waiting for binaries..."
-        break
-      fi
-      sleep 5
-    done
-
-    "${DOCKER[@]}" rm -f -v "${KUBE_BUILD_CONTAINER_NAME}" >/dev/null 2>&1 || true
-  else
-    kube::log::status "Output directory is local.  No need to copy results out."
-  fi
+  kube::build::stop_rsyncd_container
 }
 
 # ---------------------------------------------------------------------------
