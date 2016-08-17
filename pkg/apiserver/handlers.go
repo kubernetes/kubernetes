@@ -385,8 +385,12 @@ func (tw *closeHijackTimeoutWriter) Hijack() (net.Conn, *bufio.ReadWriter, error
 // or implement CORS at your proxy layer
 // Pass nil for allowedMethods and allowedHeaders to use the defaults
 func CORS(handler http.Handler, allowedOriginPatterns []*regexp.Regexp, allowedMethods []string, allowedHeaders []string, allowCredentials string) http.Handler {
+
+	glog.Infof("REGISTERING CORS HANDLER")
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		glog.Infof("IN CORS HANDLER!!")
 		origin := req.Header.Get("Origin")
+		glog.Infof("FOUND ORIGIN: %s", origin)
 		if origin != "" {
 			allowed := false
 			for _, pattern := range allowedOriginPatterns {

@@ -465,19 +465,7 @@ func (s *GenericAPIServer) init(c *Config) {
 
 	handler := http.Handler(s.mux.(*http.ServeMux))
 
-	// TODO: handle CORS and auth using go-restful
-	// See github.com/emicklei/go-restful/blob/GenericAPIServer/examples/restful-CORS-filter.go, and
-	// github.com/emicklei/go-restful/blob/GenericAPIServer/examples/restful-basic-authentication.go
-
-	if len(c.CorsAllowedOriginList) > 0 {
-		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
-		if err != nil {
-			glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
-		}
-		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
-	}
-
-	s.InsecureHandler = handler
+	insecureHandler := handler
 
 	attributeGetter := apiserver.NewRequestAttributeGetter(s.RequestContextMapper, s.NewRequestInfoResolver())
 	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, s.authorizer)
@@ -503,8 +491,26 @@ func (s *GenericAPIServer) init(c *Config) {
 		handler = authenticatedHandler
 	}
 
+	// NOTE: CORS handler should be after auth handlers, so that we dont check auth on OPTIONS request.
+	// TODO: handle CORS and auth using go-restful
+	// See github.com/emicklei/go-restful/blob/GenericAPIServer/examples/restful-CORS-filter.go, and
+	// github.com/emicklei/go-restful/blob/GenericAPIServer/examples/restful-basic-authentication.go
+	glog.Infof("CHECKING CORS LIST")
+	if len(c.CorsAllowedOriginList) > 0 {
+
+		glog.Infof("CHECK CORS LIST PASSED")
+		allowedOriginRegexps, err := util.CompileRegexps(c.CorsAllowedOriginList)
+		if err != nil {
+			glog.Fatalf("Invalid CORS allowed origin, --cors-allowed-origins flag was set to %v - %v", strings.Join(c.CorsAllowedOriginList, ","), err)
+		}
+		glog.Infof("REGISTERING CORS HANDLER OUTER")
+		handler = apiserver.CORS(handler, allowedOriginRegexps, nil, nil, "true")
+		insecureHandler = apiserver.CORS(insecureHandler, allowedOriginRegexps, nil, nil, "true")
+	}
+
 	// TODO: Make this optional?  Consumers of GenericAPIServer depend on this currently.
 	s.Handler = handler
+	s.InsecureHandler = insecureHandler
 
 	// After all wrapping is done, put a context filter around both handlers
 	if handler, err := api.NewRequestContextFilter(s.RequestContextMapper, s.Handler); err != nil {

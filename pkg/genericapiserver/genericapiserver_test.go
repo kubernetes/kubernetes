@@ -18,9 +18,9 @@ package genericapiserver
 
 import (
 	"crypto/tls"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
+	//	"encoding/json"
+	//	"fmt"
+	//	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -29,15 +29,15 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	//	"k8s.io/kubernetes/pkg/api/rest"
+	//"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 
-	"k8s.io/kubernetes/pkg/apimachinery/registered"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apiserver"
+	//	"k8s.io/kubernetes/pkg/apimachinery/registered"
+	//	"k8s.io/kubernetes/pkg/apis/extensions"
+	//	"k8s.io/kubernetes/pkg/apiserver"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
-	utilnet "k8s.io/kubernetes/pkg/util/net"
+	//	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -61,6 +61,7 @@ func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Co
 	config.Serializer = api.Codecs
 	config.APIPrefix = "/api"
 	config.APIGroupPrefix = "/apis"
+	config.CorsAllowedOriginList = []string{"http://not-my-domain.com"}
 
 	s, err := New(&config)
 	if err != nil {
@@ -69,6 +70,7 @@ func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Co
 	return s, etcdserver, config, assert
 }
 
+/*
 // TestNew verifies that the New function returns a GenericAPIServer
 // using the configuration properly.
 func TestNew(t *testing.T) {
@@ -310,6 +312,29 @@ func TestDiscoveryAtAPIS(t *testing.T) {
 	}
 
 	assert.Equal(0, len(groupList.Groups))
+}
+*/
+
+func TestCORSRequest(t *testing.T) {
+	master, etcdserver, _, _ := newMaster(t)
+	defer etcdserver.Terminate(t)
+
+	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+
+	// Send a request from a different origin.
+	//	req, err := http.NewRequest("GET", server.URL+"/apis", nil)
+	req, err := http.NewRequest("OPTIONS", server.URL+"/apis", nil)
+	//	req, err := http.NewRequest("OPTIONS", server.URL, nil)
+	//	req, err := http.NewRequest("OPTIONS", server.URL+"/api/v1/namespaces/ns1/pods", nil)
+	req.Header.Add("Origin", "http://not-my-domain.com")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected server response, expected %d, actual: %d. response: %+v", http.StatusOK, resp.StatusCode, resp)
+	}
 }
 
 func TestGetServerAddressByClientCIDRs(t *testing.T) {
