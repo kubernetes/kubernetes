@@ -84,17 +84,17 @@ func CommonTestResourceRecordSetsDifferentTypes(t *testing.T, zone dnsprovider.Z
 	defer sets.StartChangeset().Remove(rrset).Apply()
 	t.Logf("Successfully added resource record set: %v", rrset)
 
-	cnameRrset := rrsets.New("alpha.test.com", []string{"cname.test.com"}, 80, rrstype.CNAME)
+	aaaaRrset := rrsets.New("alpha.test.com", []string{"2001:4860:4860::8888"}, 80, rrstype.AAAA)
 
 	// Add the resource with the same name but different type
-	err := sets.StartChangeset().Add(cnameRrset).Apply()
+	err := sets.StartChangeset().Add(aaaaRrset).Apply()
 	if err != nil {
-		t.Errorf("Failed to add resource record set %v: %v", cnameRrset, err)
+		t.Errorf("Failed to add resource record set %v: %v", aaaaRrset, err)
 	}
-	defer sets.StartChangeset().Remove(cnameRrset).Apply()
+	defer sets.StartChangeset().Remove(aaaaRrset).Apply()
 
 	// Check that both records exist
-	assertHasRecord(t, sets, cnameRrset)
+	assertHasRecord(t, sets, aaaaRrset)
 	assertHasRecord(t, sets, rrset)
 }
 
