@@ -151,9 +151,6 @@ type KubeletConfiguration struct {
 	// default /var/run/kubernetes). If tlsCertFile and tlsPrivateKeyFile
 	// are provided, this flag will be ignored.
 	CertDirectory string `json:"certDirectory"`
-	// BootstrapKubeConfig is the path to config file or directory of files that
-	// will be used to get client certificate for kubelet.
-	BootstrapKubeconfig string `json:"bootstrapKubeconfig"`
 	// hostnameOverride is the hostname used to identify the kubelet instead
 	// of the actual hostname.
 	HostnameOverride string `json:"hostnameOverride"`

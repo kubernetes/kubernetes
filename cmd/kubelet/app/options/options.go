@@ -41,7 +41,9 @@ const (
 type KubeletServer struct {
 	componentconfig.KubeletConfiguration
 
-	KubeConfig util.StringFlag
+	KubeConfig          util.StringFlag
+	BootstrapKubeconfig string
+
 	// If true, an invalid KubeConfig will result in the Kubelet exiting with an error.
 	RequireKubeConfig bool
 	AuthPath          util.StringFlag // Deprecated -- use KubeConfig instead
