@@ -21,6 +21,15 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
+const (
+	// ImpersonateUserHeader is used to impersonate a particular user during an API server request
+	ImpersonateUserHeader = "Impersonate-User"
+
+	// ImpersonateGroupHeader is used to impersonate a particular group during an API server request.
+	// It can be repeated multipled times for multiple groups.
+	ImpersonateGroupHeader = "Impersonate-Group"
+)
+
 // +genclient=true
 // +nonNamespaced=true
 // +noMethods=true
