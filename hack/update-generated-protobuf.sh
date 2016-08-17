@@ -18,6 +18,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+
+
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/build/common.sh"
 
@@ -35,11 +37,11 @@ function prereqs() {
   KUBE_BUILD_IMAGE_TAG="build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
   KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
+  KUBE_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
   DOCKER_MOUNT_ARGS=(
     --volume "${REPO_DIR:-${KUBE_ROOT}}:/go/src/${KUBE_GO_PACKAGE}"
     --volume /etc/localtime:/etc/localtime:ro
-    --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+    --volumes-from "${KUBE_DATA_CONTAINER_NAME}"
   )
   LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 }
