@@ -1015,7 +1015,8 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (*etcdtesti
 	podPrefix := "/pods"
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
-	s := etcdstorage.NewEtcdStorage(server.Client, testapi.Default.StorageCodec(), etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
+	codec := testapi.Default.StorageCodec()
+	s := etcdstorage.NewEtcdStorage(server.Client, codec, etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
 	if hasCacheEnabled {
 		config := storage.CacherConfig{
 			CacheCapacity:  10,
@@ -1025,6 +1026,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (*etcdtesti
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
 			NewListFunc:    func() runtime.Object { return &api.PodList{} },
+			Codec:          codec,
 		}
 		s = storage.NewCacherFromConfig(config)
 	}

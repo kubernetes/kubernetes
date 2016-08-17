@@ -59,6 +59,7 @@ func newTestCacher(s storage.Interface) *storage.Cacher {
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
 		NewListFunc:    func() runtime.Object { return &api.PodList{} },
+		Codec:          testapi.Default.Codec(),
 	}
 	return storage.NewCacherFromConfig(config)
 }

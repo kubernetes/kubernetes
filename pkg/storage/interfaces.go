@@ -182,7 +182,4 @@ type Interface interface {
 	//    }
 	// })
 	GuaranteedUpdate(ctx context.Context, key string, ptrToType runtime.Object, ignoreNotFound bool, precondtions *Preconditions, tryUpdate UpdateFunc) error
-
-	// Codec provides access to the underlying codec being used by the implementation.
-	Codec() runtime.Codec
 }
