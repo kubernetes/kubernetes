@@ -889,7 +889,7 @@ func (nc *NodeController) stopAllPodEvictions() {
 }
 
 // deletePods will delete all pods from master running on given node, and return true
-// if any pods were deleted.
+// if any pods were deleted, or were found pending deletion.
 func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName)
@@ -908,8 +908,9 @@ func (nc *NodeController) deletePods(nodeName string) (bool, error) {
 		if pod.Spec.NodeName != nodeName {
 			continue
 		}
-		// if the pod has already been deleted, ignore it
+		// if the pod has already been marked for deletion, we still return true that there are remaining pods.
 		if pod.DeletionGracePeriodSeconds != nil {
+			remaining = true
 			continue
 		}
 		// if the pod is managed by a daemonset, ignore it
