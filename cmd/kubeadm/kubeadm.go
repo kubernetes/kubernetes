@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,4 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package etcdtest // import "k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
+package main
+
+import (
+	"os"
+
+	"k8s.io/kubernetes/cmd/kubeadm/app"
+)
+
+func main() {
+	if err := app.Run(); err != nil {
+		os.Exit(1)
+	}
+	os.Exit(0)
+}
