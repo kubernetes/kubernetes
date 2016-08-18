@@ -41,10 +41,16 @@ const (
 	message = "The node was low on compute resources."
 	// disk, in bytes.  internal to this module, used to account for local disk usage.
 	resourceDisk api.ResourceName = "disk"
+	// inodes, number. internal to this module, used to account for local disk inode consumption.
+	resourceInodes api.ResourceName = "inodes"
 	// imagefs, in bytes.  internal to this module, used to account for local image filesystem usage.
 	resourceImageFs api.ResourceName = "imagefs"
+	// imagefs inodes, number.  internal to this module, used to account for local image filesystem inodes.
+	resourceImageFsInodes api.ResourceName = "imagefsInodes"
 	// nodefs, in bytes.  internal to this module, used to account for local node root filesystem usage.
 	resourceNodeFs api.ResourceName = "nodefs"
+	// nodefs inodes, number.  internal to this module, used to account for local node root filesystem inodes.
+	resourceNodeFsInodes api.ResourceName = "nodefsInodes"
 )
 
 var (
@@ -62,12 +68,16 @@ func init() {
 	signalToNodeCondition[SignalMemoryAvailable] = api.NodeMemoryPressure
 	signalToNodeCondition[SignalImageFsAvailable] = api.NodeDiskPressure
 	signalToNodeCondition[SignalNodeFsAvailable] = api.NodeDiskPressure
+	signalToNodeCondition[SignalImageFsInodesFree] = api.NodeDiskPressure
+	signalToNodeCondition[SignalNodeFsInodesFree] = api.NodeDiskPressure
 
 	// map signals to resources (and vice-versa)
 	signalToResource = map[Signal]api.ResourceName{}
 	signalToResource[SignalMemoryAvailable] = api.ResourceMemory
 	signalToResource[SignalImageFsAvailable] = resourceImageFs
+	signalToResource[SignalImageFsInodesFree] = resourceImageFsInodes
 	signalToResource[SignalNodeFsAvailable] = resourceNodeFs
+	signalToResource[SignalNodeFsInodesFree] = resourceNodeFsInodes
 	resourceToSignal = map[api.ResourceName]Signal{}
 	for key, value := range signalToResource {
 		resourceToSignal[value] = key
@@ -185,22 +195,21 @@ func parseThresholdStatement(statement string) (Threshold, error) {
 				Percentage: percentage,
 			},
 		}, nil
-	} else {
-		quantity, err := resource.ParseQuantity(quantityValue)
-		if err != nil {
-			return Threshold{}, err
-		}
-		if quantity.Sign() < 0 || quantity.IsZero() {
-			return Threshold{}, fmt.Errorf("eviction threshold %v must be positive: %s", signal, &quantity)
-		}
-		return Threshold{
-			Signal:   signal,
-			Operator: operator,
-			Value: ThresholdValue{
-				Quantity: &quantity,
-			},
-		}, nil
 	}
+	quantity, err := resource.ParseQuantity(quantityValue)
+	if err != nil {
+		return Threshold{}, err
+	}
+	if quantity.Sign() < 0 || quantity.IsZero() {
+		return Threshold{}, fmt.Errorf("eviction threshold %v must be positive: %s", signal, &quantity)
+	}
+	return Threshold{
+		Signal:   signal,
+		Operator: operator,
+		Value: ThresholdValue{
+			Quantity: &quantity,
+		},
+	}, nil
 }
 
 // parsePercentage parses a string representing a percentage value
@@ -287,6 +296,18 @@ func diskUsage(fsStats *statsapi.FsStats) *resource.Quantity {
 	return resource.NewQuantity(usage, resource.BinarySI)
 }
 
+// inodeUsage converts inodes consumed into a resource quantity.
+func inodeUsage(fsStats *statsapi.FsStats) *resource.Quantity {
+	// TODO: cadvisor needs to support inodes used per container
+	// right now, cadvisor reports total inodes and inodes free per filesystem.
+	// this is insufficient to know how many inodes are consumed by the container.
+	// for example, with the overlay driver, the rootfs and each container filesystem
+	// will report the same total inode and inode free values but no way of knowing
+	// how many inodes consumed in that filesystem are charged to this container.
+	// for now, we report 0 as inode usage pending support in cadvisor.
+	return resource.NewQuantity(int64(0), resource.BinarySI)
+}
+
 // memoryUsage converts working set into a resource quantity.
 func memoryUsage(memStats *statsapi.MemoryStats) *resource.Quantity {
 	if memStats == nil || memStats.WorkingSetBytes == nil {
@@ -311,15 +332,18 @@ func localVolumeNames(pod *api.Pod) []string {
 	return result
 }
 
-// podDiskUsage aggregates pod disk usage for the specified stats to measure.
+// podDiskUsage aggregates pod disk usage and inode consumption for the specified stats to measure.
 func podDiskUsage(podStats statsapi.PodStats, pod *api.Pod, statsToMeasure []fsStatsType) (api.ResourceList, error) {
 	disk := resource.Quantity{Format: resource.BinarySI}
+	inodes := resource.Quantity{Format: resource.BinarySI}
 	for _, container := range podStats.Containers {
 		if hasFsStatsType(statsToMeasure, fsStatsRoot) {
 			disk.Add(*diskUsage(container.Rootfs))
+			inodes.Add(*inodeUsage(container.Rootfs))
 		}
 		if hasFsStatsType(statsToMeasure, fsStatsLogs) {
 			disk.Add(*diskUsage(container.Logs))
+			inodes.Add(*inodeUsage(container.Logs))
 		}
 	}
 	if hasFsStatsType(statsToMeasure, fsStatsLocalVolumeSource) {
@@ -328,13 +352,15 @@ func podDiskUsage(podStats statsapi.PodStats, pod *api.Pod, statsToMeasure []fsS
 			for _, volumeStats := range podStats.VolumeStats {
 				if volumeStats.Name == volumeName {
 					disk.Add(*diskUsage(&volumeStats.FsStats))
+					inodes.Add(*inodeUsage(&volumeStats.FsStats))
 					break
 				}
 			}
 		}
 	}
 	return api.ResourceList{
-		resourceDisk: disk,
+		resourceDisk:   disk,
+		resourceInodes: inodes,
 	}, nil
 }
 
@@ -502,8 +528,8 @@ func memory(stats statsFunc) cmpFunc {
 	}
 }
 
-// disk compares pods by largest consumer of disk relative to request.
-func disk(stats statsFunc, fsStatsToMeasure []fsStatsType) cmpFunc {
+// disk compares pods by largest consumer of disk relative to request for the specified disk resource.
+func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource api.ResourceName) cmpFunc {
 	return func(p1, p2 *api.Pod) int {
 		p1Stats, found := stats(p1)
 		// if we have no usage stats for p1, we want p2 first
@@ -528,8 +554,8 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType) cmpFunc {
 
 		// disk is best effort, so we don't measure relative to a request.
 		// TODO: add disk as a guaranteed resource
-		p1Disk := p1Usage[resourceDisk]
-		p2Disk := p2Usage[resourceDisk]
+		p1Disk := p1Usage[diskResource]
+		p2Disk := p2Usage[diskResource]
 		// if p2 is using more than p1, we want p2 first
 		return p2Disk.Cmp(p1Disk)
 	}
@@ -541,9 +567,9 @@ func rankMemoryPressure(pods []*api.Pod, stats statsFunc) {
 }
 
 // rankDiskPressureFunc returns a rankFunc that measures the specified fs stats.
-func rankDiskPressureFunc(fsStatsToMeasure []fsStatsType) rankFunc {
+func rankDiskPressureFunc(fsStatsToMeasure []fsStatsType, diskResource api.ResourceName) rankFunc {
 	return func(pods []*api.Pod, stats statsFunc) {
-		orderedBy(qosComparator, disk(stats, fsStatsToMeasure)).Sort(pods)
+		orderedBy(qosComparator, disk(stats, fsStatsToMeasure, diskResource)).Sort(pods)
 	}
 }
 
@@ -564,6 +590,7 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 	if err != nil {
 		return nil, nil, err
 	}
+
 	// build the function to work against for pod stats
 	statsFunc := cachedStatsFunc(summary.Pods)
 	// build an evaluation context for current eviction signals
@@ -575,17 +602,33 @@ func makeSignalObservations(summaryProvider stats.SummaryProvider) (signalObserv
 			capacity:  resource.NewQuantity(int64(*memory.AvailableBytes+*memory.WorkingSetBytes), resource.BinarySI),
 		}
 	}
-	if nodeFs := summary.Node.Fs; nodeFs != nil && nodeFs.AvailableBytes != nil && nodeFs.CapacityBytes != nil {
-		result[SignalNodeFsAvailable] = signalObservation{
-			available: resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI),
-			capacity:  resource.NewQuantity(int64(*nodeFs.CapacityBytes), resource.BinarySI),
+	if nodeFs := summary.Node.Fs; nodeFs != nil {
+		if nodeFs.AvailableBytes != nil && nodeFs.CapacityBytes != nil {
+			result[SignalNodeFsAvailable] = signalObservation{
+				available: resource.NewQuantity(int64(*nodeFs.AvailableBytes), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*nodeFs.CapacityBytes), resource.BinarySI),
+			}
+		}
+		if nodeFs.InodesFree != nil && nodeFs.Inodes != nil {
+			result[SignalNodeFsInodesFree] = signalObservation{
+				available: resource.NewQuantity(int64(*nodeFs.InodesFree), resource.BinarySI),
+				capacity:  resource.NewQuantity(int64(*nodeFs.Inodes), resource.BinarySI),
+			}
 		}
 	}
 	if summary.Node.Runtime != nil {
-		if imageFs := summary.Node.Runtime.ImageFs; imageFs != nil && imageFs.AvailableBytes != nil && imageFs.CapacityBytes != nil {
-			result[SignalImageFsAvailable] = signalObservation{
-				available: resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI),
-				capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
+		if imageFs := summary.Node.Runtime.ImageFs; imageFs != nil {
+			if imageFs.AvailableBytes != nil && imageFs.CapacityBytes != nil {
+				result[SignalImageFsAvailable] = signalObservation{
+					available: resource.NewQuantity(int64(*imageFs.AvailableBytes), resource.BinarySI),
+					capacity:  resource.NewQuantity(int64(*imageFs.CapacityBytes), resource.BinarySI),
+				}
+				if imageFs.InodesFree != nil && imageFs.Inodes != nil {
+					result[SignalImageFsInodesFree] = signalObservation{
+						available: resource.NewQuantity(int64(*imageFs.InodesFree), resource.BinarySI),
+						capacity:  resource.NewQuantity(int64(*imageFs.Inodes), resource.BinarySI),
+					}
+				}
 			}
 		}
 	}
@@ -785,16 +828,20 @@ func buildResourceToRankFunc(withImageFs bool) map[api.ResourceName]rankFunc {
 	// usage of an imagefs is optional
 	if withImageFs {
 		// with an imagefs, nodefs pod rank func for eviction only includes logs and local volumes
-		resourceToRankFunc[resourceNodeFs] = rankDiskPressureFunc([]fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource})
+		resourceToRankFunc[resourceNodeFs] = rankDiskPressureFunc([]fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)
+		resourceToRankFunc[resourceNodeFsInodes] = rankDiskPressureFunc([]fsStatsType{fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)
 		// with an imagefs, imagefs pod rank func for eviction only includes rootfs
-		resourceToRankFunc[resourceImageFs] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot})
+		resourceToRankFunc[resourceImageFs] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot}, resourceDisk)
+		resourceToRankFunc[resourceImageFsInodes] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot}, resourceInodes)
 	} else {
 		// without an imagefs, nodefs pod rank func for eviction looks at all fs stats
-		resourceToRankFunc[resourceNodeFs] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource})
+		resourceToRankFunc[resourceNodeFs] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceDisk)
+		resourceToRankFunc[resourceNodeFsInodes] = rankDiskPressureFunc([]fsStatsType{fsStatsRoot, fsStatsLogs, fsStatsLocalVolumeSource}, resourceInodes)
 	}
 	return resourceToRankFunc
 }
 
+// PodIsEvicted returns true if the reported pod status is due to an eviction.
 func PodIsEvicted(podStatus api.PodStatus) bool {
 	return podStatus.Phase == api.PodFailed && podStatus.Reason == reason
 }
@@ -806,11 +853,14 @@ func buildResourceToNodeReclaimFuncs(imageGC ImageGC, withImageFs bool) map[api.
 	if withImageFs {
 		// with an imagefs, nodefs pressure should just delete logs
 		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs()}
+		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteLogs()}
 		// with an imagefs, imagefs pressure should delete unused images
-		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteImages(imageGC)}
+		resourceToReclaimFunc[resourceImageFs] = nodeReclaimFuncs{deleteImages(imageGC, true)}
+		resourceToReclaimFunc[resourceImageFsInodes] = nodeReclaimFuncs{deleteImages(imageGC, false)}
 	} else {
 		// without an imagefs, nodefs pressure should delete logs, and unused images
-		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC)}
+		resourceToReclaimFunc[resourceNodeFs] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, true)}
+		resourceToReclaimFunc[resourceNodeFsInodes] = nodeReclaimFuncs{deleteLogs(), deleteImages(imageGC, false)}
 	}
 	return resourceToReclaimFunc
 }
@@ -824,12 +874,16 @@ func deleteLogs() nodeReclaimFunc {
 }
 
 // deleteImages will delete unused images to free up disk pressure.
-func deleteImages(imageGC ImageGC) nodeReclaimFunc {
+func deleteImages(imageGC ImageGC, reportBytesFreed bool) nodeReclaimFunc {
 	return func() (*resource.Quantity, error) {
 		glog.Infof("eviction manager: attempting to delete unused images")
-		reclaimed, err := imageGC.DeleteUnusedImages()
+		bytesFreed, err := imageGC.DeleteUnusedImages()
 		if err != nil {
 			return nil, err
+		}
+		reclaimed := int64(0)
+		if reportBytesFreed {
+			reclaimed = bytesFreed
 		}
 		return resource.NewQuantity(reclaimed, resource.BinarySI), nil
 	}
