@@ -18,7 +18,6 @@ package gce_pd
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -28,9 +27,9 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	gcecloud "k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/volume"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 const (
@@ -114,7 +113,7 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 	}
 
 	for _, path := range devicePaths {
-		if pathExists, err := pathExists(path); err != nil {
+		if pathExists, err := volumeutil.PathExists(path); err != nil {
 			return "", fmt.Errorf("Error checking if path exists: %v", err)
 		} else if pathExists {
 			return path, nil
@@ -122,13 +121,6 @@ func verifyDevicePath(devicePaths []string, sdBeforeSet sets.String) (string, er
 	}
 
 	return "", nil
-}
-
-// Unmount the global PD mount, which should be the only one, and delete it.
-func unmountPDAndRemoveGlobalPath(globalMountPath string, mounter mount.Interface) error {
-	err := mounter.Unmount(globalMountPath)
-	os.Remove(globalMountPath)
-	return err
 }
 
 // Returns the first path that exists, or empty string if none exist.
@@ -139,7 +131,7 @@ func verifyAllPathsRemoved(devicePaths []string) (bool, error) {
 			// udevadm errors should not block disk detachment, log and continue
 			glog.Errorf("%v", err)
 		}
-		if exists, err := pathExists(path); err != nil {
+		if exists, err := volumeutil.PathExists(path); err != nil {
 			return false, fmt.Errorf("Error checking if path exists: %v", err)
 		} else {
 			allPathsRemoved = allPathsRemoved && !exists
@@ -163,18 +155,6 @@ func getDiskByIdPaths(pdName string, partition string) []string {
 	}
 
 	return devicePaths
-}
-
-// Checks if the specified path exists
-func pathExists(path string) (bool, error) {
-	_, err := os.Stat(path)
-	if err == nil {
-		return true, nil
-	} else if os.IsNotExist(err) {
-		return false, nil
-	} else {
-		return false, err
-	}
 }
 
 // Return cloud provider
