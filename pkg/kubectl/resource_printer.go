@@ -491,6 +491,7 @@ var roleColumns = []string{"NAME", "AGE"}
 var roleBindingColumns = []string{"NAME", "AGE"}
 var clusterRoleColumns = []string{"NAME", "AGE"}
 var clusterRoleBindingColumns = []string{"NAME", "AGE"}
+var storageClassColumns = []string{"NAME", "TYPE"}
 
 // TODO: consider having 'KIND' for third party resource data
 var thirdPartyResourceDataColumns = []string{"NAME", "LABELS", "DATA"}
@@ -603,6 +604,8 @@ func (h *HumanReadablePrinter) addDefaultHandlers() {
 	h.Handler(clusterRoleBindingColumns, printClusterRoleBindingList)
 	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequest)
 	h.Handler(certificateSigningRequestColumns, printCertificateSigningRequestList)
+	h.Handler(storageClassColumns, printStorageClass)
+	h.Handler(storageClassColumns, printStorageClassList)
 }
 
 func (h *HumanReadablePrinter) unknown(data []byte, w io.Writer) error {
@@ -2061,6 +2064,32 @@ func printNetworkPolicy(networkPolicy *extensions.NetworkPolicy, w io.Writer, op
 func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, options PrintOptions) error {
 	for i := range list.Items {
 		if err := printNetworkPolicy(&list.Items[i], w, options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func printStorageClass(sc *extensions.StorageClass, w io.Writer, options PrintOptions) error {
+	name := sc.Name
+	provtype := sc.Provisioner
+
+	if _, err := fmt.Fprintf(w, "%s\t%s\t", name, provtype); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, AppendLabels(sc.Labels, options.ColumnLabels)); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprint(w, AppendAllLabels(options.ShowLabels, sc.Labels)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func printStorageClassList(scList *extensions.StorageClassList, w io.Writer, options PrintOptions) error {
+	for _, sc := range scList.Items {
+		if err := printStorageClass(&sc, w, options); err != nil {
 			return err
 		}
 	}
