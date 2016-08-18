@@ -174,9 +174,13 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs extensions.ReplicaSet) 
 		return nil, fmt.Errorf("error in converting selector to label selector for replica set %s: %s", updatedRS.Name, err)
 	}
 	options := api.ListOptions{LabelSelector: selector}
-	podList, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
+	pods, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
 	if err != nil {
 		return nil, fmt.Errorf("error in getting pod list for namespace %s and list options %+v: %s", namespace, options, err)
+	}
+	podList := api.PodList{Items: make([]api.Pod, 0, len(pods))}
+	for i := range pods {
+		podList.Items = append(podList.Items, *pods[i])
 	}
 	allPodsLabeled := false
 	if allPodsLabeled, err = deploymentutil.LabelPodsWithHash(&podList, updatedRS, dc.client, namespace, hash); err != nil {
@@ -224,8 +228,12 @@ func (dc *DeploymentController) addHashKeyToRSAndPods(rs extensions.ReplicaSet) 
 func (dc *DeploymentController) listPods(deployment *extensions.Deployment) (*api.PodList, error) {
 	return deploymentutil.ListPods(deployment,
 		func(namespace string, options api.ListOptions) (*api.PodList, error) {
-			podList, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
-			return &podList, err
+			pods, err := dc.podStore.Pods(namespace).List(options.LabelSelector)
+			result := api.PodList{Items: make([]api.Pod, 0, len(pods))}
+			for i := range pods {
+				result.Items = append(result.Items, *pods[i])
+			}
+			return &result, err
 		})
 }
 

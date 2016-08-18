@@ -479,6 +479,7 @@ func (rm *ReplicationManager) worker() {
 }
 
 // manageReplicas checks and updates replicas for the given replication controller.
+// Does NOT modify <filteredPods>.
 func (rm *ReplicationManager) manageReplicas(filteredPods []*api.Pod, rc *api.ReplicationController) {
 	diff := len(filteredPods) - int(rc.Spec.Replicas)
 	rcKey, err := controller.KeyFunc(rc)
@@ -617,19 +618,21 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	rcNeedsSync := rm.expectations.SatisfiedExpectations(rcKey)
 	trace.Step("Expectations restored")
 
+	// NOTE: filteredPods are pointing to objects from cache - if you need to
+	// modify them, you need to copy it first.
 	// TODO: Do the List and Filter in a single pass, or use an index.
 	var filteredPods []*api.Pod
 	if rm.garbageCollectorEnabled {
 		// list all pods to include the pods that don't match the rc's selector
 		// anymore but has the stale controller ref.
-		podList, err := rm.podStore.Pods(rc.Namespace).List(labels.Everything())
+		pods, err := rm.podStore.Pods(rc.Namespace).List(labels.Everything())
 		if err != nil {
 			glog.Errorf("Error getting pods for rc %q: %v", key, err)
 			rm.queue.Add(key)
 			return err
 		}
 		cm := controller.NewPodControllerRefManager(rm.podControl, rc.ObjectMeta, labels.Set(rc.Spec.Selector).AsSelector(), getRCKind())
-		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(podList.Items)
+		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
 		for _, pod := range matchesNeedsController {
 			err := cm.AdoptPod(pod)
 			// continue to next pod if adoption fails.
@@ -660,13 +663,13 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 			return aggregate
 		}
 	} else {
-		podList, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector())
+		pods, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector())
 		if err != nil {
 			glog.Errorf("Error getting pods for rc %q: %v", key, err)
 			rm.queue.Add(key)
 			return err
 		}
-		filteredPods = controller.FilterActivePods(podList.Items)
+		filteredPods = controller.FilterActivePods(pods)
 	}
 
 	if rcNeedsSync && rc.DeletionTimestamp == nil {

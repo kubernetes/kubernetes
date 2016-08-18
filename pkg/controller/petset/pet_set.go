@@ -218,15 +218,16 @@ func (psc *PetSetController) getPodsForPetSet(ps *apps.PetSet) ([]*api.Pod, erro
 	if err != nil {
 		return []*api.Pod{}, err
 	}
-	petList, err := psc.podStore.Pods(ps.Namespace).List(sel)
+	pods, err := psc.podStore.Pods(ps.Namespace).List(sel)
 	if err != nil {
 		return []*api.Pod{}, err
 	}
-	pods := []*api.Pod{}
-	for _, p := range petList.Items {
-		pods = append(pods, &p)
+	// TODO: Do we need to copy?
+	result := make([]*api.Pod, 0, len(pods))
+	for i := range pods {
+		result = append(result, &(*pods[i]))
 	}
-	return pods, nil
+	return result, nil
 }
 
 // getPetSetForPod returns the pet set managing the given pod.

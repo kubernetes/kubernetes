@@ -53,7 +53,7 @@ func NewPodControllerRefManager(
 // controllerRef pointing to other object are ignored) 3. controlledDoesNotMatch
 // are the pods that have a controllerRef pointing to the controller, but their
 // labels no longer match the selector.
-func (m *PodControllerRefManager) Classify(pods []api.Pod) (
+func (m *PodControllerRefManager) Classify(pods []*api.Pod) (
 	matchesAndControlled []*api.Pod,
 	matchesNeedsController []*api.Pod,
 	controlledDoesNotMatch []*api.Pod) {
@@ -69,9 +69,9 @@ func (m *PodControllerRefManager) Classify(pods []api.Pod) (
 			if controllerRef.UID == m.controllerObject.UID {
 				// already controlled
 				if m.controllerSelector.Matches(labels.Set(pod.Labels)) {
-					matchesAndControlled = append(matchesAndControlled, &pod)
+					matchesAndControlled = append(matchesAndControlled, pod)
 				} else {
-					controlledDoesNotMatch = append(controlledDoesNotMatch, &pod)
+					controlledDoesNotMatch = append(controlledDoesNotMatch, pod)
 				}
 			} else {
 				// ignoring the pod controlled by other controller
@@ -83,7 +83,7 @@ func (m *PodControllerRefManager) Classify(pods []api.Pod) (
 			if !m.controllerSelector.Matches(labels.Set(pod.Labels)) {
 				continue
 			}
-			matchesNeedsController = append(matchesNeedsController, &pod)
+			matchesNeedsController = append(matchesNeedsController, pod)
 		}
 	}
 	return matchesAndControlled, matchesNeedsController, controlledDoesNotMatch
