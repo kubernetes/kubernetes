@@ -144,7 +144,7 @@ unique places you need to update the go version.
 - The image for cross compiling in [build/build-image/cross/](../../build/build-image/cross/). The `VERSION` file and `Dockerfile`.
 - The jenkins test-image in
   [hack/jenkins/test-image/](../../hack/jenkins/test-image/). The `Dockerfile` and `Makefile`.
-- The docker image being run in [hack/jenkins/dockerized-e2e-runner.sh](../../hack/jenkins/dockerized-e2e-runner.sh) and [hack/jenkins/gotest-dockerized.sh](../../hack/jenkins/gotest-dockerized.sh).
+- The docker image being run in [hack/jenkins/gotest-dockerized.sh](../../hack/jenkins/gotest-dockerized.sh).
 - The cross tag `KUBE_BUILD_IMAGE_CROSS_TAG` in [build/common.sh](../../build/common.sh)
 
 ## Workflow
