@@ -139,7 +139,7 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 		var err error
 		if l, ok := service.Annotations[apiservice.AnnotationHealthCheckNodePort]; ok {
 			healthCheckNodePort, err = strconv.Atoi(l)
-			if err != nil {
+			if err != nil || healthCheckNodePort <= 0 {
 				return nil, errors.NewInternalError(fmt.Errorf("Failed to parse annotation %v: %v", apiservice.AnnotationHealthCheckNodePort, err))
 			}
 		}
