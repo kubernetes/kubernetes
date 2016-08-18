@@ -302,6 +302,18 @@ func (m *Master) InstallAPIs(c *Config) {
 			continue
 		}
 
+		// This is here so that, if the policy group is present, the eviction
+		// subresource handler wil be able to find poddisruptionbudgets
+		// TODO(lavalamp) find a better way for groups to discover and interact
+		// with each other
+		if group == "policy" {
+			storage := apiGroupsInfo[0].VersionedResourcesStorageMap["v1"]["pods/eviction"]
+			evictionStorage := storage.(*podetcd.EvictionREST)
+
+			storage = apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"]["poddisruptionbudgets"]
+			evictionStorage.PodDisruptionBudgetLister = storage.(rest.Lister)
+		}
+
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
 

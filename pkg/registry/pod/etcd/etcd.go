@@ -36,6 +36,8 @@ import (
 	podrest "k8s.io/kubernetes/pkg/registry/pod/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
+
+	"github.com/golang/glog"
 )
 
 // PodStorage includes storage for pods and all sub resources
@@ -122,7 +124,8 @@ func (r *REST) ResourceLocation(ctx api.Context, name string) (*url.URL, http.Ro
 
 // EvictionREST implements the REST endpoint for evicting pods from nodes when etcd is in use.
 type EvictionREST struct {
-	store *registry.Store
+	store                     *registry.Store
+	PodDisruptionBudgetLister rest.Lister
 }
 
 var _ = rest.Creater(&EvictionREST{})
@@ -137,6 +140,18 @@ const gotit = false
 
 func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
+
+	l, err := r.PodDisruptionBudgetLister.List(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	pdbList, ok := l.(*policy.PodDisruptionBudgetList)
+
+	glog.Warningf("PDBLIST? %v %q len=%v", ok, pdbList, len(pdbList.Items))
+	for _, pdb := range pdbList.Items {
+		glog.Warningf("PDB %q/%q", pdb.Namespace, pdb.Name)
+	}
 
 	// If there is more than 1 PDB, that's an error (500).
 	if num > 1 {
@@ -161,7 +176,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	// At this point there was either no PDB or we succeded in decrementing
 
 	// Try the delete
-	_, err := r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+	_, err = r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
 	if err != nil {
 		return nil, err
 	}
