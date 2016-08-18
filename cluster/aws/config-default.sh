@@ -141,6 +141,10 @@ ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolume
 # Important Note: disable only if you have setup a NAT instance for internet access and configured appropriate routes!
 ENABLE_NODE_PUBLIC_IP=${KUBE_ENABLE_NODE_PUBLIC_IP:-true}
 
+# This enables nodes to resolve services via skyDNS. Useful for mounting network file systems hosted within your k8s cluster
+# Currently this also makes DNS wonky on the master, since it can't reach cluster ips
+KUBE_ENABLE_NODE_SKYDNS=${KUBE_ENABLE_NODE_SKYDNS:-false}
+
 # OS options for minions
 KUBE_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION:-jessie}"
 MASTER_OS_DISTRIBUTION="${KUBE_OS_DISTRIBUTION}"
