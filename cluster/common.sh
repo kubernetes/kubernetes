@@ -463,7 +463,7 @@ function stage-images() {
   done
 
   kube::util::wait-for-jobs || {
-    kube::log::error "unable to push images. see ${temp_dir}/*.log for more info."
+    kube::log::error "unable to push images. See ${temp_dir}/*.log for more info."
     return 1
   }
 
