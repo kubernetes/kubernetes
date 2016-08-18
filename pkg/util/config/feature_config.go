@@ -82,7 +82,7 @@ func (f *featureGate) Set(value string) error {
 		}
 		f.features[k] = value
 	}
-	glog.Infof("feature config: %v", f.features)
+	glog.Infof("feature gates: %v", f.features)
 	return nil
 }
 
@@ -118,14 +118,13 @@ func parseConfigMapEntry(configMap ConfigurationMap, key string, defaultValue bo
 	return defaultValue, nil
 }
 
-// AddFlag adds a flag for setting global feature config to the
-// specified FlagSet.
+// AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 	var known []string
 	for key, defaultValue := range featureDefaults {
 		known = append(known, fmt.Sprintf("%s=true|false (default=%t)", key, defaultValue))
 	}
 	fs.Var(f, flagName, ""+
-		"A set of key=value pairs that describe feature configuration for alpha/experimental features. "+
+		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
 		"Keys include:\n"+strings.Join(known, "\n"))
 }

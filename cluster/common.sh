@@ -683,9 +683,9 @@ EOF
 INITIAL_ETCD_CLUSTER: $(yaml-quote ${INITIAL_ETCD_CLUSTER})
 EOF
     fi
-    if [ -n "${FEATURE_CONFIG:-}" ]; then
+    if [ -n "${FEATURE_GATE:-}" ]; then
       cat >>$file <<EOF
-FEATURE_CONFIG: $(yaml-quote ${FEATURE_CONFIG})
+FEATURE_GATE: $(yaml-quote ${FEATURE_GATE})
 EOF
     fi
   else

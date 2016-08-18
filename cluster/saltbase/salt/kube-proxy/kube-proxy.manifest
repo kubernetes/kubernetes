@@ -24,13 +24,13 @@
   {% set log_level = pillar['kubeproxy_test_log_level'] -%}
 {% endif -%}
 
-{% set feature_config = "" -%}
-{% if grains.feature_config is defined -%}
- {% set feature_config = "--feature-config=" + grains.feature_config -%}
+{% set feature_gate = "" -%}
+{% if grains.feature_gate is defined -%}
+ {% set feature_gate = "--feature-gate=" + grains.feature_gate -%}
 {% endif -%}
 
 # test_args should always go last to overwrite prior configuration
-{% set params = log_level + " " + feature_config + " " + test_args -%}
+{% set params = log_level + " " + feature_gate + " " + test_args -%}
 
 # kube-proxy podspec
 apiVersion: v1

@@ -5,12 +5,12 @@
   {% set log_level = pillar['scheduler_test_log_level'] -%}
 {% endif -%}
 
-{% set feature_config = "" -%}
-{% if grains.feature_config is defined -%}
- {% set feature_config = "--feature-config=" + grains.feature_config -%}
+{% set feature_gate = "" -%}
+{% if grains.feature_gate is defined -%}
+ {% set feature_gate = "--feature-gate=" + grains.feature_gate -%}
 {% endif -%}
 
-{% set params = params + log_level + " " + feature_config -%}
+{% set params = params + log_level + " " + feature_gate -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['scheduler_test_args'] is defined -%}

@@ -123,7 +123,7 @@ func TestBroadcaster(t *testing.T) {
 	<-ch
 }
 
-func TestFeatureConfigFlag(t *testing.T) {
+func TestFeatureGateFlag(t *testing.T) {
 	tests := []struct {
 		arg         string
 		enableAlpha bool

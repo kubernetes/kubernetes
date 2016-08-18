@@ -52,7 +52,7 @@ type KubeletServer struct {
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
 
-	FeatureConfig utilconfig.FeatureConfig
+	FeatureGate utilconfig.FeatureGate
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -63,7 +63,7 @@ func NewKubeletServer() *KubeletServer {
 		AuthPath:             util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
 		KubeConfig:           util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		KubeletConfiguration: config,
-		FeatureConfig:        utilconfig.NewFeatureConfig(),
+		FeatureGate:        utilconfig.NewFeatureGate(),
 	}
 }
 
@@ -136,7 +136,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&s.VolumePluginDir, "volume-plugin-dir", s.VolumePluginDir, "<Warning: Alpha feature> The full path of the directory in which to search for additional third party volume plugins")
 	fs.StringVar(&s.CloudProvider, "cloud-provider", s.CloudProvider, "The provider for cloud services. By default, kubelet will attempt to auto-detect the cloud provider. Specify empty string for running with no cloud provider. [default=auto-detect]")
 	fs.StringVar(&s.CloudConfigFile, "cloud-config", s.CloudConfigFile, "The path to the cloud provider configuration file.  Empty string for no configuration file.")
-	s.FeatureConfig.AddFlag(fs)
+	s.FeatureGate.AddFlag(fs)
 
 	fs.StringVar(&s.KubeletCgroups, "resource-container", s.KubeletCgroups, "Optional absolute name of the resource-only container to create and run the Kubelet in.")
 	fs.MarkDeprecated("resource-container", "Use --kubelet-cgroups instead. Will be removed in a future version.")
