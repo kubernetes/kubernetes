@@ -54,6 +54,8 @@ kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: datadir-cockroachdb-${i}
+  labels:
+    app: cockroachdb
 spec:
   accessModes:
     - ReadWriteOnce
