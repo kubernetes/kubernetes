@@ -134,7 +134,7 @@ func (m *FakeNodeHandler) List(opts api.ListOptions) (*api.NodeList, error) {
 		}
 	}
 	for i := 0; i < len(m.CreatedNodes); i++ {
-		if !contains(m.Existing[i], m.DeletedNodes) && !contains(m.CreatedNodes[i], nodes) {
+		if !contains(m.CreatedNodes[i], m.DeletedNodes) && !contains(m.CreatedNodes[i], nodes) {
 			nodes = append(nodes, m.CreatedNodes[i])
 		}
 	}
