@@ -173,17 +173,13 @@ function install_google_cloud_sdk_tarball() {
 }
 
 # Figures out the builtin k8s version of a GCI image.
+# Assumes: JENKINS_GCI_IMAGE_FAMILY and KUBE_GCE_MASTER_IMAGE
 function get_gci_k8s_version() {
-    local -r image_description=$(gcloud compute images describe ${KUBE_GCE_MASTER_IMAGE} --project=${KUBE_GCE_MASTER_PROJECT})
-    # Staged GCI images all include versions in their image descriptions so we
-    # extract builtin Kubernetes version from them.
-    local -r k8s_version_re='.*Kubernetes: ([0-9a-z.-]+),.*'
-    if [[ ${image_description} =~ ${k8s_version_re} ]]; then
-        local -r gci_k8s_version="v${BASH_REMATCH[1]}"
-    else
-        echo "Failed to determine builtin k8s version for image ${image_name}: ${image_description}"
+    if [[ -z "${JENKINS_GCI_IMAGE_FAMILY:-}" ]] || [[ -z "${KUBE_GCE_MASTER_IMAGE:-}" ]]; then
+        echo "JENKINS_GCI_IMAGE_FAMILY and KUBE_GCE_MASTER_IMAGE must be set."
         exit 1
     fi
+    local -r gci_k8s_version="v$(gsutil cat gs://container-vm-image-staging/k8s-version-map/${KUBE_GCE_MASTER_IMAGE})"
     echo "${gci_k8s_version}"
 }
 
