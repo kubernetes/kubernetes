@@ -162,6 +162,8 @@ test-e2e: ginkgo generated_files
 #  INSTANCE_PREFIX: For REMOTE=true only.  Instances created from images will
 #    have the name "${INSTANCE_PREFIX}-${IMAGE_NAME}".  Defaults to "test".
 #  INSTANCE_METADATA: For REMOTE=true and running on GCE only.
+#  GUBERNATOR: For REMOTE=true only. Produce link to Gubernator to view logs.
+#	 Defaults to false.
 #
 # Example:
 #   make test-e2e-node FOCUS=Kubelet SKIP=container
