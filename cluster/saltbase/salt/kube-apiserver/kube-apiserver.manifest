@@ -120,6 +120,19 @@
   {% set authz_mode = authz_mode + ",Webhook" -%}
 {% endif -%}
 
+{% set image_review_config = "" -%}
+{% set admission_controller_config_mount = "" -%}
+{% set admission_controller_config_volume = "" -%}
+{% set image_policy_webhook_config_mount = "" -%}
+{% set image_policy_webhook_config_volume = "" -%}
+{% if grains.image_review_config is defined -%}
+  {% set image_review_config = " --admission-control-config-file=" + grains.image_review_config -%}
+  {% set admission_controller_config_mount = "{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"" + grains.image_review_config + "\", \"readOnly\": false}," -%}
+  {% set admission_controller_config_volume = "{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"" + grains.image_review_config + "\"}}," -%}
+  {% set image_policy_webhook_config_mount = "{\"name\": \"imagepolicywebhookconfigmount\",\"mountPath\": \"/etc/gcp_image_review.config\", \"readOnly\": false}," -%}
+  {% set image_policy_webhook_config_volume = "{\"name\": \"imagepolicywebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_image_review.config\"}}," -%}
+{% endif -%}
+
 {% set admission_control = "" -%}
 {% if pillar['admission_control'] is defined -%}
  {% set admission_control = "--admission-control=" + pillar['admission_control'] -%}
@@ -146,7 +159,7 @@
 {% endif -%}
 
 {% set params = address + " " + storage_backend + " " + etcd_servers + " " + etcd_servers_overrides + " " + cloud_provider + " " + cloud_config + " " + runtime_config + " " + feature_gates + " " + admission_control + " " + target_ram_mb + " " + service_cluster_ip_range + " " + client_ca_file + basic_auth_file + " " + min_request_timeout + " " + enable_garbage_collector -%}
-{% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config -%}
+{% set params = params + " " + cert_file + " " + key_file + " --secure-port=" + secure_port + token_auth_file + " " + bind_address + " " + log_level + " " + advertise_address  + " " + proxy_ssh_options + authz_mode + abac_policy_file + webhook_authentication_config + webhook_authorization_config + image_review_config -%}
 
 # test_args has to be kept at the end, so they'll overwrite any prior configuration
 {% if pillar['apiserver_test_args'] is defined -%}
@@ -202,6 +215,8 @@
         {{additional_cloud_config_mount}}
         {{webhook_config_mount}}
         {{webhook_authn_config_mount}}
+        {{admission_controller_config_mount}}
+        {{image_policy_webhook_config_mount}}
         { "name": "srvkube",
         "mountPath": "{{srv_kube_path}}",
         "readOnly": true},
@@ -231,6 +246,8 @@
   {{additional_cloud_config_volume}}
   {{webhook_config_volume}}
   {{webhook_authn_config_volume}}
+  {{admission_controller_config_volume}}
+  {{image_policy_webhook_config_volume}}
   { "name": "srvkube",
     "hostPath": {
         "path": "{{srv_kube_path}}"}
