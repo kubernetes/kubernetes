@@ -17,7 +17,9 @@ limitations under the License.
 package apiserver
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/golang/glog"
 
@@ -32,19 +34,16 @@ import (
 // WithImpersonation is a filter that will inspect and check requests that attempt to change the user.Info for their requests
 func WithImpersonation(handler http.Handler, requestContextMapper api.RequestContextMapper, a authorizer.Authorizer) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		requestedUser := req.Header.Get(authenticationapi.ImpersonateUserHeader)
-		if len(requestedUser) == 0 {
-			if len(req.Header[authenticationapi.ImpersonateGroupHeader]) > 0 {
-				glog.V(4).Infof("attempt to impersonate groups without impersonating a user: %v", req.Header[authenticationapi.ImpersonateGroupHeader])
-				forbidden(w, req)
-				return
-			}
-
+		impersonationRequests, err := buildImpersonationRequests(req.Header)
+		if err != nil {
+			glog.V(4).Infof("%v", err)
+			forbidden(w, req)
+			return
+		}
+		if len(impersonationRequests) == 0 {
 			handler.ServeHTTP(w, req)
 			return
 		}
-
-		impersonationRequests := buildImpersonationRequests(requestedUser, req.Header[authenticationapi.ImpersonateGroupHeader])
 
 		ctx, exists := requestContextMapper.Get(req)
 		if !exists {
@@ -65,6 +64,7 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 		// and group information
 		username := ""
 		groups := []string{}
+		userExtra := map[string][]string{}
 		for _, impersonationRequest := range impersonationRequests {
 			actingAsAttributes := &authorizer.AttributesRecord{
 				User:            requestor,
@@ -92,8 +92,15 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 				actingAsAttributes.Resource = "groups"
 				groups = append(groups, impersonationRequest.Name)
 
+			case authenticationapi.Kind("UserExtra"):
+				extraKey := impersonationRequest.FieldPath
+				extraValue := impersonationRequest.Name
+				actingAsAttributes.Resource = "userextras"
+				actingAsAttributes.Subresource = extraKey
+				userExtra[extraKey] = append(userExtra[extraKey], extraValue)
+
 			default:
-				glog.V(4).Infof("unknown impersonation request type: %v", impersonationRequest)
+				glog.V(4).Infof("unknown impersonation request type: %v\n", impersonationRequest)
 				forbidden(w, req)
 				return
 			}
@@ -109,7 +116,7 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 		newUser := &user.DefaultInfo{
 			Name:   username,
 			Groups: groups,
-			Extra:  map[string][]string{},
+			Extra:  userExtra,
 		}
 		requestContextMapper.Update(req, api.WithUser(ctx, newUser))
 
@@ -121,19 +128,55 @@ func WithImpersonation(handler http.Handler, requestContextMapper api.RequestCon
 }
 
 // buildImpersonationRequests returns a list of objectreferences that represent the different things we're requesting to impersonate.
-// Each request must be authorized against the current user before switching contexts
-func buildImpersonationRequests(requestedUser string, requestedGroups []string) []api.ObjectReference {
+// Also includes a map[string][]string representing user.Info.Extra
+// Each request must be authorized against the current user before switching contexts.
+func buildImpersonationRequests(headers http.Header) ([]api.ObjectReference, error) {
 	impersonationRequests := []api.ObjectReference{}
 
-	if namespace, name, err := serviceaccount.SplitUsername(requestedUser); err == nil {
-		impersonationRequests = append(impersonationRequests, api.ObjectReference{Kind: "ServiceAccount", Namespace: namespace, Name: name})
-	} else {
-		impersonationRequests = append(impersonationRequests, api.ObjectReference{Kind: "User", Name: requestedUser})
+	requestedUser := headers.Get(authenticationapi.ImpersonateUserHeader)
+	hasUser := len(requestedUser) > 0
+	if hasUser {
+		if namespace, name, err := serviceaccount.SplitUsername(requestedUser); err == nil {
+			impersonationRequests = append(impersonationRequests, api.ObjectReference{Kind: "ServiceAccount", Namespace: namespace, Name: name})
+		} else {
+			impersonationRequests = append(impersonationRequests, api.ObjectReference{Kind: "User", Name: requestedUser})
+		}
 	}
 
-	for _, group := range requestedGroups {
+	hasGroups := false
+	for _, group := range headers[authenticationapi.ImpersonateGroupHeader] {
+		hasGroups = true
 		impersonationRequests = append(impersonationRequests, api.ObjectReference{Kind: "Group", Name: group})
 	}
 
-	return impersonationRequests
+	hasUserExtra := false
+	for headerName, values := range headers {
+		if !strings.HasPrefix(headerName, authenticationapi.ImpersonateUserExtraHeaderPrefix) {
+			continue
+		}
+
+		hasUserExtra = true
+		extraKey := strings.ToLower(headerName[len(authenticationapi.ImpersonateUserExtraHeaderPrefix):])
+
+		// make a separate request for each extra value they're trying to set
+		for _, value := range values {
+			impersonationRequests = append(impersonationRequests,
+				api.ObjectReference{
+					Kind: "UserExtra",
+					// we only parse out a group above, but the parsing will fail if there isn't SOME version
+					// using the internal version will help us fail if anyone starts using it
+					APIVersion: authenticationapi.SchemeGroupVersion.String(),
+					Name:       value,
+					// ObjectReference doesn't have a subresource field.  FieldPath is close and available, so we'll use that
+					// TODO fight the good fight for ObjectReference to refer to resources and subresources
+					FieldPath: extraKey,
+				})
+		}
+	}
+
+	if (hasGroups || hasUserExtra) && !hasUser {
+		return nil, fmt.Errorf("requested %v without impersonating a user", impersonationRequests)
+	}
+
+	return impersonationRequests, nil
 }
