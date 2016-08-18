@@ -118,14 +118,19 @@ func (f *featureGate) Type() string {
 
 // AllAlpha returns value for allAlpha.
 func (f *featureGate) AllAlpha() bool {
-	defaultValue := knownFeatures[allAlpha].enabled
+	return f.lookup(allAlpha)
+}
+
+func (f *featureGate) lookup(key string) bool {
+	defaultValue := knownFeatures[key].enabled
 	if f.features == nil {
 		panic(fmt.Sprintf("--%s has not been parsed", flagName))
 	}
-	if v, ok := f.features[allAlpha]; ok {
+	if v, ok := f.features[key]; ok {
 		return v
 	}
 	return defaultValue
+
 }
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
