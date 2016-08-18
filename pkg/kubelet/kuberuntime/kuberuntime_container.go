@@ -49,8 +49,8 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 	restartCountUint32 := uint32(restartCount)
 	config := &runtimeApi.ContainerConfig{
 		Metadata: &runtimeApi.ContainerMetadata{
-			Name:         &container.Name,
-			RestartCount: &restartCountUint32,
+			Name:    &container.Name,
+			Attempt: &restartCountUint32,
 		},
 		Image:       &runtimeApi.ImageSpec{Image: &container.Image},
 		Command:     command,

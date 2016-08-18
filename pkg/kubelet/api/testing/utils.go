@@ -23,7 +23,7 @@ import (
 )
 
 func BuildContainerName(metadata *runtimeApi.ContainerMetadata) string {
-	return fmt.Sprintf("%s_%d", metadata.GetName(), metadata.GetRestartCount())
+	return fmt.Sprintf("%s_%d", metadata.GetName(), metadata.GetAttempt())
 }
 
 func BuildSandboxName(metadata *runtimeApi.PodSandboxMetadata) string {

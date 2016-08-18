@@ -374,8 +374,8 @@ message LinuxUser {
 message ContainerMetadata {
     // The name of the container. Same as the container name in the PodSpec.
     optional string name = 1;
-    // The restart count of the container.
-    optional uint32 restart_count = 2;
+    // The attempt number of creating the container.
+    optional uint32 attempt = 2;
 }
 
 // ContainerConfig holds all the required and optional fields for creating a
