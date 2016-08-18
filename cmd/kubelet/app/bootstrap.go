@@ -1,3 +1,19 @@
+/*
+Copyright 2016 The Kubernetes Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package app
 
 import (
@@ -82,7 +98,7 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap client cert path: %v", err)
 	}
-	certData, err := requestClientCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
+	certData, err := RequestClientCertificate(bootstrapClient.CertificateSigningRequests(), keyData, nodeName)
 	if err != nil {
 		return err
 	}
@@ -170,11 +186,11 @@ func loadOrGenerateKeyFile(keyPath string) (data []byte, wasGenerated bool, err 
 	return generatedData, true, nil
 }
 
-// requestClientCertificate will create a certificate signing request and send it to API server,
+// RequestClientCertificate will create a certificate signing request and send it to API server,
 // then it will watch the object's status, once approved by API server, it will return the API
 // server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
 // it will return an error.
-func requestClientCertificate(client unversionedcertificates.CertificateSigningRequestInterface, privateKeyData []byte, nodeName string) (certData []byte, err error) {
+func RequestClientCertificate(client unversionedcertificates.CertificateSigningRequestInterface, privateKeyData []byte, nodeName string) (certData []byte, err error) {
 	subject := &pkix.Name{
 		Organization: []string{"system:nodes"},
 		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
