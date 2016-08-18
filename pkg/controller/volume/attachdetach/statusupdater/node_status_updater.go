@@ -67,7 +67,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 				"Could not update node status. Failed to find node %q in NodeInformer cache. %v",
 				nodeName,
 				err)
-			return nil
+			continue
 		}
 
 		node, ok := nodeObj.(*api.Node)
