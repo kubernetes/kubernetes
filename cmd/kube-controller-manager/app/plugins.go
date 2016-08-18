@@ -62,8 +62,10 @@ func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	return allPlugins
 }
 
-// ProbeRecyclableVolumePlugins collects all persistent volume plugins into an easy to use list.
-func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
+// ProbeControllerVolumePlugins collects all persistent volume plugins into an
+// easy to use list. Only volume plugins that implement any of
+// provisioner/recycler/deleter interface should be returned.
+func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) []volume.VolumePlugin {
 	allPlugins := []volume.VolumePlugin{}
 
 	// The list of plugins to probe is decided by this binary, not
@@ -79,6 +81,7 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 		RecyclerMinimumTimeout:   int(config.PersistentVolumeRecyclerConfiguration.MinimumTimeoutHostPath),
 		RecyclerTimeoutIncrement: int(config.PersistentVolumeRecyclerConfiguration.IncrementTimeoutHostPath),
 		RecyclerPodTemplate:      volume.NewPersistentVolumeRecyclerPodTemplate(),
+		ProvisioningEnabled:      config.EnableHostPathProvisioning,
 	}
 	if err := AttemptToLoadRecycler(config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, &hostPathConfig); err != nil {
 		glog.Fatalf("Could not create hostpath recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathHostPath, err)
@@ -95,22 +98,34 @@ func ProbeRecyclableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 
-	allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
-	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+	if cloud != nil {
+		switch {
+		case aws.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, aws_ebs.ProbeVolumePlugins()...)
+		case gce.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
+		case openstack.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
+		case vsphere.ProviderName == cloud.ProviderName():
+			allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
+		}
+	}
 
 	return allPlugins
 }
 
-// NewVolumeProvisioner returns a volume provisioner to use when running in a cloud or development environment.
-// The beta implementation of provisioning allows 1 implied provisioner per cloud, until we allow configuration of many.
-// We explicitly map clouds to volume plugins here which allows us to configure many later without backwards compatibility issues.
-// Not all cloudproviders have provisioning capability, which is the reason for the bool in the return to tell the caller to expect one or not.
-func NewVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
+// NewAlphaVolumeProvisioner returns a volume provisioner to use when running in
+// a cloud or development environment. The alpha implementation of provisioning
+// allows 1 implied provisioner per cloud and is here only for compatibility
+// with Kubernetes 1.3
+// TODO: remove in Kubernetes 1.5
+func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
 	switch {
 	case cloud == nil && config.EnableHostPathProvisioning:
-		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(volume.VolumeConfig{}))
+		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(
+			volume.VolumeConfig{
+				ProvisioningEnabled: true,
+			}))
 	case cloud != nil && aws.ProviderName == cloud.ProviderName():
 		return getProvisionablePluginFromVolumePlugins(aws_ebs.ProbeVolumePlugins())
 	case cloud != nil && gce.ProviderName == cloud.ProviderName():

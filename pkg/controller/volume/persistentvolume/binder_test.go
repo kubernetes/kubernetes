@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
 // Test single call to syncClaim and syncVolume methods.
@@ -421,8 +422,88 @@ func TestSync(t *testing.T) {
 			newClaimArray("claim4-8", "uid4-8", "10Gi", "volume4-8-x", api.ClaimBound),
 			noevents, noerrors, testSyncVolume,
 		},
+
+		// PVC with class
+		{
+			// syncVolume binds a claim to requested class even if there is a
+			// smaller PV available
+			"13-1 - binding to class",
+			[]*api.PersistentVolume{
+				newVolume("volume13-1-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+				newVolume("volume13-1-2", "10Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain, annClass),
+			},
+			[]*api.PersistentVolume{
+				newVolume("volume13-1-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+				newVolume("volume13-1-2", "10Gi", "uid13-1", "claim13-1", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController, annClass),
+			},
+			newClaimArray("claim13-1", "uid13-1", "1Gi", "", api.ClaimPending, annClass),
+			withExpectedCapacity("10Gi", newClaimArray("claim13-1", "uid13-1", "1Gi", "volume13-1-2", api.ClaimBound, annBoundByController, annClass, annBindCompleted)),
+			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncVolume binds a claim without a class even if there is a
+			// smaller PV with a class available
+			"13-2 - binding without a class",
+			[]*api.PersistentVolume{
+				newVolume("volume13-2-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain, annClass),
+				newVolume("volume13-2-2", "10Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+			},
+			[]*api.PersistentVolume{
+				newVolume("volume13-2-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain, annClass),
+				newVolume("volume13-2-2", "10Gi", "uid13-2", "claim13-2", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
+			},
+			newClaimArray("claim13-2", "uid13-2", "1Gi", "", api.ClaimPending),
+			withExpectedCapacity("10Gi", newClaimArray("claim13-2", "uid13-2", "1Gi", "volume13-2-2", api.ClaimBound, annBoundByController, annBindCompleted)),
+			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncVolume binds a claim with given class even if there is a
+			// smaller PV with different class available
+			"13-3 - binding to specific a class",
+			volumeWithClass("silver", []*api.PersistentVolume{
+				newVolume("volume13-3-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+				newVolume("volume13-3-2", "10Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain, annClass),
+			}),
+			volumeWithClass("silver", []*api.PersistentVolume{
+				newVolume("volume13-3-1", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+				newVolume("volume13-3-2", "10Gi", "uid13-3", "claim13-3", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController, annClass),
+			}),
+			newClaimArray("claim13-3", "uid13-3", "1Gi", "", api.ClaimPending, annClass),
+			withExpectedCapacity("10Gi", newClaimArray("claim13-3", "uid13-3", "1Gi", "volume13-3-2", api.ClaimBound, annBoundByController, annBindCompleted, annClass)),
+			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncVolume binds claim requesting class "" to claim to PV with
+			// class=""
+			"13-4 - empty class",
+			volumeWithClass("", newVolumeArray("volume13-4", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain)),
+			volumeWithClass("", newVolumeArray("volume13-4", "1Gi", "uid13-4", "claim13-4", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController)),
+			claimWithClass("", newClaimArray("claim13-4", "uid13-4", "1Gi", "", api.ClaimPending)),
+			claimWithClass("", newClaimArray("claim13-4", "uid13-4", "1Gi", "volume13-4", api.ClaimBound, annBoundByController, annBindCompleted)),
+			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncVolume binds claim requesting class nil to claim to PV with
+			// class = ""
+			"13-5 - nil class",
+			volumeWithClass("", newVolumeArray("volume13-5", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain)),
+			volumeWithClass("", newVolumeArray("volume13-5", "1Gi", "uid13-5", "claim13-5", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController)),
+			newClaimArray("claim13-5", "uid13-5", "1Gi", "", api.ClaimPending),
+			newClaimArray("claim13-5", "uid13-5", "1Gi", "volume13-5", api.ClaimBound, annBoundByController, annBindCompleted),
+			noevents, noerrors, testSyncClaim,
+		},
+		{
+			// syncVolume binds claim requesting class "" to claim to PV with
+			// class=nil
+			"13-6 - nil class in PV, '' class in claim",
+			newVolumeArray("volume13-6", "1Gi", "", "", api.VolumePending, api.PersistentVolumeReclaimRetain),
+			newVolumeArray("volume13-6", "1Gi", "uid13-6", "claim13-6", api.VolumeBound, api.PersistentVolumeReclaimRetain, annBoundByController),
+			claimWithClass("", newClaimArray("claim13-6", "uid13-6", "1Gi", "", api.ClaimPending)),
+			claimWithClass("", newClaimArray("claim13-6", "uid13-6", "1Gi", "volume13-6", api.ClaimBound, annBoundByController, annBindCompleted)),
+			noevents, noerrors, testSyncClaim,
+		},
 	}
-	runSyncTests(t, tests)
+	runSyncTests(t, tests, []*extensions.StorageClass{})
 }
 
 // Test multiple calls to syncClaim/syncVolume and periodic sync of all
@@ -469,5 +550,5 @@ func TestMultiSync(t *testing.T) {
 		},
 	}
 
-	runMultisyncTests(t, tests)
+	runMultisyncTests(t, tests, []*extensions.StorageClass{}, "")
 }

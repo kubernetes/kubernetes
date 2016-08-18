@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -61,6 +62,8 @@ func init() {
 //
 const defaultObjectCount = 100
 const defaultSyncPeriod = 10 * time.Second
+
+const provisionerPluginName = "kubernetes.io/mock-provisioner"
 
 func getObjectCount() int {
 	objectCount := defaultObjectCount
@@ -849,8 +852,20 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	defer watchPVC.Stop()
 
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
-	// non-namespaced objects (PersistenceVolumes).
+	// non-namespaced objects (PersistenceVolumes and StorageClasses).
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Extensions().StorageClasses().DeleteCollection(nil, api.ListOptions{})
+
+	storageClass := extensions.StorageClass{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "gold",
+		},
+		Provisioner: provisionerPluginName,
+	}
+	testClient.Extensions().StorageClasses().Create(&storageClass)
 
 	binder.Run()
 	defer binder.Stop()
@@ -860,7 +875,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	for i := 0; i < objCount; i++ {
 		pvc := createPVC("pvc-provision-"+strconv.Itoa(i), ns.Name, "1G", []api.PersistentVolumeAccessMode{api.ReadWriteOnce})
 		pvc.Annotations = map[string]string{
-			"volume.alpha.kubernetes.io/storage-class": "",
+			"volume.beta.kubernetes.io/storage-class": "gold",
 		}
 		pvcs[i] = pvc
 	}
@@ -1086,7 +1101,7 @@ func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeri
 
 	host := volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */)
 	plugin := &volumetest.FakeVolumePlugin{
-		PluginName:             "plugin-name",
+		PluginName:             provisionerPluginName,
 		Host:                   host,
 		Config:                 volume.VolumeConfig{},
 		LastProvisionerOptions: volume.VolumeOptions{},
@@ -1101,7 +1116,18 @@ func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeri
 	cloud := &fake_cloud.FakeCloud{}
 
 	syncPeriod = getSyncPeriod(syncPeriod)
-	ctrl := persistentvolumecontroller.NewPersistentVolumeController(binderClient, syncPeriod, plugin, plugins, cloud, "", nil, nil, nil, true)
+	ctrl := persistentvolumecontroller.NewPersistentVolumeController(
+		binderClient,
+		syncPeriod,
+		nil, // alpha provisioner
+		plugins,
+		cloud,
+		"",   // cluster name
+		nil,  // volumeSource
+		nil,  // claimSource
+		nil,  // classSource
+		nil,  // eventRecorder
+		true) // enableDynamicProvisioning
 
 	watchPV, err := testClient.PersistentVolumes().Watch(api.ListOptions{})
 	if err != nil {

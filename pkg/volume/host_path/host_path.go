@@ -43,17 +43,6 @@ func ProbeVolumePlugins(volumeConfig volume.VolumeConfig) []volume.VolumePlugin 
 	}
 }
 
-func ProbeRecyclableVolumePlugins(recyclerFunc func(pvName string, spec *volume.Spec, host volume.VolumeHost, volumeConfig volume.VolumeConfig) (volume.Recycler, error), volumeConfig volume.VolumeConfig) []volume.VolumePlugin {
-	return []volume.VolumePlugin{
-		&hostPathPlugin{
-			host:               nil,
-			newRecyclerFunc:    recyclerFunc,
-			newProvisionerFunc: newProvisioner,
-			config:             volumeConfig,
-		},
-	}
-}
-
 type hostPathPlugin struct {
 	host volume.VolumeHost
 	// decouple creating Recyclers/Deleters/Provisioners by deferring to a function.  Allows for easier testing.
@@ -132,6 +121,9 @@ func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, err
 }
 
 func (plugin *hostPathPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if !plugin.config.ProvisioningEnabled {
+		return nil, fmt.Errorf("Provisioning in volume plugin %q is disabled", plugin.GetPluginName())
+	}
 	if len(options.AccessModes) == 0 {
 		options.AccessModes = plugin.GetAccessModes()
 	}
