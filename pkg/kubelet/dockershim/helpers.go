@@ -172,9 +172,9 @@ func buildKubeGenericName(sandboxConfig *runtimeApi.PodSandboxConfig, containerN
 	stableName := fmt.Sprintf("%s_%s_%s_%s_%s",
 		kubePrefix,
 		containerName,
-		sandboxConfig.GetName(),
-		sandboxConfig.GetNamespace(),
-		sandboxConfig.GetUid(),
+		sandboxConfig.Metadata.GetName(),
+		sandboxConfig.Metadata.GetNamespace(),
+		sandboxConfig.Metadata.GetUid(),
 	)
 	UID := fmt.Sprintf("%08x", rand.Uint32())
 	return fmt.Sprintf("%s_%s", stableName, UID)
@@ -198,7 +198,8 @@ func parseSandboxName(name string) (string, string, string, error) {
 // buildContainerName creates a name which can be reversed to identify container name.
 // This function returns stable name, unique name and an unique id.
 func buildContainerName(sandboxConfig *runtimeApi.PodSandboxConfig, containerConfig *runtimeApi.ContainerConfig) string {
-	return buildKubeGenericName(sandboxConfig, containerConfig.GetName())
+	containerName := fmt.Sprintf("%s.%d", containerConfig.Metadata.GetName(), containerConfig.Metadata.GetRestartCount())
+	return buildKubeGenericName(sandboxConfig, containerName)
 }
 
 // parseContainerName unpacks a container name, returning the pod name, namespace, UID and container name
@@ -214,7 +215,9 @@ func parseContainerName(name string) (podName, podNamespace, podUID, containerNa
 		return "", "", "", "", err
 	}
 
-	return parts[2], parts[3], parts[4], parts[1], nil
+	nameParts := strings.Split(parts[1], ".")
+	containerName = nameParts[0]
+	return parts[2], parts[3], parts[4], containerName, nil
 }
 
 // dockerFilter wraps around dockerfilters.Args and provides methods to modify

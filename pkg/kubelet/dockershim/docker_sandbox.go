@@ -55,7 +55,7 @@ func (ds *dockerService) CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (
 	createConfig := makeSandboxDockerConfig(config, image)
 	createResp, err := ds.client.CreateContainer(*createConfig)
 	if err != nil || createResp == nil {
-		return "", fmt.Errorf("failed to create a sandbox for pod %q: %v", config.GetName(), err)
+		return "", fmt.Errorf("failed to create a sandbox for pod %q: %v", config.Metadata.GetName(), err)
 	}
 
 	// Step 3: Start the sandbox container.

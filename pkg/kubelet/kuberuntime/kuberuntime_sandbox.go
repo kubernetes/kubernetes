@@ -28,9 +28,11 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP
 	// Refer https://github.com/kubernetes/kubernetes/issues/29871
 	podUID := string(pod.UID)
 	podSandboxConfig := &runtimeApi.PodSandboxConfig{
-		Name:        &pod.Name,
-		Namespace:   &pod.Namespace,
-		Uid:         &podUID,
+		Metadata: &runtimeApi.PodSandboxMetadata{
+			Name:      &pod.Name,
+			Namespace: &pod.Namespace,
+			Uid:       &podUID,
+		},
 		Labels:      newPodLabels(pod),
 		Annotations: newPodAnnotations(pod),
 	}

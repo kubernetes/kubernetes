@@ -111,13 +111,13 @@ func (r *FakeRuntimeService) CreatePodSandbox(config *runtimeApi.PodSandboxConfi
 
 	// PodSandboxID should be randomized for real container runtime, but here just use
 	// sandbox's name for easily making fake sandboxes.
-	podSandboxID := config.GetName()
+	podSandboxID := config.Metadata.GetName()
 	createdAt := time.Now().Unix()
 	readyState := runtimeApi.PodSandBoxState_READY
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
 		PodSandbox: runtimeApi.PodSandbox{
 			Id:        &podSandboxID,
-			Name:      config.Name,
+			Name:      config.Metadata.Name,
 			State:     &readyState,
 			CreatedAt: &createdAt,
 			Labels:    config.Labels,
@@ -223,14 +223,14 @@ func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtim
 
 	// ContainerID should be randomized for real container runtime, but here just use
 	// container's name for easily making fake containers.
-	containerID := config.GetName()
+	containerID := config.Metadata.GetName()
 	createdAt := time.Now().Unix()
 	createdState := runtimeApi.ContainerState_CREATED
 	imageRef := config.Image.GetImage()
 	r.Containers[containerID] = &FakeContainer{
 		ContainerStatus: runtimeApi.ContainerStatus{
 			Id:          &containerID,
-			Name:        config.Name,
+			Name:        config.Metadata.Name,
 			Image:       config.Image,
 			ImageRef:    &imageRef,
 			CreatedAt:   &createdAt,

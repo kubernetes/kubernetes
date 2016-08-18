@@ -46,8 +46,12 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 	command, args := kubecontainer.ExpandContainerCommandAndArgs(container, opts.Envs)
 	containerLogsPath := getContainerLogsPath(container.Name, pod.UID)
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
+	restartCountUint32 := uint32(restartCount)
 	config := &runtimeApi.ContainerConfig{
-		Name:        &container.Name,
+		Metadata: &runtimeApi.ContainerMetadata{
+			Name:         &container.Name,
+			RestartCount: &restartCountUint32,
+		},
 		Image:       &runtimeApi.ImageSpec{Image: &container.Image},
 		Command:     command,
 		Args:        args,

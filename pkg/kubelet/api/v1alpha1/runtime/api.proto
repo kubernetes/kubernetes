@@ -134,17 +134,24 @@ message LinuxPodSandboxConfig {
     optional NamespaceOption namespace_options = 2;
 }
 
+// PodSandboxMetadata holds all necessary information for building unique sandbox name.
+message PodSandboxMetadata {
+    // The pod name of the sandbox. Same with the pod name in the PodSpec.
+    optional string name = 1;
+    // The pod uid of the sandbox. Same with the pod UID in the PodSpec.
+    optional string uid = 2;
+    // The pod namespace of the sandbox. Same with the pod namespace in the PodSpec.
+    optional string namespace = 3;
+}
+
 // PodSandboxConfig holds all the required and optional fields for creating a
 // sandbox.
 message PodSandboxConfig {
-    // The name of the sandbox.
-    optional string name = 1;
-    // The uid of the sandbox.
-    optional string uid = 2;
-    // The namespace of the sandbox.
-    optional string namespace = 3;
+    // The metadata of the sandbox. The container runtime should build a unique
+    // name based on this.
+    optional PodSandboxMetadata metadata = 1;
     // The hostname of the sandbox.
-    optional string hostname = 4;
+    optional string hostname = 2;
     // Path to the directory on the host in which container log files are
     // stored.
     // By default the log of a container going into the LogDirectory will be
@@ -160,18 +167,18 @@ message PodSandboxConfig {
     // container logs are under active discussion in
     // https://issues.k8s.io/24677. There *may* be future change of direction
     // for logging as the discussion carries on.
-    optional string log_directory = 5;
+    optional string log_directory = 3;
     // The DNS options for the sandbox.
-    optional DNSOption dns_options = 6;
+    optional DNSOption dns_options = 4;
     // The port mappings for the sandbox.
-    repeated PortMapping port_mappings = 7;
+    repeated PortMapping port_mappings = 5;
     // Labels are key value pairs that may be used to scope and select individual resources.
-    map<string, string> labels = 8;
+    map<string, string> labels = 6;
     // Annotations is an unstructured key value map that may be set by external
     // tools to store and retrieve arbitrary metadata.
-    map<string, string> annotations = 9;
+    map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
-    optional LinuxPodSandboxConfig linux = 10;
+    optional LinuxPodSandboxConfig linux = 8;
 }
 
 message CreatePodSandboxRequest {
@@ -362,9 +369,21 @@ message LinuxUser {
     repeated int64 additional_gids = 3;
 }
 
-message ContainerConfig {
-    // Name of the container.
+// ContainerMetadata holds all necessary information for building unique
+// container name.
+message ContainerMetadata {
+    // The name of the container. Same with the container name in the PodSpec.
     optional string name = 1;
+    // The restart count of the container.
+    optional uint32 restart_count = 2;
+}
+
+// ContainerConfig holds all the required and optional fields for creating a
+// container.
+message ContainerConfig {
+    // The metadata of the container. The container runtime should build a unique
+    // container name based on this.
+    optional ContainerMetadata metadata = 1 ;
     // Image to use.
     optional ImageSpec image = 2;
     // Command to execute (i.e., entrypoint for docker)

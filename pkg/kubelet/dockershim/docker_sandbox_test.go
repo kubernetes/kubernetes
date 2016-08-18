@@ -29,7 +29,13 @@ func TestCreateSandbox(t *testing.T) {
 	name := "FOO"
 	namespace := "BAR"
 	uid := "1"
-	config := &runtimeApi.PodSandboxConfig{Name: &name, Namespace: &namespace, Uid: &uid}
+	config := &runtimeApi.PodSandboxConfig{
+		Metadata: &runtimeApi.PodSandboxMetadata{
+			Name:      &name,
+			Namespace: &namespace,
+			Uid:       &uid,
+		},
+	}
 	id, err := ds.CreatePodSandbox(config)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)

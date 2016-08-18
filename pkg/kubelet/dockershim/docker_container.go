@@ -83,7 +83,7 @@ func (ds *dockerService) CreateContainer(podSandboxID string, config *runtimeApi
 		return "", fmt.Errorf("container config is nil")
 	}
 	if sandboxConfig == nil {
-		return "", fmt.Errorf("sandbox config is nil for container %q", config.GetName())
+		return "", fmt.Errorf("sandbox config is nil for container %q", config.Metadata.GetName())
 	}
 
 	// Merge annotations and labels because docker supports only labels.
