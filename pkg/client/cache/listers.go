@@ -265,6 +265,25 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	return
 }
 
+type StoreToDeploymentNamespacer struct {
+	store     Store
+	namespace string
+}
+
+func (s StoreToDeploymentNamespacer) List() (deployments []extensions.Deployment, err error) {
+	for _, c := range s.store.List() {
+		d := *(c.(*extensions.Deployment))
+		if s.namespace == api.NamespaceAll || s.namespace == d.Namespace {
+			deployments = append(deployments, d)
+		}
+	}
+	return
+}
+
+func (s *StoreToDeploymentLister) Deployments(namespace string) StoreToDeploymentNamespacer {
+	return StoreToDeploymentNamespacer{s.Store, namespace}
+}
+
 // StoreToDeploymentLister gives a store List and Exists methods. The store must contain only Deployments.
 type StoreToDeploymentLister struct {
 	Store
