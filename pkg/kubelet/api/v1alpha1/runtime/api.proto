@@ -136,11 +136,11 @@ message LinuxPodSandboxConfig {
 
 // PodSandboxMetadata holds all necessary information for building unique sandbox name.
 message PodSandboxMetadata {
-    // The pod name of the sandbox. Same with the pod name in the PodSpec.
+    // The pod name of the sandbox. Same as the pod name in the PodSpec.
     optional string name = 1;
-    // The pod uid of the sandbox. Same with the pod UID in the PodSpec.
+    // The pod uid of the sandbox. Same as the pod UID in the PodSpec.
     optional string uid = 2;
-    // The pod namespace of the sandbox. Same with the pod namespace in the PodSpec.
+    // The pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
     optional string namespace = 3;
 }
 
@@ -372,7 +372,7 @@ message LinuxUser {
 // ContainerMetadata holds all necessary information for building unique
 // container name.
 message ContainerMetadata {
-    // The name of the container. Same with the container name in the PodSpec.
+    // The name of the container. Same as the container name in the PodSpec.
     optional string name = 1;
     // The restart count of the container.
     optional uint32 restart_count = 2;

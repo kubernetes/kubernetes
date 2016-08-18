@@ -488,11 +488,11 @@ func (m *LinuxPodSandboxConfig) GetNamespaceOptions() *NamespaceOption {
 
 // PodSandboxMetadata holds all necessary information for building unique sandbox name.
 type PodSandboxMetadata struct {
-	// The pod name of the sandbox. Same with the pod name in the PodSpec.
+	// The pod name of the sandbox. Same as the pod name in the PodSpec.
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
-	// The pod uid of the sandbox. Same with the pod UID in the PodSpec.
+	// The pod uid of the sandbox. Same as the pod UID in the PodSpec.
 	Uid *string `protobuf:"bytes,2,opt,name=uid" json:"uid,omitempty"`
-	// The pod namespace of the sandbox. Same with the pod namespace in the PodSpec.
+	// The pod namespace of the sandbox. Same as the pod namespace in the PodSpec.
 	Namespace        *string `protobuf:"bytes,3,opt,name=namespace" json:"namespace,omitempty"`
 	XXX_unrecognized []byte  `json:"-"`
 }
@@ -1297,7 +1297,7 @@ func (m *LinuxUser) GetAdditionalGids() []int64 {
 // ContainerMetadata holds all necessary information for building unique
 // container name.
 type ContainerMetadata struct {
-	// The name of the container. Same with the container name in the PodSpec.
+	// The name of the container. Same as the container name in the PodSpec.
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	// The restart count of the container.
 	RestartCount     *uint32 `protobuf:"varint,2,opt,name=restart_count,json=restartCount" json:"restart_count,omitempty"`
