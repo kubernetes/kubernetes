@@ -454,10 +454,21 @@ func (s *server) String() string {
 // TODO(random-liu): Move this to util
 func readinessCheck(urls []string, errCh <-chan error) error {
 	endTime := time.Now().Add(*serverStartTimeout)
+	blockCh := make(chan error)
+	defer close(blockCh)
 	for endTime.After(time.Now()) {
 		select {
-		case err := <-errCh:
-			return err
+		case err, ok := <-errCh:
+			if ok { // The channel is not closed, this is a real error
+				if err != nil { // If there is an error, return it
+					return err
+				}
+				// If not, keep checking readiness.
+			} else { // The channel is closed, this is only a zero value.
+				// Replace the errCh with blockCh to avoid busy loop,
+				// and keep checking readiness.
+				errCh = blockCh
+			}
 		case <-time.After(time.Second):
 			ready := true
 			for _, url := range urls {
