@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -52,8 +53,15 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	framework.KubeDescribe("DynamicProvisioner", func() {
 		It("should create and delete persistent volumes", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
+
+			By("creating a StorageClass")
+			class := newStorageClass()
+			_, err := c.Extensions().StorageClasses().Create(class)
+			defer c.Extensions().StorageClasses().Delete(class.Name)
+			Expect(err).NotTo(HaveOccurred())
+
 			By("creating a claim with a dynamic provisioning annotation")
-			claim := createClaim(ns)
+			claim := newClaim(ns)
 			defer func() {
 				c.PersistentVolumeClaims(ns).Delete(claim.Name)
 			}()
@@ -124,13 +132,13 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	})
 })
 
-func createClaim(ns string) *api.PersistentVolumeClaim {
+func newClaim(ns string) *api.PersistentVolumeClaim {
 	return &api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
 			Annotations: map[string]string{
-				"volume.alpha.kubernetes.io/storage-class": "",
+				"volume.beta.kubernetes.io/storage-class": "fast",
 			},
 		},
 		Spec: api.PersistentVolumeClaimSpec{
@@ -191,4 +199,27 @@ func runInPodWithVolume(c *client.Client, ns, claimName, command string) {
 	}()
 	framework.ExpectNoError(err, "Failed to create pod: %v", err)
 	framework.ExpectNoError(framework.WaitForPodSuccessInNamespaceSlow(c, pod.Name, pod.Spec.Containers[0].Name, pod.Namespace))
+}
+
+func newStorageClass() *extensions.StorageClass {
+	var pluginName string
+
+	switch {
+	case framework.ProviderIs("gke"), framework.ProviderIs("gce"):
+		pluginName = "kubernetes.io/gce-pd"
+	case framework.ProviderIs("aws"):
+		pluginName = "kubernetes.io/aws-ebs"
+	case framework.ProviderIs("openstack"):
+		pluginName = "kubernetes.io/cinder"
+	}
+
+	return &extensions.StorageClass{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "fast",
+		},
+		Provisioner: pluginName,
+	}
 }

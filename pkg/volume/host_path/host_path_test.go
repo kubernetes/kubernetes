@@ -154,7 +154,8 @@ func TestProvisioner(t *testing.T) {
 	err := os.MkdirAll(tempPath, 0750)
 
 	plugMgr := volume.VolumePluginMgr{}
-	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */))
+	plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{ProvisioningEnabled: true}),
+		volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */))
 	spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: tempPath}}}}}
 	plug, err := plugMgr.FindCreatablePluginBySpec(spec)
 	if err != nil {
