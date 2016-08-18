@@ -335,6 +335,17 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 
 	if kcfg == nil {
 		var kubeClient, eventClient *clientset.Clientset
+
+		if s.KubeConfig.Value() != "" && s.BootstrapKubeconfig != "" {
+			nodeName, err := getNodeName(s)
+			if err != nil {
+				return err
+			}
+			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+				return err
+			}
+		}
+
 		clientConfig, err := CreateAPIServerClientConfig(s)
 		if err == nil {
 			kubeClient, err = clientset.NewForConfig(clientConfig)
@@ -439,13 +450,37 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	return nil
 }
 
+// getNodeName returns the node name according to the cloud provider
+// if cloud provider is specified. Otherwise, returns the host name of the node.
+func getNodeName(s *options.KubeletServer) (string, error) {
+	var err error
+	var cloud cloudprovider.Interface
+
+	if s.CloudProvider != kubeExternal.AutoDetectCloudProvider {
+		cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	hostName := nodeutil.GetHostname(s.HostnameOverride)
+	if cloud != nil {
+		instances, ok := cloud.Instances()
+		if !ok {
+			return "", fmt.Errorf("failed to get instances from cloud provider")
+		}
+		return instances.CurrentNodeName(hostName)
+	}
+	return hostName, nil
+}
+
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
 func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
 		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if crypto.ShouldGenSelfSignedCerts(s.TLSCertFile, s.TLSPrivateKeyFile) {
+		if !crypto.FoundCertOrKey(s.TLSCertFile, s.TLSPrivateKeyFile) {
 			if err := crypto.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
@@ -528,13 +563,13 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 		return nil, fmt.Errorf("cannot specify both --kubeconfig and --auth-path")
 	}
 	if s.KubeConfig.Provided() {
-		return kubeconfigClientConfig(s)
+		return kubeconfigClientConfig(s.KubeConfig.Value(), s.APIServerList)
 	}
 	if s.AuthPath.Provided() {
 		return authPathClientConfig(s, false)
 	}
 	// Try the kubeconfig default first, falling back to the auth path default.
-	clientConfig, err := kubeconfigClientConfig(s)
+	clientConfig, err := kubeconfigClientConfig(s.KubeConfig.Value(), s.APIServerList)
 	if err != nil {
 		glog.Warningf("Could not load kubeconfig file %s: %v. Trying auth path instead.", s.KubeConfig, err)
 		return authPathClientConfig(s, true)
