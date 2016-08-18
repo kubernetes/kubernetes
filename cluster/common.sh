@@ -648,6 +648,11 @@ NUM_NODES: $(yaml-quote ${NUM_NODES})
 STORAGE_BACKEND: $(yaml-quote ${STORAGE_BACKEND:-})
 ENABLE_GARBAGE_COLLECTOR: $(yaml-quote ${ENABLE_GARBAGE_COLLECTOR:-false})
 EOF
+    if [ -n "${TEST_ETCD_VERSION:-}" ]; then
+      cat >>$file <<EOF
+TEST_ETCD_VERSION: $(yaml-quote ${TEST_ETCD_VERSION})
+EOF
+    fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat >>$file <<EOF
 APISERVER_TEST_ARGS: $(yaml-quote ${APISERVER_TEST_ARGS})
