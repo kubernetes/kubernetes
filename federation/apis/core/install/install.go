@@ -40,26 +40,26 @@ var accessor = meta.NewAccessor()
 var availableVersions = []unversioned.GroupVersion{core_v1.SchemeGroupVersion}
 
 func init() {
-	registered.RegisterVersions(availableVersions)
-	externalVersions := []unversioned.GroupVersion{}
-	for _, v := range availableVersions {
-		if registered.IsAllowedVersion(v) {
-			externalVersions = append(externalVersions, v)
-		}
-	}
-	if len(externalVersions) == 0 {
-		glog.V(4).Infof("No version is registered for group %v", core.GroupName)
-		return
-	}
+	//registered.RegisterVersions(availableVersions)
+	//externalVersions := []unversioned.GroupVersion{}
+	//for _, v := range availableVersions {
+	//	if registered.IsAllowedVersion(v) {
+	//		externalVersions = append(externalVersions, v)
+	//	}
+	//}
+	//if len(externalVersions) == 0 {
+	//	glog.V(4).Infof("No version is registered for group %v", core.GroupName)
+	//	return
+	//}
 
-	if err := registered.EnableVersions(externalVersions...); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
-	}
-	if err := enableVersions(externalVersions); err != nil {
-		glog.V(4).Infof("%v", err)
-		return
-	}
+	//if err := registered.EnableVersions(externalVersions...); err != nil {
+	//	glog.V(4).Infof("%v", err)
+	//	return
+	//}
+	//if err := enableVersions(externalVersions); err != nil {
+	//	glog.V(4).Infof("%v", err)
+	//	return
+	//}
 }
 
 // TODO: enableVersions should be centralized rather than spread in each API
