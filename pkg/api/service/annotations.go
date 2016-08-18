@@ -17,7 +17,6 @@ limitations under the License.
 package service
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/golang/glog"
@@ -43,6 +42,7 @@ const (
 	AnnotationHealthCheckNodePort = "service.alpha.kubernetes.io/healthcheck-nodeport"
 )
 
+// ServiceNeedsHealthCheck Check service for health check annotations
 func ServiceNeedsHealthCheck(service *api.Service) bool {
 	if l, ok := service.Annotations[AnnotationExternalTraffic]; ok {
 		if l == AnnotationValueExternalTrafficLocal {
@@ -57,29 +57,28 @@ func ServiceNeedsHealthCheck(service *api.Service) bool {
 	return false
 }
 
-func GetServiceHealthCheckNodePort(service *api.Service) (int32, error) {
+// GetServiceHealthCheckNodePort Return health check node port annotation for service, if one exists
+func GetServiceHealthCheckNodePort(service *api.Service) int32 {
 	if ServiceNeedsHealthCheck(service) {
 		if l, ok := service.Annotations[AnnotationHealthCheckNodePort]; ok {
 			p, err := strconv.Atoi(l)
 			if err != nil {
 				glog.Errorf("Failed to parse annotation %v: %v", AnnotationHealthCheckNodePort, err)
-				return 0, fmt.Errorf("Failed to parse annotation %v: %v", AnnotationHealthCheckNodePort, err)
+				return 0
 			}
-			return int32(p), nil
-		} else {
-			glog.Errorf("Service does not contain necessary annotation %v", AnnotationHealthCheckNodePort)
+			return int32(p)
 		}
 	}
-	return 0, fmt.Errorf("No health check needed")
+	return 0
 }
 
-// Return the path programmed into the Cloud LB Health Check
+// GetServiceHealthCheckPathPort Return the path and nodePort programmed into the Cloud LB Health Check
 func GetServiceHealthCheckPathPort(service *api.Service) (string, int32) {
 	if !ServiceNeedsHealthCheck(service) {
 		return "", 0
 	}
-	port, err := GetServiceHealthCheckNodePort(service)
-	if err != nil {
+	port := GetServiceHealthCheckNodePort(service)
+	if port == 0 {
 		return "", 0
 	}
 	return "/healthz", port

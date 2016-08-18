@@ -853,8 +853,8 @@ func TestServiceRegistryExternalTrafficAnnotationHealthCheckNodePortAllocation(t
 	if !service.ServiceNeedsHealthCheck(created_service) {
 		t.Errorf("Unexpected missing annotation %s", service.AnnotationExternalTraffic)
 	}
-	_, err = service.GetServiceHealthCheckNodePort(created_service)
-	if err != nil {
+	port := service.GetServiceHealthCheckNodePort(created_service)
+	if port == 0 {
 		t.Errorf("Failed to allocate and create the health check node port annotation %s", service.AnnotationHealthCheckNodePort)
 	}
 
@@ -891,8 +891,8 @@ func TestServiceRegistryExternalTrafficAnnotationHealthCheckNodePortUserAllocati
 	if !service.ServiceNeedsHealthCheck(created_service) {
 		t.Errorf("Unexpected missing annotation %s", service.AnnotationExternalTraffic)
 	}
-	port, err := service.GetServiceHealthCheckNodePort(created_service)
-	if err != nil {
+	port := service.GetServiceHealthCheckNodePort(created_service)
+	if port == 0 {
 		t.Errorf("Failed to allocate and create the health check node port annotation %s", service.AnnotationHealthCheckNodePort)
 	}
 	if port != 30200 {
@@ -900,15 +900,43 @@ func TestServiceRegistryExternalTrafficAnnotationHealthCheckNodePortUserAllocati
 	}
 }
 
-// Validate that the health check nodePort is not allocated when the externalTraffic annotation is !"OnlyLocal"
+// Validate that the service creation fails when the requested port number is -1
 func TestServiceRegistryExternalTrafficAnnotationNegative(t *testing.T) {
 	ctx := api.NewDefaultContext()
 	storage, _ := NewTestREST(t, nil)
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "external-lb-esipp",
 			Annotations: map[string]string{
-				service.AnnotationExternalTraffic:     service.AnnotationValueExternalTrafficGlobal,
-				service.AnnotationHealthCheckNodePort: "30200",
+				service.AnnotationExternalTraffic:     service.AnnotationValueExternalTrafficLocal,
+				service.AnnotationHealthCheckNodePort: "-1",
+			},
+		},
+		Spec: api.ServiceSpec{
+			Selector:        map[string]string{"bar": "baz"},
+			SessionAffinity: api.ServiceAffinityNone,
+			Type:            api.ServiceTypeLoadBalancer,
+			Ports: []api.ServicePort{{
+				Port:       6502,
+				Protocol:   api.ProtocolTCP,
+				TargetPort: intstr.FromInt(6502),
+			}},
+		},
+	}
+	created_svc, err := storage.Create(ctx, svc)
+	if created_svc == nil || err != nil {
+		return
+	}
+	t.Errorf("Unexpected creation of service with invalid healthCheckNodePort specified")
+}
+
+// Validate that the health check nodePort is not allocated when the externalTraffic annotation is !"OnlyLocal"
+func TestServiceRegistryExternalTrafficAnnotationGlobal(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	storage, _ := NewTestREST(t, nil)
+	svc := &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "external-lb-esipp",
+			Annotations: map[string]string{
+				service.AnnotationExternalTraffic: service.AnnotationValueExternalTrafficGlobal,
 			},
 		},
 		Spec: api.ServiceSpec{
@@ -932,8 +960,8 @@ func TestServiceRegistryExternalTrafficAnnotationNegative(t *testing.T) {
 		t.Errorf("Unexpected value for annotation %s", service.AnnotationExternalTraffic)
 	}
 	// Make sure the service does not have the health check node port allocated
-	_, err = service.GetServiceHealthCheckNodePort(created_service)
-	if err == nil {
+	port := service.GetServiceHealthCheckNodePort(created_service)
+	if port != 0 {
 		t.Errorf("Unexpected allocation of health check node port annotation %s", service.AnnotationHealthCheckNodePort)
 	}
 }
@@ -945,8 +973,7 @@ func TestServiceRegistryExternalTrafficAnnotationClusterIP(t *testing.T) {
 	svc := &api.Service{
 		ObjectMeta: api.ObjectMeta{Name: "external-lb-esipp",
 			Annotations: map[string]string{
-				service.AnnotationExternalTraffic:     service.AnnotationValueExternalTrafficGlobal,
-				service.AnnotationHealthCheckNodePort: "30200",
+				service.AnnotationExternalTraffic: service.AnnotationValueExternalTrafficGlobal,
 			},
 		},
 		Spec: api.ServiceSpec{
@@ -966,8 +993,8 @@ func TestServiceRegistryExternalTrafficAnnotationClusterIP(t *testing.T) {
 	}
 	created_service := created_svc.(*api.Service)
 	// Make sure that ClusterIP services do not have the health check node port allocated
-	_, err = service.GetServiceHealthCheckNodePort(created_service)
-	if err == nil {
+	port := service.GetServiceHealthCheckNodePort(created_service)
+	if port != 0 {
 		t.Errorf("Unexpected allocation of health check node port annotation %s", service.AnnotationHealthCheckNodePort)
 	}
 }

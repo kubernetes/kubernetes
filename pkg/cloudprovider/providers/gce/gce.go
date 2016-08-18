@@ -72,9 +72,6 @@ const (
 
 	maxTargetPoolCreateInstances = 200
 
-	// Max size of names accepted by the GCE api.
-	nameLengthLimit = 63
-
 	// HTTP Load Balancer parameters
 	// Configure 2 second period for external health checks.
 	gceHcCheckIntervalSeconds = int64(2)
