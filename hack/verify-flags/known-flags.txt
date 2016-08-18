@@ -276,6 +276,7 @@ kubelet-sync-frequency
 kubelet-timeout
 kubernetes-service-node-port
 label-columns
+large-cluster-size-threshold
 last-release-pr
 leader-elect
 leader-elect-lease-duration
@@ -335,6 +336,7 @@ network-plugin-dir
 no-headers
 no-suggestions
 node-cidr-mask-size
+node-eviction-rate
 node-instance-group
 node-ip
 node-labels
@@ -433,6 +435,7 @@ scheduler-name
 schema-cache-dir
 scopes
 seccomp-profile-root
+secondary-node-eviction-rate
 secure-port
 serialize-image-pulls
 server-start-timeout
@@ -492,6 +495,7 @@ ttl-secs
 type-src
 udp-port
 udp-timeout
+unhealthy-zone-threshold
 unix-socket
 update-period
 upgrade-target
