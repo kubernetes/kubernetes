@@ -63,8 +63,8 @@ latest major version for at least one year from its original release date.
 beta releases. X.Y.Z-alpha.W.C+aaaa is C commits after X.Y.Z-alpha.W, with an
 additional +aaaa build suffix added; X.Y.Z-beta.W.C+bbbb is C commits after
 X.Y.Z-beta.W, with an additional +bbbb build suffix added. Furthermore, builds
-that are built off of a dirty build tree, (during development, with things in
-the tree that are not checked it,) it will be appended with -dirty.
+that are built off of a dirty build tree (during development, with things in
+the tree that are not checked in) will be appended with -dirty.
 
 ### Supported releases and component skew
 
