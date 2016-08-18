@@ -270,6 +270,7 @@ type StoreToDeploymentNamespacer struct {
 	namespace string
 }
 
+// StoreToDeploymentNamespacer lists all deployments under its namespace in the store.
 func (s StoreToDeploymentNamespacer) List() (deployments []extensions.Deployment, err error) {
 	for _, c := range s.store.List() {
 		d := *(c.(*extensions.Deployment))
