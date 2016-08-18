@@ -84,6 +84,11 @@ type ingressItem struct {
 func NewIngressController(client federation_release_1_4.Interface) *IngressController {
 	ic := &IngressController{
 		federatedApiClient: client,
+		ingressReviewDelay:  time.Second * 10,
+		clusterAvailableDelay: time.Second * 20,
+		smallDelay:            time.Second * 3,
+		updateTimeout:         time.Second * 30,
+		ingressBackoff:      flowcontrol.NewBackOff(5*time.Second, time.Minute),
 	}
 
 	// Build deliverers for triggering reconcilations.
