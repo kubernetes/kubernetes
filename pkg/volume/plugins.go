@@ -55,6 +55,10 @@ type VolumeOptions struct {
 	ClusterName string
 	// Tags to attach to the real volume in the cloud provider - e.g. AWS EBS
 	CloudTags *map[string]string
+	// Encrypted is a flag that denotes whether or not a provisioned volume is encrypted
+	Encrypted bool
+	// EncryptionKeyName is the fully-qualified name of a key resource in a cloud provider
+	EncryptionKeyName string
 }
 
 // VolumePlugin is an interface to volume plugins that can be used on a

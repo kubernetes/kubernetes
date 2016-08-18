@@ -211,9 +211,11 @@ type EC2Metadata interface {
 
 // VolumeOptions specifies capacity and tags for a volume.
 type VolumeOptions struct {
-	CapacityGB int
-	Tags       map[string]string
-	PVCName    string
+	CapacityGB        int
+	Tags              map[string]string
+	PVCName           string
+	Encrypted         bool
+	EncryptionKeyName string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -1483,6 +1485,8 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
 	request.VolumeType = aws.String(DefaultVolumeType)
+	request.Encrypted = volumeOptions.Encrypted
+	request.KmsKeyId = volumeOptions.EncryptionKeyName
 	response, err := c.ec2.CreateVolume(request)
 	if err != nil {
 		return "", err

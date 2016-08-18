@@ -79,9 +79,11 @@ func (util *AWSDiskUtil) CreateVolume(c *awsElasticBlockStoreProvisioner) (strin
 	// AWS works with gigabytes, convert to GiB with rounding up
 	requestGB := int(volume.RoundUpSize(requestBytes, 1024*1024*1024))
 	volumeOptions := &aws.VolumeOptions{
-		CapacityGB: requestGB,
-		Tags:       tags,
-		PVCName:    c.options.PVCName,
+		CapacityGB:        requestGB,
+		Tags:              tags,
+		PVCName:           c.options.PVCName,
+		Encrypted:         c.options.Encrypted,
+		EncryptionKeyName: c.options.EncryptionKeyName,
 	}
 
 	name, err := cloud.CreateDisk(volumeOptions)

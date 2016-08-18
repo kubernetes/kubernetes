@@ -1212,6 +1212,11 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
 		PVCName:                       claim.Name,
+
+		// will this need anything considering I see
+		//    Parameters:                    storageClass.Parameters,
+		// in https://github.com/kubernetes/kubernetes/pull/29006
+		// EBS plugin just accesses Parameters directly?
 	}
 
 	// Provision the volume
