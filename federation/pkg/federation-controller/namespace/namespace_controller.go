@@ -221,6 +221,7 @@ func (nc *NamespaceController) reconcileNamespacesOnClusterChange() {
 func (nc *NamespaceController) reconcileNamespace(namespace string) {
 	if !nc.isSynced() {
 		nc.deliverNamespace(namespace, nc.clusterAvailableDelay, false)
+		return
 	}
 
 	baseNamespaceObj, exist, err := nc.namespaceInformerStore.GetByKey(namespace)
