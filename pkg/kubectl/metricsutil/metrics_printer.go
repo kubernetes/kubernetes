@@ -19,7 +19,6 @@ package metricsutil
 import (
 	"fmt"
 	"io"
-	"time"
 
 	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
@@ -31,10 +30,9 @@ var (
 	MeasuredResources = []api.ResourceName{
 		api.ResourceCPU,
 		api.ResourceMemory,
-		api.ResourceStorage,
 	}
-	NodeColumns     = []string{"NAME", "CPU (cores)", "MEMORY (bytes)", "STORAGE (bytes)", "TIMESTAMP"}
-	PodColumns      = []string{"NAME", "CPU (cores)", "MEMORY (bytes)", "STORAGE (bytes)", "TIMESTAMP"}
+	NodeColumns     = []string{"NAME", "CPU(cores)", "CPU%", "MEMORY(bytes)", "MEMORY%"}
+	PodColumns      = []string{"NAME", "CPU(cores)", "MEMORY(bytes)"}
 	NamespaceColumn = "NAMESPACE"
 	PodColumn       = "POD"
 )
@@ -43,7 +41,6 @@ type ResourceMetricsInfo struct {
 	Name      string
 	Metrics   api.ResourceList
 	Available api.ResourceList
-	Timestamp string
 }
 
 type TopCmdPrinter struct {
@@ -72,7 +69,6 @@ func (printer *TopCmdPrinter) PrintNodeMetrics(metrics []metrics_api.NodeMetrics
 			Name:      m.Name,
 			Metrics:   usage,
 			Available: availableResources[m.Name],
-			Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
 		})
 	}
 	return nil
@@ -139,7 +135,6 @@ func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 				Name:      contName,
 				Metrics:   containers[contName],
 				Available: api.ResourceList{},
-				Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
 			})
 		}
 	} else {
@@ -149,7 +144,7 @@ func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 		printMetricsLine(out, &ResourceMetricsInfo{
 			Name:      m.Name,
 			Metrics:   podMetrics,
-			Timestamp: m.Timestamp.Time.Format(time.RFC1123Z),
+			Available: api.ResourceList{},
 		})
 	}
 	return nil
@@ -158,7 +153,6 @@ func printSinglePodMetrics(out io.Writer, m *metrics_api.PodMetrics, printContai
 func printMetricsLine(out io.Writer, metrics *ResourceMetricsInfo) {
 	printValue(out, metrics.Name)
 	printAllResourceUsages(out, metrics)
-	printValue(out, metrics.Timestamp)
 	fmt.Fprint(out, "\n")
 }
 
@@ -170,11 +164,11 @@ func printAllResourceUsages(out io.Writer, metrics *ResourceMetricsInfo) {
 	for _, res := range MeasuredResources {
 		quantity := metrics.Metrics[res]
 		printSingleResourceUsage(out, res, quantity)
+		fmt.Fprint(out, "\t")
 		if available, found := metrics.Available[res]; found {
 			fraction := float64(quantity.MilliValue()) / float64(available.MilliValue()) * 100
-			fmt.Fprintf(out, " (%d%%)", int64(fraction))
+			fmt.Fprintf(out, "%d%%\t", int64(fraction))
 		}
-		fmt.Fprint(out, "\t")
 	}
 }
 
@@ -184,9 +178,6 @@ func printSingleResourceUsage(out io.Writer, resourceType api.ResourceName, quan
 		fmt.Fprintf(out, "%vm", quantity.MilliValue())
 	case api.ResourceMemory:
 		fmt.Fprintf(out, "%vMi", quantity.Value()/(1024*1024))
-	case api.ResourceStorage:
-		// TODO: Change it after storage metrics collection is finished.
-		fmt.Fprint(out, "-")
 	default:
 		fmt.Fprintf(out, "%v", quantity.Value())
 	}
