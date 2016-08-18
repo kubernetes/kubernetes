@@ -119,7 +119,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		}
 	})
 
-	Context("create a batch of pods [Benchmark]", func() {
+	Context("create a batch of pods", func() {
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -137,7 +137,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval",
+			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval [Benchmark]",
 				itArg.podsNr, itArg.interval), func() {
 				itArg.createMethod = "batch"
 				testName := itArg.getTestName()
@@ -190,7 +190,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		}
 	})
 
-	Context("create a sequence of pods [Benchmark]", func() {
+	Context("create a sequence of pods", func() {
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -208,7 +208,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods",
+			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods [Benchmark]",
 				itArg.podsNr, itArg.bgPodsNr), func() {
 				itArg.createMethod = "sequence"
 				testName := itArg.getTestName()
