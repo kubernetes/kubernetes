@@ -455,8 +455,8 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			info.loadBalancerSourceRanges = service.Spec.LoadBalancerSourceRanges
 			info.onlyNodeLocalEndpoints = apiservice.ServiceNeedsHealthCheck(service)
 			if info.onlyNodeLocalEndpoints {
-				p, err := apiservice.GetServiceHealthCheckNodePort(service)
-				if err != nil {
+				p := apiservice.GetServiceHealthCheckNodePort(service)
+				if p == 0 {
 					glog.Errorf("Service does not contain necessary annotation %v",
 						apiservice.AnnotationHealthCheckNodePort)
 				} else {
@@ -1098,6 +1098,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 		// Generate the per-endpoint chains.  We do this in multiple passes so we
 		// can group rules together.
+		// These two slices parallel each other - keep in sync
 		endpoints := make([]*endpointsInfo, 0)
 		endpointChains := make([]utiliptables.Chain, 0)
 		for _, ep := range proxier.endpointsMap[svcName] {
@@ -1151,7 +1152,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", "comment", "--comment", svcName.String(),
 			}
 			// Handle traffic that loops back to the originator with SNAT.
-			// We only need to do this if the endpoint is on this node.
+			// We only need to do this if the endpoint is local to this node.
 			if endpoints[i].localEndpoint {
 				writeLine(natRules, append(args,
 					"-s", fmt.Sprintf("%s/32", strings.Split(endpoints[i].ip, ":")[0]),
@@ -1230,7 +1231,6 @@ func (proxier *Proxier) syncProxyRules() {
 				writeLine(natRules, args...)
 			}
 		}
-
 	}
 
 	// Delete chains no longer in use.
