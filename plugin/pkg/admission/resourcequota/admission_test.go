@@ -284,7 +284,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 
 	// old service was a load balancer, but updated version is a node port.
 	oldService := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test"},
+		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test", ResourceVersion: "1"},
 		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
 	}
 	newService := &api.Service{
