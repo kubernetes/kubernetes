@@ -51,6 +51,7 @@ import (
 	utilyaml "k8s.io/kubernetes/pkg/util/yaml"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -142,7 +143,7 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 					}
 					ing.Spec.Rules = newRules
 				})
-				fmt.Sprintf("Checking that %s is not exposed by polling for failure", pathToFail)
+				By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.address, pathToFail)
 				ExpectNoError(jig.pollURL(route, updateURLMapHost, lbCleanupTimeout, &http.Client{Timeout: reqTimeout}, true))
 			},
