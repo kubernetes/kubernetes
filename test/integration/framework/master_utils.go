@@ -54,6 +54,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/plugin/pkg/admission/admit"
 
+	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 )
 
@@ -134,6 +135,18 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		masterConfig = NewMasterConfig()
 		masterConfig.EnableProfiling = true
 		masterConfig.EnableSwaggerSupport = true
+		masterConfig.EnableOpenAPISupport = true
+		masterConfig.OpenAPIInfo = spec.Info{
+			InfoProps: spec.InfoProps{
+				Title: "Kubernetes",
+				Version: "unversioned",
+			},
+		}
+		masterConfig.OpenAPIDefaultResponse = spec.Response{
+			ResponseProps: spec.ResponseProps{
+				Description: "Default Response.",
+			},
+		}
 	}
 	m, err := master.New(masterConfig)
 	if err != nil {
