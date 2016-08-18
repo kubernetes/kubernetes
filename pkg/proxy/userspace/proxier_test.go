@@ -181,14 +181,14 @@ func waitForNumProxyLoops(t *testing.T, p *Proxier, want int32) {
 	t.Errorf("expected %d ProxyLoops running, got %d", want, got)
 }
 
-func waitForNumProxyClients(t *testing.T, s *serviceInfo, want int, timeout time.Duration) {
+func waitForNumProxyClients(t *testing.T, s *ServiceInfo, want int, timeout time.Duration) {
 	var got int
 	now := time.Now()
 	deadline := now.Add(timeout)
 	for time.Now().Before(deadline) {
-		s.activeClients.mu.Lock()
-		got = len(s.activeClients.clients)
-		s.activeClients.mu.Unlock()
+		s.ActiveClients.Lock()
+		got = len(s.ActiveClients.Clients)
+		s.ActiveClients.Unlock()
 		if got == want {
 			return
 		}
@@ -400,8 +400,8 @@ func TestTCPProxyStop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("error adding new service: %#v", err)
 	}
-	if !svcInfo.isAlive() {
-		t.Fatalf("wrong value for isAlive(): expected true")
+	if !svcInfo.IsAlive() {
+		t.Fatalf("wrong value for IsAlive(): expected true")
 	}
 	conn, err := net.Dial("tcp", joinHostPort("", svcInfo.proxyPort))
 	if err != nil {
@@ -411,8 +411,8 @@ func TestTCPProxyStop(t *testing.T) {
 	waitForNumProxyLoops(t, p, 1)
 
 	stopProxyByName(p, service)
-	if svcInfo.isAlive() {
-		t.Fatalf("wrong value for isAlive(): expected false")
+	if svcInfo.IsAlive() {
+		t.Fatalf("wrong value for IsAlive(): expected false")
 	}
 	// Wait for the port to really close.
 	if err := waitForClosedPortTCP(p, svcInfo.proxyPort); err != nil {

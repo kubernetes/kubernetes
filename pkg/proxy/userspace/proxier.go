@@ -42,14 +42,18 @@ type portal struct {
 	isExternal bool
 }
 
-type serviceInfo struct {
+// ServiceInfo contains information and state for a particular proxied service
+type ServiceInfo struct {
+	// Timeout is the the read/write timeout (used for UDP connections)
+	Timeout time.Duration
+	// ActiveClients is the cache of active UDP clients being proxied by this proxy for this service
+	ActiveClients *ClientCache
+
 	isAliveAtomic       int32 // Only access this with atomic ops
 	portal              portal
 	protocol            api.Protocol
 	proxyPort           int
-	socket              proxySocket
-	timeout             time.Duration
-	activeClients       *clientCache
+	socket              ProxySocket
 	nodePort            int
 	loadBalancerStatus  api.LoadBalancerStatus
 	sessionAffinityType api.ServiceAffinity
@@ -58,7 +62,7 @@ type serviceInfo struct {
 	externalIPs []string
 }
 
-func (info *serviceInfo) setAlive(b bool) {
+func (info *ServiceInfo) setAlive(b bool) {
 	var i int32
 	if b {
 		i = 1
@@ -66,7 +70,7 @@ func (info *serviceInfo) setAlive(b bool) {
 	atomic.StoreInt32(&info.isAliveAtomic, i)
 }
 
-func (info *serviceInfo) isAlive() bool {
+func (info *ServiceInfo) IsAlive() bool {
 	return atomic.LoadInt32(&info.isAliveAtomic) != 0
 }
 
@@ -85,7 +89,7 @@ func logTimeout(err error) bool {
 type Proxier struct {
 	loadBalancer   LoadBalancer
 	mu             sync.Mutex // protects serviceMap
-	serviceMap     map[proxy.ServicePortName]*serviceInfo
+	serviceMap     map[proxy.ServicePortName]*ServiceInfo
 	syncPeriod     time.Duration
 	minSyncPeriod  time.Duration // unused atm, but plumbed through
 	udpIdleTimeout time.Duration
@@ -177,7 +181,7 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 	}
 	return &Proxier{
 		loadBalancer: loadBalancer,
-		serviceMap:   make(map[proxy.ServicePortName]*serviceInfo),
+		serviceMap:   make(map[proxy.ServicePortName]*ServiceInfo),
 		portMap:      make(map[portMapKey]*portMapValue),
 		syncPeriod:   syncPeriod,
 		// plumbed through if needed, not used atm.
@@ -301,14 +305,14 @@ func (proxier *Proxier) cleanupStaleStickySessions() {
 }
 
 // This assumes proxier.mu is not locked.
-func (proxier *Proxier) stopProxy(service proxy.ServicePortName, info *serviceInfo) error {
+func (proxier *Proxier) stopProxy(service proxy.ServicePortName, info *ServiceInfo) error {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	return proxier.stopProxyInternal(service, info)
 }
 
 // This assumes proxier.mu is locked.
-func (proxier *Proxier) stopProxyInternal(service proxy.ServicePortName, info *serviceInfo) error {
+func (proxier *Proxier) stopProxyInternal(service proxy.ServicePortName, info *ServiceInfo) error {
 	delete(proxier.serviceMap, service)
 	info.setAlive(false)
 	err := info.socket.Close()
@@ -317,23 +321,23 @@ func (proxier *Proxier) stopProxyInternal(service proxy.ServicePortName, info *s
 	return err
 }
 
-func (proxier *Proxier) getServiceInfo(service proxy.ServicePortName) (*serviceInfo, bool) {
+func (proxier *Proxier) getServiceInfo(service proxy.ServicePortName) (*ServiceInfo, bool) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	info, ok := proxier.serviceMap[service]
 	return info, ok
 }
 
-func (proxier *Proxier) setServiceInfo(service proxy.ServicePortName, info *serviceInfo) {
+func (proxier *Proxier) setServiceInfo(service proxy.ServicePortName, info *ServiceInfo) {
 	proxier.mu.Lock()
 	defer proxier.mu.Unlock()
 	proxier.serviceMap[service] = info
 }
 
-// addServiceOnPort starts listening for a new service, returning the serviceInfo.
+// addServiceOnPort starts listening for a new service, returning the ServiceInfo.
 // Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP
 // connections, for now.
-func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol api.Protocol, proxyPort int, timeout time.Duration) (*serviceInfo, error) {
+func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol api.Protocol, proxyPort int, timeout time.Duration) (*ServiceInfo, error) {
 	sock, err := newProxySocket(protocol, proxier.listenIP, proxyPort)
 	if err != nil {
 		return nil, err
@@ -348,13 +352,14 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 		sock.Close()
 		return nil, err
 	}
-	si := &serviceInfo{
+	si := &ServiceInfo{
+		Timeout:       timeout,
+		ActiveClients: newClientCache(),
+
 		isAliveAtomic:       1,
 		proxyPort:           portNum,
 		protocol:            protocol,
 		socket:              sock,
-		timeout:             timeout,
-		activeClients:       newClientCache(),
 		sessionAffinityType: api.ServiceAffinityNone, // default
 		stickyMaxAgeMinutes: 180,                     // TODO: parameterize this in the API.
 	}
@@ -364,7 +369,7 @@ func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol
 	go func(service proxy.ServicePortName, proxier *Proxier) {
 		defer runtime.HandleCrash()
 		atomic.AddInt32(&proxier.numProxyLoops, 1)
-		sock.ProxyLoop(service, si, proxier)
+		sock.ProxyLoop(service, si, proxier.loadBalancer)
 		atomic.AddInt32(&proxier.numProxyLoops, -1)
 	}(service, proxier)
 
@@ -455,7 +460,7 @@ func (proxier *Proxier) OnServiceUpdate(services []api.Service) {
 	}
 }
 
-func sameConfig(info *serviceInfo, service *api.Service, port *api.ServicePort) bool {
+func sameConfig(info *ServiceInfo, service *api.Service, port *api.ServicePort) bool {
 	if info.protocol != port.Protocol || info.portal.port != int(port.Port) || info.nodePort != int(port.NodePort) {
 		return false
 	}
@@ -486,7 +491,7 @@ func ipsEqual(lhs, rhs []string) bool {
 	return true
 }
 
-func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *serviceInfo) error {
+func (proxier *Proxier) openPortal(service proxy.ServicePortName, info *ServiceInfo) error {
 	err := proxier.openOnePortal(info.portal, info.protocol, proxier.listenIP, info.proxyPort, service)
 	if err != nil {
 		return err
@@ -668,7 +673,7 @@ func (proxier *Proxier) openNodePort(nodePort int, protocol api.Protocol, proxyI
 	return nil
 }
 
-func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *serviceInfo) error {
+func (proxier *Proxier) closePortal(service proxy.ServicePortName, info *ServiceInfo) error {
 	// Collect errors and report them all at the end.
 	el := proxier.closeOnePortal(info.portal, info.protocol, proxier.listenIP, info.proxyPort, service)
 	for _, publicIP := range info.externalIPs {
