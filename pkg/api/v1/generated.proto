@@ -1748,6 +1748,9 @@ message PersistentVolumeSource {
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 14;
+
+  // Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+  optional QuobyteVolumeSource quobyte = 15;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -2315,6 +2318,30 @@ message Probe {
   // Minimum consecutive failures for the probe to be considered failed after having succeeded.
   // Defaults to 3. Minimum value is 1.
   optional int32 failureThreshold = 6;
+}
+
+// Represents a Quobyte mount that lasts the lifetime of a pod.
+// Quobyte volumes do not support ownership management or SELinux relabeling.
+message QuobyteVolumeSource {
+  // Registry represents a single or multiple Quobyte Registry services
+  // specified as a string as host:port pair (multiple entries are separated with commas)
+  // which acts as the central registry for volumes
+  optional string registry = 1;
+
+  // Volume is a string that references an already created Quobyte volume by name.
+  optional string volume = 2;
+
+  // ReadOnly here will force the Quobyte volume to be mounted with read-only permissions.
+  // Defaults to false.
+  optional bool readOnly = 3;
+
+  // User to map volume access to
+  // Defaults to serivceaccount user
+  optional string user = 4;
+
+  // Group to map volume access to
+  // Default is no group
+  optional string group = 5;
 }
 
 // Represents a Rados Block Device mount that lasts the lifetime of a pod.
@@ -2977,6 +3004,9 @@ message VolumeSource {
 
   // VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
   optional VsphereVirtualDiskVolumeSource vsphereVolume = 20;
+
+  // Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+  optional QuobyteVolumeSource quobyte = 21;
 }
 
 // Represents a vSphere volume resource.

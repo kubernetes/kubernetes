@@ -714,6 +714,7 @@ var (
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
 	VsphereVolume         FSType = "vsphereVolume"
+	Quobyte               FSType = "quobyte"
 	All                   FSType = "*"
 )
 
