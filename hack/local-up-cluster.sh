@@ -323,6 +323,8 @@ function start_controller_manager {
       --v=${LOG_LEVEL} \
       --service-account-private-key-file="${SERVICE_ACCOUNT_KEY}" \
       --root-ca-file="${ROOT_CA_FILE}" \
+      --cluster-signing-cert-file="/tmp/ca.pem" \
+      --cluster-signing-key-file="/tmp/ca-key.pem" \
       --enable-hostpath-provisioner="${ENABLE_HOSTPATH_PROVISIONER}" \
       ${node_cidr_args} \
       --pvclaimbinder-sync-period="${CLAIM_BINDER_SYNC_PERIOD}" \
@@ -386,6 +388,7 @@ function start_kubelet {
         --address="${KUBELET_HOST}" \
         --api-servers="${API_HOST}:${API_PORT}" \
         --cpu-cfs-quota=${CPU_CFS_QUOTA} \
+        --experimental-bootstrap-kubeconfig="/tmp/bootstrap-kubeconfig" \
         ${dns_args} \
         ${net_plugin_dir_args} \
         ${net_plugin_args} \

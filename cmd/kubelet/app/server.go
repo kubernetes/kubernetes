@@ -353,7 +353,7 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		}
 
 		if s.BootstrapKubeconfig != "" {
-			nodeName, err := getNodeName(kcfg.Cloud, nodeutil.GetHostname(s.HostnameOverride))
+			nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
 			if err != nil {
 				return err
 			}
