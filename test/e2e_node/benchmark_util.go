@@ -45,9 +45,8 @@ type NodeTimeSeries struct {
 func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]unversioned.Time, testName string) {
 	timeSeries := &NodeTimeSeries{
 		Labels: map[string]string{
-			"node":     framework.TestContext.NodeName,
-			"datatype": "timeseries",
-			"test":     testName,
+			"node": framework.TestContext.NodeName,
+			"test": testName,
 		},
 		Version: currentTimeSeriesVersion,
 	}
@@ -94,10 +93,12 @@ func getLatencyPerfData(latency framework.LatencyMetric, testName string) *perft
 				Labels: map[string]string{
 					"datatype":    "latency",
 					"latencytype": "test-e2e",
-					"node":        framework.TestContext.NodeName,
-					"test":        testName,
 				},
 			},
+		},
+		Labels: map[string]string{
+			"node": framework.TestContext.NodeName,
+			"test": testName,
 		},
 	}
 }
