@@ -242,15 +242,17 @@ func (m *Master) InstallAPIs(c *Config) {
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1": m.v1ResourcesStorage,
 			},
-			IsLegacyGroup:        true,
-			Scheme:               api.Scheme,
-			ParameterCodec:       api.ParameterCodec,
-			NegotiatedSerializer: api.Codecs,
+			IsLegacyGroup:               true,
+			Scheme:                      api.Scheme,
+			ParameterCodec:              api.ParameterCodec,
+			NegotiatedSerializer:        api.Codecs,
+			SubresourceGroupVersionKind: map[string]unversioned.GroupVersionKind{},
 		}
 		if autoscalingGroupVersion := (unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
-			apiGroupInfo.SubresourceGroupVersionKind = map[string]unversioned.GroupVersionKind{
-				"replicationcontrollers/scale": autoscalingGroupVersion.WithKind("Scale"),
-			}
+			apiGroupInfo.SubresourceGroupVersionKind["replicationcontrollers/scale"] = autoscalingGroupVersion.WithKind("Scale")
+		}
+		if policyGroupVersion := (unversioned.GroupVersion{Group: "policy", Version: "v1alpha1"}); registered.IsEnabledVersion(policyGroupVersion) {
+			apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
