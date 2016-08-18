@@ -19,8 +19,6 @@ package app
 
 import (
 	"crypto/tls"
-	"crypto/x509/pkix"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -41,14 +39,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	kubeExternal "k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/client/chaosclient"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
-	unversionedcertificates "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/certificates/unversioned"
 	unversionedcore "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -69,7 +64,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
-	utilcertificates "k8s.io/kubernetes/pkg/util/certificates"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/configz"
 	"k8s.io/kubernetes/pkg/util/crypto"
@@ -83,12 +77,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/watch"
-)
-
-const (
-	defaultKubeletClientCertificateFile = "/var/run/kubernetes/kubelet-client.crt"
-	defaultKubeletClientKeyFile         = "/var/run/kubernetes/kubelet-client.key"
 )
 
 // bootstrapping interface for kubelet, targets the initialization protocol
@@ -347,8 +335,29 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 
 	if kcfg == nil {
 		var kubeClient, eventClient *clientset.Clientset
+		var autoDetectCloudProvider bool
+		var cloud cloudprovider.Interface
+
+		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
+			autoDetectCloudProvider = true
+		} else {
+			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+			if err != nil {
+				return err
+			}
+			if cloud == nil {
+				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			} else {
+				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			}
+		}
+
 		if s.BootstrapKubeconfig != "" {
-			if err := bootstrapClientCert(s); err != nil {
+			nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+			if err != nil {
+				return err
+			}
+			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
 				return err
 			}
 		}
@@ -377,24 +386,12 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		if err != nil {
 			return err
 		}
+
 		kcfg = cfg
+		kcfg.AutoDetectCloudProvider = autoDetectCloudProvider
+		kcfg.Cloud = cloud
 		kcfg.KubeClient = kubeClient
 		kcfg.EventClient = eventClient
-
-		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
-			kcfg.AutoDetectCloudProvider = true
-		} else {
-			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-			if err != nil {
-				return err
-			}
-			if cloud == nil {
-				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			} else {
-				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-				kcfg.Cloud = cloud
-			}
-		}
 	}
 
 	if kcfg.CAdvisorInterface == nil {
@@ -457,240 +454,26 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	return nil
 }
 
-// bootstrapClientCert will request a client cert for kubelet.
-// If the file specified by --kubeconfig does not exist, the bootstrap kubeconfig is used
-// to request a client certificate from the API server.
-// On success, a kubeconfig file referencing the generated key and obtained certificate is
-// written to the path specified by --kubeconfig.
-// The certificate and key file will be stored in /var/run/kubernetes/.
-func bootstrapClientCert(s *options.KubeletServer) error {
-	// Check the if --kubeconfig already has sufficient TLS client info.
-	kcfg, err := (&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()}).Load()
-	if err == nil {
-		authInfo, err := getCurrentContextAuthInfo(kcfg)
-		if err == nil {
-			if containsSufficientTLSInfo(authInfo) {
-				return nil
-			}
-		}
-	}
-
-	// At this point, we need to use the bootstrap kubeconfig to generate TLS client cert, key, and a kubeconfig
-	// to stored in --kubeconfig.
-	glog.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
-
-	kcfg, err = (&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.BootstrapKubeconfig}).Load()
-	if err != nil {
-		return fmt.Errorf("unable to load boostrap kubeconfig: %v", err)
-	}
-	authInfo, err := getCurrentContextAuthInfo(kcfg)
-	if err != nil {
-		return fmt.Errorf("unable to load auth info in bootstrap kubeconfig: %v", err)
-	}
-
-	authInfo.ClientCertificate, authInfo.ClientKey, err = getClientCertAndKey(s, authInfo.ClientCertificate, authInfo.ClientKey)
-	if err != nil {
-		return fmt.Errorf("unable to get cert from API server: %v", err)
-	}
-
-	// Marshal and write the kubeconfig to disk.
-	data, err := json.Marshal(kcfg)
-	if err != nil {
-		return fmt.Errorf("unable to marshal the kubeconfig: %v", err)
-	}
-
-	if err := ioutil.WriteFile(s.KubeConfig.Value(), data, 0644); err != nil {
-		return fmt.Errorf("unable to write the kubeconfig file at %q: %v", s.KubeConfig.Value(), err)
-	}
-
-	return nil
-}
-
-// getCurrentContextAuthInfo returns the AuthInfo object that's referenced
-// by the current context.
-// If current context or auth info name is empty, then it will return an error.
-// If AuthInfo is empty, a new auth info object will be created.
-func getCurrentContextAuthInfo(config *clientcmdapi.Config) (*clientcmdapi.AuthInfo, error) {
-	ctx, ok := config.Contexts[config.CurrentContext]
-	if !ok {
-		return nil, fmt.Errorf("unable to find current context %q", config.CurrentContext)
-	}
-
-	if ctx.AuthInfo == "" {
-		return nil, fmt.Errorf("unable to find the name of the authInfo in current context %q", config.CurrentContext)
-	}
-
-	if _, ok := config.AuthInfos[ctx.AuthInfo]; !ok {
-		config.AuthInfos[ctx.AuthInfo] = clientcmdapi.NewAuthInfo()
-	}
-	return config.AuthInfos[ctx.AuthInfo], nil
-}
-
-// TODO(yifan): More detailed check on the cert / key content.
-// CheckTLSInfo returns true if the authInfo contains client certificate data for client key data.
-// Or if the client certificate or key file exists.
-func containsSufficientTLSInfo(authInfo *clientcmdapi.AuthInfo) bool {
-	// We use '||' so that we won't override existing data in case of wrong setup.
-	if len(authInfo.ClientCertificateData) > 0 || len(authInfo.ClientKeyData) > 0 {
-		return true
-	}
-
-	if crypto.FoundCertOrKey(authInfo.ClientCertificate, authInfo.ClientKey) {
-		return true
-	}
-
-	return false
-}
-
-// getClientCertAndKey will:
-// (1) Create a restful client for doing the certificate signing request.
-// (2) Read existing key data from existingKeyPath if possible.
-// (3) Pass 'requestClientCertificate()' the CSR client, existing key data, and node name to
-//     request for client certificate from the API server.
-// (4) Once (3) succeeds, dump the certificate and key data to the given paths.
-// On failure, the the certificate and key file will be cleaned up.
-// If the existingCertPath or existingKeyPath is empty, then the function will use the default path, respectively:
-// /var/run/kubernetes/kubelet-client.crt, /var/run/kubernetes/kubelet-client.key.
-func getClientCertAndKey(s *options.KubeletServer, existingCertPath, existingKeyPath string) (certPath, keyPath string, err error) {
-	// (1).
-	clientConfig, err := kubeconfigClientConfig(s.BootstrapKubeconfig, s.APIServerList)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to create client config: %v", err)
-	}
-	client, err := unversionedcertificates.NewForConfig(clientConfig)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to create certificates signing request client: %v", err)
-	}
-	csrClient := client.CertificateSigningRequests()
-
-	// (2).
-	certPath, keyPath = existingCertPath, existingKeyPath
-	if certPath == "" {
-		certPath = defaultKubeletClientCertificateFile
-	}
-	if keyPath == "" {
-		keyPath = defaultKubeletClientKeyFile
-
-	}
-	existingKeyData, err := ioutil.ReadFile(keyPath)
-	if err != nil && !os.IsNotExist(err) {
-		return "", "", fmt.Errorf("unable to read key file %q: %v", keyPath, err)
-	}
-
-	// (3).
-	nodeName, err := getNodeName(s)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to get node name: %v", err)
-	}
-	certData, keyData, err := requestClientCertificate(csrClient, existingKeyData, nodeName)
-	if err != nil {
-		return "", "", fmt.Errorf("unable to request certificate from API server: %v", err)
-	}
-
-	// (4).
-	if err = crypto.WriteCertToPath(certPath, certData); err != nil {
-		return "", "", fmt.Errorf("unable to write certificate file %q: %v", certPath, err)
-	}
-	if err = crypto.WriteKeyToPath(keyPath, keyData); err != nil {
-		if err := os.Remove(certPath); err != nil {
-			glog.Warningf("Cannot clean up the certificate file %q: %v", certPath, err)
-		}
-		return "", "", fmt.Errorf("unable to write key file %q: %v", keyPath, err)
-	}
-
-	return certPath, keyPath, nil
-}
-
 // getNodeName returns the node name according to the cloud provider
-// if cloud provider is specified. Otherwise, returns the host name of the node.
-func getNodeName(s *options.KubeletServer) (string, error) {
-	var err error
-	var cloud cloudprovider.Interface
-
-	if s.CloudProvider != kubeExternal.AutoDetectCloudProvider {
-		cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-		if err != nil {
-			return "", err
-		}
+// if cloud provider is specified. Otherwise, returns the hostname of the node.
+func getNodeName(cloud cloudprovider.Interface, hostname string) (string, error) {
+	if cloud == nil {
+		return hostname, nil
 	}
 
-	hostName := nodeutil.GetHostname(s.HostnameOverride)
-	if cloud != nil {
-		instances, ok := cloud.Instances()
-		if !ok {
-			return "", fmt.Errorf("failed to get instances from cloud provider")
-		}
-		return instances.CurrentNodeName(hostName)
-	}
-	return hostName, nil
-}
-
-// requestClientCertificate will create a certificate signing request and send it to API server,
-// then it will watch the object's status, once approved by API server, it will return the API
-// server's issued certificate (pem-encoded). If there is any errors, or the watch timeouts,
-// it will return an error.
-// If the existingKeyData is empty, a new private key will be generated to create the certificate
-// signing request.
-func requestClientCertificate(client unversionedcertificates.CertificateSigningRequestInterface, existingKeyData []byte, nodeName string) (certData []byte, keyData []byte, err error) {
-	subject := &pkix.Name{
-		Organization: []string{"system:nodes"},
-		CommonName:   fmt.Sprintf("system:node:%s", nodeName),
+	instances, ok := cloud.Instances()
+	if !ok {
+		return "", fmt.Errorf("failed to get instances from cloud provider")
 	}
 
-	csr, keyData, err := utilcertificates.NewCertificateRequest(existingKeyData, subject, nil, nil)
+	nodeName, err := instances.CurrentNodeName(hostname)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unable to generate certificate request: %v", err)
+		return "", fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
 	}
 
-	req, err := client.Create(&certificates.CertificateSigningRequest{
-		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
-		ObjectMeta: api.ObjectMeta{GenerateName: "csr-"},
+	glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
 
-		// Username, UID, Groups will be injected by API server.
-		Spec: certificates.CertificateSigningRequestSpec{Request: csr},
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot create certificate signing request: %v", err)
-
-	}
-
-	// Make a default timeout = 3600s
-	var defaultTimeoutSeconds int64 = 3600
-	resultCh, err := client.Watch(api.ListOptions{
-		Watch:          true,
-		TimeoutSeconds: &defaultTimeoutSeconds,
-		// Label and field selector are not used now.
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot watch on the certificate signing request: %v", err)
-	}
-
-	var status certificates.CertificateSigningRequestStatus
-	ch := resultCh.ResultChan()
-
-	for {
-		event, ok := <-ch
-		if !ok {
-			break
-		}
-
-		if event.Type == watch.Modified {
-			if event.Object.(*certificates.CertificateSigningRequest).UID != req.UID {
-				continue
-			}
-			status = event.Object.(*certificates.CertificateSigningRequest).Status
-			for _, c := range status.Conditions {
-				if c.Type == certificates.CertificateDenied {
-					return nil, nil, fmt.Errorf("certificate signing request is not approved: %v, %v", c.Reason, c.Message)
-				}
-				if c.Type == certificates.CertificateApproved && status.Certificate != nil {
-					return status.Certificate, keyData, nil
-				}
-			}
-		}
-	}
-
-	return nil, nil, fmt.Errorf("watch channel closed")
+	return nodeName, nil
 }
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
@@ -782,13 +565,13 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 		return nil, fmt.Errorf("cannot specify both --kubeconfig and --auth-path")
 	}
 	if s.KubeConfig.Provided() {
-		return kubeconfigClientConfig(s.KubeConfig.Value(), s.APIServerList)
+		return kubeconfigClientConfig(s)
 	}
 	if s.AuthPath.Provided() {
 		return authPathClientConfig(s, false)
 	}
 	// Try the kubeconfig default first, falling back to the auth path default.
-	clientConfig, err := kubeconfigClientConfig(s.KubeConfig.Value(), s.APIServerList)
+	clientConfig, err := kubeconfigClientConfig(s)
 	if err != nil {
 		glog.Warningf("Could not load kubeconfig file %s: %v. Trying auth path instead.", s.KubeConfig, err)
 		return authPathClientConfig(s, true)
@@ -932,23 +715,10 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
 
 	if len(kcfg.NodeName) == 0 {
-		// Query the cloud provider for our node name, default to Hostname
-		nodeName := kcfg.Hostname
-		if kcfg.Cloud != nil {
-			var err error
-			instances, ok := kcfg.Cloud.Instances()
-			if !ok {
-				return fmt.Errorf("failed to get instances from cloud provider")
-			}
-
-			nodeName, err = instances.CurrentNodeName(kcfg.Hostname)
-			if err != nil {
-				return fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-			}
-
-			glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+		nodeName, err := getNodeName(kcfg.Cloud, kcfg.Hostname)
+		if err != nil {
+			return err
 		}
-
 		kcfg.NodeName = nodeName
 	}
 

@@ -135,7 +135,7 @@ func WriteCertToPath(certPath string, data []byte) error {
 	return nil
 }
 
-// writeCertToPath writes the pem-encoded key data to keyPath.
+// WriteKeyToPath writes the pem-encoded key data to keyPath.
 // The key file will be created with file mode 0600.
 // If the key file already exists, it will be overwritten.
 // The parent directory of the keyPath will be created as needed with file mode 0755.
