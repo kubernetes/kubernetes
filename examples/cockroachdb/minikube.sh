@@ -28,6 +28,9 @@
 
 set -exuo pipefail
 
+# Clean up anything from a prior run:
+kubectl delete petsets,pods,persistentvolumes,persistentvolumeclaims,services -l app=cockroachdb
+
 # Make persistent volumes and (correctly named) claims. We must create the
 # claims here manually even though that sounds counter-intuitive. For details
 # see https://github.com/kubernetes/contrib/pull/1295#issuecomment-230180894.
@@ -40,6 +43,7 @@ metadata:
   name: pv${i}
   labels:
     type: local
+    app: cockroachdb
 spec:
   capacity:
     storage: 1Gi
