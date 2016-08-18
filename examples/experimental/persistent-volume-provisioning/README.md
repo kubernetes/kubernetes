@@ -121,6 +121,30 @@ parameters:
 * `type`: [VolumeType](http://docs.openstack.org/admin-guide/dashboard-manage-volumes.html) created in Cinder. Default is empty.
 * `availability`: Availability Zone. Default is empty.
 
+#### Ceph RBD
+
+```yaml                                                                                                                                                                                                          
+  apiVersion: extensions/v1beta1                                                                                                                                                                                   
+  kind: StorageClass                                                                                                                                                                                               
+  metadata: 
+   name: fast
+provisioner: kubernetes.io/rbd
+parameters:
+    monitors: 10.16.153.105:6789
+    adminID: kube
+    adminKey: AQAMgXhVwBCeDhAA9nlPaFyfUSatGD4drFWDvQ==
+    pool: kube
+    userId: kube
+    secretName: ceph-secret
+```
+
+* `monitors`: Ceph monitors, comma delimited
+* `adminID`: Ceph client ID that is capable of creating images in the pool. Default is "admin"
+* `adminKey`": Ceph Client ID's key
+* `pool`: Ceph RBD pool. Default is "rbd"
+* `userId`: Ceph client ID that is used to map the RBD image. Default is the same as `adminID`
+* `secretName`: The name of Ceph Secret. It must exist in the same namespace as PVCs.
+
 ### User provisioning requests
 
 Users request dynamically provisioned storage by including a storage class in their `PersistentVolumeClaim`.

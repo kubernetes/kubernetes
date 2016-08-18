@@ -18,13 +18,16 @@ package rbd
 
 import (
 	"fmt"
+	dstrings "strings"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
+	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -40,6 +43,8 @@ type rbdPlugin struct {
 
 var _ volume.VolumePlugin = &rbdPlugin{}
 var _ volume.PersistentVolumePlugin = &rbdPlugin{}
+var _ volume.DeletableVolumePlugin = &rbdPlugin{}
+var _ volume.ProvisionableVolumePlugin = &rbdPlugin{}
 
 const (
 	rbdPluginName = "kubernetes.io/rbd"
@@ -175,6 +180,131 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 		},
 	}
 	return volume.NewSpecFromVolume(rbdVolume), nil
+}
+
+func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
+	}
+
+	return plugin.newDeleterInternal(spec, &RBDUtil{})
+}
+
+func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, manager diskManager) (volume.Deleter, error) {
+	return &rbdVolumeDeleter{
+		rbdMounter: &rbdMounter{
+			rbd: &rbd{
+				volName: spec.Name(),
+				Image:   spec.PersistentVolume.Spec.RBD.RBDImage,
+				Pool:    spec.PersistentVolume.Spec.RBD.RBDPool,
+				manager: manager,
+				plugin:  plugin,
+			},
+			Mon: spec.PersistentVolume.Spec.RBD.CephMonitors,
+			Id:  spec.PersistentVolume.Spec.RBD.RadosUser,
+		}}, nil
+}
+
+func (plugin *rbdPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if len(options.AccessModes) == 0 {
+		options.AccessModes = plugin.GetAccessModes()
+	}
+	return plugin.newProvisionerInternal(options, &RBDUtil{})
+}
+
+func (plugin *rbdPlugin) newProvisionerInternal(options volume.VolumeOptions, manager diskManager) (volume.Provisioner, error) {
+	return &rbdVolumeProvisioner{
+		rbdMounter: &rbdMounter{
+			rbd: &rbd{
+				manager: manager,
+				plugin:  plugin,
+			},
+		},
+		options: options,
+	}, nil
+}
+
+type rbdVolumeProvisioner struct {
+	*rbdMounter
+	options volume.VolumeOptions
+}
+
+func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
+	if r.options.Selector != nil {
+		return nil, fmt.Errorf("claim Selector is not supported")
+	}
+	secretName := ""
+	userId := ""
+	for k, v := range r.options.Parameters {
+		switch dstrings.ToLower(k) {
+		case "monitors":
+			arr := dstrings.Split(v, ",")
+			for _, m := range arr {
+				r.Mon = append(r.Mon, m)
+			}
+		case "adminid":
+			r.Id = v
+		case "adminkey":
+			r.Secret = v
+		case "userid":
+			userId = v
+		case "pool":
+			r.Pool = v
+		case "secretname":
+			secretName = v
+		default:
+			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
+		}
+	}
+	// sanity check
+	if len(r.Mon) < 1 {
+		return nil, fmt.Errorf("missing Ceph monitors")
+	}
+	if secretName == "" {
+		return nil, fmt.Errorf("missing secret name")
+	}
+	if r.Id == "" {
+		r.Id = "admin"
+	}
+	if r.Pool == "" {
+		r.Pool = "rbd"
+	}
+	if userId == "" {
+		userId = r.Id
+	}
+	// create random image name
+	image := fmt.Sprintf("%s", uuid.NewUUID())
+	r.rbdMounter.Image = image
+	rbd, sizeMB, err := r.manager.CreateImage(r)
+	if err != nil {
+		glog.Errorf("rbd: create volume failed, err: %v", err)
+		return nil, fmt.Errorf("rbd: create volume failed, err: %v", err)
+	}
+	pv := new(api.PersistentVolume)
+	//FIXME: this secret has to be created in all namespace
+	rbd.SecretRef = new(api.LocalObjectReference)
+	rbd.SecretRef.Name = secretName
+	rbd.RadosUser = userId
+	pv.Spec.PersistentVolumeSource.RBD = rbd
+	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
+	pv.Spec.AccessModes = r.options.AccessModes
+	pv.Spec.Capacity = api.ResourceList{
+		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
+	}
+	return pv, nil
+}
+
+type rbdVolumeDeleter struct {
+	*rbdMounter
+}
+
+func (r *rbdVolumeDeleter) GetPath() string {
+	name := rbdPluginName
+	return r.plugin.host.GetPodVolumeDir(r.podUID, strings.EscapeQualifiedNameForDisk(name), r.volName)
+}
+
+func (r *rbdVolumeDeleter) Delete() error {
+	return r.manager.DeleteImage(r)
 }
 
 type rbd struct {
