@@ -90,7 +90,7 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 		}
 	})
 
-	Context("regular resource usage tracking [Benchmark]", func() {
+	Context("regular resource usage tracking", func() {
 		rTests := []resourceTest{
 			{
 				podsNr: 10,
@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 		for _, testArg := range rTests {
 			itArg := testArg
 
-			It(fmt.Sprintf("resource tracking for %d pods per node", itArg.podsNr), func() {
+			It(fmt.Sprintf("resource tracking for %d pods per node [Benchmark]", itArg.podsNr), func() {
 				runResourceUsageTest(f, rc, itArg)
 				// Log and verify resource usage
 				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, itArg.getTestName(), true)
