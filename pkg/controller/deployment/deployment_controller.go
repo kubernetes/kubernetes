@@ -327,19 +327,19 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 }
 
 // getDeploymentForPod returns the deployment managing the ReplicaSet that manages the given Pod.
-// TODO: Surface that we are ignoring multiple deployments for a given Pod.
+// If there are multiple deployments for a given Pod, only return the oldest one.
 func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.Deployment {
 	rss, err := dc.rsStore.GetPodReplicaSets(pod)
 	if err != nil {
 		glog.V(4).Infof("Error: %v. No ReplicaSets found for pod %v, deployment controller will avoid syncing.", err, pod.Name)
 		return nil
 	}
-	if len(rss) > 0 {
-		if len(rss) > 1 {
-			sort.Sort(rsByCreationTimestamp(rss))
-			glog.Errorf("user error! more than one replica set is selecting pod %s/%s with labels: %#v, only choose %s/%s", pod.Namespace, pod.Name, pod.Labels, rss[0].Namespace, rss[0].Name)
-		}
-		rs := &rss[0]
+	if len(rss) > 1 {
+		sort.Sort(rsByCreationTimestamp(rss))
+		glog.Errorf("user error! more than one replica set is selecting pod %s/%s with labels: %#v", pod.Namespace, pod.Name, pod.Labels)
+	}
+	for i := range rss {
+		rs := &rss[i]
 		deployments, err := dc.dStore.GetDeploymentsForReplicaSet(rs)
 		if err == nil && len(deployments) > 0 {
 			if len(deployments) > 1 {
@@ -424,25 +424,23 @@ func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deploym
 	dc.queue.Add(key)
 }
 
-func (dc *DeploymentController) markDeploymentOverlap(deployment, withDeployment extensions.Deployment) error {
-	if deployment.Annotations[util.OverlapAnnotation] == withDeployment.Name {
-		return nil
+func (dc *DeploymentController) markDeploymentOverlap(deployment *extensions.Deployment, withDeployment string) (*extensions.Deployment, error) {
+	if deployment.Annotations[util.OverlapAnnotation] == withDeployment {
+		return deployment, nil
 	}
 	if deployment.Annotations == nil {
 		deployment.Annotations = make(map[string]string)
 	}
-	deployment.Annotations[util.OverlapAnnotation] = withDeployment.Name
-	_, err := dc.client.Extensions().Deployments(deployment.Namespace).Update(&deployment)
-	return err
+	deployment.Annotations[util.OverlapAnnotation] = withDeployment
+	return dc.client.Extensions().Deployments(deployment.Namespace).Update(deployment)
 }
 
-func (dc *DeploymentController) clearDeploymentOverlap(deployment extensions.Deployment) error {
+func (dc *DeploymentController) clearDeploymentOverlap(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	if len(deployment.Annotations[util.OverlapAnnotation]) == 0 {
-		return nil
+		return deployment, nil
 	}
 	delete(deployment.Annotations, util.OverlapAnnotation)
-	_, err := dc.client.Extensions().Deployments(deployment.Namespace).Update(&deployment)
-	return err
+	return dc.client.Extensions().Deployments(deployment.Namespace).Update(deployment)
 }
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
@@ -509,33 +507,6 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 
-	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
-	// Relist all deployment in the same namespace for overlaps, and avoid syncing the newer overlapping ones (only sync the oldest one)
-	deployments, err := dc.dStore.Deployments(deployment.Namespace).List()
-	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
-	if err != nil {
-		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
-	}
-	overlapping := false
-	for _, d := range deployments {
-		if !selector.Empty() && selector.Matches(labels.Set(d.Spec.Template.Labels)) && d.UID != deployment.UID {
-			overlapping = true
-			dc.markDeploymentOverlap(*deployment, d)
-			dc.markDeploymentOverlap(d, *deployment)
-			// skip syncing this one if older overlapping one is found
-			shouldSkip, err := dc.isOlderThan(d, *deployment)
-			if err != nil {
-				return fmt.Errorf("error finding older overlapping deployment: %v", err)
-			}
-			if shouldSkip {
-				return fmt.Errorf("found deployment %s/%s has overlapping selector with deployment %s/%s, skip syncing it", deployment.Namespace, deployment.Name, d.Namespace, d.Name)
-			}
-		}
-	}
-	if !overlapping {
-		dc.clearDeploymentOverlap(*deployment)
-	}
-
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
 	d, err := util.DeploymentDeepCopy(deployment)
@@ -545,6 +516,38 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	if d.DeletionTimestamp != nil {
 		return dc.syncStatusOnly(d)
+	}
+
+	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
+	// Relist all deployment in the same namespace for overlaps, and avoid syncing the newer overlapping ones (only sync the oldest one)
+	deployments, err := dc.dStore.Deployments(deployment.Namespace).List()
+	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
+	if err != nil {
+		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
+	}
+	overlapping := false
+	for i := range deployments {
+		other := &deployments[i]
+		if !selector.Empty() && selector.Matches(labels.Set(other.Spec.Template.Labels)) && d.UID != other.UID {
+			overlapping = true
+			// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
+			d, _ = dc.markDeploymentOverlap(d, other.Name)
+			other, _ = dc.markDeploymentOverlap(other, d.Name)
+			// Skip syncing this one if older overlapping one is found
+			// TODO: figure out a better way to determine which deployment to skip,
+			// either with controller reference, or with validation
+			shouldSkip, err := dc.isOlderThan(other, d)
+			if err != nil {
+				return fmt.Errorf("error finding older overlapping deployment: %v", err)
+			}
+			if shouldSkip {
+				return fmt.Errorf("found deployment %s/%s has overlapping selector with deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
+			}
+		}
+	}
+	if !overlapping {
+		// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
+		d, _ = dc.clearDeploymentOverlap(d)
 	}
 
 	if d.Spec.Paused {
@@ -575,7 +578,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }
 
-func (dc *DeploymentController) isOlderThan(d1, d2 extensions.Deployment) (bool, error) {
+func (dc *DeploymentController) isOlderThan(d1, d2 *extensions.Deployment) (bool, error) {
 	t1, err := dc.oldestActiveReplicaSet(d1)
 	if err != nil {
 		return false, err
@@ -592,8 +595,8 @@ func (dc *DeploymentController) isOlderThan(d1, d2 extensions.Deployment) (bool,
 	return t2.IsZero() || t1.Before(t2), nil
 }
 
-func (dc *DeploymentController) oldestActiveReplicaSet(deployment extensions.Deployment) (unversioned.Time, error) {
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(&deployment, false)
+func (dc *DeploymentController) oldestActiveReplicaSet(deployment *extensions.Deployment) (unversioned.Time, error) {
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, false)
 	if err != nil {
 		return unversioned.Time{}, err
 	}
