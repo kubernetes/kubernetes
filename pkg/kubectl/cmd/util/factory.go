@@ -607,8 +607,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if t.Spec.Paused {
 					return true, nil
 				}
-				t.Spec.Paused = true
-				_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
+				body := []byte("{\"spec\":{\"paused\":true}}")
+				_, err = c.Extensions().Deployments(t.Namespace).Patch(t.Name, api.StrategicMergePatchType, body)
 				return false, err
 			default:
 				gvks, _, err := api.Scheme.ObjectKinds(object)
@@ -629,8 +629,8 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				if !t.Spec.Paused {
 					return true, nil
 				}
-				t.Spec.Paused = false
-				_, err := clientset.Extensions().Deployments(t.Namespace).Update(t)
+				body := []byte("{\"spec\":{\"paused\":false}}")
+				_, err = c.Extensions().Deployments(t.Namespace).Patch(t.Name, api.StrategicMergePatchType, body)
 				return false, err
 			default:
 				gvks, _, err := api.Scheme.ObjectKinds(object)
