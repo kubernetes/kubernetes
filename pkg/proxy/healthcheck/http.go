@@ -23,9 +23,13 @@ import (
 	"github.com/golang/glog"
 )
 
-// Satisfies the http.Handler interface needed for each service's http.Server listening port.
+// A healthCheckHandler serves http requests on /healthz on the service health check node port,
+// and responds to every request with either:
+// 200 OK and the count of endpoints for the given service that are local to this node.
+// or
+// 503 Service Unavailable If the count is zero or the service does not exist
 type healthCheckHandler struct {
-	svcName string
+	svcNsName string
 }
 
 // HTTP Utility function to send the required statusCode and error text to a http.ResponseWriter object
@@ -37,6 +41,6 @@ func sendHealthCheckResponse(rw http.ResponseWriter, statusCode int, error strin
 
 // ServeHTTP: Interface callback method for net.Listener Handlers
 func (h healthCheckHandler) ServeHTTP(response http.ResponseWriter, req *http.Request) {
-	glog.V(4).Infof("Received HC Request Service %s from Cloud Load Balancer", h.svcName)
-	healthchecker.handleHealthCheckRequest(response, h.svcName)
+	glog.V(4).Infof("Received HC Request Service %s from Cloud Load Balancer", h.svcNsName)
+	healthchecker.handleHealthCheckRequest(response, h.svcNsName)
 }
