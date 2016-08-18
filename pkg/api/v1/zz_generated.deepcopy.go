@@ -2464,6 +2464,7 @@ func DeepCopy_v1_PodSecurityContext(in interface{}, out interface{}, c *conversi
 		} else {
 			out.FSGroup = nil
 		}
+		out.HostUser = in.HostUser
 		return nil
 	}
 }

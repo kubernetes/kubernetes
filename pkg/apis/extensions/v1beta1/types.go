@@ -967,6 +967,8 @@ type PodSecurityPolicySpec struct {
 	// If set to false the container may run with a read only root file system if it wishes but it
 	// will not be forced to.
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
+	// HostUser determines if the policy allows the use of HostUser in the pod spec.
+	HostUser bool `json:"hostUser,omitempty" protobuf:"varint,15,opt,name=hostUser"`
 }
 
 // FS Type gives strong typing to different file systems that are used by volumes.

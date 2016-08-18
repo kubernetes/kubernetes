@@ -561,6 +561,7 @@ func (dm *DockerManager) runContainer(
 	ipcMode string,
 	utsMode string,
 	pidMode string,
+	userMode string,
 	restartCount int,
 	oomScoreAdj int) (kubecontainer.ContainerID, error) {
 
@@ -646,6 +647,7 @@ func (dm *DockerManager) runContainer(
 		IpcMode:        dockercontainer.IpcMode(ipcMode),
 		UTSMode:        dockercontainer.UTSMode(utsMode),
 		PidMode:        dockercontainer.PidMode(pidMode),
+		UsernsMode:     dockercontainer.UsernsMode(userMode),
 		ReadonlyRootfs: readOnlyRootFilesystem(container),
 		Resources: dockercontainer.Resources{
 			Memory:     memoryLimit,
@@ -1581,7 +1583,7 @@ func (dm *DockerManager) applyOOMScoreAdj(pod *api.Pod, container *api.Container
 
 // Run a single container from a pod. Returns the docker container ID
 // If do not need to pass labels, just pass nil.
-func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode, pidMode, podIP string, restartCount int) (kubecontainer.ContainerID, error) {
+func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Container, netMode, ipcMode, pidMode, userMode, podIP string, restartCount int) (kubecontainer.ContainerID, error) {
 	start := time.Now()
 	defer func() {
 		metrics.ContainerManagerLatency.WithLabelValues("runContainerInPod").Observe(metrics.SinceInMicroseconds(start))
@@ -1606,7 +1608,7 @@ func (dm *DockerManager) runContainerInPod(pod *api.Pod, container *api.Containe
 
 	oomScoreAdj := dm.calculateOomScoreAdj(pod, container)
 
-	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, restartCount, oomScoreAdj)
+	id, err := dm.runContainer(pod, container, opts, ref, netMode, ipcMode, utsMode, pidMode, userMode, restartCount, oomScoreAdj)
 	if err != nil {
 		return kubecontainer.ContainerID{}, fmt.Errorf("runContainer: %v", err)
 	}
@@ -1791,7 +1793,7 @@ func (dm *DockerManager) createPodInfraContainer(pod *api.Pod) (kubecontainer.Do
 	}
 
 	// Currently we don't care about restart count of infra container, just set it to 0.
-	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), "", 0)
+	id, err := dm.runContainerInPod(pod, container, netNamespace, getIPCMode(pod), getPidMode(pod), getUserMode(pod), "", 0)
 	if err != nil {
 		return "", kubecontainer.ErrRunContainer, err.Error()
 	}
@@ -2130,6 +2132,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 	// See createPodInfraContainer for infra container setup.
 	namespaceMode := fmt.Sprintf("container:%v", podInfraContainerID)
 	pidMode := getPidMode(pod)
+	userMode := getUserMode(pod)
 
 	if next != nil {
 		if len(containerChanges.ContainersToStart) == 0 {
@@ -2153,7 +2156,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		}
 
 		glog.V(4).Infof("Creating init container %+v in pod %v", container, format.Pod(pod))
-		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
+		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, userMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			return
@@ -2191,7 +2194,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 		}
 
 		glog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
-		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, podIP); err != nil {
+		if err, msg := dm.tryContainerStart(container, pod, podStatus, pullSecrets, namespaceMode, pidMode, userMode, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
 			utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
 			continue
@@ -2202,7 +2205,7 @@ func (dm *DockerManager) SyncPod(pod *api.Pod, _ api.PodStatus, podStatus *kubec
 
 // tryContainerStart attempts to pull and start the container, returning an error and a reason string if the start
 // was not successful.
-func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, namespaceMode, pidMode, podIP string) (err error, reason string) {
+func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []api.Secret, namespaceMode, pidMode, userMode, podIP string) (err error, reason string) {
 	err, msg := dm.imagePuller.EnsureImageExists(pod, container, pullSecrets)
 	if err != nil {
 		return err, msg
@@ -2222,7 +2225,7 @@ func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Po
 		restartCount = containerStatus.RestartCount + 1
 	}
 
-	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, podIP, restartCount)
+	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, userMode, podIP, restartCount)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		return kubecontainer.ErrRunContainer, err.Error()
@@ -2406,6 +2409,16 @@ func (dm *DockerManager) doBackOff(pod *api.Pod, container *api.Container, podSt
 		backOff.Next(stableName, ts)
 	}
 	return false, nil, ""
+}
+
+// getUserMode returns the user mode to use on the docker containers of the pod
+// based on pod.Spec.SecurityContext.HostUser.
+func getUserMode(pod *api.Pod) string {
+	userMode := ""
+	if pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.HostUser {
+		userMode = namespaceModeHost
+	}
+	return userMode
 }
 
 // getPidMode returns the pid mode to use on the docker container based on pod.Spec.HostPID.

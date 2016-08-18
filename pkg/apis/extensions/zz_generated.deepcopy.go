@@ -789,6 +789,7 @@ func DeepCopy_extensions_PodSecurityPolicySpec(in interface{}, out interface{}, 
 		}
 		out.HostPID = in.HostPID
 		out.HostIPC = in.HostIPC
+		out.HostUser = in.HostUser
 		if err := DeepCopy_extensions_SELinuxStrategyOptions(&in.SELinux, &out.SELinux, c); err != nil {
 			return err
 		}
