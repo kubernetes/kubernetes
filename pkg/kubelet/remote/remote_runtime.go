@@ -151,11 +151,11 @@ func (r *RemoteRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilte
 }
 
 // CreateContainer creates a new container in the specified PodSandbox.
-func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
+func (r *RemoteRuntimeService) CreateContainer(podSandBoxID string, instanceNumber int, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error) {
 	ctx, cancel := getContextWithTimeout(r.timeout)
 	defer cancel()
 
-	uid := uuid.NewUUID()
+	uid := fmt.Sprintf("%s_%s_%s", PodSandboxId, config.GetName(), instanceNumber)
 	resp, err := r.runtimeClient.CreateContainer(ctx, &runtimeApi.CreateContainerRequest{
 		RequestId:     &uid,
 		PodSandboxId:  &podSandBoxID,

@@ -40,8 +40,11 @@ type RuntimeService interface {
 	PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error)
 	// ListPodSandbox returns a list of Sandbox.
 	ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error)
-	// CreateContainer creates a new container in specified PodSandbox.
-	CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error)
+	// CreateContainer creates a new container in specified PodSandbox. The
+	// instanceNumber parameter should provide an incrementing value that, when
+	// combined with the podSandboxID and config.Name, uniquely identifies this
+	// container.
+	CreateContainer(podSandboxID string, instanceNumber int, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error)
 	// StartContainer starts the container.
 	StartContainer(containerID string) error
 	// StopContainer stops a running container with a grace period (i.e., timeout).
