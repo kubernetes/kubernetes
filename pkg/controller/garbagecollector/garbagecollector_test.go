@@ -283,18 +283,18 @@ func TestProcessEvent(t *testing.T) {
 
 	for _, scenario := range testScenarios {
 		propagator := &Propagator{
-			eventQueue: workqueue.NewTimedWorkQueue(clock.RealClock{}),
+			eventQueue: workqueue.NewTimedWorkQueue(),
 			uidToNode: &concurrentUIDToNode{
 				RWMutex:   &sync.RWMutex{},
 				uidToNode: make(map[types.UID]*node),
 			},
 			gc: &GarbageCollector{
-				dirtyQueue: workqueue.NewTimedWorkQueue(clock.RealClock{}),
+				dirtyQueue: workqueue.NewTimedWorkQueue(),
 				clock:      clock.RealClock{},
 			},
 		}
 		for i := 0; i < len(scenario.events); i++ {
-			propagator.eventQueue.Add(scenario.events[i])
+			propagator.eventQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: propagator.gc.clock.Now(), Object: &scenario.events[i]})
 			propagator.processEvent()
 			verifyGraphInvariants(scenario.name, propagator.uidToNode.uidToNode, t)
 		}
@@ -327,7 +327,7 @@ func TestDependentsRace(t *testing.T) {
 		}
 	}()
 	go func() {
-		gc.orphanQueue.Add(owner)
+		gc.orphanQueue.Add(&workqueue.TimedWorkQueueItem{StartTime: gc.clock.Now(), Object: owner})
 		for i := 0; i < updates; i++ {
 			gc.orphanFinalizer()
 		}
