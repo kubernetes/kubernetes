@@ -1,0 +1,8 @@
+---
+images:
+  containervm:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-1
+    tests:
+      - ".*create 10 pods with 0s? interval"

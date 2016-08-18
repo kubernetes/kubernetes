@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval",
+			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %s interval",
 				itArg.podsNr, itArg.interval), func() {
 
 				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg)
