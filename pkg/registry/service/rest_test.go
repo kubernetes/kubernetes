@@ -850,7 +850,7 @@ func TestServiceRegistryExternalTrafficAnnotationHealthCheckNodePortAllocation(t
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
 	created_service := created_svc.(*api.Service)
-	if !service.ServiceNeedsHealthCheck(created_service) {
+	if !service.NeedsHealthCheck(created_service) {
 		t.Errorf("Unexpected missing annotation %s", service.AnnotationExternalTraffic)
 	}
 	port := service.GetServiceHealthCheckNodePort(created_service)
@@ -888,7 +888,7 @@ func TestServiceRegistryExternalTrafficAnnotationHealthCheckNodePortUserAllocati
 		t.Errorf("Unexpected failure creating service %v", err)
 	}
 	created_service := created_svc.(*api.Service)
-	if !service.ServiceNeedsHealthCheck(created_service) {
+	if !service.NeedsHealthCheck(created_service) {
 		t.Errorf("Unexpected missing annotation %s", service.AnnotationExternalTraffic)
 	}
 	port := service.GetServiceHealthCheckNodePort(created_service)
@@ -956,7 +956,7 @@ func TestServiceRegistryExternalTrafficAnnotationGlobal(t *testing.T) {
 	}
 	created_service := created_svc.(*api.Service)
 	// Make sure the service does not have the annotation
-	if service.ServiceNeedsHealthCheck(created_service) {
+	if service.NeedsHealthCheck(created_service) {
 		t.Errorf("Unexpected value for annotation %s", service.AnnotationExternalTraffic)
 	}
 	// Make sure the service does not have the health check node port allocated

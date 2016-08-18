@@ -1046,7 +1046,7 @@ func (gce *GCECloud) createTargetPool(name, serviceName, region string, hosts []
 		hcLinks = append(hcLinks, hc.SelfLink)
 	}
 	if len(hcLinks) > 0 {
-		glog.Infof("Creating targetpool %v with healthchecking")
+		glog.Infof("Creating targetpool %v with healthchecking", name)
 	}
 	pool := &compute.TargetPool{
 		Name:            name,

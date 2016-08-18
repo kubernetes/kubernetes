@@ -432,7 +432,7 @@ func shouldAssignNodePorts(service *api.Service) bool {
 func shouldCheckOrAssignHealthCheckNodePort(service *api.Service) bool {
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
 		// True if Service-type == LoadBalancer AND annotation AnnotationExternalTraffic present
-		return apiservice.ServiceNeedsHealthCheck(service)
+		return apiservice.NeedsHealthCheck(service)
 	}
 	glog.V(4).Infof("Service type: %v does not need health check node port", service.Spec.Type)
 	return false
