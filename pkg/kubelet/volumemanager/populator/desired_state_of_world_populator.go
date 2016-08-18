@@ -339,7 +339,7 @@ func (dswp *desiredStateOfWorldPopulator) createVolumeSpec(
 			clonedPodVolumeObj)
 	}
 
-	return volume.NewSpecFromVolume(&clonedPodVolume, "default"), "", nil
+	return volume.NewSpecFromVolume(&clonedPodVolume, podNamespace), "", nil
 }
 
 // getPVCExtractPV fetches the PVC object with the given namespace and name from
