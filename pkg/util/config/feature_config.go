@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	flagName = "feature-config"
+	flagName = "feature-gate"
 	// All known feature keys
 	allAlpha = "enableAllAlpha"
 )
@@ -36,27 +36,27 @@ var featureDefaults = map[string]bool{
 	allAlpha: false,
 }
 
-// FeatureConfig parses and stores flag gates for known features from
+// FeatureGate parses and stores flag gates for known features from
 // a ConfigurationMap.
-type FeatureConfig interface {
+type FeatureGate interface {
 	AddFlag(fs *pflag.FlagSet)
-	GetEnableAllAlpha() (bool, error)
+	AlphaEnabled() bool
 	// TODO: Define accessors for each non-API alpha feature.
 }
 
-// featureConfig implements FeatureConfig as well as pflag.Value
+// featureGate implements FeatureGate as well as pflag.Value
 // for parsing from a flag using a ConfigurationMap.
-type featureConfig struct {
+type featureGate struct {
 	configMap *ConfigurationMap
 	features  map[string]bool
 }
 
-// NewFeatureConfig creates a new FeatureConfig. Caller should add flag
+// NewFeatureGate creates a new FeatureGate. Caller should add flag
 // to a flagset with AddFlag and parse flags before calling any of
 // the accessors.
-func NewFeatureConfig() FeatureConfig {
+func NewFeatureGate() FeatureGate {
 	m := make(ConfigurationMap)
-	return &featureConfig{
+	return &featureGate{
 		configMap: &m,
 	}
 }
@@ -65,7 +65,7 @@ func NewFeatureConfig() FeatureConfig {
 
 // Set Parses a string of the form // "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
-func (f *featureConfig) Set(value string) error {
+func (f *featureGate) Set(value string) error {
 	err := f.configMap.Set(value)
 	if err != nil {
 		return err
@@ -86,24 +86,24 @@ func (f *featureConfig) Set(value string) error {
 	return nil
 }
 
-func (f *featureConfig) String() string {
+func (f *featureGate) String() string {
 	return f.configMap.String()
 }
 
-func (f *featureConfig) Type() string {
+func (f *featureGate) Type() string {
 	return f.configMap.Type()
 }
 
-// GetEnableAllAlpha returns value for allAlpha.
-func (f *featureConfig) GetEnableAllAlpha() (bool, error) {
+// AlphaEnabled returns value for allAlpha.
+func (f *featureGate) AlphaEnabled() bool {
 	defaultValue := featureDefaults[allAlpha]
 	if f.features == nil {
-		return defaultValue, fmt.Errorf("--%s has not been parsed", flagName)
+		panic(fmt.Sprintf("--%s has not been parsed", flagName))
 	}
 	if v, ok := f.features[allAlpha]; ok {
-		return v, nil
+		return v
 	}
-	return defaultValue, nil
+	return defaultValue
 }
 
 func parseConfigMapEntry(configMap ConfigurationMap, key string, defaultValue bool) (bool, error) {
@@ -120,12 +120,12 @@ func parseConfigMapEntry(configMap ConfigurationMap, key string, defaultValue bo
 
 // AddFlag adds a flag for setting global feature config to the
 // specified FlagSet.
-func (f *featureConfig) AddFlag(fs *pflag.FlagSet) {
+func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 	var known []string
 	for key, defaultValue := range featureDefaults {
 		known = append(known, fmt.Sprintf("%s=true|false (default=%t)", key, defaultValue))
 	}
 	fs.Var(f, flagName, ""+
 		"A set of key=value pairs that describe feature configuration for alpha/experimental features. "+
-		"Keys include "+strings.Join(known, ", "))
+		"Keys include:\n"+strings.Join(known, "\n"))
 }

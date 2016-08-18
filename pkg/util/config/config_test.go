@@ -125,22 +125,22 @@ func TestBroadcaster(t *testing.T) {
 
 func TestFeatureConfigFlag(t *testing.T) {
 	tests := []struct {
-		args        []string
+		arg         string
 		enableAlpha bool
 		parseError  error
 	}{
-		{[]string{"--feature-config=enableFooBarBaz=maybeidk"}, false, fmt.Errorf("unrecognized key: enableFooBarBaz")},
-		{[]string{"--feature-config="}, false, nil},
-		{[]string{"--feature-config=enableAllAlpha=false"}, false, nil},
-		{[]string{"--feature-config=enableAllAlpha=true"}, true, nil},
-		{[]string{"--feature-config=enableAllAlpha=banana"}, false, fmt.Errorf("invalid value of enableAllAlpha")},
+		{fmt.Sprintf("--%s=enableFooBarBaz=maybeidk", flagName), false, fmt.Errorf("unrecognized key: enableFooBarBaz")},
+		{fmt.Sprintf("--%s=", flagName), false, nil},
+		{fmt.Sprintf("--%s=enableAllAlpha=false", flagName), false, nil},
+		{fmt.Sprintf("--%s=enableAllAlpha=true", flagName), true, nil},
+		{fmt.Sprintf("--%s=enableAllAlpha=banana", flagName), false, fmt.Errorf("invalid value of enableAllAlpha")},
 	}
 	for i, test := range tests {
-		fs := pflag.NewFlagSet("testfeatureconfigflag", pflag.ContinueOnError)
-		f := NewFeatureConfig()
+		fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
+		f := NewFeatureGate()
 		f.AddFlag(fs)
 
-		err := fs.Parse(test.args)
+		err := fs.Parse([]string{test.arg})
 		if test.parseError != nil {
 			if !strings.Contains(err.Error(), test.parseError.Error()) {
 				t.Errorf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)
@@ -148,13 +148,8 @@ func TestFeatureConfigFlag(t *testing.T) {
 		} else if err != nil {
 			t.Errorf("%d: Parse() Expected nil, Got %v", i, err)
 		}
-		if alpha, _ := f.GetEnableAllAlpha(); alpha != test.enableAlpha {
-			t.Errorf("%d: GetEnableAllAlpha() expected %v, Got %v", i, test.enableAlpha, alpha)
+		if alpha := f.AlphaEnabled(); alpha != test.enableAlpha {
+			t.Errorf("%d: AlphaEnabled() expected %v, Got %v", i, test.enableAlpha, alpha)
 		}
-	}
-	f := NewFeatureConfig()
-	notParsedErr := fmt.Errorf("--feature-config has not been parsed")
-	if _, err := f.GetEnableAllAlpha(); err == nil || err.Error() != notParsedErr.Error() {
-		t.Errorf("GetEnableAllAlpha on new FeatureConfig Expected %v, Got %v", notParsedErr, err)
 	}
 }
