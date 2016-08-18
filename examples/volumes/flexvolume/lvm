@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/sh
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2015 The Kubernetes Authors All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,15 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Notes:
-#  - Please install "jq" package before using this driver.
 usage() {
 	err "Invalid usage. Usage: "
 	err "\t$0 init"
-	err "\t$0 attach <json params>"
-	err "\t$0 detach <mount device>"
-	err "\t$0 mount <mount dir> <mount device> <json params>"
-	err "\t$0 unmount <mount dir>"
+	err "\t$0 attach <json params> <hostname>"
+	err "\t$0 getvolumename <json params>"
+	err "\t$0 waitforattach <json params>"
+	err "\t$0 mountdevice <json params> <mount device> <mount path>"
+	err "\t$0 unmountdevice <mount device>"
+	err "\t$0 detach <mount device> <hostname>"
+	err "\t$0 waitfordetach <mount device>"
+	err "\t$0 mount <json params> <mount device> <mount path>"
+	err "\t$0 unmount <mount path>"
 	exit 1
 }
 
@@ -34,6 +37,7 @@ log() {
 	echo -ne $* >&1
 }
 
+# Check whether the path is mounted.
 ismounted() {
 	MOUNT=`findmnt -n ${MNTPATH} 2>/dev/null | cut -d' ' -f1`
 	if [ "${MOUNT}" == "${MNTPATH}" ]; then
@@ -43,33 +47,79 @@ ismounted() {
 	fi
 }
 
+# Attach the LVM volume. This call just imitates the attach call and cannot
+# remotely check whether the volume exists on the Kubelet node.
 attach() {
-	VOLUMEID=$(echo $1 | jq -r '.volumeID')
-	SIZE=$(echo $1 | jq -r '.size')
-	VG=$(echo $1|jq -r '.volumegroup')
+	DMDEV=
+	VOLUMEID=$(echo $1 | awk -F "volumeID" '{print $2}'|awk -F"," '{print $1}'|tr -d "\":}")
+	VG=$(echo $1 | awk -F "volumegroup" '{print $2}'|awk -F"," '{print $1}'|tr -d "\":}")
+	SIZE=$(echo $1 | awk -F "size" '{print $2}'|awk -F"," '{print $1}'|tr -d "\":}")
 
 	# LVM substitutes - with --
 	VOLUMEID=`echo $VOLUMEID|sed s/-/--/g`
 	VG=`echo $VG|sed s/-/--/g`
 
 	DMDEV="/dev/mapper/${VG}-${VOLUMEID}"
-	if [ ! -b "${DMDEV}" ]; then
-		err "{\"status\": \"Failure\", \"message\": \"Volume ${VOLUMEID} does not exist\"}"
-		exit 1
-	fi
+
+	# Return the device path.
 	log "{\"status\": \"Success\", \"device\":\"${DMDEV}\"}"
-	exit 0
 }
 
+# Wait for volume to attach on the Kubelet node. This call just imitates the
+# call.
+waitforattach() {
+	attach $*
+}
+
+# Get globally unique volume name.
+getvolumename() {
+	VOLUMEID=$(echo $1 | awk -F "volumeID" '{print $2}'|awk -F"," '{print $1}'|tr -d "\":}")
+	VG=$(echo $1 | awk -F "volumegroup" '{print $2}'|awk -F"," '{print $1}'|tr -d "\":}")
+
+	# LVM substitutes - with --
+	VOLUMEID=`echo $VOLUMEID|sed s/-/--/g`
+	VG=`echo $VG|sed s/-/--/g`
+
+	# In this simple example, volume name is not cluster wide unique. The framework
+	# actually expects volume name to be unique.
+	VOLUMENAME="${VG}-${VOLUMEID}"
+	log "{\"status\": \"Success\", \"device\":\"${VOLUMENAME}\"}"
+
+}
+
+# Detach the volume.
 detach() {
 	log "{\"status\": \"Success\"}"
-	exit 0
 }
 
+# Bind mount the volume.
 domount() {
-	MNTPATH=$1
+	OPTIONS=$1
+	SRC=$2
+	DEST=$3
+
+	if [ ! -d "$SRC" ]; then
+		err "{\"status\": \"Failure\", \"message\": \"${SRC} directory does not exist\"}"
+		exit 1
+	fi
+
+	mkdir -p ${DEST} &> /dev/null
+
+	mount --bind ${SRC} ${DEST} &> /dev/null
+	if [ $? -ne 0 ]; then
+		err "{ \"status\": \"Failure\", \"message\": \"Failed to bind mount ${SRC} at ${DEST}\"}"
+		exit 1
+	fi
+	log "{\"status\": \"Success\"}"
+}
+
+# Mount the device at a global path. Individual pods will then bind mount this
+# path.
+mountdevice() {
+	FSTYPE=$(echo $1 |awk -F "kubernetes.io/fsType" '{print $2}'|awk -F"," '{print $1}'|tr -d "\":}")
 	DMDEV=$2
-	FSTYPE=$(echo $3|jq -r '.["kubernetes.io/fsType"]')
+	MNTPATH=$3
+	RW=$(echo $1 |awk -F "kubernetes.io/readwrite" '{print $2}'|awk -F"," '{print $1}'|tr -d "\":}")
 
 	if [ ! -b "${DMDEV}" ]; then
 		err "{\"status\": \"Failure\", \"message\": \"${DMDEV} does not exist\"}"
@@ -92,15 +142,15 @@ domount() {
 
 	mkdir -p ${MNTPATH} &> /dev/null
 
-	mount ${DMDEV} ${MNTPATH} &> /dev/null
+	mount -o ${RW} ${DMDEV} ${MNTPATH} &> /dev/null
 	if [ $? -ne 0 ]; then
 		err "{ \"status\": \"Failure\", \"message\": \"Failed to mount device ${DMDEV} at ${MNTPATH}\"}"
 		exit 1
 	fi
 	log "{\"status\": \"Success\"}"
-	exit 0
 }
 
+# Unmount
 unmount() {
 	MNTPATH=$1
 	if [ $(ismounted) -eq 0 ] ; then
@@ -113,10 +163,8 @@ unmount() {
 		err "{ \"status\": \"Failed\", \"message\": \"Failed to unmount volume at ${MNTPATH}\"}"
 		exit 1
 	fi
-	rmdir ${MNTPATH} &> /dev/null
 
 	log "{\"status\": \"Success\"}"
-	exit 0
 }
 
 op=$1
@@ -133,20 +181,34 @@ fi
 shift
 
 case "$op" in
-	attach)
+	attach|waitforattach)
 		attach $*
+		;;
+
+	getdevicename)
+		getdevicename $*
+		;;
+	getvolumename)
+		getvolumename $*
 		;;
 	detach)
 		detach $*
 		;;
+	mountdevice)
+		mountdevice $*
+		;;
 	mount)
 		domount $*
 		;;
-	unmount)
+	unmount|unmountdevice)
 		unmount $*
 		;;
-	*)
+	help)
 		usage
+		;;
+	getdevicemountpath|*)
+		log "{\"status\": \"Not supported\"}"
+		;;
 esac
 
-exit 1
+exit 0
