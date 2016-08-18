@@ -19,20 +19,16 @@ package healthcheck
 import (
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // All public API Methods for this package
 
 // UpdateEndpoints Update the set of local endpoints for a service
 func UpdateEndpoints(serviceName types.NamespacedName, endpointUids sets.String) {
-	// Deepcopy the endpoints set with the latest
-	endpoints := sets.NewString()
-	for _, e := range endpointUids.List() {
-		endpoints.Insert(e)
-	}
 	req := &proxyMutationRequest{
 		serviceName:  serviceName,
-		endpointUids: &endpoints,
+		endpointUids: &endpointUids,
 	}
 	healthchecker.mutationRequestChannel <- req
 }
@@ -61,5 +57,9 @@ func DeleteServiceListener(serviceName types.NamespacedName, listenPort int) boo
 
 // Run Start the healthchecker main loop
 func Run() {
-	once.Do(run)
+	healthchecker = proxyHealthCheckFactory()
+	// Wrap with a wait.Forever to handle panics.
+	go wait.Forever(func() {
+		healthchecker.handlerLoop()
+	}, 0)
 }

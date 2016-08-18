@@ -18,29 +18,12 @@ limitations under the License.
 package healthcheck // import "k8s.io/kubernetes/pkg/proxy/healthcheck"
 
 import (
-	"sync"
 	"time"
-
-	"k8s.io/kubernetes/pkg/util/wait"
 
 	"github.com/golang/glog"
 )
 
-var once sync.Once
 var healthchecker *proxyHC
-
-func run() {
-	allocatedCh := make(chan bool)
-	go func() {
-		healthchecker = proxyHealthCheckFactory()
-		allocatedCh <- true
-		wait.Forever(func() {
-			healthchecker.handlerLoop()
-		}, 0)
-	}()
-	// Return only after factory function allocation
-	<-allocatedCh
-}
 
 // handlerLoop Serializes all requests to prevent concurrent access to the maps
 func (h *proxyHC) handlerLoop() {
@@ -53,18 +36,18 @@ func (h *proxyHC) handlerLoop() {
 		case req := <-h.listenerRequestChannel:
 			req.responseChannel <- h.handleServiceListenerRequest(req)
 		case <-ticker.C:
-			h.sync()
+			go h.sync()
 		}
 	}
 }
 
 func (h *proxyHC) sync() {
-	glog.V(2).Infof("%d Health Check Listeners", len(h.serviceResponderMap))
-	glog.V(2).Infof("%d Services registered for health checking", len(h.serviceEndpointsMap.List()))
+	glog.V(4).Infof("%d Health Check Listeners", len(h.serviceResponderMap))
+	glog.V(4).Infof("%d Services registered for health checking", len(h.serviceEndpointsMap.List()))
 	for _, svc := range h.serviceEndpointsMap.ListKeys() {
 		if e, ok := h.serviceEndpointsMap.Get(svc); ok {
 			endpointList := e.(*serviceEndpointsList)
-			glog.V(2).Infof("Service %s has %d local endpoints", svc, endpointList.endpoints.Len())
+			glog.V(4).Infof("Service %s has %d local endpoints", svc, endpointList.endpoints.Len())
 		}
 	}
 }
