@@ -114,10 +114,11 @@ func (r *FakeRuntimeService) CreatePodSandbox(config *runtimeApi.PodSandboxConfi
 	podSandboxID := config.Metadata.GetName()
 	createdAt := time.Now().Unix()
 	readyState := runtimeApi.PodSandBoxState_READY
+	sandboxName := BuildSandboxName(config.Metadata)
 	r.Sandboxes[podSandboxID] = &FakePodSandbox{
 		PodSandbox: runtimeApi.PodSandbox{
 			Id:        &podSandboxID,
-			Name:      config.Metadata.Name,
+			Name:      &sandboxName,
 			State:     &readyState,
 			CreatedAt: &createdAt,
 			Labels:    config.Labels,
@@ -227,10 +228,11 @@ func (r *FakeRuntimeService) CreateContainer(podSandboxID string, config *runtim
 	createdAt := time.Now().Unix()
 	createdState := runtimeApi.ContainerState_CREATED
 	imageRef := config.Image.GetImage()
+	containerName := BuildContainerName(config.Metadata)
 	r.Containers[containerID] = &FakeContainer{
 		ContainerStatus: runtimeApi.ContainerStatus{
 			Id:          &containerID,
-			Name:        config.Metadata.Name,
+			Name:        &containerName,
 			Image:       config.Image,
 			ImageRef:    &imageRef,
 			CreatedAt:   &createdAt,
