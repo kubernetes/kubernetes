@@ -19,12 +19,14 @@ package e2e
 import (
 	"testing"
 
+	"github.com/vharitonsky/iniflags"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func init() {
 	framework.RegisterCommonFlags()
 	framework.RegisterClusterFlags()
+	iniflags.Parse()
 }
 
 func TestE2E(t *testing.T) {
