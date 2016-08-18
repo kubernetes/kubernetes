@@ -335,9 +335,25 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 
 	if kcfg == nil {
 		var kubeClient, eventClient *clientset.Clientset
+		var autoDetectCloudProvider bool
+		var cloud cloudprovider.Interface
+
+		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
+			autoDetectCloudProvider = true
+		} else {
+			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+			if err != nil {
+				return err
+			}
+			if cloud == nil {
+				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			} else {
+				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			}
+		}
 
 		if s.BootstrapKubeconfig != "" {
-			nodeName, err := getNodeName(s)
+			nodeName, err := getNodeName(kcfg.Cloud, nodeutil.GetHostname(s.HostnameOverride))
 			if err != nil {
 				return err
 			}
@@ -370,24 +386,12 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		if err != nil {
 			return err
 		}
+
 		kcfg = cfg
+		kcfg.AutoDetectCloudProvider = autoDetectCloudProvider
+		kcfg.Cloud = cloud
 		kcfg.KubeClient = kubeClient
 		kcfg.EventClient = eventClient
-
-		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
-			kcfg.AutoDetectCloudProvider = true
-		} else {
-			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-			if err != nil {
-				return err
-			}
-			if cloud == nil {
-				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			} else {
-				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-				kcfg.Cloud = cloud
-			}
-		}
 	}
 
 	if kcfg.CAdvisorInterface == nil {
@@ -451,27 +455,16 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 }
 
 // getNodeName returns the node name according to the cloud provider
-// if cloud provider is specified. Otherwise, returns the host name of the node.
-func getNodeName(s *options.KubeletServer) (string, error) {
-	var err error
-	var cloud cloudprovider.Interface
-
-	if s.CloudProvider != kubeExternal.AutoDetectCloudProvider {
-		cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	hostName := nodeutil.GetHostname(s.HostnameOverride)
+// if cloud provider is specified. Otherwise, returns the hostname of the node.
+func getNodeName(cloud cloudprovider.Interface, hostname string) (string, error) {
 	if cloud != nil {
 		instances, ok := cloud.Instances()
 		if !ok {
 			return "", fmt.Errorf("failed to get instances from cloud provider")
 		}
-		return instances.CurrentNodeName(hostName)
+		return instances.CurrentNodeName(hostname)
 	}
-	return hostName, nil
+	return hostname, nil
 }
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
