@@ -93,7 +93,7 @@ func NewCMServer() *CMServer {
 			LeaderElection:          leaderelection.DefaultLeaderElectionConfiguration(),
 			ControllerStartInterval: unversioned.Duration{Duration: 0 * time.Second},
 			EnableGarbageCollector:  false,
-			ConcurrentGCSyncs:       5,
+			ConcurrentGCSyncs:       100,
 			ClusterSigningCertFile:  "/etc/kubernetes/ca/ca.pem",
 			ClusterSigningKeyFile:   "/etc/kubernetes/ca/ca.key",
 		},
