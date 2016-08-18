@@ -70,8 +70,6 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 		ns = f.Namespace.Name
 	})
 
-	conformanceTests = createComformanceTests(jig, ns)
-
 	// Before enabling this loadbalancer test in any other test list you must
 	// make sure the associated project has enough quota. At the time of this
 	// writing a GCE project is allowed 3 backend services by default. This
@@ -107,6 +105,7 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 		})
 
 		It("should conform to Ingress spec", func() {
+			conformanceTests = createComformanceTests(jig, ns)
 			for _, t := range conformanceTests {
 				By(t.entryLog)
 				t.execute()

@@ -95,7 +95,9 @@ func clusterIsReadyOrFail(f *framework.Framework, context *framework.E2EContext)
 	framework.Logf("Cluster %s is Ready", context.Name)
 }
 
-func waitforclustersReadness(f *framework.Framework, clusterSize int) *federationapi.ClusterList {
+// waitForAllClustersReady wait for all clusters defined in e2e context to be created
+// return ClusterList until the listed cluster items equals clusterCount
+func waitForAllClustersReady(f *framework.Framework, clusterCount int) *federationapi.ClusterList {
 	var clusterList *federationapi.ClusterList
 	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 		var err error
@@ -103,8 +105,8 @@ func waitforclustersReadness(f *framework.Framework, clusterSize int) *federatio
 		if err != nil {
 			return false, err
 		}
-		framework.Logf("%d clusters registered, waiting for %d", len(clusterList.Items), clusterSize)
-		if len(clusterList.Items) == clusterSize {
+		framework.Logf("%d clusters registered, waiting for %d", len(clusterList.Items), clusterCount)
+		if len(clusterList.Items) == clusterCount {
 			return true, nil
 		}
 		return false, nil
@@ -182,7 +184,7 @@ func registerClusters(clusters map[string]*cluster, userAgentName, federationNam
 	}
 
 	By("Obtaining a list of all the clusters")
-	clusterList := waitforclustersReadness(f, len(contexts))
+	clusterList := waitForAllClustersReady(f, len(contexts))
 
 	framework.Logf("Checking that %d clusters are Ready", len(contexts))
 	for _, context := range contexts {
