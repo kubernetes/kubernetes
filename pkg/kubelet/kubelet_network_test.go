@@ -17,13 +17,7 @@ limitations under the License.
 package kubelet
 
 import (
-	"net"
-	"reflect"
-	"strings"
 	"testing"
-
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/util/bandwidth"
 )
 
 func TestGetIPTablesMark(t *testing.T) {
