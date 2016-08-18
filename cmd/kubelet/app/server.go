@@ -294,11 +294,10 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 // Otherwise, the caller is assumed to have set up the KubeletConfig object and all defaults
 // will be ignored.
 func Run(s *options.KubeletServer, kcfg *KubeletConfig) error {
-	err := run(s, kcfg)
-	if err != nil {
-		glog.Errorf("Failed running kubelet: %v", err)
+	if err := run(s, kcfg); err != nil {
+		return fmt.Errorf("failed to run Kubelet: %v", err)
 	}
-	return err
+	return nil
 }
 
 func checkPermissions() error {
@@ -313,9 +312,6 @@ func checkPermissions() error {
 func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	if s.ExitOnLockContention && s.LockFilePath == "" {
 		return errors.New("cannot exit on lock file contention: no lock file specified")
-	}
-	if err := checkPermissions(); err != nil {
-		glog.Error(err)
 	}
 
 	done := make(chan struct{})
@@ -338,25 +334,34 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	}
 
 	if kcfg == nil {
-		cfg, err := UnsecuredKubeletConfig(s)
-		if err != nil {
-			return err
-		}
-		kcfg = cfg
-
+		var kubeClient, eventClient *clientset.Clientset
 		clientConfig, err := CreateAPIServerClientConfig(s)
 		if err == nil {
-			kcfg.KubeClient, err = clientset.NewForConfig(clientConfig)
+			kubeClient, err = clientset.NewForConfig(clientConfig)
 
 			// make a separate client for events
 			eventClientConfig := *clientConfig
 			eventClientConfig.QPS = float32(s.EventRecordQPS)
 			eventClientConfig.Burst = int(s.EventBurst)
-			kcfg.EventClient, err = clientset.NewForConfig(&eventClientConfig)
+			eventClient, err = clientset.NewForConfig(&eventClientConfig)
 		}
-		if err != nil && len(s.APIServerList) > 0 {
-			glog.Warningf("No API client: %v", err)
+		if err != nil {
+			if s.RequireKubeConfig {
+				return fmt.Errorf("invalid kubeconfig: %v", err)
+			}
+			// TODO: this should be replaced by a --standalone flag
+			if len(s.APIServerList) > 0 {
+				glog.Warningf("No API client: %v", err)
+			}
 		}
+
+		cfg, err := UnsecuredKubeletConfig(s)
+		if err != nil {
+			return err
+		}
+		kcfg = cfg
+		kcfg.KubeClient = kubeClient
+		kcfg.EventClient = eventClient
 
 		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
 			kcfg.AutoDetectCloudProvider = true
@@ -397,6 +402,10 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		if err != nil {
 			return err
 		}
+	}
+
+	if err := checkPermissions(); err != nil {
+		glog.Error(err)
 	}
 
 	runtime.ReallyCrash = s.ReallyCrashForTesting
@@ -481,9 +490,17 @@ func authPathClientConfig(s *options.KubeletServer, useDefaults bool) (*restclie
 }
 
 func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
+	if s.RequireKubeConfig {
+		// Ignores the values of s.APIServerList
+		return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+			&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
+			&clientcmd.ConfigOverrides{},
+		).ClientConfig()
+	}
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: s.KubeConfig.Value()},
-		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: s.APIServerList[0]}},
+	).ClientConfig()
 }
 
 // createClientConfig creates a client configuration from the command line
@@ -493,6 +510,20 @@ func kubeconfigClientConfig(s *options.KubeletServer) (*restclient.Config, error
 // fall back to the default auth (none) without an error.
 // TODO(roberthbailey): Remove support for --auth-path
 func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
+	if s.RequireKubeConfig {
+		return kubeconfigClientConfig(s)
+	}
+
+	// TODO: handle a new --standalone flag that bypasses kubeconfig loading and returns no error.
+	// DEPRECATED: all subsequent code is deprecated
+	if len(s.APIServerList) == 0 {
+		return nil, fmt.Errorf("no api servers specified")
+	}
+	// TODO: adapt Kube client to support LB over several servers
+	if len(s.APIServerList) > 1 {
+		glog.Infof("Multiple api servers specified.  Picking first one")
+	}
+
 	if s.KubeConfig.Provided() && s.AuthPath.Provided() {
 		return nil, fmt.Errorf("cannot specify both --kubeconfig and --auth-path")
 	}
@@ -516,14 +547,6 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 // the configuration via addChaosToClientConfig. This func is exported to support
 // integration with third party kubelet extensions (e.g. kubernetes-mesos).
 func CreateAPIServerClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
-	if len(s.APIServerList) < 1 {
-		return nil, fmt.Errorf("no api servers specified")
-	}
-	// TODO: adapt Kube client to support LB over several servers
-	if len(s.APIServerList) > 1 {
-		glog.Infof("Multiple api servers specified.  Picking first one")
-	}
-
 	clientConfig, err := createClientConfig(s)
 	if err != nil {
 		return nil, err

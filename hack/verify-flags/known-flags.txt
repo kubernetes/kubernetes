@@ -410,6 +410,7 @@ repo-root
 report-dir
 report-prefix
 required-contexts
+require-kubeconfig
 resolv-conf
 resource-container
 resource-quota-sync-period
