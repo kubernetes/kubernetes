@@ -35,8 +35,9 @@ const (
 
 // FederatedOperation definition contains type (add/update/delete) and the object itself.
 type FederatedOperation struct {
-	Type FederatedOperationType
-	Obj  pkg_runtime.Object
+	Type        FederatedOperationType
+	ClusterName string
+	Obj         pkg_runtime.Object
 }
 
 // A helper that executes the given set of updates on federation, in parallel.
@@ -72,11 +73,7 @@ func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation, timeout time.Du
 	done := make(chan error, len(ops))
 	for _, op := range ops {
 		go func(op FederatedOperation) {
-			clusterName, err := GetClusterName(op.Obj)
-			if err != nil {
-				done <- err
-				return
-			}
+			clusterName := op.ClusterName
 
 			// TODO: Ensure that the clientset has reasonable timeout.
 			clientset, err := fu.federation.GetClientsetForCluster(clusterName)

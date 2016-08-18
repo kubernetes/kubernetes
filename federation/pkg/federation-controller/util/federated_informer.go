@@ -40,10 +40,16 @@ const (
 	userAgentName     = "federation-service-controller"
 )
 
+// An object with an origin information.
+type FederatedObject struct {
+	Object      interface{}
+	ClusterName string
+}
+
 // FederatedReadOnlyStore is an overlay over multiple stores created in federated clusters.
 type FederatedReadOnlyStore interface {
 	// Returns all items in the store.
-	List() ([]interface{}, error)
+	List() ([]FederatedObject, error)
 
 	// Returns all items from a cluster.
 	ListFromCluster(clusterName string) ([]interface{}, error)
@@ -52,7 +58,7 @@ type FederatedReadOnlyStore interface {
 	GetByKey(clusterName string, key string) (interface{}, bool, error)
 
 	// Returns the items stored under the given key in all clusters.
-	GetFromAllClusters(key string) ([]interface{}, error)
+	GetFromAllClusters(key string) ([]FederatedObject, error)
 
 	// Checks whether stores for all clusters form the lists (and only these) are there and
 	// are synced. This is only a basic check whether the data inside of the store is usable.
@@ -382,14 +388,15 @@ func (f *federatedInformerImpl) GetTargetStore() FederatedReadOnlyStore {
 }
 
 // Returns all items in the store.
-func (fs *federatedStoreImpl) List() ([]interface{}, error) {
+func (fs *federatedStoreImpl) List() ([]FederatedObject, error) {
 	fs.federatedInformer.Lock()
 	defer fs.federatedInformer.Unlock()
 
-	result := make([]interface{}, 0)
-	for _, targetInformer := range fs.federatedInformer.targetInformers {
-		values := targetInformer.store.List()
-		result = append(result, values...)
+	result := make([]FederatedObject, 0)
+	for clusterName, targetInformer := range fs.federatedInformer.targetInformers {
+		for _, value := range targetInformer.store.List() {
+			result = append(result, FederatedObject{ClusterName: clusterName, Object: value})
+		}
 	}
 	return result, nil
 }
@@ -418,18 +425,18 @@ func (fs *federatedStoreImpl) GetByKey(clusterName string, key string) (interfac
 }
 
 // Returns the items stored under the given key in all clusters.
-func (fs *federatedStoreImpl) GetFromAllClusters(key string) ([]interface{}, error) {
+func (fs *federatedStoreImpl) GetFromAllClusters(key string) ([]FederatedObject, error) {
 	fs.federatedInformer.Lock()
 	defer fs.federatedInformer.Unlock()
 
-	result := make([]interface{}, 0)
-	for _, targetInformer := range fs.federatedInformer.targetInformers {
+	result := make([]FederatedObject, 0)
+	for clusterName, targetInformer := range fs.federatedInformer.targetInformers {
 		value, exist, err := targetInformer.store.GetByKey(key)
 		if err != nil {
 			return nil, err
 		}
 		if exist {
-			result = append(result, value)
+			result = append(result, FederatedObject{ClusterName: clusterName, Object: value})
 		}
 	}
 	return result, nil

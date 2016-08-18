@@ -74,7 +74,7 @@ func (a *PromptingAuthLoader) Prompt() *clientauth.Info {
 }
 
 func promptForString(field string, r io.Reader) string {
-	fmt.Printf("Please enter %s: ", field)
+	fmt.Printf("Please enter %s: \n", field)
 	var result string
 	fmt.Fscan(r, &result)
 	return result
