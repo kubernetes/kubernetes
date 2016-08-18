@@ -19,7 +19,7 @@ func TestNewCertificateRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err := NewCertificateRequest(keyData, subject, dnsSANs, ipSANs)
+	_, _, err = NewCertificateRequest(keyData, subject, dnsSANs, ipSANs)
 	if err != nil {
 		t.Error(err)
 	}
