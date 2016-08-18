@@ -272,6 +272,7 @@ func Run(s *options.APIServer) error {
 	genericConfig.ProxyDialer = proxyDialerFn
 	genericConfig.ProxyTLSClientConfig = proxyTLSClientConfig
 	genericConfig.Serializer = api.Codecs
+	genericConfig.OpenAPIInfo.Title = "Kubernetes"
 
 	config := &master.Config{
 		Config:                  genericConfig,

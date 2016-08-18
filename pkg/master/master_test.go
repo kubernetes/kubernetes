@@ -64,6 +64,10 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/util/sets"
 
+	"github.com/go-openapi/loads"
+	"github.com/go-openapi/spec"
+	"github.com/go-openapi/strfmt"
+	"github.com/go-openapi/validate"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/net/context"
 )
@@ -1204,4 +1208,55 @@ func testThirdPartyDiscovery(t *testing.T, version string) {
 			Kind:       "Foo",
 		},
 	})
+}
+
+// TestValidOpenAPISpec verifies that the open api is added
+// at the proper endpoint and the spec is valid.
+func TestValidOpenAPISpec(t *testing.T) {
+	_, etcdserver, config, assert := setUp(t)
+	defer etcdserver.Terminate(t)
+
+	config.EnableOpenAPISupport = true
+	config.OpenAPIInfo = spec.Info{
+		InfoProps: spec.InfoProps{
+			Title:   "Kubernetes",
+			Version: "unversioned",
+		},
+	}
+	master, err := New(&config)
+	if err != nil {
+		t.Fatalf("Error in bringing up the master: %v", err)
+	}
+
+	// make sure swagger.json is not registered before calling install api.
+	server := httptest.NewServer(master.HandlerContainer.ServeMux)
+	resp, err := http.Get(server.URL + "/swagger.json")
+	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	assert.Equal(http.StatusNotFound, resp.StatusCode)
+
+	master.InstallOpenAPI()
+	resp, err = http.Get(server.URL + "/swagger.json")
+	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	assert.Equal(http.StatusOK, resp.StatusCode)
+
+	// as json schema
+	var sch spec.Schema
+	if assert.NoError(decodeResponse(resp, &sch)) {
+		validator := validate.NewSchemaValidator(spec.MustLoadSwagger20Schema(), nil, "", strfmt.Default)
+		res := validator.Validate(&sch)
+		assert.NoError(res.AsError())
+	}
+
+	// Validate OpenApi spec
+	doc, err := loads.Spec(server.URL + "/swagger.json")
+	if assert.NoError(err) {
+		// TODO(mehdy): This test is timing out on jerkin but passing locally. Enable it after debugging timeout issue.
+		_ = validate.NewSpecValidator(doc.Schema(), strfmt.Default)
+		// res, _ := validator.Validate(doc)
+		// assert.NoError(res.AsError())
+	}
 }

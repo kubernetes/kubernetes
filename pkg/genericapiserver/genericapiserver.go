@@ -36,6 +36,7 @@ import (
 	"github.com/golang/glog"
 	"gopkg.in/natefinch/lumberjack.v2"
 
+	"github.com/go-openapi/spec"
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -48,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/handlers"
 	"k8s.io/kubernetes/pkg/cloudprovider"
+	"k8s.io/kubernetes/pkg/genericapiserver/openapi"
 	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	genericvalidation "k8s.io/kubernetes/pkg/genericapiserver/validation"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -192,6 +194,15 @@ type Config struct {
 	ExtraEndpointPorts []api.EndpointPort
 
 	KubernetesServiceNodePort int
+
+	// EnableOpenAPISupport enables OpenAPI support. Allow downstream customers to disable OpenAPI spec.
+	EnableOpenAPISupport bool
+
+	// OpenAPIInfo will be directly available as Info section of Open API spec.
+	OpenAPIInfo spec.Info
+
+	// OpenAPIDefaultResponse will be used if an web service operation does not have any responses listed.
+	OpenAPIDefaultResponse spec.Response
 }
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
@@ -252,6 +263,12 @@ type GenericAPIServer struct {
 	// Map storing information about all groups to be exposed in discovery response.
 	// The map is from name to the group.
 	apiGroupsForDiscovery map[string]unversioned.APIGroup
+
+	// See Config.$name for documentation of these flags
+
+	enableOpenAPISupport   bool
+	openAPIInfo            spec.Info
+	openAPIDefaultResponse spec.Response
 }
 
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
@@ -378,6 +395,10 @@ func New(c *Config) (*GenericAPIServer, error) {
 
 		KubernetesServiceNodePort: c.KubernetesServiceNodePort,
 		apiGroupsForDiscovery:     map[string]unversioned.APIGroup{},
+
+		enableOpenAPISupport:   c.EnableOpenAPISupport,
+		openAPIInfo:            c.OpenAPIInfo,
+		openAPIDefaultResponse: c.OpenAPIDefaultResponse,
 	}
 
 	if c.RestfulContainer != nil {
@@ -579,6 +600,16 @@ func NewConfig(options *options.ServerRunOptions) *Config {
 		ReadWritePort:             options.SecurePort,
 		ServiceClusterIPRange:     &options.ServiceClusterIPRange,
 		ServiceNodePortRange:      options.ServiceNodePortRange,
+		EnableOpenAPISupport:      true,
+		OpenAPIDefaultResponse: spec.Response{
+			ResponseProps: spec.ResponseProps{
+				Description: "Default Response."}},
+		OpenAPIInfo: spec.Info{
+			InfoProps: spec.InfoProps{
+				Title:   "Generic API Server",
+				Version: "unversioned",
+			},
+		},
 	}
 }
 
@@ -631,6 +662,9 @@ func DefaultAndValidateRunOptions(options *options.ServerRunOptions) {
 func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 	if s.enableSwaggerSupport {
 		s.InstallSwaggerAPI()
+	}
+	if s.enableOpenAPISupport {
+		s.InstallOpenAPI()
 	}
 	// We serve on 2 ports. See docs/admin/accessing-the-api.md
 	secureLocation := ""
@@ -868,17 +902,12 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 	}, nil
 }
 
-// InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
-// and traversal. It is optional to allow consumers of the Kubernetes GenericAPIServer to
-// register their own web services into the Kubernetes mux prior to initialization
-// of swagger, so that other resource types show up in the documentation.
-func (s *GenericAPIServer) InstallSwaggerAPI() {
+// getSwaggerConfig returns swagger config shared between SwaggerAPI and OpenAPI spec generators
+func (s *GenericAPIServer) getSwaggerConfig() *swagger.Config {
 	hostAndPort := s.ExternalAddress
 	protocol := "https://"
 	webServicesUrl := protocol + hostAndPort
-
-	// Enable swagger UI and discovery API
-	swaggerConfig := swagger.Config{
+	return &swagger.Config{
 		WebServicesUrl:  webServicesUrl,
 		WebServices:     s.HandlerContainer.RegisteredWebServices(),
 		ApiPath:         "/swaggerapi/",
@@ -892,7 +921,30 @@ func (s *GenericAPIServer) InstallSwaggerAPI() {
 			return ""
 		},
 	}
-	swagger.RegisterSwaggerService(swaggerConfig, s.HandlerContainer)
+}
+
+// InstallSwaggerAPI installs the /swaggerapi/ endpoint to allow schema discovery
+// and traversal. It is optional to allow consumers of the Kubernetes GenericAPIServer to
+// register their own web services into the Kubernetes mux prior to initialization
+// of swagger, so that other resource types show up in the documentation.
+func (s *GenericAPIServer) InstallSwaggerAPI() {
+
+	// Enable swagger UI and discovery API
+	swagger.RegisterSwaggerService(*s.getSwaggerConfig(), s.HandlerContainer)
+}
+
+// InstallOpenAPI installs the /swagger.json endpoint to allow new OpenAPI schema discovery.
+func (s *GenericAPIServer) InstallOpenAPI() {
+	openAPIConfig := openapi.Config{
+		SwaggerConfig:   s.getSwaggerConfig(),
+		IgnorePrefixes:  []string{"/swaggerapi"},
+		Info:            &s.openAPIInfo,
+		DefaultResponse: &s.openAPIDefaultResponse,
+	}
+	err := openapi.RegisterOpenAPIService(&openAPIConfig, s.HandlerContainer)
+	if err != nil {
+		glog.Fatalf("Failed to generate open api spec: %v", err)
+	}
 }
 
 // NewDefaultAPIGroupInfo returns an APIGroupInfo stubbed with "normal" values
