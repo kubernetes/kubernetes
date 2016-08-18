@@ -57,7 +57,7 @@ to filter logs for that test.
 
 Based on the message logged in the junit file, the pod name may be displayed.
 
-![alt text](https://github.com/mnshaw/kubernetes/blob/gubernator-doc/docs/devel/gubernator-images/testfailures.png)
+![alt text](/gubernator-images/testfailures.png)
 
 
 ### Log Filtering
@@ -65,32 +65,32 @@ Based on the message logged in the junit file, the pod name may be displayed.
 The log filtering page comes with checkboxes and textboxes to aid in filtering. Filtered keywords will be bolded
 and lines including keywords will be highlighted. Up to four lines around the line of interest will also be displayed.
 
-![alt text](https://github.com/mnshaw/kubernetes/blob/gubernator-doc/docs/devel/gubernator-images/filterpage.png)
+![alt text](https://github.com/kubernetes/kubernetes/docs/devel/gubernator-images/filterpage.png)
 
 If less than 100 lines are skipped, the "... skipping xx lines ..." message can be clicked to expand and show
 the hidden lines.
 
 Before expansion:
-![alt text](https://github.com/mnshaw/kubernetes/blob/gubernator-doc/docs/devel/gubernator-images/skipping1.png)
+![alt text](/gubernator-images/skipping1.png)
 After expansion:
-![alt text](https://github.com/mnshaw/kubernetes/blob/gubernator-doc/docs/devel/gubernator-images/skipping2.png)
+![alt text](/gubernator-images/skipping2.png)
 
 If the pod name was displayed in the Test Failures list, it will automatically be filled in and filtered.
 If it is not found in the error message, it can be entered into the textbox. Once a pod name
 is entered, the Pod UID, Namespace, and ContainerID may be automatically filled in as well. These can be
 altered as well. To apply the filter check off the checkbox corresponding to the filter.
 
-![alt text](https://github.com/mnshaw/kubernetes/blob/gubernator-doc/docs/devel/gubernator-images/filterpage1.png)
+![alt text](/gubernator-images/filterpage1.png)
 
 To add a filter, type the term to be filtered into the textbox labeled "Add filter:" and press enter. 
 Additional filters will be displayed as checkboxes under the textbox.
 
-![alt text](https://github.com/mnshaw/kubernetes/blob/gubernator-doc/docs/devel/gubernator-images/filterpage3.png)
+![alt text](/gubernator-images/filterpage3.png)
 
 To choose which logs to view check off the checkboxes corresponding to the logs of interest. If multiple logs are
 checked off, the "Weave by timestamp" option can weave the selected logs together based on the timestamp in each line.
 
-![alt text](https://github.com/mnshaw/kubernetes/blob/gubernator-doc/docs/devel/gubernator-images/filterpage2.png)
+![alt text](/gubernator-images/filterpage2.png)
 
 ### Gubernator for Local Tests
 
