@@ -397,7 +397,7 @@ func (dswp *desiredStateOfWorldPopulator) getPVSpec(
 	}
 
 	volumeGidValue := getPVVolumeGidAnnotationValue(pv)
-	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly, "default"), volumeGidValue, nil
+	return volume.NewSpecFromPersistentVolume(pv, pvcReadOnly), volumeGidValue, nil
 }
 
 func getPVVolumeGidAnnotationValue(pv *api.PersistentVolume) string {
