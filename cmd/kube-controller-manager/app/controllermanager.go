@@ -419,19 +419,21 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		glog.Infof("Not starting %s apis", groupVersion)
 	}
 
-	provisioner, err := NewVolumeProvisioner(cloud, s.VolumeConfiguration)
+	alphaProvisioner, err := NewAlphaVolumeProvisioner(cloud, s.VolumeConfiguration)
 	if err != nil {
-		glog.Fatalf("A Provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
+		glog.Fatalf("An backward-compatible provisioner could not be created: %v, but one was expected. Provisioning will not work. This functionality is considered an early Alpha version.", err)
 	}
-
 	volumeController := persistentvolumecontroller.NewPersistentVolumeController(
 		clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "persistent-volume-binder")),
 		s.PVClaimBinderSyncPeriod.Duration,
-		provisioner,
-		ProbeRecyclableVolumePlugins(s.VolumeConfiguration),
+		alphaProvisioner,
+		ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 		cloud,
 		s.ClusterName,
-		nil, nil, nil,
+		nil, // volumeSource
+		nil, // claimSource
+		nil, // classSource
+		nil, // eventRecorder
 		s.VolumeConfiguration.EnableDynamicProvisioning,
 	)
 	volumeController.Run()

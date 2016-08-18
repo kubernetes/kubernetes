@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
@@ -108,10 +110,19 @@ const annBindCompleted = "pv.kubernetes.io/bind-completed"
 // pre-bound). Value of this annotation does not matter.
 const annBoundByController = "pv.kubernetes.io/bound-by-controller"
 
-// annClass annotation represents a new field which instructs dynamic
-// provisioning to choose a particular storage class (aka profile).
-// Value of this annotation should be empty.
-const annClass = "volume.alpha.kubernetes.io/storage-class"
+// annClass annotation represents the storage class associated with a resource:
+// - in PersistentVolumeClaim it represents required class to match.
+//   Only PersistentVolumes with the same class (i.e. annotation with the same
+//   value) can be bound to the claim. In case no such volume exists, the
+//   controller will provision a new one using StorageClass instance with
+//   the same name as the annotation value.
+// - in PersistentVolume it represents storage class to which the persistent
+//   volume belongs.
+const annClass = "volume.beta.kubernetes.io/storage-class"
+
+// alphaAnnClass annotation represents the previous alpha storage class
+// annotation.  it's no longer used and held here for posterity.
+const annAlphaClass = "volume.alpha.kubernetes.io/storage-class"
 
 // This annotation is added to a PV that has been dynamically provisioned by
 // Kubernetes. Its value is name of volume plugin that created the volume.
@@ -148,11 +159,13 @@ type PersistentVolumeController struct {
 	claimController           *framework.Controller
 	claimControllerStopCh     chan struct{}
 	claimSource               cache.ListerWatcher
+	classReflector            *cache.Reflector
+	classReflectorStopCh      chan struct{}
+	classSource               cache.ListerWatcher
 	kubeClient                clientset.Interface
 	eventRecorder             record.EventRecorder
 	cloud                     cloudprovider.Interface
-	recyclePluginMgr          vol.VolumePluginMgr
-	provisioner               vol.ProvisionableVolumePlugin
+	volumePluginMgr           vol.VolumePluginMgr
 	enableDynamicProvisioning bool
 	clusterName               string
 
@@ -163,6 +176,7 @@ type PersistentVolumeController struct {
 	// it saves newer version to etcd.
 	volumes persistentVolumeOrderedIndex
 	claims  cache.Store
+	classes cache.Store
 
 	// Map of scheduled/running operations.
 	runningOperations goroutinemap.GoRoutineMap
@@ -173,6 +187,10 @@ type PersistentVolumeController struct {
 
 	createProvisionedPVRetryCount int
 	createProvisionedPVInterval   time.Duration
+
+	// Provisioner for annAlphaClass.
+	// TODO: remove in 1.5
+	alphaProvisioner vol.ProvisionableVolumePlugin
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
@@ -198,6 +216,7 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 	// OBSERVATION: pvc is "Pending"
 	if claim.Spec.VolumeName == "" {
 		// User did not care which PV they get.
+
 		// [Unit test set 1]
 		volume, err := ctrl.volumes.findBestMatchForClaim(claim)
 		if err != nil {
@@ -208,7 +227,8 @@ func (ctrl *PersistentVolumeController) syncUnboundClaim(claim *api.PersistentVo
 			glog.V(4).Infof("synchronizing unbound PersistentVolumeClaim[%s]: no volume found", claimToClaimKey(claim))
 			// No PV could be found
 			// OBSERVATION: pvc is "Pending", will retry
-			if hasAnnotation(claim.ObjectMeta, annClass) {
+			// TODO: remove Alpha check in 1.5
+			if getClaimClass(claim) != "" || hasAnnotation(claim.ObjectMeta, annAlphaClass) {
 				if err = ctrl.provisionClaim(claim); err != nil {
 					return err
 				}
@@ -965,7 +985,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 
 	// Find a plugin.
 	spec := vol.NewSpecFromPersistentVolume(volume, false)
-	plugin, err := ctrl.recyclePluginMgr.FindRecyclablePluginBySpec(spec)
+	plugin, err := ctrl.volumePluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		// No recycler found. Emit an event and mark the volume Failed.
 		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedRecycle", "No recycler plugin found for the volume!"); err != nil {
@@ -1119,13 +1139,32 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *api.PersistentV
 // (it will be re-used in future provisioner error cases).
 func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVolume) error {
 	glog.V(4).Infof("doDeleteVolume [%s]", volume.Name)
-	// Find a plugin.
-	spec := vol.NewSpecFromPersistentVolume(volume, false)
-	plugin, err := ctrl.recyclePluginMgr.FindDeletablePluginBySpec(spec)
-	if err != nil {
-		// No deleter found. Emit an event and mark the volume Failed.
-		return fmt.Errorf("Error getting deleter volume plugin for volume %q: %v", volume.Name, err)
+	var err error
+
+	// Find a plugin. Try to find the same plugin that provisioned the volume
+	var plugin vol.DeletableVolumePlugin
+	if hasAnnotation(volume.ObjectMeta, annDynamicallyProvisioned) {
+		provisionPluginName := volume.Annotations[annDynamicallyProvisioned]
+		if provisionPluginName != "" {
+			plugin, err = ctrl.volumePluginMgr.FindDeletablePluginByName(provisionPluginName)
+			if err != nil {
+				glog.V(3).Infof("did not find a deleter plugin %q for volume %q: %v, will try to find a generic one",
+					provisionPluginName, volume.Name, err)
+			}
+		}
 	}
+
+	spec := vol.NewSpecFromPersistentVolume(volume, false)
+	if plugin == nil {
+		// The plugin that provisioned the volume was not found or the volume
+		// was not dynamically provisioned. Try to find a plugin by spec.
+		plugin, err = ctrl.volumePluginMgr.FindDeletablePluginBySpec(spec)
+		if err != nil {
+			// No deleter found. Emit an event and mark the volume Failed.
+			return fmt.Errorf("Error getting deleter volume plugin for volume %q: %v", volume.Name, err)
+		}
+	}
+	glog.V(5).Infof("found a deleter plugin %q for volume %q", plugin.GetPluginName(), volume.Name)
 
 	// Plugin found
 	deleter, err := plugin.NewDeleter(spec)
@@ -1143,7 +1182,8 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 	return nil
 }
 
-// provisionClaim starts new asynchronous operation to provision a claim if provisioning is enabled.
+// provisionClaim starts new asynchronous operation to provision a claim if
+// provisioning is enabled.
 func (ctrl *PersistentVolumeController) provisionClaim(claim *api.PersistentVolumeClaim) error {
 	if !ctrl.enableDynamicProvisioning {
 		return nil
@@ -1165,7 +1205,9 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		glog.Errorf("Cannot convert provisionClaimOperation argument to claim, got %#v", claimObj)
 		return
 	}
-	glog.V(4).Infof("provisionClaimOperation [%s] started", claimToClaimKey(claim))
+
+	claimClass := getClaimClass(claim)
+	glog.V(4).Infof("provisionClaimOperation [%s] started, class: %q", claimToClaimKey(claim), claimClass)
 
 	//  A previous doProvisionClaim may just have finished while we were waiting for
 	//  the locks. Check that PV (with deterministic name) hasn't been provisioned
@@ -1187,12 +1229,10 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		return
 	}
 
-	// TODO: find provisionable plugin based on a class/profile
-	plugin := ctrl.provisioner
-	if plugin == nil {
-		// No provisioner found. Emit an event.
-		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ProvisioningFailed", "No provisioner plugin found for the claim!")
-		glog.V(2).Infof("no provisioner plugin found for claim %s!", claimToClaimKey(claim))
+	plugin, storageClass, err := ctrl.findProvisionablePlugin(claim)
+	if err != nil {
+		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ProvisioningFailed", err.Error())
+		glog.V(2).Infof("error finding provisioning plugin for claim %s: %v", claimToClaimKey(claim), err)
 		// The controller will retry provisioning the volume in every
 		// syncVolume() call.
 		return
@@ -1212,21 +1252,23 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		ClusterName:                   ctrl.clusterName,
 		PVName:                        pvName,
 		PVCName:                       claim.Name,
+		Parameters:                    storageClass.Parameters,
+		Selector:                      claim.Spec.Selector,
 	}
 
 	// Provision the volume
 	provisioner, err := plugin.NewProvisioner(options)
 	if err != nil {
 		strerr := fmt.Sprintf("Failed to create provisioner: %v", err)
-		glog.V(2).Infof("failed to create provisioner for claim %q: %v", claimToClaimKey(claim), err)
+		glog.V(2).Infof("failed to create provisioner for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
 		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ProvisioningFailed", strerr)
 		return
 	}
 
 	volume, err = provisioner.Provision()
 	if err != nil {
-		strerr := fmt.Sprintf("Failed to provision volume: %v", err)
-		glog.V(2).Infof("failed to provision volume for claim %q: %v", claimToClaimKey(claim), err)
+		strerr := fmt.Sprintf("Failed to provision volume with StorageClass %q: %v", storageClass.Name, err)
+		glog.V(2).Infof("failed to provision volume for claim %q with StorageClass %q: %v", claimToClaimKey(claim), storageClass.Name, err)
 		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ProvisioningFailed", strerr)
 		return
 	}
@@ -1242,6 +1284,12 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 	// Add annBoundByController (used in deleting the volume)
 	setAnnotation(&volume.ObjectMeta, annBoundByController, "yes")
 	setAnnotation(&volume.ObjectMeta, annDynamicallyProvisioned, plugin.GetPluginName())
+	// For Alpha provisioning behavior, do not add annClass for volumes created
+	// by annAlphaClass
+	// TODO: remove this check in 1.5, annClass will be always non-empty there.
+	if claimClass != "" {
+		setAnnotation(&volume.ObjectMeta, annClass, claimClass)
+	}
 
 	// Try to create the PV object several times
 	for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
@@ -1319,4 +1367,64 @@ func (ctrl *PersistentVolumeController) scheduleOperation(operationName string, 
 			glog.Errorf("error scheduling operaion %q: %v", operationName, err)
 		}
 	}
+}
+
+func (ctrl *PersistentVolumeController) findProvisionablePlugin(claim *api.PersistentVolumeClaim) (vol.ProvisionableVolumePlugin, *extensions.StorageClass, error) {
+	// TODO: remove this alpha behavior in 1.5
+	alpha := hasAnnotation(claim.ObjectMeta, annAlphaClass)
+	beta := hasAnnotation(claim.ObjectMeta, annClass)
+	if alpha && beta {
+		// Both Alpha and Beta annotations are set. Do beta.
+		alpha = false
+		msg := fmt.Sprintf("both %q and %q annotations are present, using %q", annAlphaClass, annClass, annClass)
+		ctrl.eventRecorder.Event(claim, api.EventTypeNormal, "ProvisioningIgnoreAlpha", msg)
+	}
+	if alpha {
+		// Fall back to fixed list of provisioner plugins
+		return ctrl.findAlphaProvisionablePlugin()
+	}
+
+	// provisionClaim() which leads here is never called with claimClass=="", we
+	// can save some checks.
+	claimClass := getClaimClass(claim)
+	classObj, found, err := ctrl.classes.GetByKey(claimClass)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !found {
+		return nil, nil, fmt.Errorf("StorageClass %q not found", claimClass)
+	}
+	class, ok := classObj.(*extensions.StorageClass)
+	if !ok {
+		return nil, nil, fmt.Errorf("Cannot convert object to StorageClass: %+v", classObj)
+	}
+
+	// Find a plugin for the class
+	plugin, err := ctrl.volumePluginMgr.FindProvisionablePluginByName(class.Provisioner)
+	if err != nil {
+		return nil, nil, err
+	}
+	return plugin, class, nil
+}
+
+// findAlphaProvisionablePlugin returns a volume plugin compatible with
+// Kubernetes 1.3.
+// TODO: remove in Kubernetes 1.5
+func (ctrl *PersistentVolumeController) findAlphaProvisionablePlugin() (vol.ProvisionableVolumePlugin, *extensions.StorageClass, error) {
+	if ctrl.alphaProvisioner == nil {
+		return nil, nil, fmt.Errorf("cannot find volume plugin for alpha provisioning")
+	}
+
+	// Return a dummy StorageClass instance with no parameters
+	storageClass := &extensions.StorageClass{
+		TypeMeta: unversioned.TypeMeta{
+			Kind: "StorageClass",
+		},
+		ObjectMeta: api.ObjectMeta{
+			Name: "",
+		},
+		Provisioner: ctrl.alphaProvisioner.GetPluginName(),
+	}
+	glog.V(4).Infof("using alpha provisioner %s", ctrl.alphaProvisioner.GetPluginName())
+	return ctrl.alphaProvisioner, storageClass, nil
 }

@@ -92,6 +92,7 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 	var smallestVolumeSize int64
 	requestedQty := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
 	requestedSize := requestedQty.Value()
+	requestedClass := getClaimClass(claim)
 
 	var selector labels.Selector
 	if claim.Spec.Selector != nil {
@@ -123,12 +124,24 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 				return volume, nil
 			}
 
+			// In Alpha dynamic provisioning, we do now want not match claims
+			// with existing PVs, findByClaim must find only PVs that are
+			// pre-bound to the claim (by dynamic provisioning). TODO: remove in
+			// 1.5
+			if hasAnnotation(claim.ObjectMeta, annAlphaClass) {
+				continue
+			}
+
 			// filter out:
 			// - volumes bound to another claim
 			// - volumes whose labels don't match the claim's selector, if specified
+			// - volumes in Class that is not requested
 			if volume.Spec.ClaimRef != nil {
 				continue
 			} else if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
+				continue
+			}
+			if getVolumeClass(volume) != requestedClass {
 				continue
 			}
 
@@ -140,17 +153,6 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 					smallestVolumeSize = volumeSize
 				}
 			}
-		}
-
-		// We want to provision volumes if the annotation is set even if there
-		// is matching PV. Therefore, do not look for available PV and let
-		// a new volume to be provisioned.
-		//
-		// When provisioner creates a new PV to this claim, an exact match
-		// pre-bound to the claim will be found by the checks above during
-		// subsequent claim sync.
-		if hasAnnotation(claim.ObjectMeta, annClass) {
-			return nil, nil
 		}
 
 		if smallestVolume != nil {

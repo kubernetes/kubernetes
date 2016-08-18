@@ -101,6 +101,16 @@ type Config struct {
 	}
 }
 
+type DiskType string
+
+const (
+	DiskTypeSSD      = "pd-ssd"
+	DiskTypeStandard = "pd-standard"
+
+	diskTypeDefault     = DiskTypeStandard
+	diskTypeUriTemplate = "https://www.googleapis.com/compute/v1/projects/%s/zones/%s/diskTypes/%s"
+)
+
 // Disks is interface for manipulation with GCE PDs.
 type Disks interface {
 	// AttachDisk attaches given disk to given instance. Current instance
@@ -116,7 +126,7 @@ type Disks interface {
 
 	// CreateDisk creates a new PD with given properties. Tags are serialized
 	// as JSON into Description field.
-	CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error
+	CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error
 
 	// DeleteDisk deletes PD.
 	DeleteDisk(diskToDelete string) error
@@ -2258,18 +2268,29 @@ func (gce *GCECloud) encodeDiskTags(tags map[string]string) (string, error) {
 }
 
 // CreateDisk creates a new Persistent Disk, with the specified name & size, in
-// the specified zone. It stores specified tags endoced in JSON in Description
+// the specified zone. It stores specified tags encoded in JSON in Description
 // field.
-func (gce *GCECloud) CreateDisk(name string, zone string, sizeGb int64, tags map[string]string) error {
+func (gce *GCECloud) CreateDisk(name string, diskType string, zone string, sizeGb int64, tags map[string]string) error {
 	tagsStr, err := gce.encodeDiskTags(tags)
 	if err != nil {
 		return err
 	}
 
+	switch diskType {
+	case DiskTypeSSD, DiskTypeStandard:
+		// noop
+	case "":
+		diskType = diskTypeDefault
+	default:
+		return fmt.Errorf("invalid GCE disk type %q", diskType)
+	}
+	diskTypeUri := fmt.Sprintf(diskTypeUriTemplate, gce.projectID, zone, diskType)
+
 	diskToCreate := &compute.Disk{
 		Name:        name,
 		SizeGb:      sizeGb,
 		Description: tagsStr,
+		Type:        diskTypeUri,
 	}
 
 	createOp, err := gce.service.Disks.Insert(gce.projectID, zone, diskToCreate).Do()
