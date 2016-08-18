@@ -563,13 +563,13 @@ func createClientConfig(s *options.KubeletServer) (*restclient.Config, error) {
 		return nil, fmt.Errorf("cannot specify both --kubeconfig and --auth-path")
 	}
 	if s.KubeConfig.Provided() {
-		return kubeconfigClientConfig(s.KubeConfig.Value(), s.APIServerList)
+		return kubeconfigClientConfig(s)
 	}
 	if s.AuthPath.Provided() {
 		return authPathClientConfig(s, false)
 	}
 	// Try the kubeconfig default first, falling back to the auth path default.
-	clientConfig, err := kubeconfigClientConfig(s.KubeConfig.Value(), s.APIServerList)
+	clientConfig, err := kubeconfigClientConfig(s)
 	if err != nil {
 		glog.Warningf("Could not load kubeconfig file %s: %v. Trying auth path instead.", s.KubeConfig, err)
 		return authPathClientConfig(s, true)
