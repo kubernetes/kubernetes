@@ -388,7 +388,6 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 		"pods/portforward": podStorage.PortForward,
 		"pods/proxy":       podStorage.Proxy,
 		"pods/binding":     podStorage.Binding,
-		"pods/eviction":    podStorage.Eviction,
 		"bindings":         podStorage.Binding,
 
 		"podTemplates": podTemplateStorage,
@@ -426,6 +425,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	}
 	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		m.v1ResourcesStorage["replicationControllers/scale"] = controllerStorage.Scale
+	}
+	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "policy", Version: "v1alpha1"}) {
+		m.v1ResourcesStorage["pods/eviction"] = podStorage.Eviction
 	}
 }
 
