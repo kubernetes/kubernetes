@@ -18,6 +18,7 @@ package common
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -32,27 +33,37 @@ var _ = framework.KubeDescribe("ConfigMap", func() {
 	f := framework.NewDefaultFramework("configmap")
 
 	It("should be consumable from pods in volume [Conformance]", func() {
-		doConfigMapE2EWithoutMappings(f, 0, 0)
+		doConfigMapE2EWithoutMappings(f, 0, 0, nil)
+	})
+
+	It("should be consumable from pods in volume with defaultMode set [Conformance]", func() {
+		defaultMode := int32(0400)
+		doConfigMapE2EWithoutMappings(f, 0, 0, &defaultMode)
 	})
 
 	It("should be consumable from pods in volume as non-root [Conformance]", func() {
-		doConfigMapE2EWithoutMappings(f, 1000, 0)
+		doConfigMapE2EWithoutMappings(f, 1000, 0, nil)
 	})
 
 	It("should be consumable from pods in volume as non-root with FSGroup [Feature:FSGroup]", func() {
-		doConfigMapE2EWithoutMappings(f, 1000, 1001)
+		doConfigMapE2EWithoutMappings(f, 1000, 1001, nil)
 	})
 
 	It("should be consumable from pods in volume with mappings [Conformance]", func() {
-		doConfigMapE2EWithMappings(f, 0, 0)
+		doConfigMapE2EWithMappings(f, 0, 0, nil)
+	})
+
+	It("should be consumable from pods in volume with mappings and Item mode set[Conformance]", func() {
+		mode := int32(0400)
+		doConfigMapE2EWithMappings(f, 0, 0, &mode)
 	})
 
 	It("should be consumable from pods in volume with mappings as non-root [Conformance]", func() {
-		doConfigMapE2EWithMappings(f, 1000, 0)
+		doConfigMapE2EWithMappings(f, 1000, 0, nil)
 	})
 
 	It("should be consumable from pods in volume with mappings as non-root with FSGroup [Feature:FSGroup]", func() {
-		doConfigMapE2EWithMappings(f, 1000, 1001)
+		doConfigMapE2EWithMappings(f, 1000, 1001, nil)
 	})
 
 	It("updates should be reflected in volume [Conformance]", func() {
@@ -290,7 +301,7 @@ func newConfigMap(f *framework.Framework, name string) *api.ConfigMap {
 	}
 }
 
-func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
+func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64, defaultMode *int32) {
 	var (
 		name            = "configmap-test-volume-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
@@ -331,13 +342,14 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 			Containers: []api.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.6",
-					Args:  []string{"--file_content=/etc/configmap-volume/data-1"},
+					Image: "gcr.io/google_containers/mounttest:0.7",
+					Args: []string{
+						"--file_content=/etc/configmap-volume/data-1",
+						"--file_mode=/etc/configmap-volume/data-1"},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,
 							MountPath: volumeMountPath,
-							ReadOnly:  true,
 						},
 					},
 				},
@@ -353,14 +365,27 @@ func doConfigMapE2EWithoutMappings(f *framework.Framework, uid, fsGroup int64) {
 	if fsGroup != 0 {
 		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
+	if defaultMode != nil {
+		pod.Spec.Volumes[0].VolumeSource.ConfigMap.DefaultMode = defaultMode
+	} else {
+		mode := int32(0644)
+		defaultMode = &mode
+	}
 
-	f.TestContainerOutput("consume configMaps", pod, 0, []string{
+	// Just check file mode if fsGroup is not set. If fsGroup is set, the
+	// final mode is adjusted and we are not testing that case.
+	output := []string{
 		"content of file \"/etc/configmap-volume/data-1\": value-1",
-	})
+	}
+	if fsGroup == 0 {
+		modeString := fmt.Sprintf("%v", os.FileMode(*defaultMode))
+		output = append(output, "mode of file \"/etc/configmap-volume/data-1\": "+modeString)
+	}
+	f.TestContainerOutput("consume configMaps", pod, 0, output)
 
 }
 
-func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
+func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64, itemMode *int32) {
 	var (
 		name            = "configmap-test-volume-map-" + string(uuid.NewUUID())
 		volumeName      = "configmap-volume"
@@ -407,8 +432,9 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
 			Containers: []api.Container{
 				{
 					Name:  "configmap-volume-test",
-					Image: "gcr.io/google_containers/mounttest:0.6",
-					Args:  []string{"--file_content=/etc/configmap-volume/path/to/data-2"},
+					Image: "gcr.io/google_containers/mounttest:0.7",
+					Args: []string{"--file_content=/etc/configmap-volume/path/to/data-2",
+						"--file_mode=/etc/configmap-volume/path/to/data-2"},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,
@@ -429,8 +455,21 @@ func doConfigMapE2EWithMappings(f *framework.Framework, uid, fsGroup int64) {
 	if fsGroup != 0 {
 		pod.Spec.SecurityContext.FSGroup = &fsGroup
 	}
+	if itemMode != nil {
+		pod.Spec.Volumes[0].VolumeSource.ConfigMap.Items[0].Mode = itemMode
+	} else {
+		mode := int32(0644)
+		itemMode = &mode
+	}
 
-	f.TestContainerOutput("consume configMaps", pod, 0, []string{
+	// Just check file mode if fsGroup is not set. If fsGroup is set, the
+	// final mode is adjusted and we are not testing that case.
+	output := []string{
 		"content of file \"/etc/configmap-volume/path/to/data-2\": value-2",
-	})
+	}
+	if fsGroup == 0 {
+		modeString := fmt.Sprintf("%v", os.FileMode(*itemMode))
+		output = append(output, "mode of file \"/etc/configmap-volume/path/to/data-2\": "+modeString)
+	}
+	f.TestContainerOutput("consume configMaps", pod, 0, output)
 }

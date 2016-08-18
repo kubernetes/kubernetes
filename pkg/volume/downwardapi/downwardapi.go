@@ -92,6 +92,7 @@ func (plugin *downwardAPIPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, opt
 	}
 	return &downwardAPIVolumeMounter{
 		downwardAPIVolume: v,
+		source:            *spec.Volume.DownwardAPI,
 		opts:              &opts,
 	}, nil
 }
@@ -130,7 +131,8 @@ type downwardAPIVolume struct {
 // and dumps it in files
 type downwardAPIVolumeMounter struct {
 	*downwardAPIVolume
-	opts *volume.VolumeOptions
+	source api.DownwardAPIVolumeSource
+	opts   *volume.VolumeOptions
 }
 
 // downwardAPIVolumeMounter implements volume.Mounter interface
@@ -166,7 +168,7 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	data, err := b.collectData()
+	data, err := b.collectData(b.source.DefaultMode)
 	if err != nil {
 		glog.Errorf("Error preparing data for downwardAPI volume %v for pod %v/%v: %s", b.volName, b.pod.Namespace, b.pod.Name, err.Error())
 		return err
@@ -185,7 +187,11 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 		return err
 	}
 
-	volume.SetVolumeOwnership(b, fsGroup)
+	err = volume.SetVolumeOwnership(b, fsGroup)
+	if err != nil {
+		glog.Errorf("Error applying volume ownership settings for group: %v", fsGroup)
+		return err
+	}
 
 	return nil
 }
@@ -193,16 +199,27 @@ func (b *downwardAPIVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 // collectData collects requested downwardAPI in data map.
 // Map's key is the requested name of file to dump
 // Map's value is the (sorted) content of the field to be dumped in the file.
-func (d *downwardAPIVolume) collectData() (map[string][]byte, error) {
+func (d *downwardAPIVolume) collectData(defaultMode *int32) (map[string]volumeutil.FileProjection, error) {
+	if defaultMode == nil {
+		return nil, fmt.Errorf("No defaultMode used, not even the default value for it")
+	}
+
 	errlist := []error{}
-	data := make(map[string][]byte)
+	data := make(map[string]volumeutil.FileProjection)
 	for _, fileInfo := range d.items {
+		var fileProjection volumeutil.FileProjection
+		fPath := path.Clean(fileInfo.Path)
+		if fileInfo.Mode != nil {
+			fileProjection.Mode = *fileInfo.Mode
+		} else {
+			fileProjection.Mode = *defaultMode
+		}
 		if fileInfo.FieldRef != nil {
 			if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fileInfo.FieldRef.FieldPath); err != nil {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
 				errlist = append(errlist, err)
 			} else {
-				data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
+				fileProjection.Data = []byte(sortLines(values))
 			}
 		} else if fileInfo.ResourceFieldRef != nil {
 			containerName := fileInfo.ResourceFieldRef.ContainerName
@@ -213,9 +230,11 @@ func (d *downwardAPIVolume) collectData() (map[string][]byte, error) {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.ResourceFieldRef.Resource, err.Error())
 				errlist = append(errlist, err)
 			} else {
-				data[path.Clean(fileInfo.Path)] = []byte(sortLines(values))
+				fileProjection.Data = []byte(sortLines(values))
 			}
 		}
+
+		data[fPath] = fileProjection
 	}
 	return data, utilerrors.NewAggregate(errlist)
 }
