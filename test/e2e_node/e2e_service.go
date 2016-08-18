@@ -434,23 +434,34 @@ func (s *server) String() string {
 func readinessCheck(urls []string, errCh <-chan error) error {
 	endTime := time.Now().Add(*serverStartTimeout)
 	for endTime.After(time.Now()) {
+		time.Sleep(time.Second)
+		// Use select with a default to do a non-blocking read attempt.
+		// We *always* want to run the health check if there is no error on the channel.
+		// With systemd, reads from errCh report nil because cmd.Run() waits
+		// on systemd-run, rather than the service process. systemd-run quickly
+		// exits with status 0, causing the channel to be closed with no error. In
+		// this case, you want to wait for the health check to complete, rather
+		// than returning from readinessCheck as soon as the channel is closed.
 		select {
 		case err := <-errCh:
-			return err
-		case <-time.After(time.Second):
-			ready := true
-			for _, url := range urls {
-				resp, err := http.Get(url)
-				if err != nil || resp.StatusCode != http.StatusOK {
-					ready = false
-					break
-				}
+			if err != nil {
+				return err
 			}
-			if ready {
-				return nil
+		default:
+		}
+		ready := true
+		for _, url := range urls {
+			resp, err := http.Get(url)
+			if err != nil || resp.StatusCode != http.StatusOK {
+				ready = false
+				break
 			}
 		}
+		if ready {
+			return nil
+		}
 	}
+
 	return fmt.Errorf("e2e service readiness check timeout %v", *serverStartTimeout)
 }
 
