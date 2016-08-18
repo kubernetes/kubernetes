@@ -3327,6 +3327,7 @@ func DeepCopy_v1_ServiceSpec(in interface{}, out interface{}, c *conversion.Clon
 		} else {
 			out.LoadBalancerSourceRanges = nil
 		}
+		out.ExternalName = in.ExternalName
 		return nil
 	}
 }
