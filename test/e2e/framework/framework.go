@@ -619,7 +619,7 @@ type E2EContext struct {
 
 func (f *Framework) GetUnderlyingFederatedContexts() []E2EContext {
 	if !f.federated {
-		Failf("geUnderlyingFederatedContexts called on non-federated framework")
+		Failf("getUnderlyingFederatedContexts called on non-federated framework")
 	}
 
 	kubeconfig := KubeConfig{}
