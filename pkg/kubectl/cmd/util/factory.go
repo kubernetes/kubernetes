@@ -1124,32 +1124,28 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 	if ok := registered.IsEnabledVersion(gvk.GroupVersion()); !ok {
 		return fmt.Errorf("API version %q isn't supported, only supports API versions %q", gvk.GroupVersion().String(), registered.EnabledVersions())
 	}
-	if gvk.Group == autoscaling.GroupName {
+	switch gvk.Group {
+	case autoscaling.GroupName:
 		if c.c.AutoscalingClient == nil {
 			return errors.New("unable to validate: no autoscaling client")
 		}
 		return getSchemaAndValidate(c.c.AutoscalingClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	}
-	if gvk.Group == policy.GroupName {
+	case policy.GroupName:
 		if c.c.PolicyClient == nil {
 			return errors.New("unable to validate: no policy client")
 		}
 		return getSchemaAndValidate(c.c.PolicyClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	}
-	if gvk.Group == apps.GroupName {
+	case apps.GroupName:
 		if c.c.AppsClient == nil {
 			return errors.New("unable to validate: no apps client")
 		}
 		return getSchemaAndValidate(c.c.AppsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	}
-
-	if gvk.Group == batch.GroupName {
+	case batch.GroupName:
 		if c.c.BatchClient == nil {
 			return errors.New("unable to validate: no batch client")
 		}
 		return getSchemaAndValidate(c.c.BatchClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	}
-	if gvk.Group == rbac.GroupName {
+	case rbac.GroupName:
 		if c.c.RbacClient == nil {
 			return errors.New("unable to validate: no rbac client")
 		}
@@ -1159,19 +1155,18 @@ func (c *clientSwaggerSchema) ValidateBytes(data []byte) error {
 		// Don't attempt to validate third party objects
 		return nil
 	}
-	if gvk.Group == extensions.GroupName {
+	switch gvk.Group {
+	case extensions.GroupName:
 		if c.c.ExtensionsClient == nil {
 			return errors.New("unable to validate: no experimental client")
 		}
 		return getSchemaAndValidate(c.c.ExtensionsClient.RESTClient, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	}
-	if gvk.Group == federation.GroupName {
+	case federation.GroupName:
 		if c.fedc == nil {
 			return errors.New("unable to validate: no federation client")
 		}
 		return getSchemaAndValidate(c.fedc, data, "apis/", gvk.GroupVersion().String(), c.cacheDir, c)
-	}
-	if gvk.Group == certificates.GroupName {
+	case certificates.GroupName:
 		if c.c.CertificatesClient == nil {
 			return errors.New("unable to validate: no certificates client")
 		}
