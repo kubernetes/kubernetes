@@ -35,6 +35,7 @@ import (
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	sc "k8s.io/kubernetes/pkg/securitycontext"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	"k8s.io/kubernetes/pkg/util/maps"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 	"k8s.io/kubernetes/pkg/watch"
 )
@@ -190,7 +191,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 
 	errs := field.ErrorList{}
 
-	psc, err := provider.CreatePodSecurityContext(pod)
+	psc, pscAnnotations, err := provider.CreatePodSecurityContext(pod)
 	if err != nil {
 		errs = append(errs, field.Invalid(field.NewPath("spec", "securityContext"), pod.Spec.SecurityContext, err.Error()))
 	}
@@ -200,6 +201,8 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 	// validation.
 	originalPSC := pod.Spec.SecurityContext
 	pod.Spec.SecurityContext = psc
+	originalAnnotations := maps.CopySS(pod.Annotations)
+	pod.Annotations = pscAnnotations
 	errs = append(errs, provider.ValidatePodSecurityContext(pod, field.NewPath("spec", "securityContext"))...)
 
 	// Note: this is not changing the original container, we will set container SCs later so long
@@ -211,7 +214,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		// overriding pod level settings.
 		containerCopy.SecurityContext = sc.DetermineEffectiveSecurityContext(pod, &containerCopy)
 
-		sc, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
+		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
 		if err != nil {
 			errs = append(errs, field.Invalid(field.NewPath("spec", "initContainers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
@@ -219,6 +222,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		generatedInitSCs = append(generatedInitSCs, sc)
 
 		containerCopy.SecurityContext = sc
+		pod.Annotations = scAnnotations
 		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &containerCopy, field.NewPath("spec", "initContainers").Index(i).Child("securityContext"))...)
 	}
 
@@ -231,7 +235,7 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		// overriding pod level settings.
 		containerCopy.SecurityContext = sc.DetermineEffectiveSecurityContext(pod, &containerCopy)
 
-		sc, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
+		sc, scAnnotations, err := provider.CreateContainerSecurityContext(pod, &containerCopy)
 		if err != nil {
 			errs = append(errs, field.Invalid(field.NewPath("spec", "containers").Index(i).Child("securityContext"), "", err.Error()))
 			continue
@@ -239,12 +243,14 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 		generatedSCs[i] = sc
 
 		containerCopy.SecurityContext = sc
+		pod.Annotations = scAnnotations
 		errs = append(errs, provider.ValidateContainerSecurityContext(pod, &containerCopy, field.NewPath("spec", "containers").Index(i).Child("securityContext"))...)
 	}
 
 	if len(errs) > 0 {
 		// ensure psc is not mutated if there are errors
 		pod.Spec.SecurityContext = originalPSC
+		pod.Annotations = originalAnnotations
 		return errs
 	}
 
