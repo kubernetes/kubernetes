@@ -389,6 +389,36 @@ contexts:
   name: webhook
 EOF
   fi
+
+if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
+    # This is the config file for the image review webhook.
+    cat <<EOF >/etc/gcp_image_review.config
+clusters:
+  - name: gcp-image-review-server
+    cluster:
+      server: ${GCP_IMAGE_VERIFICATION_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-image-review-server
+    user: kube-apiserver
+  name: webhook
+EOF
+    # This is the config for the image review admission controller.
+    cat <<EOF >/etc/admission_controller.config
+imagePolicy:
+  kubeConfigFile: /etc/gcp_image_review.config
+  allowTTL: 30
+  denyTTL: 30
+  retryBackoff: 500
+  defaultAllow: true
+EOF
+  fi
 }
 
 # Uses KUBELET_CA_CERT (falling back to CA_CERT), KUBELET_CERT, and KUBELET_KEY
@@ -537,9 +567,24 @@ start_kube_apiserver() {
   if [ -n "${SERVICE_CLUSTER_IP_RANGE:-}" ]; then
     params="${params} --service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
   fi
+
+  local admission_controller_config_mount=""
+  local admission_controller_config_volume=""
+  local image_policy_webhook_config_mount=""
+  local image_policy_webhook_config_volume=""
   if [ -n "${ADMISSION_CONTROL:-}" ]; then
     params="${params} --admission-control=${ADMISSION_CONTROL}"
+    if [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
+      params+=" --admission-control-config-file=/etc/admission_controller.config"
+      # Mount the file to configure admission controllers if ImagePolicyWebhook is set.
+      admission_controller_config_mount="{\"name\": \"admissioncontrollerconfigmount\",\"mountPath\": \"/etc/admission_controller.config\", \"readOnly\": false},"
+      admission_controller_config_volume="{\"name\": \"admissioncontrollerconfigmount\",\"hostPath\": {\"path\": \"/etc/admission_controller.config\"}},"
+      # Mount the file to configure the ImagePolicyWebhook's webhook.
+      image_policy_webhook_config_mount="{\"name\": \"imagepolicywebhookconfigmount\",\"mountPath\": \"/etc/gcp_image_review.config\", \"readOnly\": false},"
+      image_policy_webhook_config_volume="{\"name\": \"imagepolicywebhookconfigmount\",\"hostPath\": {\"path\": \"/etc/gcp_image_review.config\"}},"
+    fi
   fi
+
   if [ -n "${KUBE_APISERVER_REQUEST_TIMEOUT:-}" ]; then
     params="${params} --min-request-timeout=${KUBE_APISERVER_REQUEST_TIMEOUT}"
   fi
@@ -554,8 +599,8 @@ start_kube_apiserver() {
   fi
   readonly kube_apiserver_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-apiserver.docker_tag)
 
-  webhook_authn_config_mount=""
-  webhook_authn_config_volume=""
+  local webhook_authn_config_mount=""
+  local webhook_authn_config_volume=""
   if [ -n "${GCP_AUTHN_URL:-}" ]; then
     params="${params} --authentication-token-webhook-config-file=/etc/gcp_authn.config"
     webhook_authn_config_mount="{\"name\": \"webhookauthnconfigmount\",\"mountPath\": \"/etc/gcp_authn.config\", \"readOnly\": false},"
@@ -563,8 +608,8 @@ start_kube_apiserver() {
   fi
 
   params="${params} --authorization-mode=ABAC"
-  webhook_config_mount=""
-  webhook_config_volume=""
+  local webhook_config_mount=""
+  local webhook_config_volume=""
   if [ -n "${GCP_AUTHZ_URL:-}" ]; then
     params="${params},Webhook --authorization-webhook-config-file=/etc/gcp_authz.config"
     webhook_config_mount="{\"name\": \"webhookconfigmount\",\"mountPath\": \"/etc/gcp_authz.config\", \"readOnly\": false},"
@@ -574,10 +619,10 @@ start_kube_apiserver() {
   src_dir="/home/kubernetes/kube-manifests/kubernetes/gci-trusty"
 
   if [[ -n "${KUBE_USER:-}" ]]; then
-	  local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
-	  remove_salt_config_comments "${abac_policy_json}"
-	  sed -i -e "s@{{kube_user}}@${KUBE_USER}@g" "${abac_policy_json}"
-	  cp "${abac_policy_json}" /etc/srv/kubernetes/
+    local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
+    remove_salt_config_comments "${abac_policy_json}"
+    sed -i -e "s@{{kube_user}}@${KUBE_USER}@g" "${abac_policy_json}"
+    cp "${abac_policy_json}" /etc/srv/kubernetes/
   fi
 
   src_file="${src_dir}/kube-apiserver.manifest"
@@ -599,6 +644,10 @@ start_kube_apiserver() {
   sed -i -e "s@{{webhook_authn_config_volume}}@${webhook_authn_config_volume}@g" "${src_file}"
   sed -i -e "s@{{webhook_config_mount}}@${webhook_config_mount}@g" "${src_file}"
   sed -i -e "s@{{webhook_config_volume}}@${webhook_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{admission_controller_config_mount}}@${admission_controller_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{admission_controller_config_volume}}@${admission_controller_config_volume}@g" "${src_file}"
+  sed -i -e "s@{{image_policy_webhook_config_mount}}@${image_policy_webhook_config_mount}@g" "${src_file}"
+  sed -i -e "s@{{image_policy_webhook_config_volume}}@${image_policy_webhook_config_volume}@g" "${src_file}"
 
   cp "${src_file}" /etc/kubernetes/manifests
 }
