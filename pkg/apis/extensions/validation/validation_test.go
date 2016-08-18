@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -1510,7 +1511,9 @@ func TestValidateReplicaSet(t *testing.T) {
 func TestValidatePodSecurityPolicy(t *testing.T) {
 	validPSP := func() *extensions.PodSecurityPolicy {
 		return &extensions.PodSecurityPolicy{
-			ObjectMeta: api.ObjectMeta{Name: "foo"},
+			ObjectMeta: api.ObjectMeta{
+				Name: "foo",
+			},
 			Spec: extensions.PodSecurityPolicySpec{
 				SELinux: extensions.SELinuxStrategyOptions{
 					Rule: extensions.SELinuxStrategyRunAsAny,
@@ -1583,6 +1586,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	allowedCapListedInRequiredDrop := validPSP()
 	allowedCapListedInRequiredDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
 	allowedCapListedInRequiredDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
+
+	invalidAppArmorDefault := validPSP()
+	invalidAppArmorDefault.Annotations = map[string]string{
+		apparmor.DefaultProfileAnnotationKey: "not-good",
+	}
+	invalidAppArmorAllowed := validPSP()
+	invalidAppArmorAllowed.Annotations = map[string]string{
+		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
+	}
 
 	errorCases := map[string]struct {
 		psp         *extensions.PodSecurityPolicy
@@ -1664,6 +1676,16 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "capability is listed in allowedCapabilities and requiredDropCapabilities",
 		},
+		"invalid AppArmor default profile": {
+			psp:         invalidAppArmorDefault,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "invalid AppArmor profile name: \"not-good\"",
+		},
+		"invalid AppArmor allowed profile": {
+			psp:         invalidAppArmorAllowed,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "invalid AppArmor profile name: \"not-good\"",
+		},
 	}
 
 	for k, v := range errorCases {
@@ -1700,6 +1722,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	caseInsensitiveAllowedDrop.Spec.RequiredDropCapabilities = []api.Capability{"FOO"}
 	caseInsensitiveAllowedDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
 
+	validAppArmor := validPSP()
+	validAppArmor.Annotations = map[string]string{
+		apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
+		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
+	}
+
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -1717,6 +1745,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"comparison for allowed -> drop is case sensitive": {
 			psp: caseInsensitiveAllowedDrop,
+		},
+		"valid AppArmor annotations": {
+			psp: validAppArmor,
 		},
 	}
 
