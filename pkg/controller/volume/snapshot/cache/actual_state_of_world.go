@@ -30,8 +30,9 @@ import (
 // the snapshot controller's actual state of the world cache.
 type ActualStateOfWorld interface {
 	operationexecutor.ActualStateOfWorldSnapshotUpdater
-	AddVolume(volumeSpec *volume.Spec, pvc *api.PersistentVolumeClaim, snapshotName string) error
+	AddVolume(volumeSpec *volume.Spec, pvc *api.PersistentVolumeClaim, snapshotName string) (api.UniqueVolumeName, error)
 	DeleteVolume(api.UniqueVolumeName)
+	VolumeExists(volumeName api.UniqueVolumeName) bool
 	GetVolumesToSnapshot() []VolumeToSnapshot
 }
 
@@ -64,13 +65,16 @@ func (asw *actualStateOfWorld) MarkVolumeAsSnapshotted(volumeName api.UniqueVolu
 	asw.DeleteVolume(volumeName)
 }
 
-func (asw *actualStateOfWorld) AddVolume(volumeSpec *volume.Spec, pvc *api.PersistentVolumeClaim, snapshotName string) error {
+func (asw *actualStateOfWorld) AddVolume(
+	volumeSpec *volume.Spec,
+	pvc *api.PersistentVolumeClaim,
+	snapshotName string) (api.UniqueVolumeName, error) {
 	asw.Lock()
 	defer asw.Unlock()
 
 	snapshottableVolumePlugin, err := asw.volumePluginMgr.FindSnapshottablePluginBySpec(volumeSpec)
 	if err != nil || snapshottableVolumePlugin == nil {
-		return fmt.Errorf(
+		return "", fmt.Errorf(
 			"Failed to get AttachablePlugin from volumeSpec for volumeSpec %q err=%v",
 			volumeSpec.Name(),
 			err)
@@ -79,7 +83,7 @@ func (asw *actualStateOfWorld) AddVolume(volumeSpec *volume.Spec, pvc *api.Persi
 	uniqueVolumeName, err := volumehelper.GetUniqueVolumeNameFromSpec(
 		snapshottableVolumePlugin, volumeSpec)
 	if err != nil {
-		return fmt.Errorf(
+		return "", fmt.Errorf(
 			"Failed to GetUniqueVolumeNameFromSpec for volumeSpec %q err=%v",
 			volumeSpec.Name(),
 			err)
@@ -97,7 +101,7 @@ func (asw *actualStateOfWorld) AddVolume(volumeSpec *volume.Spec, pvc *api.Persi
 		asw.volumesToSnapshot[uniqueVolumeName] = volumeObj
 	}
 
-	return nil
+	return uniqueVolumeName, nil
 }
 
 func (asw *actualStateOfWorld) DeleteVolume(volumeName api.UniqueVolumeName) {
@@ -109,6 +113,17 @@ func (asw *actualStateOfWorld) DeleteVolume(volumeName api.UniqueVolumeName) {
 	}
 
 	delete(asw.volumesToSnapshot, volumeName)
+}
+
+func (asw *actualStateOfWorld) VolumeExists(volumeName api.UniqueVolumeName) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+
+	if _, volumeExists := asw.volumesToSnapshot[volumeName]; volumeExists {
+		return true
+	}
+
+	return false
 }
 
 func (asw *actualStateOfWorld) GetVolumesToSnapshot() []VolumeToSnapshot {
