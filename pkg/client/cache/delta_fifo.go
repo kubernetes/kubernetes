@@ -483,8 +483,8 @@ func (f *DeltaFIFO) Replace(list []interface{}, resourceVersion string) error {
 
 // Resync will send a sync event for each item
 func (f *DeltaFIFO) Resync() error {
-	f.lock.RLock()
-	defer f.lock.RUnlock()
+	f.lock.Lock()
+	defer f.lock.Unlock()
 	for _, k := range f.knownObjects.ListKeys() {
 		obj, exists, err := f.knownObjects.GetByKey(k)
 		if err != nil {
