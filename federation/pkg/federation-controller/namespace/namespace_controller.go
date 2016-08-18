@@ -116,9 +116,8 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconcilation whenever something in federated cluster is changed. In most cases it
 				// would be just confirmation that some namespace opration suceeded.
-				util.NewTriggerOnMetaAndSpecChangesPreproc(
+				util.NewTriggerOnMetaAndSpecChanges(
 					func(obj pkg_runtime.Object) { nc.deliverNamespaceObj(obj, nc.namespaceReviewDelay, false) },
-					func(obj pkg_runtime.Object) { util.SetClusterName(obj, cluster.Name) },
 				))
 		},
 
@@ -265,12 +264,12 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 			ObjectMeta: baseNamespace.ObjectMeta,
 			Spec:       baseNamespace.Spec,
 		}
-		util.SetClusterName(desiredNamespace, cluster.Name)
 
 		if !found {
 			operations = append(operations, util.FederatedOperation{
-				Type: util.OperationTypeAdd,
-				Obj:  desiredNamespace,
+				Type:        util.OperationTypeAdd,
+				Obj:         desiredNamespace,
+				ClusterName: cluster.Name,
 			})
 		} else {
 			clusterNamespace := clusterNamespaceObj.(*api_v1.Namespace)
@@ -279,8 +278,9 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 			if !reflect.DeepEqual(desiredNamespace.ObjectMeta, clusterNamespace.ObjectMeta) ||
 				!reflect.DeepEqual(desiredNamespace.Spec, clusterNamespace.Spec) {
 				operations = append(operations, util.FederatedOperation{
-					Type: util.OperationTypeUpdate,
-					Obj:  desiredNamespace,
+					Type:        util.OperationTypeUpdate,
+					Obj:         desiredNamespace,
+					ClusterName: cluster.Name,
 				})
 			}
 		}
