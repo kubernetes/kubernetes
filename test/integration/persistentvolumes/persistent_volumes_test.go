@@ -1116,7 +1116,18 @@ func createClients(ns *api.Namespace, t *testing.T, s *httptest.Server, syncPeri
 	cloud := &fake_cloud.FakeCloud{}
 
 	syncPeriod = getSyncPeriod(syncPeriod)
-	ctrl := persistentvolumecontroller.NewPersistentVolumeController(binderClient, syncPeriod, plugins, cloud, "", nil, nil, nil, nil, true)
+	ctrl := persistentvolumecontroller.NewPersistentVolumeController(
+		binderClient,
+		syncPeriod,
+		nil, // alpha provisioner
+		plugins,
+		cloud,
+		"",   // cluster name
+		nil,  // volumeSource
+		nil,  // claimSource
+		nil,  // classSource
+		nil,  // eventRecorder
+		true) // enableDynamicProvisioning
 
 	watchPV, err := testClient.PersistentVolumes().Watch(api.ListOptions{})
 	if err != nil {

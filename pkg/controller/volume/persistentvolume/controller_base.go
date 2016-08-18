@@ -48,6 +48,7 @@ import (
 func NewPersistentVolumeController(
 	kubeClient clientset.Interface,
 	syncPeriod time.Duration,
+	alphaProvisioner vol.ProvisionableVolumePlugin,
 	volumePlugins []vol.VolumePlugin,
 	cloud cloudprovider.Interface,
 	clusterName string,
@@ -73,9 +74,15 @@ func NewPersistentVolumeController(
 		clusterName:                   clusterName,
 		createProvisionedPVRetryCount: createProvisionedPVRetryCount,
 		createProvisionedPVInterval:   createProvisionedPVInterval,
+		alphaProvisioner:              alphaProvisioner,
 	}
 
 	controller.volumePluginMgr.InitPlugins(volumePlugins, controller)
+	if controller.alphaProvisioner != nil {
+		if err := controller.alphaProvisioner.Init(controller); err != nil {
+			glog.Errorf("PersistentVolumeController: error initializing alpha provisioner plugin: %v", err)
+		}
+	}
 
 	if volumeSource == nil {
 		volumeSource = &cache.ListWatch{

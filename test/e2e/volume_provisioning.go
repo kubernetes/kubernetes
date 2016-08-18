@@ -38,6 +38,69 @@ const (
 	expectedSize = "2Gi"
 )
 
+func testDynamicProvisioning(client *client.Client, claim *api.PersistentVolumeClaim) {
+	err := framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, client, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+	Expect(err).NotTo(HaveOccurred())
+
+	By("checking the claim")
+	// Get new copy of the claim
+	claim, err = client.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Get the bound PV
+	pv, err := client.PersistentVolumes().Get(claim.Spec.VolumeName)
+	Expect(err).NotTo(HaveOccurred())
+
+	// Check sizes
+	expectedCapacity := resource.MustParse(expectedSize)
+	pvCapacity := pv.Spec.Capacity[api.ResourceName(api.ResourceStorage)]
+	Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()))
+
+	requestedCapacity := resource.MustParse(requestedSize)
+	claimCapacity := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
+	Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()))
+
+	// Check PV properties
+	Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(api.PersistentVolumeReclaimDelete))
+	expectedAccessModes := []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
+	Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
+	Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
+	Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
+
+	// We start two pods:
+	// - The first writes 'hello word' to the /mnt/test (= the volume).
+	// - The second one runs grep 'hello world' on /mnt/test.
+	// If both succeed, Kubernetes actually allocated something that is
+	// persistent across pods.
+	By("checking the created volume is writable")
+	runInPodWithVolume(client, claim.Namespace, claim.Name, "echo 'hello world' > /mnt/test/data")
+
+	By("checking the created volume is readable and retains data")
+	runInPodWithVolume(client, claim.Namespace, claim.Name, "grep 'hello world' /mnt/test/data")
+
+	// Ugly hack: if we delete the AWS/GCE/OpenStack volume here, it will
+	// probably collide with destruction of the pods above - the pods
+	// still have the volume attached (kubelet is slow...) and deletion
+	// of attached volume is not allowed by AWS/GCE/OpenStack.
+	// Kubernetes *will* retry deletion several times in
+	// pvclaimbinder-sync-period.
+	// So, technically, this sleep is not needed. On the other hand,
+	// the sync perion is 10 minutes and we really don't want to wait
+	// 10 minutes here. There is no way how to see if kubelet is
+	// finished with cleaning volumes. A small sleep here actually
+	// speeds up the test!
+	// Three minutes should be enough to clean up the pods properly.
+	// We've seen GCE PD detach to take more than 1 minute.
+	By("Sleeping to let kubelet destroy all pods")
+	time.Sleep(3 * time.Minute)
+
+	By("deleting the claim")
+	framework.ExpectNoError(client.PersistentVolumeClaims(claim.Namespace).Delete(claim.Name))
+
+	// Wait for the PV to get deleted too.
+	framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(client, pv.Name, 5*time.Second, 20*time.Minute))
+}
+
 var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 	f := framework.NewDefaultFramework("volume-provisioning")
 
@@ -61,85 +124,39 @@ var _ = framework.KubeDescribe("Dynamic provisioning", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			By("creating a claim with a dynamic provisioning annotation")
-			claim := newClaim(ns)
+			claim := newClaim(ns, false)
+			defer func() {
+				c.PersistentVolumeClaims(ns).Delete(claim.Name)
+			}()
+			claim, err = c.PersistentVolumeClaims(ns).Create(claim)
+			Expect(err).NotTo(HaveOccurred())
+
+			testDynamicProvisioning(c, claim)
+		})
+	})
+
+	framework.KubeDescribe("DynamicProvisioner Alpha", func() {
+		It("should create and delete alpha persistent volumes", func() {
+			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke")
+
+			By("creating a claim with an alpha dynamic provisioning annotation")
+			claim := newClaim(ns, true)
 			defer func() {
 				c.PersistentVolumeClaims(ns).Delete(claim.Name)
 			}()
 			claim, err := c.PersistentVolumeClaims(ns).Create(claim)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, c, ns, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("checking the claim")
-			// Get new copy of the claim
-			claim, err = c.PersistentVolumeClaims(ns).Get(claim.Name)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Get the bound PV
-			pv, err := c.PersistentVolumes().Get(claim.Spec.VolumeName)
-			Expect(err).NotTo(HaveOccurred())
-
-			// Check sizes
-			expectedCapacity := resource.MustParse(expectedSize)
-			pvCapacity := pv.Spec.Capacity[api.ResourceName(api.ResourceStorage)]
-			Expect(pvCapacity.Value()).To(Equal(expectedCapacity.Value()))
-
-			requestedCapacity := resource.MustParse(requestedSize)
-			claimCapacity := claim.Spec.Resources.Requests[api.ResourceName(api.ResourceStorage)]
-			Expect(claimCapacity.Value()).To(Equal(requestedCapacity.Value()))
-
-			// Check PV properties
-			Expect(pv.Spec.PersistentVolumeReclaimPolicy).To(Equal(api.PersistentVolumeReclaimDelete))
-			expectedAccessModes := []api.PersistentVolumeAccessMode{api.ReadWriteOnce}
-			Expect(pv.Spec.AccessModes).To(Equal(expectedAccessModes))
-			Expect(pv.Spec.ClaimRef.Name).To(Equal(claim.ObjectMeta.Name))
-			Expect(pv.Spec.ClaimRef.Namespace).To(Equal(claim.ObjectMeta.Namespace))
-
-			// We start two pods:
-			// - The first writes 'hello word' to the /mnt/test (= the volume).
-			// - The second one runs grep 'hello world' on /mnt/test.
-			// If both succeed, Kubernetes actually allocated something that is
-			// persistent across pods.
-			By("checking the created volume is writable")
-			runInPodWithVolume(c, ns, claim.Name, "echo 'hello world' > /mnt/test/data")
-
-			By("checking the created volume is readable and retains data")
-			runInPodWithVolume(c, ns, claim.Name, "grep 'hello world' /mnt/test/data")
-
-			// Ugly hack: if we delete the AWS/GCE/OpenStack volume here, it will
-			// probably collide with destruction of the pods above - the pods
-			// still have the volume attached (kubelet is slow...) and deletion
-			// of attached volume is not allowed by AWS/GCE/OpenStack.
-			// Kubernetes *will* retry deletion several times in
-			// pvclaimbinder-sync-period.
-			// So, technically, this sleep is not needed. On the other hand,
-			// the sync perion is 10 minutes and we really don't want to wait
-			// 10 minutes here. There is no way how to see if kubelet is
-			// finished with cleaning volumes. A small sleep here actually
-			// speeds up the test!
-			// Three minutes should be enough to clean up the pods properly.
-			// We've seen GCE PD detach to take more than 1 minute.
-			By("Sleeping to let kubelet destroy all pods")
-			time.Sleep(3 * time.Minute)
-
-			By("deleting the claim")
-			framework.ExpectNoError(c.PersistentVolumeClaims(ns).Delete(claim.Name))
-
-			// Wait for the PV to get deleted too.
-			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, 20*time.Minute))
+			testDynamicProvisioning(c, claim)
 		})
 	})
 })
 
-func newClaim(ns string) *api.PersistentVolumeClaim {
-	return &api.PersistentVolumeClaim{
+func newClaim(ns string, alpha bool) *api.PersistentVolumeClaim {
+	claim := api.PersistentVolumeClaim{
 		ObjectMeta: api.ObjectMeta{
 			GenerateName: "pvc-",
 			Namespace:    ns,
-			Annotations: map[string]string{
-				"volume.beta.kubernetes.io/storage-class": "fast",
-			},
 		},
 		Spec: api.PersistentVolumeClaimSpec{
 			AccessModes: []api.PersistentVolumeAccessMode{
@@ -152,6 +169,19 @@ func newClaim(ns string) *api.PersistentVolumeClaim {
 			},
 		},
 	}
+
+	if alpha {
+		claim.Annotations = map[string]string{
+			"volume.alpha.kubernetes.io/storage-class": "",
+		}
+	} else {
+		claim.Annotations = map[string]string{
+			"volume.beta.kubernetes.io/storage-class": "fast",
+		}
+
+	}
+
+	return &claim
 }
 
 // runInPodWithVolume runs a command in a pod with given claim mounted to /mnt directory.

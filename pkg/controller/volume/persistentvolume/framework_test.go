@@ -597,6 +597,7 @@ func newTestController(kubeClient clientset.Interface, volumeSource, claimSource
 	ctrl := NewPersistentVolumeController(
 		kubeClient,
 		5*time.Second,        // sync period
+		nil,                  // alpha provisioner
 		[]vol.VolumePlugin{}, // recyclers
 		nil,                  // cloud
 		"",
@@ -820,7 +821,9 @@ func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, 
 			provisionCalls: expectedProvisionCalls,
 		}
 		ctrl.volumePluginMgr.InitPlugins([]vol.VolumePlugin{plugin}, ctrl)
-
+		if expectedProvisionCalls != nil {
+			ctrl.alphaProvisioner = plugin
+		}
 		return toWrap(ctrl, reactor, test)
 	}
 }
