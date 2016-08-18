@@ -53,7 +53,7 @@ func (h *proxyHC) handleServiceListenerRequest(req *proxyListenerRequest) bool {
 	glog.V(2).Infof("Adding health check listener for service %s on nodePort %d", req.serviceName, req.listenPort)
 	server := http.Server{
 		Addr:    fmt.Sprintf(":%d", req.listenPort),
-		Handler: healthCheckHandler{svcName: req.serviceName.String()},
+		Handler: healthCheckHandler{svcNsName: req.serviceName.String()},
 	}
 	listener, err := net.Listen("tcp", server.Addr)
 	if err != nil {
