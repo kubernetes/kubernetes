@@ -44,3 +44,11 @@ The usage may look like this (assuming the user uses the convention of labelling
 ```
 kubectl apply --purge-missing-where 'app=myapp' -f https://example.com/myapp.json
 ```
+
+## Interactions with namespaces
+
+* If no namespace is specified, operate across `default` namespace only.
+* If `--namespace` is specified, only operate in that namespace.
+* If `--all-namespaces` is specified, operate across the entire cluster.
+
+The label selector should only match objects in the specified namespace(s).
