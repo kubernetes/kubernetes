@@ -17,11 +17,14 @@ limitations under the License.
 package flexvolume
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/volume"
 )
 
 type pluginDefaults flexVolumePlugin
 
 func (plugin *pluginDefaults) GetVolumeName(spec *volume.Spec) (string, error) {
+	glog.Warningf("Using default GetVolumeName")
 	return "", nil
 }

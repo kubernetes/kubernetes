@@ -18,21 +18,26 @@ package flexvolume
 
 import (
 	"time"
+
+	"github.com/golang/glog"
 )
 
 type detacherDefaults flexVolumeDetacher
 
 // Detach is part of the volume.Detacher interface.
 func (d *detacherDefaults) Detach(deviceName, hostName string) error {
+	glog.Warningf("Using default Detach")
 	return nil
 }
 
 // WaitForDetach is part of the volume.Detacher interface.
 func (d *detacherDefaults) WaitForDetach(devicePath string, timeout time.Duration) error {
+	glog.Warningf("Using default WaitForDetach")
 	return nil
 }
 
 // UnmountDevice is part of the volume.Detacher interface.
 func (d *detacherDefaults) UnmountDevice(deviceMountPath string) error {
+	glog.Warningf("Using default UnmountDevice")
 	return doUnmount(d.plugin.host.GetMounter(), deviceMountPath)
 }

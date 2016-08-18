@@ -16,8 +16,13 @@ limitations under the License.
 
 package flexvolume
 
+import (
+	"github.com/golang/glog"
+)
+
 type unmounterDefaults flexVolumeUnmounter
 
 func (f *unmounterDefaults) TearDownAt(dir string) error {
+	glog.Warningf("Using default TearDownAt")
 	return doUnmount(f.mounter, dir)
 }

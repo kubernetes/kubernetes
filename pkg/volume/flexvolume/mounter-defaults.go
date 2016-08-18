@@ -17,6 +17,8 @@ limitations under the License.
 package flexvolume
 
 import (
+	"github.com/golang/glog"
+
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -25,6 +27,7 @@ type mounterDefaults flexVolumeMounter
 // SetUpAt is part of the volume.Mounter interface.
 // This implementation relies on the attacher's device mount path and does a bind mount to dir.
 func (f *mounterDefaults) SetUpAt(src, dir string, fsGroup *int64) error {
+	glog.Warningf("Using default SetUpAt")
 	err := doMount(f.mounter, src, dir, "auto", []string{"bind"})
 	if err != nil {
 		return err
@@ -37,6 +40,7 @@ func (f *mounterDefaults) SetUpAt(src, dir string, fsGroup *int64) error {
 
 // Returns the default volume attributes.
 func (f *mounterDefaults) GetAttributes() volume.Attributes {
+	glog.Warningf("Using default GetAttributes")
 	return volume.Attributes{
 		ReadOnly:        f.readOnly,
 		Managed:         !f.readOnly,
