@@ -124,6 +124,14 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 				return volume, nil
 			}
 
+			// In Alpha dynamic provisioning, we do now want not match claims
+			// with existing PVs, findByClaim must find only PVs that are
+			// pre-bound to the claim (by dynamic provisioning). TODO: remove in
+			// 1.5
+			if hasAnnotation(claim.ObjectMeta, annAlphaClass) {
+				continue
+			}
+
 			// filter out:
 			// - volumes bound to another claim
 			// - volumes whose labels don't match the claim's selector, if specified
