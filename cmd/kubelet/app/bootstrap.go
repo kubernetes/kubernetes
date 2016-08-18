@@ -221,7 +221,7 @@ func requestClientCertificate(client unversionedcertificates.CertificateSigningR
 			break
 		}
 
-		if event.Type == watch.Modified {
+		if event.Type == watch.Modified || event.Type == watch.Added {
 			if event.Object.(*certificates.CertificateSigningRequest).UID != req.UID {
 				continue
 			}
