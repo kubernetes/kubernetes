@@ -268,7 +268,6 @@ func (dc *DeploymentController) getDeploymentForReplicaSet(rs *extensions.Replic
 	if len(deployments) > 1 {
 		sort.Sort(byCreationTimestamp(deployments))
 		glog.Errorf("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s", rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
-		glog.V(4).Infof("More than one deployment is selecting replica set %s/%s: %#v", rs.Namespace, rs.Name, deployments)
 	}
 	return &deployments[0]
 }
@@ -339,7 +338,6 @@ func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.De
 		if len(rss) > 1 {
 			sort.Sort(rsByCreationTimestamp(rss))
 			glog.Errorf("user error! more than one replica set is selecting pod %s/%s with labels: %#v, only choose %s/%s", pod.Namespace, pod.Name, pod.Labels, rss[0].Namespace, rss[0].Name)
-			glog.V(4).Infof("More than one replica set is selecting pod %s/%s: %#v", pod.Namespace, pod.Name, rss)
 		}
 		rs := &rss[0]
 		deployments, err := dc.dStore.GetDeploymentsForReplicaSet(rs)
@@ -347,7 +345,6 @@ func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.De
 			if len(deployments) > 1 {
 				sort.Sort(byCreationTimestamp(deployments))
 				glog.Errorf("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s", rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
-				glog.V(4).Infof("More than one deployment is selecting replica set %s/%s: %#v", rs.Namespace, rs.Name, deployments)
 			}
 			return &deployments[0]
 		}
@@ -424,38 +421,6 @@ func (dc *DeploymentController) enqueueDeployment(deployment *extensions.Deploym
 		return
 	}
 
-	// TODO: Handle overlapping deployments better. Either disallow them at admission time or
-	// deterministically avoid syncing deployments that fight over ReplicaSet's. Currently, we
-	// only ensure that the same deployment is synced for a given ReplicaSet. When we
-	// periodically relist all deployments there will still be some ReplicaSet instability. One
-	//  way to handle this is by querying the store for all deployments that this deployment
-	// overlaps, as well as all deployments that overlap this deployments, and sorting them.
-
-	// Relist all deployment for overlaps, and avoid syncing the newer overlapping ones (only sync the oldest one)
-	deployments, err := dc.dStore.List()
-	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
-	if err != nil {
-		glog.Errorf("Deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
-		return
-	}
-	overlapping := false
-	for _, d := range deployments {
-		if !selector.Empty() && selector.Matches(labels.Set(d.Spec.Template.Labels)) && d.UID != deployment.UID {
-			overlapping = true
-			dc.markDeploymentOverlap(*deployment, d)
-			dc.markDeploymentOverlap(d, *deployment)
-			// skip syncing this one if older overlapping one is found
-			shouldSkip := d.CreationTimestamp.Before(deployment.CreationTimestamp)
-			if shouldSkip {
-				glog.Errorf("Found deployment %s/%s has overlapping selector with deployment %s/%s, skip syncing it", deployment.Namespace, deployment.Name, d.Namespace, d.Name)
-				return
-			}
-			glog.Errorf("Found deployment %s/%s has overlapping selector with deployment %s/%s", deployment.Namespace, deployment.Name, d.Namespace, d.Name)
-		}
-	}
-	if !overlapping {
-		dc.clearDeploymentOverlap(*deployment)
-	}
 	dc.queue.Add(key)
 }
 
@@ -544,6 +509,33 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return nil
 	}
 
+	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
+	// Relist all deployment in the same namespace for overlaps, and avoid syncing the newer overlapping ones (only sync the oldest one)
+	deployments, err := dc.dStore.Deployments(deployment.Namespace).List()
+	selector, err := unversioned.LabelSelectorAsSelector(deployment.Spec.Selector)
+	if err != nil {
+		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", deployment.Namespace, deployment.Name, err)
+	}
+	overlapping := false
+	for _, d := range deployments {
+		if !selector.Empty() && selector.Matches(labels.Set(d.Spec.Template.Labels)) && d.UID != deployment.UID {
+			overlapping = true
+			dc.markDeploymentOverlap(*deployment, d)
+			dc.markDeploymentOverlap(d, *deployment)
+			// skip syncing this one if older overlapping one is found
+			shouldSkip, err := dc.isOlderThan(d, *deployment)
+			if err != nil {
+				return fmt.Errorf("error finding older overlapping deployment: %v", err)
+			}
+			if shouldSkip {
+				return fmt.Errorf("found deployment %s/%s has overlapping selector with deployment %s/%s, skip syncing it", deployment.Namespace, deployment.Name, d.Namespace, d.Name)
+			}
+		}
+	}
+	if !overlapping {
+		dc.clearDeploymentOverlap(*deployment)
+	}
+
 	// Deep-copy otherwise we are mutating our cache.
 	// TODO: Deep-copy only when needed.
 	d, err := util.DeploymentDeepCopy(deployment)
@@ -583,12 +575,53 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }
 
+func (dc *DeploymentController) isOlderThan(d1, d2 extensions.Deployment) (bool, error) {
+	t1, err := dc.oldestActiveReplicaSet(d1)
+	if err != nil {
+		return false, err
+	}
+	t2, err := dc.oldestActiveReplicaSet(d2)
+	if err != nil {
+		return false, err
+	}
+	// If no active replica set is found, or if the time is the same,
+	// use deployment creation timestamp as a tie breaker
+	if t1.IsZero() && t2.IsZero() || t1.Equal(t2) {
+		return d1.CreationTimestamp.Before(d2.CreationTimestamp), nil
+	}
+	return t2.IsZero() || t1.Before(t2), nil
+}
+
+func (dc *DeploymentController) oldestActiveReplicaSet(deployment extensions.Deployment) (unversioned.Time, error) {
+	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(&deployment, false)
+	if err != nil {
+		return unversioned.Time{}, err
+	}
+	allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
+	if len(allRSs) == 0 {
+		return unversioned.Time{}, nil
+	}
+	sort.Sort(rsPByCreationTimestamp(allRSs))
+	return allRSs[0].CreationTimestamp, nil
+}
+
 // byCreationTimestamp sorts a list of deployments by creation timestamp, using their names as a tie breaker.
 type byCreationTimestamp []extensions.Deployment
 
 func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o byCreationTimestamp) Less(i, j int) bool {
+	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+		return o[i].Name < o[j].Name
+	}
+	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+}
+
+type rsPByCreationTimestamp []*extensions.ReplicaSet
+
+func (o rsPByCreationTimestamp) Len() int      { return len(o) }
+func (o rsPByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o rsPByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
