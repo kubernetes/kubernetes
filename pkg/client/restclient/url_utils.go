@@ -55,6 +55,10 @@ func DefaultServerURL(host string, defaultTLS bool) (*url.URL, error) {
 }
 
 func DefaultServerURLsForHosts(hosts []string, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) ([]*url.URL, string, error) {
+	if len(hosts) == 0 {
+		hosts = []string{"localhost"}
+	}
+
 	var hostsURLs []*url.URL
 
 	for _, host := range hosts {
@@ -95,7 +99,7 @@ func defaultServerUrlFor(config *Config) ([]*url.URL, string, error) {
 	hasCert := len(config.CertFile) != 0 || len(config.CertData) != 0
 	defaultTLS := hasCA || hasCert || config.Insecure
 	if config.GroupVersion != nil {
-		return DefaultServerURLsForHosts(config.AllHosts(), config.APIPath, *config.GroupVersion, defaultTLS)
+		return DefaultServerURLsForHosts(config.Hosts(), config.APIPath, *config.GroupVersion, defaultTLS)
 	}
-	return DefaultServerURLsForHosts(config.AllHosts(), config.APIPath, unversioned.GroupVersion{}, defaultTLS)
+	return DefaultServerURLsForHosts(config.Hosts(), config.APIPath, unversioned.GroupVersion{}, defaultTLS)
 }

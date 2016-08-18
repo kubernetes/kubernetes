@@ -25,7 +25,7 @@ func TestRoundRobinProvider(t *testing.T) {
 	url1, _ := url.Parse("http://master:8000")
 	url2, _ := url.Parse("http://master:8001")
 
-	rr := &RoundRobinProvider{urls: []*url.URL{url1, url2}}
+	rr := NewRoundRobinProvider(url1, url2)
 
 	returned := rr.Get()
 	if url1 != returned {
@@ -37,6 +37,6 @@ func TestRoundRobinProvider(t *testing.T) {
 	}
 	returned = rr.Next()
 	if url1 != returned {
-		t.Errorf("Expected %v != Returned %v", url2, returned)
+		t.Errorf("Expected %v != Returned %v", url1, returned)
 	}
 }

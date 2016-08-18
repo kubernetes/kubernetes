@@ -106,7 +106,7 @@ func NewRESTClient(hosts []*url.URL, versionedAPIPath string, config ContentConf
 	}
 	glog.V(4).Infof("Rest client initialized with following urls %v", hosts)
 	return &RESTClient{
-		urlProvider:      &RoundRobinProvider{urls: hosts},
+		urlProvider:      NewRoundRobinProvider(hosts...),
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
