@@ -5207,6 +5207,15 @@ func TestValidateService(t *testing.T) {
 			},
 			numErrs: 1,
 		},
+		{
+			name: "invalid node port with clusterIP None",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeNodePort
+				s.Spec.Ports = append(s.Spec.Ports, api.ServicePort{Name: "q", Port: 1, Protocol: "TCP", NodePort: 1, TargetPort: intstr.FromInt(1)})
+				s.Spec.ClusterIP = "None"
+			},
+			numErrs: 1,
+		},
 	}
 
 	for _, tc := range testCases {
