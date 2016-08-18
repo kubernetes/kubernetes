@@ -223,7 +223,7 @@ func TestPersistentClaimReadOnlyFlag(t *testing.T) {
 	plug, _ := plugMgr.FindPluginByName(rbdPluginName)
 
 	// readOnly bool is supplied by persistent-claim volume source when its mounter creates other volumes
-	spec := volume.NewSpecFromPersistentVolume(pv, true, "default")
+	spec := volume.NewSpecFromPersistentVolume(pv, true, claim.Namespace)
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, _ := plug.NewMounter(spec, pod, volume.VolumeOptions{})
 

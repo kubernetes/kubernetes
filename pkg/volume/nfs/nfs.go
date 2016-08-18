@@ -145,7 +145,8 @@ func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(nfsVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(nfsVolume, ""), nil
 }
 
 // NFS volumes represent a bare host file or directory mount of an NFS export.

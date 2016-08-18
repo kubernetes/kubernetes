@@ -305,11 +305,11 @@ func NewSpecFromVolume(vs *api.Volume, namespace string) *Spec {
 }
 
 // NewSpecFromPersistentVolume creates an Spec from an api.PersistentVolume
-func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool) *Spec {
+func NewSpecFromPersistentVolume(pv *api.PersistentVolume, readOnly bool, namespace string) *Spec {
 	return &Spec{
 		PersistentVolume: pv,
 		ReadOnly:         readOnly,
-		Namespace:        pv.Namespace,
+		Namespace:        namespace,
 	}
 }
 

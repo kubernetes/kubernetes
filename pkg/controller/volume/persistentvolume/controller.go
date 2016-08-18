@@ -964,7 +964,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 	volume = newVolume
 
 	// Find a plugin.
-	spec := vol.NewSpecFromPersistentVolume(volume, false)
+	spec := vol.NewSpecFromPersistentVolume(volume, false, "")
 	plugin, err := ctrl.recyclePluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		// No recycler found. Emit an event and mark the volume Failed.

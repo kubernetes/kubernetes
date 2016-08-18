@@ -164,7 +164,8 @@ func (plugin *cephfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(cephfsVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(cephfsVolume, ""), nil
 }
 
 // CephFS volumes represent a bare host file or directory mount of an CephFS export.

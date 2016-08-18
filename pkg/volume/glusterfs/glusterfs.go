@@ -155,7 +155,8 @@ func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string)
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(glusterfsVolume), nil
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(glusterfsVolume, ""), nil
 }
 
 // Glusterfs volumes represent a bare host file or directory mount of an Glusterfs export.

@@ -156,6 +156,20 @@ func (plugin *flexVolumePlugin) NewDetacher() (volume.Detacher, error) {
 	return &flexVolumeDetacher{plugin}, nil
 }
 
+// ConstructVolumeSpec is part of the volume.AttachableVolumePlugin interface.
+func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	flexVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			FlexVolume: &api.FlexVolumeSource{
+				Driver: plugin.driverName,
+			},
+		},
+	}
+	// namespace is unknown here
+	return volume.NewSpecFromVolume(flexVolume, ""), nil
+}
+
 // Mark the given commands as unsupported.
 func (plugin *flexVolumePlugin) unsupported(commands ...string) {
 	plugin.Lock()
@@ -173,4 +187,9 @@ func (plugin *flexVolumePlugin) isUnsupported(command string) bool {
 		}
 	}
 	return false
+}
+
+func (plugin *flexVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	mounter := plugin.host.GetMounter()
+	return mount.GetMountRefs(mounter, deviceMountPath)
 }
