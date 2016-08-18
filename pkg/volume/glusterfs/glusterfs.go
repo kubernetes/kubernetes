@@ -54,6 +54,7 @@ var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
 	glusterfsPluginName = "kubernetes.io/glusterfs"
+	volprefix           = "vol_"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -344,12 +345,12 @@ func (plugin *glusterfsPlugin) newProvisionerInternal(options volume.VolumeOptio
 }
 
 type glusterfsClusterConf struct {
-	Glusterep          string `json:"endpoint"`
-	GlusterRestvolpath string `json:"path"`
-	GlusterRestUrl     string `json:"resturl"`
-	GlusterRestAuth    bool   `json:"restauthenabled"`
-	GlusterRestUser    string `json:"restuser"`
-	GlusterRestUserKey string `json:"restuserkey"`
+	glusterep          string `json:"endpoint"`
+	glusterRestvolpath string `json:"path"`
+	glusterRestUrl     string `json:"resturl"`
+	glusterRestAuth    bool   `json:"restauthenabled"`
+	glusterRestUser    string `json:"restuser"`
+	glusterRestUserKey string `json:"restuserkey"`
 }
 
 type glusterfsVolumeProvisioner struct {
@@ -369,11 +370,9 @@ func (plugin *glusterfsPlugin) newDeleterInternal(spec *volume.Spec) (volume.Del
 	return &glusterfsVolumeDeleter{
 		glusterfsMounter: &glusterfsMounter{
 			glusterfs: &glusterfs{
-
 				volName: spec.Name(),
 				plugin:  plugin,
 			},
-
 			path: spec.PersistentVolume.Spec.Glusterfs.Path,
 		}}, nil
 }
@@ -393,10 +392,10 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 	glog.V(2).Infof("glusterfs: delete volume :%s ", d.glusterfsMounter.path)
 	volumetodel := d.glusterfsMounter.path
 	d.glusterfsClusterConf = d.plugin.clusterconf
-	newvolumetodel := dstrings.TrimPrefix(volumetodel, "vol_")
-	cli := gcli.NewClient(d.GlusterRestUrl, d.GlusterRestUser, d.GlusterRestUserKey)
+	newvolumetodel := dstrings.TrimPrefix(volumetodel, volprefix)
+	cli := gcli.NewClient(d.glusterRestUrl, d.glusterRestUser, d.glusterRestUserKey)
 	if cli == nil {
-		glog.V(4).Infof("glusterfs: failed to create gluster rest client")
+		glog.Errorf("glusterfs: failed to create gluster rest client")
 		return fmt.Errorf("glusterfs: failed to create gluster rest client, REST server authentication failed")
 	}
 	err = cli.VolumeDelete(newvolumetodel)
@@ -411,34 +410,38 @@ func (d *glusterfsVolumeDeleter) Delete() error {
 
 func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	var err error
-	if r.options.ProvisionerSelector != nil {
+	/*if r.options.ProvisionerSelector != nil {
 		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
 		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
-	}
+	}*/
 	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", r.options)
 	for k, v := range r.options.Parameters {
 		switch dstrings.ToLower(k) {
 		case "endpoint":
-			r.plugin.clusterconf.Glusterep = v
+			r.plugin.clusterconf.glusterep = v
 		case "path":
-			r.plugin.clusterconf.GlusterRestvolpath = v
+			r.plugin.clusterconf.glusterRestvolpath = v
 		case "resturl":
-			r.plugin.clusterconf.GlusterRestUrl = v
+			r.plugin.clusterconf.glusterRestUrl = v
 		case "restauthenabled":
-			r.plugin.clusterconf.GlusterRestAuth, err = strconv.ParseBool(v)
+			r.plugin.clusterconf.glusterRestAuth, err = strconv.ParseBool(v)
 		case "restuser":
-			r.plugin.clusterconf.GlusterRestUser = v
+			r.plugin.clusterconf.glusterRestUser = v
 		case "restuserkey":
-			r.plugin.clusterconf.GlusterRestUserKey = v
+			r.plugin.clusterconf.glusterRestUserKey = v
 		default:
 			return nil, fmt.Errorf("glusterfs: invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
 		}
 	}
 	glog.V(4).Infof("glusterfs: storage class parameters in plugin clusterconf %v", r.plugin.clusterconf)
+	if !r.plugin.clusterconf.glusterRestAuth {
+		r.plugin.clusterconf.glusterRestUser = ""
+		r.plugin.clusterconf.glusterRestUserKey = ""
+	}
 	r.glusterfsClusterConf = r.plugin.clusterconf
 	glusterfs, sizeGB, err := r.CreateVolume()
 	if err != nil {
-		glog.V(4).Infof("glusterfs: create volume err: %s.", err)
+		glog.Errorf("glusterfs: create volume err: %s.", err)
 		return nil, fmt.Errorf("glusterfs: create volume err: %s.", err)
 	}
 	pv := new(api.PersistentVolume)
@@ -455,26 +458,24 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 	volSizeBytes := p.options.Capacity.Value()
 	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
 	glog.V(2).Infof("glusterfs: create volume of size:%d bytes", volSizeBytes)
-
-	if p.glusterfsClusterConf.GlusterRestUrl == "" {
-		glog.V(4).Infof("glusterfs : rest server endpoint is empty")
+	if p.glusterfsClusterConf.glusterRestUrl == "" {
+		glog.Errorf("glusterfs : rest server endpoint is empty")
 		return nil, 0, fmt.Errorf("failed to create gluster REST client, REST URL is empty")
-
 	}
-	cli := gcli.NewClient(p.GlusterRestUrl, p.GlusterRestUser, p.GlusterRestUserKey)
+	cli := gcli.NewClient(p.glusterRestUrl, p.glusterRestUser, p.glusterRestUserKey)
 	if cli == nil {
-		glog.V(4).Infof("glusterfs: failed to create gluster rest client")
+		glog.Errorf("glusterfs: failed to create gluster rest client")
 		return nil, 0, fmt.Errorf("failed to create gluster REST client, REST server authentication failed")
 	}
 	volumeReq := &gapi.VolumeCreateRequest{Size: sz}
 	volume, err := cli.VolumeCreate(volumeReq)
 	if err != nil {
-		glog.V(4).Infof("glusterfs: error creating volume %s ", err)
+		glog.Errorf("glusterfs: error creating volume %s ", err)
 		return nil, 0, fmt.Errorf("error creating volume %v", err)
 	}
 	glog.V(1).Infof("glusterfs: volume with size :%d and name:%s created", volume.Size, volume.Name)
 	return &api.GlusterfsVolumeSource{
-		EndpointsName: p.glusterfsClusterConf.Glusterep,
+		EndpointsName: p.glusterfsClusterConf.glusterep,
 		Path:          volume.Name,
 		ReadOnly:      false,
 	}, sz, nil
