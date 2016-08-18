@@ -133,10 +133,8 @@ func (n *NodeInfo) AllocatableResource() Resource {
 }
 
 func (n *NodeInfo) Clone() *NodeInfo {
-	pods := append([]*api.Pod(nil), n.pods...)
 	clone := &NodeInfo{
 		node:                n.node,
-		pods:                pods,
 		requestedResource:   &(*n.requestedResource),
 		nonzeroRequest:      &(*n.nonzeroRequest),
 		allocatableResource: &(*n.allocatableResource),
