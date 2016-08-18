@@ -71,6 +71,10 @@ const KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 // TODO(thockin): Remove this for v1.3 or v1.4.
 const oldIptablesMasqueradeMark = "0x4d415351"
 
+// An annotation that denotes if this Service desires to only route to local
+// endpoints. Typically used to preserve source IP in loadbalanced Services.
+const onlyNodeLocalEndpointsAnnotation = "service.alpha.kubernetes.io/only-node-local-endpoints"
+
 // IptablesVersioner can query the current iptables version.
 type IptablesVersioner interface {
 	// returns "X.Y.Z"
@@ -128,14 +132,15 @@ const sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
 
 // internal struct for string service information
 type serviceInfo struct {
-	clusterIP           net.IP
-	port                int
-	protocol            api.Protocol
-	nodePort            int
-	loadBalancerStatus  api.LoadBalancerStatus
-	sessionAffinityType api.ServiceAffinity
-	stickyMaxAgeSeconds int
-	externalIPs         []string
+	clusterIP              net.IP
+	port                   int
+	protocol               api.Protocol
+	nodePort               int
+	loadBalancerStatus     api.LoadBalancerStatus
+	sessionAffinityType    api.ServiceAffinity
+	stickyMaxAgeSeconds    int
+	externalIPs            []string
+	onlyNodeLocalEndpoints bool
 }
 
 // returns a new serviceInfo struct
@@ -428,6 +433,14 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			// Deep-copy in case the service instance changes
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.sessionAffinityType = service.Spec.SessionAffinity
+			if l, ok := service.Annotations[onlyNodeLocalEndpointsAnnotation]; ok {
+				b, err := strconv.ParseBool(l)
+				if err != nil {
+					glog.Errorf("Failed to parse annotation %v: %v", onlyNodeLocalEndpointsAnnotation, err)
+				}
+				info.onlyNodeLocalEndpoints = b
+			}
+
 			proxier.serviceMap[serviceName] = info
 
 			glog.V(4).Infof("added serviceInfo(%s): %s", serviceName, spew.Sdump(info))
@@ -487,6 +500,17 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 			svcPort := proxy.ServicePortName{NamespacedName: types.NamespacedName{Namespace: svcEndpoints.Namespace, Name: svcEndpoints.Name}, Port: portname}
 			curEndpoints := proxier.endpointsMap[svcPort]
 			newEndpoints := flattenValidEndpoints(portsToEndpoints[portname])
+			if svc, ok := proxier.serviceMap[svcPort]; ok && svc.onlyNodeLocalEndpoints {
+				localEndpoints := []string{}
+				for i := range newEndpoints {
+					if !isLocalEndpoint(newEndpoints[i]) {
+						continue
+					}
+					localEndpoints = append(localEndpoints, newEndpoints[i])
+				}
+				glog.V(4).Infof("Found localized Service, endpoints modified from %+v -> %+v", newEndpoints, localEndpoints)
+				newEndpoints = localEndpoints
+			}
 
 			if len(curEndpoints) != len(newEndpoints) || !slicesEquiv(slice.CopyStrings(curEndpoints), newEndpoints) {
 				removedEndpoints := getRemovedEndpoints(curEndpoints, newEndpoints)
@@ -799,7 +823,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// If the "external" IP happens to be an IP that is local to this
 			// machine, hold the local port open so no other process can open it
 			// (because the socket might open but it would never work).
-			if local, err := isLocalIP(externalIP); err != nil {
+			if local, err := isLocalIP(externalIP, false); err != nil {
 				glog.Errorf("can't determine if IP is local, assuming not: %v", err)
 			} else if local {
 				lp := localPort{
@@ -854,8 +878,14 @@ func (proxier *Proxier) syncProxyRules() {
 					"-d", fmt.Sprintf("%s/32", ingress.IP),
 					"--dport", fmt.Sprintf("%d", svcInfo.port),
 				}
-				// We have to SNAT packets from external IPs.
-				writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+				// We have to SNAT packets from external IPs, however if the
+				// Service is only proxying to local endpoints, we don't need
+				// to masquerade.
+				if !svcInfo.onlyNodeLocalEndpoints {
+					writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+				} else {
+					glog.Infof("Skipping NAT rules for localized service %+v", svcInfo)
+				}
 				writeLine(natRules, append(args, "-j", string(svcChain))...)
 			}
 		}
@@ -1052,21 +1082,41 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 	buf.WriteString(strings.Join(words, " ") + "\n")
 }
 
-func isLocalIP(ip string) (bool, error) {
+// isLocalIP checks if the given IP is local.
+// If includeCIDRs is true, the function returns true if the ip falls in a
+// subnet range assigned to a local interface.
+func isLocalIP(ip string, includeCIDRs bool) (bool, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return false, err
 	}
 	for i := range addrs {
-		intf, _, err := net.ParseCIDR(addrs[i].String())
+		intf, cidrNet, err := net.ParseCIDR(addrs[i].String())
 		if err != nil {
 			return false, err
 		}
-		if net.ParseIP(ip).Equal(intf) {
+		netIP := net.ParseIP(ip)
+		if netIP.Equal(intf) {
+			return true, nil
+		}
+		if includeCIDRs && cidrNet.Contains(netIP) {
 			return true, nil
 		}
 	}
 	return false, nil
+}
+
+// isLocalEndpoint checks if a given Endpoint (IP:Port) is local.
+func isLocalEndpoint(endpoint string) bool {
+	b, err := isLocalIP(strings.Split(endpoint, ":")[0], true)
+	if err != nil {
+		// If we can't verify whether an endpoint is local, assume it isn't.
+		// The localized service will break up front instead of working with
+		// the wrong source IP.
+		glog.Errorf("Failed to check if %v is a local endpoint: %v", endpoint, err)
+		return false
+	}
+	return b
 }
 
 func openLocalPort(lp *localPort) (closeable, error) {

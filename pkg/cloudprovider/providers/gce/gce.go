@@ -70,8 +70,20 @@ const (
 	// were to continuously return a nextPageToken.
 	maxPages = 25
 
-	// Target Pool creation is limited to 200 instances.
 	maxTargetPoolCreateInstances = 200
+
+	// An annotation that denotes if this Service desires to only route to local
+	// endpoints. Typically used to preserve source IP in loadbalanced Services.
+	onlyNodeLocalEndpointsAnnotation = "service.alpha.kubernetes.io/only-node-local-endpoints"
+
+	// Path used for http health check of services with the
+	// onlyNodeLocalEndpointsAnnotation annotation set. The same path applies to
+	// all nodePorts, we should instead consider modifying it to also support the
+	// container/service ports.
+	serviceHealthCheckPathAnnotation = "service.alpha.kubernetes.io/health-check-path"
+
+	// Max size of names accepted by the GCE api.
+	nameLengthLimit = 63
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
@@ -720,12 +732,28 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Serv
 		glog.Infof("EnsureLoadBalancer(%v(%v)): deleted forwarding rule", loadBalancerName, serviceName)
 	}
 	if tpExists && tpNeedsUpdate {
-		if err := gce.deleteTargetPool(loadBalancerName, gce.region); err != nil {
+		// TODO: Also delete health checks?
+		if err := gce.deleteTargetPool(loadBalancerName, gce.region, []*compute.HttpHealthCheck{}); err != nil {
 			return nil, fmt.Errorf("failed to delete existing target pool %s for load balancer update: %v", loadBalancerName, err)
 		}
 		glog.Infof("EnsureLoadBalancer(%v(%v)): deleted target pool", loadBalancerName, serviceName)
 	}
 
+	hc := []*compute.HttpHealthCheck{}
+	if path := getServiceHealthCheckPath(apiService); path != "" {
+		glog.Infof("service %v needs health checks on path %v", apiService.Name, path)
+		for _, p := range apiService.Spec.Ports {
+			if p.NodePort == 0 {
+				continue
+			}
+			glog.Infof("service %v has nodeport %v, will be used for health check on path %v", apiService.Name, p.NodePort, path)
+			c, err := gce.createHttpHealthCheckIfNeeded(loadBalancerName, path, p.NodePort)
+			if err != nil {
+				return nil, fmt.Errorf("Failed to create health check for localized service %v on node port %v: %v", loadBalancerName, p.NodePort, err)
+			}
+			hc = append(hc, c)
+		}
+	}
 	// Once we've deleted the resources (if necessary), build them back up (or for
 	// the first time if they're new).
 	if tpNeedsUpdate {
@@ -734,7 +762,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Serv
 			createInstances = createInstances[:maxTargetPoolCreateInstances]
 		}
 
-		if err := gce.createTargetPool(loadBalancerName, serviceName.String(), gce.region, createInstances, affinityType); err != nil {
+		if err := gce.createTargetPool(loadBalancerName, serviceName.String(), gce.region, createInstances, affinityType, hc); err != nil {
 			return nil, fmt.Errorf("failed to create target pool %s: %v", loadBalancerName, err)
 		}
 		if len(hosts) <= maxTargetPoolCreateInstances {
@@ -767,7 +795,74 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Serv
 
 	status := &api.LoadBalancerStatus{}
 	status.Ingress = []api.LoadBalancerIngress{{IP: ipAddress}}
+
 	return status, nil
+}
+
+func serviceNeedsHealthCheck(service *api.Service) (b bool) {
+	if l, ok := service.Annotations[onlyNodeLocalEndpointsAnnotation]; ok {
+		var err error
+		b, err = strconv.ParseBool(l)
+		if err != nil {
+			glog.Errorf("Failed to parse annotation %v: %v", onlyNodeLocalEndpointsAnnotation, err)
+			return false
+		}
+	}
+	return
+}
+
+func getServiceHealthCheckPath(service *api.Service) string {
+	if !serviceNeedsHealthCheck(service) {
+		return ""
+	}
+	if p, ok := service.Annotations[serviceHealthCheckPathAnnotation]; ok {
+		// GCE requires a leading "/"
+		if string(p[0]) != "/" {
+			p = fmt.Sprintf("/%v", p)
+		}
+		return p
+	}
+	return "/"
+}
+
+func (gce *GCECloud) createHttpHealthCheckIfNeeded(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {
+	name = fmt.Sprintf("%v-%v", name, port)
+	// TODO: Trim name
+	if len(name) > nameLengthLimit {
+		return nil, fmt.Errorf("Cannot create health check, name too long %v(%d) only allowed %d chars", name, len(name), nameLengthLimit)
+	}
+	hc, err = gce.GetHttpHealthCheck(name)
+	if hc == nil || err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
+		glog.Infof("Did not find health check %v, creating port %v path %v", name, port, path)
+		newHC := &compute.HttpHealthCheck{
+			Name:        name,
+			Port:        int64(port),
+			RequestPath: path,
+			// TODO: Allow configurability?
+			Host:        "",
+			Description: "kubernetes HTTP health check for L4 loadbalancer",
+			// We're using this as a binary weight, so it needs to be fast.
+			CheckIntervalSec: int64(2),
+			// Arbitrarily chosen.
+			TimeoutSec: int64(1),
+			// Start sending requests as soon as a pod is found on the node.
+			HealthyThreshold: int64(1),
+			// If a pod is evicted, we get upto 5s?
+			UnhealthyThreshold: int64(2),
+			// TODO: include headers?.
+		}
+		if err = gce.CreateHttpHealthCheck(newHC); err != nil {
+			return nil, err
+		}
+		hc, err = gce.GetHttpHealthCheck(name)
+		if err != nil {
+			glog.Errorf("Failed to get http health check %v", err)
+			return nil, err
+		}
+	}
+	// TODO: Verify the health check
+	glog.Infof("Health check %v already exists", name)
+	return hc, nil
 }
 
 // Passing nil for requested IP is perfectly fine - it just means that no specific
@@ -962,16 +1057,22 @@ func (gce *GCECloud) createForwardingRule(name, serviceName, region, ipAddress s
 	return nil
 }
 
-func (gce *GCECloud) createTargetPool(name, serviceName, region string, hosts []*gceInstance, affinityType api.ServiceAffinity) error {
+func (gce *GCECloud) createTargetPool(name, serviceName, region string, hosts []*gceInstance, affinityType api.ServiceAffinity, hc []*compute.HttpHealthCheck) error {
 	var instances []string
 	for _, host := range hosts {
 		instances = append(instances, makeHostURL(gce.projectID, host.Zone, host.Name))
 	}
+	hcLinks := []string{}
+	for _, c := range hc {
+		hcLinks = append(hcLinks, c.SelfLink)
+	}
+	glog.Infof("creating targetpool %v with %d health checks", name, len(hcLinks))
 	pool := &compute.TargetPool{
 		Name:            name,
 		Description:     fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, serviceName),
 		Instances:       instances,
 		SessionAffinity: translateAffinityType(affinityType),
+		HealthChecks:    hcLinks,
 	}
 	op, err := gce.service.TargetPools.Insert(gce.projectID, region, pool).Do()
 	if err != nil && !isHTTPErrorCode(err, http.StatusConflict) {
@@ -1279,6 +1380,22 @@ func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, service *api.
 	glog.V(2).Infof("EnsureLoadBalancerDeleted(%v, %v, %v, %v, %v)", clusterName, service.Namespace, service.Name, loadBalancerName,
 		gce.region)
 
+	hc := []*compute.HttpHealthCheck{}
+	if path := getServiceHealthCheckPath(service); path != "" {
+		for _, p := range service.Spec.Ports {
+			if p.NodePort == 0 {
+				continue
+			}
+			name := fmt.Sprintf("%v-%d", loadBalancerName, p.NodePort)
+			c, err := gce.GetHttpHealthCheck(name)
+			if err != nil && !isHTTPErrorCode(err, http.StatusNotFound) {
+				glog.Infof("Failed to retrieve health check %v:%v", name, err)
+				return err
+			}
+			hc = append(hc, c)
+		}
+	}
+
 	errs := utilerrors.AggregateGoroutines(
 		func() error { return gce.deleteFirewall(loadBalancerName, gce.region) },
 		// Even though we don't hold on to static IPs for load balancers, it's
@@ -1291,7 +1408,7 @@ func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, service *api.
 			if err := gce.deleteForwardingRule(loadBalancerName, gce.region); err != nil {
 				return err
 			}
-			if err := gce.deleteTargetPool(loadBalancerName, gce.region); err != nil {
+			if err := gce.deleteTargetPool(loadBalancerName, gce.region, hc); err != nil {
 				return err
 			}
 			return nil
@@ -1319,7 +1436,14 @@ func (gce *GCECloud) deleteForwardingRule(name, region string) error {
 	return nil
 }
 
-func (gce *GCECloud) deleteTargetPool(name, region string) error {
+func (gce *GCECloud) deleteTargetPool(name, region string, hc []*compute.HttpHealthCheck) error {
+	for _, c := range hc {
+		glog.Infof("Deleting health check %v", c.Name)
+		if err := gce.DeleteHttpHealthCheck(c.Name); err != nil {
+			glog.Warningf("Failed to delete health check %v: %v", c, err)
+			return err
+		}
+	}
 	op, err := gce.service.TargetPools.Delete(gce.projectID, region, name).Do()
 	if err != nil && isHTTPErrorCode(err, http.StatusNotFound) {
 		glog.Infof("Target pool %s already deleted. Continuing to delete other resources.", name)
