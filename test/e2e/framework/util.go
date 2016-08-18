@@ -3131,7 +3131,22 @@ func DeleteRCAndWaitForGC(c *client.Client, ns, name string) error {
 	}
 	deleteRCTime := time.Now().Sub(startTime)
 	Logf("Deleting RC %s took: %v", name, deleteRCTime)
-	err = waitForPodsInactive(ps, 10*time.Millisecond, 10*time.Minute)
+	var interval, timeout time.Duration
+	switch {
+	case rc.Spec.Replicas < 100:
+		interval = 10 * time.Millisecond
+		timeout = 10 * time.Minute
+	case rc.Spec.Replicas < 1000:
+		interval = 1 * time.Second
+		timeout = 10 * time.Minute
+	case rc.Spec.Replicas < 10000:
+		interval = 10 * time.Second
+		timeout = 10 * time.Minute
+	default:
+		interval = 10 * time.Second
+		timeout = 20 * time.Minute
+	}
+	err = waitForPodsInactive(ps, interval, timeout)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
