@@ -17244,6 +17244,10 @@
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
      },
+     "quobyte": {
+      "$ref": "v1.QuobyteVolumeSource",
+      "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime"
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -17629,6 +17633,36 @@
      }
     }
    },
+   "v1.QuobyteVolumeSource": {
+    "id": "v1.QuobyteVolumeSource",
+    "description": "Represents a Quobyte mount that lasts the lifetime of a pod. Quobyte volumes do not support ownership management or SELinux relabeling.",
+    "required": [
+     "registry",
+     "volume"
+    ],
+    "properties": {
+     "registry": {
+      "type": "string",
+      "description": "Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes"
+     },
+     "volume": {
+      "type": "string",
+      "description": "Volume is a string that references an already created Quobyte volume by name."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false."
+     },
+     "user": {
+      "type": "string",
+      "description": "User to map volume access to Defaults to serivceaccount user"
+     },
+     "group": {
+      "type": "string",
+      "description": "Group to map volume access to Default is no group"
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -17879,6 +17913,10 @@
      "vsphereVolume": {
       "$ref": "v1.VsphereVirtualDiskVolumeSource",
       "description": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine"
+     },
+     "quobyte": {
+      "$ref": "v1.QuobyteVolumeSource",
+      "description": "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime"
      }
     }
    },

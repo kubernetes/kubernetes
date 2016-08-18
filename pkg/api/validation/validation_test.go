@@ -1970,6 +1970,76 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "azureFile.shareName",
 		},
+		// Quobyte
+		{
+			name: "valid Quobyte",
+			vol: api.Volume{
+				Name: "quobyte",
+				VolumeSource: api.VolumeSource{
+					Quobyte: &api.QuobyteVolumeSource{
+						Registry: "registry:7861",
+						Volume:   "volume",
+						ReadOnly: false,
+						User:     "root",
+						Group:    "root",
+					},
+				},
+			},
+		},
+		{
+			name: "empty registry quobyte",
+			vol: api.Volume{
+				Name: "quobyte",
+				VolumeSource: api.VolumeSource{
+					Quobyte: &api.QuobyteVolumeSource{
+						Volume: "/test",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "quobyte.registry",
+		},
+		{
+			name: "wrong format registry quobyte",
+			vol: api.Volume{
+				Name: "quobyte",
+				VolumeSource: api.VolumeSource{
+					Quobyte: &api.QuobyteVolumeSource{
+						Registry: "registry7861",
+						Volume:   "/test",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "quobyte.registry",
+		},
+		{
+			name: "wrong format multiple registries quobyte",
+			vol: api.Volume{
+				Name: "quobyte",
+				VolumeSource: api.VolumeSource{
+					Quobyte: &api.QuobyteVolumeSource{
+						Registry: "registry:7861,reg2",
+						Volume:   "/test",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeInvalid,
+			errfield: "quobyte.registry",
+		},
+		{
+			name: "empty volume quobyte",
+			vol: api.Volume{
+				Name: "quobyte",
+				VolumeSource: api.VolumeSource{
+					Quobyte: &api.QuobyteVolumeSource{
+						Registry: "registry:7861",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "quobyte.volume",
+		},
 	}
 
 	for i, tc := range testCases {

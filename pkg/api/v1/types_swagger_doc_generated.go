@@ -1081,6 +1081,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
 	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1373,6 +1374,19 @@ var map_Probe = map[string]string{
 
 func (Probe) SwaggerDoc() map[string]string {
 	return map_Probe
+}
+
+var map_QuobyteVolumeSource = map[string]string{
+	"":         "Represents a Quobyte mount that lasts the lifetime of a pod. Quobyte volumes do not support ownership management or SELinux relabeling.",
+	"registry": "Registry represents a single or multiple Quobyte Registry services specified as a string as host:port pair (multiple entries are separated with commas) which acts as the central registry for volumes",
+	"volume":   "Volume is a string that references an already created Quobyte volume by name.",
+	"readOnly": "ReadOnly here will force the Quobyte volume to be mounted with read-only permissions. Defaults to false.",
+	"user":     "User to map volume access to Defaults to serivceaccount user",
+	"group":    "Group to map volume access to Default is no group",
+}
+
+func (QuobyteVolumeSource) SwaggerDoc() map[string]string {
+	return map_QuobyteVolumeSource
 }
 
 var map_RBDVolumeSource = map[string]string{
@@ -1749,6 +1763,7 @@ var map_VolumeSource = map[string]string{
 	"azureFile":     "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"configMap":     "ConfigMap represents a configMap that should populate this volume",
 	"vsphereVolume": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
+	"quobyte":       "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

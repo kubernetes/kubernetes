@@ -157,6 +157,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Probe, InType: reflect.TypeOf(&Probe{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_QuobyteVolumeSource, InType: reflect.TypeOf(&QuobyteVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_RBDVolumeSource, InType: reflect.TypeOf(&RBDVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_RangeAllocation, InType: reflect.TypeOf(&RangeAllocation{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ReplicationController, InType: reflect.TypeOf(&ReplicationController{})},
@@ -2175,6 +2176,13 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		} else {
 			out.RBD = nil
 		}
+		if in.Quobyte != nil {
+			in, out := &in.Quobyte, &out.Quobyte
+			*out = new(QuobyteVolumeSource)
+			**out = **in
+		} else {
+			out.Quobyte = nil
+		}
 		if in.ISCSI != nil {
 			in, out := &in.ISCSI, &out.ISCSI
 			*out = new(ISCSIVolumeSource)
@@ -2835,6 +2843,19 @@ func DeepCopy_api_Probe(in interface{}, out interface{}, c *conversion.Cloner) e
 		out.PeriodSeconds = in.PeriodSeconds
 		out.SuccessThreshold = in.SuccessThreshold
 		out.FailureThreshold = in.FailureThreshold
+		return nil
+	}
+}
+
+func DeepCopy_api_QuobyteVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*QuobyteVolumeSource)
+		out := out.(*QuobyteVolumeSource)
+		out.Registry = in.Registry
+		out.Volume = in.Volume
+		out.ReadOnly = in.ReadOnly
+		out.User = in.User
+		out.Group = in.Group
 		return nil
 	}
 }
@@ -3556,6 +3577,13 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			}
 		} else {
 			out.RBD = nil
+		}
+		if in.Quobyte != nil {
+			in, out := &in.Quobyte, &out.Quobyte
+			*out = new(QuobyteVolumeSource)
+			**out = **in
+		} else {
+			out.Quobyte = nil
 		}
 		if in.FlexVolume != nil {
 			in, out := &in.FlexVolume, &out.FlexVolume

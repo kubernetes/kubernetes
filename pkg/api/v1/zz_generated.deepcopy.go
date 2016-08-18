@@ -153,6 +153,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Probe, InType: reflect.TypeOf(&Probe{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_QuobyteVolumeSource, InType: reflect.TypeOf(&QuobyteVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RBDVolumeSource, InType: reflect.TypeOf(&RBDVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RangeAllocation, InType: reflect.TypeOf(&RangeAllocation{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ReplicationController, InType: reflect.TypeOf(&ReplicationController{})},
@@ -2179,6 +2180,13 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 		} else {
 			out.VsphereVolume = nil
 		}
+		if in.Quobyte != nil {
+			in, out := &in.Quobyte, &out.Quobyte
+			*out = new(QuobyteVolumeSource)
+			**out = **in
+		} else {
+			out.Quobyte = nil
+		}
 		return nil
 	}
 }
@@ -2778,6 +2786,19 @@ func DeepCopy_v1_Probe(in interface{}, out interface{}, c *conversion.Cloner) er
 		out.PeriodSeconds = in.PeriodSeconds
 		out.SuccessThreshold = in.SuccessThreshold
 		out.FailureThreshold = in.FailureThreshold
+		return nil
+	}
+}
+
+func DeepCopy_v1_QuobyteVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*QuobyteVolumeSource)
+		out := out.(*QuobyteVolumeSource)
+		out.Registry = in.Registry
+		out.Volume = in.Volume
+		out.ReadOnly = in.ReadOnly
+		out.User = in.User
+		out.Group = in.Group
 		return nil
 	}
 }
@@ -3594,6 +3615,13 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			**out = **in
 		} else {
 			out.VsphereVolume = nil
+		}
+		if in.Quobyte != nil {
+			in, out := &in.Quobyte, &out.Quobyte
+			*out = new(QuobyteVolumeSource)
+			**out = **in
+		} else {
+			out.Quobyte = nil
 		}
 		return nil
 	}
