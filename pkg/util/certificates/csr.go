@@ -49,7 +49,7 @@ func ParseCertificateRequestObject(obj *certificates.CertificateSigningRequest) 
 // NewCertificateRequest generates a PEM-encoded CSR using the supplied private
 // key data, subject, and SANs. If the private key data is empty, it generates a
 // new ECDSA P256 key to use and returns it together with the CSR data.
-func NewCertificateRequest(keyData []byte, subject *pkix.Name, dnsSANs []string, ipSANs []net.IP) (csr []byte, keyData []byte, err error) {
+func NewCertificateRequest(keyData []byte, subject *pkix.Name, dnsSANs []string, ipSANs []net.IP) (csr []byte, key []byte, err error) {
 	var privateKey interface{}
 	var privateKeyPemBlock *pem.Block
 
@@ -70,10 +70,7 @@ func NewCertificateRequest(keyData []byte, subject *pkix.Name, dnsSANs []string,
 			Bytes: derBytes,
 		}
 	} else {
-		privateKeyPemBlock, err = pem.Decode(keyData)
-		if err != nil {
-			return nil, nil, err
-		}
+		privateKeyPemBlock, _ = pem.Decode(keyData)
 	}
 
 	var sigType x509.SignatureAlgorithm
@@ -119,7 +116,7 @@ func NewCertificateRequest(keyData []byte, subject *pkix.Name, dnsSANs []string,
 		IPAddresses:        ipSANs,
 	}
 
-	csr, err := x509.CreateCertificateRequest(cryptorand.Reader, template, privateKey)
+	csr, err = x509.CreateCertificateRequest(cryptorand.Reader, template, privateKey)
 	if err != nil {
 		return nil, nil, err
 	}
