@@ -28,12 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-var (
-	start   int
-	end     int
-	choices []byte
-)
-
 type TestCaseData struct {
 	nodePorts    int
 	numEndpoints int
@@ -41,13 +35,17 @@ type TestCaseData struct {
 	svcNames     []types.NamespacedName
 }
 
-func init() {
-	start = 20000
-	end = 40000
+const (
+	startPort = 20000
+	endPort   = 40000
+)
+
+var (
 	choices = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
-}
+)
 
 func generateRandomString(n int) string {
+
 	b := make([]byte, n)
 	l := len(choices)
 	for i := range b {
@@ -119,7 +117,7 @@ func TestHealthChecker(t *testing.T) {
 
 	Run()
 
-	ports := start
+	ports := startPort
 	for n, tc := range testcases {
 		tc.nodePortList = make([]int, tc.nodePorts)
 		tc.svcNames = make([]types.NamespacedName, tc.nodePorts)
@@ -136,6 +134,10 @@ func TestHealthChecker(t *testing.T) {
 				DeleteServiceListener(tc.svcNames[i], tc.nodePortList[i])
 				// Keep searching for a port that works
 				t.Logf("Failed to bind/listen on port %d...trying next port", ports-1)
+				if ports > endPort {
+					t.Errorf("Exhausted range of ports available for tests")
+					return
+				}
 			}
 		}
 		t.Logf("Validating if all nodePorts for tc %d work", n)
