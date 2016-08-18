@@ -25,24 +25,19 @@ import (
 )
 
 // Returns framework.ResourceEventHandlerFuncs that trigger the given function
-// on all object changes. Preproc perprocessing function is executed before each trigger and chec.
-func NewTriggerOnAllChangesPreproc(triggerFunc func(pkg_runtime.Object), preproc func(obj pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
+// on all object changes.
+func NewTriggerOnAllChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
 	return &framework.ResourceEventHandlerFuncs{
 		DeleteFunc: func(old interface{}) {
 			oldObj := old.(pkg_runtime.Object)
-			preproc(oldObj)
 			triggerFunc(oldObj)
 		},
 		AddFunc: func(cur interface{}) {
 			curObj := cur.(pkg_runtime.Object)
-			preproc(curObj)
 			triggerFunc(curObj)
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			curObj := cur.(pkg_runtime.Object)
-			oldObj := cur.(pkg_runtime.Object)
-			preproc(curObj)
-			preproc(oldObj)
 			if !reflect.DeepEqual(old, cur) {
 				triggerFunc(curObj)
 			}
@@ -50,14 +45,9 @@ func NewTriggerOnAllChangesPreproc(triggerFunc func(pkg_runtime.Object), preproc
 	}
 }
 
-func NewTriggerOnAllChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
-	return NewTriggerOnAllChangesPreproc(triggerFunc, func(obj pkg_runtime.Object) {})
-}
-
 // Returns framework.ResourceEventHandlerFuncs that trigger the given function
-// on object add and delete as well as spec/object meta on update. Preproc preprocessing is executed
-// before each trigger and check.
-func NewTriggerOnMetaAndSpecChangesPreproc(triggerFunc func(pkg_runtime.Object), preproc func(obj pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
+// on object add and delete as well as spec/object meta on update.
+func NewTriggerOnMetaAndSpecChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
 	getFieldOrPanic := func(obj interface{}, fieldName string) interface{} {
 		val := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
 		if val.IsValid() {
@@ -69,27 +59,18 @@ func NewTriggerOnMetaAndSpecChangesPreproc(triggerFunc func(pkg_runtime.Object),
 	return &framework.ResourceEventHandlerFuncs{
 		DeleteFunc: func(old interface{}) {
 			oldObj := old.(pkg_runtime.Object)
-			preproc(oldObj)
 			triggerFunc(oldObj)
 		},
 		AddFunc: func(cur interface{}) {
 			curObj := cur.(pkg_runtime.Object)
-			preproc(curObj)
 			triggerFunc(curObj)
 		},
 		UpdateFunc: func(old, cur interface{}) {
 			curObj := cur.(pkg_runtime.Object)
-			oldObj := cur.(pkg_runtime.Object)
-			preproc(curObj)
-			preproc(oldObj)
 			if !reflect.DeepEqual(getFieldOrPanic(old, "ObjectMeta"), getFieldOrPanic(cur, "ObjectMeta")) ||
 				!reflect.DeepEqual(getFieldOrPanic(old, "Spec"), getFieldOrPanic(cur, "Spec")) {
 				triggerFunc(curObj)
 			}
 		},
 	}
-}
-
-func TriggerOnMetaAndSpecChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
-	return NewTriggerOnAllChangesPreproc(triggerFunc, func(obj pkg_runtime.Object) {})
 }
