@@ -200,8 +200,8 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 	// set for container generation/validation.  We will reset to original post container
 	// validation.
 	originalPSC := pod.Spec.SecurityContext
-	pod.Spec.SecurityContext = psc
 	originalAnnotations := maps.CopySS(pod.Annotations)
+	pod.Spec.SecurityContext = psc
 	pod.Annotations = pscAnnotations
 	errs = append(errs, provider.ValidatePodSecurityContext(pod, field.NewPath("spec", "securityContext"))...)
 
@@ -248,7 +248,8 @@ func assignSecurityContext(provider psp.Provider, pod *api.Pod, fldPath *field.P
 	}
 
 	if len(errs) > 0 {
-		// ensure psc is not mutated if there are errors
+		// ensure pod is not mutated if there are errors
+		pod.Annotations = originalAnnotations
 		pod.Spec.SecurityContext = originalPSC
 		pod.Annotations = originalAnnotations
 		return errs

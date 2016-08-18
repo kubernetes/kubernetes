@@ -22,6 +22,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	kadmission "k8s.io/kubernetes/pkg/admission"
 	kapi "k8s.io/kubernetes/pkg/api"
 	extensions "k8s.io/kubernetes/pkg/apis/extensions"
@@ -29,10 +31,13 @@ import (
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	diff "k8s.io/kubernetes/pkg/util/diff"
 )
+
+const defaultContainerName = "test-c"
 
 func NewTestAdmission(store cache.Store, kclient clientset.Interface) kadmission.Interface {
 	return &podSecurityPolicyPlugin{
@@ -606,6 +611,85 @@ func TestAdmitSELinux(t *testing.T) {
 			if !reflect.DeepEqual(*v.expectedSELinux, *v.pod.Spec.Containers[0].SecurityContext.SELinuxOptions) {
 				t.Errorf("%s expected selinux to be: %v but found %v", k, *v.expectedSELinux, *v.pod.Spec.Containers[0].SecurityContext.SELinuxOptions)
 			}
+		}
+	}
+}
+
+func TestAdmitAppArmor(t *testing.T) {
+	createPodWithAppArmor := func(profile string) *kapi.Pod {
+		pod := goodPod()
+		apparmor.SetProfileName(pod, defaultContainerName, profile)
+		return pod
+	}
+
+	unconstrainedPSP := restrictivePSP()
+	defaultedPSP := restrictivePSP()
+	defaultedPSP.Annotations = map[string]string{
+		apparmor.DefaultProfileAnnotationKey: apparmor.ProfileRuntimeDefault,
+	}
+	appArmorPSP := restrictivePSP()
+	appArmorPSP.Annotations = map[string]string{
+		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+	}
+	appArmorDefaultPSP := restrictivePSP()
+	appArmorDefaultPSP.Annotations = map[string]string{
+		apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
+		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
+	}
+
+	tests := map[string]struct {
+		pod             *kapi.Pod
+		psp             *extensions.PodSecurityPolicy
+		shouldPass      bool
+		expectedProfile string
+	}{
+		"unconstrained with no profile": {
+			pod:             goodPod(),
+			psp:             unconstrainedPSP,
+			shouldPass:      true,
+			expectedProfile: "",
+		},
+		"unconstrained with profile": {
+			pod:             createPodWithAppArmor(apparmor.ProfileRuntimeDefault),
+			psp:             unconstrainedPSP,
+			shouldPass:      true,
+			expectedProfile: apparmor.ProfileRuntimeDefault,
+		},
+		"unconstrained with default profile": {
+			pod:             goodPod(),
+			psp:             defaultedPSP,
+			shouldPass:      true,
+			expectedProfile: apparmor.ProfileRuntimeDefault,
+		},
+		"AppArmor enforced with no profile": {
+			pod:        goodPod(),
+			psp:        appArmorPSP,
+			shouldPass: false,
+		},
+		"AppArmor enforced with default profile": {
+			pod:             goodPod(),
+			psp:             appArmorDefaultPSP,
+			shouldPass:      true,
+			expectedProfile: apparmor.ProfileRuntimeDefault,
+		},
+		"AppArmor enforced with good profile": {
+			pod:             createPodWithAppArmor(apparmor.ProfileNamePrefix + "foo"),
+			psp:             appArmorDefaultPSP,
+			shouldPass:      true,
+			expectedProfile: apparmor.ProfileNamePrefix + "foo",
+		},
+		"AppArmor enforced with local profile": {
+			pod:        createPodWithAppArmor(apparmor.ProfileNamePrefix + "bar"),
+			psp:        appArmorPSP,
+			shouldPass: false,
+		},
+	}
+
+	for k, v := range tests {
+		testPSPAdmit(k, []*extensions.PodSecurityPolicy{v.psp}, v.pod, v.shouldPass, v.psp.Name, t)
+
+		if v.shouldPass {
+			assert.Equal(t, v.expectedProfile, apparmor.GetProfileName(v.pod, defaultContainerName), k)
 		}
 	}
 }
@@ -1212,6 +1296,7 @@ func goodPod() *kapi.Pod {
 			SecurityContext:    &kapi.PodSecurityContext{},
 			Containers: []kapi.Container{
 				{
+					Name:            defaultContainerName,
 					SecurityContext: &kapi.SecurityContext{},
 				},
 			},

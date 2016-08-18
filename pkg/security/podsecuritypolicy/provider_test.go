@@ -22,12 +22,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
+
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
+
+const defaultContainerName = "test-c"
 
 func TestCreatePodSecurityContextNonmutating(t *testing.T) {
 	// Create a pod with a security context that needs filling in
@@ -303,6 +308,14 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		Level: "bar",
 	}
 
+	failNilAppArmorPod := defaultPod()
+	failInvalidAppArmorPod := defaultPod()
+	apparmor.SetProfileName(failInvalidAppArmorPod, defaultContainerName, apparmor.ProfileNamePrefix+"foo")
+	failAppArmorPSP := defaultPSP()
+	failAppArmorPSP.Annotations = map[string]string{
+		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+	}
+
 	failPrivPod := defaultPod()
 	var priv bool = true
 	failPrivPod.Spec.Containers[0].SecurityContext.Privileged = &priv
@@ -346,6 +359,16 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 			pod:           failSELinuxPod,
 			psp:           failSELinuxPSP,
 			expectedError: "does not match required level",
+		},
+		"failNilAppArmor": {
+			pod:           failNilAppArmorPod,
+			psp:           failAppArmorPSP,
+			expectedError: "AppArmor profile must be set",
+		},
+		"failInvalidAppArmor": {
+			pod:           failInvalidAppArmorPod,
+			psp:           failAppArmorPSP,
+			expectedError: "localhost/foo is not an allowed profile. Allowed values: \"runtime/default\"",
 		},
 		"failPrivPSP": {
 			pod:           failPrivPod,
@@ -499,6 +522,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 				SecurityContext: &api.PodSecurityContext{},
 				Containers: []api.Container{
 					{
+						Name: defaultContainerName,
 						SecurityContext: &api.SecurityContext{
 							// expected to be set by defaulting mechanisms
 							Privileged: &notPriv,
@@ -510,7 +534,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		}
 	}
 
-	// fail user strat
+	// success user strat
 	userPSP := defaultPSP()
 	var uid int64 = 999
 	userPSP.Spec.RunAsUser = extensions.RunAsUserStrategyOptions{
@@ -520,7 +544,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	userPod := defaultPod()
 	userPod.Spec.Containers[0].SecurityContext.RunAsUser = &uid
 
-	// fail selinux strat
+	// success selinux strat
 	seLinuxPSP := defaultPSP()
 	seLinuxPSP.Spec.SELinux = extensions.SELinuxStrategyOptions{
 		Rule: extensions.SELinuxStrategyMustRunAs,
@@ -532,6 +556,13 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 	seLinuxPod.Spec.Containers[0].SecurityContext.SELinuxOptions = &api.SELinuxOptions{
 		Level: "foo",
 	}
+
+	appArmorPSP := defaultPSP()
+	appArmorPSP.Annotations = map[string]string{
+		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+	}
+	appArmorPod := defaultPod()
+	apparmor.SetProfileName(appArmorPod, defaultContainerName, apparmor.ProfileRuntimeDefault)
 
 	privPSP := defaultPSP()
 	privPSP.Spec.Privileged = true
@@ -591,6 +622,10 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 			pod: seLinuxPod,
 			psp: seLinuxPSP,
 		},
+		"pass AppArmor allowed profiles": {
+			pod: appArmorPod,
+			psp: appArmorPSP,
+		},
 		"pass priv validating PSP": {
 			pod: privPod,
 			psp: privPSP,
@@ -632,7 +667,7 @@ func TestValidateContainerSecurityContextSuccess(t *testing.T) {
 		}
 		errs := provider.ValidateContainerSecurityContext(v.pod, &v.pod.Spec.Containers[0], field.NewPath(""))
 		if len(errs) != 0 {
-			t.Errorf("%s expected validation pass but received errors %v", k, errs)
+			t.Errorf("%s expected validation pass but received errors %v\n%s", k, errs, spew.Sdump(v.pod.ObjectMeta))
 			continue
 		}
 	}
@@ -748,6 +783,7 @@ func defaultPod() *api.Pod {
 			},
 			Containers: []api.Container{
 				{
+					Name: defaultContainerName,
 					SecurityContext: &api.SecurityContext{
 						// expected to be set by defaulting mechanisms
 						Privileged: &notPriv,
