@@ -157,7 +157,10 @@ junitFilenamePrefix() {
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
   local KUBE_TEST_API_NO_SLASH="${KUBE_TEST_API//\//-}"
   # This file name isn't parsed by anything, and tee needs a shorter file name.
+  # Convert strings like junit_v1,apps-v1alpha1,authentication.k8s.io-v1beta1
+  # to junit_v1,apps.k-v1a1,authentication.k-v1b1
   KUBE_TEST_API_NO_SLASH="${KUBE_TEST_API_NO_SLASH//k8s.io-/}"
+  KUBE_TEST_API_NO_SLASH="$(echo "$KUBE_TEST_API_NO_SLASH"|sed 's/\([0-9]\)alpha\([0-9]\)/\1a\2/g;s/\([0-9]\)beta\([0-9]\)/\1b\2/g')"
   echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_NO_SLASH}_$(kube::util::sortable_date)"
 }
 
