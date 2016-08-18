@@ -226,7 +226,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 	cmds.AddCommand(NewCmdUncordon(f, out))
 
 	cmds.AddCommand(NewCmdAttach(f, in, out, err))
-	cmds.AddCommand(NewCmdExec(f, in, out, err))
+  cmds.AddCommand(NewCmdExec("kubectl", f, in, out, err))
 	cmds.AddCommand(NewCmdPortForward(f, out, err))
 	cmds.AddCommand(NewCmdProxy(f, out))
 
