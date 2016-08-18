@@ -25,8 +25,6 @@ ENV E2E_UP=true \
 
 # Customize these as appropriate
 ENV E2E_PUBLISH_GREEN_VERSION=false \
-    GINKGO_PARALLEL_NODES=25 \
-    GINKGO_TEST_ARGS="--ginkgo.focus=\[Conformance\]" \
     INSTANCE_PREFIX=jenkins-e2e \
     KUBERNETES_PROVIDER=gce
 
