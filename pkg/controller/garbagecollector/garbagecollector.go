@@ -311,11 +311,11 @@ func (gc *GarbageCollector) removeOrphanFinalizer(owner *node) error {
 // the "Orphan" finalizer. The node is add back into the orphanQueue if any of
 // these steps fail.
 func (gc *GarbageCollector) orphanFinalizer() {
-	key, start, quit := gc.orphanQueue.Get()
+	origin, key, start, quit := gc.orphanQueue.Get()
 	if quit {
 		return
 	}
-	defer gc.orphanQueue.Done(key)
+	defer gc.orphanQueue.Done(origin)
 	owner, ok := key.(*node)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("expect *node, got %#v", key))
@@ -331,25 +331,25 @@ func (gc *GarbageCollector) orphanFinalizer() {
 	err := gc.orhpanDependents(owner.identity, dependents)
 	if err != nil {
 		glog.V(6).Infof("orphanDependents for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.AddWithTimestamp(owner, start)
+		gc.orphanQueue.AddWithTimestamp(origin, owner, start)
 		return
 	}
 	// update the owner, remove "orphaningFinalizer" from its finalizers list
 	err = gc.removeOrphanFinalizer(owner)
 	if err != nil {
 		glog.V(6).Infof("removeOrphanFinalizer for %s failed with %v", owner.identity, err)
-		gc.orphanQueue.AddWithTimestamp(owner, start)
+		gc.orphanQueue.AddWithTimestamp(origin, owner, start)
 	}
 	OrphanProcessingLatency.Observe(sinceInMicroseconds(gc.clock, start))
 }
 
 // Dequeueing an event from eventQueue, updating graph, populating dirty_queue.
 func (p *Propagator) processEvent() {
-	key, start, quit := p.eventQueue.Get()
+	origin, key, start, quit := p.eventQueue.Get()
 	if quit {
 		return
 	}
-	defer p.eventQueue.Done(key)
+	defer p.eventQueue.Done(origin)
 	event, ok := key.(event)
 	if !ok {
 		utilruntime.HandleError(fmt.Errorf("expect an event, got %v", key))
@@ -572,11 +572,11 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 }
 
 func (gc *GarbageCollector) worker() {
-	key, start, quit := gc.dirtyQueue.Get()
+	origin, key, start, quit := gc.dirtyQueue.Get()
 	if quit {
 		return
 	}
-	defer gc.dirtyQueue.Done(key)
+	defer gc.dirtyQueue.Done(origin)
 	err := gc.processItem(key.(*node))
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", key, err))
