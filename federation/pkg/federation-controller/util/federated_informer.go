@@ -344,8 +344,6 @@ func (f *federatedInformerImpl) getReadyClusterUnlocked(name string) (*federatio
 
 // Synced returns true if the view is synced (for the first time)
 func (f *federatedInformerImpl) ClustersSynced() bool {
-	f.Lock()
-	defer f.Unlock()
 	return f.clusterInformer.controller.HasSynced()
 }
 
@@ -452,18 +450,31 @@ func (fs *federatedStoreImpl) GetKeyFor(item interface{}) string {
 // Checks whether stores for all clusters form the lists (and only these) are there and
 // are synced.
 func (fs *federatedStoreImpl) ClustersSynced(clusters []*federation_api.Cluster) bool {
-	fs.federatedInformer.Lock()
-	defer fs.federatedInformer.Unlock()
 
-	if len(fs.federatedInformer.targetInformers) != len(clusters) {
+	// Get the list of informers to check under a lock and check it outside.
+	okSoFar, informersToCheck := func() (bool, []informer) {
+		fs.federatedInformer.Lock()
+		defer fs.federatedInformer.Unlock()
+
+		if len(fs.federatedInformer.targetInformers) != len(clusters) {
+			return false, []informer{}
+		}
+		informersToCheck := make([]informer, 0, len(clusters))
+		for _, cluster := range clusters {
+			if targetInformer, found := fs.federatedInformer.targetInformers[cluster.Name]; found {
+				informersToCheck = append(informersToCheck, targetInformer)
+			} else {
+				return false, []informer{}
+			}
+		}
+		return true, informersToCheck
+	}()
+
+	if !okSoFar {
 		return false
 	}
-	for _, cluster := range clusters {
-		if targetInformer, found := fs.federatedInformer.targetInformers[cluster.Name]; found {
-			if !targetInformer.controller.HasSynced() {
-				return false
-			}
-		} else {
+	for _, informerToCheck := range informersToCheck {
+		if !informerToCheck.controller.HasSynced() {
 			return false
 		}
 	}
