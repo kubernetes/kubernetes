@@ -200,3 +200,4 @@ test/soak/serve_hostnames
 third_party/forked/golang/expansion
 pkg/util/maps
 pkg/volume/quobyte
+pkg/version/prometheus

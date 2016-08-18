@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
+	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
