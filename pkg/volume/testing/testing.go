@@ -273,6 +273,12 @@ func (plugin *FakeVolumePlugin) GetNewDetacherCallCount() int {
 	return plugin.NewDetacherCallCount
 }
 
+func (plugin *FakeVolumePlugin) CreateSnapshot(spec *Spec, snapshotName string) (string, error) {
+	plugin.Lock()
+	defer plugin.Unlock()
+	return "snapshot-timestamp", nil
+}
+
 func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec) (Recycler, error) {
 	return &fakeRecycler{"/attributesTransferredFromSpec", MetricsNil{}}, nil
 }

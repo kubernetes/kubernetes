@@ -166,7 +166,7 @@ func (sc *snapshotController) pvcAdd(obj interface{}) {
 		return
 	}
 
-	addVolumeErr := sc.actualStateOfWorld.AddVolume(volumeSpec, pvc, snapshotName)
+	_, addVolumeErr := sc.actualStateOfWorld.AddVolume(volumeSpec, pvc, snapshotName)
 	if addVolumeErr != nil {
 		glog.V(5).Infof(
 			"Failed to add volume %q/%q (spec name %q) to actualStateOfTheWorld. err=%v",
