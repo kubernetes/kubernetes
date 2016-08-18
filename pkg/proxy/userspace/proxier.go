@@ -84,21 +84,25 @@ func logTimeout(err error) bool {
 	return false
 }
 
+// ProxySocketFunc is a function which constructs a ProxySocket from a protocol, ip, and port
+type ProxySocketFunc func(protocol api.Protocol, ip net.IP, port int) (ProxySocket, error)
+
 // Proxier is a simple proxy for TCP connections between a localhost:lport
 // and services that provide the actual implementations.
 type Proxier struct {
-	loadBalancer   LoadBalancer
-	mu             sync.Mutex // protects serviceMap
-	serviceMap     map[proxy.ServicePortName]*ServiceInfo
-	syncPeriod     time.Duration
-	udpIdleTimeout time.Duration
-	portMapMutex   sync.Mutex
-	portMap        map[portMapKey]*portMapValue
-	numProxyLoops  int32 // use atomic ops to access this; mostly for testing
-	listenIP       net.IP
-	iptables       iptables.Interface
-	hostIP         net.IP
-	proxyPorts     PortAllocator
+	loadBalancer    LoadBalancer
+	mu              sync.Mutex // protects serviceMap
+	serviceMap      map[proxy.ServicePortName]*ServiceInfo
+	syncPeriod      time.Duration
+	udpIdleTimeout  time.Duration
+	portMapMutex    sync.Mutex
+	portMap         map[portMapKey]*portMapValue
+	numProxyLoops   int32 // use atomic ops to access this; mostly for testing
+	listenIP        net.IP
+	iptables        iptables.Interface
+	hostIP          net.IP
+	proxyPorts      PortAllocator
+	makeProxySocket ProxySocketFunc
 }
 
 // assert Proxier is a ProxyProvider
@@ -144,6 +148,14 @@ func IsProxyLocked(err error) bool {
 // created, it will keep iptables up to date in the background and will not
 // terminate if a particular iptables call fails.
 func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr utilnet.PortRange, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
+	return NewCustomProxier(loadBalancer, listenIP, iptables, pr, syncPeriod, udpIdleTimeout, newProxySocket)
+}
+
+// NewCustomProxier functions similarly to NewProxier, returing a new Proxier
+// for the given LoadBalancer and address.  The new proxier is constructed using
+// the ProxySocket constructor provided, however, instead of constructing the
+// default ProxySockets.
+func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, pr utilnet.PortRange, syncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
 	if listenIP.Equal(localhostIPv4) || listenIP.Equal(localhostIPv6) {
 		return nil, ErrProxyOnLocalhost
 	}
@@ -161,10 +173,10 @@ func NewProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.In
 	proxyPorts := newPortAllocator(pr)
 
 	glog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
-	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod, udpIdleTimeout)
+	return createProxier(loadBalancer, listenIP, iptables, hostIP, proxyPorts, syncPeriod, udpIdleTimeout, makeProxySocket)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, udpIdleTimeout time.Duration) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
 	// convenient to pass nil for tests..
 	if proxyPorts == nil {
 		proxyPorts = newPortAllocator(utilnet.PortRange{})
@@ -179,15 +191,16 @@ func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables
 		return nil, fmt.Errorf("failed to flush iptables: %v", err)
 	}
 	return &Proxier{
-		loadBalancer:   loadBalancer,
-		serviceMap:     make(map[proxy.ServicePortName]*ServiceInfo),
-		portMap:        make(map[portMapKey]*portMapValue),
-		syncPeriod:     syncPeriod,
-		udpIdleTimeout: udpIdleTimeout,
-		listenIP:       listenIP,
-		iptables:       iptables,
-		hostIP:         hostIP,
-		proxyPorts:     proxyPorts,
+		loadBalancer:    loadBalancer,
+		serviceMap:      make(map[proxy.ServicePortName]*ServiceInfo),
+		portMap:         make(map[portMapKey]*portMapValue),
+		syncPeriod:      syncPeriod,
+		udpIdleTimeout:  udpIdleTimeout,
+		listenIP:        listenIP,
+		iptables:        iptables,
+		hostIP:          hostIP,
+		proxyPorts:      proxyPorts,
+		makeProxySocket: makeProxySocket,
 	}, nil
 }
 
@@ -335,7 +348,7 @@ func (proxier *Proxier) setServiceInfo(service proxy.ServicePortName, info *Serv
 // Pass proxyPort=0 to allocate a random port. The timeout only applies to UDP
 // connections, for now.
 func (proxier *Proxier) addServiceOnPort(service proxy.ServicePortName, protocol api.Protocol, proxyPort int, timeout time.Duration) (*ServiceInfo, error) {
-	sock, err := newProxySocket(protocol, proxier.listenIP, proxyPort)
+	sock, err := proxier.makeProxySocket(protocol, proxier.listenIP, proxyPort)
 	if err != nil {
 		return nil, err
 	}
@@ -590,7 +603,7 @@ func (proxier *Proxier) claimNodePort(ip net.IP, port int, protocol api.Protocol
 		// it.  Tools like 'ss' and 'netstat' do not show sockets that are
 		// bind()ed but not listen()ed, and at least the default debian netcat
 		// has no way to avoid about 10 seconds of retries.
-		socket, err := newProxySocket(protocol, ip, port)
+		socket, err := proxier.makeProxySocket(protocol, ip, port)
 		if err != nil {
 			return fmt.Errorf("can't open node port for %s: %v", key.String(), err)
 		}
