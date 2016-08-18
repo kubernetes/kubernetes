@@ -460,6 +460,11 @@ kube_uid: '$(echo "${KUBE_UID}" | sed -e "s/'/''/g")'
 initial_etcd_cluster: '$(echo "${INITIAL_ETCD_CLUSTER:-}" | sed -e "s/'/''/g")'
 hostname: $(hostname -s)
 EOF
+    if [ -n "${ADMISSION_CONTROL:-}" ] && [ ${ADMISSION_CONTROL} == *"ImagePolicyWebhook"* ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+admission-control-config-file: /etc/admission_controller.config
+EOF
+    fi
     if [ -n "${KUBELET_PORT:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 kubelet_port: '$(echo "$KUBELET_PORT" | sed -e "s/'/''/g")'
@@ -895,6 +900,44 @@ contexts:
   name: webhook
 EOF
   fi
+
+
+  if [[ -n "${GCP_IMAGE_VERIFICATION_URL:-}" ]]; then
+    # This is the config file for the image review webhook.
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  image_review_config: /etc/gcp_image_review.config
+EOF
+    cat <<EOF >/etc/gcp_image_review.config
+clusters:
+  - name: gcp-image-review-server
+    cluster:
+      server: ${GCP_IMAGE_VERIFICATION_URL}
+users:
+  - name: kube-apiserver
+    user:
+      auth-provider:
+        name: gcp
+current-context: webhook
+contexts:
+- context:
+    cluster: gcp-image-review-server
+    user: kube-apiserver
+  name: webhook
+EOF
+    # This is the config for the image review admission controller.
+    cat <<EOF >>/etc/salt/minion.d/grains.conf
+  image_review_webhook_config: /etc/admission_controller.config
+EOF
+    cat <<EOF >/etc/admission_controller.config
+imagePolicy:
+  kubeConfigFile: /etc/gcp_image_review.config
+  allowTTL: 30
+  denyTTL: 30
+  retryBackoff: 500
+  defaultAllow: true
+EOF
+  fi
+
 
   # If the kubelet on the master is enabled, give it the same CIDR range
   # as a generic node.
