@@ -1197,8 +1197,8 @@ func testOverlappingDeployment(f *framework.Framework) {
 
 	// Wait for it to be updated to revision 1
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploy.Name, "1", redisImage)
-
 	Expect(err).NotTo(HaveOccurred())
+
 	deploymentName = "second-deployment"
 	By(fmt.Sprintf("Creating deployment %q with overlapping selector", deploymentName))
 	d = newDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
@@ -1217,6 +1217,7 @@ func testOverlappingDeployment(f *framework.Framework) {
 	By("Checking only the first overlapping deployment is synced")
 	options := api.ListOptions{}
 	rsList, err := c.Extensions().ReplicaSets(ns).List(options)
+	Expect(err).NotTo(HaveOccurred())
 	Expect(rsList.Items).To(HaveLen(int(replicas)))
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers).To(HaveLen(1))
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers[0].Image).To(Equal(deploy.Spec.Template.Spec.Containers[0].Image))
@@ -1231,10 +1232,12 @@ func testOverlappingDeployment(f *framework.Framework) {
 
 	// Wait for it to be updated to revision 1
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deployOverlapping.Name, "1", nginxImage)
+	Expect(err).NotTo(HaveOccurred())
 
 	// Now the second deployment is synced
 	By("Checking the second overlapping deployment is synced")
 	rsList, err = c.Extensions().ReplicaSets(ns).List(options)
+	Expect(err).NotTo(HaveOccurred())
 	Expect(rsList.Items).To(HaveLen(int(replicas)))
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers).To(HaveLen(1))
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers[0].Image).To(Equal(deployOverlapping.Spec.Template.Spec.Containers[0].Image))
