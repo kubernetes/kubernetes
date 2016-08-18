@@ -256,6 +256,13 @@ message ConfigMapVolumeSource {
   // the volume setup will error. Paths must be relative and may not contain
   // the '..' path or start with '..'.
   repeated KeyToPath items = 2;
+
+  // Optional: mode bits to use on created files by default. Must be a
+  // value between 0 and 0777. Defaults to 0644.
+  // Directories within the path are not affected by this setting.
+  // This might be in conflict with other options that affect the file
+  // mode, like fsGroup, and the result can be other mode bits set.
+  optional int32 defaultMode = 3;
 }
 
 // A single application container that you want to run within a pod.
@@ -526,6 +533,12 @@ message DownwardAPIVolumeFile {
   // Selects a resource of the container: only resources limits and requests
   // (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.
   optional ResourceFieldSelector resourceFieldRef = 3;
+
+  // Optional: mode bits to use on this file, must be a value between 0
+  // and 0777. If not specified, the volume defaultMode will be used.
+  // This might be in conflict with other options that affect the file
+  // mode, like fsGroup, and the result can be other mode bits set.
+  optional int32 mode = 4;
 }
 
 // DownwardAPIVolumeSource represents a volume containing downward API info.
@@ -533,6 +546,13 @@ message DownwardAPIVolumeFile {
 message DownwardAPIVolumeSource {
   // Items is a list of downward API volume file
   repeated DownwardAPIVolumeFile items = 1;
+
+  // Optional: mode bits to use on created files by default. Must be a
+  // value between 0 and 0777. Defaults to 0644.
+  // Directories within the path are not affected by this setting.
+  // This might be in conflict with other options that affect the file
+  // mode, like fsGroup, and the result can be other mode bits set.
+  optional int32 defaultMode = 2;
 }
 
 // Represents an empty directory for a pod.
@@ -963,6 +983,12 @@ message KeyToPath {
   // May not contain the path element '..'.
   // May not start with the string '..'.
   optional string path = 2;
+
+  // Optional: mode bits to use on this file, must be a value between 0
+  // and 0777. If not specified, the volume defaultMode will be used.
+  // This might be in conflict with other options that affect the file
+  // mode, like fsGroup, and the result can be other mode bits set.
+  optional int32 mode = 3;
 }
 
 // Lifecycle describes actions that the management system should take in response to container lifecycle
@@ -2564,6 +2590,13 @@ message SecretVolumeSource {
   // the volume setup will error. Paths must be relative and may not contain
   // the '..' path or start with '..'.
   repeated KeyToPath items = 2;
+
+  // Optional: mode bits to use on created files by default. Must be a
+  // value between 0 and 0777. Defaults to 0644.
+  // Directories within the path are not affected by this setting.
+  // This might be in conflict with other options that affect the file
+  // mode, like fsGroup, and the result can be other mode bits set.
+  optional int32 defaultMode = 3;
 }
 
 // SecurityContext holds security configuration that will be applied to a container.

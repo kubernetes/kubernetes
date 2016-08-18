@@ -35,6 +35,9 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 		SetDefaults_Pod,
 		SetDefaults_PodSpec,
 		SetDefaults_Probe,
+		SetDefaults_SecretVolumeSource,
+		SetDefaults_ConfigMapVolumeSource,
+		SetDefaults_DownwardAPIVolumeSource,
 		SetDefaults_Secret,
 		SetDefaults_PersistentVolume,
 		SetDefaults_PersistentVolumeClaim,
@@ -172,6 +175,24 @@ func SetDefaults_Probe(obj *Probe) {
 	}
 	if obj.FailureThreshold == 0 {
 		obj.FailureThreshold = 3
+	}
+}
+func SetDefaults_SecretVolumeSource(obj *SecretVolumeSource) {
+	if obj.DefaultMode == nil {
+		perm := int32(SecretVolumeSourceDefaultMode)
+		obj.DefaultMode = &perm
+	}
+}
+func SetDefaults_ConfigMapVolumeSource(obj *ConfigMapVolumeSource) {
+	if obj.DefaultMode == nil {
+		perm := int32(ConfigMapVolumeSourceDefaultMode)
+		obj.DefaultMode = &perm
+	}
+}
+func SetDefaults_DownwardAPIVolumeSource(obj *DownwardAPIVolumeSource) {
+	if obj.DefaultMode == nil {
+		perm := int32(DownwardAPIVolumeSourceDefaultMode)
+		obj.DefaultMode = &perm
 	}
 }
 func SetDefaults_Secret(obj *Secret) {

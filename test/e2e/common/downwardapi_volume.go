@@ -47,6 +47,26 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 		})
 	})
 
+	It("should set DefaultMode on files [Conformance]", func() {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		defaultMode := int32(0400)
+		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podname", nil, &defaultMode)
+
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
+			"mode of file \"/etc/podname\": -r--------",
+		})
+	})
+
+	It("should set mode on item file [Conformance]", func() {
+		podName := "downwardapi-volume-" + string(uuid.NewUUID())
+		mode := int32(0400)
+		pod := downwardAPIVolumePodForModeTest(podName, "/etc/podname", &mode, nil)
+
+		f.TestContainerOutput("downward API volume plugin", pod, 0, []string{
+			"mode of file \"/etc/podname\": -r--------",
+		})
+	})
+
 	It("should provide podname as non-root with fsgroup [Feature:FSGroup]", func() {
 		podName := "metadata-volume-" + string(uuid.NewUUID())
 		uid := int64(1001)
@@ -178,6 +198,32 @@ var _ = framework.KubeDescribe("Downward API volume", func() {
 	})
 
 })
+
+func downwardAPIVolumePodForModeTest(name, filePath string, itemMode, defaultMode *int32) *api.Pod {
+	pod := downwardAPIVolumeBasePod(name, nil, nil)
+
+	pod.Spec.Containers = []api.Container{
+		{
+			Name:    "client-container",
+			Image:   "gcr.io/google_containers/mounttest:0.7",
+			Command: []string{"/mt", "--file_mode=" + filePath},
+			VolumeMounts: []api.VolumeMount{
+				{
+					Name:      "podinfo",
+					MountPath: "/etc",
+				},
+			},
+		},
+	}
+	if itemMode != nil {
+		pod.Spec.Volumes[0].VolumeSource.DownwardAPI.Items[0].Mode = itemMode
+	}
+	if defaultMode != nil {
+		pod.Spec.Volumes[0].VolumeSource.DownwardAPI.DefaultMode = defaultMode
+	}
+
+	return pod
+}
 
 func downwardAPIVolumePodForSimpleTest(name string, filePath string) *api.Pod {
 	pod := downwardAPIVolumeBasePod(name, nil, nil)
