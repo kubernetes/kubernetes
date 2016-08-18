@@ -21,6 +21,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -111,6 +112,17 @@ func (s storePodsNamespacer) List(selector labels.Selector) (api.PodList, error)
 	return pods, nil
 }
 
+func (s storePodsNamespacer) Get(name string) (*api.Pod, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("pod"), name)
+	}
+	return obj.(*api.Pod), nil
+}
+
 // Exists returns true if a pod matching the namespace/name of the given pod exists in the store.
 func (s *StoreToPodLister) Exists(pod *api.Pod) (bool, error) {
 	_, exists, err := s.Indexer.Get(pod)
@@ -193,6 +205,17 @@ func (s *StoreToReplicationControllerLister) ReplicationControllers(namespace st
 type storeReplicationControllersNamespacer struct {
 	indexer   Indexer
 	namespace string
+}
+
+func (s storeReplicationControllersNamespacer) Get(name string) (*api.ReplicationController, error) {
+	obj, exists, err := s.indexer.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(api.Resource("replicationcontroller"), name)
+	}
+	return obj.(*api.ReplicationController), nil
 }
 
 func (s storeReplicationControllersNamespacer) List(selector labels.Selector) ([]api.ReplicationController, error) {
@@ -356,6 +379,17 @@ func (s storeReplicaSetsNamespacer) List(selector labels.Selector) (rss []extens
 		}
 	}
 	return
+}
+
+func (s storeReplicaSetsNamespacer) Get(name string) (*extensions.ReplicaSet, error) {
+	obj, exists, err := s.store.GetByKey(s.namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(extensions.Resource("replicaset"), name)
+	}
+	return obj.(*extensions.ReplicaSet), nil
 }
 
 func (s *StoreToReplicaSetLister) ReplicaSets(namespace string) storeReplicaSetsNamespacer {
