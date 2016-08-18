@@ -157,7 +157,7 @@ func TestSetsCodec(t *testing.T) {
 		var versionedPath string
 		err := SetKubernetesDefaults(conf)
 		if err == nil {
-			_, versionedPath, err = restclient.DefaultServerURLsForHosts(conf.AllHosts(), conf.APIPath, *conf.GroupVersion, false)
+			_, versionedPath, err = restclient.DefaultServerURLsForHosts(conf.Hosts(), conf.APIPath, *conf.GroupVersion, false)
 		}
 
 		switch {

@@ -129,10 +129,9 @@ func NewRequest(client HTTPClient, verb string, urlProvider URLProvider, version
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
 	}
-	baseUrl := urlProvider.Get()
 	pathPrefix := "/"
-	if baseUrl != nil {
-		pathPrefix = path.Join(pathPrefix, baseUrl.Path)
+	if url := urlProvider.Get(); url != nil {
+		pathPrefix = path.Join(pathPrefix, url.Path)
 	}
 	r := &Request{
 		client:      client,
@@ -588,8 +587,8 @@ func (r *Request) URL() *url.URL {
 	}
 
 	finalURL := &url.URL{}
-	if r.urlProvider.Get() != nil {
-		*finalURL = *r.urlProvider.Get()
+	if url := r.urlProvider.Get(); url != nil {
+		*finalURL = *url
 	}
 	finalURL.Path = p
 
@@ -652,8 +651,8 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, fmt.Errorf("watching resources is not possible with this client (content-type: %s)", r.content.ContentType)
 	}
 
-	url := r.URL().String()
-	req, err := http.NewRequest(r.verb, url, r.body)
+	url := r.URL()
+	req, err := http.NewRequest(r.verb, url.String(), r.body)
 	if err != nil {
 		return nil, err
 	}
@@ -662,16 +661,15 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(url))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
-	if r.urlProvider.Get() != nil {
-		if err != nil {
-			r.backoffMgr.UpdateBackoff(r.urlProvider.Get(), err, 0)
-		} else {
-			r.backoffMgr.UpdateBackoff(r.urlProvider.Get(), err, resp.StatusCode)
-		}
+	if err != nil {
+		r.backoffMgr.UpdateBackoff(url, err, 0)
+	} else {
+		r.backoffMgr.UpdateBackoff(url, err, resp.StatusCode)
 	}
+
 	if err != nil {
 		// The watch stream mechanism handles many common partial data errors, so closed
 		// connections can be retried in many cases.
@@ -695,17 +693,16 @@ func (r *Request) Watch() (watch.Interface, error) {
 // updateURLMetrics is a convenience function for pushing metrics.
 // It also handles corner cases for incomplete/invalid request data.
 func updateURLMetrics(req *Request, resp *http.Response, err error) {
-	url := "none"
-	baseUrl := req.urlProvider.Get()
-	if baseUrl != nil {
-		url = baseUrl.Host
+	host := "none"
+	if url := req.urlProvider.Get(); url != nil {
+		host = url.Host
 	}
 	// If we have an error (i.e. apiserver down) we report that as a metric label.
 	if err != nil {
-		metrics.RequestResult.WithLabelValues(err.Error(), req.verb, url).Inc()
+		metrics.RequestResult.WithLabelValues(err.Error(), req.verb, host).Inc()
 	} else {
 		//Metrics for failure codes
-		metrics.RequestResult.WithLabelValues(strconv.Itoa(resp.StatusCode), req.verb, url).Inc()
+		metrics.RequestResult.WithLabelValues(strconv.Itoa(resp.StatusCode), req.verb, host).Inc()
 	}
 }
 
@@ -720,8 +717,8 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 
 	r.tryThrottle()
 
-	url := r.URL().String()
-	req, err := http.NewRequest(r.verb, url, nil)
+	url := r.URL()
+	req, err := http.NewRequest(r.verb, url.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -730,16 +727,15 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(url))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
-	if r.urlProvider.Get() != nil {
-		if err != nil {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
-		} else {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
-		}
+	if err != nil {
+		r.backoffMgr.UpdateBackoff(url, err, 0)
+	} else {
+		r.backoffMgr.UpdateBackoff(url, err, resp.StatusCode)
 	}
+
 	if err != nil {
 		r.urlProvider.Next()
 		return nil, err
@@ -808,20 +804,20 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	retries := 0
 	initialUrl := r.urlProvider.Get()
 	for {
-		url := r.URL().String()
-		req, err := http.NewRequest(r.verb, url, r.body)
+		url := r.URL()
+		req, err := http.NewRequest(r.verb, url.String(), r.body)
 		if err != nil {
 			return err
 		}
 		req.Header = r.headers
 
-		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(r.URL()))
+		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(url))
 		resp, err := client.Do(req)
 		updateURLMetrics(r, resp, err)
 		if err != nil {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, 0)
+			r.backoffMgr.UpdateBackoff(url, err, 0)
 		} else {
-			r.backoffMgr.UpdateBackoff(r.URL(), err, resp.StatusCode)
+			r.backoffMgr.UpdateBackoff(url, err, resp.StatusCode)
 		}
 		if err != nil {
 			if r.urlProvider.Next() == initialUrl {
