@@ -4710,6 +4710,15 @@ func TestValidateService(t *testing.T) {
 			numErrs: 0,
 		},
 		{
+			name: "invalid load balancer with clusterIP None",
+			tweakSvc: func(s *api.Service) {
+				s.Spec.Type = api.ServiceTypeLoadBalancer
+				s.Spec.Ports[0] = api.ServicePort{Name: "q", Port: 12345, Protocol: "UDP", TargetPort: intstr.FromInt(12345)}
+				s.Spec.ClusterIP = "None"
+			},
+			numErrs: 1,
+		},		
+		{
 			name: "invalid load balancer with mix protocol",
 			tweakSvc: func(s *api.Service) {
 				s.Spec.Type = api.ServiceTypeLoadBalancer

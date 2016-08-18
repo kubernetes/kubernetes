@@ -2189,6 +2189,9 @@ func ValidateService(service *api.Service) field.ErrorList {
 		allErrs = append(allErrs, field.Required(specPath.Child("ports"), ""))
 	}
 	if service.Spec.Type == api.ServiceTypeLoadBalancer {
+		if service.Spec.ClusterIP == "None" {
+			allErrs = append(allErrs, field.Invalid(specPath.Child("clusterIP"), service.Spec.ClusterIP, "invalid value when using load balancer service type"))
+		}
 		for ix := range service.Spec.Ports {
 			port := &service.Spec.Ports[ix]
 			// This is a workaround for broken cloud environments that
