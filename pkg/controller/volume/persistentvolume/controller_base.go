@@ -609,16 +609,20 @@ func getVolumeClass(volume *api.PersistentVolume) string {
 	if class, found := volume.Annotations[annClass]; found {
 		return class
 	}
+
+	// 'nil' is interpreted as "", i.e. the volume does not belong to any class.
 	return ""
 }
 
-// getClaimClass returns value of annClass annotation or empty string in case
-// the annotation does not exist.
-// TODO: change to PersistentVolumeClaim.Spec.Class value when this attribute is
-// introduced.
+// getClaimClass returns name of class that is requested by given claim.
+// Request for `nil` class is interpreted as request for class "",
+// i.e. for a classless PV.
 func getClaimClass(claim *api.PersistentVolumeClaim) string {
+	// TODO: change to PersistentVolumeClaim.Spec.Class value when this
+	// attribute is introduced.
 	if class, found := claim.Annotations[annClass]; found {
 		return class
 	}
+
 	return ""
 }
