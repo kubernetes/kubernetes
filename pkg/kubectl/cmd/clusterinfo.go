@@ -62,7 +62,7 @@ func RunClusterInfo(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command) error
 	}
 	printService(out, "Kubernetes master", client.Host)
 	if len(client.AlternateHosts) > 0 {
-		printService(out, "Kubernetes other api servers", strings.Join(client.AlternateHosts, ","))
+		printService(out, "Kubernetes alternate masters", strings.Join(client.AlternateHosts, ","))
 	}
 
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))

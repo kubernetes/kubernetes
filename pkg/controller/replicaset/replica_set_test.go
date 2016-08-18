@@ -1081,7 +1081,7 @@ func TestDeletionTimestamp(t *testing.T) {
 // setupManagerWithGCEnabled creates a RS manager with a fakePodControl
 // and with garbageCollectorEnabled set to true
 func setupManagerWithGCEnabled() (manager *ReplicaSetController, fakePodControl *controller.FakePodControl) {
-	c := clientset.NewForConfigOrDie(&restclient.Config{Host: "0.0.0.0:8000", ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+	c := clientset.NewForConfigOrDie(&restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
 	fakePodControl = &controller.FakePodControl{}
 	manager = NewReplicaSetControllerFromClient(c, controller.NoResyncPeriodFunc, BurstReplicas, 0)
 	manager.garbageCollectorEnabled = true

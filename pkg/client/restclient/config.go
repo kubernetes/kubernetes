@@ -114,7 +114,8 @@ type Config struct {
 	// Do we need this?
 	// Version string
 
-	// Hosts must be a slice of strings, with properties of Host
+	// AlternateHosts must be a slice of strings, with properties of Host
+	// Will be used if URL specified in Host won't be provided or will be unavailable
 	AlternateHosts []string
 }
 
@@ -157,9 +158,9 @@ type ContentConfig struct {
 }
 
 // Returns Host and AlternateHosts as a single slice, without duplicates
-func (c *Config) AllHosts() []string {
+func (c *Config) Hosts() []string {
 	var hosts []string
-	if c.Host != "" {
+	if len(c.Host) > 0 {
 		hosts = append(hosts, c.Host)
 	}
 	if len(c.AlternateHosts) > 0 {
@@ -303,7 +304,7 @@ func InClusterConfig() (*Config, error) {
 // still possible.
 func IsConfigTransportTLS(config Config) bool {
 	hosts, _, err := defaultServerUrlFor(&config)
-	if err != nil || len(hosts) == 0 {
+	if err != nil {
 		return false
 	}
 	for _, host := range hosts {
