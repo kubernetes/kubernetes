@@ -29,12 +29,12 @@ import (
 )
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, error) {
-	info := transport.TLSInfo{
+	tlsInfo := transport.TLSInfo{
 		CertFile: c.CertFile,
 		KeyFile:  c.KeyFile,
 		CAFile:   c.CAFile,
 	}
-	tlsConfig, err := info.ClientConfig()
+	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
 		return nil, err
 	}

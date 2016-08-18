@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package testing
+package testingcert
 
 // You can use cfssl tool to generate certificates, please refer
 // https://github.com/coreos/etcd/tree/master/hack/tls-setup for more details.
