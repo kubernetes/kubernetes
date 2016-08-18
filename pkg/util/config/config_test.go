@@ -17,12 +17,8 @@ limitations under the License.
 package config
 
 import (
-	"fmt"
 	"reflect"
-	"strings"
 	"testing"
-
-	"github.com/spf13/pflag"
 )
 
 func TestConfigurationChannels(t *testing.T) {
@@ -121,35 +117,4 @@ func TestBroadcaster(t *testing.T) {
 	b.Notify("test")
 	<-ch
 	<-ch
-}
-
-func TestFeatureConfigFlag(t *testing.T) {
-	tests := []struct {
-		arg         string
-		enableAlpha bool
-		parseError  error
-	}{
-		{fmt.Sprintf("--%s=enableFooBarBaz=maybeidk", flagName), false, fmt.Errorf("unrecognized key: enableFooBarBaz")},
-		{fmt.Sprintf("--%s=", flagName), false, nil},
-		{fmt.Sprintf("--%s=enableAllAlpha=false", flagName), false, nil},
-		{fmt.Sprintf("--%s=enableAllAlpha=true", flagName), true, nil},
-		{fmt.Sprintf("--%s=enableAllAlpha=banana", flagName), false, fmt.Errorf("invalid value of enableAllAlpha")},
-	}
-	for i, test := range tests {
-		fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
-		f := NewFeatureGate()
-		f.AddFlag(fs)
-
-		err := fs.Parse([]string{test.arg})
-		if test.parseError != nil {
-			if !strings.Contains(err.Error(), test.parseError.Error()) {
-				t.Errorf("%d: Parse() Expected %v, Got %v", i, test.parseError, err)
-			}
-		} else if err != nil {
-			t.Errorf("%d: Parse() Expected nil, Got %v", i, err)
-		}
-		if alpha := f.AlphaEnabled(); alpha != test.enableAlpha {
-			t.Errorf("%d: AlphaEnabled() expected %v, Got %v", i, test.enableAlpha, alpha)
-		}
-	}
 }

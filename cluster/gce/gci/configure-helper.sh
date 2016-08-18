@@ -473,8 +473,8 @@ function start-kubelet {
   if [[ "${ALLOCATE_NODE_CIDRS:-}" == "true" ]]; then
      flags+=" --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
   fi
-  if [[ -n "${FEATURE_CONFIG:-}" ]]; then
-     flags+=" --feature-config=${feature_config}"
+  if [[ -n "${FEATURE_GATES:-}" ]]; then
+     flags+=" --feature-gates=${feature_gates}"
   fi
   echo "KUBELET_OPTS=\"${flags}\"" > /etc/default/kubelet
 
@@ -510,8 +510,8 @@ function start-kube-proxy {
   local -r kube_proxy_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-proxy.docker_tag)
   local api_servers="--master=https://${KUBERNETES_MASTER_NAME}"
   local params="${KUBEPROXY_TEST_LOG_LEVEL:-"--v=2"}"
-  if [[ -n "${FEATURE_CONFIG:-}" ]]; then
-    params+=" --feature-config=${FEATURE_CONFIG}"
+  if [[ -n "${FEATURE_GATES:-}" ]]; then
+    params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ -n "${KUBEPROXY_TEST_ARGS:-}" ]]; then
     params+=" ${KUBE_PROXY_TEST_ARGS}"
@@ -673,8 +673,8 @@ function start-kube-apiserver {
   if [[ -n "${RUNTIME_CONFIG:-}" ]]; then
     params+=" --runtime-config=${RUNTIME_CONFIG}"
   fi
-  if [[ -n "${FEATURE_CONFIG:-}" ]]; then
-    params+=" --feature-config=${FEATURE_CONFIG}"
+  if [[ -n "${FEATURE_GATES:-}" ]]; then
+    params+=" --feature-gates=${FEATURE_GATES}"
   fi
   if [[ -n "${PROJECT_ID:-}" && -n "${TOKEN_URL:-}" && -n "${TOKEN_BODY:-}" && -n "${NODE_NETWORK:-}" ]]; then
     local -r vm_external_ip=$(curl --retry 5 --retry-delay 3 --fail --silent -H 'Metadata-Flavor: Google' "http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip")
@@ -769,8 +769,8 @@ function start-kube-controller-manager {
   if [[ -n "${TERMINATED_POD_GC_THRESHOLD:-}" ]]; then
     params+=" --terminated-pod-gc-threshold=${TERMINATED_POD_GC_THRESHOLD}"
   fi
-  if [[ -n "${FEATURE_CONFIG:-}" ]]; then
-    params+=" --feature-config=${FEATURE_CONFIG}"
+  if [[ -n "${FEATURE_GATES:-}" ]]; then
+    params+=" --feature-gates=${FEATURE_GATES}"
   fi
   local -r kube_rc_docker_tag=$(cat /home/kubernetes/kube-docker-files/kube-controller-manager.docker_tag)
 
@@ -800,8 +800,8 @@ function start-kube-scheduler {
 
   # Calculate variables and set them in the manifest.
   params="${SCHEDULER_TEST_LOG_LEVEL:-"--v=2"} ${SCHEDULER_TEST_ARGS:-}"
-  if [[ -n "${FEATURE_CONFIG:-}" ]]; then
-    params+=" --feature-config=${FEATURE_CONFIG}"
+  if [[ -n "${FEATURE_GATES:-}" ]]; then
+    params+=" --feature-gates=${FEATURE_GATES}"
   fi
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 
