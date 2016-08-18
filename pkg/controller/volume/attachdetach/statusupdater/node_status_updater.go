@@ -63,7 +63,7 @@ func (nsu *nodeStatusUpdater) UpdateNodeStatuses() error {
 		nodeObj, exists, err := nsu.nodeInformer.GetStore().GetByKey(nodeName)
 		if nodeObj == nil || !exists || err != nil {
 			// If node does not exist, its status cannot be updated, log error and move on.
-			glog.Warningf(
+			glog.V(5).Infof(
 				"Could not update node status. Failed to find node %q in NodeInformer cache. %v",
 				nodeName,
 				err)
