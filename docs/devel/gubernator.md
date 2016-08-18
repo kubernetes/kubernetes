@@ -39,6 +39,7 @@ Documentation for other releases can be found at
     - [Test Failures list](#test-failures-list)
     - [Log Filtering](#log-filtering)
     - [Gubernator for Local Tests](#gubernator-for-local-tests)
+  - [Future Work](#future-work)
 
 <!-- END MUNGE: GENERATED_TOC -->
 
@@ -135,6 +136,22 @@ Do you want to run gubernator.sh and upload logs publicly to GCS? [y/n]y
 Gubernator linked below:
 k8s-gubernator.appspot.com/build/yourusername-g8r-logs/logs/e2e-node/timestamp
 ```
+
+## Future Work
+
+* Extend GUBERNATOR flag to all local tests
+
+* More accurate identification of pod name, container ID, etc.
+..* Changes in the content of logged strings for failures
+..* Better regex in Gubernator
+
+* Automate discovery of more keywords (ex: Volume Name, Pod IP, etc)
+
+* Clickable pod names in the displayed lines in order to add them as filters
+
+* Construct story of pod's lifetime
+
+* Improve UI
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/devel/gubernator.md?pixel)]()
