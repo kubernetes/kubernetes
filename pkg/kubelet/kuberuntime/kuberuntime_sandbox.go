@@ -17,7 +17,6 @@ limitations under the License.
 package kuberuntime
 
 import (
-	"fmt"
 	"sort"
 
 	"github.com/golang/glog"
@@ -26,10 +25,6 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
-)
-
-var (
-	errNoMatchingSandboxes = fmt.Errorf("no matching sandboxes")
 )
 
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
@@ -146,6 +141,7 @@ func (m *kubeGenericRuntimeManager) getKubeletSandboxes(all bool) ([]*runtimeApi
 }
 
 // determinePodSandboxIP determines the IP address of the given pod sandbox.
+// TODO: remove determinePodSandboxIP after networking is delegated to the container runtime.
 func (m *kubeGenericRuntimeManager) determinePodSandboxIP(podNamespace, podName string, podSandbox *runtimeApi.PodSandboxStatus) string {
 	ip := ""
 
@@ -178,11 +174,12 @@ func (m *kubeGenericRuntimeManager) getSandboxIDByPodUID(podUID string, state *r
 	}
 	sandboxes, err := m.runtimeService.ListPodSandbox(filter)
 	if err != nil {
-		glog.Infof("ListPodSandbox with pod UID %q failed: %v", podUID, err)
+		glog.Errorf("ListPodSandbox with pod UID %q failed: %v", podUID, err)
 		return nil, err
 	}
+
 	if len(sandboxes) == 0 {
-		return nil, errNoMatchingSandboxes
+		return nil, nil
 	}
 
 	// Sort with newest first.

@@ -14,5 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package kuberuntime wraps the new runtime interface to kubecontainer.Runtime.
+// Package kuberuntime contains an implementation of kubecontainer.Runtime using
+// the interface in pkg/kubelet/api/services.go.
 package kuberuntime

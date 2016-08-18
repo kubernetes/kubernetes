@@ -306,6 +306,7 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 	//	we can only assume their restart count is 0.
 	// Anyhow, we only promised "best-effort" restart count reporting, we can just ignore
 	// these limitations now.
+	// TODO: move this comment to SyncPod.
 	podFullName := kubecontainer.BuildPodFullName(name, namespace)
 	podSandboxIDs, err := m.getSandboxIDByPodUID(string(uid), nil)
 	if err != nil {
