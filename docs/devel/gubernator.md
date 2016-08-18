@@ -47,9 +47,9 @@ Documentation for other releases can be found at
 [Gubernator](https://k8s-gubernator.appspot.com/) is a webpage for viewing and filtering Kubernetes
  test results. Gubernator runs on Google App Engine and fetches logs stored on Google Cloud Storage.
 
-Gubernator simplifies the debugging proccess and makes it easier to track down failures by automating many 
+Gubernator simplifies the debugging proccess and makes it easier to track down failures by automating many
 steps commonly taken in searching through logs, and by offering tools to filter through logs to find relevant lines.
-Gubernator automates the steps of finding the failed tests, displaying relevant logs, and determining the 
+Gubernator automates the steps of finding the failed tests, displaying relevant logs, and determining the
 failed pods and the corresponing pod UID, namespace, and container ID.
 It also allows for filtering of the log files to display relevant lines based on selected keywords, and
 allows for multiple logs to be woven together by timestamp.
@@ -64,8 +64,9 @@ to filter logs for that test.
 
 Based on the message logged in the junit file, the pod name may be displayed.
 
-![alt text](/gubernator-images/testfailures.png)
+![alt text](https://github.com/gubernator-images/testfailures.png)
 
+[Test Failures List Example](https://k8s-gubernator.appspot.com/build/kubernetes-jenkins/logs/kubernetes-e2e-gke/11721)
 
 ### Log Filtering
 
@@ -78,26 +79,31 @@ If less than 100 lines are skipped, the "... skipping xx lines ..." message can 
 the hidden lines.
 
 Before expansion:
-![alt text](/gubernator-images/skipping1.png)
+![alt text](https://github.com/gubernator-images/skipping1.png)
 After expansion:
-![alt text](/gubernator-images/skipping2.png)
+![alt text](https://github.com/gubernator-images/skipping2.png)
 
 If the pod name was displayed in the Test Failures list, it will automatically be included in the filters.
 If it is not found in the error message, it can be manually entered into the textbox. Once a pod name
 is entered, the Pod UID, Namespace, and ContainerID may be automatically filled in as well. These can be
 altered as well. To apply the filter, check off the options corresponding to the filter.
 
-![alt text](/gubernator-images/filterpage1.png)
+![alt text](https://github.com/gubernator-images/filterpage1.png)
 
-To add a filter, type the term to be filtered into the textbox labeled "Add filter:" and press enter. 
+To add a filter, type the term to be filtered into the textbox labeled "Add filter:" and press enter.
 Additional filters will be displayed as checkboxes under the textbox.
 
-![alt text](/gubernator-images/filterpage3.png)
+![alt text](https://github.com/gubernator-images/filterpage3.png)
 
 To choose which logs to view check off the checkboxes corresponding to the logs of interest. If multiple logs are
 included, the "Weave by timestamp" option can weave the selected logs together based on the timestamp in each line.
 
-![alt text](/gubernator-images/filterpage2.png)
+![alt text](https://github.com/gubernator-images/filterpage2.png)
+
+[Log Filtering Example 1](https://k8s-gubernator.appspot.com/build/kubernetes-jenkins/logs/kubelet-gce-e2e-ci/5535/nodelog?pod=pod-configmaps-b5b876cb-3e1e-11e6-8956-42010af0001d&junit=junit_03.xml&wrap=on&logfiles=%2Fkubernetes-jenkins%2Flogs%2Fkubelet-gce-e2e-ci%2F5535%2Fartifacts%2Ftmp-node-e2e-7a5a3b40-e2e-node-coreos-stable20160622-image%2Fkube-apiserver.log&logfiles=%2Fkubernetes-jenkins%2Flogs%2Fkubelet-gce-e2e-ci%2F5535%2Fartifacts%2Ftmp-node-e2e-7a5a3b40-e2e-node-coreos-stable20160622-image%2Fkubelet.log&UID=on&poduid=b5b8a59e-3e1e-11e6-b358-42010af0001d&ns=e2e-tests-configmap-oi12h&cID=tmp-node-e2e-7a5a3b40-e2e-node-coreos-stable20160622-image)
+
+[Log Filtering Example 2](https://k8s-gubernator.appspot.com/build/kubernetes-jenkins/logs/kubernetes-e2e-gke/11721/nodelog?pod=client-containers-a53f813c-503e-11e6-88dd-0242ac110003&junit=junit_19.xml&wrap=on)
+
 
 ### Gubernator for Local Tests
 
