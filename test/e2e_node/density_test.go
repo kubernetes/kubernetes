@@ -241,7 +241,7 @@ type densityTest struct {
 }
 
 func (dt *densityTest) getTestName() string {
-	return fmt.Sprintf("create_%s_%d_%d_%d", dt.createMethod, dt.podsNr, dt.bgPodsNr, dt.interval.Nanoseconds()/1000000)
+	return fmt.Sprintf("density_create_%s_%d_%d_%d", dt.createMethod, dt.podsNr, dt.bgPodsNr, dt.interval.Nanoseconds()/1000000)
 }
 
 // runDensityBatchTest runs the density batch pod creation test

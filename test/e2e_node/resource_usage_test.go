@@ -194,15 +194,9 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 
 	// Print resource usage
 	framework.PrintPerfData(framework.ResourceUsageToPerfDataWithLabels(usagePerNode,
-		map[string]string{
-			"datatype": "resource",
-			"test":     testName,
-		}))
+		map[string]string{"test": testName, "node": nodeName}))
 	framework.PrintPerfData(framework.CPUUsageToPerfDataWithLabels(cpuSummaryPerNode,
-		map[string]string{
-			"datatype": "resource",
-			"test":     testName,
-		}))
+		map[string]string{"test": testName, "node": nodeName}))
 
 	// Verify resource usage
 	if isVerify {

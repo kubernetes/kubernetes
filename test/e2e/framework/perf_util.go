@@ -78,27 +78,20 @@ func PrintPerfData(p *perftype.PerfData) {
 // Notice that this function only cares about memory usage, because cpu usage information will be extracted from NodesCPUSummary.
 func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels map[string]string) *perftype.PerfData {
 	items := []perftype.DataItem{}
-	for node, usages := range usagePerNode {
+	for _, usages := range usagePerNode {
 		for c, usage := range usages {
-			newLabels := map[string]string{
-				"node":      node,
-				"container": c,
-				"resource":  "memory",
-			}
-			if labels != nil {
-				for k, v := range labels {
-					newLabels[k] = v
-				}
-			}
-
 			item := perftype.DataItem{
 				Data: map[string]float64{
 					"memory":     float64(usage.MemoryUsageInBytes) / (1024 * 1024),
 					"workingset": float64(usage.MemoryWorkingSetInBytes) / (1024 * 1024),
 					"rss":        float64(usage.MemoryRSSInBytes) / (1024 * 1024),
 				},
-				Unit:   "MB",
-				Labels: newLabels,
+				Unit: "MB",
+				Labels: map[string]string{
+					"container": c,
+					"datatype":  "resource",
+					"resource":  "memory",
+				},
 			}
 			items = append(items, item)
 		}
@@ -106,34 +99,28 @@ func ResourceUsageToPerfDataWithLabels(usagePerNode ResourceUsagePerNode, labels
 	return &perftype.PerfData{
 		Version:   currentKubeletPerfMetricsVersion,
 		DataItems: items,
+		Labels:    labels,
 	}
 }
 
 // CPUUsageToPerfDataWithLabels transforms NodesCPUSummary to PerfData with additional labels.
 func CPUUsageToPerfDataWithLabels(usagePerNode NodesCPUSummary, labels map[string]string) *perftype.PerfData {
 	items := []perftype.DataItem{}
-	for node, usages := range usagePerNode {
+	for _, usages := range usagePerNode {
 		for c, usage := range usages {
-			newLabels := map[string]string{
-				"node":      node,
-				"container": c,
-				"resource":  "cpu",
-			}
-			if labels != nil {
-				for k, v := range labels {
-					newLabels[k] = v
-				}
-			}
-
 			data := map[string]float64{}
 			for perc, value := range usage {
 				data[fmt.Sprintf("Perc%02.0f", perc*100)] = value * 1000
 			}
 
 			item := perftype.DataItem{
-				Data:   data,
-				Unit:   "mCPU",
-				Labels: newLabels,
+				Data: data,
+				Unit: "mCPU",
+				Labels: map[string]string{
+					"container": c,
+					"datatype":  "resource",
+					"resource":  "cpu",
+				},
 			}
 			items = append(items, item)
 		}
@@ -141,5 +128,6 @@ func CPUUsageToPerfDataWithLabels(usagePerNode NodesCPUSummary, labels map[strin
 	return &perftype.PerfData{
 		Version:   currentKubeletPerfMetricsVersion,
 		DataItems: items,
+		Labels:    labels,
 	}
 }
