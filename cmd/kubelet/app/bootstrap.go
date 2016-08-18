@@ -33,24 +33,20 @@ const (
 // On success, a kubeconfig file referencing the generated key and obtained certificate is written to kubeconfigPath.
 // The certificate and key file are stored in certDir.
 func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir string, nodeName string) error {
-	// Short-circuit if the kubeconfig file already exists
-	// TODO: inspect the kubeconfig, ensure a rest client can be built from it, verify client cert expiration, etc
-	if kubeconfigPath == "" {
-		return fmt.Errorf("no kubeconfig specified")
-	}
-	if _, err := os.Stat(kubeconfigPath); err == nil {
-		glog.V(2).Infof("kubeconfig %s exists, skipping bootstrap", kubeconfigPath)
+	// Short-circuit if the kubeconfig file already exists.
+	// TODO: inspect the kubeconfig, ensure a rest client can be built from it, verify client cert expiration, etc.
+	_, err := os.Stat(kubeconfigPath)
+	if err == nil {
+		glog.V(2).Infof("Kubeconfig %s exists, skipping bootstrap", kubeconfigPath)
 		return nil
-	} else if !os.IsNotExist(err) {
-		glog.V(2).Infof("error reading kubeconfig %s, skipping bootstrap: %v", kubeconfigPath, err)
+	}
+	if !os.IsNotExist(err) {
+		glog.Errorf("Error reading kubeconfig %s, skipping bootstrap: %v", kubeconfigPath, err)
 		return err
 	}
 
 	glog.V(2).Info("Using bootstrap kubeconfig to generate TLS client cert, key and kubeconfig file")
 
-	if bootstrapPath == "" {
-		return fmt.Errorf("no bootstrap kubeconfig specified")
-	}
 	bootstrapClientConfig, err := loadRESTClientConfig(bootstrapPath)
 	if err != nil {
 		return fmt.Errorf("unable to load bootstrap kubeconfig: %v", err)
@@ -62,7 +58,7 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 
 	success := false
 
-	// Get the private key
+	// Get the private key.
 	keyPath, err := filepath.Abs(filepath.Join(certDir, "kubelet-client.key"))
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap key path: %v", err)
@@ -81,7 +77,7 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 		}()
 	}
 
-	// Get the cert
+	// Get the cert.
 	certPath, err := filepath.Abs(filepath.Join(certDir, "kubelet-client.crt"))
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap client cert path: %v", err)
@@ -101,22 +97,22 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 		}
 	}()
 
-	// Get the CA data from the bootstrap client config
+	// Get the CA data from the bootstrap client config.
 	caFile, caData := bootstrapClientConfig.CAFile, []byte{}
 	if len(caFile) == 0 {
 		caData = bootstrapClientConfig.CAData
 	}
 
-	// Build resulting kubeconfig
+	// Build resulting kubeconfig.
 	kubeconfigData := clientcmdapi.Config{
-		// Define a cluster stanza based on the bootstrap kubeconfig
+		// Define a cluster stanza based on the bootstrap kubeconfig.
 		Clusters: map[string]*clientcmdapi.Cluster{"default-cluster": {
 			Server:                   bootstrapClientConfig.Host,
 			InsecureSkipTLSVerify:    bootstrapClientConfig.Insecure,
 			CertificateAuthority:     caFile,
 			CertificateAuthorityData: caData,
 		}},
-		// Define auth based on the obtained client cert
+		// Define auth based on the obtained client cert.
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{"default-auth": {
 			ClientCertificate: certPath,
 			ClientKey:         keyPath,
@@ -140,13 +136,13 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 }
 
 func loadRESTClientConfig(kubeconfig string) (*restclient.Config, error) {
-	// Load structured kubeconfig data from the given path
+	// Load structured kubeconfig data from the given path.
 	loader := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
 	loadedConfig, err := loader.Load()
 	if err != nil {
 		return nil, err
 	}
-	// Flatten the loaded data to a particular restclient.Config based on the current context
+	// Flatten the loaded data to a particular restclient.Config based on the current context.
 	return clientcmd.NewNonInteractiveClientConfig(
 		*loadedConfig,
 		loadedConfig.CurrentContext,
@@ -205,7 +201,7 @@ func requestClientCertificate(client unversionedcertificates.CertificateSigningR
 
 	}
 
-	// Make a default timeout = 3600s
+	// Make a default timeout = 3600s.
 	var defaultTimeoutSeconds int64 = 3600
 	resultCh, err := client.Watch(api.ListOptions{
 		Watch:          true,

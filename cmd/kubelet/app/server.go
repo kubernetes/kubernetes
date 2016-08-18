@@ -336,7 +336,7 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	if kcfg == nil {
 		var kubeClient, eventClient *clientset.Clientset
 
-		if s.KubeConfig.Value() != "" && s.BootstrapKubeconfig != "" {
+		if s.BootstrapKubeconfig != "" {
 			nodeName, err := getNodeName(s)
 			if err != nil {
 				return err
