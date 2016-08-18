@@ -43,7 +43,7 @@ tar xzf kubernetes-server-linux-amd64.tar.gz
 kubernetes/server/bin/kube-scheduler --master=127.0.0.1:8080 $(cat scheduler_flags) &> /var/log/kube-scheduler.log &
 
 kubernetes/server/bin/kube-apiserver \
-	--address=0.0.0.0 \
+	--insecure-bind-address=0.0.0.0 \
 	--etcd-servers=http://127.0.0.1:2379 \
 	--etcd-servers-overrides=/events#${EVENT_STORE_URL} \
 	--tls-cert-file=/srv/kubernetes/server.cert \
