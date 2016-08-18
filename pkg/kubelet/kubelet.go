@@ -501,13 +501,15 @@ func NewMainKubelet(
 		return nil, err
 	}
 
+	// setup volumeManager
 	klet.volumeManager, err = volumemanager.NewVolumeManager(
 		enableControllerAttachDetach,
 		nodeName,
 		klet.podManager,
 		klet.kubeClient,
 		klet.volumePluginMgr,
-		klet.containerRuntime)
+		klet.containerRuntime,
+		klet.getPodsDir())
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {
@@ -998,7 +1000,7 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	}
 
 	// Start volume manager
-	go kl.volumeManager.Run(wait.NeverStop)
+	go kl.volumeManager.Run(kl.sourcesReady, wait.NeverStop)
 
 	if kl.kubeClient != nil {
 		// Start syncing node status immediately, this may set up things the runtime needs to run.
@@ -2017,16 +2019,21 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(
 		if allPods.Has(string(uid)) {
 			continue
 		}
+		// If volumes have not been unmounted/detached, do not delete directory.
+		// Doing so may result in corruption of data.
 		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
-			// If volumes have not been unmounted/detached, do not delete directory.
-			// Doing so may result in corruption of data.
 			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up; err: %v", uid, err)
+			continue
+		}
+		// Check whether volume is still mounted on disk. If so, do not delete directory
+		if volumeNames, err := kl.getPodVolumeNameListFromDisk(uid); err != nil || len(volumeNames) != 0 {
+			glog.V(3).Infof("Orphaned pod %q found, but volumes are still mounted; err: %v, volumes: %v ", uid, err, volumeNames)
 			continue
 		}
 
 		glog.V(3).Infof("Orphaned pod %q found, removing", uid)
 		if err := os.RemoveAll(kl.getPodDir(uid)); err != nil {
-			glog.Infof("Failed to remove orphaned pod %q dir; err: %v", uid, err)
+			glog.Errorf("Failed to remove orphaned pod %q dir; err: %v", uid, err)
 			errlist = append(errlist, err)
 		}
 	}

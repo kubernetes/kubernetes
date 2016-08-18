@@ -179,6 +179,18 @@ func (plugin *flexVolumePlugin) newUnmounterInternal(volName string, podUID type
 	}, nil
 }
 
+func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, sourceName string) (*volume.Spec, error) {
+	flexVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			FlexVolume: &api.FlexVolumeSource{
+				Driver: sourceName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(flexVolume), nil
+}
+
 // flexVolume is the disk resource provided by this plugin.
 type flexVolumeDisk struct {
 	// podUID is the UID of the pod.

@@ -182,6 +182,24 @@ func (plugin *gcePersistentDiskPlugin) newProvisionerInternal(options volume.Vol
 	}, nil
 }
 
+func (plugin *gcePersistentDiskPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	gceVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			GCEPersistentDisk: &api.GCEPersistentDiskVolumeSource{
+				PDName: sourceName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(gceVolume), nil
+}
+
 // Abstract interface to PD operations.
 type pdManager interface {
 	// Creates a volume

@@ -50,6 +50,9 @@ func (mi *fakeMountInterface) List() ([]mount.MountPoint, error) {
 func (mi *fakeMountInterface) IsLikelyNotMountPoint(file string) (bool, error) {
 	return false, fmt.Errorf("unsupported")
 }
+func (mi *fakeMountInterface) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return "", nil
+}
 
 func fakeContainerMgrMountInt() mount.Interface {
 	return &fakeMountInterface{

@@ -145,6 +145,19 @@ func (plugin *glusterfsPlugin) execCommand(command string, args []string) ([]byt
 	return cmd.CombinedOutput()
 }
 
+func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	glusterfsVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			Glusterfs: &api.GlusterfsVolumeSource{
+				EndpointsName: volumeName,
+				Path:          volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(glusterfsVolume), nil
+}
+
 // Glusterfs volumes represent a bare host file or directory mount of an Glusterfs export.
 type glusterfs struct {
 	volName string

@@ -19,9 +19,13 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
+	"path"
+	"path/filepath"
+	"strings"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/util/exec"
-	"path/filepath"
 )
 
 type Interface interface {
@@ -37,6 +41,9 @@ type Interface interface {
 	// IsLikelyNotMountPoint determines if a directory is a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
 	IsLikelyNotMountPoint(file string) (bool, error)
+	// GetDeviceNameFromMount finds the device name by checking the mount path
+	// to get the global mount path which matches its plugin directory
+	GetDeviceNameFromMount(mountPath, pluginDir string) (string, error)
 }
 
 // This represents a single line in /proc/mounts or /etc/fstab.
@@ -144,4 +151,26 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 		}
 	}
 	return device, refCount, nil
+}
+
+// getDeviceNameFromMount find the device name from /proc/mounts in which
+// the mount path reference should match the given plugin directory. In case no mount path reference
+// matches, returns the volume name taken from its given mountPath
+func getDeviceNameFromMount(mounter Interface, mountPath, pluginDir string) (string, error) {
+	refs, err := GetMountRefs(mounter, mountPath)
+	if err != nil {
+		glog.V(4).Infof("GetMountRefs failed for mount path %q: %v", mountPath, err)
+		return "", err
+	}
+	if len(refs) == 0 {
+		glog.V(4).Infof("Directory %s is not mounted", mountPath)
+		return "", fmt.Errorf("directory %s is not mounted", mountPath)
+	}
+	for _, ref := range refs {
+		if strings.HasPrefix(ref, pluginDir) {
+			return path.Base(ref), nil
+		}
+	}
+
+	return path.Base(mountPath), nil
 }

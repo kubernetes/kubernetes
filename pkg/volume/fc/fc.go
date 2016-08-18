@@ -141,6 +141,16 @@ func (plugin *fcPlugin) execCommand(command string, args []string) ([]byte, erro
 	return cmd.CombinedOutput()
 }
 
+func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	fcVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			FC: &api.FCVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(fcVolume), nil
+}
+
 type fcDisk struct {
 	volName string
 	podUID  types.UID

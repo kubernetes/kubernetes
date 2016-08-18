@@ -117,6 +117,18 @@ func (p *flockerPlugin) NewUnmounter(datasetName string, podUID types.UID) (volu
 	return nil, nil
 }
 
+func (p *flockerPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	flockerVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			Flocker: &api.FlockerVolumeSource{
+				DatasetName: volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(flockerVolume), nil
+}
+
 type flockerMounter struct {
 	*flocker
 	client   flockerclient.Clientable

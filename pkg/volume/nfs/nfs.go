@@ -136,6 +136,18 @@ func (plugin *nfsPlugin) NewRecycler(pvName string, spec *volume.Spec) (volume.R
 	return plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
 }
 
+func (plugin *nfsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	nfsVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			NFS: &api.NFSVolumeSource{
+				Path: volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(nfsVolume), nil
+}
+
 // NFS volumes represent a bare host file or directory mount of an NFS export.
 type nfs struct {
 	volName string

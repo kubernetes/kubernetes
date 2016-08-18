@@ -54,6 +54,11 @@ func (plugin *gcePersistentDiskPlugin) NewAttacher() (volume.Attacher, error) {
 	}, nil
 }
 
+func (plugin *gcePersistentDiskPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	mounter := plugin.host.GetMounter()
+	return mount.GetMountRefs(mounter, deviceMountPath)
+}
+
 // Attach checks with the GCE cloud provider if the specified volume is already
 // attached to the specified node. If the volume is attached, it succeeds
 // (returns nil). If it is not, Attach issues a call to the GCE cloud provider

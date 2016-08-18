@@ -288,6 +288,14 @@ func (plugin *FakeVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 	return []api.PersistentVolumeAccessMode{}
 }
 
+func (plugin *FakeVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string) (*Spec, error) {
+	return nil, nil
+}
+
+func (plugin *FakeVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	return []string{}, nil
+}
+
 type FakeVolume struct {
 	sync.RWMutex
 	PodUID  types.UID

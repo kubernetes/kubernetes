@@ -188,6 +188,24 @@ func getVolumeSource(
 	return nil, false, fmt.Errorf("Spec does not reference an AWS EBS volume type")
 }
 
+func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	mounter := plugin.host.GetMounter()
+	pluginDir := plugin.host.GetPluginDir(plugin.GetPluginName())
+	sourceName, err := mounter.GetDeviceNameFromMount(mountPath, pluginDir)
+	if err != nil {
+		return nil, err
+	}
+	awsVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			AWSElasticBlockStore: &api.AWSElasticBlockStoreVolumeSource{
+				VolumeID: sourceName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(awsVolume), nil
+}
+
 // Abstract interface to PD operations.
 type ebsManager interface {
 	CreateVolume(provisioner *awsElasticBlockStoreProvisioner) (volumeID string, volumeSizeGB int, labels map[string]string, err error)

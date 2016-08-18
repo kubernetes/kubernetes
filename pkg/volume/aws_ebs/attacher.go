@@ -52,6 +52,11 @@ func (plugin *awsElasticBlockStorePlugin) NewAttacher() (volume.Attacher, error)
 	}, nil
 }
 
+func (plugin *awsElasticBlockStorePlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	mounter := plugin.host.GetMounter()
+	return mount.GetMountRefs(mounter, deviceMountPath)
+}
+
 func (attacher *awsElasticBlockStoreAttacher) Attach(spec *volume.Spec, hostName string) (string, error) {
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {

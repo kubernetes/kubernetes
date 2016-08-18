@@ -128,6 +128,16 @@ func (plugin *emptyDirPlugin) newUnmounterInternal(volName string, podUID types.
 	return ed, nil
 }
 
+func (plugin *emptyDirPlugin) ConstructVolumeSpec(volName, mountPath string) (*volume.Spec, error) {
+	emptyDirVolume := &api.Volume{
+		Name: volName,
+		VolumeSource: api.VolumeSource{
+			EmptyDir: &api.EmptyDirVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(emptyDirVolume), nil
+}
+
 // mountDetector abstracts how to find what kind of mount a path is backed by.
 type mountDetector interface {
 	// GetMountMedium determines what type of medium a given path is backed

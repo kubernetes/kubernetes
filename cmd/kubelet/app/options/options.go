@@ -45,6 +45,11 @@ const (
 	defaultPodInfraContainerImageVersion = "3.0"
 	// Auto detect cloud provider.
 	AutoDetectCloudProvider = "auto-detect"
+	// Defualt names used by kubelet
+	DefaultKubeletPodsDirName       = "pods"
+	DefaultKubeletVolumesDirName    = "volumes"
+	DefaultKubeletPluginsDirName    = "plugins"
+	DefaultKubeletContainersDirName = "containers"
 )
 
 // Returns the arch-specific pause image that kubelet should use as the default

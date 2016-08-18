@@ -124,3 +124,7 @@ func (f *FakeMounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	glog.V(5).Infof("isLikelyMountPoint for %s: true", file)
 	return true, nil
 }
+
+func (f *FakeMounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return getDeviceNameFromMount(f, mountPath, pluginDir)
+}

@@ -172,6 +172,11 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, nil
 }
 
+//GetDeviceNameFromMount: given a mount point, find the device name from its global mount point
+func (mounter *Mounter) GetDeviceNameFromMount(mountPath, pluginDir string) (string, error) {
+	return getDeviceNameFromMount(mounter, mountPath, pluginDir)
+}
+
 func listProcMounts(mountFilePath string) ([]MountPoint, error) {
 	hash1, err := readProcMounts(mountFilePath, nil)
 	if err != nil {

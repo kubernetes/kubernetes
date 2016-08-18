@@ -86,6 +86,16 @@ func (plugin *configMapPlugin) NewUnmounter(volName string, podUID types.UID) (v
 	return &configMapVolumeUnmounter{&configMapVolume{volName, podUID, plugin, plugin.host.GetMounter(), plugin.host.GetWriter(), volume.MetricsNil{}}}, nil
 }
 
+func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	configMapVolume := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			ConfigMap: &api.ConfigMapVolumeSource{},
+		},
+	}
+	return volume.NewSpecFromVolume(configMapVolume), nil
+}
+
 type configMapVolume struct {
 	volName string
 	podUID  types.UID
