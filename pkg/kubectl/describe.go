@@ -949,7 +949,11 @@ func describeContainers(label string, containers []api.Container, containerStatu
 				if err != nil {
 					valueFrom = ""
 				}
-				fmt.Fprintf(out, "      %s:\t%s (%s)\n", e.Name, valueFrom, e.ValueFrom.ResourceFieldRef.Resource)
+				resource := e.ValueFrom.ResourceFieldRef.Resource
+				if valueFrom == "0" && (resource == "limits.cpu" || resource == "limits.memory") {
+					valueFrom = "node allocatable"
+				}
+				fmt.Fprintf(out, "      %s:\t%s (%s)\n", e.Name, valueFrom, resource)
 			case e.ValueFrom.SecretKeyRef != nil:
 				fmt.Fprintf(out, "      %s:\t<set to the key '%s' in secret '%s'>\n", e.Name, e.ValueFrom.SecretKeyRef.Key, e.ValueFrom.SecretKeyRef.Name)
 			case e.ValueFrom.ConfigMapKeyRef != nil:
