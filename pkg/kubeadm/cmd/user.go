@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cmd
 
 import (
-	_ "github.com/square/go-jose"
+	"io"
+
+	"github.com/spf13/cobra"
+	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 )
 
-func main() {
+func NewCmdUser(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "user",
+		Short: "Get initial admin credentials for a cluster.", // using TLS bootstrap
+		Run: func(cmd *cobra.Command, args []string) {
+		},
+	}
+	return cmd
 }
