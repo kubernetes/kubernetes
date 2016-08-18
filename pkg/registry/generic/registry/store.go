@@ -445,11 +445,11 @@ var (
 	errEmptiedFinalizers = fmt.Errorf("emptied finalizers")
 )
 
-// Return if we need to update the finalizers of the object, and the desired
-// list of finalizers.
-// When deciding whether to add the OrphanDependent finalizer, in the order of
-// highest to lowever priority: options.OrphanDependents, existing finalizers of
-// the object, e.DeleteStrategy.DefaultGarbageCollectionBehavior.
+// shouldUpdateFinalizers returns if we need to update the finalizers of the
+// object, and the desired list of finalizers.
+// When deciding whether to add the OrphanDependent finalizer, factors in the
+// order of highest to lowest priority are: options.OrphanDependents, existing
+// finalizers of the object, e.DeleteStrategy.DefaultGarbageCollectionPolicy.
 func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
 	// check if the object already has the orphan finalizer set.
 	alreadyOrphan := false
@@ -460,10 +460,10 @@ func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteO
 		}
 	}
 	// check whether the e.DeleteStrategy indicates to orphan.
-	shouldOprhanStorageDefault := false
+	defaultToOrphan := false
 	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
-		if gcStrategy.DefaultGarbageCollectionBehavior() == rest.Orphan {
-			shouldOprhanStorageDefault = true
+		if gcStrategy.DefaultGarbageCollectionPolicy() == rest.OrphanDependents {
+			defaultToOrphan = true
 		}
 	}
 	if options == nil || options.OrphanDependents == nil {
@@ -472,14 +472,14 @@ func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteO
 			return false, finalizers
 		}
 		// otherwise respect the default behavior specified by the storage
-		if shouldOprhanStorageDefault {
+		if defaultToOrphan {
 			finalizers = append(finalizers, api.FinalizerOrphan)
 			return true, finalizers
 		}
 		return false, finalizers
 	}
-	// if options.OrphanDependents is not nil, it has the final say. Storage
-	// default will be ignored.
+	// if options.OrphanDependents is not nil, it has the final say. The default
+	// orphan strategy will be ignored.
 	shouldOrphan := *options.OrphanDependents
 	if shouldOrphan == alreadyOrphan {
 		return false, finalizers
