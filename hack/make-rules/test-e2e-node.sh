@@ -80,6 +80,7 @@ fi
 if [ $remote = true ] ; then
   # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
   if [[ $gubernator = true && -d "${artifacts}" ]]; then
+    echo "Removing artifacts directory at ${artifacts}"
     rm -r ${artifacts}
   fi
 

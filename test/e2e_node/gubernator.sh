@@ -60,12 +60,11 @@ V=2 kube::log::status "Using bucket ${bucket_name}"
 if ! gsutil ls gs:// | grep -q "gs://${bucket_name}/"; then
   V=2 kube::log::status "Creating bucket ${bucket_name}"
   gsutil mb gs://${bucket_name}/
+  # Make all files in the bucket publicly readable
+  gsutil acl ch -u AllUsers:R gs://${bucket_name}
 else
   V=2 kube::log::status "Bucket already exists"
 fi
-
-# Make all files in the bucket publicly readable
-gsutil acl ch -u AllUsers:R gs://${bucket_name}
 
 # Path for e2e-node test results
 GCS_JOBS_PATH="gs://${bucket_name}/logs/e2e-node"
