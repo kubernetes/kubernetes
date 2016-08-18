@@ -448,7 +448,6 @@ var _ = framework.KubeDescribe("Density", func() {
 		switch testArg.podsPerNode {
 		case 30:
 			name = "[Feature:Performance] " + name
-			f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
 		case 95:
 			name = "[Feature:HighDensityPerformance]" + name
 		default:
@@ -457,6 +456,9 @@ var _ = framework.KubeDescribe("Density", func() {
 		itArg := testArg
 		It(name, func() {
 			podsPerNode := itArg.podsPerNode
+			if podsPerNode == 30 {
+				f.AddonResourceConstraints = func() map[string]framework.ResourceConstraint { return density30AddonResourceVerifier(nodeCount) }()
+			}
 			totalPods = podsPerNode * nodeCount
 			fileHndl, err := os.Create(fmt.Sprintf(framework.TestContext.OutputDir+"/%s/pod_states.csv", uuid))
 			framework.ExpectNoError(err)
