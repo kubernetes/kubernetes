@@ -27,9 +27,9 @@ type TimedWorkQueue struct {
 	clock clock.Clock
 }
 
-type timedWorkQueueItem struct {
-	time time.Time
-	obj  interface{}
+type TimedWorkQueueItem struct {
+	Time time.Time
+	Obj  interface{}
 }
 
 func NewTimedWorkQueue(clock clock.Clock) *TimedWorkQueue {
@@ -39,24 +39,28 @@ func NewTimedWorkQueue(clock clock.Clock) *TimedWorkQueue {
 // Add adds the obj along with the current timestamp to the queue.
 func (q TimedWorkQueue) Add(obj interface{}) {
 	start := q.clock.Now()
-	item := timedWorkQueueItem{start, obj}
+	item := &TimedWorkQueueItem{start, obj}
 	q.Type.Add(item)
 }
 
 // AddWithTimestamp is useful if the caller does not want to refresh the start
 // time when requeuing an item.
-func (q TimedWorkQueue) AddWithTimestamp(obj interface{}, timestamp time.Time) {
-	item := timedWorkQueueItem{timestamp, obj}
-	q.Type.Add(item)
+func (q TimedWorkQueue) AddWithTimestamp(timedItem *TimedWorkQueueItem) error {
+	q.Type.Add(timedItem)
+	return nil
 }
 
 // Get gets the obj along with its timestamp from the queue.
-func (q TimedWorkQueue) Get() (item interface{}, start time.Time, shutdown bool) {
-	item, shutdown = q.Type.Get()
-	if item != nil {
-		timed, _ := item.(timedWorkQueueItem)
-		item = timed.obj
-		start = timed.time
+func (q TimedWorkQueue) Get() (timedItem *TimedWorkQueueItem, start time.Time, shutdown bool) {
+	origin, shutdown := q.Type.Get()
+	if origin != nil {
+		timedItem, _ = origin.(*TimedWorkQueueItem)
+		start = timedItem.Time
 	}
-	return item, start, shutdown
+	return timedItem, start, shutdown
+}
+
+func (q TimedWorkQueue) Done(timedItem *TimedWorkQueueItem) error {
+	q.Type.Done(timedItem)
+	return nil
 }
