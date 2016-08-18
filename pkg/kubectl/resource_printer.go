@@ -286,14 +286,12 @@ func (p *JSONPrinter) PrintObj(obj runtime.Object, w io.Writer) error {
 		return err
 	}
 
-	data, err := json.Marshal(obj)
+	data, err := json.MarshalIndent(obj, "", "    ")
 	if err != nil {
 		return err
 	}
-	dst := bytes.Buffer{}
-	err = json.Indent(&dst, data, "", "    ")
-	dst.WriteByte('\n')
-	_, err = w.Write(dst.Bytes())
+	data = append(data, '\n')
+	_, err = w.Write(data)
 	return err
 }
 
