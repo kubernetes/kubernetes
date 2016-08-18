@@ -36,11 +36,33 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_Eviction, InType: reflect.TypeOf(&Eviction{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudget, InType: reflect.TypeOf(&PodDisruptionBudget{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetList, InType: reflect.TypeOf(&PodDisruptionBudgetList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetSpec, InType: reflect.TypeOf(&PodDisruptionBudgetSpec{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_policy_PodDisruptionBudgetStatus, InType: reflect.TypeOf(&PodDisruptionBudgetStatus{})},
 	)
+}
+
+func DeepCopy_policy_Eviction(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*Eviction)
+		out := out.(*Eviction)
+		out.TypeMeta = in.TypeMeta
+		if err := api.DeepCopy_api_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+			return err
+		}
+		if in.DeleteOptions != nil {
+			in, out := &in.DeleteOptions, &out.DeleteOptions
+			*out = new(api.DeleteOptions)
+			if err := api.DeepCopy_api_DeleteOptions(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.DeleteOptions = nil
+		}
+		return nil
+	}
 }
 
 func DeepCopy_policy_PodDisruptionBudget(in interface{}, out interface{}, c *conversion.Cloner) error {
