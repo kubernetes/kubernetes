@@ -330,6 +330,9 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			out.KubeReserved = nil
 		}
 		out.ProtectKernelDefaults = in.ProtectKernelDefaults
+		out.MakeIPTablesUtilChains = in.MakeIPTablesUtilChains
+		out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
+		out.IPTablesDropBit = in.IPTablesDropBit
 		return nil
 	}
 }
