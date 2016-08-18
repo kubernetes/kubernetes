@@ -96,6 +96,7 @@ pkg/credentialprovider/aws
 pkg/hyperkube
 pkg/kubelet/api
 pkg/kubelet/container
+pkg/kubelet/eviction
 pkg/kubelet/envvars
 pkg/kubelet/util/format
 pkg/kubelet/util/ioutils
