@@ -59,11 +59,15 @@ parameters:
   type: io1
   zone: us-east-1d
   iopsPerGB: "10"
+  encrypted: "true"
+  kmsKeyId: "arn:aws:kms:us-east-1:012345678910:key/abcd1234-a123-456a-a12b-a123b4cd56ef"
 ```
 
 * `type`: `io1`, `gp2`, `sc1`, `st1`. See AWS docs for details. Default: `gp2`.
 * `zone`: AWS zone. If not specified, a random zone in the same region as controller-manager will be chosen.
 * `iopsPerGB`: only for `io1` volumes. I/O operations per second per GiB. AWS volume plugin multiplies this with size of requested volume to compute IOPS of the volume and caps it at 20 000 IOPS (maximum supported by AWS, see AWS docs).
+* `encrypted`: enable EBS encryption on the disk. If not specified, no encryption is used.
+* `kmsKeyId`: which KMS key to use for EBS encryption. If not specified, the default key is used. If this is specified, `encrypted` must also be set.
 
 #### GCE
 
