@@ -82,17 +82,145 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  "kind": "Policy",
 		  "apiVersion": "v1",
 		  "predicates": [
-		    {"name": "PodFitsHostPorts"}
+		    {"name": "MatchNodeSelector"},
+		    {"name": "PodFitsHostPorts"},
+		    {"name": "PodFitsResources"},
+		    {"name": "NoDiskConflict"},
+		    {"name": "HostName"},
+    {"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
+    {"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
 		  ],"priorities": [
-		    {"name": "SelectorSpreadPriority",   "weight": 2}
+		    {"name": "LeastRequestedPriority",   "weight": 2},
+		    {"name": "BalancedResourceAllocation",   "weight": 2},
+		    {"name": "SelectorSpreadPriority",   "weight": 2},
+    {"name": "TestServiceAntiAffinity",  "weight": 3, "argument": {"serviceAntiAffinity": {"label": "zone"}}},
+    {"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
 			ExpectedPolicy: schedulerapi.Policy{
 				Predicates: []schedulerapi.PredicatePolicy{
+					{Name: "MatchNodeSelector"},
 					{Name: "PodFitsHostPorts"},
+					{Name: "PodFitsResources"},
+					{Name: "NoDiskConflict"},
+					{Name: "HostName"},
+					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
+					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
 				},
 				Priorities: []schedulerapi.PriorityPolicy{
+					{Name: "LeastRequestedPriority", Weight: 2},
+					{Name: "BalancedResourceAllocation", Weight: 2},
 					{Name: "SelectorSpreadPriority", Weight: 2},
+					{Name: "TestServiceAntiAffinity", Weight: 3, Argument: &schedulerapi.PriorityArgument{ServiceAntiAffinity: &schedulerapi.ServiceAntiAffinity{Label: "zone"}}},
+					{Name: "TestLabelPreference", Weight: 4, Argument: &schedulerapi.PriorityArgument{LabelPreference: &schedulerapi.LabelPreference{Label: "bar", Presence: true}}},
+				},
+			},
+		},
+		// Do not change this JSON. A failure indicates backwards compatibility with 1.2 was broken.
+		"1.2": {
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+		    {"name": "MatchNodeSelector"},
+		    {"name": "PodFitsResources"},
+		    {"name": "PodFitsHostPorts"},
+		    {"name": "HostName"},
+		    {"name": "NoDiskConflict"},
+		    {"name": "NoVolumeZoneConflict"},
+		    {"name": "MaxEBSVolumeCount"},
+		    {"name": "MaxGCEPDVolumeCount"},
+		    {"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
+		    {"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
+		  ],"priorities": [
+		    {"name": "ImageLocalityPriority",   "weight": 2},
+		    {"name": "LeastRequestedPriority",   "weight": 2},
+		    {"name": "BalancedResourceAllocation",   "weight": 2},
+		    {"name": "SelectorSpreadPriority",   "weight": 2},
+		    {"name": "TestServiceAntiAffinity",  "weight": 3, "argument": {"serviceAntiAffinity": {"label": "zone"}}},
+		    {"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
+		  ]
+		}`,
+			ExpectedPolicy: schedulerapi.Policy{
+				Predicates: []schedulerapi.PredicatePolicy{
+					{Name: "MatchNodeSelector"},
+					{Name: "PodFitsResources"},
+					{Name: "PodFitsHostPorts"},
+					{Name: "HostName"},
+					{Name: "NoDiskConflict"},
+					{Name: "NoVolumeZoneConflict"},
+					{Name: "MaxEBSVolumeCount"},
+					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
+					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+				},
+				Priorities: []schedulerapi.PriorityPolicy{
+					{Name: "ImageLocalityPriority", Weight: 2},
+					{Name: "LeastRequestedPriority", Weight: 2},
+					{Name: "BalancedResourceAllocation", Weight: 2},
+					{Name: "SelectorSpreadPriority", Weight: 2},
+					{Name: "TestServiceAntiAffinity", Weight: 3, Argument: &schedulerapi.PriorityArgument{ServiceAntiAffinity: &schedulerapi.ServiceAntiAffinity{Label: "zone"}}},
+					{Name: "TestLabelPreference", Weight: 4, Argument: &schedulerapi.PriorityArgument{LabelPreference: &schedulerapi.LabelPreference{Label: "bar", Presence: true}}},
+				},
+			},
+		},
+		// Do not change this JSON. A failure indicates backwards compatibility with 1.3 was broken.
+		"1.3": {
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+		    {"name": "MatchNodeSelector"},
+		    {"name": "PodFitsResources"},
+		    {"name": "PodFitsHostPorts"},
+		    {"name": "HostName"},
+		    {"name": "NoDiskConflict"},
+		    {"name": "NoVolumeZoneConflict"},
+		    {"name": "PodToleratesNodeTaints"},
+		    {"name": "CheckNodeMemoryPressure"},
+		    {"name": "CheckNodeDiskPressure"},
+		    {"name": "MaxEBSVolumeCount"},
+		    {"name": "MaxGCEPDVolumeCount"},
+		    {"name": "MatchInterPodAffinity"},
+		    {"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
+		    {"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
+		  ],"priorities": [
+		    {"name": "ImageLocalityPriority",   "weight": 2},
+		    {"name": "LeastRequestedPriority",   "weight": 2},
+		    {"name": "BalancedResourceAllocation",   "weight": 2},
+		    {"name": "SelectorSpreadPriority",   "weight": 2},
+		    {"name": "NodePreferAvoidPodsPriority",   "weight": 2},
+		    {"name": "NodeAffinityPriority",   "weight": 2},
+		    {"name": "TaintTolerationPriority",   "weight": 2},
+		    {"name": "InterPodAffinityPriority",   "weight": 2}
+		  ]
+		}`,
+			ExpectedPolicy: schedulerapi.Policy{
+				Predicates: []schedulerapi.PredicatePolicy{
+					{Name: "MatchNodeSelector"},
+					{Name: "PodFitsResources"},
+					{Name: "PodFitsHostPorts"},
+					{Name: "HostName"},
+					{Name: "NoDiskConflict"},
+					{Name: "NoVolumeZoneConflict"},
+					{Name: "PodToleratesNodeTaints"},
+					{Name: "CheckNodeMemoryPressure"},
+					{Name: "CheckNodeDiskPressure"},
+					{Name: "MaxEBSVolumeCount"},
+					{Name: "MaxGCEPDVolumeCount"},
+					{Name: "MatchInterPodAffinity"},
+					{Name: "TestServiceAffinity", Argument: &schedulerapi.PredicateArgument{ServiceAffinity: &schedulerapi.ServiceAffinity{Labels: []string{"region"}}}},
+					{Name: "TestLabelsPresence", Argument: &schedulerapi.PredicateArgument{LabelsPresence: &schedulerapi.LabelsPresence{Labels: []string{"foo"}, Presence: true}}},
+				},
+				Priorities: []schedulerapi.PriorityPolicy{
+					{Name: "ImageLocalityPriority", Weight: 2},
+					{Name: "LeastRequestedPriority", Weight: 2},
+					{Name: "BalancedResourceAllocation", Weight: 2},
+					{Name: "SelectorSpreadPriority", Weight: 2},
+					{Name: "NodePreferAvoidPodsPriority", Weight: 2},
+					{Name: "NodeAffinityPriority", Weight: 2},
+					{Name: "TaintTolerationPriority", Weight: 2},
+					{Name: "InterPodAffinityPriority", Weight: 2},
 				},
 			},
 		},
