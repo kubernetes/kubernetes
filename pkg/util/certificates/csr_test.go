@@ -19,7 +19,11 @@ func TestNewCertificateRequest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _, err = NewCertificateRequest(keyData, subject, dnsSANs, ipSANs)
+	key, err := ParsePrivateKey(keyData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = NewCertificateRequest(key, subject, dnsSANs, ipSANs)
 	if err != nil {
 		t.Error(err)
 	}
