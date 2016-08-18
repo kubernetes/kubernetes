@@ -1009,18 +1009,17 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", "comment", "--comment", fmt.Sprintf(`"%s loadbalancer IP"`, svcName.String()),
 				}
 
+				// Each source match rule in the FW chain may jump to either the SVC or the XLB chain
 				chosenChain := svcXlbChain
-				// We have to DNAT packets from external IPs, however if the
-				// Service is only proxying to local endpoints, we don't need
-				// to masquerade.
+				// If the service is only proxying to local endpoints, we will not have a double-hop
+				// so don't need to masquerade for these services.
 				if !svcInfo.onlyNodeLocalEndpoints {
-					// We have to SNAT packets from external IPs.
 					writeLine(natRules, append(args, "-j", string(KubeMarkMasqChain))...)
-					chosenChain := svcChain
+					chosenChain = svcChain
 				}
 
 				if len(svcInfo.loadBalancerSourceRanges) == 0 {
-					// allow all sources, so jump directly to KUBE-SVC chain
+					// allow all sources, so jump directly to the KUBE-SVC or KUBE-XLB chain
 					writeLine(natRules, append(args, "-j", string(chosenChain))...)
 				} else {
 					// firewall filter based on each source range
@@ -1170,34 +1169,34 @@ func (proxier *Proxier) syncProxyRules() {
 			writeLine(natRules, args...)
 		}
 
+		// The logic below this applies only if this service is marked as OnlyLocal
 		if !svcInfo.onlyNodeLocalEndpoints {
 			continue
 		}
 
 		// Now write ingress loadbalancing & DNAT rules only for services that have a localOnly annotation
+		// TODO - This logic may be combinable with the block above that creates the svc balancer chain
 		localEndpoints := make([]*endpointsInfo, 0)
 		localEndpointChains := make([]utiliptables.Chain, 0)
 		for i := range endpointChains {
 			if endpoints[i].localEndpoint {
-				// These slices parallel each other; must be in sync
+				// These slices parallel each other; must be kept in sync
 				localEndpoints = append(localEndpoints, endpoints[i])
 				localEndpointChains = append(localEndpointChains, endpointChains[i])
 			}
 		}
-
-		if n == 0 {
-			// Blackhole all LB traffic that should not be double-hopped.
-			// TODO - nat table does not allow DROP action - use mark action from FW chain (Minhan's commit)
+		numLocalEndpoints := len(localEndpointChains)
+		if numLocalEndpoints == 0 {
+			// Blackhole all traffic since there are no local endpoints
 			args := []string{
 				"-A", string(svcXlbChain),
 				"-m", "comment", "--comment",
-				fmt.Sprintf(`"Blackhole rule for %s - No local endpoints"`, svcName.String()),
+				fmt.Sprintf(`"%s has no local endpoints"`, svcName.String()),
 				"-j",
-				"LOG",
+				string(KubeMarkDropChain),
 			}
 			writeLine(natRules, args...)
 		} else {
-			n = len(localEndpointChains)
 			// Setup probability filter rules only over local endpoints
 			for i, endpointChain := range localEndpointChains {
 				// Balancing rules in the per-service chain.
@@ -1206,28 +1205,15 @@ func (proxier *Proxier) syncProxyRules() {
 					"-m", "comment", "--comment",
 					fmt.Sprintf(`"Balancing rule %d for %s"`, i, svcName.String()),
 				}
-				if i < (n - 1) {
+				if i < (numLocalEndpoints - 1) {
 					// Each rule is a probabilistic match.
 					args = append(args,
 						"-m", "statistic",
 						"--mode", "random",
-						"--probability", fmt.Sprintf("%0.5f", 1.0/float64(n-i)))
+						"--probability", fmt.Sprintf("%0.5f", 1.0/float64(numLocalEndpoints-i)))
 				}
 				// The final (or only if n == 1) rule is a guaranteed match.
 				args = append(args, "-j", string(endpointChain))
-				writeLine(natRules, args...)
-
-				args = []string{
-					"-A", string(endpointChain),
-					"-m", "comment", "--comment",
-					fmt.Sprintf(`"Endpoint rule for %s"`, svcName.String()),
-				}
-				// Update client-affinity lists.
-				if svcInfo.sessionAffinityType == api.ServiceAffinityClientIP {
-					args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
-				}
-				// DNAT to final destination.
-				args = append(args, "-m", protocol, "-p", protocol, "-j", "DNAT", "--to-destination", localEndpoints[i].ip)
 				writeLine(natRules, args...)
 			}
 		}
