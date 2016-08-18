@@ -226,7 +226,7 @@ func validateDNSResults(f *framework.Framework, pod *api.Pod, fileNames []string
 		framework.Failf("Failed to get pod %s: %v", pod.Name, err)
 	}
 	// Try to find results for each expected name.
-	By("looking for the results for each expected name from probiers")
+	By("looking for the results for each expected name from probers")
 	assertFilesExist(fileNames, "results", pod, f.Client)
 
 	// TODO: probe from the host, too.
@@ -319,6 +319,15 @@ var _ = framework.KubeDescribe("DNS", func() {
 			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
 		}()
 
+		externalService := createServiceSpec("external-test-service", true, testServiceSelector)
+		_, err = f.Client.Services(f.Namespace.Name).Create(externalService)
+		Expect(err).NotTo(HaveOccurred())
+		defer func() {
+			By("deleting the test external service")
+			defer GinkgoRecover()
+			f.Client.Services(f.Namespace.Name).Delete(externalService.Name)
+		}()
+
 		regularService := createServiceSpec("test-service-2", false, testServiceSelector)
 		regularService, err = f.Client.Services(f.Namespace.Name).Create(regularService)
 		Expect(err).NotTo(HaveOccurred())
@@ -335,6 +344,9 @@ var _ = framework.KubeDescribe("DNS", func() {
 			fmt.Sprintf("%s", headlessService.Name),
 			fmt.Sprintf("%s.%s", headlessService.Name, f.Namespace.Name),
 			fmt.Sprintf("%s.%s.svc", headlessService.Name, f.Namespace.Name),
+			fmt.Sprintf("%s", externalService.Name),
+			fmt.Sprintf("%s.%s", externalService.Name, f.Namespace.Name),
+			fmt.Sprintf("%s.%s.svc", externalService.Name, f.Namespace.Name),
 			fmt.Sprintf("_http._tcp.%s.%s.svc", headlessService.Name, f.Namespace.Name),
 			fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
 		}
