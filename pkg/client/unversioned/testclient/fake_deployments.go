@@ -70,6 +70,15 @@ func (c *FakeDeployments) Create(deployment *extensions.Deployment) (*extensions
 	return obj.(*extensions.Deployment), err
 }
 
+func (c *FakeDeployments) Patch(deployment *extensions.Deployment, body []byte) (*extensions.Deployment, error) {
+	obj, err := c.Fake.Invokes(NewPatchAction("deployments", c.Namespace, deployment), deployment)
+	if obj == nil {
+		return nil, err
+	}
+
+	return obj.(*extensions.Deployment), err
+}
+
 func (c *FakeDeployments) Update(deployment *extensions.Deployment) (*extensions.Deployment, error) {
 	obj, err := c.Fake.Invokes(NewUpdateAction("deployments", c.Namespace, deployment), deployment)
 	if obj == nil {

@@ -33,6 +33,7 @@ type DeploymentInterface interface {
 	Get(name string) (*extensions.Deployment, error)
 	Delete(name string, options *api.DeleteOptions) error
 	Create(*extensions.Deployment) (*extensions.Deployment, error)
+	Patch(*extensions.Deployment, []byte) (*extensions.Deployment, error)
 	Update(*extensions.Deployment) (*extensions.Deployment, error)
 	UpdateStatus(*extensions.Deployment) (*extensions.Deployment, error)
 	Watch(opts api.ListOptions) (watch.Interface, error)
@@ -79,6 +80,13 @@ func (c *deployments) Delete(name string, options *api.DeleteOptions) error {
 func (c *deployments) Create(deployment *extensions.Deployment) (result *extensions.Deployment, err error) {
 	result = &extensions.Deployment{}
 	err = c.client.Post().Namespace(c.ns).Resource("deployments").Body(deployment).Do().Into(result)
+	return
+}
+
+// Patch takes the partial representation of a deployment and updates it. Returns the server's representation of the deployment, and an error, if there is any.
+func (c *deployments) Patch(deployment *extensions.Deployment, body []byte) (result *extensions.Deployment, err error) {
+	result = &extensions.Deployment{}
+	err = c.client.Patch(api.StrategicMergePatchType).Namespace(c.ns).Resource("deployments").Name(deployment.Name).Body(body).Do().Into(result)
 	return
 }
 
