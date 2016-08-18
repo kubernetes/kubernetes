@@ -79,10 +79,10 @@ This section applies only to pull requests on the master branch.
 For cherry-pick PRs, see the [Cherrypick instructions](cherry-picks.md)
 
 1. All pull requests are initiated with a `release-note-label-needed` label.
-1. For a PR to be ready to merge, the `release-note-label-needed` label must be removed and one of the other `release-note-*` labels must be added.
-1. `release-note-none` is a valid option if the PR does not need to be mentioned
+2. For a PR to be ready to merge, the `release-note-label-needed` label must be removed and one of the other `release-note-*` labels must be added.
+3. `release-note-none` is a valid option if the PR does not need to be mentioned
  at release time.
-1. `release-note` labeled PRs generate a release note using the PR title by
+4. `release-note` labeled PRs generate a release note using the PR title by
    default OR the release-note block in the PR template if filled in.
   * See the [PR template](../../.github/PULL_REQUEST_TEMPLATE.md) for more
     details.
