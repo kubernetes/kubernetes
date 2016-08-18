@@ -132,20 +132,42 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
+const num = 1
+const gotit = false
+
 func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
 
-	// If no DB is found, allow it
+	// If there is more than 1 PDB, that's an error (500).
+	if num > 1 {
+		return &unversioned.Status{
+			Status:  unversioned.StatusFailure,
+			Message: "Too many PDBs yo",
+			Code:    500,
+		}, nil
+	} else if num == 1 {
+		// Try to verify-and-decrement
+		// If it was false already, or if it becomes false during the course of our retries,
+		// raise an error marked as a ... 429 maybe?
+		if !gotit {
+			return &unversioned.Status{
+				Status:  unversioned.StatusFailure,
+				Message: "Not yet, brother",
+				Code:    429,
+			}, nil
+		}
+	}
 
-	// If >1 DB is found, return a 5xx explaining the service is misconfigured
+	// At this point there was either no PDB or we succeded in decrementing
 
-	// Try to verify-and-decrement
-	// If it was false already, or if it becomes false during the course of our retries,
-	// raise an error marked as a ... 429 maybe?
+	// Try the delete
+	_, err := r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
+	if err != nil {
+		return nil, err
+	}
 
-	// If we succeed in decrementing, try the eviction via
-	return r.store.Delete(ctx, eviction.Name, eviction.DeleteOptions)
-	// except maybe we shouldn't return exactly what Delete() returns
+	// Success!
+	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
