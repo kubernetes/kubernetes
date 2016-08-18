@@ -41,9 +41,10 @@ const (
 type KubeletServer struct {
 	componentconfig.KubeletConfiguration
 
-	AuthPath      util.StringFlag // Deprecated -- use KubeConfig instead
-	KubeConfig    util.StringFlag
-	APIServerList []string
+	AuthPath          util.StringFlag // Deprecated -- use KubeConfig instead
+	KubeConfig        util.StringFlag
+	WaitForKubeConfig bool
+	APIServerList     []string
 
 	RunOnce bool
 
@@ -109,6 +110,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(&s.AuthPath, "auth-path", "Path to .kubernetes_auth file, specifying how to authenticate to API server.")
 	fs.MarkDeprecated("auth-path", "will be removed in a future version")
 	fs.Var(&s.KubeConfig, "kubeconfig", "Path to a kubeconfig file, specifying how to authenticate to API server (the master location is set by the api-servers flag).")
+	fs.BoolVar(&s.WaitForKubeConfig, "wait-for-kubeconfig", s.WaitForKubeConfig, "If true, kubelet will keep waiting for kubeconfig file and whether --api-servers is provided or not.")
 	fs.Int32Var(&s.CAdvisorPort, "cadvisor-port", s.CAdvisorPort, "The port of the localhost cAdvisor endpoint")
 	fs.Int32Var(&s.HealthzPort, "healthz-port", s.HealthzPort, "The port of the localhost healthz endpoint")
 	fs.Var(componentconfig.IPVar{Val: &s.HealthzBindAddress}, "healthz-bind-address", "The IP address for the healthz server to serve on, defaulting to 127.0.0.1 (set to 0.0.0.0 for all interfaces)")
