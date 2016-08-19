@@ -119,6 +119,7 @@ func loadTestProfiles() error {
 		return fmt.Errorf("failed to write profiles to file: %v", err)
 	}
 
+	// TODO(random-liu): The test is run as root now, no need to use sudo here.
 	cmd := exec.Command("sudo", "apparmor_parser", "-r", "-W", f.Name())
 	stderr := &bytes.Buffer{}
 	cmd.Stderr = stderr

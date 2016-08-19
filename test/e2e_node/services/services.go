@@ -148,17 +148,7 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can't get current binary: %v", err)
 	}
-	startCmd := exec.Command("sudo", testBin,
-		// TODO(mtaufen): Flags e.g. that target the TestContext need to be manually forwarded to the
-		//                test binary when we start it up in run-services mode. This is not ideal.
-		//                Very unintuitive because it prevents any flags NOT manually forwarded here
-		//                from being set via TEST_ARGS when running tests from the command line.
-		"--run-services-mode",
-		"--server-start-timeout", serverStartTimeout.String(),
-		"--feature-gates", framework.TestContext.FeatureGates,
-		"--logtostderr",
-		"--vmodule=*="+LOG_VERBOSITY_LEVEL,
-	)
+	startCmd := exec.Command(testBin, append([]string{"--run-services-mode"}, os.Args[1:]...)...)
 	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
 	return server, server.start()
 }
@@ -184,8 +174,8 @@ func (e *E2EServices) startKubelet() (*server, error) {
 		// sense to test it that way
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
 		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", builder.GetKubeletServerBin())
-		killCommand = exec.Command("sudo", "systemctl", "kill", unitName)
-		restartCommand = exec.Command("sudo", "systemctl", "restart", unitName)
+		killCommand = exec.Command("systemctl", "kill", unitName)
+		restartCommand = exec.Command("systemctl", "restart", unitName)
 		e.logFiles["kubelet.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
@@ -251,7 +241,7 @@ func (e *E2EServices) startKubelet() (*server, error) {
 			"--network-plugin-dir", filepath.Join(cwd, "cni", "bin")) // Enable kubenet
 	}
 
-	cmd := exec.Command("sudo", cmdArgs...)
+	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	server := newServer(
 		"kubelet",
 		cmd,
@@ -286,7 +276,7 @@ func (e *E2EServices) getLogFiles() {
 				continue
 			}
 			glog.Infof("Get log file %q with journalctl command %v.", targetFileName, logFileData.journalctlCommand)
-			out, err := exec.Command("sudo", append([]string{"journalctl"}, logFileData.journalctlCommand...)...).CombinedOutput()
+			out, err := exec.Command("journalctl", logFileData.journalctlCommand...).CombinedOutput()
 			if err != nil {
 				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
@@ -319,10 +309,10 @@ func isJournaldAvailable() bool {
 
 func copyLogFile(src, target string) error {
 	// If not a journald based distro, then just symlink files.
-	if out, err := exec.Command("sudo", "cp", src, target).CombinedOutput(); err != nil {
+	if out, err := exec.Command("cp", src, target).CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to copy %q to %q: %v, %v", src, target, out, err)
 	}
-	if out, err := exec.Command("sudo", "chmod", "a+r", target).CombinedOutput(); err != nil {
+	if out, err := exec.Command("chmod", "a+r", target).CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to make log file %q world readable: %v, %v", target, out, err)
 	}
 	return nil
