@@ -881,6 +881,9 @@ func (r *Request) DoRaw() ([]byte, error) {
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
 		result.body, result.err = ioutil.ReadAll(resp.Body)
+		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
+			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
+		}
 	})
 	if err != nil {
 		return nil, err
