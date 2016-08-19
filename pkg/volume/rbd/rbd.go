@@ -182,15 +182,32 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 	return volume.NewSpecFromVolume(rbdVolume), nil
 }
 
-func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *rbdPlugin) NewDeleter(parameter map[string]string, spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
 	}
-
-	return plugin.newDeleterInternal(spec, &RBDUtil{})
+	admin := ""
+	secret := ""
+	for k, v := range parameter {
+		switch dstrings.ToLower(k) {
+		case "adminid":
+			admin = v
+		case "adminkey":
+			secret = v
+		}
+	}
+	// sanity check
+	if secret == "" {
+		// no key, log an error but keep trying
+		glog.Infof("failed to get admin key from deleter parameter")
+	}
+	if admin == "" {
+		admin = "admin"
+	}
+	return plugin.newDeleterInternal(spec, admin, secret, &RBDUtil{})
 }
 
-func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, manager diskManager) (volume.Deleter, error) {
+func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret string, manager diskManager) (volume.Deleter, error) {
 	return &rbdVolumeDeleter{
 		rbdMounter: &rbdMounter{
 			rbd: &rbd{
@@ -200,8 +217,9 @@ func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, manager diskManag
 				manager: manager,
 				plugin:  plugin,
 			},
-			Mon: spec.PersistentVolume.Spec.RBD.CephMonitors,
-			Id:  spec.PersistentVolume.Spec.RBD.RadosUser,
+			Mon:    spec.PersistentVolume.Spec.RBD.CephMonitors,
+			Id:     admin,
+			Secret: secret,
 		}}, nil
 }
 
