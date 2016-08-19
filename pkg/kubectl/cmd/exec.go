@@ -261,8 +261,10 @@ func (p *ExecOptions) Run() error {
 
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
-		msg := fmt.Errorf("defaulting container name to %s, use '%s describe po/%s' cmd to see all containers in this pod", pod.Spec.Containers[0].Name, p.FullCmdName, p.PodName)
-		fmt.Printf("%v\n", msg)
+		if len(pod.Spec.Containers) > 1 {
+			msg := fmt.Sprintf("defaulting container name to %s, use '%s describe po/%s' cmd to see all containers in this pod", pod.Spec.Containers[0].Name, p.FullCmdName, p.PodName)
+			fmt.Fprintf(p.Err, "%s", msg)
+		}
 		containerName = pod.Spec.Containers[0].Name
 	}
 
