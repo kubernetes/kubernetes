@@ -54,6 +54,9 @@ func getMaxVols(defaultVal int) int {
 
 func init() {
 	factory.RegisterAlgorithmProvider(factory.DefaultProvider, defaultPredicates(), defaultPriorities())
+	// Cluster autoscaler friendly scheduling algorithm.
+	factory.RegisterAlgorithmProvider("ClusterAutoscalerProvider", defaultPredicates(),
+		replace(defaultPriorities(), "LeastRequestedPriority", "MostRequestedPriority"))
 	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
 	// Register the priority function so that its available
 	// but do not include it as part of the default priorities
@@ -95,6 +98,15 @@ func init() {
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction("MostRequestedPriority", priorities.MostRequestedPriority, 1)
+}
+
+func replace(set sets.String, replaceWhat, replaceWith string) sets.String {
+	result := sets.NewString(set.List()...)
+	if result.Has(replaceWhat) {
+		result.Delete(replaceWhat)
+		result.Insert(replaceWith)
+	}
+	return result
 }
 
 func defaultPredicates() sets.String {
