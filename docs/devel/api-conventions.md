@@ -1345,7 +1345,7 @@ encodes the stream before returning it to the client.
 
 Clients should use the SPDY protocols if their clients have native support, or
 WebSockets as a fallback. Note that WebSockets is susceptible to Head-of-Line
-blocking and so clients must read and process each message sequentionally. In
+blocking and so clients must read and process each message sequentially. In
 the future, an HTTP/2 implementation will be exposed that deprecates SPDY.
 
 
