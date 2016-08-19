@@ -399,6 +399,13 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.IPTablesDropBit = nil
 		}
+		if in.SysctlCustomWhitelist != nil {
+			in, out := &in.SysctlCustomWhitelist, &out.SysctlCustomWhitelist
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.SysctlCustomWhitelist = nil
+		}
 		return nil
 	}
 }

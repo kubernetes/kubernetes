@@ -802,6 +802,13 @@ func DeepCopy_extensions_PodSecurityPolicySpec(in interface{}, out interface{}, 
 			return err
 		}
 		out.ReadOnlyRootFilesystem = in.ReadOnlyRootFilesystem
+		if in.Sysctls != nil {
+			in, out := &in.Sysctls, &out.Sysctls
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.Sysctls = nil
+		}
 		return nil
 	}
 }
