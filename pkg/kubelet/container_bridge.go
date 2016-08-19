@@ -17,36 +17,87 @@ limitations under the License.
 package kubelet
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
-	"regexp"
+	"syscall"
 
 	"github.com/golang/glog"
+	"github.com/vishvananda/netlink"
+
 	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/procfs"
-	"syscall"
 )
 
-var cidrRegexp = regexp.MustCompile(`inet ([0-9a-fA-F.:]*/[0-9]*)`)
+// ensureBridge and ensureIPTablesMasqRule are the only methods that are called from outside this file
+func ensureBridge(brName string, brMtu int, wantCIDR *net.IPNet, promiscuous, babysitDaemons bool) error {
+	br := &netlink.Bridge{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: brName,
+			MTU:  brMtu,
+			// Let kernel use default txqueuelen; leaving it unset
+			// means 0, and a zero-length TX queue messes up FIFO
+			// traffic shapers which use TX queue length as the
+			// default packet limit
+			TxQLen: -1,
+		},
+	}
 
-func createCBR0(wantCIDR *net.IPNet, babysitDaemons bool) error {
-	// recreate cbr0 with wantCIDR
-	if err := exec.Command("brctl", "addbr", "cbr0").Run(); err != nil {
-		glog.Error(err)
+	exists, err := bridgeExists(br.Name)
+	if err != nil {
 		return err
 	}
-	if err := exec.Command("ip", "addr", "add", wantCIDR.String(), "dev", "cbr0").Run(); err != nil {
-		glog.Error(err)
-		return err
+	if !exists {
+		glog.V(2).Infof("%s doesn't exist, attempting to create it with range: %s", br.Name, wantCIDR)
+		return createBridge(br, wantCIDR, babysitDaemons)
 	}
-	if err := exec.Command("ip", "link", "set", "dev", "cbr0", "mtu", "1460", "up").Run(); err != nil {
-		glog.Error(err)
-		return err
+	if !bridgeCidrCorrect(br, wantCIDR) {
+		glog.V(2).Infof("Attempting to recreate %s with address range: %s", br.Name, wantCIDR)
+
+		if err := netlink.LinkSetDown(br); err != nil {
+			return fmt.Errorf("could not set down bridge %s: %v", br.Name, err)
+		}
+
+		if err := netlink.LinkDel(br); err != nil {
+			return fmt.Errorf("could not delete bridge %s: %v", br.Name, err)
+		}
+
+		return createBridge(br, wantCIDR, babysitDaemons)
 	}
+	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
+	// TODO: Remove this once the kernel bug (#20096) is fixed.
+	if promiscuous {
+		// Checking if the bridge is in promiscuous mode is as expensive and more brittle than
+		// simply setting the flag every time.
+		// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
+		if err := exec.Command("ip", "link", "set", br.Name, "promisc", "on").Run(); err != nil {
+			glog.Error(err)
+			return err
+		}
+	}
+	return nil
+}
+
+func createBridge(br *netlink.Bridge, wantCIDR *net.IPNet, babysitDaemons bool) error {
+	addr := &netlink.Addr{
+		IPNet: wantCIDR,
+		Label: "",
+	}
+
+	if err := netlink.LinkAdd(br); err != nil {
+		return fmt.Errorf("could not add create bridge %s: %v", br.Name, err)
+	}
+
+	if err := netlink.AddrAdd(br, addr); err != nil {
+		return fmt.Errorf("could not add IP address to bridge %s: %v", br.Name, err)
+	}
+
+	if err := netlink.LinkSetUp(br); err != nil {
+		return fmt.Errorf("could not set up bridge %s: %v", br.Name, err)
+	}
+
 	// Stop docker so that babysitter process can restart it again with proper configurations and
 	// checkpoint file (https://github.com/docker/docker/issues/18283). It is safe to kill docker
 	// process here since CIDR can be changed only once for a given node object, and node is marked
@@ -68,54 +119,15 @@ func createCBR0(wantCIDR *net.IPNet, babysitDaemons bool) error {
 			glog.Error(err)
 		}
 	}
-	glog.V(2).Info("Recreated cbr0 and restarted docker")
+	glog.V(2).Info("Recreated %s and restarted docker", br.Name)
 	return nil
 }
 
-func ensureCbr0(wantCIDR *net.IPNet, promiscuous, babysitDaemons bool) error {
-	exists, err := cbr0Exists()
-	if err != nil {
-		return err
-	}
-	if !exists {
-		glog.V(2).Infof("CBR0 doesn't exist, attempting to create it with range: %s", wantCIDR)
-		return createCBR0(wantCIDR, babysitDaemons)
-	}
-	if !cbr0CidrCorrect(wantCIDR) {
-		glog.V(2).Infof("Attempting to recreate cbr0 with address range: %s", wantCIDR)
-
-		// delete cbr0
-		if err := exec.Command("ip", "link", "set", "dev", "cbr0", "down").Run(); err != nil {
-			glog.Error(err)
-			return err
-		}
-		if err := exec.Command("brctl", "delbr", "cbr0").Run(); err != nil {
-			glog.Error(err)
-			return err
-		}
-		if err := createCBR0(wantCIDR, babysitDaemons); err != nil {
-			glog.Error(err)
-			return err
-		}
-	}
-	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
-	// TODO: Remove this once the kernel bug (#20096) is fixed.
-	if promiscuous {
-		// Checking if the bridge is in promiscuous mode is as expensive and more brittle than
-		// simply setting the flag every time.
-		if err := exec.Command("ip", "link", "set", "cbr0", "promisc", "on").Run(); err != nil {
-			glog.Error(err)
-			return err
-		}
-	}
-	return nil
-}
-
-// Check if cbr0 network interface is configured or not, and take action
+// Check if the bridge network interface is configured or not, and take action
 // when the configuration is missing on the node, and propagate the rest
 // error to kubelet to handle.
-func cbr0Exists() (bool, error) {
-	if _, err := os.Stat("/sys/class/net/cbr0"); err != nil {
+func bridgeExists(brName string) (bool, error) {
+	if _, err := os.Stat("/sys/class/net/" + brName); err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
@@ -124,24 +136,21 @@ func cbr0Exists() (bool, error) {
 	return true, nil
 }
 
-func cbr0CidrCorrect(wantCIDR *net.IPNet) bool {
-	output, err := exec.Command("ip", "addr", "show", "cbr0").Output()
+// Check if some of the IP addresses on this bridge matches the CIDR we want
+func bridgeCidrCorrect(br *netlink.Bridge, wantCIDR *net.IPNet) bool {
+	addrs, err := netlink.AddrList(br, syscall.AF_INET)
 	if err != nil {
+		glog.Errorf("could not get list of IP addresses from bridge %s: %v", br.Name, err)
 		return false
 	}
-	match := cidrRegexp.FindSubmatch(output)
-	if len(match) < 2 {
-		return false
-	}
-	cbr0IP, cbr0CIDR, err := net.ParseCIDR(string(match[1]))
-	if err != nil {
-		glog.Errorf("Couldn't parse CIDR: %q", match[1])
-		return false
-	}
-	cbr0CIDR.IP = cbr0IP
 
-	glog.V(5).Infof("Want cbr0 CIDR: %s, have cbr0 CIDR: %s", wantCIDR, cbr0CIDR)
-	return wantCIDR.IP.Equal(cbr0IP) && bytes.Equal(wantCIDR.Mask, cbr0CIDR.Mask)
+	for _, addr := range addrs {
+		if addr.IPNet.String() == wantCIDR.String() {
+			return true
+		}
+	}
+
+	return false
 }
 
 // nonMasqueradeCIDR is the CIDR for our internal IP range; traffic to IPs
