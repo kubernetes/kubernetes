@@ -45,6 +45,7 @@ import (
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
+	"strconv"
 )
 
 const (
@@ -53,6 +54,9 @@ const (
 	DefaultCNIDir     = "/opt/cni/bin"
 
 	sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
+
+	// private mac prefix safe to use
+	privateMACPrefix = "0a:58"
 )
 
 type kubenetNetworkPlugin struct {
@@ -75,6 +79,8 @@ type kubenetNetworkPlugin struct {
 	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
 	vendorDir         string
 	nonMasqueradeCIDR string
+	podCidr		  string
+	gateway		  net.IP
 }
 
 func NewPlugin(networkPluginDir string) network.NetworkPlugin {
@@ -233,6 +239,8 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 			// plugin will bail out if the bridge has an unexpected one
 			plugin.clearBridgeAddressesExcept(cidr)
 		}
+		plugin.podCidr = podCIDR
+		plugin.gateway = cidr.IP
 	}
 
 	if err != nil {
@@ -317,6 +325,23 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, res.IP4)
 	}
 
+
+	// Explicitly assign mac address to cbr0. If bridge mac address is not explicitly set will adopt the lowest MAC address of the attached veths.
+	// TODO: Remove this once upstream cni bridge plugin handles this
+	link, err := netlink.LinkByName(BridgeName)
+	if err != nil {
+		return fmt.Errorf("failed to lookup %q: %v", BridgeName, err)
+	}
+	macAddr, err := generateHardwareAddr(plugin.gateway)
+	if err != nil {
+		return err
+	}
+	glog.V(3).Infof("Configure %q mac address to %v", BridgeName, macAddr)
+	err = netlink.LinkSetHardwareAddr(link, macAddr)
+	if err != nil {
+		return fmt.Errorf("Failed to configure %q mac address to %q: %v", BridgeName, macAddr, err)
+	}
+
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
 	// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
@@ -328,6 +353,8 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
 			}
 		}
+
+
 	}
 
 	// The first SetUpPod call creates the bridge; get a shaper for the sake of
@@ -572,4 +599,22 @@ func (plugin *kubenetNetworkPlugin) shaper() bandwidth.BandwidthShaper {
 		plugin.bandwidthShaper.ReconcileInterface()
 	}
 	return plugin.bandwidthShaper
+}
+
+// generateHardwareAddr generates 48 bit virtual mac addresses based on the IP input.
+func generateHardwareAddr(ip net.IP) (net.HardwareAddr, error) {
+	if ip.To4() == nil {
+		return nil, fmt.Errorf("generateHardwareAddr only support valid ipv4 address as input")
+	}
+	mac := privateMACPrefix
+	sections := strings.Split(ip.String(), ".")
+	for _, s := range sections {
+		i, _ := strconv.Atoi(s)
+		mac = mac + ":" + fmt.Sprintf("%02x", i)
+	}
+	hwAddr, err := net.ParseMAC(mac)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse mac address %s generated based on ip %s due to: %v", mac, ip, err)
+	}
+	return hwAddr, nil
 }
