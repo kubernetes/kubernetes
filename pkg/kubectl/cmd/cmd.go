@@ -17,16 +17,18 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	cmdconfig "k8s.io/kubernetes/pkg/kubectl/cmd/config"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/rollout"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/templates"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 
+	"github.com/golang/glog"
 	"github.com/spf13/cobra"
 )
 
@@ -222,59 +224,89 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		Run: runHelp,
 		BashCompletionFunction: bash_completion_func,
 	}
-	cmds.SetHelpTemplate(help_template)
-	cmds.SetUsageTemplate(usage_template)
 
 	f.BindFlags(cmds.PersistentFlags())
 	f.BindExternalFlags(cmds.PersistentFlags())
 
-	cmds.SetHelpCommand(NewCmdHelp(f, out))
-
 	// From this point and forward we get warnings on flags that contain "_" separators
 	cmds.SetGlobalNormalizationFunc(flag.WarnWordSepNormalizeFunc)
 
-	cmds.AddCommand(NewCmdGet(f, out, err))
-	cmds.AddCommand(set.NewCmdSet(f, out))
-	cmds.AddCommand(NewCmdDescribe(f, out))
-	cmds.AddCommand(NewCmdCreate(f, out))
-	cmds.AddCommand(NewCmdReplace(f, out))
-	cmds.AddCommand(NewCmdPatch(f, out))
-	cmds.AddCommand(NewCmdDelete(f, out))
-	cmds.AddCommand(NewCmdEdit(f, out, err))
-	cmds.AddCommand(NewCmdApply(f, out))
+	groups := templates.CommandGroups{
+		{
+			Message: "Basic Commands (Beginner):",
+			Commands: []*cobra.Command{
+				NewCmdCreate(f, out),
+				NewCmdExposeService(f, out),
+				NewCmdRun(f, in, out, err),
+				set.NewCmdSet(f, out),
+			},
+		},
+		{
+			Message: "Basic Commands (Intermediate):",
+			Commands: []*cobra.Command{
+				NewCmdGet(f, out, err),
+				NewCmdExplain(f, out),
+				NewCmdEdit(f, out, err),
+				NewCmdDelete(f, out),
+			},
+		},
+		{
+			Message: "Deploy Commands:",
+			Commands: []*cobra.Command{
+				rollout.NewCmdRollout(f, out),
+				NewCmdRollingUpdate(f, out),
+				NewCmdScale(f, out),
+				NewCmdAutoscale(f, out),
+			},
+		},
+		{
+			Message: "Cluster Management Commands:",
+			Commands: []*cobra.Command{
+				NewCmdClusterInfo(f, out),
+				NewCmdTop(f, out),
+				NewCmdCordon(f, out),
+				NewCmdUncordon(f, out),
+				NewCmdDrain(f, out),
+				NewCmdTaint(f, out),
+			},
+		},
+		{
+			Message: "Troubleshooting and Debugging Commands:",
+			Commands: []*cobra.Command{
+				NewCmdDescribe(f, out),
+				NewCmdLogs(f, out),
+				NewCmdAttach(f, in, out, err),
+				NewCmdExec(f, in, out, err),
+				NewCmdPortForward(f, out, err),
+				NewCmdProxy(f, out),
+			},
+		},
+		{
+			Message: "Advanced Commands:",
+			Commands: []*cobra.Command{
+				NewCmdApply(f, out),
+				NewCmdPatch(f, out),
+				NewCmdReplace(f, out),
+				NewCmdConvert(f, out),
+			},
+		},
+		{
+			Message: "Settings Commands:",
+			Commands: []*cobra.Command{
+				NewCmdLabel(f, out),
+				NewCmdAnnotate(f, out),
+				NewCmdCompletion(f, out),
+			},
+		},
+	}
+	groups.Add(cmds)
 
-	cmds.AddCommand(NewCmdNamespace(out))
-	cmds.AddCommand(NewCmdLogs(f, out))
-	cmds.AddCommand(NewCmdRollingUpdate(f, out))
-	cmds.AddCommand(NewCmdScale(f, out))
-	cmds.AddCommand(NewCmdCordon(f, out))
-	cmds.AddCommand(NewCmdDrain(f, out))
-	cmds.AddCommand(NewCmdUncordon(f, out))
-
-	cmds.AddCommand(NewCmdAttach(f, in, out, err))
-	cmds.AddCommand(NewCmdExec(f, in, out, err))
-	cmds.AddCommand(NewCmdPortForward(f, out, err))
-	cmds.AddCommand(NewCmdProxy(f, out))
-
-	cmds.AddCommand(NewCmdRun(f, in, out, err))
-	cmds.AddCommand(NewCmdStop(f, out))
-	cmds.AddCommand(NewCmdExposeService(f, out))
-	cmds.AddCommand(NewCmdAutoscale(f, out))
-	cmds.AddCommand(rollout.NewCmdRollout(f, out))
-
-	cmds.AddCommand(NewCmdLabel(f, out))
-	cmds.AddCommand(NewCmdAnnotate(f, out))
-	cmds.AddCommand(NewCmdTaint(f, out))
-
-	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out))
-	cmds.AddCommand(NewCmdClusterInfo(f, out))
-	cmds.AddCommand(NewCmdApiVersions(f, out))
-	cmds.AddCommand(NewCmdVersion(f, out))
-	cmds.AddCommand(NewCmdExplain(f, out))
-	cmds.AddCommand(NewCmdConvert(f, out))
-	cmds.AddCommand(NewCmdCompletion(f, out))
-
-	cmds.AddCommand(NewCmdTop(f, out))
+	filters := []string{
+		"options",
+		Deprecated("kubectl", "delete", cmds, NewCmdStop(f, out)),
+		Deprecated("kubectl", "config set-context", cmds, NewCmdNamespace(out)),
+	}
+	templates.ActsAsRootCommand(cmds, filters, groups...)
 
 	if cmds.Flag("namespace") != nil {
 		if cmds.Flag("namespace").Annotations == nil {
@@ -286,6 +318,11 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		)
 	}
 
+	cmds.AddCommand(cmdconfig.NewCmdConfig(clientcmd.NewDefaultPathOptions(), out))
+	cmds.AddCommand(NewCmdVersion(f, out))
+	cmds.AddCommand(NewCmdApiVersions(f, out))
+	cmds.AddCommand(NewCmdOptions(out))
+
 	return cmds
 }
 
@@ -295,4 +332,11 @@ func runHelp(cmd *cobra.Command, args []string) {
 
 func printDeprecationWarning(command, alias string) {
 	glog.Warningf("%s is DEPRECATED and will be removed in a future version. Use %s instead.", alias, command)
+}
+
+func Deprecated(baseName, to string, parent, cmd *cobra.Command) string {
+	cmd.Long = fmt.Sprintf("Deprecated: This command is deprecated, all its functionalities are covered by \"%s %s\"", baseName, to)
+	cmd.Short = fmt.Sprintf("Deprecated: %s", to)
+	parent.AddCommand(cmd)
+	return cmd.Name()
 }
