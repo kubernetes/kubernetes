@@ -974,14 +974,14 @@ func (r *Runtime) generateRunCommand(pod *api.Pod, uuid, netnsName string) (stri
 
 	osInfos, err := getOSReleaseInfo()
 	if err != nil {
-		glog.Errorf("rkt: Failed to read the os release info: %v", err)
-	}
-
-	// Overlay fs is not supported for SELinux yet on many distros.
-	// See https://github.com/coreos/rkt/issues/1727#issuecomment-173203129.
-	// For now, coreos carries a patch to support it: https://github.com/coreos/coreos-overlay/pull/1703
-	if osInfos["ID"] != "coreos" && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil {
-		runPrepared = append(runPrepared, "--no-overlay=true")
+		glog.Warningf("rkt: Failed to read the os release info: %v", err)
+	} else {
+		// Overlay fs is not supported for SELinux yet on many distros.
+		// See https://github.com/coreos/rkt/issues/1727#issuecomment-173203129.
+		// For now, coreos carries a patch to support it: https://github.com/coreos/coreos-overlay/pull/1703
+		if osInfos["ID"] != "coreos" && pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil {
+			runPrepared = append(runPrepared, "--no-overlay=true")
+		}
 	}
 
 	// Apply '--net=host' to pod that is running on host network or inside a network namespace.
@@ -2338,7 +2338,8 @@ func getOSReleaseInfo() (map[string]string, error) {
 		line := scanner.Text()
 		info := strings.SplitN(line, "=", 2)
 		if len(info) != 2 {
-			return nil, fmt.Errorf("unexpected entry in os-release %q", line)
+			glog.Warningf("Unexpected entry in os-release %q", line)
+			continue
 		}
 		result[info[0]] = info[1]
 	}
