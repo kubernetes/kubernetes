@@ -25,6 +25,17 @@ import (
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 )
 
+// cgroupSubsystems holds information about the mounted cgroup subsytems
+type cgroupSubsystems struct {
+	// Cgroup subsystem mounts.
+	// e.g.: "/sys/fs/cgroup/cpu" -> ["cpu", "cpuacct"]
+	mounts []libcontainercgroups.Mount
+
+	// Cgroup subsystem to their mount location.
+	// e.g.: "cpu" -> "/sys/fs/cgroup/cpu"
+	mountPoints map[string]string
+}
+
 // cgroupManagerImpl implements the CgroupManager interface.
 // Its a stateless object which can be used to
 // update,create or delete any number of cgroups
@@ -98,7 +109,7 @@ type subsystem interface {
 }
 
 // Cgroup subsystems we currently support
-var supportedSubsystems []subsystem = []subsystem{
+var supportedSubsystems = []subsystem{
 	&cgroupfs.MemoryGroup{},
 	&cgroupfs.CpuGroup{},
 }
@@ -142,11 +153,18 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 		resources.CpuQuota = *resourceConfig.CpuQuota
 	}
 
+	// Get map of all cgroup paths on the system for the particular cgroup
+	cgroupPaths := make(map[string]string, len(m.subsystems.mountPoints))
+	for key, val := range m.subsystems.mountPoints {
+		cgroupPaths[key] = path.Join(val, name)
+	}
+
 	// Initialize libcontainer's cgroup config
 	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
 		Name:      path.Base(name),
 		Parent:    path.Dir(name),
 		Resources: resources,
+		Paths:     cgroupPaths,
 	}
 
 	if err := setSupportedSubsytems(libcontainerCgroupConfig); err != nil {
@@ -177,7 +195,7 @@ func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
 	// It creates cgroup files for each subsytems and writes the pid
 	// in the tasks file. We use the function to create all the required
 	// cgroup files but not attach any "real" pid to the cgroup.
-	if err := fsCgroupManager.Apply(0); err != nil {
+	if err := fsCgroupManager.Apply(-1); err != nil {
 		return fmt.Errorf("Failed to apply cgroup config for %v: %v", name, err)
 	}
 	return nil
