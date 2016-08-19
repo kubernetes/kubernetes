@@ -206,7 +206,7 @@ func (r resourceUsageByCPU) Swap(i, j int)      { r[i], r[j] = r[j], r[i] }
 func (r resourceUsageByCPU) Less(i, j int) bool { return r[i].CPUUsageInCores < r[j].CPUUsageInCores }
 
 // The percentiles to report.
-var percentiles = [...]float64{0.05, 0.20, 0.50, 0.70, 0.90, 0.95, 0.99}
+var percentiles = [...]float64{0.50, 0.90, 0.95, 0.99, 1.00}
 
 // GetBasicCPUStats returns the percentiles the cpu usage in cores for
 // containerName. This method examines all data currently in the buffer.

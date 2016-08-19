@@ -372,7 +372,7 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 	rc.Start()
 	defer rc.Stop()
 
-	// create pods sequentially (back-to-back)
+	// Create pods sequentially (back-to-back). e2eLags have been sorted.
 	batchlag, e2eLags := createBatchPodSequential(f, testPods)
 
 	// Log throughput data.

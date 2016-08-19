@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	// TODO(coufon): be consistent with perf_util.go version (not exposed)
+	// TODO(coufon): be consistent with perf_util.go version
 	currentTimeSeriesVersion = "v1"
 	TimeSeriesTag            = "[Result:TimeSeries]"
 	TimeSeriesEnd            = "[Finish:TimeSeries]"
@@ -35,8 +35,8 @@ const (
 
 type NodeTimeSeries struct {
 	// value in OperationData is an array of timestamps
-	OperationData map[string][]int64         `json:"op_data,omitempty"`
-	ResourceData  map[string]*ResourceSeries `json:"resource_data,omitempty"`
+	OperationData map[string][]int64         `json:"op_series,omitempty"`
+	ResourceData  map[string]*ResourceSeries `json:"resource_series,omitempty"`
 	Labels        map[string]string          `json:"labels"`
 	Version       string                     `json:"version"`
 }
@@ -85,14 +85,15 @@ func getLatencyPerfData(latency framework.LatencyMetric, testName string) *perft
 		DataItems: []perftype.DataItem{
 			{
 				Data: map[string]float64{
-					"Perc50": float64(latency.Perc50) / 1000000,
-					"Perc90": float64(latency.Perc90) / 1000000,
-					"Perc99": float64(latency.Perc99) / 1000000,
+					"Perc50":  float64(latency.Perc50) / 1000000,
+					"Perc90":  float64(latency.Perc90) / 1000000,
+					"Perc99":  float64(latency.Perc99) / 1000000,
+					"Perc100": float64(latency.Perc100) / 1000000,
 				},
 				Unit: "ms",
 				Labels: map[string]string{
 					"datatype":    "latency",
-					"latencytype": "test-e2e",
+					"latencytype": "create-pod",
 				},
 			},
 		},
