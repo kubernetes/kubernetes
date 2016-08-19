@@ -406,6 +406,8 @@ type server struct {
 	// Writing to this channel, if it is not nil, stops the restart loop.
 	// When tearing down a server, you should check for this channel and write to it if it exists.
 	stopRestartingCh chan<- bool
+	// The restart loop uses this to acknowledge, once you've told it to stop restarting, that it saw the server die.
+	ackDeadCh <-chan bool
 }
 
 func newServer(name string, start, kill *exec.Cmd, urls []string, filename string) *server {
@@ -479,10 +481,11 @@ func readinessCheck(urls []string, errCh <-chan error, allowRestartCh chan<- boo
 
 func (s *server) start(restartOnExit bool) error {
 	errCh := make(chan error)
-	var allowRestartCh, stopRestartingCh chan bool
+	var allowRestartCh, stopRestartingCh, ackDeadCh chan bool
 	if restartOnExit {
 		allowRestartCh = make(chan bool)
 		stopRestartingCh = make(chan bool)
+		ackDeadCh = make(chan bool)
 	}
 	go func() {
 		defer close(errCh)
@@ -537,10 +540,9 @@ func (s *server) start(restartOnExit bool) error {
 			// Restart loop
 			for {
 				select {
-				// TODO(mtaufen): This could still be racy, if e.g. we're already in default when
-				// someone writes to stopRestartingCh and tries to shut down the server. In practice
-				// this possibility doesn't seem to be causing issues with test-suite teardown.
 				case <-stopRestartingCh:
+					// This ack is your confirmation that the server died after the restart loop was turned off.
+					ackDeadCh <- true
 					glog.Infof("stopping restart loop for server start command: %q.", commandToString(cmd))
 					return
 				default:
@@ -574,10 +576,39 @@ func (s *server) start(restartOnExit bool) error {
 }
 
 func (s *server) kill() error {
+	const ackTimeout = 1 * time.Minute
+	const retryInterval = 1 * time.Second
+
 	name := s.name
 	cmd := s.startCommand
 
+	// Tell any restart loops to no longer restart the server.
+	var hasRestartLoop bool
+	if s.stopRestartingCh != nil {
+		s.stopRestartingCh <- true
+		hasRestartLoop = true
+	}
+
 	if s.killCommand != nil {
+		if hasRestartLoop {
+			// Attempt to kill until the restart loop acks that it saw the server die, or until we time out.
+			for {
+				err := s.killCommand.Run()
+				select {
+				case <-s.ackDeadCh:
+					return err
+				case <-time.After(ackTimeout):
+					// This is ok with respect to restarts. The only reason we won't get an ack is if the restart loop is still waiting
+					// on the server start command because the kill attempts are failing (or taking a long time) to kill that command.
+					// But the restart loop has been told not to restart once that command exits, so we don't have to worry about restarts
+					// when it finally dies.
+					return fmt.Errorf("Attempted to kill restartable %q every %s for %s, but restart loop is still waiting for it to die. It will not be restarted by said loop when it dies.",
+						name, retryInterval, ackTimeout)
+				default:
+					<-time.After(retryInterval)
+				}
+			}
+		}
 		return s.killCommand.Run()
 	}
 
@@ -594,52 +625,71 @@ func (s *server) kill() error {
 		return fmt.Errorf("invalid PID %d for %q", pid, name)
 	}
 
-	// Stop any restart loops prior to trying to shut down the process.
-	if s.stopRestartingCh != nil {
-		s.stopRestartingCh <- true
-	}
+	tryTermAndKill := func() error {
+		const timeout = 10 * time.Second
 
-	// Attempt to shut down the process in a friendly manner before forcing it.
-	waitChan := make(chan error)
-	go func() {
-		_, err := cmd.Process.Wait()
-		waitChan <- err
-		close(waitChan)
-	}()
+		// Attempt to shut down the process in a friendly manner before forcing it.
+		waitChan := make(chan error)
+		go func() {
+			_, err := cmd.Process.Wait()
+			waitChan <- err
+			close(waitChan)
+		}()
 
-	const timeout = 10 * time.Second
-	for _, signal := range []string{"-TERM", "-KILL"} {
-		glog.V(2).Infof("Killing process %d (%s) with %s", pid, name, signal)
-		cmd := exec.Command("sudo", "kill", signal, strconv.Itoa(pid))
+		for _, signal := range []string{"-TERM", "-KILL"} {
+			glog.V(2).Infof("Killing process %d (%s) with %s", pid, name, signal)
+			cmd := exec.Command("sudo", "kill", signal, strconv.Itoa(pid))
 
-		// Run the 'kill' command in a separate process group so sudo doesn't ignore it
-		attrs := &syscall.SysProcAttr{}
-		// Hack to set unix-only field without build tags.
-		setpgidField := reflect.ValueOf(attrs).Elem().FieldByName("Setpgid")
-		if setpgidField.IsValid() {
-			setpgidField.Set(reflect.ValueOf(true))
-		} else {
-			return fmt.Errorf("Failed to set Setpgid field (non-unix build)")
-		}
-		cmd.SysProcAttr = attrs
-
-		_, err := cmd.Output()
-		if err != nil {
-			glog.Errorf("Error signaling process %d (%s) with %s: %v", pid, name, signal, err)
-			continue
-		}
-
-		select {
-		case err := <-waitChan:
-			if err != nil {
-				return fmt.Errorf("error stopping %q: %v", name, err)
+			// Run the 'kill' command in a separate process group so sudo doesn't ignore it
+			attrs := &syscall.SysProcAttr{}
+			// Hack to set unix-only field without build tags.
+			setpgidField := reflect.ValueOf(attrs).Elem().FieldByName("Setpgid")
+			if setpgidField.IsValid() {
+				setpgidField.Set(reflect.ValueOf(true))
+			} else {
+				return fmt.Errorf("Failed to set Setpgid field (non-unix build)")
 			}
-			// Success!
-			return nil
-		case <-time.After(timeout):
-			// Continue.
+			cmd.SysProcAttr = attrs
+
+			_, err := cmd.Output()
+			if err != nil {
+				glog.Errorf("Error signaling process %d (%s) with %s: %v", pid, name, signal, err)
+				continue
+			}
+
+			select {
+			case err := <-waitChan:
+				if err != nil {
+					return fmt.Errorf("error stopping %q: %v", name, err)
+				}
+				// Success!
+				return nil
+			case <-time.After(timeout):
+				// Continue.
+			}
+		}
+		return fmt.Errorf("unable to stop %q", name)
+	}
+
+	if hasRestartLoop {
+		// Attempt to kill until the restart loop acks that it saw the server die, or until we time out.
+		for {
+			err := tryTermAndKill()
+			select {
+			case <-s.ackDeadCh:
+				return err
+			case <-time.After(ackTimeout):
+				// This is ok with respect to restarts. The only reason we won't get an ack is if the restart loop is still waiting
+				// on the server start command because the kill attempts are failing (or taking a long time) to kill that command.
+				// But the restart loop has been told not to restart once that command exits, so we don't have to worry about restarts
+				// when it finally dies.
+				return fmt.Errorf("Attempted to kill restartable %q every %s for %s, but restart loop is still waiting for it to die. It will not be restarted by said loop when it dies.",
+					name, retryInterval, ackTimeout)
+			default:
+				<-time.After(retryInterval)
+			}
 		}
 	}
 
-	return fmt.Errorf("unable to stop %q", name)
+	return tryTermAndKill()
 }
