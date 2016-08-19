@@ -188,14 +188,18 @@ function get_gci_k8s_version() {
 }
 
 # GCI specific settings.
-# Assumes: JENKINS_GCI_IMAGE_FAMILY
+# Assumes: JENKINS_GCI_IMAGE_FAMILY & JENKINS_GCI_PROJECT
 function setup_gci_vars() {
-    local -r gci_staging_project=container-vm-image-staging
-    local -r image_name="$(gcloud compute images describe-from-family ${JENKINS_GCI_IMAGE_FAMILY} --project=${gci_staging_project} --format='value(name)')"
+    local -r gci_project=${JENKINS_GCI_PROJECT:-container-vm-image-staging}
+    local -r image_name="$(gcloud compute images describe-from-family ${JENKINS_GCI_IMAGE_FAMILY} --project=${gci_project} --format='value(name)')"
 
-    export KUBE_GCE_MASTER_PROJECT="${gci_staging_project}"
+    export KUBE_GCE_MASTER_PROJECT="${gci_project}"
     export KUBE_GCE_MASTER_IMAGE="${image_name}"
     export KUBE_MASTER_OS_DISTRIBUTION="gci"
+    if [[ "${KUBE_OS_DISTRIBUTION}" == "gci" || "${KUBE_NODE_OS_DISTRIBUTION}" == "gci" ]]; then
+        export KUBE_GCE_NODE_PROJECT="${gci_project}"
+        export KUBE_GCE_NODE_IMAGE="${image_name}"
+    fi
     if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-canary-test" ]]; then
         # The family "gci-canary-test" is reserved for a special type of GCI images
         # that are used to continuously validate Docker releases.
