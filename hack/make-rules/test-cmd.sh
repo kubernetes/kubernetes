@@ -1399,6 +1399,8 @@ __EOF__
   kubectl create "${kube_flags[@]}" --namespace=other -f docs/admin/limitrange/valid-pod.yaml
   # Post-condition: valid-pod POD is created
   kube::test::get_object_assert 'pods --namespace=other' "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
+  # Post-condition: verify shorthand `-n other` has the same results as `--namespace=other`
+  kube::test::get_object_assert 'pods -n other' "{{range.items}}{{$id_field}}:{{end}}" 'valid-pod:'
 
   ### Delete POD valid-pod in specific namespace
   # Pre-condition: valid-pod POD exists
