@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,67 +17,70 @@ limitations under the License.
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/kubectl/resource"
 )
 
-// NewCmdCreateSecret groups subcommands to create various types of secrets
-func NewCmdCreateSecret(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+// NewCmdReplaceSecret groups subcommands to replace various types of secrets
+func NewCmdReplaceSecret(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "secret",
-		Short: "Create a secret using specified subcommand",
-		Long:  "Create a secret using specified subcommand.",
+		Short: "Replacea secret using specified subcommand",
+		Long:  "Replace a secret using specified subcommand.",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Help()
 		},
 	}
-	cmd.AddCommand(NewCmdCreateSecretDockerRegistry(f, cmdOut))
-	cmd.AddCommand(NewCmdCreateSecretTLS(f, cmdOut))
-	cmd.AddCommand(NewCmdCreateSecretGeneric(f, cmdOut))
+	cmd.AddCommand(NewCmdReplaceSecretDockerRegistry(f, cmdOut))
+	cmd.AddCommand(NewCmdReplaceSecretTLS(f, cmdOut))
+	cmd.AddCommand(NewCmdReplaceSecretGeneric(f, cmdOut))
 
 	return cmd
 }
 
 var (
-	createSecretLong = dedent.Dedent(`
-		Create a secret based on a file, directory, or specified literal value.
+	replaceSecretLong = dedent.Dedent(`
+		Replace a secret based on a file, directory, or specified literal value.
 
 		A single secret may package one or more key/value pairs.
 
-		When creating a secret based on a file, the key will default to the basename of the file, and the value will
+		When replacing a secret based on a file, the key will default to the basename of the file, and the value will
 		default to the file content.  If the basename is an invalid key, you may specify an alternate key.
 
-		When creating a secret based on a directory, each file whose basename is a valid key in the directory will be
+		When replacing a secret based on a directory, each file whose basename is a valid key in the directory will be
 		packaged into the secret.  Any directory entries except regular files are ignored (e.g. subdirectories,
 		symlinks, devices, pipes, etc).
 		`)
 
-	createSecretExample = dedent.Dedent(`
-		  # Create a new secret named my-secret with keys for each file in folder bar
-		  kubectl create secret generic my-secret --from-file=path/to/bar
+	replaceSecretExample = dedent.Dedent(`
+		  # Replace a secret named my-secret with keys for each file in folder bar
+		  kubectl replace secret generic my-secret --from-file=path/to/bar
 
-		  # Create a new secret named my-secret with specified keys instead of names on disk
-		  kubectl create secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
+		  # Replace a secret named my-secret with specified keys instead of names on disk
+		  kubectl replace secret generic my-secret --from-file=ssh-privatekey=~/.ssh/id_rsa --from-file=ssh-publickey=~/.ssh/id_rsa.pub
 
-		  # Create a new secret named my-secret with key1=supersecret and key2=topsecret
-		  kubectl create secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret`)
+		  # Replace a secret named my-secret with key1=supersecret and key2=topsecret
+		  kubectl replace secret generic my-secret --from-literal=key1=supersecret --from-literal=key2=topsecret`)
 )
 
-// NewCmdCreateSecretGeneric is a command to create generic secrets from files, directories, or literal values
-func NewCmdCreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+// NewCmdReplaceSecretGeneric is a command to replace generic secrets from files, directories, or literal values
+func NewCmdReplaceSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
-		Short:   "Create a secret from a local file, directory or literal value",
-		Long:    createSecretLong,
-		Example: createSecretExample,
+		Use:     "generic NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Short:   "Replace a secret from a local file, directory or literal value",
+		Long:    replaceSecretLong,
+		Example: replaceSecretExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateSecretGeneric(f, cmdOut, cmd, args)
+			err := ReplaceSecretGeneric(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -87,29 +90,58 @@ func NewCmdCreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Comm
 	cmdutil.AddGeneratorFlags(cmd, cmdutil.SecretV1GeneratorName)
 	cmd.Flags().StringSlice("from-file", []string{}, "Key files can be specified using their file path, in which case a default name will be given to them, or optionally with a name and file path, in which case the given name will be used.  Specifying a directory will iterate each named file in the directory that is a valid secret key.")
 	cmd.Flags().StringSlice("from-literal", []string{}, "Specify a key and literal value to insert in secret (i.e. mykey=somevalue)")
-	cmd.Flags().String("type", "", "The type of secret to create")
 	return cmd
 }
 
-// CreateSecretGeneric is the implementation of the create secret generic command
-func CreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+// ReplaceSecretGeneric is the implementation of the replace secret generic command
+func ReplaceSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
 	}
+	cmdNamespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
+		NamespaceParam(cmdNamespace).DefaultNamespace().
+		ResourceTypeOrNameArgs(true, "secret", name).
+		ContinueOnError().
+		Latest().
+		Flatten().
+		Do()
+	err = r.Err()
+	if err != nil {
+		return err
+	}
+	infos, err := r.Infos()
+	if len(infos) != 1 {
+		// There should be only one secret
+		return fmt.Errorf("Expected 1 secret named \"%s\", but found %d", name, len(infos))
+	}
+	var oldSecretType api.SecretType
+	switch obj := infos[0].Object.(type) {
+	case *api.Secret:
+		oldSecretType = obj.Type
+	default:
+		// This should not happen
+		return errors.New("The type is expected to be secret")
+	}
+
 	var generator kubectl.StructuredGenerator
 	switch generatorName := cmdutil.GetFlagString(cmd, "generator"); generatorName {
 	case cmdutil.SecretV1GeneratorName:
 		generator = &kubectl.SecretGeneratorV1{
 			Name:           name,
-			Type:           cmdutil.GetFlagString(cmd, "type"),
+			Type:           string(oldSecretType),
 			FileSources:    cmdutil.GetFlagStringSlice(cmd, "from-file"),
 			LiteralSources: cmdutil.GetFlagStringSlice(cmd, "from-literal"),
 		}
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
-	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
+	return RunReplaceSubcommand(f, cmd, cmdOut, &ReplaceSubcommandOptions{
 		Name:                name,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetDryRunFlag(cmd),
@@ -118,34 +150,30 @@ func CreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comman
 }
 
 var (
-	createSecretForDockerRegistryLong = dedent.Dedent(`
-		Create a new secret for use with Docker registries.
+	replaceSecretForDockerRegistryLong = dedent.Dedent(`
+		Replace a secret for use with Docker registries.
 
 		Dockercfg secrets are used to authenticate against Docker registries.
 
 		When using the Docker command line to push images, you can authenticate to a given registry by running
 		  'docker login DOCKER_REGISTRY_SERVER --username=DOCKER_USER --password=DOCKER_PASSWORD --email=DOCKER_EMAIL'.
 		That produces a ~/.dockercfg file that is used by subsequent 'docker push' and 'docker pull' commands to
-		authenticate to the registry.
+		authenticate to the registry.`)
 
-		When creating applications, you may have a Docker registry that requires authentication.  In order for the
-		nodes to pull images on your behalf, they have to have the credentials.  You can provide this information
-		by creating a dockercfg secret and attaching it to your service account.`)
-
-	createSecretForDockerRegistryExample = dedent.Dedent(`
-		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
-		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`)
+	replaceSecretForDockerRegistryExample = dedent.Dedent(`
+		  # If you already have a .dockercfg file, you can replace a dockercfg secret directly by using:
+		  kubectl replace secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`)
 )
 
-// NewCmdCreateSecretDockerRegistry is a macro command for creating secrets to work with Docker registries
-func NewCmdCreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+// NewCmdReplaceSecretDockerRegistry is a macro command for replacing secrets to work with Docker registries
+func NewCmdReplaceSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
-		Short:   "Create a secret for use with a Docker registry",
-		Long:    createSecretForDockerRegistryLong,
-		Example: createSecretForDockerRegistryExample,
+		Short:   "Replace a secret for use with a Docker registry",
+		Long:    replaceSecretForDockerRegistryLong,
+		Example: replaceSecretForDockerRegistryExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateSecretDockerRegistry(f, cmdOut, cmd, args)
+			err := ReplaceSecretDockerRegistry(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -164,8 +192,8 @@ func NewCmdCreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer) *cob
 	return cmd
 }
 
-// CreateSecretDockerRegistry is the implementation of the create secret docker-registry command
-func CreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+// ReplaceSecretDockerRegistry is the implementation of the replace secret docker-registry command
+func ReplaceSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -189,7 +217,7 @@ func CreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
-	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
+	return RunReplaceSubcommand(f, cmd, cmdOut, &ReplaceSubcommandOptions{
 		Name:                name,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetDryRunFlag(cmd),
@@ -198,25 +226,25 @@ func CreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra
 }
 
 var (
-	createSecretForTLSLong = dedent.Dedent(`
-		Create a TLS secret from the given public/private key pair.
+	replaceSecretForTLSLong = dedent.Dedent(`
+		Replace a TLS secret from the given public/private key pair.
 
 		The public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.`)
 
-	createSecretForTLSExample = dedent.Dedent(`
-		  # Create a new TLS secret named tls-secret with the given key pair:
-		  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`)
+	replaceSecretForTLSExample = dedent.Dedent(`
+		  # Replace a TLS secret named tls-secret with the given key pair:
+		  kubectl replace secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`)
 )
 
-// NewCmdCreateSecretTLS is a macro command for creating secrets to work with Docker registries
-func NewCmdCreateSecretTLS(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+// NewCmdReplaceSecretTLS is a macro command for replacing secret tls
+func NewCmdReplaceSecretTLS(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
-		Short:   "Create a TLS secret",
-		Long:    createSecretForTLSLong,
-		Example: createSecretForTLSExample,
+		Short:   "Replace a TLS secret",
+		Long:    replaceSecretForTLSLong,
+		Example: replaceSecretForTLSExample,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := CreateSecretTLS(f, cmdOut, cmd, args)
+			err := ReplaceSecretTLS(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -229,8 +257,8 @@ func NewCmdCreateSecretTLS(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	return cmd
 }
 
-// CreateSecretTLS is the implementation of the create secret tls command
-func CreateSecretTLS(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+// ReplaceSecretTLS is the implementation of the replace secret tls command
+func ReplaceSecretTLS(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -252,7 +280,7 @@ func CreateSecretTLS(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, a
 	default:
 		return cmdutil.UsageError(cmd, fmt.Sprintf("Generator: %s not supported.", generatorName))
 	}
-	return RunCreateSubcommand(f, cmd, cmdOut, &CreateSubcommandOptions{
+	return RunReplaceSubcommand(f, cmd, cmdOut, &ReplaceSubcommandOptions{
 		Name:                name,
 		StructuredGenerator: generator,
 		DryRun:              cmdutil.GetFlagBool(cmd, "dry-run"),

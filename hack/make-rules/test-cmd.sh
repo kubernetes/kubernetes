@@ -1465,6 +1465,16 @@ __EOF__
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'test-type'
   [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o yaml "${kube_flags[@]}" | grep 'key1: dmFsdWUx')" ]]
+
+  ### Replace a generic secret in a specific namespace
+  # Pre-condition: SECRET 'test-secret' exists
+  kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" 'test-secret:'
+  # Command
+  kubectl replace secret generic test-secret --from-literal=key1=value2 --namespace=test-secrets
+  # Post-condition: secret exists and has expected values
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'test-type'
+  [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o yaml "${kube_flags[@]}" | grep 'key1: dmFsdWUy')" ]]
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
@@ -1477,6 +1487,18 @@ __EOF__
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/dockercfg'
   [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o yaml "${kube_flags[@]}" | grep '.dockercfg:')" ]]
+
+  ### Replace a docker-registry secret in a specific namespace
+  # Pre-condition: SECRET 'test-secret' exists
+  kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" 'test-secret:'
+  # Command
+  kubectl replace secret docker-registry test-secret --docker-username=new-test-user --docker-password=new-test-password --docker-email='new-test-user@test.com' --namespace=test-secrets
+  # Post-condition: secret exists and has expected values
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/dockercfg'
+  [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o go-template='{{index .data ".dockercfg"}}' "${kube_flags[@]}" | base64 --decode | grep '"username":"new-test-user"')" ]]
+  [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o go-template='{{index .data ".dockercfg"}}' "${kube_flags[@]}" | base64 --decode | grep '"password":"new-test-password"')" ]]
+  [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o go-template='{{index .data ".dockercfg"}}' "${kube_flags[@]}" | base64 --decode | grep '"email":"new-test-user@test.com"')" ]]
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
@@ -1487,6 +1509,19 @@ __EOF__
   kubectl create secret tls test-secret --namespace=test-secrets --key=hack/testdata/tls.key --cert=hack/testdata/tls.crt
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
   kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/tls'
+
+  ### Replace a tls secret
+  # Pre-condition: SECRET 'test-secret' exists
+  kube::test::get_object_assert 'secrets --namespace=test-secrets' "{{range.items}}{{$id_field}}:{{end}}" 'test-secret:'
+  oldcrtvalue="$(kubectl get secret/test-secret --namespace=test-secrets -o go-template='{{index .data "tls.crt"}}' "${kube_flags[@]}")"
+  oldkeyvalue="$(kubectl get secret/test-secret --namespace=test-secrets -o go-template='{{index .data "tls.key"}}' "${kube_flags[@]}")"
+  # Command
+  kubectl replace secret tls test-secret --namespace=test-secrets --key=hack/testdata/tls2.key --cert=hack/testdata/tls2.crt
+  # Post-condition: secret exists and has updated values
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$id_field}}" 'test-secret'
+  kube::test::get_object_assert 'secret/test-secret --namespace=test-secrets' "{{$secret_type}}" 'kubernetes.io/tls'
+  [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o go-template='{{index .data "tls.crt"}}' "${kube_flags[@]}")" != $oldcrtvalue ]]
+  [[ "$(kubectl get secret/test-secret --namespace=test-secrets -o go-template='{{index .data "tls.key"}}' "${kube_flags[@]}")" != $oldkeyvalue ]]
   # Clean-up
   kubectl delete secret test-secret --namespace=test-secrets
 
@@ -1548,6 +1583,15 @@ __EOF__
   # Post-condition: configmap exists and has expected values
   kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
   [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value1')" ]]
+
+  ### Replace a generic configmap in a specific namespace
+  # Pre-condition: the configmap 'test-configmap' exists
+  kube::test::get_object_assert 'configmaps --namespace=test-configmaps' "{{range.items}}{{$id_field}}:{{end}}" 'test-configmap:'
+  # Command
+  kubectl replace configmap test-configmap --from-literal=key1=value2 --namespace=test-configmaps
+  # Post-condition: configmap exists and has updated values
+  kube::test::get_object_assert 'configmap/test-configmap --namespace=test-configmaps' "{{$id_field}}" 'test-configmap'
+  [[ "$(kubectl get configmap/test-configmap --namespace=test-configmaps -o yaml "${kube_flags[@]}" | grep 'key1: value2')" ]]
   # Clean-up
   kubectl delete configmap test-configmap --namespace=test-configmaps
   kubectl delete namespace test-configmaps

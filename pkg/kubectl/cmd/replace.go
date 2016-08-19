@@ -28,6 +28,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
@@ -95,6 +96,9 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	cmdutil.AddRecordFlag(cmd)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
 
+	// create subcommands
+	cmd.AddCommand(NewCmdReplaceSecret(f, out))
+	cmd.AddCommand(NewCmdReplaceConfigMap(f, out))
 	return cmd
 }
 
@@ -289,4 +293,67 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 		return fmt.Errorf("no objects passed to replace")
 	}
 	return nil
+}
+
+// ReplaceSubcommandOptions is an options struct to support replace subcommands
+type ReplaceSubcommandOptions struct {
+	// Name of resource being replaced
+	Name string
+	// StructuredGenerator is the resource generator for the object being replaced
+	StructuredGenerator kubectl.StructuredGenerator
+	// DryRun is true if the command should be simulated but not run against the server
+	DryRun bool
+	// OutputFormat
+	OutputFormat string
+}
+
+// RunReplaceSubcommand executes a replace subcommand using the specified options
+func RunReplaceSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, options *ReplaceSubcommandOptions) error {
+	namespace, _, err := f.DefaultNamespace()
+	if err != nil {
+		return err
+	}
+	obj, err := options.StructuredGenerator.StructuredGenerate()
+	if err != nil {
+		return err
+	}
+	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	gvks, _, err := typer.ObjectKinds(obj)
+	if err != nil {
+		return err
+	}
+	gvk := gvks[0]
+	mapping, err := mapper.RESTMapping(unversioned.GroupKind{Group: gvk.Group, Kind: gvk.Kind}, gvk.Version)
+	if err != nil {
+		return err
+	}
+	client, err := f.ClientForMapping(mapping)
+	if err != nil {
+		return err
+	}
+	resourceMapper := &resource.Mapper{
+		ObjectTyper:  typer,
+		RESTMapper:   mapper,
+		ClientMapper: resource.ClientMapperFunc(f.ClientForMapping),
+	}
+	info, err := resourceMapper.InfoForObject(obj, nil)
+	if err != nil {
+		return err
+	}
+	if err := kubectl.UpdateApplyAnnotation(info, f.JSONEncoder()); err != nil {
+		return err
+	}
+	if !options.DryRun {
+		obj, err = resource.NewHelper(client, mapping).Replace(namespace, options.Name, true, info.Object)
+		if err != nil {
+			return err
+		}
+	}
+
+	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
+		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, options.Name, "replaced")
+		return nil
+	}
+
+	return f.PrintObject(cmd, mapper, obj, out)
 }
