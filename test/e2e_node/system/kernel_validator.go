@@ -208,14 +208,13 @@ func (k *KernelValidator) getKernelConfigReader() (io.Reader, error) {
 		}
 		// If the kernel config file is not found, try to load the kernel
 		// config module and check again.
-		// TODO(random-liu): Remove "sudo" in containerize test PR #31093
-		output, err := exec.Command("sudo", modprobeCmd, configsModule).CombinedOutput()
+		output, err := exec.Command(modprobeCmd, configsModule).CombinedOutput()
 		if err != nil {
 			return nil, fmt.Errorf("unable to load kernel module %q: output - %q, err - %v",
 				configsModule, output, err)
 		}
 		// Unload the kernel config module to make sure the validation have no side effect.
-		defer exec.Command("sudo", modprobeCmd, "-r", configsModule).Run()
+		defer exec.Command(modprobeCmd, "-r", configsModule).Run()
 		loadModule = true
 	}
 	return nil, fmt.Errorf("no config path in %v is available", possibePaths)
