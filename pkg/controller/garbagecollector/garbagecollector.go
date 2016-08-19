@@ -443,6 +443,7 @@ type GarbageCollector struct {
 	clock                            clock.Clock
 	registeredRateLimiter            *RegisteredRateLimiter
 	registeredRateLimiterForMonitors *RegisteredRateLimiter
+	deletionToWatchTracker           *uidToDeletionTime
 }
 
 func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
@@ -517,6 +518,16 @@ func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource
 					obj:       obj,
 				}
 				gc.propagator.eventQueue.Add(event)
+				// measure how long it takes from GC to sent a deletion request until GC observes the deletion via reflector.
+				accessor, err := meta.Accessor(obj)
+				if err != nil {
+					utilruntime.HandleError(fmt.Errorf("cannot access obj: %v", err))
+					return
+				}
+				latency, err := gc.deletionToWatchTracker.DeletionObserved(accessor.GetUID(), gc.clock.Now())
+				if err == nil {
+					DeletionToWatchLatency.Observe(latency)
+				}
 			},
 		},
 	)
@@ -544,6 +555,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		orphanQueue:                      workqueue.NewTimedWorkQueue(clock),
 		registeredRateLimiter:            NewRegisteredRateLimiter(),
 		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(),
+		deletionToWatchTracker:           NewDeletionToWatchTracker(100),
 	}
 	gc.propagator = &Propagator{
 		eventQueue: workqueue.NewTimedWorkQueue(gc.clock),
@@ -580,6 +592,9 @@ func (gc *GarbageCollector) worker() {
 	err := gc.processItem(key.(*node))
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Error syncing item %#v: %v", key, err))
+		// retry if garbage collection of an object failed.
+		gc.dirtyQueue.AddWithTimestamp(key, start)
+		return
 	}
 	DirtyProcessingLatency.Observe(sinceInMicroseconds(gc.clock, start))
 }
@@ -612,7 +627,14 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 	uid := item.UID
 	preconditions := v1.Preconditions{UID: &uid}
 	deleteOptions := v1.DeleteOptions{Preconditions: &preconditions}
-	return client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
+	err = client.Resource(resource, item.Namespace).Delete(item.Name, &deleteOptions)
+	if err == nil {
+		err2 := gc.deletionToWatchTracker.DeletionSent(item.UID, gc.clock.Now())
+		if err2 != nil {
+			utilruntime.HandleError(err2)
+		}
+	}
+	return err
 }
 
 func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
