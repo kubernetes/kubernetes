@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/statusupdater"
@@ -45,8 +46,9 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
 	ad := operationexecutor.NewOperationExecutor(
-		fakeKubeClient, volumePluginMgr)
+		fakeKubeClient, volumePluginMgr, fakeRecorder)
 	nodeInformer := informers.NewNodeInformer(
 		fakeKubeClient, resyncPeriod)
 	nsu := statusupdater.NewNodeStatusUpdater(
@@ -76,7 +78,8 @@ func Test_Run_Positive_OneDesiredVolumeAttach(t *testing.T) {
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
+	fakeRecorder := &record.FakeRecorder{}
+	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr, fakeRecorder)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
@@ -121,7 +124,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithUnmountedVolume(t *te
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
+	fakeRecorder := &record.FakeRecorder{}
+	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr, fakeRecorder)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
@@ -187,7 +191,8 @@ func Test_Run_Positive_OneDesiredVolumeAttachThenDetachWithMountedVolume(t *test
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
+	fakeRecorder := &record.FakeRecorder{}
+	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr, fakeRecorder)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(false /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)
@@ -253,7 +258,8 @@ func Test_Run_Negative_OneDesiredVolumeAttachThenDetachWithUnmountedVolumeUpdate
 	dsw := cache.NewDesiredStateOfWorld(volumePluginMgr)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
-	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr)
+	fakeRecorder := &record.FakeRecorder{}
+	ad := operationexecutor.NewOperationExecutor(fakeKubeClient, volumePluginMgr, fakeRecorder)
 	nsu := statusupdater.NewFakeNodeStatusUpdater(true /* returnError */)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, maxWaitForUnmountDuration, dsw, asw, ad, nsu)

@@ -530,7 +530,8 @@ func NewMainKubelet(
 		klet.volumePluginMgr,
 		klet.containerRuntime,
 		mounter,
-		klet.getPodsDir())
+		klet.getPodsDir(),
+		recorder)
 
 	runtimeCache, err := kubecontainer.NewRuntimeCache(klet.containerRuntime)
 	if err != nil {

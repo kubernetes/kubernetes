@@ -26,6 +26,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
@@ -70,7 +71,8 @@ func NewAttachDetachController(
 	pvcInformer framework.SharedInformer,
 	pvInformer framework.SharedInformer,
 	cloud cloudprovider.Interface,
-	plugins []volume.VolumePlugin) (AttachDetachController, error) {
+	plugins []volume.VolumePlugin,
+	recorder record.EventRecorder) (AttachDetachController, error) {
 	// TODO: The default resyncPeriod for shared informers is 12 hours, this is
 	// unacceptable for the attach/detach controller. For example, if a pod is
 	// skipped because the node it is scheduled to didn't set its annotation in
@@ -113,7 +115,8 @@ func NewAttachDetachController(
 	adc.attacherDetacher =
 		operationexecutor.NewOperationExecutor(
 			kubeClient,
-			&adc.volumePluginMgr)
+			&adc.volumePluginMgr,
+			recorder)
 	adc.nodeStatusUpdater = statusupdater.NewNodeStatusUpdater(
 		kubeClient, nodeInformer, adc.actualStateOfWorld)
 	adc.reconciler = reconciler.NewReconciler(
@@ -184,6 +187,9 @@ type attachDetachController struct {
 	// desiredStateOfWorldPopulator runs an asynchronous periodic loop to
 	// populate the current pods using podInformer.
 	desiredStateOfWorldPopulator populator.DesiredStateOfWorldPopulator
+
+	// recorder is used to record events in the API server
+	recorder record.EventRecorder
 }
 
 func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
