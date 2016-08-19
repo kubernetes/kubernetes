@@ -51,8 +51,7 @@ var (
 		will first check for an exact match on TYPE and NAME_PREFIX. If no such resource
 		exists, it will output details for every resource that has a name prefixed with NAME_PREFIX.
 
-		`) +
-		kubectl.PossibleResourceTypes
+		`) + valid_resources
 
 	describe_example = dedent.Dedent(`
 		# Describe a node
