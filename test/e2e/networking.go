@@ -59,7 +59,6 @@ var _ = framework.KubeDescribe("Networking", func() {
 		tests := []struct {
 			path string
 		}{
-			{path: "/validate"},
 			{path: "/healthz"},
 			// TODO: test proxy links here
 		}
