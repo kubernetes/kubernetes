@@ -536,13 +536,11 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 			other, _ = dc.markDeploymentOverlap(other, d.Name)
 			// Skip syncing this one if older overlapping one is found
 			// TODO: figure out a better way to determine which deployment to skip,
-			// either with controller reference, or with validation
-			shouldSkip, err := dc.isOlderThan(other, d)
-			if err != nil {
-				return fmt.Errorf("error finding older overlapping deployment: %v", err)
-			}
-			if shouldSkip {
-				return fmt.Errorf("found deployment %s/%s has overlapping selector with deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
+			// either with controller reference, or with validation.
+			// Using oldest active replica set to determine which deployment to skip wouldn't make much difference,
+			// since new replica set hasn't been created after selector update
+			if other.CreationTimestamp.Before(d.CreationTimestamp) {
+				return fmt.Errorf("found deployment %s/%s has overlapping selector with an older deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
 			}
 		}
 	}
@@ -579,53 +577,12 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }
 
-func (dc *DeploymentController) isOlderThan(d1, d2 *extensions.Deployment) (bool, error) {
-	t1, err := dc.oldestActiveReplicaSet(d1)
-	if err != nil {
-		return false, err
-	}
-	t2, err := dc.oldestActiveReplicaSet(d2)
-	if err != nil {
-		return false, err
-	}
-	// If no active replica set is found, or if the time is the same,
-	// use deployment creation timestamp as a tie breaker
-	if t1.IsZero() && t2.IsZero() || t1.Equal(t2) {
-		return d1.CreationTimestamp.Before(d2.CreationTimestamp), nil
-	}
-	return t2.IsZero() || t1.Before(t2), nil
-}
-
-func (dc *DeploymentController) oldestActiveReplicaSet(deployment *extensions.Deployment) (unversioned.Time, error) {
-	newRS, oldRSs, err := dc.getAllReplicaSetsAndSyncRevision(deployment, false)
-	if err != nil {
-		return unversioned.Time{}, err
-	}
-	allRSs := controller.FilterActiveReplicaSets(append(oldRSs, newRS))
-	if len(allRSs) == 0 {
-		return unversioned.Time{}, nil
-	}
-	sort.Sort(rsPByCreationTimestamp(allRSs))
-	return allRSs[0].CreationTimestamp, nil
-}
-
 // byCreationTimestamp sorts a list of deployments by creation timestamp, using their names as a tie breaker.
 type byCreationTimestamp []extensions.Deployment
 
 func (o byCreationTimestamp) Len() int      { return len(o) }
 func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
 func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-}
-
-type rsPByCreationTimestamp []*extensions.ReplicaSet
-
-func (o rsPByCreationTimestamp) Len() int      { return len(o) }
-func (o rsPByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-func (o rsPByCreationTimestamp) Less(i, j int) bool {
 	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
 		return o[i].Name < o[j].Name
 	}
