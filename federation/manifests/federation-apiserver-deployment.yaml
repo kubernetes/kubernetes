@@ -27,7 +27,7 @@ spec:
         - --basic-auth-file=/srv/kubernetes/basic_auth.csv
         - --tls-cert-file=/srv/kubernetes/server.cert
         - --tls-private-key-file=/srv/kubernetes/server.key
-        # TODO: --admission-control values must be set when support is added for each type of control.
+        - --admission-control={{.FEDERATION_ADMISSION_CONTROL}}
         - --token-auth-file=/srv/kubernetes/known-tokens.csv
         ports:
         - containerPort: 443
