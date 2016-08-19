@@ -415,6 +415,8 @@ type KubeletConfiguration struct {
 	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
 	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
 	IPTablesDropBit int32 `json:"iptablesDropBit"`
+	// Whitelist of sysctls or sysctl patterns (ending in *).
+	SysctlWhitelist []string `json:"experimentalSysctlWhitelist,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {

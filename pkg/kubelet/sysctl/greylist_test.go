@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package types
+package sysctl
 
-const (
-	// system default DNS resolver configuration
-	ResolvConfDefault = "/etc/resolv.conf"
+import (
+	"testing"
 )
 
-// DefaultSysctlWhitelist returns the default whitelist of sysctls and sysctl patterns (ending in *).
-func DefaultSysctlWhitelist() []string {
-	return []string{
-		"kernel.shm_rmid_forced",
-		"net.ipv4.ip_local_port_range",
-		"net.ipv4.tcp_max_syn_backlog",
-		"net.ipv4.tcp_syncookies",
+func TestNamespacedBy(t *testing.T) {
+	tests := map[string]Namespace{
+		"kernel.shm_rmid_forced": IpcNamespace,
+		"net.a.b.c":              NetNamespace,
+		"fs.mqueue.a.b.c":        IpcNamespace,
+		"foo":                    UnknownNamespace,
+	}
+
+	for sysctl, ns := range tests {
+		if got := NamespacedBy(sysctl); got != ns {
+			t.Errorf("wrong namespace for %q: got=%s want=%s", sysctl, got, ns)
+		}
 	}
 }

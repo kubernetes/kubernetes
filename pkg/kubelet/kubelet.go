@@ -67,6 +67,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -250,6 +251,7 @@ func NewMainKubelet(
 	makeIPTablesUtilChains bool,
 	iptablesMasqueradeBit int,
 	iptablesDropBit int,
+	sysctlWhitelist []string,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -591,6 +593,18 @@ func NewMainKubelet(
 	}
 	klet.evictionManager = evictionManager
 	klet.AddPodAdmitHandler(evictionAdmitHandler)
+
+	// add sysctl admission
+	runtimeSupport, err := sysctl.NewRuntimeAdmitHandler(klet.containerRuntime)
+	if err != nil {
+		return nil, err
+	}
+	whitelist, err := sysctl.NewWhitelist(sysctlWhitelist)
+	if err != nil {
+		return nil, err
+	}
+	klet.AddPodAdmitHandler(runtimeSupport)
+	klet.AddPodAdmitHandler(whitelist)
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, klet.recorder, klet.clock)
