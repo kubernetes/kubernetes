@@ -691,7 +691,7 @@ var _ = framework.KubeDescribe("Density", func() {
 			}
 			RCName = "density" + strconv.Itoa(totalPods) + "-" + strconv.Itoa(i) + "-" + uuid
 			RCConfigs[i] = framework.RCConfig{Client: c,
-				Image:                "gcr.io/google_containers/pause-amd64:3.0",
+				Image:                framework.GetPauseImageName(f.Client),
 				Name:                 RCName,
 				Namespace:            ns,
 				Labels:               map[string]string{"type": "densityPod"},

@@ -461,7 +461,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 		Name:         "node-selector",
 		Namespace:    f.Namespace.Name,
 		Timeout:      defaultTimeout,
-		Image:        "gcr.io/google_containers/pause-amd64:3.0",
+		Image:        framework.GetPauseImageName(f.Client),
 		Replicas:     replicas,
 		HostPorts:    map[string]int{"port1": 4321},
 		NodeSelector: map[string]string{"cluster-autoscaling-test.special-node": "true"},
