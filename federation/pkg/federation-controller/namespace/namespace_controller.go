@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
@@ -102,7 +103,7 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 	// Federated informer on namespaces in members of federation.
 	nc.namespaceFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient federation_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
+		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
 			return framework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
@@ -131,17 +132,17 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 
 	// Federated updeater along with Create/Update/Delete operations.
 	nc.federatedUpdater = util.NewFederatedUpdater(nc.namespaceFederatedInformer,
-		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
 			namespace := obj.(*api_v1.Namespace)
 			_, err := client.Core().Namespaces().Create(namespace)
 			return err
 		},
-		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
 			namespace := obj.(*api_v1.Namespace)
 			_, err := client.Core().Namespaces().Update(namespace)
 			return err
 		},
-		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
 			namespace := obj.(*api_v1.Namespace)
 			err := client.Core().Namespaces().Delete(namespace.Name, &api.DeleteOptions{})
 			return err
