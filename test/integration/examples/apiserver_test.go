@@ -27,10 +27,11 @@ import (
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/examples/apiserver"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
 
-var serverIP = fmt.Sprintf("http://localhost:%d", InsecurePort)
+var serverIP = fmt.Sprintf("http://localhost:%d", apiserver.InsecurePort)
 
 var groupVersion = v1.SchemeGroupVersion
 
@@ -41,7 +42,7 @@ var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
 
 func TestRun(t *testing.T) {
 	go func() {
-		if err := Run(NewServerRunOptions()); err != nil {
+		if err := apiserver.Run(apiserver.NewServerRunOptions()); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
