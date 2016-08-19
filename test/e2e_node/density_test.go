@@ -133,6 +133,30 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				podsNr:   105,
 				interval: 0 * time.Millisecond,
 			},
+			{
+				podsNr:   10,
+				interval: 100 * time.Millisecond,
+			},
+			{
+				podsNr:   35,
+				interval: 100 * time.Millisecond,
+			},
+			{
+				podsNr:   105,
+				interval: 100 * time.Millisecond,
+			},
+			{
+				podsNr:   10,
+				interval: 300 * time.Millisecond,
+			},
+			{
+				podsNr:   35,
+				interval: 300 * time.Millisecond,
+			},
+			{
+				podsNr:   105,
+				interval: 300 * time.Millisecond,
+			},
 		}
 
 		for _, testArg := range dTests {
