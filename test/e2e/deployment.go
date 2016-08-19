@@ -1193,31 +1193,31 @@ func testOverlappingDeployment(f *framework.Framework) {
 	By(fmt.Sprintf("Creating deployment %q", deploymentName))
 	d := newDeployment(deploymentName, replicas, podLabels, redisImageName, redisImage, extensions.RollingUpdateDeploymentStrategyType, nil)
 	deploy, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed creating the first deployment")
 
 	// Wait for it to be updated to revision 1
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deploy.Name, "1", redisImage)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "The first deployment failed to update to revision 1")
 
 	deploymentName = "second-deployment"
 	By(fmt.Sprintf("Creating deployment %q with overlapping selector", deploymentName))
 	d = newDeployment(deploymentName, replicas, podLabels, nginxImageName, nginxImage, extensions.RollingUpdateDeploymentStrategyType, nil)
 	deployOverlapping, err := c.Extensions().Deployments(ns).Create(d)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed creating the second deployment")
 	defer stopDeployment(c, f.Client, ns, deployOverlapping.Name)
 
 	// Wait for overlapping annotation updated to both deployments
 	By("Waiting for both deployments to have overlapping annotations")
 	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deploy.Name, deployOverlapping.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to update the first deployment's overlapping annotation")
 	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployOverlapping.Name, deploy.Name)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to update the second deployment's overlapping annotation")
 
 	// Only the first deployment is synced
 	By("Checking only the first overlapping deployment is synced")
 	options := api.ListOptions{}
 	rsList, err := c.Extensions().ReplicaSets(ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed listing all replica sets in namespace %s", ns)
 	Expect(rsList.Items).To(HaveLen(int(replicas)))
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers).To(HaveLen(1))
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers[0].Image).To(Equal(deploy.Spec.Template.Spec.Containers[0].Image))
@@ -1228,16 +1228,16 @@ func testOverlappingDeployment(f *framework.Framework) {
 	// Wait for overlapping annotation cleared
 	By("Waiting for the second deployment to clear overlapping annotation")
 	err = framework.WaitForOverlappingAnnotationMatch(c, ns, deployOverlapping.Name, "")
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed to clear the second deployment's overlapping annotation")
 
 	// Wait for it to be updated to revision 1
 	err = framework.WaitForDeploymentRevisionAndImage(c, ns, deployOverlapping.Name, "1", nginxImage)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "The second deployment failed to update to revision 1")
 
 	// Now the second deployment is synced
 	By("Checking the second overlapping deployment is synced")
 	rsList, err = c.Extensions().ReplicaSets(ns).List(options)
-	Expect(err).NotTo(HaveOccurred())
+	Expect(err).NotTo(HaveOccurred(), "Failed listing all replica sets in namespace %s", ns)
 	Expect(rsList.Items).To(HaveLen(int(replicas)))
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers).To(HaveLen(1))
 	Expect(rsList.Items[0].Spec.Template.Spec.Containers[0].Image).To(Equal(deployOverlapping.Spec.Template.Spec.Containers[0].Image))
