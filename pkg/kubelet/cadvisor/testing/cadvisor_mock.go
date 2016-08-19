@@ -21,6 +21,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/stretchr/testify/mock"
+	statsApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 )
 
@@ -82,4 +83,14 @@ func (c *Mock) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 func (c *Mock) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	args := c.Called()
 	return args.Get(0).(*events.EventChannel), args.Error(1)
+}
+
+func (c *Mock) GetAllContainerStats() ([]*statsApi.ContainerStats, error) {
+	args := c.Called()
+	return args.Get(0).([]*statsApi.ContainerStats), args.Error(1)
+}
+
+func (c *Mock) GetContainerStats(id string) (*statsApi.ContainerStats, error) {
+	args := c.Called()
+	return args.Get(0).(*statsApi.ContainerStats), args.Error(1)
 }

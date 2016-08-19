@@ -24,6 +24,7 @@ import (
 	"github.com/google/cadvisor/events"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
+	statsApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 )
 
 type cadvisorUnsupported struct {
@@ -76,3 +77,7 @@ func (cu *cadvisorUnsupported) RootFsInfo() (cadvisorapiv2.FsInfo, error) {
 func (cu *cadvisorUnsupported) WatchEvents(request *events.Request) (*events.EventChannel, error) {
 	return nil, unsupportedErr
 }
+
+func (cu *cadvisorUnsupported) GetAllContainerStats() ([]*statsApi.ContainerStats, error)
+
+func (cu *cadvisorUnsupported) GetContainerStats(id string) (*statsApi.ContainerStats, error)

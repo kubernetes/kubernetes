@@ -20,6 +20,7 @@ import (
 	"io"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
+	statsApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 )
 
 // RuntimeVersioner contains methods for runtime name, version and API version.
@@ -85,4 +86,12 @@ type ImageManagerService interface {
 	PullImage(image *runtimeApi.ImageSpec, auth *runtimeApi.AuthConfig) error
 	// RemoveImage removes the image.
 	RemoveImage(image *runtimeApi.ImageSpec) error
+}
+
+// TODO: Replace statsApi with runtimeApi types.
+type ContainerMetricsService interface {
+	// GetAllContainerStats returns metrics for all containers.
+	GetAllContainerStats() ([]*statsApi.ContainerStats, error)
+	// GetContainerStats returns metrics for the given container ID.
+	GetContainerStats(id string) (*statsApi.ContainerStats, error)
 }
