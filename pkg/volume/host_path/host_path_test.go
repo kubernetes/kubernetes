@@ -107,7 +107,7 @@ func TestDeleter(t *testing.T) {
 	if err != nil {
 		t.Errorf("Can't find the plugin by name")
 	}
-	deleter, err := plug.NewDeleter(spec)
+	deleter, err := plug.NewDeleter(nil, spec)
 	if err != nil {
 		t.Errorf("Failed to make a new Deleter: %v", err)
 	}
@@ -137,7 +137,7 @@ func TestDeleterTempDir(t *testing.T) {
 		plugMgr.InitPlugins(ProbeVolumePlugins(volume.VolumeConfig{}), volumetest.NewFakeVolumeHost("/tmp/fake", nil, nil, "" /* rootContext */))
 		spec := &volume.Spec{PersistentVolume: &api.PersistentVolume{Spec: api.PersistentVolumeSpec{PersistentVolumeSource: api.PersistentVolumeSource{HostPath: &api.HostPathVolumeSource{Path: test.path}}}}}
 		plug, _ := plugMgr.FindDeletablePluginBySpec(spec)
-		deleter, _ := plug.NewDeleter(spec)
+		deleter, _ := plug.NewDeleter(nil, spec)
 		err := deleter.Delete()
 		if err == nil && test.expectedFailure {
 			t.Errorf("Expected failure for test '%s' but got nil err", name)

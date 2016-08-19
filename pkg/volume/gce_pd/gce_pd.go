@@ -148,7 +148,7 @@ func (plugin *gcePersistentDiskPlugin) newUnmounterInternal(volName string, podU
 	}}, nil
 }
 
-func (plugin *gcePersistentDiskPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *gcePersistentDiskPlugin) NewDeleter(parameters map[string]string, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec, &GCEDiskUtil{})
 }
 
