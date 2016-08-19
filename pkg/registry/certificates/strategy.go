@@ -181,5 +181,5 @@ func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
 
 // SelectableFields returns a label set that can be used for filter selection
 func SelectableFields(obj *certificates.CertificateSigningRequest) labels.Set {
-	return labels.Set{}
+	return labels.Set(generic.ObjectMetaFieldsSet(obj.ObjectMeta, false))
 }
