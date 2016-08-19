@@ -64,7 +64,11 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 	}
 
 	historyInfo := make(map[int64]*api.PodTemplateSpec)
-	for _, rs := range append(allOldRSs, newRS) {
+	allRSs := allOldRSs
+	if newRS != nil {
+		allRSs = append(allRSs, newRS)
+	}
+	for _, rs := range allRSs {
 		v, err := deploymentutil.Revision(rs)
 		if err != nil {
 			continue
