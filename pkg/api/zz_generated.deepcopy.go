@@ -3406,6 +3406,7 @@ func DeepCopy_api_ServiceSpec(in interface{}, out interface{}, c *conversion.Clo
 			out.Selector = nil
 		}
 		out.ClusterIP = in.ClusterIP
+		out.ExternalName = in.ExternalName
 		if in.ExternalIPs != nil {
 			in, out := &in.ExternalIPs, &out.ExternalIPs
 			*out = make([]string, len(*in))
