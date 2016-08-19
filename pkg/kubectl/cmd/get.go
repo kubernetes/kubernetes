@@ -35,6 +35,8 @@ import (
 type GetOptions struct {
 	Filenames []string
 	Recursive bool
+
+	Raw string
 }
 
 const (
@@ -108,12 +110,40 @@ func NewCmdGet(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	kubectl.AddJsonFilenameFlag(cmd, &options.Filenames, usage)
 	cmdutil.AddRecursiveFlag(cmd, &options.Recursive)
 	cmdutil.AddInclude3rdPartyFlags(cmd)
+	cmd.Flags().StringVar(&options.Raw, "raw", options.Raw, "Raw URI to request from the server.  Uses the transport specified by the kubeconfig file.")
 	return cmd
 }
 
 // RunGet implements the generic Get command
 // TODO: convert all direct flag accessors to a struct and pass that instead of cmd
 func RunGet(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *GetOptions) error {
+	if len(options.Raw) > 0 {
+		client, err := f.Client()
+		if err != nil {
+			return err
+		}
+
+		stream, err := client.RESTClient.Get().RequestURI(options.Raw).Stream()
+		if err != nil {
+			return err
+		}
+		defer stream.Close()
+
+		for {
+			buffer := make([]byte, 1024, 1024)
+			bytesRead, err := stream.Read(buffer)
+			if bytesRead > 0 {
+				fmt.Printf("%s", string(buffer[:bytesRead]))
+			}
+			if err == io.EOF {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
