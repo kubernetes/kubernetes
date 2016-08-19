@@ -58,11 +58,14 @@ V=2 kube::log::status "Using bucket ${bucket_name}"
 
 # Check if the bucket exists
 if ! gsutil ls gs:// | grep -q "gs://${bucket_name}/"; then
-  V=2 kube::log::status "Creating bucket ${bucket_name}"
+  V=2 kube::log::status "Creating public bucket ${bucket_name}"
   gsutil mb gs://${bucket_name}/
+  # Make all files in the bucket publicly readable
+  gsutil acl ch -u AllUsers:R gs://${bucket_name}
 else
   V=2 kube::log::status "Bucket already exists"
 fi
+
 # Path for e2e-node test results
 GCS_JOBS_PATH="gs://${bucket_name}/logs/e2e-node"
 
@@ -105,10 +108,11 @@ if gsutil ls "${GCS_JOBS_PATH}" | grep -q "${BUILD_STAMP}"; then
   exit
 fi
 
-results=$(find ${ARTIFACTS} -type d -name "results")
-if [[ $results != "" && $results != "${ARTIFACTS}/results" && $results != $ARTIFACTS ]]; then
-  mv $results $ARTIFACTS
-fi
+for result in $(find ${ARTIFACTS} -type d -name "results"); do
+  if [[ $result != "" && $result != "${ARTIFACTS}/results" && $result != $ARTIFACTS ]]; then
+    mv $result/* $ARTIFACTS
+  fi
+done
 
 # Upload log files
 for upload_attempt in $(seq 3); do
