@@ -269,11 +269,10 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 
 	for _, m := range items {
 		rc = *m.(*api.ReplicationController)
-		labelSet := labels.Set(rc.Spec.Selector)
-		selector = labels.Set(rc.Spec.Selector).AsSelector()
+		selector = labels.Set(rc.Spec.Selector).AsSelectorPreValidated()
 
 		// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
-		if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 			continue
 		}
 		controllers = append(controllers, rc)
@@ -513,7 +512,7 @@ func (s *StoreToServiceLister) GetPodServices(pod *api.Pod) (services []api.Serv
 			// services with nil selectors match nothing, not everything.
 			continue
 		}
-		selector = labels.Set(service.Spec.Selector).AsSelector()
+		selector = labels.Set(service.Spec.Selector).AsSelectorPreValidated()
 		if selector.Matches(labels.Set(pod.Labels)) {
 			services = append(services, service)
 		}

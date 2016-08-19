@@ -291,11 +291,10 @@ func isControllerMatch(pod *api.Pod, rc *api.ReplicationController) bool {
 	if rc.Namespace != pod.Namespace {
 		return false
 	}
-	labelSet := labels.Set(rc.Spec.Selector)
-	selector := labels.Set(rc.Spec.Selector).AsSelector()
+	selector := labels.Set(rc.Spec.Selector).AsSelectorPreValidated()
 
 	// If an rc with a nil or empty selector creeps in, it should match nothing, not everything.
-	if labelSet.AsSelector().Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+	if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
 		return false
 	}
 	return true
@@ -662,7 +661,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 			rm.queue.Add(key)
 			return err
 		}
-		cm := controller.NewPodControllerRefManager(rm.podControl, rc.ObjectMeta, labels.Set(rc.Spec.Selector).AsSelector(), getRCKind())
+		cm := controller.NewPodControllerRefManager(rm.podControl, rc.ObjectMeta, labels.Set(rc.Spec.Selector).AsSelectorPreValidated(), getRCKind())
 		matchesAndControlled, matchesNeedsController, controlledDoesNotMatch := cm.Classify(pods)
 		for _, pod := range matchesNeedsController {
 			err := cm.AdoptPod(pod)
@@ -694,7 +693,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 			return aggregate
 		}
 	} else {
-		pods, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelector())
+		pods, err := rm.podStore.Pods(rc.Namespace).List(labels.Set(rc.Spec.Selector).AsSelectorPreValidated())
 		if err != nil {
 			glog.Errorf("Error getting pods for rc %q: %v", key, err)
 			rm.queue.Add(key)
@@ -716,7 +715,7 @@ func (rm *ReplicationManager) syncReplicationController(key string) error {
 	// matching pods must be part of the filteredPods.
 	fullyLabeledReplicasCount := 0
 	readyReplicasCount := 0
-	templateLabel := labels.Set(rc.Spec.Template.Labels).AsSelector()
+	templateLabel := labels.Set(rc.Spec.Template.Labels).AsSelectorPreValidated()
 	for _, pod := range filteredPods {
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++

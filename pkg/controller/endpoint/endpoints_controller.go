@@ -358,7 +358,7 @@ func (e *EndpointController) syncService(key string) {
 	}
 
 	glog.V(5).Infof("About to update endpoints for service %q", key)
-	pods, err := e.podStore.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelector())
+	pods, err := e.podStore.Pods(service.Namespace).List(labels.Set(service.Spec.Selector).AsSelectorPreValidated())
 	if err != nil {
 		// Since we're getting stuff from a local cache, it is
 		// basically impossible to get this error.
