@@ -61,14 +61,14 @@ This includes:
 * The date and time this information was fetched along with hints from the server about when this information is likely to be stale.
   * This is so that a client can figure out if this information is out of date.
 
-  Any client of the cluster will want to have this information.  As the configuration of the cluster changes we need the client to keep this information up to date.  It is assumed that the information here won’t drift so fast that clients won’t be able to find *some* way to connect.
+Any client of the cluster will want to have this information.  As the configuration of the cluster changes we need the client to keep this information up to date.  It is assumed that the information here won’t drift so fast that clients won’t be able to find *some* way to connect.
 
-  In exceptional circumstances it is possible that this information may be out of date and a client would be unable to connect to a cluster.  Consider the case where a user has kubectl set up and working well and then doesn't run kubectl for quite a while.  It is possible that over this time (a) the set of servers will have migrated so that all endpoints are now invalid or (b) the root certificates will have rotated so that the user can no longer trust any endpoint.
+In exceptional circumstances it is possible that this information may be out of date and a client would be unable to connect to a cluster.  Consider the case where a user has kubectl set up and working well and then doesn't run kubectl for quite a while.  It is possible that over this time (a) the set of servers will have migrated so that all endpoints are now invalid or (b) the root certificates will have rotated so that the user can no longer trust any endpoint.
 
-  We serialize this into a JSON object (exact syntax still TBD -- this is a sketch).  The whitespace is inserted for readability.
+We serialize this into a JSON object (exact syntax still TBD -- this is a sketch).  The whitespace is inserted for readability.
 
-  ```json
-  {
+```json
+{
   "kind": "ClusterInfo",
   "apiVersion": "v1alpha1",
   "clusterId": "E0D87385-CE10-415F-9913-EA8388EFD80B",
