@@ -1,8 +1,37 @@
+<!-- BEGIN MUNGE: UNVERSIONED_WARNING -->
+
+<!-- BEGIN STRIP_FOR_RELEASE -->
+
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+<img src="http://kubernetes.io/kubernetes/img/warning.png" alt="WARNING"
+     width="25" height="25">
+
+<h2>PLEASE NOTE: This document applies to the HEAD of the source tree</h2>
+
+If you are using a released version of Kubernetes, you should
+refer to the docs that go with that version.
+
+Documentation for other releases can be found at
+[releases.k8s.io](http://releases.k8s.io).
+</strong>
+--
+
+<!-- END STRIP_FOR_RELEASE -->
+
+<!-- END MUNGE: UNVERSIONED_WARNING -->
+
 # Super Simple Discovery API
 
 ## Overview
 
-It is surprisingly hard to figure out how to talk to a Kubernetes cluster.  Not only do client need to know where to look on the network, they also need to identify the set of root certificates to trust when talking to that endpoint.
+It is surprisingly hard to figure out how to talk to a Kubernetes cluster.  Not only do clients need to know where to look on the network, they also need to identify the set of root certificates to trust when talking to that endpoint.
 
 This presents a set of problems:
 * It should be super easy for users to configure client systems with a minimum of effort `kubectl` or `kubeadm init` (or other client systems).
@@ -26,19 +55,22 @@ This includes:
   * We make this a set so that root certificates can be rotated.
   * These are BASE64 encoded PEM values (without `-----BEGIN CERTIFICATE-----` lines).
   This is similar to how [JWS encodes certifcates in JSON](https://www.google.com/url?q=https://tools.ietf.org/html/rfc7515%23appendix-B&sa=D&ust=1471374807953000&usg=AFQjCNFQNcmbquq3XEegKc76v5j956aSPw).
-* The date and time this information was fetched.
+* Other root certificate options
+  * Don't bother validating the certificate for debug and dev scenarios.
+  * Trust the system managed list of CAs.
+* The date and time this information was fetched along with hints from the server about when this information is likely to be stale.
   * This is so that a client can figure out if this information is out of date.
-  * Perhaps include a TTL?
 
   Any client of the cluster will want to have this information.  As the configuration of the cluster changes we need the client to keep this information up to date.  It is assumed that the information here won’t drift so fast that clients won’t be able to find *some* way to connect.
 
-  In exceptional circumstances, it is possible that this information may be out of date and a client would be unable to connect to a cluster.  If a user has kubectl set up and working well pointing to raw IP addresses and doesn’t run it for a long time it is possible that both (a) the set of servers will have migrated so that no IP is good or (b) the root certificates will have rotated so that the user can no longer trust the endpoint.
+  In exceptional circumstances it is possible that this information may be out of date and a client would be unable to connect to a cluster.  Consider the case where a user has kubectl set up and working well and then doesn't run kubectl for quite a while.  It is possible that over this time (a) the set of servers will have migrated so that all endpoints are now invalid or (b) the root certificates will have rotated so that the user can no longer trust any endpoint.
 
   We serialize this into a JSON object (exact syntax still TBD -- this is a sketch).  The whitespace is inserted for readability.
+
   ```json
   {
-  "type": "ClusterInfo",
-  "version": "v1",
+  "kind": "ClusterInfo",
+  "apiVersion": "v1alpha1",
   "clusterId": "E0D87385-CE10-415F-9913-EA8388EFD80B",
   "endpoints": [
     "https://10.0.0.1",
@@ -47,7 +79,7 @@ This includes:
     "https://1.2.3.4",
     "https://1.2.3.5"
   ],
-  "rootCertificates": [
+  "certificateAuthorities": [
     "MIIDFDCCAfygAwIBAgIJAIr/AmnKEdesMA0GCSqGSIb3DQEBBQUAMBAxDjAMBgNV
      BAMTBWpiZWRhMB4XDTE2MDgxMTIwMjc0MVoXDTQzMTIyODIwMjc0MVowEDEOMAwG
      A1UEAxMFamJlZGEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDAiCK6
@@ -88,11 +120,49 @@ This includes:
 }
 ```
 
+```go
+type ClusterInfo struct {
+  TypeMeta
+
+  // ClusterID is a globally unique (and not necessarily human readable) ID for a cluster.
+  ClusterID string
+
+  // Endpoints are base addresses to get to the Kubernetes API server.
+  Endpoints []string
+
+  // CertificateAuthorities is a list of root certificates to trust for
+  // connections to this cluster. These are PEM encoded certificates without
+  // `-----BEGIN CERTIFICATE-----` lines.
+  CertificateAuthorities [][]string
+
+  // InsecureSkipTLSVerify skips the validity check for the server's
+  // certificate. This will make your HTTPS connections insecure and should
+  // only be used in debug and development scenarios.
+  InsecureSkipTLSVerify bool
+
+  // TrustCommonCAs instructs clients to trust the OS managed set of root
+  // certificates. The server has a certificate issued by a "universally"
+  // trusted CA.
+  TrustCommonCAs bool
+
+  // FetchedTime encodes the time that this information was fetched and known
+  // to be good.
+  FetchedTime unversioned.Time
+
+  // ExpiredTime encodes a hint about when the client should consider this
+  // information stale and re-fetch it.
+  ExpiredTime unversioned.Time
+}
+```
+
+**Note**: This object doesn't have regular ObjectMeta.  Since this is a singleton per API server cluster, there is no user update and no list.  Most of the members of ObjectMeta don't apply.
+
 **TODO/Questions**:
-  * Turn this into a real Kubernetes API object with standard structure
+  * Is `ClusterInfo` too general?  Do we want to rename this to `ClusterLocation` as it was in the original proposal?
+  * ~~Turn this into a real Kubernetes API object with standard structure~~
   * Do we need to handle more complicated structure for specifying endpoints? Perhaps a priority?
-  * Does this get versioned with the rest of the API or is it a separate thing?
-  * How do we say "trust system installed roots"?  It is possible users will configure the cluster with a publicly signed certificate.
+  * ~~Does this get versioned with the rest of the API or is it a separate thing?~~
+  * ~~How do we say "trust system installed roots"?  It is possible users will configure the cluster with a publicly signed certificate.~~
 
 ## Methods
 
@@ -152,6 +222,7 @@ kubeadm join --token=A81E5d4DwI.0ok9tB1QhB <address>
 **Note:** This is logically a different use of the token from TLS bootstrap.  We should look to harmonize these usages and allow the same token to play double duty.  It is likely that the bare `--token` command line flag will indicate the token be used for both ClusterInfo and TLS bootstrap.
 
 #### Quick Primer on JWS
+
 [JSON Web Signatures](https://tools.ietf.org/html/rfc7515) are a way to sign, serialize and verify a payload.  It supports both symmetric keys (aka shared secrets) along with asymmetric keys (aka public key infrastructure or key pairs).  The JWS is split in to 3 parts:
 1. a header about how it is signed
 2. the clear text payload
@@ -164,7 +235,7 @@ There are a couple of different ways of encoding this data -- either as a JSON o
 The API server serves up a simple plain old HTTP endpoint for this.  The client does a HTTP GET to:
 
 ```
-http://<address>/cluster-info/v1/?token-id=<token-id>
+http://<address>/api/v1alpha1/clusterinfo/?token-id=<token-id>
 ```
 
 #### ClusterInfo Response
@@ -209,7 +280,9 @@ The full JWS will look something like:
   "signature":"vat_c1aTytSLVkPw9wWhven9GtLBSLFzJViIq5scLDA"
 }
 ```
+
 If we Base64 decode the `protected` member we get:
+
 ```json
 {
   "alg":"HS256",
@@ -223,9 +296,11 @@ The payload is the ClusterInfo JSON object as described above.  Astute readers w
 
 #### Method: ClusterInfo refresh
 
-The API server will serve up a version of this endpoint at `https://<address>/cluster-info/v1/` (note the `https`).  Assuming the user authenticates to (and verifies identity of) the API server, this returns the `ClusterInfo` object directly.  This is used by clients that already have communication with the cluster to update their cached copy of the ClusterInfo object.  It is expected that the client will respect the `expiredTime` member of the object and refresh before the information is expired if at all possible.
+The API server will serve up a version of this endpoint at `https://<address>/api/v1alpha1/clusterinfo` (note the `https`).  Assuming the user authenticates to (and verifies identity of) the API server, this returns the `ClusterInfo` object directly.  This is used by clients that already have communication with the cluster to update their cached copy of the ClusterInfo object.  It is expected that the client will respect the `expiredTime` member of the object and refresh before the information is expired if at all possible.
 
 Implementation note: We'll probably want to jitter this to avoid a stampede.
 
-#### Future Method: DNSSEC
-If we have a secure DNS method we can use that to distribute both the IP addresses of the cluster along with the root certificates to trust.  Other information can be encoded in TXT records.
+
+<!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/docs/proposals/super-simple-discovery-api.md?pixel)]()
+<!-- END MUNGE: GENERATED_ANALYTICS -->
