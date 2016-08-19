@@ -179,6 +179,25 @@ func (gv GroupVersion) String() string {
 	return gv.Version
 }
 
+// KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
+// if none of the options match the group. It prefers a match to group and version over just group.
+// TODO: Move GroupVersion to a package under pkg/runtime, since it's used by scheme.
+// TODO: Introduce an adapter type between GroupVersion and runtime.GroupVersioner, and use LegacyCodec(GroupVersion)
+//   in fewer places.
+func (gv GroupVersion) KindForGroupVersionKinds(kinds []GroupVersionKind) (target GroupVersionKind, ok bool) {
+	for _, gvk := range kinds {
+		if gvk.Group == gv.Group && gvk.Version == gv.Version {
+			return gvk, true
+		}
+	}
+	for _, gvk := range kinds {
+		if gvk.Group == gv.Group {
+			return gv.WithKind(gvk.Kind), true
+		}
+	}
+	return GroupVersionKind{}, false
+}
+
 // ParseGroupVersion turns "group/version" string into a GroupVersion struct. It reports error
 // if it cannot parse the string.
 func ParseGroupVersion(gv string) (GroupVersion, error) {
@@ -239,6 +258,25 @@ func (gv *GroupVersion) UnmarshalJSON(value []byte) error {
 // UnmarshalTEXT implements the Ugorji's encoding.TextUnmarshaler interface.
 func (gv *GroupVersion) UnmarshalText(value []byte) error {
 	return gv.unmarshal(value)
+}
+
+// GroupVersions can be used to represent a set of desired group versions.
+// TODO: Move GroupVersions to a package under pkg/runtime, since it's used by scheme.
+// TODO: Introduce an adapter type between GroupVersions and runtime.GroupVersioner, and use LegacyCodec(GroupVersion)
+//   in fewer places.
+type GroupVersions []GroupVersion
+
+// KindForGroupVersionKinds identifies the preferred GroupVersionKind out of a list. It returns ok false
+// if none of the options match the group.
+func (gvs GroupVersions) KindForGroupVersionKinds(kinds []GroupVersionKind) (target GroupVersionKind, ok bool) {
+	for _, gv := range gvs {
+		target, ok := gv.KindForGroupVersionKinds(kinds)
+		if !ok {
+			continue
+		}
+		return target, true
+	}
+	return GroupVersionKind{}, false
 }
 
 // ToAPIVersionAndKind is a convenience method for satisfying runtime.Object on types that

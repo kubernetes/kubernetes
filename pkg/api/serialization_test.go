@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/conversion"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer/streaming"
-	"k8s.io/kubernetes/pkg/runtime/serializer/versioning"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
@@ -93,7 +92,11 @@ func roundTrip(t *testing.T, codec runtime.Codec, item runtime.Object) {
 	name := reflect.TypeOf(item).Elem().Name()
 	data, err := runtime.Encode(codec, item)
 	if err != nil {
-		t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", item))
+		if runtime.IsNotRegisteredError(err) {
+			t.Logf("%v: not registered: %v (%s)", name, err, printer.Sprintf("%#v", item))
+		} else {
+			t.Errorf("%v: %v (%s)", name, err, printer.Sprintf("%#v", item))
+		}
 		return
 	}
 
@@ -181,10 +184,14 @@ func TestSetControllerConversion(t *testing.T) {
 		t.Fatalf("unexpected encoding error: %v", err)
 	}
 
-	decoder := api.Codecs.UniversalDecoder(*extGroup.GroupVersion(), *defaultGroup.GroupVersion())
-	if err := versioning.EnableCrossGroupDecoding(decoder, extGroup.GroupVersion().Group, defaultGroup.GroupVersion().Group); err != nil {
-		t.Fatalf("unexpected error while enabling cross-group decoding: %v", err)
-	}
+	decoder := api.Codecs.DecoderToVersion(
+		api.Codecs.UniversalDeserializer(),
+		runtime.NewMultiGroupVersioner(
+			*defaultGroup.GroupVersion(),
+			unversioned.GroupKind{Group: defaultGroup.GroupVersion().Group},
+			unversioned.GroupKind{Group: extGroup.GroupVersion().Group},
+		),
+	)
 
 	t.Logf("rs.v1beta1.extensions -> rc._internal")
 	if err := runtime.DecodeInto(decoder, data, rc); err != nil {
@@ -475,7 +482,7 @@ func BenchmarkEncodeCodecFromInternal(b *testing.B) {
 	width := len(items)
 	encodable := make([]api.Pod, width)
 	for i := range items {
-		if err := api.Scheme.Convert(&items[i], &encodable[i]); err != nil {
+		if err := api.Scheme.Convert(&items[i], &encodable[i], nil); err != nil {
 			b.Fatal(err)
 		}
 	}
