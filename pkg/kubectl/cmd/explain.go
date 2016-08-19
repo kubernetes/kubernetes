@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
@@ -61,7 +62,11 @@ func NewCmdExplain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 
 // RunExplain executes the appropriate steps to print a model's documentation
 func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
+	if len(args) == 0 {
+		fmt.Fprint(out, "You must specify the type of resource to explain. ", valid_resources)
+		return cmdutil.UsageError(cmd, "Required resource not specified.")
+	}
+	if len(args) > 1 {
 		return cmdutil.UsageError(cmd, "We accept only this format: explain RESOURCE")
 	}
 
