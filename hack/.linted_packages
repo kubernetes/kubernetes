@@ -203,3 +203,5 @@ pkg/volume/quobyte
 test/integration/discoverysummarizer
 test/integration/examples
 test/integration/federation
+pkg/kubelet/sysctls
+pkg/api/validation
