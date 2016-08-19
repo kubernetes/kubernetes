@@ -24,14 +24,14 @@ import (
 
 	kadmission "k8s.io/kubernetes/pkg/admission"
 	kapi "k8s.io/kubernetes/pkg/api"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
-	diff "k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/diff"
 )
 
 func NewTestAdmission(store cache.Store, kclient clientset.Interface) kadmission.Interface {
@@ -944,6 +944,136 @@ func TestAdmitReadOnlyRootFilesystem(t *testing.T) {
 	}
 }
 
+func TestAdmitSysctls(t *testing.T) {
+	podWithSysctls := func(sysctls []string) *kapi.Pod {
+		pod := goodPod()
+		if pod.Annotations == nil {
+			pod.Annotations = map[string]string{}
+		}
+		l := make([]kapi.Sysctl, len(sysctls))
+		for i, s := range sysctls {
+			l[i].Name = s
+			l[i].Value = "dummy"
+		}
+		pod.Annotations[kapi.SysctlsPodAnnotationKey] = kapi.PodAnnotationsFromSysctls(l)
+		return pod
+	}
+
+	noSysctls := restrictivePSP()
+	noSysctls.Name = "no sysctls"
+
+	emptySysctls := restrictivePSP()
+	emptySysctls.Name = "empty sysctls"
+	emptySysctls.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = ""
+
+	mixedSysctls := restrictivePSP()
+	mixedSysctls.Name = "wildcard sysctls"
+	mixedSysctls.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "a.*,b.*,c,d.e.f"
+
+	aSysctl := restrictivePSP()
+	aSysctl.Name = "a sysctl"
+	aSysctl.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "a"
+
+	bSysctl := restrictivePSP()
+	bSysctl.Name = "b sysctl"
+	bSysctl.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "b"
+
+	cSysctl := restrictivePSP()
+	cSysctl.Name = "c sysctl"
+	cSysctl.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "c"
+
+	catchallSysctls := restrictivePSP()
+	catchallSysctls.Name = "catchall sysctl"
+	catchallSysctls.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "*"
+
+	tests := map[string]struct {
+		pod         *kapi.Pod
+		psps        []*extensions.PodSecurityPolicy
+		shouldPass  bool
+		expectedPSP string
+	}{
+		"pod without sysctls request allowed under noSysctls PSP": {
+			pod:         goodPod(),
+			psps:        []*extensions.PodSecurityPolicy{noSysctls},
+			shouldPass:  true,
+			expectedPSP: noSysctls.Name,
+		},
+		"pod without sysctls request allowed under emptySysctls PSP": {
+			pod:         goodPod(),
+			psps:        []*extensions.PodSecurityPolicy{emptySysctls},
+			shouldPass:  true,
+			expectedPSP: emptySysctls.Name,
+		},
+		"pod with sysctls request allowed under noSysctls PSP": {
+			pod:         podWithSysctls([]string{"a", "b"}),
+			psps:        []*extensions.PodSecurityPolicy{noSysctls},
+			shouldPass:  true,
+			expectedPSP: noSysctls.Name,
+		},
+		"pod with sysctls request disallowed under emptySysctls PSP": {
+			pod:        podWithSysctls([]string{"a", "b"}),
+			psps:       []*extensions.PodSecurityPolicy{emptySysctls},
+			shouldPass: false,
+		},
+		"pod with matching sysctls request allowed under mixedSysctls PSP": {
+			pod:         podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f"}),
+			psps:        []*extensions.PodSecurityPolicy{mixedSysctls},
+			shouldPass:  true,
+			expectedPSP: mixedSysctls.Name,
+		},
+		"pod with not-matching sysctls request allowed under mixedSysctls PSP": {
+			pod:        podWithSysctls([]string{"a.b", "b.c", "c", "d.e.f", "e"}),
+			psps:       []*extensions.PodSecurityPolicy{mixedSysctls},
+			shouldPass: false,
+		},
+		"pod with sysctls request allowed under catchallSysctls PSP": {
+			pod:         podWithSysctls([]string{"e"}),
+			psps:        []*extensions.PodSecurityPolicy{catchallSysctls},
+			shouldPass:  true,
+			expectedPSP: catchallSysctls.Name,
+		},
+		"pod with sysctls request allowed under catchallSysctls PSP, not under mixedSysctls or emptySysctls PSP": {
+			pod:         podWithSysctls([]string{"e"}),
+			psps:        []*extensions.PodSecurityPolicy{mixedSysctls, catchallSysctls, emptySysctls},
+			shouldPass:  true,
+			expectedPSP: catchallSysctls.Name,
+		},
+		"pod with c sysctl request allowed under cSysctl PSP, not under aSysctl or bSysctl PSP": {
+			pod:         podWithSysctls([]string{"c"}),
+			psps:        []*extensions.PodSecurityPolicy{aSysctl, bSysctl, cSysctl},
+			shouldPass:  true,
+			expectedPSP: cSysctl.Name,
+		},
+	}
+
+	for k, v := range tests {
+		origSysctls, err := kapi.SysctlsFromPodAnnotation(v.pod.Annotations[kapi.SysctlsPodAnnotationKey])
+		if err != nil {
+			t.Fatalf("invalid sysctl annotations: %v", err)
+		}
+
+		testPSPAdmit(k, v.psps, v.pod, v.shouldPass, v.expectedPSP, t)
+
+		if v.shouldPass {
+			ok := true
+			setSysctls, _ := kapi.SysctlsFromPodAnnotation(v.pod.Annotations[kapi.SysctlsPodAnnotationKey])
+			if len(setSysctls) != len(origSysctls) {
+				ok = false
+			} else {
+				for i := range setSysctls {
+					if setSysctls[i].Name != origSysctls[i].Name {
+						ok = false
+						break
+					}
+				}
+			}
+			if !ok {
+				t.Errorf("%s: expected=%v, got=%v", k, origSysctls, setSysctls)
+			}
+		}
+	}
+}
+
 func testPSPAdmit(testCaseName string, psps []*extensions.PodSecurityPolicy, pod *kapi.Pod, shouldPass bool, expectedPSP string, t *testing.T) {
 	namespace := createNamespaceForTest()
 	serviceAccount := createSAForTest()
@@ -1154,7 +1284,8 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 func restrictivePSP() *extensions.PodSecurityPolicy {
 	return &extensions.PodSecurityPolicy{
 		ObjectMeta: kapi.ObjectMeta{
-			Name: "restrictive",
+			Name:        "restrictive",
+			Annotations: map[string]string{},
 		},
 		Spec: extensions.PodSecurityPolicySpec{
 			RunAsUser: extensions.RunAsUserStrategyOptions{
