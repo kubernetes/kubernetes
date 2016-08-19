@@ -97,7 +97,7 @@ func newOIDCAuthProvider(_ string, cfg map[string]string, persister restclient.A
 	}
 	hc := &http.Client{Transport: trans}
 
-	providerCfg, err := oidc.FetchProviderConfig(hc, strings.TrimSuffix(issuer, "/"))
+	providerCfg, err := oidc.FetchProviderConfig(hc, issuer)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching provider config: %v", err)
 	}
