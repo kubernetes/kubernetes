@@ -1,0 +1,50 @@
+---
+images:
+  containervm-density1:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-1
+    tests:
+      - '.*create 35 pods with 0s? interval \[Benchmark\]'    
+  containervm-density2:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-1
+    tests:
+      - '.*create 105 pods with 0s? interval \[Benchmark\]'
+  containervm-density3:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-2
+    tests:
+      - '.*create 105 pods with 0s? interval \[Benchmark\]'
+  containervm-density4:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-1
+    tests:
+      - '.*create 35 pods with 100ms interval \[Benchmark\]'    
+  containervm-density5:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-1
+    tests:
+      - '.*create 105 pods with 100ms interval \[Benchmark\]'
+  containervm-density6:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-2
+    tests:
+      - '.*create 105 pods with 100ms interval \[Benchmark\]'
+  containervm-density7:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-1
+    tests:
+      - '.*create 105 pods with 300ms interval \[Benchmark\]'
+  containervm-density8:
+    image: e2e-node-containervm-v20160321-image
+    project: kubernetes-node-e2e-images
+    machine: n1-standard-2
+    tests:
+      - '.*create 105 pods with 300ms interval \[Benchmark\]'
