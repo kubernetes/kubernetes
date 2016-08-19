@@ -527,9 +527,12 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, 
 // SysctlsFromPodAnnotation parses an annotation value of the key SysctlsPodAnnotationKey
 // into a slice of Sysctls.
 func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
-	var sysctls []Sysctl
+	if annotation == "" {
+		return nil, nil
+	}
+
 	kvs := strings.Split(annotation, ",")
-	sysctls = make([]Sysctl, len(kvs))
+	sysctls := make([]Sysctl, len(kvs))
 	for i, kv := range kvs {
 		cs := strings.Split(kv, "=")
 		if len(cs) != 2 {

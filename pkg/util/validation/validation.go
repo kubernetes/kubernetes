@@ -292,38 +292,6 @@ func IsConfigMapKey(value string) []string {
 	return errs
 }
 
-var namespacedSysctls = map[string]struct{}{
-	"kernel.msgmax":          {},
-	"kernel.msgmnb":          {},
-	"kernel.msgmni":          {},
-	"kernel.sem":             {},
-	"kernel.shmall":          {},
-	"kernel.shmmax":          {},
-	"kernel.shmmni":          {},
-	"kernel.shm_rmid_forced": {},
-}
-
-var namespacedSysctlPrefixes = []string{
-	"net.",
-	"fs.mqueue.",
-}
-
-// IsWhitelistedSysctlOpt checks that a sysctl option is whitelisted because it is known
-// to be namespaced by the Linux kernel. Note that passing this test is required, but not
-// sufficient: the container runtime might have a stricter check and refuse to launch a pod.
-func IsWhitelistedSysctlOpt(val string) bool {
-	_, found := namespacedSysctls[val]
-	if found {
-		return true
-	}
-	for _, p := range namespacedSysctlPrefixes {
-		if strings.HasPrefix(val, p) {
-			return true
-		}
-	}
-	return false
-}
-
 // MaxLenError returns a string explanation of a "string too long" validation
 // failure.
 func MaxLenError(length int) string {
