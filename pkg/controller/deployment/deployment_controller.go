@@ -110,7 +110,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 		queue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 	}
 
-	dc.dStore.Store, dc.dController = framework.NewInformer(
+	dc.dStore.Indexer, dc.dController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.client.Extensions().Deployments(api.NamespaceAll).List(options)
@@ -127,6 +127,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 			// This will enter the sync loop and no-op, because the deployment has been deleted from the store.
 			DeleteFunc: dc.deleteDeploymentNotification,
 		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
 	dc.rsStore.Store, dc.rsController = framework.NewInformer(
@@ -490,7 +491,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		glog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Now().Sub(startTime))
 	}()
 
-	obj, exists, err := dc.dStore.Store.GetByKey(key)
+	obj, exists, err := dc.dStore.Indexer.GetByKey(key)
 	if err != nil {
 		glog.Infof("Unable to retrieve deployment %v from store: %v", key, err)
 		return err

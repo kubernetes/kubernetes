@@ -61,7 +61,7 @@ type DisruptionController struct {
 	rsController *framework.Controller
 	rsLister     cache.StoreToReplicaSetLister
 
-	dStore      cache.Store
+	dIndexer    cache.Indexer
 	dController *framework.Controller
 	dLister     cache.StoreToDeploymentLister
 
@@ -155,7 +155,7 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 
 	dc.rsLister.Store = dc.rsStore
 
-	dc.dStore, dc.dController = framework.NewInformer(
+	dc.dIndexer, dc.dController = framework.NewIndexerInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
 				return dc.kubeClient.Extensions().Deployments(api.NamespaceAll).List(options)
@@ -167,9 +167,10 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 		&extensions.Deployment{},
 		30*time.Second,
 		framework.ResourceEventHandlerFuncs{},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 	)
 
-	dc.dLister.Store = dc.dStore
+	dc.dLister.Indexer = dc.dIndexer
 
 	return dc
 }

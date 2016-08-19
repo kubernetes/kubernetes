@@ -262,15 +262,36 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 }
 
 type StoreToDeploymentNamespacer struct {
-	store     Store
+	indexer   Indexer
 	namespace string
 }
 
 // StoreToDeploymentNamespacer lists all deployments under its namespace in the store.
 func (s StoreToDeploymentNamespacer) List() (deployments []extensions.Deployment, err error) {
-	for _, c := range s.store.List() {
-		d := *(c.(*extensions.Deployment))
-		if s.namespace == api.NamespaceAll || s.namespace == d.Namespace {
+	if s.namespace == api.NamespaceAll {
+		for _, m := range s.indexer.List() {
+			d := *(m.(*extensions.Deployment))
+			deployments = append(deployments, d)
+		}
+		return
+	}
+
+	key := &extensions.Deployment{ObjectMeta: api.ObjectMeta{Namespace: s.namespace}}
+	items, err := s.indexer.Index(NamespaceIndex, key)
+	if err != nil {
+		// Ignore error; do slow search without index.
+		glog.Warningf("can not retrieve list of objects using index : %v", err)
+		for _, m := range s.indexer.List() {
+			d := *(m.(*extensions.Deployment))
+			if s.namespace == d.Namespace {
+				deployments = append(deployments, d)
+			}
+		}
+		return deployments, nil
+	}
+	for _, m := range items {
+		d := *(m.(*extensions.Deployment))
+		if s.namespace == d.Namespace {
 			deployments = append(deployments, d)
 		}
 	}
@@ -278,17 +299,17 @@ func (s StoreToDeploymentNamespacer) List() (deployments []extensions.Deployment
 }
 
 func (s *StoreToDeploymentLister) Deployments(namespace string) StoreToDeploymentNamespacer {
-	return StoreToDeploymentNamespacer{s.Store, namespace}
+	return StoreToDeploymentNamespacer{s.Indexer, namespace}
 }
 
 // StoreToDeploymentLister gives a store List and Exists methods. The store must contain only Deployments.
 type StoreToDeploymentLister struct {
-	Store
+	Indexer
 }
 
 // Exists checks if the given deployment exists in the store.
 func (s *StoreToDeploymentLister) Exists(deployment *extensions.Deployment) (bool, error) {
-	_, exists, err := s.Store.Get(deployment)
+	_, exists, err := s.Indexer.Get(deployment)
 	if err != nil {
 		return false, err
 	}
@@ -298,7 +319,7 @@ func (s *StoreToDeploymentLister) Exists(deployment *extensions.Deployment) (boo
 // StoreToDeploymentLister lists all deployments in the store.
 // TODO: converge on the interface in pkg/client
 func (s *StoreToDeploymentLister) List() (deployments []extensions.Deployment, err error) {
-	for _, c := range s.Store.List() {
+	for _, c := range s.Indexer.List() {
 		deployments = append(deployments, *(c.(*extensions.Deployment)))
 	}
 	return deployments, nil
@@ -314,7 +335,7 @@ func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.Rep
 	}
 
 	// TODO: MODIFY THIS METHOD so that it checks for the podTemplateSpecHash label
-	for _, m := range s.Store.List() {
+	for _, m := range s.Indexer.List() {
 		d = *m.(*extensions.Deployment)
 		if d.Namespace != rs.Namespace {
 			continue
