@@ -1190,13 +1190,56 @@ var _ = framework.KubeDescribe("Kubectl client", func() {
 			checkOutput(output, requiredStrings)
 
 			By("removing the taint " + taintName + " of a node")
-			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+":"+taintEffect+"-")
 			By("verifying the node doesn't have the taint " + taintName)
 			output = framework.RunKubectlOrDie("describe", "node", nodeName)
 			if strings.Contains(output, taintName) {
 				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
 			}
 
+		})
+
+		It("should remove all the taints with the same key off a node", func() {
+			taintName := fmt.Sprintf("kubernetes.io/e2e-taint-key-%s", string(uuid.NewUUID()))
+			taintValue := "testing-taint-value"
+			taintEffect := fmt.Sprintf("%s", api.TaintEffectNoSchedule)
+
+			nodes, err := c.Nodes().List(api.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			node := nodes.Items[0]
+			nodeName := node.Name
+
+			By("adding the taint " + taintName + " with value " + taintValue + " and taint effect " + taintEffect + " to a node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+taintValue+":"+taintEffect)
+			By("verifying the node has the taint " + taintName + " with the value " + taintValue)
+			output := framework.RunKubectlOrDie("describe", "node", nodeName)
+			requiredStrings := [][]string{
+				{"Name:", nodeName},
+				{"Taints:"},
+				{taintName + "=" + taintValue + ":" + taintEffect},
+			}
+			checkOutput(output, requiredStrings)
+
+			newTaintValue := "another-testing-taint-value"
+			newTaintEffect := fmt.Sprintf("%s", api.TaintEffectPreferNoSchedule)
+			By("adding another taint " + taintName + " with value " + newTaintValue + " and taint effect " + newTaintEffect + " to the node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"="+newTaintValue+":"+newTaintEffect)
+			By("verifying the node has the taint " + taintName + " with the value " + newTaintValue)
+			output = framework.RunKubectlOrDie("describe", "node", nodeName)
+			requiredStrings = [][]string{
+				{"Name:", nodeName},
+				{"Taints:"},
+				{taintName + "=" + newTaintValue + ":" + newTaintEffect},
+			}
+			checkOutput(output, requiredStrings)
+
+			By("removing the taint " + taintName + " of a node")
+			framework.RunKubectlOrDie("taint", "nodes", nodeName, taintName+"-")
+			By("verifying the node doesn't have the taints " + taintName)
+			output = framework.RunKubectlOrDie("describe", "node", nodeName)
+			if strings.Contains(output, taintName) {
+				framework.Failf("Failed removing taint " + taintName + " of the node " + nodeName)
+			}
 		})
 	})
 
