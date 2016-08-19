@@ -122,3 +122,87 @@ func TestSecretGenerate(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleSecretGenericReplace(t *testing.T) {
+	generatorDefaultParams := map[string]interface{}{
+		"name":         "foo",
+		"type":         "my-type",
+		"from-literal": []string{"key1=value1", "key2=value2"},
+		"from-file":    []string{},
+	}
+
+	tests := []struct {
+		replaceParams map[string][]string
+		expected      *api.Secret
+		expectErr     bool
+	}{
+		{
+			replaceParams: map[string][]string{
+				"from-literal": {"key11=value11", "key22=value22"},
+				"from-file":    {},
+			},
+			expected: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Type: "my-type",
+				Data: map[string][]byte{
+					"key11": []byte("value11"),
+					"key22": []byte("value22"),
+				},
+			},
+			expectErr: false,
+		},
+		{
+			replaceParams: map[string][]string{
+				"from-literal": {"key1==value1"},
+				"from-file":    {},
+			},
+			expected: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Type: "my-type",
+				Data: map[string][]byte{
+					"key1": []byte("=value1"),
+				},
+			},
+			expectErr: false,
+		},
+		{
+			replaceParams: map[string][]string{
+				"from-literal": {"key1value1"},
+				"from-file":    {},
+			},
+			expectErr: true,
+		},
+		{
+			replaceParams: map[string][]string{
+				"from-literal": {},
+				"from-file":    {"key1=/file=2"},
+			},
+			expectErr: true,
+		},
+		{
+			replaceParams: map[string][]string{
+				"from-literal": {},
+				"from-file":    {"key1==value"},
+			},
+			expectErr: true,
+		},
+	}
+	generator := SecretGeneratorV1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(generatorDefaultParams)
+		err = HandleSecretGenericReplace(obj.(*api.Secret), test.replaceParams["from-file"], test.replaceParams["from-literal"])
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*api.Secret), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Secret))
+		}
+	}
+}

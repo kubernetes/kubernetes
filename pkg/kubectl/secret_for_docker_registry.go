@@ -117,6 +117,16 @@ func (s SecretForDockerRegistryGeneratorV1) validate() error {
 	return nil
 }
 
+func HandleSecretDockerRegistryReplace(secret *api.Secret, username, password, email, server string) error {
+	dockercfgContent, err := handleDockercfgContent(username, password, email, server)
+	if err != nil {
+		return err
+	}
+	secret.Data = make(map[string][]byte)
+	secret.Data[api.DockerConfigKey] = dockercfgContent
+	return nil
+}
+
 // handleDockercfgContent serializes a dockercfg json file
 func handleDockercfgContent(username, password, email, server string) ([]byte, error) {
 	dockercfgAuth := credentialprovider.DockerConfigEntry{

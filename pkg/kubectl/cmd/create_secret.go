@@ -45,7 +45,7 @@ func NewCmdCreateSecret(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 }
 
 var (
-	secretLong = dedent.Dedent(`
+	createSecretLong = dedent.Dedent(`
 		Create a secret based on a file, directory, or specified literal value.
 
 		A single secret may package one or more key/value pairs.
@@ -58,7 +58,7 @@ var (
 		symlinks, devices, pipes, etc).
 		`)
 
-	secretExample = dedent.Dedent(`
+	createSecretExample = dedent.Dedent(`
 		  # Create a new secret named my-secret with keys for each file in folder bar
 		  kubectl create secret generic my-secret --from-file=path/to/bar
 
@@ -74,8 +74,8 @@ func NewCmdCreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Comm
 	cmd := &cobra.Command{
 		Use:     "generic NAME [--type=string] [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
 		Short:   "Create a secret from a local file, directory or literal value",
-		Long:    secretLong,
-		Example: secretExample,
+		Long:    createSecretLong,
+		Example: createSecretExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := CreateSecretGeneric(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
@@ -118,7 +118,7 @@ func CreateSecretGeneric(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Comman
 }
 
 var (
-	secretForDockerRegistryLong = dedent.Dedent(`
+	createSecretForDockerRegistryLong = dedent.Dedent(`
 		Create a new secret for use with Docker registries.
 
 		Dockercfg secrets are used to authenticate against Docker registries.
@@ -132,7 +132,7 @@ var (
 		nodes to pull images on your behalf, they have to have the credentials.  You can provide this information
 		by creating a dockercfg secret and attaching it to your service account.`)
 
-	secretForDockerRegistryExample = dedent.Dedent(`
+	createSecretForDockerRegistryExample = dedent.Dedent(`
 		  # If you don't already have a .dockercfg file, you can create a dockercfg secret directly by using:
 		  kubectl create secret docker-registry my-secret --docker-server=DOCKER_REGISTRY_SERVER --docker-username=DOCKER_USER --docker-password=DOCKER_PASSWORD --docker-email=DOCKER_EMAIL`)
 )
@@ -142,8 +142,8 @@ func NewCmdCreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer) *cob
 	cmd := &cobra.Command{
 		Use:     "docker-registry NAME --docker-username=user --docker-password=password --docker-email=email [--docker-server=string] [--from-literal=key1=value1] [--dry-run]",
 		Short:   "Create a secret for use with a Docker registry",
-		Long:    secretForDockerRegistryLong,
-		Example: secretForDockerRegistryExample,
+		Long:    createSecretForDockerRegistryLong,
+		Example: createSecretForDockerRegistryExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := CreateSecretDockerRegistry(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)
@@ -198,12 +198,12 @@ func CreateSecretDockerRegistry(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra
 }
 
 var (
-	secretForTLSLong = dedent.Dedent(`
+	createSecretForTLSLong = dedent.Dedent(`
 		Create a TLS secret from the given public/private key pair.
 
 		The public/private key pair must exist before hand. The public key certificate must be .PEM encoded and match the given private key.`)
 
-	secretForTLSExample = dedent.Dedent(`
+	createSecretForTLSExample = dedent.Dedent(`
 		  # Create a new TLS secret named tls-secret with the given key pair:
 		  kubectl create secret tls tls-secret --cert=path/to/tls.cert --key=path/to/tls.key`)
 )
@@ -213,8 +213,8 @@ func NewCmdCreateSecretTLS(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command 
 	cmd := &cobra.Command{
 		Use:     "tls NAME --cert=path/to/cert/file --key=path/to/key/file [--dry-run]",
 		Short:   "Create a TLS secret",
-		Long:    secretForTLSLong,
-		Example: secretForTLSExample,
+		Long:    createSecretForTLSLong,
+		Example: createSecretForTLSExample,
 		Run: func(cmd *cobra.Command, args []string) {
 			err := CreateSecretTLS(f, cmdOut, cmd, args)
 			cmdutil.CheckErr(err)

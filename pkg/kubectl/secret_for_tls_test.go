@@ -52,7 +52,27 @@ D2lWusoe2/nEqfDVVWGWlyJ7yOmqaVm/iNUN9B2N2g==
 -----END RSA PRIVATE KEY-----
 `
 
-const mismatchRSAKeyPEM = `-----BEGIN PRIVATE KEY-----
+const anotherRSACertPEM = `-----BEGIN CERTIFICATE-----
+MIIDKzCCAhOgAwIBAgIJAP6zX1i14mEuMA0GCSqGSIb3DQEBCwUAMCwxFDASBgNV
+BAMMC2V4YW1wbGUuY29tMRQwEgYDVQQKDAtleGFtcGxlLmNvbTAeFw0xNjA1MTUw
+MDQ0NThaFw0xNzA1MTUwMDQ0NThaMCwxFDASBgNVBAMMC2V4YW1wbGUuY29tMRQw
+EgYDVQQKDAtleGFtcGxlLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoC
+ggEBAL/rrmHnmFYPhXaSJD4H8b0018HDr14GJsSEj29aQ9TKffoY7avcc+1ETrfA
+F8WlXjzqez0OhmecBgQloaNU0IKpLm1DIwFanzjejrooGsSAGm510KGKC/K6XfcW
+EPUiYWc35XLRqM4n7X9lqLbzMFdZvEJYRurPuzx7ZSw+UF3QJqPiBx3fbIPYHCIe
+rMHyh1OhZFRPuX6lLxGoDUGu5C+2MQityhZWUTXvRlh7v4Cmb3oD5a+1VGSjM/Kf
+EcXxK4SLDiECHSVdHpvjNnPi1lVXx6/Yel9+95X/rwaILJ4UNuCWp3ixn8iBr+vC
+7ttVj8HMUCkfC7aGaZVcudpre5UCAwEAAaNQME4wHQYDVR0OBBYEFMqQZOeB0B/V
+pPgBNs23SW2aRZsZMB8GA1UdIwQYMBaAFMqQZOeB0B/VpPgBNs23SW2aRZsZMAwG
+A1UdEwQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAEtLa1+ovgKHHr3YKUyrbWi2
+SbNmrMrQIdomdNnhQn/3tYl2RG/twUIpi2LaxLC8+n+hhVO9Gy1hy18xQ9bXDKtC
+I30dml8qmNqqCpCxTz6jSh7kxiBF8+7lj6B3zoN4JLVDdmp+8iQwecd+rgB5jW8O
+c333juUWA/c9QC9VO6yeDZs4EBkD2/a1GRtMkU2nkk7jk4QhMcjSxFKH+7ROC6yN
+/+80NcHdDitVt0VRqogWusZDCMeZFwGVrfPVT8iYfP8lP7p6HBkYzvVP6SaMn76P
+/tGxy/BYC4mGosiyhdfLBQS/Q1bkvNhu2O6Y9hqWE6tLNy+YIC3A0ON5/xN36dY=
+-----END CERTIFICATE-----`
+
+const anotherRSAKeyPEM = `-----BEGIN PRIVATE KEY-----
 MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC/665h55hWD4V2
 kiQ+B/G9NNfBw69eBibEhI9vWkPUyn36GO2r3HPtRE63wBfFpV486ns9DoZnnAYE
 JaGjVNCCqS5tQyMBWp843o66KBrEgBpuddChigvyul33FhD1ImFnN+Vy0ajOJ+1/
@@ -119,7 +139,7 @@ func TestSecretForTLSGenerate(t *testing.T) {
 
 	mismatchCertTmpDir := utiltesting.MkTmpdirOrDie("tls-mismatch-test")
 	defer tearDown(mismatchCertTmpDir)
-	mismatchKeyPath, mismatchCertPath := writeKeyPair(mismatchCertTmpDir, mismatchRSAKeyPEM, rsaCertPEM, t)
+	mismatchKeyPath, mismatchCertPath := writeKeyPair(mismatchCertTmpDir, anotherRSAKeyPEM, rsaCertPEM, t)
 
 	tests := map[string]struct {
 		params    map[string]interface{}
@@ -174,7 +194,7 @@ func TestSecretForTLSGenerate(t *testing.T) {
 				},
 				Data: map[string][]byte{
 					api.TLSCertKey:       []byte(rsaCertPEM),
-					api.TLSPrivateKeyKey: []byte(mismatchRSAKeyPEM),
+					api.TLSPrivateKeyKey: []byte(anotherRSAKeyPEM),
 				},
 				Type: api.SecretTypeTLS,
 			},
@@ -192,6 +212,103 @@ func TestSecretForTLSGenerate(t *testing.T) {
 	generator := SecretForTLSGeneratorV1{}
 	for _, test := range tests {
 		obj, err := generator.Generate(test.params)
+		if !test.expectErr && err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if test.expectErr && err != nil {
+			continue
+		}
+		if !reflect.DeepEqual(obj.(*api.Secret), test.expected) {
+			t.Errorf("\nexpected:\n%#v\nsaw:\n%#v", test.expected, obj.(*api.Secret))
+		}
+	}
+}
+
+func TestHandleSecretTLSReplace(t *testing.T) {
+	invalidCertTmpDir := utiltesting.MkTmpdirOrDie("tls-test")
+	defer tearDown(invalidCertTmpDir)
+	invalidKeyPath, invalidCertPath := writeKeyPair(invalidCertTmpDir, "test", "test", t)
+
+	validCertTmpDir := utiltesting.MkTmpdirOrDie("tls-test")
+	defer tearDown(validCertTmpDir)
+	validKeyPath, validCertPath := writeKeyPair(validCertTmpDir, rsaKeyPEM, rsaCertPEM, t)
+
+	anotherValidCertTmpDir := utiltesting.MkTmpdirOrDie("tls-test")
+	defer tearDown(anotherValidCertTmpDir)
+	anotherValidKeyPath, anotherValidCertPath := writeKeyPair(anotherValidCertTmpDir, anotherRSAKeyPEM, anotherRSACertPEM, t)
+
+	mismatchCertTmpDir := utiltesting.MkTmpdirOrDie("tls-mismatch-test")
+	defer tearDown(mismatchCertTmpDir)
+	mismatchKeyPath, mismatchCertPath := writeKeyPair(mismatchCertTmpDir, anotherRSAKeyPEM, rsaCertPEM, t)
+
+	generatorDefaultParams := map[string]interface{}{
+		"name": "foo",
+		"key":  validKeyPath,
+		"cert": validCertPath,
+	}
+
+	tests := map[string]struct {
+		params    map[string]string
+		expected  *api.Secret
+		expectErr bool
+	}{
+		"test-valid-tls-secret": {
+			params: map[string]string{
+				"key":  anotherValidKeyPath,
+				"cert": anotherValidCertPath,
+			},
+			expected: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					api.TLSCertKey:       []byte(anotherRSACertPEM),
+					api.TLSPrivateKeyKey: []byte(anotherRSAKeyPEM),
+				},
+				Type: api.SecretTypeTLS,
+			},
+			expectErr: false,
+		},
+		"test-invalid-key-pair": {
+			params: map[string]string{
+				"key":  invalidKeyPath,
+				"cert": invalidCertPath,
+			},
+			expected: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					api.TLSCertKey:       []byte("test"),
+					api.TLSPrivateKeyKey: []byte("test"),
+				},
+				Type: api.SecretTypeTLS,
+			},
+			expectErr: true,
+		},
+		"test-mismatched-key-pair": {
+			params: map[string]string{
+				"key":  mismatchKeyPath,
+				"cert": mismatchCertPath,
+			},
+			expected: &api.Secret{
+				ObjectMeta: api.ObjectMeta{
+					Name: "foo",
+				},
+				Data: map[string][]byte{
+					api.TLSCertKey:       []byte(rsaCertPEM),
+					api.TLSPrivateKeyKey: []byte(anotherRSAKeyPEM),
+				},
+				Type: api.SecretTypeTLS,
+			},
+			expectErr: true,
+		},
+	}
+
+	generator := SecretForTLSGeneratorV1{}
+	for _, test := range tests {
+		obj, err := generator.Generate(generatorDefaultParams)
+		err = HandleSecretTLSReplace(obj.(*api.Secret), test.params["cert"], test.params["key"])
 		if !test.expectErr && err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
