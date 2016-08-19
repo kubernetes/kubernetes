@@ -177,7 +177,7 @@ within AWS Certificate Manager.
 service.beta.kubernetes.io/aws-load-balancer-backend-protocol=(https|http|ssl|tcp)
 ```
 
-The second annotation specificies which protocol a pod speaks. For HTTPS and
+The second annotation specifies which protocol a pod speaks. For HTTPS and
 SSL, the ELB will expect the pod to authenticate itself over the encrypted
 connection.
 
