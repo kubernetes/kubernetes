@@ -675,6 +675,28 @@ func TestValidatePersistentVolumeClaim(t *testing.T) {
 				},
 			}),
 		},
+		"negative-storage-request": {
+			isExpectedFailure: true,
+			claim: testVolumeClaim("foo", "ns", api.PersistentVolumeClaimSpec{
+				Selector: &unversioned.LabelSelector{
+					MatchExpressions: []unversioned.LabelSelectorRequirement{
+						{
+							Key:      "key2",
+							Operator: "Exists",
+						},
+					},
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{
+					api.ReadWriteOnce,
+					api.ReadOnlyMany,
+				},
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						api.ResourceName(api.ResourceStorage): resource.MustParse("-10G"),
+					},
+				},
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {

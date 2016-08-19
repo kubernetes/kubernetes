@@ -1074,26 +1074,37 @@ func ValidatePersistentVolumeStatusUpdate(newPv, oldPv *api.PersistentVolume) fi
 	return allErrs
 }
 
+// ValidatePersistentVolumeClaim validates a PersistentVolumeClaim
 func ValidatePersistentVolumeClaim(pvc *api.PersistentVolumeClaim) field.ErrorList {
 	allErrs := ValidateObjectMeta(&pvc.ObjectMeta, true, ValidatePersistentVolumeName, field.NewPath("metadata"))
-	specPath := field.NewPath("spec")
-	if len(pvc.Spec.AccessModes) == 0 {
-		allErrs = append(allErrs, field.Required(specPath.Child("accessModes"), "at least 1 accessMode is required"))
+	allErrs = append(allErrs, ValidatePersistentVolumeClaimSpec(&pvc.Spec, field.NewPath("spec"))...)
+	return allErrs
+}
+
+// ValidatePersistentVolumeClaimSpec validates a PersistentVolumeClaimSpec
+func ValidatePersistentVolumeClaimSpec(spec *api.PersistentVolumeClaimSpec, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if len(spec.AccessModes) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("accessModes"), "at least 1 access mode is required"))
 	}
-	if pvc.Spec.Selector != nil {
-		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(pvc.Spec.Selector, specPath.Child("selector"))...)
+	if spec.Selector != nil {
+		allErrs = append(allErrs, unversionedvalidation.ValidateLabelSelector(spec.Selector, fldPath.Child("selector"))...)
 	}
-	for _, mode := range pvc.Spec.AccessModes {
+	for _, mode := range spec.AccessModes {
 		if mode != api.ReadWriteOnce && mode != api.ReadOnlyMany && mode != api.ReadWriteMany {
-			allErrs = append(allErrs, field.NotSupported(specPath.Child("accessModes"), mode, supportedAccessModes.List()))
+			allErrs = append(allErrs, field.NotSupported(fldPath.Child("accessModes"), mode, supportedAccessModes.List()))
 		}
 	}
-	if _, ok := pvc.Spec.Resources.Requests[api.ResourceStorage]; !ok {
-		allErrs = append(allErrs, field.Required(specPath.Child("resources").Key(string(api.ResourceStorage)), ""))
+	storageValue, ok := spec.Resources.Requests[api.ResourceStorage]
+	if !ok {
+		allErrs = append(allErrs, field.Required(fldPath.Child("resources").Key(string(api.ResourceStorage)), ""))
+	} else {
+		allErrs = append(allErrs, ValidateResourceQuantityValue(string(api.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(api.ResourceStorage)))...)
 	}
 	return allErrs
 }
 
+// ValidatePersistentVolumeClaimUpdate validates an update to a PeristentVolumeClaim
 func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidatePersistentVolumeClaim(newPvc)...)
@@ -1114,6 +1125,7 @@ func ValidatePersistentVolumeClaimUpdate(newPvc, oldPvc *api.PersistentVolumeCla
 	return allErrs
 }
 
+// ValidatePersistentVolumeClaimStatusUpdate validates an update to status of a PeristentVolumeClaim
 func ValidatePersistentVolumeClaimStatusUpdate(newPvc, oldPvc *api.PersistentVolumeClaim) field.ErrorList {
 	allErrs := ValidateObjectMetaUpdate(&newPvc.ObjectMeta, &oldPvc.ObjectMeta, field.NewPath("metadata"))
 	if len(newPvc.ResourceVersion) == 0 {
