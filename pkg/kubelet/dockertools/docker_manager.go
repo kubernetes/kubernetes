@@ -345,7 +345,11 @@ func (dm *DockerManager) determineContainerIP(podNamespace, podName string, cont
 		}
 	}
 
-	if dm.networkPlugin.Name() != network.DefaultPluginName {
+	networkMode := getDockerNetworkMode(container)
+	isHostNetwork := networkMode == namespaceModeHost
+
+	// For host networking or default network plugin, GetPodNetworkStatus doesn't work
+	if !isHostNetwork && dm.networkPlugin.Name() != network.DefaultPluginName {
 		netStatus, err := dm.networkPlugin.GetPodNetworkStatus(podNamespace, podName, kubecontainer.DockerID(container.ID).ContainerID())
 		if err != nil {
 			glog.Errorf("NetworkPlugin %s failed on the status hook for pod '%s' - %v", dm.networkPlugin.Name(), podName, err)
