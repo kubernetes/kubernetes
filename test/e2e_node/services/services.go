@@ -83,8 +83,6 @@ func (e *E2EServices) Start() error {
 	if err != nil {
 		return fmt.Errorf("can't get current binary: %v", err)
 	}
-	// TODO(random-liu): Add sudo after we statically link apiserver and etcd, because apiserver needs
-	// sudo. We can't add sudo now, because etcd may not be in PATH of root.
 	startCmd := exec.Command(testBin,
 		"--run-services-mode",
 		"--server-start-timeout", serverStartTimeout.String(),
@@ -249,7 +247,7 @@ func (es *e2eService) getLogFiles() {
 			if len(logFileData.journalctlCommand) == 0 {
 				continue
 			}
-			out, err := exec.Command("sudo", append([]string{"journalctl"}, logFileData.journalctlCommand...)...).CombinedOutput()
+			out, err := exec.Command("journalctl", logFileData.journalctlCommand...).CombinedOutput()
 			if err != nil {
 				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
@@ -275,10 +273,10 @@ func (es *e2eService) getLogFiles() {
 
 func copyLogFile(src, target string) error {
 	// If not a journald based distro, then just symlink files.
-	if out, err := exec.Command("sudo", "cp", src, target).CombinedOutput(); err != nil {
+	if out, err := exec.Command("cp", src, target).CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to copy %q to %q: %v, %v", src, target, out, err)
 	}
-	if out, err := exec.Command("sudo", "chmod", "a+r", target).CombinedOutput(); err != nil {
+	if out, err := exec.Command("chmod", "a+r", target).CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to make log file %q world readable: %v, %v", target, out, err)
 	}
 	return nil
@@ -356,8 +354,8 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		// sense to test it that way
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
 		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", build.GetKubeletServerBin())
-		killCommand = exec.Command("sudo", "systemctl", "kill", unitName)
-		restartCommand = exec.Command("sudo", "systemctl", "restart", unitName)
+		killCommand = exec.Command("systemctl", "kill", unitName)
+		restartCommand = exec.Command("systemctl", "restart", unitName)
 		es.logFiles["kubelet.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
@@ -405,7 +403,7 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 			"--network-plugin-dir", filepath.Join(cwd, "cni", "bin")) // Enable kubenet
 	}
 
-	cmd := exec.Command("sudo", cmdArgs...)
+	cmd := exec.Command(cmdArgs[0], cmdArgs[1:]...)
 	server := newServer(
 		"kubelet",
 		cmd,
@@ -424,7 +422,7 @@ type server struct {
 	// startCommand is the command used to start the server
 	startCommand *exec.Cmd
 	// killCommand is the command used to stop the server. It is not required. If it
-	// is not specified, `sudo kill` will be used to stop the server.
+	// is not specified, `kill` will be used to stop the server.
 	killCommand *exec.Cmd
 	// restartCommand is the command used to restart the server. If provided, it will be used
 	// instead of startCommand when restarting the server.
@@ -688,19 +686,7 @@ func (s *server) kill() error {
 	const timeout = 10 * time.Second
 	for _, signal := range []string{"-TERM", "-KILL"} {
 		glog.V(2).Infof("Killing process %d (%s) with %s", pid, name, signal)
-		cmd := exec.Command("sudo", "kill", signal, strconv.Itoa(pid))
-
-		// Run the 'kill' command in a separate process group so sudo doesn't ignore it
-		attrs := &syscall.SysProcAttr{}
-		// Hack to set unix-only field without build tags.
-		setpgidField := reflect.ValueOf(attrs).Elem().FieldByName("Setpgid")
-		if setpgidField.IsValid() {
-			setpgidField.Set(reflect.ValueOf(true))
-		} else {
-			return fmt.Errorf("Failed to set Setpgid field (non-unix build)")
-		}
-		cmd.SysProcAttr = attrs
-
+		cmd := exec.Command("kill", signal, strconv.Itoa(pid))
 		_, err := cmd.Output()
 		if err != nil {
 			glog.Errorf("Error signaling process %d (%s) with %s: %v", pid, name, signal, err)
