@@ -54,7 +54,7 @@ func main() {
 }
 
 func runCommand(name string, args ...string) error {
-	cmd := exec.Command("sh", "-c", strings.Join(append([]string{name}, args...), " "))
+	cmd := exec.Command("sudo", "sh", "-c", strings.Join(append([]string{name}, args...), " "))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
