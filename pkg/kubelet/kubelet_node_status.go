@@ -38,6 +38,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
+const (
+	CustomSysctlWhitelistAnnotationKey = "sysctls.security.alpha.kubernetes.io/whitelist"
+)
+
 // registerWithApiserver registers the node with the cluster master. It is safe
 // to call multiple times, but not concurrently (kl.registrationCompleted is
 // not locked).
@@ -242,6 +246,33 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		return fmt.Errorf("no node instance returned for %q", kl.nodeName)
 	}
 
+	updateNode := kl.updateCIDR(node)
+	updateNode = kl.updateSysctlCustomWhitelistAnnotation(node) || updateNode
+
+	if updateNode {
+		if updatedNode, err := kl.kubeClient.Core().Nodes().Update(node); err != nil {
+			// we ignore errors here because on the next iteration the update is tried again
+			glog.Warningf("Failed to update node: %v", err)
+		} else {
+			// Update the node resourceVersion so the status update doesn't fail.
+			node = updatedNode
+		}
+	}
+
+	if err := kl.setNodeStatus(node); err != nil {
+		return err
+	}
+
+	// Update the current status on the API server
+	updatedNode, err := kl.kubeClient.Core().Nodes().UpdateStatus(node)
+	if err == nil {
+		kl.volumeManager.MarkVolumesAsReportedInUse(
+			updatedNode.Status.VolumesInUse)
+	}
+	return err
+}
+
+func (kl *Kubelet) updateCIDR(node *api.Node) bool {
 	// Flannel is the authoritative source of pod CIDR, if it's running.
 	// This is a short term compromise till we get flannel working in
 	// reservation mode.
@@ -250,27 +281,33 @@ func (kl *Kubelet) tryUpdateNodeStatus() error {
 		if node.Spec.PodCIDR != flannelPodCIDR {
 			node.Spec.PodCIDR = flannelPodCIDR
 			glog.Infof("Updating podcidr to %v", node.Spec.PodCIDR)
-			if updatedNode, err := kl.kubeClient.Core().Nodes().Update(node); err != nil {
-				glog.Warningf("Failed to update podCIDR: %v", err)
-			} else {
-				// Update the node resourceVersion so the status update doesn't fail.
-				node = updatedNode
-			}
+			return true
 		}
 	} else if kl.reconcileCIDR {
 		kl.updatePodCIDR(node.Spec.PodCIDR)
 	}
 
-	if err := kl.setNodeStatus(node); err != nil {
-		return err
+	return false
+}
+
+func (kl *Kubelet) updateSysctlCustomWhitelistAnnotation(node *api.Node) bool {
+	cwl := kl.sysctlWhitelist.CustomWhitelist()
+	value := strings.Join(cwl, ",")
+	if value == "" {
+		if _, found := node.Annotations[CustomSysctlWhitelistAnnotationKey]; found {
+			delete(node.Annotations, CustomSysctlWhitelistAnnotationKey)
+			return true
+		}
+	} else {
+		if node.Annotations[CustomSysctlWhitelistAnnotationKey] != value {
+			if node.Annotations == nil {
+				node.Annotations = map[string]string{}
+			}
+			node.Annotations[CustomSysctlWhitelistAnnotationKey] = value
+			return true
+		}
 	}
-	// Update the current status on the API server
-	updatedNode, err := kl.kubeClient.Core().Nodes().UpdateStatus(node)
-	if err == nil {
-		kl.volumeManager.MarkVolumesAsReportedInUse(
-			updatedNode.Status.VolumesInUse)
-	}
-	return err
+	return false
 }
 
 // recordNodeStatusEvent records an event of the given type with the given
