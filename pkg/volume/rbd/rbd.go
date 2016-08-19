@@ -91,28 +91,38 @@ func (plugin *rbdPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
 }
 
 func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	secret := ""
+	var secret string
+	var err error
 	source, _ := plugin.getRBDVolumeSource(spec)
 
 	if source.SecretRef != nil {
-		kubeClient := plugin.host.GetKubeClient()
-		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
-		}
-
-		secretName, err := kubeClient.Core().Secrets(pod.Namespace).Get(source.SecretRef.Name)
-		if err != nil {
+		if secret, err = plugin.getSecret(pod.Namespace, source.SecretRef.Name); err != nil {
 			glog.Errorf("Couldn't get secret %v/%v", pod.Namespace, source.SecretRef)
 			return nil, err
 		}
-		for name, data := range secretName.Data {
-			secret = string(data)
-			glog.V(1).Infof("ceph secret info: %s/%s", name, secret)
-		}
-
 	}
+
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
+}
+
+func (plugin *rbdPlugin) getSecret(namespace, secretName string) (string, error) {
+	secret := ""
+	kubeClient := plugin.host.GetKubeClient()
+	if kubeClient == nil {
+		return "", fmt.Errorf("Cannot get kube client")
+	}
+
+	secrets, err := kubeClient.Core().Secrets(namespace).Get(secretName)
+	if err != nil {
+		return "", err
+	}
+	for name, data := range secrets.Data {
+		secret = string(data)
+		glog.V(4).Infof("ceph secret [%q/%q] info: %s/%s", namespace, secretName, name, secret)
+	}
+	return secret, nil
+
 }
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
@@ -186,23 +196,29 @@ func (plugin *rbdPlugin) NewDeleter(parameter map[string]string, spec *volume.Sp
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
 	}
+	var err error
+	adminSecretName := ""
+	adminSecretNamespace := "default"
 	admin := ""
 	secret := ""
+
 	for k, v := range parameter {
 		switch dstrings.ToLower(k) {
 		case "adminid":
 			admin = v
-		case "adminkey":
-			secret = v
+		case "adminsecretname":
+			adminSecretName = v
+		case "adminsecretnamespace":
+			adminSecretNamespace = v
 		}
 	}
 	// sanity check
-	if secret == "" {
-		// no key, log an error but keep trying
-		glog.Infof("failed to get admin key from deleter parameter")
-	}
 	if admin == "" {
 		admin = "admin"
+	}
+	if secret, err = plugin.getSecret(adminSecretNamespace, adminSecretName); err != nil {
+		// log error but don't return yet
+		glog.Errorf("failed to get admin secret from [%q/%q]", adminSecretNamespace, adminSecretName)
 	}
 	return plugin.newDeleterInternal(spec, admin, secret, &RBDUtil{})
 }
@@ -251,8 +267,13 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	if r.options.Selector != nil {
 		return nil, fmt.Errorf("claim Selector is not supported")
 	}
+	var err error
+	adminSecretName := ""
+	adminSecretNamespace := "default"
 	secretName := ""
 	userId := ""
+	secret := ""
+
 	for k, v := range r.options.Parameters {
 		switch dstrings.ToLower(k) {
 		case "monitors":
@@ -262,8 +283,10 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 			}
 		case "adminid":
 			r.Id = v
-		case "adminkey":
-			r.Secret = v
+		case "adminsecretname":
+			adminSecretName = v
+		case "adminsecretnamespace":
+			adminSecretNamespace = v
 		case "userid":
 			userId = v
 		case "pool":
@@ -275,6 +298,14 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		}
 	}
 	// sanity check
+	if adminSecretName == "" {
+		return nil, fmt.Errorf("missing Ceph admin secret name")
+	}
+	if secret, err = r.plugin.getSecret(adminSecretNamespace, adminSecretName); err != nil {
+		// log error but don't return yet
+		glog.Errorf("failed to get admin secret from [%q/%q]", adminSecretNamespace, adminSecretName)
+	}
+	r.Secret = secret
 	if len(r.Mon) < 1 {
 		return nil, fmt.Errorf("missing Ceph monitors")
 	}
@@ -290,8 +321,9 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	if userId == "" {
 		userId = r.Id
 	}
+
 	// create random image name
-	image := fmt.Sprintf("%s", uuid.NewUUID())
+	image := fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
 	r.rbdMounter.Image = image
 	rbd, sizeMB, err := r.manager.CreateImage(r)
 	if err != nil {

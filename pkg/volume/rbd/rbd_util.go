@@ -322,7 +322,7 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSourc
 	// iterate all monitors until create succeeds.
 	for i := start; i < start+l; i++ {
 		mon := p.Mon[i%l]
-		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.Id, p.rbdMounter.Keyring)
+		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.Id, p.rbdMounter.Secret)
 		var output []byte
 		output, err = p.rbdMounter.plugin.execCommand("rbd",
 			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.Id, "-m", mon, "--key=" + p.rbdMounter.Secret})
