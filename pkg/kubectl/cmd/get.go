@@ -44,7 +44,7 @@ var (
 	get_long = dedent.Dedent(`
 		Display one or many resources.
 
-		`) + kubectl.PossibleResourceTypes + dedent.Dedent(`
+		`) + valid_resources + dedent.Dedent(`
 
 		This command will hide resources that have completed. For instance, pods that are in the Succeeded or Failed phases.
 		You can see the full results for any resource by providing the '--show-all' flag.
