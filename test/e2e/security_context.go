@@ -99,11 +99,11 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 		pod := scTestPod(false, false)
 		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
 			{
-				Name:  "net.ipv4.ip_forward",
-				Value: "2",
+				Name:  "kernel.shm_rmid_forced",
+				Value: "1",
 			},
-		}
-		pod.Spec.Containers[0].Command = []string{"/bin/sysctl", "net.ipv4.ip_forward"}
+		})
+		pod.Spec.Containers[0].Command = []string{"/bin/sysctl", "kernel.shm_rmid_forced"}
 
 		f.TestContainerOutput(fmt.Sprintf("pod.Annotations[%s]", api.SysctlsPodAnnotationKey), pod, 0, []string{
 			"kernel.shm_rmid_forced = 1",
@@ -114,7 +114,7 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 		pod := scTestPod(false, false)
 		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
 			{
-				Name:  "foo",
+				Name:  "net.foo-bar",
 				Value: "bar",
 			},
 			{
@@ -123,12 +123,14 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 			},
 		})
 
+		By("Creating a pod with net.foo-bar sysctl")
 		client := f.Client.Pods(f.Namespace.Name)
 		_, err := client.Create(pod)
 		defer client.Delete(pod.Name, nil)
 
 		Expect(err).NotTo(BeNil())
-		Expect(err.Error()).To(ContainSubstring("is not whitelisted"))
+		Expect(err.Error()).To(ContainSubstring(`Invalid value: "net.foo-bar"`))
+		Expect(err.Error()).To(ContainSubstring(`Forbidden: sysctl "vm.swappiness" cannot be set in a pod`))
 	})
 
 	It("should support volume SELinux relabeling", func() {
