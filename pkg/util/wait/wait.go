@@ -20,6 +20,8 @@ import (
 	"errors"
 	"math/rand"
 	"time"
+
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 )
 
 // For any test of the style:
@@ -81,6 +83,8 @@ func JitterUntil(f func(), period time.Duration, jitterFactor float64, sliding b
 		}
 
 		func() {
+			//  Handle crash should decide if we want to exit the process on panic.
+			defer utilruntime.HandleCrash()
 			f()
 		}()
 
