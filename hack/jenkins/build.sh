@@ -79,8 +79,8 @@ elif ${RELEASE_INFRA_PUSH-}; then
     exit 1
   fi
 
-  [[ -n "$KUBE_GCS_RELEASE_BUCKET" ]] \
-   && bucket_flag="--bucket=$KUBE_GCS_RELEASE_BUCKET"
+  [[ -n "${KUBE_GCS_RELEASE_BUCKET-}" ]] \
+   && bucket_flag="--bucket=${KUBE_GCS_RELEASE_BUCKET-}"
   ${FEDERATION} && federation_flag="--federation"
   ${SET_NOMOCK_FLAG} && mock_flag="--nomock"
   ${release_infra_clone}/push-ci-build.sh ${bucket_flag-} ${federation_flag-} \
