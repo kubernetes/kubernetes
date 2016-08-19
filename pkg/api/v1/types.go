@@ -2066,6 +2066,11 @@ const (
 	// external load balancer (if the cloud provider supports it), in addition
 	// to 'NodePort' type.
 	ServiceTypeLoadBalancer ServiceType = "LoadBalancer"
+
+	// ServiceTypeExternalName means a service consists of only a reference to
+	// an external name that kubedns or equivalent will return as a CNAME
+	// record, with no exposing or proxying of any pods involved.
+	ServiceTypeExternalName ServiceType = "ExternalName"
 )
 
 // ServiceStatus represents the current status of a service.
@@ -2100,24 +2105,39 @@ type ServiceSpec struct {
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	Ports []ServicePort `json:"ports" patchStrategy:"merge" patchMergeKey:"port" protobuf:"bytes,1,rep,name=ports"`
 
-	// This service will route traffic to pods having labels matching this selector.
-	// Label keys and values that must match in order to receive traffic for this service.
-	// If not specified, endpoints must be manually specified and the system will not automatically manage them.
+	// Route service traffic to pods with label keys and values matching this
+	// selector. If empty or not present, the service is assumed to have an
+	// external process managing its endpoints, which Kubernetes will not
+	// modify. Only applies to types ClusterIP, NodePort, and LoadBalancer.
+	// Ignored if type is ExternalName.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
 	Selector map[string]string `json:"selector,omitempty" protobuf:"bytes,2,rep,name=selector"`
 
-	// ClusterIP is usually assigned by the master and is the IP address of the service.
-	// If specified, it will be allocated to the service if it is unused
-	// or else creation of the service will fail.
-	// Valid values are None, empty string (""), or a valid IP address.
-	// 'None' can be specified for a headless service when proxying is not required.
-	// Cannot be updated.
+	// clusterIP is the IP address of the service and is usually assigned
+	// randomly by the master. If an address is specified manually and is not in
+	// use by others, it will be allocated to the service; otherwise, creation
+	// of the service will fail. This field can not be changed through updates.
+	// Valid values are "None", empty string (""), or a valid IP address. "None"
+	// can be specified for headless services when proxying is not required.
+	// Only applies to types ClusterIP, NodePort, and LoadBalancer. Ignored if
+	// type is ExternalName.
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#virtual-ips-and-service-proxies
 	ClusterIP string `json:"clusterIP,omitempty" protobuf:"bytes,3,opt,name=clusterIP"`
 
-	// Type of exposed service. Must be ClusterIP, NodePort, or LoadBalancer.
-	// Defaults to ClusterIP.
-	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#external-services
+	// type determines how the Service is exposed. Defaults to ClusterIP. Valid
+	// options are ExternalName, ClusterIP, NodePort, and LoadBalancer.
+	// "ExternalName" maps to the specified externalName.
+	// "ClusterIP" allocates a cluster-internal IP address for load-balancing to
+	// endpoints. Endpoints are determined by the selector or if that is not
+	// specified, by manual construction of an Endpoints object. If clusterIP is
+	// "None", no virtual IP is allocated and the endpoints are published as a
+	// set of endpoints rather than a stable IP.
+	// "NodePort" builds on ClusterIP and allocates a port on every node which
+	// routes to the clusterIP.
+	// "LoadBalancer" builds on NodePort and creates an
+	// external load-balancer (if supported in the current cloud) which routes
+	// to the clusterIP.
+	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services.md#overview
 	Type ServiceType `json:"type,omitempty" protobuf:"bytes,4,opt,name=type,casttype=ServiceType"`
 
 	// externalIPs is a list of IP addresses for which nodes in the cluster
@@ -2156,6 +2176,11 @@ type ServiceSpec struct {
 	// cloud-provider does not support the feature."
 	// More info: http://releases.k8s.io/HEAD/docs/user-guide/services-firewalls.md
 	LoadBalancerSourceRanges []string `json:"loadBalancerSourceRanges,omitempty" protobuf:"bytes,9,opt,name=loadBalancerSourceRanges"`
+
+	// externalName is the external reference that kubedns or equivalent will
+	// return as a CNAME record for this service. No proxying will be involved.
+	// Must be a valid DNS name and requires Type to be ExternalName.
+	ExternalName string `json:"externalName,omitempty" protobuf:"bytes,10,opt,name=externalName"`
 }
 
 // ServicePort contains information on service's port.
