@@ -158,6 +158,9 @@ func NewKubeletServer() *KubeletServer {
 			BabysitDaemons:                   false,
 			EvictionPressureTransitionPeriod: unversioned.Duration{Duration: 5 * time.Minute},
 			PodsPerCore:                      0,
+			MakeIPTablesUtilChains:           true,
+			IPTablesMasqueradeBit:            14,
+			IPTablesDropBit:                  15,
 		},
 	}
 }
