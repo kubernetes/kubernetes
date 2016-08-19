@@ -74,3 +74,32 @@ func NewTriggerOnMetaAndSpecChanges(triggerFunc func(pkg_runtime.Object)) *frame
 		},
 	}
 }
+
+// Returns framework.ResourceEventHandlerFuncs that trigger the given function
+// on object add and delete.
+func NewTriggerOnChanges(triggerFunc func(pkg_runtime.Object)) *framework.ResourceEventHandlerFuncs {
+	getFieldOrPanic := func(obj interface{}, fieldName string) interface{} {
+		val := reflect.ValueOf(obj).Elem().FieldByName(fieldName)
+		if val.IsValid() {
+			return val.Interface()
+		} else {
+			panic(fmt.Errorf("field not found: %s", fieldName))
+		}
+	}
+	return &framework.ResourceEventHandlerFuncs{
+		DeleteFunc: func(old interface{}) {
+			oldObj := old.(pkg_runtime.Object)
+			triggerFunc(oldObj)
+		},
+		AddFunc: func(cur interface{}) {
+			curObj := cur.(pkg_runtime.Object)
+			triggerFunc(curObj)
+		},
+		UpdateFunc: func(old, cur interface{}) {
+			curObj := cur.(pkg_runtime.Object)
+			if !reflect.DeepEqual(getFieldOrPanic(old, "ObjectMeta"), getFieldOrPanic(cur, "ObjectMeta")) {
+				triggerFunc(curObj)
+			}
+		},
+	}
+}
