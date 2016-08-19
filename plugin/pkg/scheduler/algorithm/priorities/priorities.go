@@ -39,9 +39,10 @@ func getNonZeroRequests(pod *api.Pod) *schedulercache.Resource {
 	return result
 }
 
-// the unused capacity is calculated on a scale of 0-10
-// 0 being the lowest priority and 10 being the highest
-func calculateScore(requested int64, capacity int64, node string) int64 {
+// The unused capacity is calculated on a scale of 0-10
+// 0 being the lowest priority and 10 being the highest.
+// The more unused resources the higher the score is.
+func calculateUnusedScore(requested int64, capacity int64, node string) int64 {
 	if capacity == 0 {
 		return 0
 	}
@@ -53,22 +54,71 @@ func calculateScore(requested int64, capacity int64, node string) int64 {
 	return ((capacity - requested) * 10) / capacity
 }
 
-// Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
+// The used capacity is calculated on a scale of 0-10
+// 0 being the lowest priority and 10 being the highest.
+// The more resources are used the higher the score is. This function
+// is almost a reversed version of calculatUnusedScore (10 - calculateUnusedScore).
+// The main difference is in rounding. It was added to keep the
+// final formula clean and not to modify the widely used (by users
+// in their default scheduling policies) calculateUSedScore.
+func calculateUsedScore(requested int64, capacity int64, node string) int64 {
+	if capacity == 0 {
+		return 0
+	}
+	if requested > capacity {
+		glog.V(2).Infof("Combined requested resources %d from existing pods exceeds capacity %d on node %s",
+			requested, capacity, node)
+		return 0
+	}
+	return (requested * 10) / capacity
+}
+
+// Calculates host priority based on the amount of unused resources.
+// 'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
 // TODO: Use Node() from nodeInfo instead of passing it.
-func calculateResourceOccupancy(pod *api.Pod, podRequests *schedulercache.Resource, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
+func calculateUnusedPriority(pod *api.Pod, podRequests *schedulercache.Resource, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
 	allocatableResources := nodeInfo.AllocatableResource()
 	totalResources := *podRequests
 	totalResources.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
 	totalResources.Memory += nodeInfo.NonZeroRequest().Memory
 
-	cpuScore := calculateScore(totalResources.MilliCPU, allocatableResources.MilliCPU, node.Name)
-	memoryScore := calculateScore(totalResources.Memory, allocatableResources.Memory, node.Name)
+	cpuScore := calculateUnusedScore(totalResources.MilliCPU, allocatableResources.MilliCPU, node.Name)
+	memoryScore := calculateUnusedScore(totalResources.Memory, allocatableResources.Memory, node.Name)
 	if glog.V(10) {
 		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
 		// not logged. There is visible performance gain from it.
 		glog.V(10).Infof(
 			"%v -> %v: Least Requested Priority, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d CPU %d memory",
+			pod.Name, node.Name,
+			allocatableResources.MilliCPU, allocatableResources.Memory,
+			totalResources.MilliCPU, totalResources.Memory,
+			cpuScore, memoryScore,
+		)
+	}
+
+	return schedulerapi.HostPriority{
+		Host:  node.Name,
+		Score: int((cpuScore + memoryScore) / 2),
+	}
+}
+
+// Calculate the resource used on a node.  'node' has information about the resources on the node.
+// 'pods' is a list of pods currently scheduled on the node.
+// TODO: Use Node() from nodeInfo instead of passing it.
+func calculateUsedPriority(pod *api.Pod, podRequests *schedulercache.Resource, node *api.Node, nodeInfo *schedulercache.NodeInfo) schedulerapi.HostPriority {
+	allocatableResources := nodeInfo.AllocatableResource()
+	totalResources := *podRequests
+	totalResources.MilliCPU += nodeInfo.NonZeroRequest().MilliCPU
+	totalResources.Memory += nodeInfo.NonZeroRequest().Memory
+
+	cpuScore := calculateUsedScore(totalResources.MilliCPU, allocatableResources.MilliCPU, node.Name)
+	memoryScore := calculateUsedScore(totalResources.Memory, allocatableResources.Memory, node.Name)
+	if glog.V(10) {
+		// We explicitly don't do glog.V(10).Infof() to avoid computing all the parameters if this is
+		// not logged. There is visible performance gain from it.
+		glog.V(10).Infof(
+			"%v -> %v: Most Requested Priority, capacity %d millicores %d memory bytes, total request %d millicores %d memory bytes, score %d CPU %d memory",
 			pod.Name, node.Name,
 			allocatableResources.MilliCPU, allocatableResources.Memory,
 			totalResources.MilliCPU, totalResources.Memory,
@@ -90,7 +140,20 @@ func LeastRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulerca
 	podResources := getNonZeroRequests(pod)
 	list := make(schedulerapi.HostPriorityList, 0, len(nodes))
 	for _, node := range nodes {
-		list = append(list, calculateResourceOccupancy(pod, podResources, node, nodeNameToInfo[node.Name]))
+		list = append(list, calculateUnusedPriority(pod, podResources, node, nodeNameToInfo[node.Name]))
+	}
+	return list, nil
+}
+
+// MostRequestedPriority is a priority function that favors nodes with most requested resources.
+// It calculates the percentage of memory and CPU requested by pods scheduled on the node, and prioritizes
+// based on the maximum of the average of the fraction of requested to capacity.
+// Details: (cpu(10 * sum(requested) / capacity) + memory(10 * sum(requested) / capacity)) / 2
+func MostRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodes []*api.Node) (schedulerapi.HostPriorityList, error) {
+	podResources := getNonZeroRequests(pod)
+	list := make(schedulerapi.HostPriorityList, 0, len(nodes))
+	for _, node := range nodes {
+		list = append(list, calculateUsedPriority(pod, podResources, node, nodeNameToInfo[node.Name]))
 	}
 	return list, nil
 }
