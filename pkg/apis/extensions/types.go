@@ -679,6 +679,10 @@ type PodSecurityPolicySpec struct {
 	// If set to false the container may run with a read only root file system if it wishes but it
 	// will not be forced to.
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty"`
+	// Sysctls is a white list of allowed sysctls in a pod spec. Each entry
+	// is either a plain sysctl name or ends in "*" in which case it is considered
+	// as a prefix of allowed sysctls. The string "*" matches all sysctls.
+	Sysctls []string `json:"sysctls,omitempty"`
 }
 
 // HostPortRange defines a range of host ports that will be enabled by a policy

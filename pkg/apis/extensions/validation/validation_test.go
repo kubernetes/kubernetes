@@ -1584,6 +1584,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	allowedCapListedInRequiredDrop.Spec.RequiredDropCapabilities = []api.Capability{"foo"}
 	allowedCapListedInRequiredDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
 
+	invalidSysctlPattern := validPSP()
+	invalidSysctlPattern.Spec.Sysctls = []string{"a.*.b"}
+
 	errorCases := map[string]struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -1664,6 +1667,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "capability is listed in allowedCapabilities and requiredDropCapabilities",
 		},
+		"invalid sysctl pattern": {
+			psp:         invalidSysctlPattern,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", sysctlPatternFmt),
+		},
 	}
 
 	for k, v := range errorCases {
@@ -1700,6 +1708,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	caseInsensitiveAllowedDrop.Spec.RequiredDropCapabilities = []api.Capability{"FOO"}
 	caseInsensitiveAllowedDrop.Spec.AllowedCapabilities = []api.Capability{"foo"}
 
+	withSysctl := validPSP()
+	withSysctl.Spec.Sysctls = []string{"net.*"}
+
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -1717,6 +1728,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"comparison for allowed -> drop is case sensitive": {
 			psp: caseInsensitiveAllowedDrop,
+		},
+		"with network sysctls": {
+			psp: withSysctl,
 		},
 	}
 
@@ -1996,6 +2010,49 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	for testName, errorCase := range errorCases {
 		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
+		}
+	}
+}
+
+func TestIsValidSysctlPattern(t *testing.T) {
+	valid := []string{
+		"a.b.c.d",
+		"a",
+		"a_b",
+		"abc",
+		"abc.def",
+		"*",
+		"a.*",
+		"*",
+		"abc*",
+		"a.abc*",
+		"a.b.*",
+	}
+	invalid := []string{
+		"",
+		"ä",
+		"a_",
+		"_",
+		"_a",
+		"_a._b",
+		"__",
+		"-",
+		".",
+		"a.",
+		".a",
+		"a.b.",
+		"a*.b",
+		"a*b",
+		"*a",
+	}
+	for _, s := range valid {
+		if !IsValidSysctlPattern(s) {
+			t.Errorf("%q expected to be a valid sysctl pattern", s)
+		}
+	}
+	for _, s := range invalid {
+		if IsValidSysctlPattern(s) {
+			t.Errorf("%q expected to be an invalid sysctl pattern", s)
 		}
 	}
 }

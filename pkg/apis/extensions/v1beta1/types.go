@@ -967,6 +967,10 @@ type PodSecurityPolicySpec struct {
 	// If set to false the container may run with a read only root file system if it wishes but it
 	// will not be forced to.
 	ReadOnlyRootFilesystem bool `json:"readOnlyRootFilesystem,omitempty" protobuf:"varint,14,opt,name=readOnlyRootFilesystem"`
+	// Sysctls is a white list of allowed sysctls in a pod spec. Each entry
+	// is either a plain sysctl name or ends in "*" in which case it is considered
+	// as a prefix of allowed sysctls. The string "*" matches all sysctls.
+	Sysctls []string `json:"sysctls,omitempty" protobuf:"bytes,15,rep,name=sysctls"`
 }
 
 // FS Type gives strong typing to different file systems that are used by volumes.
