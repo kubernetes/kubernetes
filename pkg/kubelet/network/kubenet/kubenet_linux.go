@@ -72,6 +72,7 @@ type kubenetNetworkPlugin struct {
 	MTU             int
 	execer          utilexec.Interface
 	nsenterPath     string
+	ebtablesPath	string
 	hairpinMode     componentconfig.HairpinMode
 	hostportHandler hostport.HostportHandler
 	iptables        utiliptables.Interface
@@ -354,7 +355,23 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 			}
 		}
 
-
+		// configure the ebtables rules to eliminate duplicate packets by best effort
+		ebtablesPath, err := plugin.ebtables()
+		if err != nil {
+			glog.Warningf("Failed to get ebtables path: %v", err)
+		} else {
+			glog.Infof("Filtering packets with ebtables on mac address: %v, gateway: %v, pod CIDR: %v", macAddr.String(), plugin.gateway.String(), plugin.podCidr)
+			plugin.execer.Command(ebtablesPath, "-D", "OUTPUT", "-p", "IPv4", "-s", macAddr.String(), "-o", "veth+", "--ip-src", plugin.podCidr, "-j", "DROP").CombinedOutput()
+			plugin.execer.Command(ebtablesPath, "-D", "OUTPUT", "-p", "IPv4", "-s", macAddr.String(), "-o", "veth+", "--ip-src", plugin.gateway.String(), "-j", "ACCEPT").CombinedOutput()
+			_, err = plugin.execer.Command(ebtablesPath, "-A", "OUTPUT", "-p", "IPv4", "-s", macAddr.String(), "-o", "veth+", "--ip-src", plugin.gateway.String(), "-j", "ACCEPT").CombinedOutput()
+			if err != nil {
+				glog.Errorf("Failed to append ebtables rule: %v", err)
+			}
+			_, err = plugin.execer.Command(ebtablesPath, "-A", "OUTPUT", "-p", "IPv4", "-s", macAddr.String(), "-o", "veth+", "--ip-src", plugin.podCidr, "-j", "DROP").CombinedOutput()
+			if err != nil {
+				glog.Errorf("Failed to append ebtables rule: %v", err)
+			}
+		}
 	}
 
 	// The first SetUpPod call creates the bridge; get a shaper for the sake of
@@ -601,6 +618,19 @@ func (plugin *kubenetNetworkPlugin) shaper() bandwidth.BandwidthShaper {
 	return plugin.bandwidthShaper
 }
 
+
+// ebtables try to look up path of ebtables and return it
+func (plugin *kubenetNetworkPlugin) ebtables() (string, error) {
+	if plugin.ebtablesPath == "" {
+		path, err := plugin.execer.LookPath("ebtables")
+		if err != nil {
+			return "", err
+		}
+		plugin.ebtablesPath = path
+	}
+	return plugin.ebtablesPath, nil
+}
+
 // generateHardwareAddr generates 48 bit virtual mac addresses based on the IP input.
 func generateHardwareAddr(ip net.IP) (net.HardwareAddr, error) {
 	if ip.To4() == nil {
@@ -618,3 +648,4 @@ func generateHardwareAddr(ip net.IP) (net.HardwareAddr, error) {
 	}
 	return hwAddr, nil
 }
+

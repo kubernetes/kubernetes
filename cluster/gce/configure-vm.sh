@@ -50,7 +50,7 @@ function ensure-basic-networking() {
 
 # A hookpoint for installing any needed packages
 ensure-packages() {
-  :
+  apt-get-install ebtables
 }
 
 # A hookpoint for setting up local devices
