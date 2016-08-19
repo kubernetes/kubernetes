@@ -14,24 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package extensions
+package sysctl
 
 import (
-	"strings"
+	"testing"
 )
 
-// SysctlsFromPodSecurityPolicyAnnotation parses an annotation value of the key
-// SysctlsSecurityPolocyAnnotationKey into a slice of sysctls. An empty slice
-// is returned if annotation is the empty string.
-func SysctlsFromPodSecurityPolicyAnnotation(annotation string) ([]string, error) {
-	if annotation == "" {
-		return []string{}, nil
+func TestNamespacedBy(t *testing.T) {
+	tests := map[string]Namespace{
+		"kernel.shmall":   IpcNamespace,
+		"net.a.b.c":       NetNamespace,
+		"fs.mqueue.a.b.c": IpcNamespace,
+		"foo":             UnknownNamespace,
 	}
 
-	return strings.Split(annotation, ","), nil
-}
-
-// PodAnnotationsFromSysctls creates an annotation value for a slice of Sysctls.
-func PodAnnotationsFromSysctls(sysctls []string) string {
-	return strings.Join(sysctls, ",")
+	for sysctl, ns := range tests {
+		if got := NamespacedBy(sysctl); got != ns {
+			t.Errorf("wrong namespace for %q: got=%s want=%s", sysctl, got, ns)
+		}
+	}
 }
