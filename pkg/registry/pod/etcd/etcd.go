@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/kubelet/client"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/cachesize"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/registry/generic/registry"
@@ -36,9 +37,9 @@ import (
 	podrest "k8s.io/kubernetes/pkg/registry/pod/rest"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
-
-	"github.com/golang/glog"
 )
+
+// "github.com/golang/glog"
 
 // PodStorage includes storage for pods and all sub resources
 type PodStorage struct {
@@ -135,36 +136,31 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
-const num = 1
-const gotit = false
-
 func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
 
-	l, err := r.PodDisruptionBudgetLister.List(ctx, nil)
+	obj, err := r.store.Get(ctx, eviction.Name)
+	if err != nil {
+		return nil, err
+	}
+	pod := obj.(*api.Pod)
+	pdbs, err := r.getPodDisruptionBudgets(ctx, pod)
 	if err != nil {
 		return nil, err
 	}
 
-	pdbList, ok := l.(*policy.PodDisruptionBudgetList)
-
-	glog.Warningf("PDBLIST? %v %q len=%v", ok, pdbList, len(pdbList.Items))
-	for _, pdb := range pdbList.Items {
-		glog.Warningf("PDB %q/%q", pdb.Namespace, pdb.Name)
-	}
-
-	// If there is more than 1 PDB, that's an error (500).
-	if num > 1 {
+	if len(pdbs) > 1 {
 		return &unversioned.Status{
 			Status:  unversioned.StatusFailure,
 			Message: "Too many PDBs yo",
 			Code:    500,
 		}, nil
-	} else if num == 1 {
+	} else if len(pdbs) == 1 {
+		pdb := pdbs[0]
 		// Try to verify-and-decrement
 		// If it was false already, or if it becomes false during the course of our retries,
 		// raise an error marked as a ... 429 maybe?
-		if !gotit {
+		if !pdb.Status.PodDisruptionAllowed {
 			return &unversioned.Status{
 				Status:  unversioned.StatusFailure,
 				Message: "Not yet, brother",
@@ -183,6 +179,39 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 
 	// Success!
 	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
+}
+
+// Returns any PDBs that match the pod.
+// err is set if there's an error.
+func (r *EvictionREST) getPodDisruptionBudgets(ctx api.Context, pod *api.Pod) (pdbs []policy.PodDisruptionBudget, err error) {
+	if len(pod.Labels) == 0 {
+		return
+	}
+
+	l, err := r.PodDisruptionBudgetLister.List(ctx, nil)
+	if err != nil {
+		return
+	}
+
+	pdbList := l.(*policy.PodDisruptionBudgetList)
+
+	for _, pdb := range pdbList.Items {
+		if pdb.Namespace != pod.Namespace {
+			continue
+		}
+		selector, err := unversioned.LabelSelectorAsSelector(pdb.Spec.Selector)
+		if err != nil {
+			continue
+		}
+		// If a PDB with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+
+		pdbs = append(pdbs, pdb)
+	}
+
+	return pdbs, nil
 }
 
 // BindingREST implements the REST endpoint for binding pods to nodes when etcd is in use.
