@@ -95,6 +95,18 @@ func init() {
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	factory.RegisterPriorityFunction("MostRequestedPriority", priorities.MostRequestedPriority, 1)
+	// Cluster autoscaler friendly scheduling algorigthm.
+	factory.RegisterAlgorithmProvider("ClusterAutoscalerProvider", defaultPredicates(),
+		replace(defaultPriorities(), "LeastRequestedPriority", "MostRequestedPriority"))
+}
+
+func replace(set sets.String, replaceWhat, replaceWith string) sets.String {
+	result := sets.NewString(set.List()...)
+	if result.Has(replaceWhat) {
+		result.Delete(replaceWhat)
+		result.Insert(replaceWith)
+	}
+	return result
 }
 
 func defaultPredicates() sets.String {
