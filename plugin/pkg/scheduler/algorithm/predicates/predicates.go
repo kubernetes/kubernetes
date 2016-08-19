@@ -804,6 +804,10 @@ func GeneralPredicates(pod *api.Pod, meta interface{}, nodeInfo *schedulercache.
 		predicateFails = append(predicateFails, reasons...)
 	}
 
+	fit, reasons, err = PodToleratesNodeTaints(pod, meta, nodeInfo)
+	if !fit {
+		predicateFails = append(predicateFails, reasons...)
+	}
 	return len(predicateFails) == 0, predicateFails, nil
 }
 

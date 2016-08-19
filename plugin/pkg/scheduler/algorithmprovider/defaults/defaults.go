@@ -93,6 +93,10 @@ func init() {
 	factory.RegisterFitPredicate("HostName", predicates.PodFitsHost)
 	// Fit is determined by node selector query.
 	factory.RegisterFitPredicate("MatchNodeSelector", predicates.PodSelectorMatches)
+	// Fit is determined based on whether a pod can tolerate all of the node's taints
+	// This predicate is actually a default predicate, because it is invoked from
+	// predicates.GeneralPredicates()
+	factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints)
 }
 
 func defaultPredicates() sets.String {
@@ -127,9 +131,6 @@ func defaultPredicates() sets.String {
 		// GeneralPredicates are the predicates that are enforced by all Kubernetes components
 		// (e.g. kubelet and all schedulers)
 		factory.RegisterFitPredicate("GeneralPredicates", predicates.GeneralPredicates),
-
-		// Fit is determined based on whether a pod can tolerate all of the node's taints
-		factory.RegisterFitPredicate("PodToleratesNodeTaints", predicates.PodToleratesNodeTaints),
 
 		// Fit is determined by node memory pressure condition.
 		factory.RegisterFitPredicate("CheckNodeMemoryPressure", predicates.CheckNodeMemoryPressurePredicate),
