@@ -255,7 +255,7 @@ func newTestKubeletWithImageList(
 		t.Fatalf("failed to initialize volume manager: %v", err)
 	}
 
-	kubelet.sysctlWhitelist, err = sysctl.NewWhitelist([]string{"kernel.msg*"})
+	kubelet.sysctlWhitelist, err = sysctl.NewWhitelist([]string{})
 	if err != nil {
 		t.Fatalf("failed to create sysctl whitelist: %v", err)
 	}

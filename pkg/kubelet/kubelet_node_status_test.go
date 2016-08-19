@@ -22,6 +22,7 @@ import (
 	goruntime "runtime"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/util/rand"
@@ -87,6 +89,8 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 	testKubelet := newTestKubeletWithImageList(
 		t, inputImageList, false /* controllerAttachDetachEnabled */)
 	kubelet := testKubelet.kubelet
+	kubelet.sysctlCustomWhitelist = []string{"kernel.msg*"}
+	kubelet.sysctlWhitelist, _ = sysctl.NewWhitelist(kubelet.sysctlCustomWhitelist)
 	kubeClient := testKubelet.fakeKubeClient
 	kubeClient.ReactionChain = fake.NewSimpleClientset(&api.NodeList{Items: []api.Node{
 		{ObjectMeta: api.ObjectMeta{Name: testKubeletHostname}},
@@ -112,9 +116,15 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		t.Fatalf("can't update disk space manager: %v", err)
 	}
 
+	defaultSysctlWhitelist, _ := sysctl.NewWhitelist(nil)
+	allowedSysctl := strings.Join(defaultSysctlWhitelist.Allowed(), ",")
+
 	expectedNode := &api.Node{
-		ObjectMeta: api.ObjectMeta{Name: testKubeletHostname},
-		Spec:       api.NodeSpec{},
+		ObjectMeta: api.ObjectMeta{
+			Name:        testKubeletHostname,
+			Annotations: map[string]string{"sysctls.security.alpha.kubernetes.io/customWhitelist": allowedSysctl + ",kernel.msg*"},
+		},
+		Spec: api.NodeSpec{},
 		Status: api.NodeStatus{
 			Conditions: []api.NodeCondition{
 				{
@@ -187,13 +197,13 @@ func TestUpdateNewNodeStatus(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	actions := kubeClient.Actions()
-	if len(actions) != 2 {
+	if len(actions) != 3 {
 		t.Fatalf("unexpected actions: %v", actions)
 	}
-	if !actions[1].Matches("update", "nodes") || actions[1].GetSubresource() != "status" {
-		t.Fatalf("unexpected actions: %v", actions)
+	if !actions[2].Matches("update", "nodes") || actions[2].GetSubresource() != "status" {
+		t.Fatalf("unexpected actions: %+v", actions)
 	}
-	updatedNode, ok := actions[1].(core.UpdateAction).GetObject().(*api.Node)
+	updatedNode, ok := actions[2].(core.UpdateAction).GetObject().(*api.Node)
 	if !ok {
 		t.Errorf("unexpected object type")
 	}
