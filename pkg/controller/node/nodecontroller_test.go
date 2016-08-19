@@ -555,14 +555,14 @@ func TestMonitorNodeStatusEvictPods(t *testing.T) {
 		}
 
 		nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-			remaining, _ := nodeController.deletePods(value.Value)
+			remaining, _ := deletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
 			if remaining {
 				nodeController.terminationEvictor.Add(value.Value)
 			}
 			return true, 0
 		})
 		nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-			nodeController.terminatePods(value.Value, value.AddedAt)
+			terminatePods(item.fakeNodeHandler, nodeController.recorder, value.Value, value.AddedAt, nodeController.maximumGracePeriod)
 			return true, 0
 		})
 		podEvicted := false
@@ -933,6 +933,9 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
 						},
 						Status: api.NodeStatus{
+							NodeInfo: api.NodeSystemInfo{
+								KubeletVersion: "v1.2.0",
+							},
 							Conditions: []api.NodeCondition{
 								{
 									Type:   api.NodeReady,
@@ -963,6 +966,9 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 			},
 			timeToPass: 1 * time.Minute,
 			newNodeStatus: api.NodeStatus{
+				NodeInfo: api.NodeSystemInfo{
+					KubeletVersion: "v1.2.0",
+				},
 				Conditions: []api.NodeCondition{
 					{
 						Type:   api.NodeReady,
@@ -985,6 +991,76 @@ func TestMonitorNodeStatusMarkPodsNotReady(t *testing.T) {
 				},
 			},
 			expectedPodStatusUpdate: true,
+		},
+		// Node created long time ago, with outdated kubelet version 1.1.0 and status
+		// updated by kubelet exceeds grace period. Expect no action from node controller.
+		{
+			fakeNodeHandler: &FakeNodeHandler{
+				Existing: []*api.Node{
+					{
+						ObjectMeta: api.ObjectMeta{
+							Name:              "node0",
+							CreationTimestamp: unversioned.Date(2012, 1, 1, 0, 0, 0, 0, time.UTC),
+						},
+						Status: api.NodeStatus{
+							NodeInfo: api.NodeSystemInfo{
+								KubeletVersion: "v1.1.0",
+							},
+							Conditions: []api.NodeCondition{
+								{
+									Type:   api.NodeReady,
+									Status: api.ConditionTrue,
+									// Node status hasn't been updated for 1hr.
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+								{
+									Type:   api.NodeOutOfDisk,
+									Status: api.ConditionFalse,
+									// Node status hasn't been updated for 1hr.
+									LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+									LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+								},
+							},
+							Capacity: api.ResourceList{
+								api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+								api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+							},
+						},
+						Spec: api.NodeSpec{
+							ExternalID: "node0",
+						},
+					},
+				},
+				Clientset: fake.NewSimpleClientset(&api.PodList{Items: []api.Pod{*newPod("pod0", "node0")}}),
+			},
+			timeToPass: 1 * time.Minute,
+			newNodeStatus: api.NodeStatus{
+				NodeInfo: api.NodeSystemInfo{
+					KubeletVersion: "v1.1.0",
+				},
+				Conditions: []api.NodeCondition{
+					{
+						Type:   api.NodeReady,
+						Status: api.ConditionTrue,
+						// Node status hasn't been updated for 1hr.
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+					{
+						Type:   api.NodeOutOfDisk,
+						Status: api.ConditionFalse,
+						// Node status hasn't been updated for 1hr.
+						LastHeartbeatTime:  unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+						LastTransitionTime: unversioned.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC),
+					},
+				},
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceCPU):    resource.MustParse("10"),
+					api.ResourceName(api.ResourceMemory): resource.MustParse("10G"),
+				},
+			},
+			expectedPodStatusUpdate: false,
 		},
 	}
 
@@ -1082,7 +1158,7 @@ func TestNodeDeletion(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 	nodeController.podEvictor.Try(func(value TimedValue) (bool, time.Duration) {
-		nodeController.deletePods(value.Value)
+		deletePods(fakeNodeHandler, nodeController.recorder, value.Value, nodeController.daemonSetStore)
 		return true, 0
 	})
 	podEvicted := false
@@ -1220,12 +1296,12 @@ func TestCheckPod(t *testing.T) {
 
 	for i, tc := range tcs {
 		var deleteCalls int
-		nc.forcefullyDeletePod = func(_ *api.Pod) error {
+		forcefullyDeletePodsFunc := func(_ *api.Pod) error {
 			deleteCalls++
 			return nil
 		}
 
-		nc.maybeDeleteTerminatingPod(&tc.pod)
+		nc.maybeDeleteTerminatingPod(&tc.pod, nc.nodeStore.Store, forcefullyDeletePodsFunc)
 
 		if tc.prune && deleteCalls != 1 {
 			t.Errorf("[%v] expected number of delete calls to be 1 but got %v", i, deleteCalls)
@@ -1237,17 +1313,7 @@ func TestCheckPod(t *testing.T) {
 }
 
 func TestCleanupOrphanedPods(t *testing.T) {
-	newPod := func(name, node string) api.Pod {
-		return api.Pod{
-			ObjectMeta: api.ObjectMeta{
-				Name: name,
-			},
-			Spec: api.PodSpec{
-				NodeName: node,
-			},
-		}
-	}
-	pods := []api.Pod{
+	pods := []*api.Pod{
 		newPod("a", "foo"),
 		newPod("b", "bar"),
 		newPod("c", "gone"),
@@ -1263,17 +1329,77 @@ func TestCleanupOrphanedPods(t *testing.T) {
 
 	var deleteCalls int
 	var deletedPodName string
-	nc.forcefullyDeletePod = func(p *api.Pod) error {
+	forcefullyDeletePodFunc := func(p *api.Pod) error {
 		deleteCalls++
 		deletedPodName = p.ObjectMeta.Name
 		return nil
 	}
-	nc.cleanupOrphanedPods()
+	cleanupOrphanedPods(pods, nc.nodeStore.Store, forcefullyDeletePodFunc)
 
 	if deleteCalls != 1 {
 		t.Fatalf("expected one delete, got: %v", deleteCalls)
 	}
 	if deletedPodName != "c" {
 		t.Fatalf("expected deleted pod name to be 'c', but got: %q", deletedPodName)
+	}
+}
+
+func TestCheckNodeKubeletVersionParsing(t *testing.T) {
+	tests := []struct {
+		version  string
+		outdated bool
+	}{
+		{
+			version:  "",
+			outdated: true,
+		},
+		{
+			version:  "v0.21.4",
+			outdated: true,
+		},
+		{
+			version:  "v1.0.0",
+			outdated: true,
+		},
+		{
+			version:  "v1.1.0",
+			outdated: true,
+		},
+		{
+			version:  "v1.1.0-alpha.2.961+9d4c6846fc03b9-dirty",
+			outdated: true,
+		},
+		{
+			version:  "v1.2.0",
+			outdated: false,
+		},
+		{
+			version:  "v1.3.3",
+			outdated: false,
+		},
+		{
+			version:  "v1.4.0-alpha.2.961+9d4c6846fc03b9-dirty",
+			outdated: false,
+		},
+		{
+			version:  "v2.0.0",
+			outdated: false,
+		},
+	}
+
+	for _, ov := range tests {
+		n := &api.Node{
+			Status: api.NodeStatus{
+				NodeInfo: api.NodeSystemInfo{
+					KubeletVersion: ov.version,
+				},
+			},
+		}
+		isOutdated := nodeRunningOutdatedKubelet(n)
+		if ov.outdated != isOutdated {
+			t.Errorf("Version %v doesn't match test expectation. Expected outdated %v got %v", n.Status.NodeInfo.KubeletVersion, ov.outdated, isOutdated)
+		} else {
+			t.Logf("Version %v outdated %v", ov.version, isOutdated)
+		}
 	}
 }
