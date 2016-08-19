@@ -44,7 +44,7 @@ func buildGo() error {
 		return fmt.Errorf("failed to locate kubernetes root directory %v.", err)
 	}
 	targets := strings.Join(buildTargets, " ")
-	cmd := exec.Command("make", "-C", k8sRoot, fmt.Sprintf("WHAT=%s", targets))
+	cmd := exec.Command("sudo", filepath.Join(k8sRoot, "build/run.sh"), "make", fmt.Sprintf("WHAT=%s", targets))
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	err = cmd.Run()
@@ -107,7 +107,7 @@ func getK8sBuildOutputDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	buildOutputDir := filepath.Join(k8sRoot, "_output/local/go/bin")
+	buildOutputDir := filepath.Join(k8sRoot, fmt.Sprintf("_output/dockerized/bin/%s/%s", runtime.GOOS, runtime.GOARCH))
 	if _, err := os.Stat(buildOutputDir); err != nil {
 		return "", err
 	}
