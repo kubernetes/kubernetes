@@ -2022,7 +2022,7 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 }
 
 const SysctlSegmentFmt string = "[a-z0-9]([_a-z0-9]*[a-z0-9])?"
-const SysctlFmt string =  "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
+const SysctlFmt string = "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
 const SysctlMaxLength int = 253
 
 var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
