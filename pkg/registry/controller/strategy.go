@@ -42,8 +42,8 @@ type rcStrategy struct {
 // Strategy is the default logic that applies when creating and updating Replication Controller objects.
 var Strategy = rcStrategy{api.Scheme, api.SimpleNameGenerator}
 
-// DefaultGarbageCollectionPolicy returns Orphan because that's the default
-// behavior before the server-side garbage collection is implemented.
+// DefaultGarbageCollectionPolicy returns Orphan because that was the default
+// behavior before the server-side garbage collection was implemented.
 func (rcStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
 	return rest.OrphanDependents
 }

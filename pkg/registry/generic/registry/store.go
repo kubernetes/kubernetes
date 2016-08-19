@@ -451,43 +451,33 @@ var (
 // order of highest to lowest priority are: options.OrphanDependents, existing
 // finalizers of the object, e.DeleteStrategy.DefaultGarbageCollectionPolicy.
 func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteOptions) (shouldUpdate bool, newFinalizers []string) {
-	// check if the object already has the orphan finalizer set.
-	alreadyOrphan := false
+	shouldOrphan := false
+	// Get default orphan policy from this REST object type
+	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
+		if gcStrategy.DefaultGarbageCollectionPolicy() == rest.OrphanDependents {
+			shouldOrphan = true
+		}
+	}
+	// If a finalizer is set in the object, it overrides the default
+	hasOrphanFinalizer := false
 	finalizers := accessor.GetFinalizers()
 	for _, f := range finalizers {
 		if f == api.FinalizerOrphan {
-			alreadyOrphan = true
+			shouldOrphan = true
+			hasOrphanFinalizer = true
+			break
 		}
+		// TODO: update this when we add a finalizer indicating a preference for the other behavior
 	}
-	// check whether the e.DeleteStrategy indicates to orphan.
-	defaultToOrphan := false
-	if gcStrategy, ok := e.DeleteStrategy.(rest.GarbageCollectionDeleteStrategy); ok {
-		if gcStrategy.DefaultGarbageCollectionPolicy() == rest.OrphanDependents {
-			defaultToOrphan = true
-		}
+	// If an explicit policy was set at deletion time, that overrides both
+	if options != nil && options.OrphanDependents != nil {
+		shouldOrphan = *options.OrphanDependents
 	}
-	if options == nil || options.OrphanDependents == nil {
-		// if user has manually set the orphan finalizer, just respect it
-		if alreadyOrphan {
-			return false, finalizers
-		}
-		// otherwise respect the default behavior specified by the storage
-		if defaultToOrphan {
-			finalizers = append(finalizers, api.FinalizerOrphan)
-			return true, finalizers
-		}
-		return false, finalizers
-	}
-	// if options.OrphanDependents is not nil, it has the final say. The default
-	// orphan strategy will be ignored.
-	shouldOrphan := *options.OrphanDependents
-	if shouldOrphan == alreadyOrphan {
-		return false, finalizers
-	}
-	if shouldOrphan {
+	if shouldOrphan && !hasOrphanFinalizer {
 		finalizers = append(finalizers, api.FinalizerOrphan)
 		return true, finalizers
-	} else {
+	}
+	if !shouldOrphan && hasOrphanFinalizer {
 		var newFinalizers []string
 		for _, f := range finalizers {
 			if f == api.FinalizerOrphan {
@@ -497,6 +487,7 @@ func shouldUpdateFinalizers(e *Store, accessor meta.Object, options *api.DeleteO
 		}
 		return true, newFinalizers
 	}
+	return false, finalizers
 }
 
 // markAsDeleting sets the obj's DeletionGracePeriodSeconds to 0, and sets the

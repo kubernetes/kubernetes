@@ -209,7 +209,7 @@ func TestCascadingDeletion(t *testing.T) {
 	go gc.Run(5, stopCh)
 	defer close(stopCh)
 	// delete one of the replication controller
-	if err := rcClient.Delete(toBeDeletedRCName, nil); err != nil {
+	if err := rcClient.Delete(toBeDeletedRCName, getNonOrphanOptions()); err != nil {
 		t.Fatalf("failed to delete replication controller: %v", err)
 	}
 
