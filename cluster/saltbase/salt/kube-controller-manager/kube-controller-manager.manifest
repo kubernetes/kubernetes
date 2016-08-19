@@ -137,9 +137,6 @@
         "readOnly": true},
         { "name": "etcpki",
         "mountPath": "/etc/pki",
-        "readOnly": true},
-        { "name": "libexec",
-        "mountPath": "/usr/libexec/kubernetes",
         "readOnly": true}
       ]
     }
@@ -170,11 +167,6 @@
   { "name": "etcpki",
     "hostPath": {
         "path": "/etc/pki"}
-  },
-  {
-    "name": "libexec",
-    "hostPath": {
-        "path": "/usr/libexec/kubernetes"}
   }
 ]
 }}
