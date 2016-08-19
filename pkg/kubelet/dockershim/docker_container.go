@@ -64,7 +64,7 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	result := []*runtimeApi.Container{}
 	for _, c := range containers {
 		if len(filter.GetName()) > 0 {
-			_, _, _, containerName, err := parseContainerName(c.Names[0])
+			_, _, _, containerName, _, err := parseContainerName(c.Names[0])
 			if err != nil || containerName != filter.GetName() {
 				continue
 			}
@@ -278,9 +278,17 @@ func (ds *dockerService) ContainerStatus(containerID string) (*runtimeApi.Contai
 	ct, st, ft := createdAt.Unix(), startedAt.Unix(), finishedAt.Unix()
 	exitCode := int32(r.State.ExitCode)
 
+	_, _, _, containerName, attempt, err := parseContainerName(r.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	return &runtimeApi.ContainerStatus{
-		Id:         &r.ID,
-		Name:       &r.Name,
+		Id: &r.ID,
+		Metadata: &runtimeApi.ContainerMetadata{
+			Name:    &containerName,
+			Attempt: &attempt,
+		},
 		Image:      &runtimeApi.ImageSpec{Image: &r.Config.Image},
 		ImageRef:   &r.Image,
 		Mounts:     mounts,

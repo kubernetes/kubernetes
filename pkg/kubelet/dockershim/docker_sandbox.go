@@ -117,11 +117,20 @@ func (ds *dockerService) PodSandboxStatus(podSandboxID string) (*runtimeApi.PodS
 	network := &runtimeApi.PodSandboxNetworkStatus{Ip: &IP}
 	netNS := getNetworkNamespace(r)
 
+	podName, podNamespace, podUID, err := parseSandboxName(r.Name)
+	if err != nil {
+		return nil, err
+	}
+
 	return &runtimeApi.PodSandboxStatus{
 		Id:        &r.ID,
-		Name:      &r.Name,
 		State:     &state,
 		CreatedAt: &ct,
+		Metadata: &runtimeApi.PodSandboxMetadata{
+			Name:      &podName,
+			Namespace: &podNamespace,
+			Uid:       &podUID,
+		},
 		// TODO: We write annotations as labels on the docker containers. All
 		// these annotations will be read back as labels. Need to fix this.
 		// Also filter out labels only relevant to this shim.

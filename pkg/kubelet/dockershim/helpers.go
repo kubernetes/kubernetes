@@ -187,7 +187,7 @@ func buildSandboxName(sandboxConfig *runtimeApi.PodSandboxConfig) string {
 
 // parseSandboxName unpacks a sandbox full name, returning the pod name, namespace and uid
 func parseSandboxName(name string) (string, string, string, error) {
-	podName, podNamespace, podUID, _, err := parseContainerName(name)
+	podName, podNamespace, podUID, _, _, err := parseContainerName(name)
 	if err != nil {
 		return "", "", "", err
 	}
@@ -202,22 +202,32 @@ func buildContainerName(sandboxConfig *runtimeApi.PodSandboxConfig, containerCon
 	return buildKubeGenericName(sandboxConfig, containerName)
 }
 
-// parseContainerName unpacks a container name, returning the pod name, namespace, UID and container name
-func parseContainerName(name string) (podName, podNamespace, podUID, containerName string, err error) {
+// parseContainerName unpacks a container name, returning the pod name, namespace, UID,
+// container name and attempt.
+func parseContainerName(name string) (podName, podNamespace, podUID, containerName string, attempt uint32, err error) {
 	parts := strings.Split(name, "_")
 	if len(parts) == 0 || parts[0] != kubePrefix {
 		err = fmt.Errorf("failed to parse container name %q into parts", name)
-		return "", "", "", "", err
+		return "", "", "", "", 0, err
 	}
 	if len(parts) < 6 {
 		glog.Warningf("Found a container with the %q prefix, but too few fields (%d): %q", kubePrefix, len(parts), name)
 		err = fmt.Errorf("container name %q has fewer parts than expected %v", name, parts)
-		return "", "", "", "", err
+		return "", "", "", "", 0, err
 	}
 
 	nameParts := strings.Split(parts[1], ".")
 	containerName = nameParts[0]
-	return parts[2], parts[3], parts[4], containerName, nil
+	if len(nameParts) > 1 {
+		attemptNumber, err := strconv.ParseUint(nameParts[1], 10, 32)
+		if err != nil {
+			glog.Warningf("invalid container attempt %q in container %q", nameParts[1], name)
+		}
+
+		attempt = uint32(attemptNumber)
+	}
+
+	return parts[2], parts[3], parts[4], containerName, attempt, nil
 }
 
 // dockerFilter wraps around dockerfilters.Args and provides methods to modify
