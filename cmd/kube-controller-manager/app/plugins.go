@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
 	"k8s.io/kubernetes/pkg/volume/cinder"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
+	"k8s.io/kubernetes/pkg/volume/flocker"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
@@ -97,6 +98,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 		glog.Fatalf("Could not create NFS recycler pod from file %s: %+v", config.PersistentVolumeRecyclerConfiguration.PodTemplateFilePathNFS, err)
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
+
+	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
 
 	if cloud != nil {
 		switch {
