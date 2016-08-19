@@ -200,3 +200,6 @@ test/soak/serve_hostnames
 third_party/forked/golang/expansion
 pkg/util/maps
 pkg/volume/quobyte
+test/integration/discoverysummarizer
+test/integration/examples
+test/integration/federation
