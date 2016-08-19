@@ -55,6 +55,9 @@ func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 		if len(indexKeys) > 1 {
 			return "", fmt.Errorf("too many keys: %v", indexKeys)
 		}
+		if len(indexKeys) == 0 {
+			return "", fmt.Errorf("unexpected empty indexKeys")
+		}
 		return indexKeys[0], nil
 	}
 }
