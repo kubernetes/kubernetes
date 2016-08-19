@@ -142,6 +142,7 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 		allErrs = append(allErrs, err)
 	}
 
+	first := true
 	for _, info := range infos {
 		mapping := info.ResourceMapping()
 		describer, err := f.Describer(mapping)
@@ -154,7 +155,12 @@ func RunDescribe(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []s
 			allErrs = append(allErrs, err)
 			continue
 		}
-		fmt.Fprintf(out, "%s\n\n", s)
+		if first {
+			first = false
+			fmt.Fprint(out, s)
+		} else {
+			fmt.Fprintf(out, "\n\n%s", s)
+		}
 	}
 
 	return utilerrors.NewAggregate(allErrs)
