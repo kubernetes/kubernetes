@@ -22,7 +22,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-var ValidateClusterName = validation.NameIsDNSSubdomain
+var ValidateClusterName = validation.NameIsDNS1035Label
 
 func ValidateClusterSpec(spec *federation.ClusterSpec, fieldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
