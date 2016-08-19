@@ -28,8 +28,33 @@ func doCheck(t *testing.T, pref map[string]fed_api.ClusterReplicaSetPreferences,
 	planer := NewPlanner(&fed_api.FederatedReplicaSetPreferences{
 		Clusters: pref,
 	})
-	plan := planer.Plan(replicas, clusters)
+	plan, overflow := planer.Plan(replicas, clusters, map[string]int64{}, map[string]int64{})
 	assert.EqualValues(t, expected, plan)
+	assert.Equal(t, 0, len(overflow))
+}
+
+func doCheckWithExisting(t *testing.T, pref map[string]fed_api.ClusterReplicaSetPreferences, replicas int64, clusters []string,
+	existing map[string]int64, expected map[string]int64) {
+	planer := NewPlanner(&fed_api.FederatedReplicaSetPreferences{
+		Clusters: pref,
+	})
+	plan, overflow := planer.Plan(replicas, clusters, existing, map[string]int64{})
+	assert.Equal(t, 0, len(overflow))
+	assert.EqualValues(t, expected, plan)
+}
+
+func doCheckWithExistingAndCapacity(t *testing.T, rebalance bool, pref map[string]fed_api.ClusterReplicaSetPreferences, replicas int64, clusters []string,
+	existing map[string]int64,
+	capacity map[string]int64,
+	expected map[string]int64,
+	expectedOverflow map[string]int64) {
+	planer := NewPlanner(&fed_api.FederatedReplicaSetPreferences{
+		Rebalance: rebalance,
+		Clusters:  pref,
+	})
+	plan, overflow := planer.Plan(replicas, clusters, existing, capacity)
+	assert.EqualValues(t, expected, plan)
+	assert.Equal(t, expectedOverflow, overflow)
 }
 
 func pint(val int64) *int64 {
@@ -68,6 +93,132 @@ func TestEqual(t *testing.T) {
 		map[string]int64{})
 }
 
+func TestEqualWithExisting(t *testing.T) {
+	doCheckWithExisting(t, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {Weight: 1}},
+		50, []string{"A", "B", "C"},
+		map[string]int64{"C": 30},
+		map[string]int64{"A": 10, "B": 10, "C": 30})
+
+	doCheckWithExisting(t, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {Weight: 1}},
+		50, []string{"A", "B"},
+		map[string]int64{"A": 30},
+		map[string]int64{"A": 30, "B": 20})
+
+	doCheckWithExisting(t, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {Weight: 1}},
+		500000, []string{"A", "B"},
+		map[string]int64{"A": 300000},
+		map[string]int64{"A": 300000, "B": 200000})
+
+	doCheckWithExisting(t, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {Weight: 1}},
+		50, []string{"A", "B"},
+		map[string]int64{"A": 10},
+		map[string]int64{"A": 25, "B": 25})
+
+	doCheckWithExisting(t, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {Weight: 1}},
+		50, []string{"A", "B"},
+		map[string]int64{"A": 10, "B": 70},
+		map[string]int64{"A": 10, "B": 40})
+
+	doCheckWithExisting(t, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {Weight: 1}},
+		1, []string{"A", "B"},
+		map[string]int64{"A": 30},
+		map[string]int64{"A": 1, "B": 0})
+
+	doCheckWithExisting(t, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {Weight: 1}},
+		50, []string{"A", "B"},
+		map[string]int64{"A": 10, "B": 20},
+		map[string]int64{"A": 25, "B": 25})
+}
+
+func TestWithExistingAndCapacity(t *testing.T) {
+	// desired without capacity: map[string]int64{"A": 17, "B": 17, "C": 16})
+	doCheckWithExistingAndCapacity(t, true, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {Weight: 1}},
+		50, []string{"A", "B", "C"},
+		map[string]int64{},
+		map[string]int64{"C": 10},
+		map[string]int64{"A": 20, "B": 20, "C": 10},
+		map[string]int64{"C": 6})
+
+	// desired B:50 C:0
+	doCheckWithExistingAndCapacity(t, true, map[string]fed_api.ClusterReplicaSetPreferences{
+		"A": {Weight: 10000},
+		"B": {Weight: 1}},
+		50, []string{"B", "C"},
+		map[string]int64{},
+		map[string]int64{"B": 10},
+		map[string]int64{"B": 10, "C": 0},
+		map[string]int64{"B": 40},
+	)
+
+	// desired A:20 B:40
+	doCheckWithExistingAndCapacity(t, true, map[string]fed_api.ClusterReplicaSetPreferences{
+		"A": {Weight: 1},
+		"B": {Weight: 2}},
+		60, []string{"A", "B", "C"},
+		map[string]int64{},
+		map[string]int64{"B": 10},
+		map[string]int64{"A": 50, "B": 10, "C": 0},
+		map[string]int64{"B": 30})
+
+	// map[string]int64{"A": 10, "B": 30, "C": 21, "D": 10})
+	doCheckWithExistingAndCapacity(t, true, map[string]fed_api.ClusterReplicaSetPreferences{
+		"A": {Weight: 10000, MaxReplicas: pint(10)},
+		"B": {Weight: 1},
+		"C": {Weight: 1, MaxReplicas: pint(21)},
+		"D": {Weight: 1, MaxReplicas: pint(10)}},
+		71, []string{"A", "B", "C", "D"},
+		map[string]int64{},
+		map[string]int64{"C": 10},
+		map[string]int64{"A": 10, "B": 41, "C": 10, "D": 10},
+		map[string]int64{"C": 11},
+	)
+
+	// desired A:20 B:20
+	doCheckWithExistingAndCapacity(t, false, map[string]fed_api.ClusterReplicaSetPreferences{
+		"A": {Weight: 1},
+		"B": {Weight: 1}},
+		60, []string{"A", "B", "C"},
+		map[string]int64{},
+		map[string]int64{"A": 10, "B": 10},
+		map[string]int64{"A": 10, "B": 10, "C": 0},
+		map[string]int64{"A": 20, "B": 20})
+
+	// desired A:10 B:50 although A:50 B:10 is fuly acceptable because rebalance = false
+	doCheckWithExistingAndCapacity(t, false, map[string]fed_api.ClusterReplicaSetPreferences{
+		"A": {Weight: 1},
+		"B": {Weight: 5}},
+		60, []string{"A", "B", "C"},
+		map[string]int64{},
+		map[string]int64{"B": 10},
+		map[string]int64{"A": 50, "B": 10, "C": 0},
+		map[string]int64{})
+
+	doCheckWithExistingAndCapacity(t, false, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {MinReplicas: 20, Weight: 0}},
+		50, []string{"A", "B", "C"},
+		map[string]int64{},
+		map[string]int64{"B": 10},
+		map[string]int64{"A": 20, "B": 10, "C": 20},
+		map[string]int64{})
+
+	// Actually we would like to have extra 20 in B but 15 is also good.
+	doCheckWithExistingAndCapacity(t, true, map[string]fed_api.ClusterReplicaSetPreferences{
+		"*": {MinReplicas: 20, Weight: 1}},
+		60, []string{"A", "B"},
+		map[string]int64{},
+		map[string]int64{"B": 10},
+		map[string]int64{"A": 50, "B": 10},
+		map[string]int64{"B": 15})
+}
+
 func TestMin(t *testing.T) {
 	doCheck(t, map[string]fed_api.ClusterReplicaSetPreferences{
 		"*": {MinReplicas: 2, Weight: 0}},
@@ -104,7 +255,6 @@ func TestMax(t *testing.T) {
 }
 
 func TestWeight(t *testing.T) {
-
 	doCheck(t, map[string]fed_api.ClusterReplicaSetPreferences{
 		"A": {Weight: 1},
 		"B": {Weight: 2}},
