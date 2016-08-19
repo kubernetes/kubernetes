@@ -261,17 +261,19 @@ func (s *StoreToReplicationControllerLister) GetPodControllers(pod *api.Pod) (co
 	return
 }
 
-type StoreToDeploymentNamespacer struct {
+type storeToDeploymentNamespacer struct {
 	indexer   Indexer
 	namespace string
 }
 
-// StoreToDeploymentNamespacer lists all deployments under its namespace in the store.
-func (s StoreToDeploymentNamespacer) List() (deployments []extensions.Deployment, err error) {
+// storeToDeploymentNamespacer lists deployments under its namespace in the store.
+func (s storeToDeploymentNamespacer) List(selector labels.Selector) (deployments []extensions.Deployment, err error) {
 	if s.namespace == api.NamespaceAll {
 		for _, m := range s.indexer.List() {
 			d := *(m.(*extensions.Deployment))
-			deployments = append(deployments, d)
+			if selector.Matches(labels.Set(d.Labels)) {
+				deployments = append(deployments, d)
+			}
 		}
 		return
 	}
@@ -283,7 +285,7 @@ func (s StoreToDeploymentNamespacer) List() (deployments []extensions.Deployment
 		glog.Warningf("can not retrieve list of objects using index : %v", err)
 		for _, m := range s.indexer.List() {
 			d := *(m.(*extensions.Deployment))
-			if s.namespace == d.Namespace {
+			if s.namespace == d.Namespace && selector.Matches(labels.Set(d.Labels)) {
 				deployments = append(deployments, d)
 			}
 		}
@@ -291,15 +293,15 @@ func (s StoreToDeploymentNamespacer) List() (deployments []extensions.Deployment
 	}
 	for _, m := range items {
 		d := *(m.(*extensions.Deployment))
-		if s.namespace == d.Namespace {
+		if selector.Matches(labels.Set(d.Labels)) {
 			deployments = append(deployments, d)
 		}
 	}
 	return
 }
 
-func (s *StoreToDeploymentLister) Deployments(namespace string) StoreToDeploymentNamespacer {
-	return StoreToDeploymentNamespacer{s.Indexer, namespace}
+func (s *StoreToDeploymentLister) Deployments(namespace string) storeToDeploymentNamespacer {
+	return storeToDeploymentNamespacer{s.Indexer, namespace}
 }
 
 // StoreToDeploymentLister gives a store List and Exists methods. The store must contain only Deployments.
@@ -353,6 +355,37 @@ func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.Rep
 	}
 	if len(deployments) == 0 {
 		err = fmt.Errorf("could not find deployments set for ReplicaSet %s in namespace %s with labels: %v", rs.Name, rs.Namespace, rs.Labels)
+	}
+	return
+}
+
+// GetDeploymentsForPods returns a list of deployments managing a pod. Returns an error only if no matching deployments are found.
+func (s *StoreToDeploymentLister) GetDeploymentsForPod(pod *api.Pod) (deployments []extensions.Deployment, err error) {
+	var d extensions.Deployment
+
+	if len(pod.Labels) == 0 {
+		err = fmt.Errorf("no deployments found for Pod %v because it has no labels", pod.Name)
+		return
+	}
+
+	for _, m := range s.Indexer.List() {
+		d = *m.(*extensions.Deployment)
+		if d.Namespace != pod.Namespace || len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
+			continue
+		}
+
+		selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
+		if err != nil {
+			return nil, fmt.Errorf("invalid label selector: %v", err)
+		}
+		// If a deployment with a nil or empty selector creeps in, it should match nothing, not everything.
+		if selector.Empty() || !selector.Matches(labels.Set(pod.Labels)) {
+			continue
+		}
+		deployments = append(deployments, d)
+	}
+	if len(deployments) == 0 {
+		err = fmt.Errorf("could not find deployments set for Pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }

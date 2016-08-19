@@ -60,6 +60,8 @@ const (
 	RollbackDone = "DeploymentRollback"
 	// OverlapAnnotation marks deployments with overlapping selector with other deployments
 	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
+	// SelectorUpdateAnnotation marks the last time deployment selector update
+	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
 )
 
 // MaxRevision finds the highest revision in the replica sets
