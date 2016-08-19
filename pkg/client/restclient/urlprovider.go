@@ -21,30 +21,30 @@ import (
 	"sync"
 )
 
-// Allows to use multiple urls
+// A URLProvider allows to use multiple URLs.
 type URLProvider interface {
-	// Return selected url
+	// Get returns currently selected URL.
 	Get() *url.URL
-	// Select any other url, it is upto implementation to provide any
-	// health checking/load balancing, it might be as simple as iterator
+	// Next selects any other URL, it is upto implementation to provide any
+	// health checking/load balancing, it might be as simple as an iterator.
 	Next() *url.URL
 }
 
-// Allows to iterate over urls, doesnt provide any health checking
+// A RoundRobinProvider allows to iterate over URLs, doesnt provide any health checking.
 type RoundRobinProvider struct {
 	sync.RWMutex
 	current int
 	urls    []*url.URL
 }
 
-// Return selected url
+// Get returns currently selected url.
 func (p *RoundRobinProvider) Get() *url.URL {
 	p.Lock()
 	defer p.Unlock()
 	return p.urls[p.current]
 }
 
-// Select next url if it exists, return selected url
+// Next selects next URL if it exists, returns selected URL.
 func (p *RoundRobinProvider) Next() *url.URL {
 	p.Lock()
 	defer p.Unlock()
@@ -56,7 +56,7 @@ func (p *RoundRobinProvider) Next() *url.URL {
 	return p.urls[p.current]
 }
 
-// Return round robin provider with given urls
+// NewRoundRobinProvider returns pointer to new RoundRobinProvider with passed URLs.
 func NewRoundRobinProvider(urls ...*url.URL) *RoundRobinProvider {
 	return &RoundRobinProvider{urls: urls}
 }

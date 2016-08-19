@@ -114,8 +114,8 @@ type Config struct {
 	// Do we need this?
 	// Version string
 
-	// AlternateHosts must be a slice of strings, with properties of Host
-	// Will be used if URL specified in Host won't be provided or will be unavailable
+	// AlternateHosts must be a slice of strings, with properties of Host.
+	// They will be used if Host will be empty or unavailable.
 	AlternateHosts []string
 }
 
