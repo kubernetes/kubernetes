@@ -429,6 +429,7 @@ prepare_etcd_manifest() {
   sed -i -e "s@{{ *cpulimit *}}@\"$4\"@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *hostname *}}@$host_name@g" "${etcd_temp_file}"
   sed -i -e "s@{{ *etcd_cluster *}}@$etcd_cluster@g" "${etcd_temp_file}"
+  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
   sed -i -e "s@{{ *cluster_state *}}@$cluster_state@g" "${etcd_temp_file}"
   # Replace the volume host path
   sed -i -e "s@/mnt/master-pd/var/etcd@/mnt/disks/master-pd/var/etcd@g" "${etcd_temp_file}"
