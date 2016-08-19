@@ -16,47 +16,37 @@ limitations under the License.
 
 package workqueue
 
-import (
-	"time"
-
-	"k8s.io/kubernetes/pkg/util/clock"
-)
+import "time"
 
 type TimedWorkQueue struct {
 	*Type
-	clock clock.Clock
 }
 
-type timedWorkQueueItem struct {
-	time time.Time
-	obj  interface{}
+type TimedWorkQueueItem struct {
+	StartTime time.Time
+	Object    interface{}
 }
 
-func NewTimedWorkQueue(clock clock.Clock) *TimedWorkQueue {
-	return &TimedWorkQueue{New(), clock}
+func NewTimedWorkQueue() *TimedWorkQueue {
+	return &TimedWorkQueue{New()}
 }
 
 // Add adds the obj along with the current timestamp to the queue.
-func (q TimedWorkQueue) Add(obj interface{}) {
-	start := q.clock.Now()
-	item := timedWorkQueueItem{start, obj}
-	q.Type.Add(item)
-}
-
-// AddWithTimestamp is useful if the caller does not want to refresh the start
-// time when requeuing an item.
-func (q TimedWorkQueue) AddWithTimestamp(obj interface{}, timestamp time.Time) {
-	item := timedWorkQueueItem{timestamp, obj}
-	q.Type.Add(item)
+func (q TimedWorkQueue) Add(timedItem *TimedWorkQueueItem) {
+	q.Type.Add(timedItem)
 }
 
 // Get gets the obj along with its timestamp from the queue.
-func (q TimedWorkQueue) Get() (item interface{}, start time.Time, shutdown bool) {
-	item, shutdown = q.Type.Get()
-	if item != nil {
-		timed, _ := item.(timedWorkQueueItem)
-		item = timed.obj
-		start = timed.time
+func (q TimedWorkQueue) Get() (timedItem *TimedWorkQueueItem, shutdown bool) {
+	origin, shutdown := q.Type.Get()
+	if origin == nil {
+		return nil, shutdown
 	}
-	return item, start, shutdown
+	timedItem, _ = origin.(*TimedWorkQueueItem)
+	return timedItem, shutdown
+}
+
+func (q TimedWorkQueue) Done(timedItem *TimedWorkQueueItem) error {
+	q.Type.Done(timedItem)
+	return nil
 }
