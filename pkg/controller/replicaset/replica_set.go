@@ -659,7 +659,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	// part of the filteredPods.
 	fullyLabeledReplicasCount := 0
 	readyReplicasCount := 0
-	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelector()
+	templateLabel := labels.Set(rs.Spec.Template.Labels).AsSelectorPreValidated()
 	for _, pod := range filteredPods {
 		if templateLabel.Matches(labels.Set(pod.Labels)) {
 			fullyLabeledReplicasCount++
