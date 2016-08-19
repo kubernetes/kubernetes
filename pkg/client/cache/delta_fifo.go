@@ -228,15 +228,21 @@ func (f *DeltaFIFO) AddIfNotPresent(obj interface{}) error {
 	}
 	f.lock.Lock()
 	defer f.lock.Unlock()
+	f.addIfNotPresent(id, deltas)
+	return nil
+}
+
+// addIfNotPresent inserts deltas under id if it does not exist, and assumes the caller
+// already holds the fifo lock.
+func (f *DeltaFIFO) addIfNotPresent(id string, deltas Deltas) {
 	f.populated = true
 	if _, exists := f.items[id]; exists {
-		return nil
+		return
 	}
 
 	f.queue = append(f.queue, id)
 	f.items[id] = deltas
 	f.cond.Broadcast()
-	return nil
 }
 
 // re-listing and watching can deliver the same update multiple times in any
@@ -387,7 +393,9 @@ func (f *DeltaFIFO) GetByKey(key string) (item interface{}, exists bool, err err
 // is returned, so if you don't successfully process it, you need to add it back
 // with AddIfNotPresent().
 // process function is called under lock, so it is safe update data structures
-// in it that need to be in sync with the queue (e.g. knownKeys).
+// in it that need to be in sync with the queue (e.g. knownKeys). The PopProcessFunc
+// may return an instance of ErrRequeue with a nested error to indicate the current
+// item should be requeued (equivalent to calling AddIfNotPresent under the lock).
 //
 // Pop returns a 'Deltas', which has a complete list of all the things
 // that happened to the object (deltas) while it was sitting in the queue.
@@ -409,9 +417,14 @@ func (f *DeltaFIFO) Pop(process PopProcessFunc) (interface{}, error) {
 			continue
 		}
 		delete(f.items, id)
+		err := process(item)
+		if e, ok := err.(ErrRequeue); ok {
+			f.addIfNotPresent(id, item)
+			err = e.Err
+		}
 		// Don't need to copyDeltas here, because we're transferring
 		// ownership to the caller.
-		return item, process(item)
+		return item, err
 	}
 }
 
