@@ -42,7 +42,7 @@ type thirdPartyObjectConverter struct {
 	converter runtime.ObjectConvertor
 }
 
-func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersion unversioned.GroupVersion) (out runtime.Object, err error) {
+func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersion runtime.GroupVersioner) (out runtime.Object, err error) {
 	switch in.(type) {
 	// This seems weird, but in this case the ThirdPartyResourceData is really just a wrapper on the raw 3rd party data.
 	// The actual thing printed/sent to server is the actual raw third party resource data, which only has one version.
@@ -53,8 +53,8 @@ func (t *thirdPartyObjectConverter) ConvertToVersion(in runtime.Object, outVersi
 	}
 }
 
-func (t *thirdPartyObjectConverter) Convert(in, out interface{}) error {
-	return t.converter.Convert(in, out)
+func (t *thirdPartyObjectConverter) Convert(in, out, context interface{}) error {
+	return t.converter.Convert(in, out, context)
 }
 
 func (t *thirdPartyObjectConverter) ConvertFieldLabel(version, kind, label, value string) (string, string, error) {
@@ -234,11 +234,11 @@ func (t *thirdPartyResourceDataCodecFactory) StreamingSerializerForMediaType(med
 	}
 }
 
-func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
-	return &thirdPartyResourceDataEncoder{delegate: t.delegate.EncoderForVersion(s, gv), gvk: gv.WithKind(t.kind)}
+func (t *thirdPartyResourceDataCodecFactory) EncoderForVersion(s runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	return &thirdPartyResourceDataEncoder{delegate: t.delegate.EncoderForVersion(s, gv), gvk: t.encodeGV.WithKind(t.kind)}
 }
 
-func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
+func (t *thirdPartyResourceDataCodecFactory) DecoderToVersion(s runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
 	return NewDecoder(t.delegate.DecoderToVersion(s, gv), t.kind)
 }
 
@@ -515,6 +515,10 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 				return err
 			}
 			listItems[ix] = json.RawMessage(buff.Bytes())
+		}
+
+		if t.gvk.IsEmpty() {
+			return fmt.Errorf("thirdPartyResourceDataEncoder was not given a target version")
 		}
 
 		encMap := struct {
