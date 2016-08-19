@@ -144,6 +144,9 @@ type Disks interface {
 	// zone can be provided to specify the zone for the PD,
 	// if empty all managed zones will be searched.
 	GetAutoLabelsForPD(name string, zone string) (map[string]string, error)
+
+	// CreateSnapshot creates a snapshot of a disk
+	CreateSnapshot(diskName string, snapshot *compute.Snapshot) error
 }
 
 func init() {
@@ -2530,6 +2533,20 @@ func (gce *GCECloud) DiskIsAttached(diskName, instanceID string) (bool, error) {
 	}
 
 	return false, nil
+}
+
+func (gce *GCECloud) CreateSnapshot(diskName string, snapshot *compute.Snapshot) error {
+	disk, err := gce.getDiskByNameUnknownZone(diskName)
+	if err != nil {
+		return err
+	}
+
+	createOp, err := gce.service.Disks.CreateSnapshot(gce.projectID, disk.Zone, disk.Name, snapshot).Do()
+	if err != nil {
+		return err
+	}
+
+	return gce.waitForZoneOp(createOp, disk.Zone)
 }
 
 // Returns a gceDisk for the disk, if it is found in the specified zone.
