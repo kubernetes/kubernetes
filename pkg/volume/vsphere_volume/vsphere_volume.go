@@ -371,7 +371,7 @@ type vsphereVolumeDeleter struct {
 
 var _ volume.Deleter = &vsphereVolumeDeleter{}
 
-func (plugin *vsphereVolumePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *vsphereVolumePlugin) NewDeleter(parameters map[string]string, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec, &VsphereDiskUtil{})
 }
 

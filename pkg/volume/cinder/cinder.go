@@ -143,7 +143,7 @@ func (plugin *cinderPlugin) newUnmounterInternal(volName string, podUID types.UI
 		}}, nil
 }
 
-func (plugin *cinderPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *cinderPlugin) NewDeleter(parameters map[string]string, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec, &CinderDiskUtil{})
 }
 

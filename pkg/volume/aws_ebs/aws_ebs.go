@@ -141,7 +141,7 @@ func (plugin *awsElasticBlockStorePlugin) newUnmounterInternal(volName string, p
 	}}, nil
 }
 
-func (plugin *awsElasticBlockStorePlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *awsElasticBlockStorePlugin) NewDeleter(parameters map[string]string, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec, &AWSDiskUtil{})
 }
 
