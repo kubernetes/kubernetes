@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -148,7 +149,9 @@ func NewVolumeManager(
 	volumePluginMgr *volume.VolumePluginMgr,
 	kubeContainerRuntime kubecontainer.Runtime,
 	mounter mount.Interface,
-	kubeletPodsDir string) (VolumeManager, error) {
+	kubeletPodsDir string,
+	recorder record.EventRecorder) (VolumeManager, error) {
+
 	vm := &volumeManager{
 		kubeClient:          kubeClient,
 		volumePluginMgr:     volumePluginMgr,
@@ -156,7 +159,8 @@ func NewVolumeManager(
 		actualStateOfWorld:  cache.NewActualStateOfWorld(hostName, volumePluginMgr),
 		operationExecutor: operationexecutor.NewOperationExecutor(
 			kubeClient,
-			volumePluginMgr),
+			volumePluginMgr,
+			recorder),
 	}
 
 	vm.reconciler = reconciler.NewReconciler(

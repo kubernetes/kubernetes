@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
 )
@@ -32,6 +33,7 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 	nodeInformer := informers.NewNodeInformer(fakeKubeClient, resyncPeriod)
 	pvcInformer := informers.NewPVCInformer(fakeKubeClient, resyncPeriod)
 	pvInformer := informers.NewPVInformer(fakeKubeClient, resyncPeriod)
+	fakeRecorder := &record.FakeRecorder{}
 
 	// Act
 	_, err := NewAttachDetachController(
@@ -41,7 +43,8 @@ func Test_NewAttachDetachController_Positive(t *testing.T) {
 		pvcInformer,
 		pvInformer,
 		nil, /* cloud */
-		nil /* plugins */)
+		nil, /* plugins */
+		fakeRecorder)
 
 	// Assert
 	if err != nil {
