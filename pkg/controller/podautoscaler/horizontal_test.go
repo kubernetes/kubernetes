@@ -284,9 +284,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 		var heapsterRawMemResponse []byte
 
 		if tc.useMetricsApi {
-			metrics := []*metrics_api.PodMetrics{}
+			metrics := metrics_api.PodMetricsList{}
 			for i, cpu := range tc.reportedLevels {
-				podMetric := &metrics_api.PodMetrics{
+				podMetric := metrics_api.PodMetrics{
 					ObjectMeta: v1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
@@ -306,7 +306,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 						},
 					},
 				}
-				metrics = append(metrics, podMetric)
+				metrics.Items = append(metrics.Items, podMetric)
 			}
 			heapsterRawMemResponse, _ = json.Marshal(&metrics)
 		} else {

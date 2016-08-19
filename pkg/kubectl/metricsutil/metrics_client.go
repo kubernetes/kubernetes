@@ -105,10 +105,12 @@ func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector strin
 	}
 	metrics := make([]metrics_api.NodeMetrics, 0)
 	if len(nodeName) == 0 {
-		err = json.Unmarshal(resultRaw, &metrics)
+		metricsList := metrics_api.NodeMetricsList{}
+		err = json.Unmarshal(resultRaw, &metricsList)
 		if err != nil {
 			return []metrics_api.NodeMetrics{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
 		}
+		metrics = append(metrics, metricsList.Items...)
 	} else {
 		var singleMetric metrics_api.NodeMetrics
 		err = json.Unmarshal(resultRaw, &singleMetric)
@@ -148,12 +150,12 @@ func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string
 			return []metrics_api.PodMetrics{}, err
 		}
 		if len(podName) == 0 {
-			metrics := make([]metrics_api.PodMetrics, 0)
+			metrics := metrics_api.PodMetricsList{}
 			err = json.Unmarshal(resultRaw, &metrics)
 			if err != nil {
 				return []metrics_api.PodMetrics{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
 			}
-			allMetrics = append(allMetrics, metrics...)
+			allMetrics = append(allMetrics, metrics.Items...)
 		} else {
 			var singleMetric metrics_api.PodMetrics
 			err = json.Unmarshal(resultRaw, &singleMetric)
