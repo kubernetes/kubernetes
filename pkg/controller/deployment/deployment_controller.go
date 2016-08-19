@@ -255,7 +255,6 @@ func (dc *DeploymentController) addReplicaSet(obj interface{}) {
 }
 
 // getDeploymentForReplicaSet returns the deployment managing the given ReplicaSet.
-// TODO: Surface that we are ignoring multiple deployments for a given ReplicaSet.
 func (dc *DeploymentController) getDeploymentForReplicaSet(rs *extensions.ReplicaSet) *extensions.Deployment {
 	deployments, err := dc.dStore.GetDeploymentsForReplicaSet(rs)
 	if err != nil || len(deployments) == 0 {
@@ -327,31 +326,20 @@ func (dc *DeploymentController) deleteReplicaSet(obj interface{}) {
 	}
 }
 
-// getDeploymentForPod returns the deployment managing the ReplicaSet that manages the given Pod.
+// getDeploymentForPod returns the deployment that manages the given Pod.
 // If there are multiple deployments for a given Pod, only return the oldest one.
 func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.Deployment {
-	rss, err := dc.rsStore.GetPodReplicaSets(pod)
-	if err != nil {
-		glog.V(4).Infof("Error: %v. No ReplicaSets found for pod %v, deployment controller will avoid syncing.", err, pod.Name)
+	deployments, err := dc.dStore.GetDeploymentsForPod(pod)
+	if err != nil || len(deployments) == 0 {
+		glog.V(4).Infof("Error: %v. No deployment found for Pod %v, deployment controller will avoid syncing.", err, pod.Name)
 		return nil
 	}
-	if len(rss) > 1 {
-		sort.Sort(rsByCreationTimestamp(rss))
-		glog.Errorf("user error! more than one replica set is selecting pod %s/%s with labels: %#v", pod.Namespace, pod.Name, pod.Labels)
+
+	if len(deployments) > 1 {
+		sort.Sort(byCreationTimestamp(deployments))
+		glog.Errorf("user error! more than one deployment is selecting pod %s/%s with labels: %#v, returning %s/%s", pod.Namespace, pod.Name, pod.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
-	for i := range rss {
-		rs := &rss[i]
-		deployments, err := dc.dStore.GetDeploymentsForReplicaSet(rs)
-		if err == nil && len(deployments) > 0 {
-			if len(deployments) > 1 {
-				sort.Sort(byCreationTimestamp(deployments))
-				glog.Errorf("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s", rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
-			}
-			return &deployments[0]
-		}
-	}
-	glog.V(4).Infof("No deployments found for pod %v, deployment controller will avoid syncing.", pod.Name)
-	return nil
+	return &deployments[0]
 }
 
 // When a pod is created, ensure its controller syncs
@@ -521,10 +509,13 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
 	// Relist all deployment in the same namespace for overlaps, and avoid syncing the newer overlapping ones (only sync the oldest one)
-	deployments, err := dc.dStore.Deployments(deployment.Namespace).List()
 	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
 	if err != nil {
 		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
+	}
+	deployments, err := dc.dStore.Deployments(d.Namespace).List(labels.Everything())
+	if err != nil {
+		return fmt.Errorf("error listing deployments in namespace %s: %v", d.Namespace, err)
 	}
 	overlapping := false
 	for i := range deployments {
@@ -539,7 +530,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 			// either with controller reference, or with validation.
 			// Using oldest active replica set to determine which deployment to skip wouldn't make much difference,
 			// since new replica set hasn't been created after selector update
-			if other.CreationTimestamp.Before(d.CreationTimestamp) {
+			if selectorUpdatedBefore(other, d) {
 				return fmt.Errorf("found deployment %s/%s has overlapping selector with an older deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
 			}
 		}
@@ -575,6 +566,25 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.rolloutRolling(d)
 	}
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
+}
+
+func selectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
+	t1, t2 := lastSelectorUpdate(d1), lastSelectorUpdate(d2)
+	return t1.Before(t2)
+}
+
+func lastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
+	t := d.Annotations[util.SelectorUpdateAnnotation]
+	if len(t) > 0 {
+		parsedTime, err := time.Parse(t, time.RFC3339)
+		// If failed to parse the time, use creation timestamp instead
+		if err != nil {
+			return d.CreationTimestamp
+		}
+		return unversioned.Time{parsedTime}
+	}
+	// If it's never updated, use creation timestamp instead
+	return d.CreationTimestamp
 }
 
 // byCreationTimestamp sorts a list of deployments by creation timestamp, using their names as a tie breaker.
