@@ -61,6 +61,13 @@ func (ls Set) AsSelector() Selector {
 	return SelectorFromSet(ls)
 }
 
+// ValidatedAsSelector converts labels into a selector, but
+// assumes that labels are already validated and thus don't
+// preform any validation.
+func (ls Set) ValidatedAsSelector() Selector {
+	return SelectorFromValidatedSet(ls)
+}
+
 // FormatLables convert label map into plain string
 func FormatLabels(labelMap map[string]string) string {
 	l := Set(labelMap).String()
