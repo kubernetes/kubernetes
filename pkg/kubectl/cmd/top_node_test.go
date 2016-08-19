@@ -23,31 +23,40 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 	"net/url"
 )
 
+const (
+	apiPrefix  = "api"
+	apiVersion = "v1"
+)
+
 func TestTopNodeAllMetrics(t *testing.T) {
 	initTestErrorHandler(t)
-	metrics := testNodeMetricsData()
-	expectedPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
+	metrics, nodes := testNodeMetricsData()
+	expectedMetricsPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
+	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	f, tf, _, ns := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
-			case p == expectedPath && m == "GET":
+			case p == expectedMetricsPath && m == "GET":
 				body, err := marshallBody(metrics)
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)
 				}
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+			case p == expectedNodePath && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, nodes)}, nil
 			default:
-				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
+				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedMetricsPath)
 				return nil, nil
 			}
 		}),
@@ -70,12 +79,14 @@ func TestTopNodeAllMetrics(t *testing.T) {
 
 func TestTopNodeWithNameMetrics(t *testing.T) {
 	initTestErrorHandler(t)
-	metrics := testNodeMetricsData()
+	metrics, nodes := testNodeMetricsData()
 	expectedMetrics := metrics[0]
+	expectedNode := &nodes.Items[0]
 	nonExpectedMetrics := metrics[1:]
 	expectedPath := fmt.Sprintf("%s/%s/nodes/%s", baseMetricsAddress, metricsApiVersion, expectedMetrics.Name)
+	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
-	f, tf, _, ns := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -87,6 +98,8 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 					t.Errorf("unexpected error: %v", err)
 				}
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+			case p == expectedNodePath && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, expectedNode)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
 				return nil, nil
@@ -114,14 +127,19 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 
 func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	initTestErrorHandler(t)
-	metrics := testNodeMetricsData()
+	metrics, nodes := testNodeMetricsData()
 	expectedMetrics := metrics[0:1]
+	expectedNodes := &api.NodeList{
+		ListMeta: nodes.ListMeta,
+		Items:    nodes.Items[0:1],
+	}
 	nonExpectedMetrics := metrics[1:]
 	label := "key=value"
 	expectedPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
 	expectedQuery := fmt.Sprintf("labelSelector=%s", url.QueryEscape(label))
+	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
-	f, tf, _, ns := NewAPIFactory()
+	f, tf, codec, ns := NewAPIFactory()
 	tf.Printer = &testPrinter{}
 	tf.Client = &fake.RESTClient{
 		NegotiatedSerializer: ns,
@@ -133,6 +151,8 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 					t.Errorf("unexpected error: %v", err)
 				}
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+			case p == expectedNodePath && m == "GET":
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, expectedNodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
 				return nil, nil
