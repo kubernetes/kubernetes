@@ -92,17 +92,16 @@ func NewCertificateRequest(privateKey interface{}, subject *pkix.Name, dnsSANs [
 
 	switch privateKey := privateKey.(type) {
 	case *ecdsa.PrivateKey:
-		switch privateKey.Curve.Params().BitSize {
-		case 512:
-			sigType = x509.ECDSAWithSHA512
-		case 384:
-			sigType = x509.ECDSAWithSHA384
-		case 256:
+		switch ecdsaKey.Curve {
+		case elliptic.P224(), elliptic.P256():
 			sigType = x509.ECDSAWithSHA256
+		case elliptic.P384():
+			sigType = x509.ECDSAWithSHA384
+		case elliptic.P521():
+			sigType = x509.ECDSAWithSHA512
 		default:
-			return nil, fmt.Errorf("unknown ECDSA size: %d", privateKey.Curve.Params().BitSize)
+			return nil, fmt.Errorf("unknown elliptic curve: %v", ecdsaKey.Curve)
 		}
-
 	case *rsa.PrivateKey:
 		keySize := privateKey.N.BitLen()
 		switch {

@@ -206,10 +206,12 @@ func RequestClientCertificate(client unversionedcertificates.CertificateSigningR
 	}
 
 	req, err := client.Create(&certificates.CertificateSigningRequest{
+		// Username, UID, Groups will be injected by API server.
 		TypeMeta:   unversioned.TypeMeta{Kind: "CertificateSigningRequest"},
 		ObjectMeta: api.ObjectMeta{GenerateName: "csr-"},
 
-		// Username, UID, Groups will be injected by API server.
+		// TODO: For now, this is a request for a certificate with allowed usage of "TLS Web Client Authentication".
+		// Need to figure out whether/how to surface the allowed usage in the spec.
 		Spec: certificates.CertificateSigningRequestSpec{Request: csr},
 	})
 	if err != nil {
