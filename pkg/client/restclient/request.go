@@ -126,8 +126,8 @@ func NewRequest(client HTTPClient, verb string, urlProvider URLProvider, version
 		backoff = &NoBackoff{}
 	}
 	pathPrefix := "/"
-	if url := urlProvider.Get(); url != nil {
-		pathPrefix = path.Join(pathPrefix, url.Path)
+	if u := urlProvider.Get(); u != nil {
+		pathPrefix = path.Join(pathPrefix, u.Path)
 	}
 	r := &Request{
 		client:      client,
@@ -260,10 +260,9 @@ func (r *Request) AbsPath(segments ...string) *Request {
 	if r.err != nil {
 		return r
 	}
-	baseUrl := r.urlProvider.Get()
 	prefix := "/"
-	if baseUrl != nil {
-		prefix = baseUrl.Path
+	if u := r.urlProvider.Get(); u != nil {
+		prefix = u.Path
 	}
 	r.pathPrefix = path.Join(prefix, path.Join(segments...))
 	if len(segments) == 1 && (len(prefix) > 1 || len(segments[0]) > 1) && strings.HasSuffix(segments[0], "/") {
