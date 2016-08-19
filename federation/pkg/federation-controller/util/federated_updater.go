@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"time"
 
-	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
+	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 )
 
@@ -50,7 +50,7 @@ type FederatedUpdater interface {
 }
 
 // A function that executes some operation using the passed client and object.
-type FederatedOperationHandler func(federation_release_1_4.Interface, pkg_runtime.Object) error
+type FederatedOperationHandler func(kube_release_1_4.Interface, pkg_runtime.Object) error
 
 type federatedUpdaterImpl struct {
 	federation FederationView
