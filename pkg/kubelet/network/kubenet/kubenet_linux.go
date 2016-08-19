@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
+	utilebtables "k8s.io/kubernetes/pkg/util/ebtables"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -56,7 +57,13 @@ const (
 	sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
 
 	// private mac prefix safe to use
+	// Universally administered and locally administered addresses are distinguished by setting the second-least-significant
+	// bit of the first octet of the address. If it is 1, the address is locally administered. For example, for address 0a:00:00:00:00:00,
+	// the first cotet is 0a(hex), the binary form of which is 00001010, where the second-least-significant bit is 1.
 	privateMACPrefix = "0a:58"
+
+	// ebtables Chain to store dedup rules
+	dedupChain = utilebtables.Chain("KUBE-DEDUP")
 )
 
 type kubenetNetworkPlugin struct {
@@ -75,12 +82,13 @@ type kubenetNetworkPlugin struct {
 	hairpinMode     componentconfig.HairpinMode
 	hostportHandler hostport.HostportHandler
 	iptables        utiliptables.Interface
+	ebtables        utilebtables.Interface
 	// vendorDir is passed by kubelet network-plugin-dir parameter.
 	// kubenet will search for cni binaries in DefaultCNIDir first, then continue to vendorDir.
 	vendorDir         string
 	nonMasqueradeCIDR string
-	podCidr		  string
-	gateway		  net.IP
+	podCidr           string
+	gateway           net.IP
 }
 
 func NewPlugin(networkPluginDir string) network.NetworkPlugin {
@@ -325,7 +333,6 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		return fmt.Errorf("CNI plugin reported an invalid IPv4 address for container %v: %+v.", id, res.IP4)
 	}
 
-
 	// Explicitly assign mac address to cbr0. If bridge mac address is not explicitly set will adopt the lowest MAC address of the attached veths.
 	// TODO: Remove this once upstream cni bridge plugin handles this
 	link, err := netlink.LinkByName(BridgeName)
@@ -353,8 +360,8 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
 			}
 		}
-
-
+		// configure the ebtables rules to eliminate duplicate packets by best effort
+		plugin.syncEbtablesDedupRules(macAddr)
 	}
 
 	// The first SetUpPod call creates the bridge; get a shaper for the sake of
@@ -599,6 +606,48 @@ func (plugin *kubenetNetworkPlugin) shaper() bandwidth.BandwidthShaper {
 		plugin.bandwidthShaper.ReconcileInterface()
 	}
 	return plugin.bandwidthShaper
+}
+
+func (plugin *kubenetNetworkPlugin) syncEbtablesDedupRules(macAddr net.HardwareAddr) {
+	if plugin.ebtables == nil {
+		plugin.ebtables = utilebtables.New(plugin.execer)
+		glog.V(3).Infof("Deleting dedup chain")
+		if err := plugin.ebtables.DeleteChain(utilebtables.TableFilter, dedupChain); err != nil {
+			glog.Errorf("Failed to delete dedup chain: %v", err)
+			return
+		}
+	}
+	_, err := plugin.ebtables.GetVersion()
+	if err != nil {
+		glog.Warningf("Failed to get ebtables version. Skip syncing ebtables dedup rules: %v", err)
+		return
+	}
+
+	glog.V(3).Infof("Filtering packets with ebtables on mac address: %v, gateway: %v, pod CIDR: %v", macAddr.String(), plugin.gateway.String(), plugin.podCidr)
+	_, err = plugin.ebtables.EnsureChain(utilebtables.TableFilter, dedupChain)
+	if err != nil {
+		glog.Errorf("Failed to ensure %v chain %v", utilebtables.TableFilter, dedupChain)
+		return
+	}
+
+	_, err = plugin.ebtables.EnsureRule(utilebtables.Append, utilebtables.TableFilter, utilebtables.ChainOutput, "-j", string(dedupChain))
+	if err != nil {
+		glog.Errorf("Failed to ensure %v chain %v jump to %v chain: %v", utilebtables.TableFilter, utilebtables.ChainOutput, dedupChain, err)
+		return
+	}
+
+	commonArgs := []string{"-p", "IPv4", "-s", macAddr.String(), "-o", "veth+"}
+	_, err = plugin.ebtables.EnsureRule(utilebtables.Prepend, utilebtables.TableFilter, dedupChain, append(commonArgs, "--ip-src", plugin.gateway.String(), "-j", "ACCEPT")...)
+	if err != nil {
+		glog.Errorf("Failed to ensure packets from cbr0 gateway to be accepted")
+		return
+
+	}
+	_, err = plugin.ebtables.EnsureRule(utilebtables.Append, utilebtables.TableFilter, dedupChain, append(commonArgs, "--ip-src", plugin.podCidr, "-j", "DROP")...)
+	if err != nil {
+		glog.Errorf("Failed to ensure packets from podCidr but has mac address of cbr0 to get dropped.")
+		return
+	}
 }
 
 // generateHardwareAddr generates 48 bit virtual mac addresses based on the IP input.

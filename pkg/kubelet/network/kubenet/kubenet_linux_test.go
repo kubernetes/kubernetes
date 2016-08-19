@@ -188,5 +188,4 @@ func TestGenerateMacAddress(t *testing.T) {
 	}
 }
 
-
 //TODO: add unit test for each implementation of network plugin interface
