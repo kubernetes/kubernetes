@@ -148,6 +148,7 @@ func (e *E2EServices) startInternalServices() (*server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("can't get current binary: %v", err)
 	}
+	// Pass all flags into the child process, so that it will see the same flag set.
 	startCmd := exec.Command(testBin, append([]string{"--run-services-mode"}, os.Args[1:]...)...)
 	server := newServer("services", startCmd, nil, nil, getServicesHealthCheckURLs(), servicesLogFile, e.monitorParent, false)
 	return server, server.start()
