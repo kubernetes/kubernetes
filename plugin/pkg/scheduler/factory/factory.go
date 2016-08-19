@@ -20,6 +20,7 @@ package factory
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -79,6 +80,11 @@ type ConfigFactory struct {
 
 	scheduledPodPopulator *framework.Controller
 	nodePopulator         *framework.Controller
+	PodPopulator          *framework.Controller
+	pvPopulator           *framework.Controller
+	pvcPopulator          *framework.Controller
+	servicePopulator      *framework.Controller
+	controllerPopulator   *framework.Controller
 
 	schedulerCache schedulercache.Cache
 
@@ -94,6 +100,9 @@ type ConfigFactory struct {
 
 	// Indicate the "all topologies" set for empty topologyKey when it's used for PreferredDuringScheduling pod anti-affinity.
 	FailureDomains string
+
+	// Equivalence class cache
+	EquivalencePodCache *scheduler.EquivalenceCache
 }
 
 // Initializes the factory.
@@ -148,6 +157,83 @@ func NewConfigFactory(client *client.Client, schedulerName string, hardPodAffini
 		},
 	)
 
+	c.PVLister.Store, c.pvPopulator = framework.NewInformer(
+		c.createPersistentVolumeLW(),
+		&api.PersistentVolume{},
+		0,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc: func(_ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+			UpdateFunc: func(_, _ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+			DeleteFunc: func(_ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+		},
+	)
+
+	c.PVCLister.Store, c.pvcPopulator = framework.NewInformer(
+		c.createPersistentVolumeClaimLW(),
+		&api.PersistentVolumeClaim{},
+		0,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc: func(_ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+			UpdateFunc: func(_, _ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+			DeleteFunc: func(_ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+		},
+	)
+
+	c.ServiceLister.Store, c.servicePopulator = framework.NewInformer(
+		c.createServiceLW(),
+		&api.Service{},
+		0,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc: func(_ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldService := oldObj.(api.Service)
+				newService := newObj.(api.Service)
+				if !reflect.DeepEqual(oldService.Spec.Selector, newService.Spec.Selector) {
+					c.EquivalencePodCache.SendClearAllCacheReq()
+				}
+			},
+			DeleteFunc: func(_ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+		},
+	)
+
+	c.ControllerLister.Indexer, c.controllerPopulator = framework.NewIndexerInformer(
+		c.createControllerLW(),
+		&api.ReplicationController{},
+		0,
+		framework.ResourceEventHandlerFuncs{
+			AddFunc: func(_ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				oldRC := oldObj.(api.ReplicationController)
+				newRC := newObj.(api.ReplicationController)
+				if !reflect.DeepEqual(oldRC.Spec.Selector, newRC.Spec.Selector) {
+					c.EquivalencePodCache.SendClearAllCacheReq()
+				}
+			},
+			DeleteFunc: func(_ interface{}) {
+				c.EquivalencePodCache.SendClearAllCacheReq()
+			},
+		},
+		cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+	)
+
 	return c
 }
 
@@ -183,12 +269,18 @@ func (c *ConfigFactory) deletePodFromCache(obj interface{}) {
 	switch t := obj.(type) {
 	case *api.Pod:
 		pod = t
+		if pod.Spec.NodeName != "" {
+			c.EquivalencePodCache.SendInvalidAlgorithmCacheReq(pod.Spec.NodeName)
+		}
 	case cache.DeletedFinalStateUnknown:
 		var ok bool
 		pod, ok = t.Obj.(*api.Pod)
 		if !ok {
 			glog.Errorf("cannot convert to *api.Pod: %v", t.Obj)
 			return
+		}
+		if pod.Spec.NodeName != "" {
+			c.EquivalencePodCache.SendInvalidAlgorithmCacheReq(pod.Spec.NodeName)
 		}
 	default:
 		glog.Errorf("cannot convert to *api.Pod: %v", t)
@@ -224,6 +316,10 @@ func (c *ConfigFactory) updateNodeInCache(oldObj, newObj interface{}) {
 	if err := c.schedulerCache.UpdateNode(oldNode, newNode); err != nil {
 		glog.Errorf("scheduler cache UpdateNode failed: %v", err)
 	}
+
+	if !reflect.DeepEqual(oldNode.Labels, newNode.Labels) {
+		c.EquivalencePodCache.SendInvalidAlgorithmCacheReq(oldNode.Name)
+	}
 }
 
 func (c *ConfigFactory) deleteNodeFromCache(obj interface{}) {
@@ -231,6 +327,7 @@ func (c *ConfigFactory) deleteNodeFromCache(obj interface{}) {
 	switch t := obj.(type) {
 	case *api.Node:
 		node = t
+		c.EquivalencePodCache.SendInvalidAlgorithmCacheReq(node.Name)
 	case cache.DeletedFinalStateUnknown:
 		var ok bool
 		node, ok = t.Obj.(*api.Node)
@@ -238,6 +335,7 @@ func (c *ConfigFactory) deleteNodeFromCache(obj interface{}) {
 			glog.Errorf("cannot convert to *api.Node: %v", t.Obj)
 			return
 		}
+		c.EquivalencePodCache.SendInvalidAlgorithmCacheReq(node.Name)
 	default:
 		glog.Errorf("cannot convert to *api.Node: %v", t)
 		return
@@ -316,9 +414,15 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		return nil, err
 	}
 
+	// Init equivalence class cache
+	if getEquivalencePodFunc != nil {
+		f.EquivalencePodCache = scheduler.NewEquivalenceCache(getEquivalencePodFunc)
+		glog.Info("Create equivalence class cache")
+	}
+
 	f.Run()
 
-	algo := scheduler.NewGenericScheduler(f.schedulerCache, predicateFuncs, priorityConfigs, extenders)
+	algo := scheduler.NewGenericScheduler(f.schedulerCache, f.EquivalencePodCache, predicateFuncs, priorityConfigs, extenders)
 
 	podBackoff := podBackoff{
 		perPodBackoff: map[types.NamespacedName]*backoffEntry{},
@@ -394,20 +498,15 @@ func (f *ConfigFactory) Run() {
 	// Begin populating nodes.
 	go f.nodePopulator.Run(f.StopEverything)
 
-	// Watch PVs & PVCs
-	// They may be listed frequently for scheduling constraints, so provide a local up-to-date cache.
-	cache.NewReflector(f.createPersistentVolumeLW(), &api.PersistentVolume{}, f.PVLister.Store, 0).RunUntil(f.StopEverything)
-	cache.NewReflector(f.createPersistentVolumeClaimLW(), &api.PersistentVolumeClaim{}, f.PVCLister.Store, 0).RunUntil(f.StopEverything)
+	// Begin populating pv & pvc
+	go f.pvPopulator.Run(f.StopEverything)
+	go f.pvcPopulator.Run(f.StopEverything)
 
-	// Watch and cache all service objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
-	// Cache this locally.
-	cache.NewReflector(f.createServiceLW(), &api.Service{}, f.ServiceLister.Store, 0).RunUntil(f.StopEverything)
+	// Begin populating pv & pvc
+	go f.servicePopulator.Run(f.StopEverything)
 
-	// Watch and cache all ReplicationController objects. Scheduler needs to find all pods
-	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
-	// Cache this locally.
-	cache.NewReflector(f.createControllerLW(), &api.ReplicationController{}, f.ControllerLister.Indexer, 0).RunUntil(f.StopEverything)
+	// Begin populating controllers
+	go f.controllerPopulator.Run(f.StopEverything)
 
 	// Watch and cache all ReplicaSet objects. Scheduler needs to find all pods
 	// created by the same services or ReplicationControllers/ReplicaSets, so that it can spread them correctly.
