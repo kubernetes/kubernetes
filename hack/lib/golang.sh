@@ -506,6 +506,7 @@ kube::golang::build_binaries_for_platform() {
       local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
       CGO_ENABLED=1 go build -o "${outfile}" \
         "${goflags[@]:+${goflags[@]}}" \
+        -tags "static_build" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags} -extldflags \"-static\"" \
         "${binary}"
@@ -524,6 +525,7 @@ kube::golang::build_binaries_for_platform() {
     if [[ "${#nonstatics[@]}" != 0 ]]; then
       CGO_ENABLED=1 go install \
         "${goflags[@]:+${goflags[@]}}" \
+        -tags "static_build" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags} -extldflags \"-static\"" \
         "${nonstatics[@]:+${nonstatics[@]}}"
@@ -558,6 +560,7 @@ kube::golang::build_binaries_for_platform() {
     # test package.
     go install \
         "${goflags[@]:+${goflags[@]}}" \
+        -tags "static_build" \
         -gcflags "${gogcflags}" \
         -ldflags "${goldflags} -extldflags \"-static\"" \
         "${testpkg}"
@@ -565,6 +568,7 @@ kube::golang::build_binaries_for_platform() {
     mkdir -p "$(dirname ${outfile})"
     go test -c \
       "${goflags[@]:+${goflags[@]}}" \
+      -tags "static_build" \
       -gcflags "${gogcflags}" \
       -ldflags "${goldflags} -extldflags \"-static\"" \
       -o "${outfile}" \
