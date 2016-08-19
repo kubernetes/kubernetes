@@ -286,6 +286,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		StandaloneMode:                 (len(s.APIServerList) == 0),
 		StreamingConnectionIdleTimeout: s.StreamingConnectionIdleTimeout.Duration,
 		SyncFrequency:                  s.SyncFrequency.Duration,
+		SysctlWhitelist:                s.SysctlWhitelist,
 		SystemCgroups:                  s.SystemCgroups,
 		TLSOptions:                     tlsOptions,
 		Writer:                         writer,
@@ -919,6 +920,7 @@ type KubeletConfig struct {
 	StandaloneMode                 bool
 	StreamingConnectionIdleTimeout time.Duration
 	SyncFrequency                  time.Duration
+	SysctlWhitelist                []string
 	SystemCgroups                  string
 	TLSOptions                     *server.TLSOptions
 	Writer                         io.Writer
@@ -1036,6 +1038,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.MakeIPTablesUtilChains,
 		kc.iptablesMasqueradeBit,
 		kc.iptablesDropBit,
+		kc.SysctlWhitelist,
 	)
 
 	if err != nil {

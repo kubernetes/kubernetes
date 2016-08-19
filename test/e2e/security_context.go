@@ -26,7 +26,9 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/util/uuid"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -131,6 +133,44 @@ var _ = framework.KubeDescribe("Security Context [Feature:SecurityContext]", fun
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring(`Invalid value: "net.foo-bar"`))
 		Expect(err.Error()).To(ContainSubstring(`Forbidden: sysctl "vm.swappiness" cannot be set in a pod`))
+	})
+
+	It("should not launch greylisted, but not whitelisted sysctls on the node", func() {
+		sysctl := "kernel.msgmax"
+		pod := scTestPod(false, false)
+		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
+			{
+				Name:  sysctl,
+				Value: "10000000000",
+			},
+		})
+
+		By("Creating a pod with a greylisted, but not whitelisted sysctl on the node")
+		client := f.Client.Pods(f.Namespace.Name)
+		pod, err := client.Create(pod)
+		ExpectNoError(err)
+		defer client.Delete(pod.Name, nil)
+
+		By("Watching for error events")
+		var failEv api.Event
+		err = wait.Poll(framework.Poll, framework.PodStartTimeout, func() (bool, error) {
+			es, err := f.Client.Events(f.Namespace.Name).Search(pod)
+			if err != nil {
+				return false, fmt.Errorf("error in listing events: %s", err)
+			}
+			for _, e := range es.Items {
+				if e.Reason == events.FailedSync {
+					failEv = e
+					return true, nil
+				}
+			}
+			return false, nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+
+		// the exact error message might depend on the container runtime. But
+		// at least it should say something about the non-namespaces sysctl.
+		Expect(failEv.Message).Should(ContainSubstring(sysctl))
 	})
 
 	It("should support volume SELinux relabeling", func() {

@@ -167,6 +167,7 @@ experimental-flannel-overlay
 experimental-keystone-url
 experimental-nvidia-gpus
 experimental-prefix
+experimental-sysctl-whitelist
 external-hostname
 external-ip
 extra-peer-dirs

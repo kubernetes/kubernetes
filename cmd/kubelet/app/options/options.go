@@ -176,6 +176,7 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.BoolVar(&s.MakeIPTablesUtilChains, "make-iptables-util-chains", s.MakeIPTablesUtilChains, "If true, kubelet will ensure iptables utility rules are present on host.")
 	fs.Int32Var(&s.IPTablesMasqueradeBit, "iptables-masquerade-bit", s.IPTablesMasqueradeBit, "The bit of the fwmark space to mark packets for SNAT. Must be within the range [0, 31]. Please match this parameter with corresponding parameter in kube-proxy.")
 	fs.Int32Var(&s.IPTablesDropBit, "iptables-drop-bit", s.IPTablesDropBit, "The bit of the fwmark space to mark packets for dropping. Must be within the range [0, 31].")
+	fs.StringSliceVar(&s.SysctlWhitelist, "experimental-sysctl-whitelist", s.SysctlWhitelist, "Comma-separated whitelist of sysctls or sysctl patterns (ending in *).")
 
 	// Flags intended for testing, not recommended used in production environments.
 	fs.BoolVar(&s.ReallyCrashForTesting, "really-crash-for-testing", s.ReallyCrashForTesting, "If true, when panics occur crash. Intended for testing.")

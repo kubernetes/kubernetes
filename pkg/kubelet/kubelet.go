@@ -65,6 +65,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/kubelet/util/ioutils"
@@ -247,6 +248,7 @@ func NewMainKubelet(
 	makeIPTablesUtilChains bool,
 	iptablesMasqueradeBit int,
 	iptablesDropBit int,
+	sysctlWhitelist []string,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -403,6 +405,11 @@ func NewMainKubelet(
 	}
 
 	machineInfo, err := klet.GetCachedMachineInfo()
+	if err != nil {
+		return nil, err
+	}
+
+	klet.sysctlWhitelist, err = sysctl.NewWhitelist(sysctlWhitelist)
 	if err != nil {
 		return nil, err
 	}
@@ -861,6 +868,9 @@ type Kubelet struct {
 
 	// The bit of the fwmark space to mark packets for dropping.
 	iptablesDropBit int
+
+	// allowed sysctls for this node
+	sysctlWhitelist *sysctl.Whitelist
 }
 
 // setupDataDirs creates:
@@ -1627,7 +1637,11 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	kl.statusManager.SetPodStatus(pod, apiPodStatus)
 
 	// Kill pod if it should not be running
-	if errOuter := canRunPod(pod); errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
+	errOuter := canRunPod(pod)
+	if errOuter == nil {
+		errOuter = kl.sysctlWhitelist.Validate(pod)
+	}
+	if errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
 		if errInner := kl.killPod(pod, nil, podStatus, nil); errInner != nil {
 			errOuter = fmt.Errorf("error killing pod: %v", errInner)
 			utilruntime.HandleError(errOuter)
