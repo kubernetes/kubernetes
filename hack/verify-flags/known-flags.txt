@@ -164,6 +164,7 @@ executor-logv
 executor-path
 executor-suicide-timeout
 exit-on-lock-contention
+experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
 experimental-flannel-overlay
 experimental-keystone-url
