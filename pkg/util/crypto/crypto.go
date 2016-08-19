@@ -33,14 +33,14 @@ import (
 	"time"
 )
 
-// ShouldGenSelfSignedCerts returns false if the certificate or key files already exists,
-// otherwise returns true.
-func ShouldGenSelfSignedCerts(certPath, keyPath string) bool {
+// FoundCertOrKey returns true if the certificate or key files already exists,
+// otherwise returns false.
+func FoundCertOrKey(certPath, keyPath string) bool {
 	if canReadFile(certPath) || canReadFile(keyPath) {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }
 
 // If the file represented by path exists and
