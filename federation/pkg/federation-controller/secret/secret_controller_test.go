@@ -18,6 +18,7 @@ package secret
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -77,15 +78,23 @@ func TestSecretController(t *testing.T) {
 
 	secret1 := api_v1.Secret{
 		ObjectMeta: api_v1.ObjectMeta{
-			Name: "test-secret",
+			Name:      "test-secret",
+			Namespace: "mynamespace",
 		},
+		Data: map[string][]byte{
+			"A": []byte("ala ma kota"),
+			"B": []byte("quick brown fox"),
+		},
+		Type: api_v1.SecretTypeOpaque,
 	}
 
 	// Test add federated secret.
 	secretWatch.Add(&secret1)
 	createdSecret := GetSecretFromChan(cluster1CreateChan)
 	assert.NotNil(t, createdSecret)
+	assert.Equal(t, secret1.Namespace, createdSecret.Namespace)
 	assert.Equal(t, secret1.Name, createdSecret.Name)
+	assert.True(t, reflect.DeepEqual(&secret1, createdSecret))
 
 	// Test update federated secret.
 	secret1.Annotations = map[string]string{
@@ -95,12 +104,16 @@ func TestSecretController(t *testing.T) {
 	updatedSecret := GetSecretFromChan(cluster1UpdateChan)
 	assert.NotNil(t, updatedSecret)
 	assert.Equal(t, secret1.Name, updatedSecret.Name)
+	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
+	assert.True(t, reflect.DeepEqual(&secret1, updatedSecret))
 
 	// Test add cluster
 	clusterWatch.Add(cluster2)
 	createdSecret2 := GetSecretFromChan(cluster2CreateChan)
 	assert.NotNil(t, createdSecret2)
 	assert.Equal(t, secret1.Name, createdSecret2.Name)
+	assert.Equal(t, secret1.Namespace, createdSecret2.Namespace)
+	assert.True(t, reflect.DeepEqual(&secret1, createdSecret2))
 
 	close(stop)
 }
