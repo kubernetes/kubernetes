@@ -136,6 +136,7 @@ func (templater *templater) UsageFunc(exposedFlags ...string) func(*cobra.Comman
 		t.Funcs(template.FuncMap{
 			"trim":                strings.TrimSpace,
 			"trimRight":           func(s string) string { return strings.TrimRightFunc(s, unicode.IsSpace) },
+			"trimLeft":            func(s string) string { return strings.TrimLeftFunc(s, unicode.IsSpace) },
 			"gt":                  cobra.Gt,
 			"eq":                  cobra.Eq,
 			"rpad":                rpad,
@@ -143,6 +144,7 @@ func (templater *templater) UsageFunc(exposedFlags ...string) func(*cobra.Comman
 			"flagsNotIntersected": flagsNotIntersected,
 			"visibleFlags":        visibleFlags,
 			"flagsUsages":         flagsUsages,
+			"indentLines":         indentLines,
 			"cmdGroups":           templater.cmdGroups,
 			"rootCmd":             templater.rootCmdName,
 			"isRootCmd":           templater.isRootCmd,
@@ -258,6 +260,15 @@ func flagsUsages(f *flag.FlagSet) string {
 func rpad(s string, padding int) string {
 	template := fmt.Sprintf("%%-%ds", padding)
 	return fmt.Sprintf(template, s)
+}
+
+func indentLines(s string, indentation int) string {
+	r := []string{}
+	for _, line := range strings.Split(s, "\n") {
+		indented := strings.Repeat(" ", indentation) + line
+		r = append(r, indented)
+	}
+	return strings.Join(r, "\n")
 }
 
 func appendIfNotPresent(s, stringToAppend string) string {

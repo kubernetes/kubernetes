@@ -51,22 +51,44 @@ const (
 
 	mainHelpTemplate = `{{with or .Long .Short }}{{. | trim}}{{end}}{{if or .Runnable .HasSubCommands}}{{.UsageString}}{{end}}`
 
-	mainUsageTemplate = vars + `{{if gt .Aliases 0}}
+	mainUsageTemplate = vars +
+		// ALIASES
+		`{{if gt .Aliases 0}}
+
 Aliases:
-  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+{{.NameAndAliases}}{{end}}` +
+
+		// EXAMPLES
+		`{{if .HasExample}}
 
 Examples:
-{{ .Example | trimRight}}
-{{end}}{{ if .HasAvailableSubCommands}}{{range cmdGroups . .Commands}}
-{{.Message}}{{range .Commands}}{{if .Runnable}}
-  {{rpad .Name .NamePadding }} {{.Short}}{{end}}{{end}}
-{{end}}{{end}}{{ if or $visibleFlags.HasFlags $explicitlyExposedFlags.HasFlags}}
-Options:
-{{ if $visibleFlags.HasFlags}}{{flagsUsages $visibleFlags}}{{end}}{{ if $explicitlyExposedFlags.HasFlags}}{{flagsUsages $explicitlyExposedFlags}}{{end}}{{end}}
+{{ indentLines (.Example | trimLeft) 2 }}{{end}}` +
 
-Usage:{{if and .Runnable (ne .UseLine "") (ne .UseLine $rootCmd)}}
-  {{if .HasFlags}}{{appendIfNotPresent .UseLine "[flags]"}}{{else}}{{.UseLine}}{{end}}{{end}}{{ if .HasSubCommands }}
-Use "{{$rootCmd}} <command> --help" for more information about a given command.{{end}}{{ if $optionsCmdFor}}
+		// SUBCOMMANDS
+		`{{ if .HasAvailableSubCommands}}
+{{range cmdGroups . .Commands}}
+{{.Message}}
+{{range .Commands}}{{if .Runnable}}  {{rpad .Name .NamePadding }} {{.Short}}
+{{end}}{{end}}{{end}}{{end}}` +
+
+		// VISIBLE FLAGS
+		`{{ if or $visibleFlags.HasFlags $explicitlyExposedFlags.HasFlags}}
+
+Options:
+{{ if $visibleFlags.HasFlags}}{{flagsUsages $visibleFlags}}{{end}}{{ if $explicitlyExposedFlags.HasFlags}}{{flagsUsages $explicitlyExposedFlags}}{{end}}{{end}}` +
+
+		// USAGE LINE
+		`{{if and .Runnable (ne .UseLine "") (ne .UseLine $rootCmd)}}
+Usage:
+  {{$usageLine}}
+{{end}}` +
+
+		// TIPS: --help
+		`{{ if .HasSubCommands }}
+Use "{{$rootCmd}} <command> --help" for more information about a given command.{{end}}` +
+
+		// TIPS: global options
+		`{{ if $optionsCmdFor}}
 Use "{{$optionsCmdFor}}" for a list of global command-line options (applies to all commands).{{end}}`
 
 	optionsHelpTemplate = ``
