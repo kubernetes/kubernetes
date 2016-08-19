@@ -511,6 +511,7 @@ watch-cache
 watch-cache-sizes
 watch-only
 whitelist-override-label
+whitelist-sysctls
 windows-line-endings
 www-prefix
 zone-name

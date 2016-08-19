@@ -57,6 +57,7 @@ import (
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -252,6 +253,11 @@ func newTestKubeletWithImageList(
 		kubelet.getPodsDir())
 	if err != nil {
 		t.Fatalf("failed to initialize volume manager: %v", err)
+	}
+
+	kubelet.sysctlWhitelist, err = sysctl.NewWhitelist([]string{"kernel.msg*"})
+	if err != nil {
+		t.Fatalf("failed to create sysctl whitelist: %v", err)
 	}
 
 	// enable active deadline handler
