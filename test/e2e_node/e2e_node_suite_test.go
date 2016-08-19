@@ -172,12 +172,11 @@ func validateSystem() error {
 	if err != nil {
 		return fmt.Errorf("can't get current binary: %v", err)
 	}
-	// TODO(random-liu): Remove sudo in containerize PR.
-	output, err := exec.Command("sudo", testBin, "--system-validate-mode").CombinedOutput()
+	output, err := exec.Command(testBin, append([]string{"--system-validate-mode"}, os.Args[1:]...)...).CombinedOutput()
 	// The output of system validation should have been formatted, directly print here.
 	fmt.Print(string(output))
 	if err != nil {
-		return fmt.Errorf("system validation failed")
+		return fmt.Errorf("system validation failed: %v", err)
 	}
 	return nil
 }
@@ -190,7 +189,7 @@ func maskLocksmithdOnCoreos() {
 		return
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
-		output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput()
+		output, err := exec.Command("systemctl", "mask", "--now", "locksmithd").CombinedOutput()
 		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
 		glog.Infof("Locksmithd is masked successfully")
 	}
