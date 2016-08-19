@@ -142,6 +142,7 @@ list when adding new short flags
 
   * `-f`: Resource file
     * also used for `--follow` in `logs`, but should be deprecated in favor of `-F`
+  * `-n`: Namespace scope
   * `-l`: Label selector
     * also used for `--labels` in `expose`, but should be deprecated
   * `-L`: Label columns
