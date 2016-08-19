@@ -22,24 +22,15 @@ import (
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
-// RuntimeService interface should be implemented by a container runtime.
-// The methods should be thread-safe.
-type RuntimeService interface {
+// RuntimeVersioner contains methods for runtime name, version and API version.
+type RuntimeVersioner interface {
 	// Version returns the runtime name, runtime version and runtime API version
 	Version(apiVersion string) (*runtimeApi.VersionResponse, error)
-	// CreatePodSandbox creates a pod-level sandbox.
-	// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
-	CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (string, error)
-	// StopPodSandbox stops the sandbox. If there are any running containers in the
-	// sandbox, they should be force terminated.
-	StopPodSandbox(podSandboxID string) error
-	// RemovePodSandbox removes the sandbox. If there are running containers in the
-	// sandbox, they should be forcibly removed.
-	RemovePodSandbox(podSandboxID string) error
-	// PodSandboxStatus returns the Status of the PodSandbox.
-	PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error)
-	// ListPodSandbox returns a list of Sandbox.
-	ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error)
+}
+
+// ContainerManager contains methods to manipulate containers managed by a
+// container runtime. The methods are thread-safe.
+type ContainerManager interface {
 	// CreateContainer creates a new container in specified PodSandbox.
 	CreateContainer(podSandboxID string, config *runtimeApi.ContainerConfig, sandboxConfig *runtimeApi.PodSandboxConfig) (string, error)
 	// StartContainer starts the container.
@@ -54,6 +45,32 @@ type RuntimeService interface {
 	ContainerStatus(containerID string) (*runtimeApi.ContainerStatus, error)
 	// Exec executes a command in the container.
 	Exec(containerID string, cmd []string, tty bool, stdin io.Reader, stdout, stderr io.WriteCloser) error
+}
+
+// PodSandboxManager contains methods for operating on PodSandboxes. The methods
+// are thread-safe.
+type PodSandboxManager interface {
+	// CreatePodSandbox creates a pod-level sandbox.
+	// The definition of PodSandbox is at https://github.com/kubernetes/kubernetes/pull/25899
+	CreatePodSandbox(config *runtimeApi.PodSandboxConfig) (string, error)
+	// StopPodSandbox stops the sandbox. If there are any running containers in the
+	// sandbox, they should be force terminated.
+	StopPodSandbox(podSandboxID string) error
+	// RemovePodSandbox removes the sandbox. If there are running containers in the
+	// sandbox, they should be forcibly removed.
+	RemovePodSandbox(podSandboxID string) error
+	// PodSandboxStatus returns the Status of the PodSandbox.
+	PodSandboxStatus(podSandboxID string) (*runtimeApi.PodSandboxStatus, error)
+	// ListPodSandbox returns a list of Sandbox.
+	ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]*runtimeApi.PodSandbox, error)
+}
+
+// RuntimeService interface should be implemented by a container runtime.
+// The methods should be thread-safe.
+type RuntimeService interface {
+	RuntimeVersioner
+	ContainerManager
+	PodSandboxManager
 }
 
 // ImageManagerService interface should be implemented by a container image
