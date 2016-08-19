@@ -208,3 +208,5 @@ test/integration/discoverysummarizer
 test/integration/examples
 test/integration/federation
 pkg/security/podsecuritypolicy/apparmor
+test/integration/federation
+pkg/kubelet/sysctls
