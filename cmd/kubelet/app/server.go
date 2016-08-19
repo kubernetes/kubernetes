@@ -457,14 +457,23 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 // getNodeName returns the node name according to the cloud provider
 // if cloud provider is specified. Otherwise, returns the hostname of the node.
 func getNodeName(cloud cloudprovider.Interface, hostname string) (string, error) {
-	if cloud != nil {
-		instances, ok := cloud.Instances()
-		if !ok {
-			return "", fmt.Errorf("failed to get instances from cloud provider")
-		}
-		return instances.CurrentNodeName(hostname)
+	if cloud == nil {
+		return hostname, nil
 	}
-	return hostname, nil
+
+	instances, ok := cloud.Instances()
+	if !ok {
+		return "", fmt.Errorf("failed to get instances from cloud provider")
+	}
+
+	nodeName, err := instances.CurrentNodeName(hostname)
+	if err != nil {
+		return "", fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+	}
+
+	glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+
+	return nodeName, nil
 }
 
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
@@ -706,23 +715,10 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
 
 	if len(kcfg.NodeName) == 0 {
-		// Query the cloud provider for our node name, default to Hostname
-		nodeName := kcfg.Hostname
-		if kcfg.Cloud != nil {
-			var err error
-			instances, ok := kcfg.Cloud.Instances()
-			if !ok {
-				return fmt.Errorf("failed to get instances from cloud provider")
-			}
-
-			nodeName, err = instances.CurrentNodeName(kcfg.Hostname)
-			if err != nil {
-				return fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-			}
-
-			glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+		nodeName, err := getNodeName(kcfg.Cloud, kcfg.Hostname)
+		if err != nil {
+			return err
 		}
-
 		kcfg.NodeName = nodeName
 	}
 

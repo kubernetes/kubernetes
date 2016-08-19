@@ -75,7 +75,7 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 	success := false
 
 	// Get the private key.
-	keyPath, err := filepath.Abs(filepath.Join(certDir, "kubelet-client.key"))
+	keyPath, err := filepath.Abs(filepath.Join(certDir, defaultKubeletClientKeyFile))
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap key path: %v", err)
 	}
@@ -94,7 +94,7 @@ func bootstrapClientCert(kubeconfigPath string, bootstrapPath string, certDir st
 	}
 
 	// Get the cert.
-	certPath, err := filepath.Abs(filepath.Join(certDir, "kubelet-client.crt"))
+	certPath, err := filepath.Abs(filepath.Join(certDir, defaultKubeletClientCertificateFile))
 	if err != nil {
 		return fmt.Errorf("unable to build bootstrap client cert path: %v", err)
 	}
