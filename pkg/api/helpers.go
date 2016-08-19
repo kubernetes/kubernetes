@@ -222,6 +222,10 @@ func IsServiceIPSet(service *Service) bool {
 
 // this function aims to check if the service's cluster IP is requested or not
 func IsServiceIPRequested(service *Service) bool {
+	// ExternalName services are CNAME aliases to external ones. Ignore the IP.
+	if service.Spec.Type == ServiceTypeExternalName {
+		return false
+	}
 	return service.Spec.ClusterIP == ""
 }
 
