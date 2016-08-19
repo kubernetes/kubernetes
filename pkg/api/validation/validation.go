@@ -2465,6 +2465,9 @@ func ValidateReadOnlyPersistentDisks(volumes []api.Volume, fldPath *field.Path) 
 // validateTaints tests if given taints have valid data.
 func validateTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
 	allErrors := field.ErrorList{}
+
+	uniqueTaints := map[api.TaintEffect]sets.String{}
+
 	for i, currTaint := range taints {
 		idxPath := fldPath.Index(i)
 		// validate the taint key
@@ -2475,6 +2478,20 @@ func validateTaints(taints []api.Taint, fldPath *field.Path) field.ErrorList {
 		}
 		// validate the taint effect
 		allErrors = append(allErrors, validateTaintEffect(&currTaint.Effect, false, idxPath.Child("effect"))...)
+
+		// validate if taint is unique by <key, effect>
+		if len(uniqueTaints[currTaint.Effect]) > 0 && uniqueTaints[currTaint.Effect].Has(currTaint.Key) {
+			duplicatedError := field.Duplicate(idxPath, currTaint)
+			duplicatedError.Detail = "taints must be unique by key and effect pair"
+			allErrors = append(allErrors, duplicatedError)
+			continue
+		}
+
+		// add taint to existingTaints for uniqueness check
+		if len(uniqueTaints[currTaint.Effect]) == 0 {
+			uniqueTaints[currTaint.Effect] = sets.String{}
+		}
+		uniqueTaints[currTaint.Effect].Insert(currTaint.Key)
 	}
 	return allErrors
 }

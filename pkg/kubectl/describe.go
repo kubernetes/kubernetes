@@ -2546,15 +2546,19 @@ func printTaintsMultilineWithIndent(out io.Writer, initialIndent, title, innerIn
 	}
 	sort.Strings(keys)
 
+	effects := []api.TaintEffect{api.TaintEffectNoSchedule, api.TaintEffectPreferNoSchedule}
+
 	for i, key := range keys {
-		for _, taint := range taints {
-			if taint.Key == key {
-				if i != 0 {
-					fmt.Fprint(out, initialIndent)
-					fmt.Fprint(out, innerIndent)
+		for _, effect := range effects {
+			for _, taint := range taints {
+				if taint.Key == key && taint.Effect == effect {
+					if i != 0 {
+						fmt.Fprint(out, initialIndent)
+						fmt.Fprint(out, innerIndent)
+					}
+					fmt.Fprintf(out, "%s=%s:%s\n", taint.Key, taint.Value, taint.Effect)
+					i++
 				}
-				fmt.Fprintf(out, "%s=%s:%s\n", taint.Key, taint.Value, taint.Effect)
-				i++
 			}
 		}
 	}
