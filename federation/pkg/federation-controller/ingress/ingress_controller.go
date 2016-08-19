@@ -24,6 +24,7 @@ import (
 	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
 	// api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	// "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -75,10 +76,12 @@ type IngressController struct {
 // A structure passed by delaying deliverer. It contains an ingress that should be reconciled and
 // the number of previous attempts that ended up in some kind of ingress-related
 // error (like failure to create).
+/*
 type ingressItem struct {
 	ingress      string
 	prevAttempts int64
 }
+*/
 
 // NewIngressController returns a new ingress controller
 func NewIngressController(client federation_release_1_4.Interface) *IngressController {
@@ -149,17 +152,17 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	ic.federatedUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer,
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
-			_, err := client.Extensions().Ingresses(api.NamespaceAll).Create(ingress)
+			_, err := client.Extensions().Ingresses(ingress.Namespace).Create(ingress)
 			return err
 		},
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
-			_, err := client.Extensions().Ingresses(api.NamespaceAll).Update(ingress)
+			_, err := client.Extensions().Ingresses(ingress.Namespace).Update(ingress)
 			return err
 		},
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
-			err := client.Extensions().Ingresses(api.NamespaceAll).Delete(ingress.Name, &api.DeleteOptions{})
+			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &api.DeleteOptions{})
 			return err
 		})
 	return ic
@@ -176,9 +179,9 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		ic.ingressFederatedInformer.Stop()
 	}()
 	ic.ingressDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
-		i := item.Value.(string)
-		glog.V(4).Infof("Ingress change delivered, reconciling: %v", i)
-		ic.reconcileIngress(i)
+		ingress := item.Value.(types.NamespacedName)
+		glog.V(4).Infof("Ingress change delivered, reconciling: %v", ingress)
+		ic.reconcileIngress(ingress)
 	})
 	ic.clusterDeliverer.StartWithHandler(func(_ *util.DelayingDelivererItem) {
 		glog.V(4).Infof("Cluster change delivered, reconciling ingresses")
@@ -197,17 +200,19 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 
 func (ic *IngressController) deliverIngressObj(obj interface{}, delay time.Duration, failed bool) {
 	ingress := obj.(*extensions_v1beta1.Ingress)
-	ic.deliverIngress(ingress.Name, delay, failed)
+	ic.deliverIngress(types.NamespacedName{ingress.Namespace, ingress.Name}, delay, failed)
 }
 
-func (ic *IngressController) deliverIngress(ingress string, delay time.Duration, failed bool) {
-	glog.V(4).Infof("Delivering ingress: %q", ingress)
+func (ic *IngressController) deliverIngress(ingress types.NamespacedName, delay time.Duration, failed bool) {
+	glog.V(4).Infof("Delivering ingress: %s", ingress)
+	key := ingress.String()
 	if failed {
-		ic.ingressBackoff.Next(ingress, time.Now())
+		ic.ingressBackoff.Next(key, time.Now())
+		delay = delay + ic.ingressBackoff.Get(key)
 	} else {
-		ic.ingressBackoff.Reset(ingress)
+		ic.ingressBackoff.Reset(key)
 	}
-	ic.ingressDeliverer.DeliverAfter(ingress, ingress, delay)
+	ic.ingressDeliverer.DeliverAfter(key, ingress, delay)
 }
 
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
@@ -238,24 +243,28 @@ func (ic *IngressController) reconcileIngressesOnClusterChange() {
 	}
 	for _, obj := range ic.ingressInformerStore.List() {
 		ingress := obj.(*extensions_v1beta1.Ingress)
-		ic.deliverIngress(ingress.Name, ic.smallDelay, false)
+		ic.deliverIngress(types.NamespacedName{Namespace: ingress.Namespace, Name: ingress.Name}, ic.smallDelay, false)
 	}
 }
 
+/*
 func backoff(trial int64) time.Duration {
 	if trial > 12 {
 		return 12 * 5 * time.Second
 	}
 	return time.Duration(trial) * 5 * time.Second
 }
+*/
 
-func (ic *IngressController) reconcileIngress(ingress string) {
+func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	glog.V(4).Infof("Reconciling ingress %q", ingress)
 	if !ic.isSynced() {
 		ic.deliverIngress(ingress, ic.clusterAvailableDelay, false)
+		return
 	}
 
-	baseIngressObj, exist, err := ic.ingressInformerStore.GetByKey(ingress)
+	key := ingress.String()
+	baseIngressObj, exist, err := ic.ingressInformerStore.GetByKey(key)
 	if err != nil {
 		glog.Errorf("Failed to query main ingress store for %v: %v", ingress, err)
 		ic.deliverIngress(ingress, 0, true)
@@ -278,7 +287,7 @@ func (ic *IngressController) reconcileIngress(ingress string) {
 	operations := make([]util.FederatedOperation, 0)
 
 	for _, cluster := range clusters {
-		clusterIngressObj, found, err := ic.ingressFederatedInformer.GetTargetStore().GetByKey(cluster.Name, ingress)
+		clusterIngressObj, found, err := ic.ingressFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			glog.Errorf("Failed to get %s from %s: %v", ingress, cluster.Name, err)
 			ic.deliverIngress(ingress, 0, true)

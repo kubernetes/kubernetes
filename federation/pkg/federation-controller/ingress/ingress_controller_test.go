@@ -18,6 +18,7 @@ package ingress
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -78,7 +79,8 @@ func TestIngressController(t *testing.T) {
 
 	ing1 := extensions_v1beta1.Ingress{
 		ObjectMeta: api_v1.ObjectMeta{
-			Name: "test-ingress",
+			Name:      "test-ingress",
+			Namespace: "mynamespace",
 		},
 	}
 
@@ -86,7 +88,9 @@ func TestIngressController(t *testing.T) {
 	ingressWatch.Add(&ing1)
 	createdIngress := GetIngressFromChan(cluster1CreateChan)
 	assert.NotNil(t, createdIngress)
+	assert.Equal(t, ing1.Namespace, createdIngress.Namespace)
 	assert.Equal(t, ing1.Name, createdIngress.Name)
+	assert.True(t, reflect.DeepEqual(&ing1, createdIngress))
 
 	// Test update federated ingress.
 	ing1.Annotations = map[string]string{
@@ -95,15 +99,19 @@ func TestIngressController(t *testing.T) {
 	ingressWatch.Modify(&ing1)
 	updatedIngress := GetIngressFromChan(cluster1UpdateChan)
 	assert.NotNil(t, updatedIngress)
+	assert.Equal(t, ing1.Namespace, updatedIngress.Namespace)
 	assert.Equal(t, ing1.Name, updatedIngress.Name)
 	// assert.Contains(t, updatedIngress.Annotations, "A")
+	// TODO: assert.True(t, reflect.DeepEqual(&ing1, createdIngress))
 
 	// Test add cluster
 	clusterWatch.Add(cluster2)
 	createdIngress2 := GetIngressFromChan(cluster2CreateChan)
 	assert.NotNil(t, createdIngress2)
+	assert.Equal(t, ing1.Namespace, createdIngress2.Namespace)
 	assert.Equal(t, ing1.Name, createdIngress2.Name)
 	// assert.Contains(t, createdIngress2.Annotations, "A")
+	// TODO: assert.True(t, reflect.DeepEqual(&ing1, createdIngress2))
 
 	close(stop)
 }
