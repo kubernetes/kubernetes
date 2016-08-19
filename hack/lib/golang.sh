@@ -70,26 +70,32 @@ if [[ "${KUBE_FASTBUILD:-}" == "true" ]]; then
 else
 
   # The server platform we are building on.
-  readonly KUBE_SERVER_PLATFORMS=(
+  KUBE_SERVER_PLATFORMS=(
     linux/amd64
     linux/arm
     linux/arm64
-    linux/ppc64le # note: hyperkube is temporarily disabled due to a linking error
   )
+  if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
+    KUBE_SERVER_PLATFORMS+=(linux/ppc64le)
+  fi
+  readonly KUBE_SERVER_PLATFORMS
 
   # If we update this we should also update the set of golang compilers we build
   # in 'build/build-image/cross/Dockerfile'. However, it's only a bit faster since go 1.5, not mandatory
-  readonly KUBE_CLIENT_PLATFORMS=(
+  KUBE_CLIENT_PLATFORMS=(
     linux/amd64
     linux/386
     linux/arm
     linux/arm64
-    linux/ppc64le
     darwin/amd64
     darwin/386
     windows/amd64
     windows/386
   )
+  if [[ "${KUBE_BUILD_PPC64LE:-}" =~ ^[yY]$ ]]; then
+    KUBE_CLIENT_PLATFORMS+=(linux/ppc64le)
+  fi
+  readonly KUBE_CLIENT_PLATFORMS
 
   # Which platforms we should compile test targets for. Not all client platforms need these tests
   readonly KUBE_TEST_PLATFORMS=(
@@ -461,15 +467,7 @@ kube::golang::build_binaries_for_platform() {
 
   for binary in "${binaries[@]}"; do
 
-    # TODO(IBM): Enable hyperkube builds for ppc64le again
-    # The current workaround creates a text file with help text instead of a binary
-    # We're doing it this way so the build system isn't affected so much
-    if [[ "${binary}" == *"hyperkube" && "${platform}" == "linux/ppc64le" ]]; then
-      echo "hyperkube build for ppc64le is disabled. Creating dummy text file instead."
-      local outfile=$(kube::golang::output_filename_for_binary "${binary}" "${platform}")
-      mkdir -p $(dirname ${outfile})
-      echo "Not available at the moment. Please see: https://github.com/kubernetes/kubernetes/issues/25886 for more information." > ${outfile}
-    elif [[ "${binary}" =~ ".test"$ ]]; then
+    if [[ "${binary}" =~ ".test"$ ]]; then
       tests+=($binary)
     elif kube::golang::is_statically_linked_library "${binary}"; then
       statics+=($binary)
@@ -668,7 +666,7 @@ kube::golang::build_binaries() {
     kube::golang::build_kube_toolchain
 
     if [[ "${parallel}" == "true" ]]; then
-      kube::log::status "Building go targets for ${platforms[@]} in parallel (output will appear in a burst when complete):" "${targets[@]}"
+      kube::log::status "Building go targets for {${platforms[*]}} in parallel (output will appear in a burst when complete):" "${targets[@]}"
       local platform
       for platform in "${platforms[@]}"; do (
           kube::golang::set_platform_envs "${platform}"
