@@ -134,9 +134,10 @@ var InterestingKubeletMetrics = []string{
 
 // Dashboard metrics
 type LatencyMetric struct {
-	Perc50 time.Duration `json:"Perc50"`
-	Perc90 time.Duration `json:"Perc90"`
-	Perc99 time.Duration `json:"Perc99"`
+	Perc50  time.Duration `json:"Perc50"`
+	Perc90  time.Duration `json:"Perc90"`
+	Perc99  time.Duration `json:"Perc99"`
+	Perc100 time.Duration `json:"Perc100"`
 }
 
 type PodStartupLatency struct {
@@ -450,7 +451,8 @@ func ExtractLatencyMetrics(latencies []PodLatencyData) LatencyMetric {
 	perc50 := latencies[int(math.Ceil(float64(length*50)/100))-1].Latency
 	perc90 := latencies[int(math.Ceil(float64(length*90)/100))-1].Latency
 	perc99 := latencies[int(math.Ceil(float64(length*99)/100))-1].Latency
-	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99}
+	perc100 := latencies[length-1].Latency
+	return LatencyMetric{Perc50: perc50, Perc90: perc90, Perc99: perc99, Perc100: perc100}
 }
 
 // LogSuspiciousLatency logs metrics/docker errors from all nodes that had slow startup times
