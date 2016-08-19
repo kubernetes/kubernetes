@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	metrics_api "k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -35,12 +36,18 @@ func TestTopPodAllInNamespaceMetrics(t *testing.T) {
 	metrics := testPodMetricsData()
 	testNamespace := "testnamespace"
 	nonTestNamespace := "anothernamespace"
-	expectedMetrics := metrics[0:2]
-	for _, m := range expectedMetrics {
+	expectedMetrics := metrics_api.PodMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[0:2],
+	}
+	for _, m := range expectedMetrics.Items {
 		m.Namespace = testNamespace
 	}
-	nonExpectedMetrics := metrics[2:]
-	for _, m := range expectedMetrics {
+	nonExpectedMetrics := metrics_api.PodMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[2:],
+	}
+	for _, m := range expectedMetrics.Items {
 		m.Namespace = nonTestNamespace
 	}
 	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods", baseMetricsAddress, metricsApiVersion, testNamespace)
@@ -72,12 +79,12 @@ func TestTopPodAllInNamespaceMetrics(t *testing.T) {
 
 	// Check the presence of pod names in the output.
 	result := buf.String()
-	for _, m := range expectedMetrics {
+	for _, m := range expectedMetrics.Items {
 		if !strings.Contains(result, m.Name) {
 			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
 		}
 	}
-	for _, m := range nonExpectedMetrics {
+	for _, m := range nonExpectedMetrics.Items {
 		if strings.Contains(result, m.Name) {
 			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
 		}
@@ -87,8 +94,11 @@ func TestTopPodAllInNamespaceMetrics(t *testing.T) {
 func TestTopPodWithNameMetrics(t *testing.T) {
 	initTestErrorHandler(t)
 	metrics := testPodMetricsData()
-	expectedMetrics := metrics[0]
-	nonExpectedMetrics := metrics[1:]
+	expectedMetrics := metrics.Items[0]
+	nonExpectedMetrics := metrics_api.PodMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[1:],
+	}
 	testNamespace := "testnamespace"
 	expectedMetrics.Namespace = testNamespace
 	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods/%s", baseMetricsAddress, metricsApiVersion, testNamespace, expectedMetrics.Name)
@@ -123,7 +133,7 @@ func TestTopPodWithNameMetrics(t *testing.T) {
 	if !strings.Contains(result, expectedMetrics.Name) {
 		t.Errorf("missing metrics for %s: \n%s", expectedMetrics.Name, result)
 	}
-	for _, m := range nonExpectedMetrics {
+	for _, m := range nonExpectedMetrics.Items {
 		if strings.Contains(result, m.Name) {
 			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
 		}
@@ -133,8 +143,14 @@ func TestTopPodWithNameMetrics(t *testing.T) {
 func TestTopPodWithLabelSelectorMetrics(t *testing.T) {
 	initTestErrorHandler(t)
 	metrics := testPodMetricsData()
-	expectedMetrics := metrics[0:2]
-	nonExpectedMetrics := metrics[2:]
+	expectedMetrics := metrics_api.PodMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[0:2],
+	}
+	nonExpectedMetrics := metrics_api.PodMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[2:],
+	}
 	label := "key=value"
 	testNamespace := "testnamespace"
 	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods", baseMetricsAddress, metricsApiVersion, testNamespace)
@@ -168,12 +184,12 @@ func TestTopPodWithLabelSelectorMetrics(t *testing.T) {
 
 	// Check the presence of pod names in the output.
 	result := buf.String()
-	for _, m := range expectedMetrics {
+	for _, m := range expectedMetrics.Items {
 		if !strings.Contains(result, m.Name) {
 			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
 		}
 	}
-	for _, m := range nonExpectedMetrics {
+	for _, m := range nonExpectedMetrics.Items {
 		if strings.Contains(result, m.Name) {
 			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
 		}
@@ -183,8 +199,11 @@ func TestTopPodWithLabelSelectorMetrics(t *testing.T) {
 func TestTopPodWithContainersMetrics(t *testing.T) {
 	initTestErrorHandler(t)
 	metrics := testPodMetricsData()
-	expectedMetrics := metrics[0]
-	nonExpectedMetrics := metrics[1:]
+	expectedMetrics := metrics.Items[0]
+	nonExpectedMetrics := metrics_api.PodMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[1:],
+	}
 	testNamespace := "testnamespace"
 	expectedMetrics.Namespace = testNamespace
 	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods/%s", baseMetricsAddress, metricsApiVersion, testNamespace, expectedMetrics.Name)
@@ -225,7 +244,7 @@ func TestTopPodWithContainersMetrics(t *testing.T) {
 			t.Errorf("missing metrics for container %s: \n%s", m.Name, result)
 		}
 	}
-	for _, m := range nonExpectedMetrics {
+	for _, m := range nonExpectedMetrics.Items {
 		if strings.Contains(result, m.Name) {
 			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
 		}
