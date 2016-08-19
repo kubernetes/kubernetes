@@ -106,19 +106,20 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 			itArg := testArg
 			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval",
 				itArg.podsNr, itArg.interval), func() {
-
-				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg)
+				itArg.createMethod = "batch"
+				testName := itArg.getTestName()
+				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, false)
 
 				By("Verifying latency")
-				printAndVerifyLatency(batchLag, e2eLags, itArg, true)
+				logAndVerifyLatency(batchLag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testName, true)
 
 				By("Verifying resource")
-				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, true)
+				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testName, true)
 			})
 		}
 	})
 
-	Context("create a batch of pods [Benchmark]", func() {
+	Context("create a batch of pods", func() {
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -136,16 +137,17 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval",
+			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %v interval [Benchmark]",
 				itArg.podsNr, itArg.interval), func() {
-
-				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg)
+				itArg.createMethod = "batch"
+				testName := itArg.getTestName()
+				batchLag, e2eLags := runDensityBatchTest(f, rc, itArg, true)
 
 				By("Verifying latency")
-				printAndVerifyLatency(batchLag, e2eLags, itArg, false)
+				logAndVerifyLatency(batchLag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testName, false)
 
 				By("Verifying resource")
-				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, false)
+				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testName, false)
 			})
 		}
 	})
@@ -175,19 +177,20 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 			itArg := testArg
 			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods",
 				itArg.podsNr, itArg.bgPodsNr), func() {
-
+				itArg.createMethod = "sequence"
+				testName := itArg.getTestName()
 				batchlag, e2eLags := runDensitySeqTest(f, rc, itArg)
 
 				By("Verifying latency")
-				printAndVerifyLatency(batchlag, e2eLags, itArg, true)
+				logAndVerifyLatency(batchlag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testName, true)
 
 				By("Verifying resource")
-				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, true)
+				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testName, true)
 			})
 		}
 	})
 
-	Context("create a sequence of pods [Benchmark]", func() {
+	Context("create a sequence of pods", func() {
 		dTests := []densityTest{
 			{
 				podsNr:   10,
@@ -205,16 +208,17 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 
 		for _, testArg := range dTests {
 			itArg := testArg
-			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods",
+			It(fmt.Sprintf("latency/resource should be within limit when create %d pods with %d background pods [Benchmark]",
 				itArg.podsNr, itArg.bgPodsNr), func() {
-
+				itArg.createMethod = "sequence"
+				testName := itArg.getTestName()
 				batchlag, e2eLags := runDensitySeqTest(f, rc, itArg)
 
 				By("Verifying latency")
-				printAndVerifyLatency(batchlag, e2eLags, itArg, false)
+				logAndVerifyLatency(batchlag, e2eLags, itArg.podStartupLimits, itArg.podBatchStartupLimit, testName, false)
 
 				By("Verifying resource")
-				printAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, false)
+				logAndVerifyResource(f, rc, itArg.cpuLimits, itArg.memLimits, testName, false)
 			})
 		}
 	})
@@ -227,6 +231,8 @@ type densityTest struct {
 	bgPodsNr int
 	// interval between creating pod (rate control)
 	interval time.Duration
+	// create pods in 'batch' or 'sequence'
+	createMethod string
 	// performance limits
 	cpuLimits            framework.ContainersCPUSummary
 	memLimits            framework.ResourceUsagePerContainer
@@ -234,8 +240,13 @@ type densityTest struct {
 	podBatchStartupLimit time.Duration
 }
 
+func (dt *densityTest) getTestName() string {
+	return fmt.Sprintf("density_create_%s_%d_%d_%d", dt.createMethod, dt.podsNr, dt.bgPodsNr, dt.interval.Nanoseconds()/1000000)
+}
+
 // runDensityBatchTest runs the density batch pod creation test
-func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg densityTest) (time.Duration, []framework.PodLatencyData) {
+func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg densityTest,
+	isLogTimeSeries bool) (time.Duration, []framework.PodLatencyData) {
 	const (
 		podType               = "density_test_pod"
 		sleepBeforeCreatePods = 30 * time.Second
@@ -308,6 +319,13 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	sort.Sort(framework.LatencySlice(e2eLags))
 	batchLag := lastRunning.Time.Sub(firstCreate.Time)
 
+	// Log time series data.
+	if isLogTimeSeries {
+		logDensityTimeSeries(rc, createTimes, watchTimes, testArg.getTestName())
+	}
+	// Log throughput data.
+	logPodCreateThroughput(batchLag, e2eLags, testArg.podsNr)
+
 	return batchLag, e2eLags
 }
 
@@ -332,6 +350,9 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 
 	// create pods sequentially (back-to-back)
 	batchlag, e2eLags := createBatchPodSequential(f, testPods)
+
+	// Log throughput data.
+	logPodCreateThroughput(batchlag, e2eLags, testArg.podsNr)
 
 	return batchlag, e2eLags
 }
@@ -454,31 +475,36 @@ func createBatchPodSequential(f *framework.Framework, pods []*api.Pod) (time.Dur
 	return batchLag, e2eLags
 }
 
-// printAndVerifyLatency verifies that whether pod creation latency satisfies the limit.
-func printAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyData, testArg densityTest, isVerify bool) {
+// logAndVerifyLatency verifies that whether pod creation latency satisfies the limit.
+func logAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyData, podStartupLimits framework.LatencyMetric,
+	podBatchStartupLimit time.Duration, testName string, isVerify bool) {
 	framework.PrintLatencies(e2eLags, "worst client e2e total latencies")
 
-	// TODO(coufon): do not trust `kubelet' metrics since they are not reset!
+	// TODO(coufon): do not trust 'kubelet' metrics since they are not reset!
 	latencyMetrics, _ := getPodStartLatency(kubeletAddr)
 	framework.Logf("Kubelet Prometheus metrics (not reset):\n%s", framework.PrettyPrintJSON(latencyMetrics))
 
-	// check whether e2e pod startup time is acceptable.
 	podCreateLatency := framework.PodStartupLatency{Latency: framework.ExtractLatencyMetrics(e2eLags)}
-	framework.Logf("Pod create latency: %s", framework.PrettyPrintJSON(podCreateLatency))
 
-	// calculate and log throughput
-	throughputBatch := float64(testArg.podsNr) / batchLag.Minutes()
+	// log latency perf data
+	framework.PrintPerfData(getLatencyPerfData(podCreateLatency.Latency, testName))
+
+	if isVerify {
+		// check whether e2e pod startup time is acceptable.
+		framework.ExpectNoError(verifyPodStartupLatency(podStartupLimits, podCreateLatency.Latency))
+
+		// check bactch pod creation latency
+		if podBatchStartupLimit > 0 {
+			Expect(batchLag <= podBatchStartupLimit).To(Equal(true), "Batch creation startup time %v exceed limit %v",
+				batchLag, podBatchStartupLimit)
+		}
+	}
+}
+
+// logThroughput calculates and logs pod creation throughput.
+func logPodCreateThroughput(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int) {
+	throughputBatch := float64(podsNr) / batchLag.Minutes()
 	framework.Logf("Batch creation throughput is %.1f pods/min", throughputBatch)
 	throughputSequential := 1.0 / e2eLags[len(e2eLags)-1].Latency.Minutes()
 	framework.Logf("Sequential creation throughput is %.1f pods/min", throughputSequential)
-
-	if isVerify {
-		framework.ExpectNoError(verifyPodStartupLatency(testArg.podStartupLimits, podCreateLatency.Latency))
-
-		// check bactch pod creation latency
-		if testArg.podBatchStartupLimit > 0 {
-			Expect(batchLag <= testArg.podBatchStartupLimit).To(Equal(true), "Batch creation startup time %v exceed limit %v",
-				batchLag, testArg.podBatchStartupLimit)
-		}
-	}
 }
