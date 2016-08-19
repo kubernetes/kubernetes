@@ -312,6 +312,7 @@ func (m *Master) InstallAPIs(c *Config) {
 
 			storage = apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"]["poddisruptionbudgets"]
 			evictionStorage.PodDisruptionBudgetLister = storage.(rest.Lister)
+			evictionStorage.PodDisruptionBudgetUpdater = storage.(rest.Updater)
 		}
 
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
