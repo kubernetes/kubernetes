@@ -2079,6 +2079,10 @@ message PodSecurityContext {
   // 
   // If unset, the Kubelet will not modify the ownership and permissions of any volume.
   optional int64 fsGroup = 5;
+
+  // Use the host's user namespace.
+  // Optional: Default to false.
+  optional bool hostUser = 6;
 }
 
 // Describes the class of pods that should avoid this node.

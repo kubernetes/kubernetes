@@ -4861,10 +4861,12 @@ func autoConvert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurity
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.SupplementalGroups = in.SupplementalGroups
 	out.FSGroup = in.FSGroup
+	out.HostUser = in.HostUser
 	return nil
 }
 
 func autoConvert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurityContext, out *PodSecurityContext, s conversion.Scope) error {
+	out.HostUser = in.HostUser
 	if in.SELinuxOptions != nil {
 		in, out := &in.SELinuxOptions, &out.SELinuxOptions
 		*out = new(SELinuxOptions)

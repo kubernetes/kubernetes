@@ -62,14 +62,14 @@ for monitoring.  Assuming that the docker daemon is started with
 here is when the host user namespace should be set:
 
 1.  When setting any other namespace flag to `host`
-    * Not strictly required for `net=host` if not binding to low ports 
+    * Not strictly required for `net=host` if not binding to low ports
      but if the system provides defaulting it covers the 80% case
 2.  When using capabilities that aren't tied to any namespace
     * MKNOD
     * SYS_MODULE
     * SYS_TIME
     * others?  (@mrunalp is looking at source to determine this)
-3.  When explicitly granted permissions to use a host volume and 
+3.  When explicitly granted permissions to use a host volume and
 escape the private user namespace
 
 
