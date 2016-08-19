@@ -84,7 +84,65 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			framework.Logf("Verified that zero clusters remain")
 		})
 	})
+	Describe("Admission control", func() {
+		AfterEach(func() {
+			framework.SkipUnlessFederated(f.Client)
+		})
+
+		It("Namespace lifecycle admission control should work as expected", func() {
+			framework.SkipUnlessFederated(f.Client)
+
+			// Ensure that a service can be created in default namespace.
+			svcName := "mysvc"
+			clientSet := f.FederationClientset_1_4
+			framework.Logf("Creating service %s in default namespace", svcName)
+			if _, err := clientSet.Core().Services(api.NamespaceDefault).Create(newService(svcName, api.NamespaceDefault)); err != nil {
+				framework.Failf("Expected service to be created fine in default namespace, got error: %v", err)
+			}
+
+			// Creating a service in a non-existing namespace should fail.
+			svcNamespace := "myns"
+			framework.Logf("Trying to create service %s in namespace %s, expect to get error", svcName, svcNamespace)
+			if _, err := clientSet.Core().Services(svcNamespace).Create(newService(svcName, svcNamespace)); err == nil {
+				framework.Failf("Expected to get an error while creating a service in a non-existing namespace")
+			}
+
+			// Verify that we can create the service after first creating the namespace.
+			framework.Logf("Creating namespace %s", svcNamespace)
+			if _, err := clientSet.Core().Namespaces().Create(newNamespace(svcNamespace)); err != nil {
+				framework.Failf("unexpected error in creating namespace: %v", err)
+			}
+			framework.Logf("Creating service %s in namespace %s", svcName, svcNamespace)
+			if _, err := clientSet.Core().Services(svcNamespace).Create(newService(svcName, svcNamespace)); err != nil {
+				framework.Failf("unexpected error in creating service after creating the namespace: %v", err)
+			}
+		})
+	})
 })
+
+func newService(name, namespace string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Port: 80,
+				},
+			},
+		},
+	}
+}
+
+func newNamespace(name string) *v1.Namespace {
+	return &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
+			Name: name,
+		},
+	}
+}
 
 // Verify that the cluster is marked ready.
 func isReady(clusterName string, clientset *federation_release_1_4.Clientset) error {
