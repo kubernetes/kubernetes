@@ -39,7 +39,7 @@ var (
 	explainLong = dedent.Dedent(`
 		Documentation of resources.
 
-		`) + kubectl.PossibleResourceTypes
+		`) + valid_resources
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
