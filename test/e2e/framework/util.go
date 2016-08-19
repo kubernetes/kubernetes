@@ -3077,16 +3077,16 @@ func DeleteRCAndPods(c *client.Client, ns, name string) error {
 	}
 	defer ps.Stop()
 	startTime := time.Now()
-	err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
+	err = reaper.Stop(ns, name, 0, nil)
 	if apierrs.IsNotFound(err) {
 		Logf("RC %s was already deleted: %v", name, err)
 		return nil
 	}
-	deleteRCTime := time.Now().Sub(startTime)
-	Logf("Deleting RC %s took: %v", name, deleteRCTime)
 	if err != nil {
 		return fmt.Errorf("error while stopping RC: %s: %v", name, err)
 	}
+	deleteRCTime := time.Now().Sub(startTime)
+	Logf("Deleting RC %s took: %v", name, deleteRCTime)
 	err = waitForPodsInactive(ps, 10*time.Millisecond, 10*time.Minute)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
@@ -3219,7 +3219,7 @@ func DeleteReplicaSet(c *client.Client, ns, name string) error {
 		return err
 	}
 	startTime := time.Now()
-	err = reaper.Stop(ns, name, 0, api.NewDeleteOptions(0))
+	err = reaper.Stop(ns, name, 0, nil)
 	if apierrs.IsNotFound(err) {
 		Logf("ReplicaSet %s was already deleted: %v", name, err)
 		return nil
