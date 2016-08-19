@@ -821,9 +821,16 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 
 		done := func() bool {
-			// ensure the response body is closed before we reconnect, so that we reuse the same
-			// TCP connection
-			defer resp.Body.Close()
+			// Ensure the response body is fully read and closed
+			// before we reconnect, so that we reuse the same TCP
+			// connection.
+			defer func() {
+				const maxBodySlurpSize = 2 << 10
+				if resp.ContentLength <= maxBodySlurpSize {
+					io.Copy(ioutil.Discard, &io.LimitedReader{R: resp.Body, N: maxBodySlurpSize})
+				}
+				resp.Body.Close()
+			}()
 
 			retries++
 			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
