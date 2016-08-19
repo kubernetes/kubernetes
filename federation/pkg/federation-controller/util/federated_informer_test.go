@@ -21,11 +21,12 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	fake_federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
 	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -37,7 +38,7 @@ import (
 // Basic test for Federated Informer. Checks whether the subinformer are added and deleted
 // when the corresponding cluster entries appear and dissapear from etcd.
 func TestFederatedInformer(t *testing.T) {
-	fakeClient := &fake_federation_release_1_4.Clientset{}
+	fakeFederationClient := &fake_federation_release_1_4.Clientset{}
 
 	// Add a single cluster to federation and remove it when needed.
 	cluster := federation_api.Cluster{
@@ -50,11 +51,11 @@ func TestFederatedInformer(t *testing.T) {
 			},
 		},
 	}
-	fakeClient.AddReactor("list", "clusters", func(action core.Action) (bool, runtime.Object, error) {
+	fakeFederationClient.AddReactor("list", "clusters", func(action core.Action) (bool, runtime.Object, error) {
 		return true, &federation_api.ClusterList{Items: []federation_api.Cluster{cluster}}, nil
 	})
 	deleteChan := make(chan struct{})
-	fakeClient.AddWatchReactor("clusters", func(action core.Action) (bool, watch.Interface, error) {
+	fakeFederationClient.AddWatchReactor("clusters", func(action core.Action) (bool, watch.Interface, error) {
 		fakeWatch := watch.NewFake()
 		go func() {
 			<-deleteChan
@@ -63,6 +64,7 @@ func TestFederatedInformer(t *testing.T) {
 		return true, fakeWatch, nil
 	})
 
+	fakeKubeClient := &fake_kube_release_1_4.Clientset{}
 	// There is a single service ns1/s1 in cluster mycluster.
 	service := api_v1.Service{
 		ObjectMeta: api_v1.ObjectMeta{
@@ -70,14 +72,14 @@ func TestFederatedInformer(t *testing.T) {
 			Name:      "s1",
 		},
 	}
-	fakeClient.AddReactor("list", "services", func(action core.Action) (bool, runtime.Object, error) {
+	fakeKubeClient.AddReactor("list", "services", func(action core.Action) (bool, runtime.Object, error) {
 		return true, &api_v1.ServiceList{Items: []api_v1.Service{service}}, nil
 	})
-	fakeClient.AddWatchReactor("services", func(action core.Action) (bool, watch.Interface, error) {
+	fakeKubeClient.AddWatchReactor("services", func(action core.Action) (bool, watch.Interface, error) {
 		return true, watch.NewFake(), nil
 	})
 
-	targetInformerFactory := func(cluster *federation_api.Cluster, clientset federation_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
+	targetInformerFactory := func(cluster *federation_api.Cluster, clientset kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
 		return framework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
@@ -105,9 +107,9 @@ func TestFederatedInformer(t *testing.T) {
 		},
 	}
 
-	informer := NewFederatedInformer(fakeClient, targetInformerFactory, &lifecycle).(*federatedInformerImpl)
-	informer.clientFactory = func(cluster *federation_api.Cluster) (federation_release_1_4.Interface, error) {
-		return fakeClient, nil
+	informer := NewFederatedInformer(fakeFederationClient, targetInformerFactory, &lifecycle).(*federatedInformerImpl)
+	informer.clientFactory = func(cluster *federation_api.Cluster) (kube_release_1_4.Interface, error) {
+		return fakeKubeClient, nil
 	}
 	assert.NotNil(t, informer)
 	informer.Start()
