@@ -1512,7 +1512,8 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	validPSP := func() *extensions.PodSecurityPolicy {
 		return &extensions.PodSecurityPolicy{
 			ObjectMeta: api.ObjectMeta{
-				Name: "foo",
+				Name:        "foo",
+				Annotations: map[string]string{},
 			},
 			Spec: extensions.PodSecurityPolicySpec{
 				SELinux: extensions.SELinuxStrategyOptions{
@@ -1595,6 +1596,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	invalidAppArmorAllowed.Annotations = map[string]string{
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
 	}
+
+	invalidSysctlPattern := validPSP()
+	invalidSysctlPattern.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
 
 	errorCases := map[string]struct {
 		psp         *extensions.PodSecurityPolicy
@@ -1686,6 +1690,11 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "invalid AppArmor profile name: \"not-good\"",
 		},
+		"invalid sysctl pattern": {
+			psp:         invalidSysctlPattern,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
+		},
 	}
 
 	for k, v := range errorCases {
@@ -1728,6 +1737,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
 	}
 
+	withSysctl := validPSP()
+	withSysctl.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "net.*"
+
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -1748,6 +1760,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"valid AppArmor annotations": {
 			psp: validAppArmor,
+		},
+		"with network sysctls": {
+			psp: withSysctl,
 		},
 	}
 
@@ -2027,6 +2042,58 @@ func TestValidateNetworkPolicyUpdate(t *testing.T) {
 	for testName, errorCase := range errorCases {
 		if errs := ValidateNetworkPolicyUpdate(&errorCase.update, &errorCase.old); len(errs) == 0 {
 			t.Errorf("expected failure: %s", testName)
+		}
+	}
+}
+
+func TestIsValidSysctlPattern(t *testing.T) {
+	valid := []string{
+		"a.b.c.d",
+		"a",
+		"a_b",
+		"a-b",
+		"abc",
+		"abc.def",
+		"*",
+		"a.*",
+		"*",
+		"abc*",
+		"a.abc*",
+		"a.b.*",
+	}
+	invalid := []string{
+		"",
+		"ä",
+		"a_",
+		"_",
+		"_a",
+		"_a._b",
+		"__",
+		"-",
+		".",
+		"a.",
+		".a",
+		"a.b.",
+		"a*.b",
+		"a*b",
+		"*a",
+		"Abc",
+		func(n int) string {
+			x := make([]byte, n)
+			for i := range x {
+				x[i] = byte('a')
+			}
+			return string(x)
+		}(256),
+	}
+	for _, s := range valid {
+		if !IsValidSysctlPattern(s) {
+			t.Errorf("%q expected to be a valid sysctl pattern", s)
+		}
+	}
+	for _, s := range invalid {
+		if IsValidSysctlPattern(s) {
+			t.Errorf("%q expected to be an invalid sysctl pattern", s)
 		}
 	}
 }
