@@ -125,8 +125,9 @@ func (r *REST) ResourceLocation(ctx api.Context, name string) (*url.URL, http.Ro
 
 // EvictionREST implements the REST endpoint for evicting pods from nodes when etcd is in use.
 type EvictionREST struct {
-	store                     *registry.Store
-	PodDisruptionBudgetLister rest.Lister
+	store                      *registry.Store
+	PodDisruptionBudgetLister  rest.Lister
+	PodDisruptionBudgetUpdater rest.Updater
 }
 
 var _ = rest.Creater(&EvictionREST{})
@@ -158,9 +159,15 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	} else if len(pdbs) == 1 {
 		pdb := pdbs[0]
 		// Try to verify-and-decrement
+
 		// If it was false already, or if it becomes false during the course of our retries,
 		// raise an error marked as a ... 429 maybe?
-		if !pdb.Status.PodDisruptionAllowed {
+		ok, err := r.checkAndDecrement(ctx, pdb)
+		if err != nil {
+			return nil, err
+		}
+
+		if !ok {
 			return &unversioned.Status{
 				Status:  unversioned.StatusFailure,
 				Message: "Not yet, brother",
@@ -179,6 +186,46 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 
 	// Success!
 	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
+}
+
+type uoi struct{}
+
+var _ = rest.UpdatedObjectInfo(&uoi{})
+
+func (u *uoi) Preconditions() *api.Preconditions {
+	return nil
+}
+
+func (u *uoi) UpdatedObject(ctx api.Context, oldObj runtime.Object) (newObj runtime.Object, err error) {
+	copy, err := api.Scheme.DeepCopy(oldObj)
+	if err != nil {
+		return
+	}
+	newObj = copy.(runtime.Object)
+	pdb := oldObj.(*policy.PodDisruptionBudget)
+	if !pdb.Status.PodDisruptionAllowed {
+		return nil, fmt.Errorf("PodDisruptionAllowed is already false")
+	}
+	pdb.Status.PodDisruptionAllowed = false
+
+	return
+}
+
+func (r *EvictionREST) checkAndDecrement(ctx api.Context, pdb policy.PodDisruptionBudget) (ok bool, err error) {
+	if !pdb.Status.PodDisruptionAllowed {
+		return false, nil
+	}
+	newObj, _, err := r.PodDisruptionBudgetUpdater.Update(ctx, pdb.Name, &uoi{})
+	if err != nil {
+		return false, err
+	}
+
+	newPdb := newObj.(*policy.PodDisruptionBudget)
+	if newPdb.Status.PodDisruptionAllowed {
+		return false, fmt.Errorf("update did not succeed")
+	}
+
+	return true, nil
 }
 
 // Returns any PDBs that match the pod.
