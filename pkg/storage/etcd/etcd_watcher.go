@@ -139,13 +139,15 @@ func newEtcdWatcher(
 		// monitor how much of this buffer is actually used.
 		etcdIncoming: make(chan *etcd.Response, 100),
 		etcdError:    make(chan error, 1),
-		outgoing:     make(chan watch.Event),
-		userStop:     make(chan struct{}),
-		stopped:      false,
-		wg:           sync.WaitGroup{},
-		cache:        cache,
-		ctx:          nil,
-		cancel:       nil,
+		// Similarly to etcdIncomming, we don't want to force context
+		// switch on every new incoming object.
+		outgoing: make(chan watch.Event, 100),
+		userStop: make(chan struct{}),
+		stopped:  false,
+		wg:       sync.WaitGroup{},
+		cache:    cache,
+		ctx:      nil,
+		cancel:   nil,
 	}
 	w.emit = func(e watch.Event) {
 		// Give up on user stop, without this we leak a lot of goroutines in tests.
