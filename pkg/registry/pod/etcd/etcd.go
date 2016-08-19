@@ -188,15 +188,15 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
 }
 
-type uoi struct{}
+// UpdatedObjectInfo is a simple interface for attempting updates to
+// runtime.Objects.  EvictionREST implements it directly.
+var _ = rest.UpdatedObjectInfo(&EvictionREST{})
 
-var _ = rest.UpdatedObjectInfo(&uoi{})
-
-func (u *uoi) Preconditions() *api.Preconditions {
+func (r *EvictionREST) Preconditions() *api.Preconditions {
 	return nil
 }
 
-func (u *uoi) UpdatedObject(ctx api.Context, oldObj runtime.Object) (newObj runtime.Object, err error) {
+func (r *EvictionREST) UpdatedObject(ctx api.Context, oldObj runtime.Object) (newObj runtime.Object, err error) {
 	copy, err := api.Scheme.DeepCopy(oldObj)
 	if err != nil {
 		return
@@ -215,7 +215,7 @@ func (r *EvictionREST) checkAndDecrement(ctx api.Context, pdb policy.PodDisrupti
 	if !pdb.Status.PodDisruptionAllowed {
 		return false, nil
 	}
-	newObj, _, err := r.PodDisruptionBudgetUpdater.Update(ctx, pdb.Name, &uoi{})
+	newObj, _, err := r.PodDisruptionBudgetUpdater.Update(ctx, pdb.Name, r)
 	if err != nil {
 		return false, err
 	}
