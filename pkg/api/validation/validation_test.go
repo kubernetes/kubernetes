@@ -3025,14 +3025,6 @@ func TestValidatePodSpec(t *testing.T) {
 			RestartPolicy: api.RestartPolicyAlways,
 			DNSPolicy:     api.DNSClusterFirst,
 		},
-		{
-			SecurityContext: &api.PodSecurityContext{
-				Sysctls: []api.Sysctl{{Name: "test", Value: "4"}}},
-			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-		},
 	}
 	for i := range successCases {
 		if errs := ValidatePodSpec(&successCases[i], field.NewPath("field")); len(errs) != 0 {
@@ -3162,15 +3154,6 @@ func TestValidatePodSpec(t *testing.T) {
 		},
 		"bad nodeName": {
 			NodeName:      "node name",
-			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
-			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-			RestartPolicy: api.RestartPolicyAlways,
-			DNSPolicy:     api.DNSClusterFirst,
-		},
-		"bad sysctl name": {
-			SecurityContext: &api.PodSecurityContext{
-				Sysctls: []api.Sysctl{{Name: "test", Value: "4"}},
-			},
 			Volumes:       []api.Volume{{Name: "vol", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}}},
 			Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
 			RestartPolicy: api.RestartPolicyAlways,
@@ -3487,6 +3470,20 @@ func TestValidatePod(t *testing.T) {
 				Namespace: "ns",
 				Annotations: map[string]string{
 					api.SeccompContainerAnnotationKeyPrefix + "foo": "localhost/foo",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		{ // valid, greylisted sysctls
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SysctlsPodAnnotationKey: "kernel.shmmni=32768,kernel.shmmax=1000000000",
 				},
 			},
 			Spec: api.PodSpec{
@@ -3983,6 +3980,34 @@ func TestValidatePod(t *testing.T) {
 				Namespace: "ns",
 				Annotations: map[string]string{
 					api.SeccompPodAnnotationKey: "localhost/../foo",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid sysctl annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SysctlsPodAnnotationKey: "foo:",
+				},
+			},
+			Spec: api.PodSpec{
+				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
+				RestartPolicy: api.RestartPolicyAlways,
+				DNSPolicy:     api.DNSClusterFirst,
+			},
+		},
+		"invalid comma-separated sysctl annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SysctlsPodAnnotationKey: "kernel.msgmax,",
 				},
 			},
 			Spec: api.PodSpec{
@@ -7828,5 +7853,92 @@ func TestValidateHasLabel(t *testing.T) {
 	}
 	if errs := ValidateHasLabel(wrongValueCase, field.NewPath("field"), "foo", "bar"); len(errs) == 0 {
 		t.Errorf("expected failure")
+	}
+}
+
+func TestIsValidSysctlName(t *testing.T) {
+	valid := []string{
+		"a.b.c.d",
+		"a",
+		"a_b",
+		"abc",
+		"abc.def",
+	}
+	invalid := []string{
+		"",
+		"*",
+		"ä",
+		"a_",
+		"_",
+		"__",
+		"_a",
+		"_a._b",
+		"-",
+		".",
+		"a.",
+		".a",
+		"a.b.",
+		"a*.b",
+		"a*b",
+		"*a",
+		"a.*",
+		"*",
+		"abc*",
+		"a.abc*",
+		"a.b.*",
+		"Abc",
+		func(n int) string {
+			x := make([]byte, n)
+			for i := range x {
+				x[i] = byte('a')
+			}
+			return string(x)
+		}(256),
+	}
+	for _, s := range valid {
+		if !IsValidSysctlName(s) {
+			t.Errorf("%q expected to be a valid sysctl name", s)
+		}
+	}
+	for _, s := range invalid {
+		if IsValidSysctlName(s) {
+			t.Errorf("%q expected to be an invalid sysctl name", s)
+		}
+	}
+}
+
+func TestValidateSysctls(t *testing.T) {
+	valid := []string{
+		"net.foo.bar",
+		"kernel.shmmax",
+	}
+	invalid := []string{
+		"i..nvalid",
+		"_invalid",
+	}
+
+	sysctls := make([]api.Sysctl, len(valid))
+	for i, sysctl := range valid {
+		sysctls[i].Name = sysctl
+	}
+	errs := validateSysctls(sysctls, field.NewPath("foo"))
+	if len(errs) != 0 {
+		t.Errorf("unexpected validation errors: %v", errs)
+	}
+
+	sysctls = make([]api.Sysctl, len(invalid))
+	for i, sysctl := range invalid {
+		sysctls[i].Name = sysctl
+	}
+	errs = validateSysctls(sysctls, field.NewPath("foo"))
+	if len(errs) != 2 {
+		t.Errorf("expected 2 validation errors. Got: %v", errs)
+	} else {
+		if got, expected := errs[0].Error(), "foo"; !strings.Contains(got, expected) {
+			t.Errorf("unexpected errors: expected=%q, got=%q", expected, got)
+		}
+		if got, expected := errs[1].Error(), "foo"; !strings.Contains(got, expected) {
+			t.Errorf("unexpected errors: expected=%q, got=%q", expected, got)
+		}
 	}
 }

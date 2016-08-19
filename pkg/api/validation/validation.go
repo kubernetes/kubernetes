@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/golang/glog"
@@ -129,6 +130,13 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, fldPath *fiel
 	}
 
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
+
+	sysctls, err := api.SysctlsFromPodAnnotation(annotations[api.SysctlsPodAnnotationKey])
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.SysctlsPodAnnotationKey), annotations[api.SysctlsPodAnnotationKey], err.Error()))
+	} else {
+		allErrs = append(allErrs, validateSysctls(sysctls, fldPath.Key(api.SysctlsPodAnnotationKey))...)
+	}
 
 	return allErrs
 }
@@ -2033,13 +2041,35 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 	return allErrs
 }
 
+const (
+	// a sysctl segment regex, concatenated with dots to form a sysctl name
+	SysctlSegmentFmt string = "[a-z0-9]([_a-z0-9]*[a-z0-9])?"
+
+	// a sysctl name regex
+	SysctlFmt string = "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
+
+	// the maximal length of a sysctl name
+	SysctlMaxLength int = 253
+)
+
+var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
+
+// IsValidSysctlName checks that the given string is a valid sysctl name,
+// i.e. matches SysctlFmt.
+func IsValidSysctlName(name string) bool {
+	if len(name) > SysctlMaxLength {
+		return false
+	}
+	return sysctlRegexp.MatchString(name)
+}
+
 func validateSysctls(sysctls []api.Sysctl, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, s := range sysctls {
 		if len(s.Name) == 0 {
-			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("name"), "sysctl:name"))
-		} else if !validation.IsWhitelistedSysctlOpt(s.Name) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, "is not whitelisted"))
+			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("name"), ""))
+		} else if !IsValidSysctlName(s.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, fmt.Sprintf("must have at most %d characters and match regex %s", SysctlMaxLength, SysctlFmt)))
 		}
 	}
 	return allErrs
@@ -2065,9 +2095,6 @@ func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *a
 			for _, msg := range validation.IsValidGroupId(gid) {
 				allErrs = append(allErrs, field.Invalid(fldPath.Child("supplementalGroups").Index(g), gid, msg))
 			}
-		}
-		if securityContext.Sysctls != nil {
-			allErrs = append(allErrs, validateSysctls(securityContext.Sysctls, fldPath.Child("sysctl"))...)
 		}
 	}
 
