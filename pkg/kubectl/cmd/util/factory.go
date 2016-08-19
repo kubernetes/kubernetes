@@ -350,8 +350,11 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 			priorityRESTMapper := meta.PriorityRESTMapper{
 				Delegate: outputRESTMapper,
 			}
-			// TODO: this should come from registered versions
-			groups := []string{api.GroupName, autoscaling.GroupName, extensions.GroupName, federation.GroupName, batch.GroupName}
+			//come from registered versions
+			groups := []string{}
+			for _, groupVersion := range registered.RegisteredGroupVersions() {
+				groups = append(groups, groupVersion.Group)
+			}
 			// set a preferred version
 			for _, group := range groups {
 				gvs := registered.EnabledVersionsForGroup(group)
