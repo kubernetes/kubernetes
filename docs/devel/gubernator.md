@@ -67,7 +67,7 @@ to filter logs for that test.
 
 Based on the message logged in the junit file, the pod name may be displayed.
 
-![alt text](https://github.com/kubernetes/kubernetes/docs/devel/gubernator-images/testfailures.png)
+![alt text](gubernator-images/testfailures.png)
 
 [Test Failures List Example](https://k8s-gubernator.appspot.com/build/kubernetes-jenkins/logs/kubernetes-e2e-gke/11721)
 
@@ -76,32 +76,32 @@ Based on the message logged in the junit file, the pod name may be displayed.
 The log filtering page comes with checkboxes and textboxes to aid in filtering. Filtered keywords will be bolded
 and lines including keywords will be highlighted. Up to four lines around the line of interest will also be displayed.
 
-![alt text](https://github.com/kubernetes/kubernetes/docs/devel/gubernator-images/filterpage.png)
+![alt text](gubernator-images/filterpage.png)
 
 If less than 100 lines are skipped, the "... skipping xx lines ..." message can be clicked to expand and show
 the hidden lines.
 
 Before expansion:
-![alt text](https://github.com/kubernetes/kubernetes/docs/devel/gubernator-images/skipping1.png)
+![alt text](gubernator-images/skipping1.png)
 After expansion:
-![alt text](https://github.com/kubernetes/kubernetes/docs/devel/gubernator-images/skipping2.png)
+![alt text](gubernator-images/skipping2.png)
 
 If the pod name was displayed in the Test Failures list, it will automatically be included in the filters.
 If it is not found in the error message, it can be manually entered into the textbox. Once a pod name
 is entered, the Pod UID, Namespace, and ContainerID may be automatically filled in as well. These can be
 altered as well. To apply the filter, check off the options corresponding to the filter.
 
-![alt text](https://github.com/kubernetes/kubernetes/docs/devel/gubernator-images/filterpage1.png)
+![alt text](gubernator-images/filterpage1.png)
 
 To add a filter, type the term to be filtered into the textbox labeled "Add filter:" and press enter.
 Additional filters will be displayed as checkboxes under the textbox.
 
-![alt text](https://github.com/kubernetes/kubernetes/docs/devel/gubernator-images/filterpage3.png)
+![alt text](gubernator-images/filterpage3.png)
 
 To choose which logs to view check off the checkboxes corresponding to the logs of interest. If multiple logs are
 included, the "Weave by timestamp" option can weave the selected logs together based on the timestamp in each line.
 
-![alt text](https://github.com/kubernetes/kubernetes/docs/devel/gubernator-images/filterpage2.png)
+![alt text](gubernator-images/filterpage2.png)
 
 [Log Filtering Example 1](https://k8s-gubernator.appspot.com/build/kubernetes-jenkins/logs/kubelet-gce-e2e-ci/5535/nodelog?pod=pod-configmaps-b5b876cb-3e1e-11e6-8956-42010af0001d&junit=junit_03.xml&wrap=on&logfiles=%2Fkubernetes-jenkins%2Flogs%2Fkubelet-gce-e2e-ci%2F5535%2Fartifacts%2Ftmp-node-e2e-7a5a3b40-e2e-node-coreos-stable20160622-image%2Fkube-apiserver.log&logfiles=%2Fkubernetes-jenkins%2Flogs%2Fkubelet-gce-e2e-ci%2F5535%2Fartifacts%2Ftmp-node-e2e-7a5a3b40-e2e-node-coreos-stable20160622-image%2Fkubelet.log&UID=on&poduid=b5b8a59e-3e1e-11e6-b358-42010af0001d&ns=e2e-tests-configmap-oi12h&cID=tmp-node-e2e-7a5a3b40-e2e-node-coreos-stable20160622-image)
 
