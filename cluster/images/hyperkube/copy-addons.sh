@@ -20,6 +20,16 @@
 # This way we're using the latest manifests from hyperkube without updating
 # kube-addon-manager which is used for other deployments too
 
+if [[ ${USE_CNI} == true ]]; then
+	# copy the daemonsets
+	cp /daemonsets/flannel-ds.yaml /etc/kubernetes/addons/
+	cp /daemonsets/kube-proxy-ds.yaml /etc/kubernetes/addons/
+
+	# configure the master IP in the templates
+	sed -i -e "s#MASTER_IP#${MASTER_IP}#g" /etc/kubernetes/addons/flannel-ds.yaml
+	sed -i -e "s#MASTER_IP#${MASTER_IP}#g" /etc/kubernetes/addons/kube-proxy-ds.yaml
+fi
+
 # While there is no data copied over to the emptyDir, try to copy it.
 while [[ ! -d /srv/kubernetes/addons ]]; do
 	cp -r /etc/kubernetes/* /srv/kubernetes/

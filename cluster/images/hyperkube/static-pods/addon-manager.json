@@ -38,6 +38,16 @@
             "mountPath": "/srv/kubernetes/",
             "readOnly": false
           }
+        ],
+        "env": [
+          {
+            "name": "MASTER_IP",
+            "value": "MASTER_IP_VALUE"
+          },
+          {
+            "name": "USE_CNI",
+            "value": "USE_CNI_VALUE"
+          }
         ]
       }
     ],
