@@ -142,9 +142,8 @@ Since kubernetes is mostly built and tested in containers, there are a few
 unique places you need to update the go version.
 
 - The image for cross compiling in [build/build-image/cross/](../../build/build-image/cross/). The `VERSION` file and `Dockerfile`.
-- The jenkins test-image in
-  [hack/jenkins/test-image/](../../hack/jenkins/test-image/). The `Dockerfile` and `Makefile`.
-- The docker image being run in [hack/jenkins/dockerized-e2e-runner.sh](../../hack/jenkins/dockerized-e2e-runner.sh) and [hack/jenkins/gotest-dockerized.sh](../../hack/jenkins/gotest-dockerized.sh).
+- Update [dockerized-e2e-runner.sh](https://github.com/kubernetes/test-infra/blob/master/jenkins/dockerized-e2e-runner.sh) to run a kubekins-e2e with the desired go version, which requires pushing [e2e-image](../../hack/jenkins/e2e-image/) and [test-image](../../hack/jenkins/test-image/) images that are `FROM` the desired go version.
+- The docker image being run in [hack/jenkins/gotest-dockerized.sh](../../hack/jenkins/gotest-dockerized.sh).
 - The cross tag `KUBE_BUILD_IMAGE_CROSS_TAG` in [build/common.sh](../../build/common.sh)
 
 ## Workflow
