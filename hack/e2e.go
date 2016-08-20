@@ -266,6 +266,8 @@ func TearDown() bool {
 
 // Up brings an e2e cluster up, recreating it if one is already running.
 func Up() bool {
+	// force having batch/v2alpha1 always on for e2e tests
+	os.Setenv("KUBE_RUNTIME_CONFIG", "batch/v2alpha1=true")
 	return finishRunning("up", exec.Command("./hack/e2e-internal/e2e-up.sh"))
 }
 
