@@ -466,6 +466,11 @@ kubelet_port: '$(echo "$KUBELET_PORT" | sed -e "s/'/''/g")'
 EOF
     fi
     # Configuration changes for test clusters
+    if [ -n "${TEST_ETCD_VERSION:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+etcd_docker_tag: '$(echo "$TEST_ETCD_VERSION" | sed -e "s/'/''/g")'
+EOF
+    fi
     if [ -n "${APISERVER_TEST_ARGS:-}" ]; then
       cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
 apiserver_test_args: '$(echo "$APISERVER_TEST_ARGS" | sed -e "s/'/''/g")'
