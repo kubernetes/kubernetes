@@ -73,14 +73,28 @@ func UnmountPath(mountPath string, mounter mount.Interface) error {
 		return nil
 	}
 
-	err := mounter.Unmount(mountPath)
-	if err == nil {
-		// Only delete directory on successful unmount
-		glog.V(5).Infof("Unmounted %q. Deleting path.", mountPath)
+	notMnt, err := mounter.IsLikelyNotMountPoint(mountPath)
+	if err != nil {
+		return err
+	}
+	if notMnt {
+		glog.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
 		return os.Remove(mountPath)
 	}
 
-	return err
+	// Unmount the mount path
+	if err := mounter.Unmount(mountPath); err != nil {
+		return err
+	}
+	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
+	if mntErr != nil {
+		return err
+	}
+	if notMnt {
+		glog.V(4).Info("%q is unmounted, deleting the directory", mountPath)
+		return os.Remove(mountPath)
+	}
+	return nil
 }
 
 // PathExists returns true if the specified path exists.
