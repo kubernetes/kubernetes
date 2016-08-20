@@ -33,7 +33,9 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/google/cadvisor/manager"
+	"github.com/google/cadvisor/metrics"
 	"github.com/google/cadvisor/utils/sysfs"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/runtime"
 )
 
@@ -70,7 +72,27 @@ func init() {
 	}
 }
 
-// Creates a cAdvisor and exports its API on the specified port if port > 0.
+func containerLabels(c *cadvisorapi.ContainerInfo) map[string]string {
+	set := map[string]string{metrics.LabelID: c.Name}
+	if len(c.Aliases) > 0 {
+		set[metrics.LabelName] = c.Aliases[0]
+	}
+	if image := c.Spec.Image; len(image) > 0 {
+		set[metrics.LabelImage] = image
+	}
+	if v, ok := c.Spec.Labels[types.KubernetesPodNameLabel]; ok {
+		set["pod_name"] = v
+	}
+	if v, ok := c.Spec.Labels[types.KubernetesPodNamespaceLabel]; ok {
+		set["namespace"] = v
+	}
+	if v, ok := c.Spec.Labels[types.KubernetesContainerNameLabel]; ok {
+		set["container_name"] = v
+	}
+	return set
+}
+
+// New creates a cAdvisor and exports its API on the specified port if port > 0.
 func New(port uint, runtime string) (Interface, error) {
 	sysFs, err := sysfs.NewRealSysFs()
 	if err != nil {
@@ -108,7 +130,7 @@ func (cc *cadvisorClient) exportHTTP(port uint) error {
 		return err
 	}
 
-	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", nil)
+	cadvisorhttp.RegisterPrometheusHandler(mux, cc, "/metrics", containerLabels)
 
 	// Only start the http server if port > 0
 	if port > 0 {
