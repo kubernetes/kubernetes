@@ -1331,6 +1331,14 @@
 			"Rev": "8096f47503459bcc74d1f4c487b7e6e42e5746b5"
 		},
 		{
+			"ImportPath": "github.com/gorilla/rpc/v2",
+			"Rev": "e592e2e099465ae27afa66ec089d570904cd2d53"
+		},
+		{
+			"ImportPath": "github.com/gorilla/rpc/v2/json2",
+			"Rev": "e592e2e099465ae27afa66ec089d570904cd2d53"
+		},
+		{
 			"ImportPath": "github.com/grpc-ecosystem/grpc-gateway/runtime",
 			"Comment": "v1.0.0-8-gf52d055",
 			"Rev": "f52d055dc48aec25854ed7d31862f78913cf17d1"
@@ -1862,6 +1870,10 @@
 		{
 			"ImportPath": "github.com/prometheus/procfs",
 			"Rev": "454a56f35412459b5e684fd5ec0f9211b94f002a"
+		},
+		{
+			"ImportPath": "github.com/quobyte/api",
+			"Rev": "06f1f9bc4119d7cc9e4f49534e8d2aeb6e435dec"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",

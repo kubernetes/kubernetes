@@ -1,0 +1,12 @@
+apiVersion: extensions/v1beta1
+kind: StorageClass
+metadata:
+   name: slow
+provisioner: kubernetes.io/quobyte
+parameters:
+    apiServer: http://139.59.210.140:7860
+    registry: 139.59.210.140:7861
+    adminSecretName: quobyte-admin-secret
+    adminSecretNamespace: "kube-system"
+    user: root
+    group: root
