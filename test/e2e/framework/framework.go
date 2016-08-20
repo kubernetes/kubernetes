@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -95,8 +96,9 @@ type TestDataSummary interface {
 }
 
 type FrameworkOptions struct {
-	ClientQPS   float32
-	ClientBurst int
+	ClientQPS    float32
+	ClientBurst  int
+	GroupVersion *unversioned.GroupVersion
 }
 
 // NewFramework makes a new framework and sets up a BeforeEach/AfterEach for
@@ -172,6 +174,9 @@ func (f *Framework) BeforeEach() {
 		Expect(err).NotTo(HaveOccurred())
 		config.QPS = f.options.ClientQPS
 		config.Burst = f.options.ClientBurst
+		if f.options.GroupVersion != nil {
+			config.GroupVersion = f.options.GroupVersion
+		}
 		if TestContext.KubeAPIContentType != "" {
 			config.ContentType = TestContext.KubeAPIContentType
 		}
