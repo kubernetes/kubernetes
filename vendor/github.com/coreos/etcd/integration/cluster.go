@@ -752,6 +752,7 @@ func NewClusterV3(t *testing.T, cfg *ClusterConfig) *ClusterV3 {
 	clus := &ClusterV3{
 		cluster: NewClusterByConfig(t, cfg),
 	}
+	clus.Launch(t)
 	for _, m := range clus.Members {
 		client, err := NewClientV3(m)
 		if err != nil {
@@ -759,7 +760,6 @@ func NewClusterV3(t *testing.T, cfg *ClusterConfig) *ClusterV3 {
 		}
 		clus.clients = append(clus.clients, client)
 	}
-	clus.Launch(t)
 
 	return clus
 }
