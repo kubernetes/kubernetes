@@ -34,4 +34,6 @@ ENV KUBE_GIT_VERSION_FILE /kube-version-defs
 # Make output from the dockerized build go someplace else
 ENV KUBE_OUTPUT_SUBPATH _output/dockerized
 
+ADD rsyncd.password /
+RUN chmod a+r /rsyncd.password
 ADD rsyncd.sh /

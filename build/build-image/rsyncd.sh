@@ -31,6 +31,7 @@ ALLOW=${ALLOW:-192.168.0.0/16 172.16.0.0/12 10.0.0./8}
 CONFDIR="/tmp/rsync.k8s"
 PIDFILE="${CONFDIR}/rsyncd.pid"
 CONFFILE="${CONFDIR}/rsyncd.conf"
+SECRETS="${CONFDIR}/rsyncd.secrets"
 
 mkdir -p "${CONFDIR}"
 
@@ -40,6 +41,13 @@ if [[ -f "${PIDFILE}" ]]; then
   killall $PID &> /dev/null || true
   rm "${PIDFILE}"
 fi
+
+PASSWORD=$(</rsyncd.password)
+
+cat <<EOF >"${SECRETS}"
+k8s:${PASSWORD}
+EOF
+chmod go= "${SECRETS}"
 
 cat <<EOF >"${CONFFILE}"
 pid file = ${PIDFILE}
@@ -51,6 +59,8 @@ port = 8730
 [k8s]
   hosts deny = *
   hosts allow = ${ALLOW}
+  auth users = k8s
+  secrets file = ${SECRETS}
   read only = false
   path = ${VOLUME}
   filter = - /.make/ - /.git/
