@@ -873,6 +873,17 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
+// WaitForReplicaSetHasDesiredReplicas waits for the desired replica count for
+// a ReplicaSet's ReplicaSelector to be equals the Replicas count.
+func WaitForReplicaSetHasDesiredReplicas(c *client.Client, ns, replicaSetName string) error {
+	w, err := c.ReplicaSets(ns).Watch(api.SingleObject(api.ObjectMeta{Name: replicaSetName}))
+	if err != nil {
+		return err
+	}
+	_, err = watch.Until(1*time.Minute, w, client.ReplicaSetHasDesiredReplicas)
+	return err
+}
+
 // WaitForFederationApiserverReady waits for the federation apiserver to be ready.
 // It tests the readiness by sending a GET request and expecting a non error response.
 func WaitForFederationApiserverReady(c *federation_release_1_4.Clientset) error {

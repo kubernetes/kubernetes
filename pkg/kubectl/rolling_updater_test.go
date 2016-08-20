@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 func oldRc(replicas int, original int) *api.ReplicationController {
@@ -1128,7 +1129,7 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			expected: []string{
 				"get",
 				"update",
-				"get",
+				"watch",
 				"get",
 			},
 		},
@@ -1139,7 +1140,7 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			expected: []string{
 				"get",
 				"update",
-				"get",
+				"watch",
 				"get",
 				"delete",
 			},
@@ -1168,7 +1169,18 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		watchedResponse, err := api.Scheme.Copy(test.responses[0])
+		if err != nil {
+			t.Fatalf("%s unexpected error: %v", test.name, err)
+		}
 		fake := testclient.NewSimpleFake(test.responses...)
+		fakeWatch := watch.NewFake()
+		fake.PrependWatchReactor("replicationcontrollers", testclient.DefaultWatchReactor(fakeWatch, nil))
+		go func() {
+			fakeWatch.Add(watchedResponse)
+		}()
+		// reaper := ReplicationControllerReaper{fake, time.Millisecond, time.Millisecond}
+		// err = reaper.Stop(rcExisting.Namespace, rcExisting.Name, 0, nil)
 		updater := &RollingUpdater{
 			ns: "default",
 			c:  fake,
@@ -1182,7 +1194,8 @@ func TestRollingUpdater_cleanupWithClients(t *testing.T) {
 			Timeout:       time.Millisecond,
 			CleanupPolicy: test.policy,
 		}
-		err := updater.cleanupWithClients(rc, rcExisting, config)
+		err = updater.cleanupWithClients(rc, rcExisting, config)
+
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}

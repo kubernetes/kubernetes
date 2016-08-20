@@ -29,11 +29,13 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/integer"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/pkg/watch"
 )
 
 const (
@@ -501,9 +503,16 @@ func (r *RollingUpdater) cleanupWithClients(oldRc, newRc *api.ReplicationControl
 		return err
 	}
 
-	if err = wait.Poll(config.Interval, config.Timeout, client.ControllerHasDesiredReplicas(r.c, newRc)); err != nil {
+	watchOptions := api.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", newRc.Name), ResourceVersion: "0"}
+	watcher, err := r.c.ReplicationControllers(r.ns).Watch(watchOptions)
+	if err != nil {
 		return err
 	}
+	_, err = watch.Until(config.Timeout, watcher, client.ReplicationControllerHasDesiredReplicas)
+	if err != nil {
+		return err
+	}
+
 	newRc, err = r.c.ReplicationControllers(r.ns).Get(newRc.Name)
 	if err != nil {
 		return err

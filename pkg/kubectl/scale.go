@@ -182,14 +182,7 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		if err != nil {
 			return err
 		}
-		_, err = watch.Until(waitForReplicas.Timeout, watcher, func(event watch.Event) (bool, error) {
-			if event.Type != watch.Added && event.Type != watch.Modified {
-				return false, nil
-			}
-
-			rc := event.Object.(*api.ReplicationController)
-			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == rc.Spec.Replicas, nil
-		})
+		_, err = watch.Until(waitForReplicas.Timeout, watcher, client.ReplicationControllerHasDesiredReplicas)
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}
@@ -245,15 +238,16 @@ func (scaler *ReplicaSetScaler) Scale(namespace, name string, newSize uint, prec
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
-		rs, err := scaler.c.ReplicaSets(namespace).Get(name)
+		watchOptions := api.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", name), ResourceVersion: "0"}
+		watcher, err := scaler.c.ReplicaSets(namespace).Watch(watchOptions)
 		if err != nil {
 			return err
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.ReplicaSetHasDesiredReplicas(scaler.c, rs))
+		_, err = watch.Until(waitForReplicas.Timeout, watcher, client.ReplicaSetHasDesiredReplicas)
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}
@@ -314,15 +308,16 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
 	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
-	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+	if err := wait.PollImmediate(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
 	if waitForReplicas != nil {
-		job, err := scaler.c.Jobs(namespace).Get(name)
+		watchOptions := api.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", name), ResourceVersion: "0"}
+		watcher, err := scaler.c.Jobs(namespace).Watch(watchOptions)
 		if err != nil {
 			return err
 		}
-		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.JobHasDesiredParallelism(scaler.c, job))
+		_, err = watch.Until(waitForReplicas.Timeout, watcher, client.JobHasDesiredParallelism)
 		if err == wait.ErrWaitTimeout {
 			return fmt.Errorf("timed out waiting for %q to be synced", name)
 		}

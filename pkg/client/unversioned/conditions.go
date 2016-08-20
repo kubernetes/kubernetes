@@ -28,73 +28,77 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-// ControllerHasDesiredReplicas returns a condition that will be true if and only if
-// the desired replica count for a controller's ReplicaSelector equals the Replicas count.
-func ControllerHasDesiredReplicas(c Interface, controller *api.ReplicationController) wait.ConditionFunc {
+// ReplicationControllerHasDesiredReplicas returns true if and only if the
+// desired replica count for a controller's ReplicaSelector equals the Replicas count.
+func ReplicationControllerHasDesiredReplicas(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "replicationcontrollers"}, "")
+	}
 
-	// If we're given a controller where the status lags the spec, it either means that the controller is stale,
-	// or that the rc manager hasn't noticed the update yet. Polling status.Replicas is not safe in the latter case.
-	desiredGeneration := controller.Generation
+	switch t := event.Object.(type) {
+	case *api.ReplicationController:
+		// If we're given a controller where the status lags the spec, it either means that the controller is stale,
+		// or that the rc manager hasn't noticed the update yet. Polling status.Replicas is not safe in the latter case.
+		desiredGeneration := t.Generation
 
-	return func() (bool, error) {
-		ctrl, err := c.ReplicationControllers(controller.Namespace).Get(controller.Name)
-		if err != nil {
-			return false, err
-		}
 		// There's a chance a concurrent update modifies the Spec.Replicas causing this check to pass,
 		// or, after this check has passed, a modification causes the rc manager to create more pods.
 		// This will not be an issue once we've implemented graceful delete for rcs, but till then
 		// concurrent stop operations on the same rc might have unintended side effects.
-		return ctrl.Status.ObservedGeneration >= desiredGeneration && ctrl.Status.Replicas == ctrl.Spec.Replicas, nil
+		return t.Status.ObservedGeneration >= desiredGeneration && t.Status.Replicas == t.Spec.Replicas, nil
 	}
+	return false, nil
 }
 
-// ReplicaSetHasDesiredReplicas returns a condition that will be true if and only if
-// the desired replica count for a ReplicaSet's ReplicaSelector equals the Replicas count.
-func ReplicaSetHasDesiredReplicas(c ExtensionsInterface, replicaSet *extensions.ReplicaSet) wait.ConditionFunc {
+// ReplicaSetHasDesiredReplicas returns true if and only if the desired replica
+// count for a ReplicaSet's ReplicaSelector equals the Replicas count.
+func ReplicaSetHasDesiredReplicas(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "replicasets"}, "")
+	}
+	switch t := event.Object.(type) {
+	case *extensions.ReplicaSet:
+		// If we're given a ReplicaSet where the status lags the spec, it either means that the
+		// ReplicaSet is stale, or that the ReplicaSet manager hasn't noticed the update yet.
+		// Polling status.Replicas is not safe in the latter case.
+		desiredGeneration := t.Generation
 
-	// If we're given a ReplicaSet where the status lags the spec, it either means that the
-	// ReplicaSet is stale, or that the ReplicaSet manager hasn't noticed the update yet.
-	// Polling status.Replicas is not safe in the latter case.
-	desiredGeneration := replicaSet.Generation
-
-	return func() (bool, error) {
-		rs, err := c.ReplicaSets(replicaSet.Namespace).Get(replicaSet.Name)
-		if err != nil {
-			return false, err
-		}
 		// There's a chance a concurrent update modifies the Spec.Replicas causing this check to
 		// pass, or, after this check has passed, a modification causes the ReplicaSet manager to
 		// create more pods. This will not be an issue once we've implemented graceful delete for
 		// ReplicaSets, but till then concurrent stop operations on the same ReplicaSet might have
 		// unintended side effects.
-		return rs.Status.ObservedGeneration >= desiredGeneration && rs.Status.Replicas == rs.Spec.Replicas, nil
+		return t.Status.ObservedGeneration >= desiredGeneration && t.Status.Replicas == t.Spec.Replicas, nil
 	}
+	return false, nil
 }
 
-// JobHasDesiredParallelism returns a condition that will be true if the desired parallelism count
-// for a job equals the current active counts or is less by an appropriate successful/unsuccessful count.
-func JobHasDesiredParallelism(c BatchInterface, job *batch.Job) wait.ConditionFunc {
+// JobHasDesiredParallelism returns true if the desired parallelism count for a job
+// equals the current active counts or is less by an appropriate successful/unsuccessful count.
+func JobHasDesiredParallelism(event watch.Event) (bool, error) {
+	switch event.Type {
+	case watch.Deleted:
+		return false, errors.NewNotFound(unversioned.GroupResource{Resource: "jobs"}, "")
+	}
 
-	return func() (bool, error) {
-		job, err := c.Jobs(job.Namespace).Get(job.Name)
-		if err != nil {
-			return false, err
-		}
-
+	switch t := event.Object.(type) {
+	case *batch.Job:
 		// desired parallelism can be either the exact number, in which case return immediately
-		if job.Status.Active == *job.Spec.Parallelism {
+		if t.Status.Active == *t.Spec.Parallelism {
 			return true, nil
 		}
-		if job.Spec.Completions == nil {
+		if t.Spec.Completions == nil {
 			// A job without specified completions needs to wait for Active to reach Parallelism.
 			return false, nil
 		} else {
 			// otherwise count successful
-			progress := *job.Spec.Completions - job.Status.Active - job.Status.Succeeded
+			progress := *t.Spec.Completions - t.Status.Active - t.Status.Succeeded
 			return progress == 0, nil
 		}
 	}
+	return false, nil
 }
 
 // DeploymentHasDesiredReplicas returns a condition that will be true if and only if
