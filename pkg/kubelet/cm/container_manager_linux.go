@@ -100,7 +100,8 @@ type containerManagerImpl struct {
 	qosContainers    QOSContainersInfo
 	periodicTasks    []func()
 	// holds all the mounted cgroup subsystems
-	subsystems *cgroupSubsystems
+	subsystems *CgroupSubsystems
+	nodeInfo   *api.Node
 }
 
 type features struct {
@@ -173,9 +174,9 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist : %v", err)
 		}
 	}
-	subsystems, err := getCgroupSubsystems()
+	subsystems, err := GetCgroupSubsystems()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get mounted subsystems: %v", err)
+		return nil, fmt.Errorf("failed to get mounted cgroup subsystems: %v", err)
 	}
 	return &containerManagerImpl{
 		cadvisorInterface: cadvisorInterface,
@@ -183,6 +184,23 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 		NodeConfig:        nodeConfig,
 		subsystems:        subsystems,
 	}, nil
+}
+
+// NewPodContainerManager is a factory method returns a PodContainerManager object
+// If qosCgroups are enabled then it returns the general pod container manager
+// otherwise it returns a no-op manager which essentially does nothing
+func (cm *containerManagerImpl) NewPodContainerManager() PodContainerManager {
+	if cm.NodeConfig.CgroupsPerQOS {
+		return &podContainerManagerImpl{
+			qosContainersInfo: cm.qosContainers,
+			nodeInfo:          cm.nodeInfo,
+			subsystems:        cm.subsystems,
+			cgroupManager:     NewCgroupManager(cm.subsystems),
+		}
+	}
+	return &podContainerManagerNoop{
+		cgroupRoot: cm.NodeConfig.CgroupRoot,
+	}
 }
 
 // Create a cgroup container manager.
@@ -213,7 +231,7 @@ const (
 // RootContainer by default. InitQOS is called only once during kubelet bootstrapping.
 // TODO(@dubstack) Add support for cgroup-root to work on both systemd and cgroupfs
 // drivers. Currently we only support systems running cgroupfs driver
-func InitQOS(rootContainer string, subsystems *cgroupSubsystems) (QOSContainersInfo, error) {
+func InitQOS(rootContainer string, subsystems *CgroupSubsystems) (QOSContainersInfo, error) {
 	cm := NewCgroupManager(subsystems)
 	// Top level for Qos containers are created only for Burstable
 	// and Best Effort classes
@@ -425,13 +443,24 @@ func (cm *containerManagerImpl) GetNodeConfig() NodeConfig {
 	return cm.NodeConfig
 }
 
+func (cm *containerManagerImpl) GetMountedSubsystems() *CgroupSubsystems {
+	return cm.subsystems
+}
+
+func (cm *containerManagerImpl) GetQOSContainersInfo() QOSContainersInfo {
+	return cm.qosContainers
+}
+
 func (cm *containerManagerImpl) Status() Status {
 	cm.RLock()
 	defer cm.RUnlock()
 	return cm.status
 }
 
-func (cm *containerManagerImpl) Start() error {
+func (cm *containerManagerImpl) Start(node *api.Node) error {
+	// cache the node Info including resource capacity and
+	// allocatable of the node
+	cm.nodeInfo = node
 	// Setup the node
 	if err := cm.setupNode(); err != nil {
 		return err
