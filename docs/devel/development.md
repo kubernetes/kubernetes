@@ -225,6 +225,8 @@ git push -f origin my-feature
 2. Click the "Compare & pull request" button next to your "my-feature" branch.
 3. Check out the pull request [process](pull-requests.md) for more details
 
+**Note:** If you have write access, please refrain from using the GitHub UI for creating PRs, because GitHub will create the PR branch inside the main repository rather than inside your fork.
+
 ### When to retain commits and when to squash
 
 Upon merge, all git commits should represent meaningful milestones or units of
