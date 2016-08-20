@@ -50,9 +50,10 @@ const (
 )
 
 var (
-	replicaSetReviewDelay   = 10 * time.Second
-	clusterAvailableDelay   = 20 * time.Second
-	clusterUnavailableDelay = 60 * time.Second
+	replicaSetReviewDelay    = 10 * time.Second
+	clusterAvailableDelay    = 20 * time.Second
+	clusterUnavailableDelay  = 60 * time.Second
+	allReplicaSetReviewDealy = 2 * time.Minute
 )
 
 func parseFederationReplicaSetReference(frs *extensionsv1.ReplicaSet) (*fed.FederatedReplicaSetPreferences, error) {
@@ -121,12 +122,14 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			&extensionsv1.ReplicaSet{},
 			controller.NoResyncPeriodFunc(),
 			fedutil.NewTriggerOnAllChanges(
-				func(obj runtime.Object) { frsc.deliverLocalReplicaSet(obj, replicaSetReviewDelay) },
+				func(obj runtime.Object) { frsc.deliverLocalReplicaSet(obj, allReplicaSetReviewDealy) },
 			),
 		)
 	}
 	clusterLifecycle := fedutil.ClusterLifecycleHandlerFuncs{
-		ClusterAvailable: func(cluster *fedv1.Cluster) { /* no rebalancing for now */ },
+		ClusterAvailable: func(cluster *fedv1.Cluster) {
+			frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterUnavailableDelay)
+		},
 		ClusterUnavailable: func(cluster *fedv1.Cluster, _ []interface{}) {
 			frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterUnavailableDelay)
 		},
@@ -147,7 +150,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 			controller.NoResyncPeriodFunc(),
 			fedutil.NewTriggerOnAllChanges(
 				func(obj runtime.Object) {
-					//frsc.deliverLocalReplicaSet(obj, replicaSetReviewDelay)
+					frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterUnavailableDelay)
 				},
 			),
 		)
@@ -182,7 +185,7 @@ func (frsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 		frsc.replicasetWorkQueue.Add(item.Key)
 	})
 	frsc.clusterDeliverer.StartWithHandler(func(_ *fedutil.DelayingDelivererItem) {
-		frsc.reconcileNamespacesOnClusterChange()
+		frsc.reconcileReplicaSetsOnClusterChange()
 	})
 
 	for !frsc.isSynced() {
@@ -227,11 +230,6 @@ func (frsc *ReplicaSetController) isSynced() bool {
 
 	if !frsc.fedPodInformer.ClustersSynced() {
 		glog.V(2).Infof("Cluster list not synced")
-		return false
-	}
-	clusters, err = frsc.fedPodInformer.GetReadyClusters()
-	if err != nil {
-		glog.Errorf("Failed to get ready clusters: %v", err)
 		return false
 	}
 	if !frsc.fedPodInformer.GetTargetStore().ClustersSynced(clusters) {
@@ -297,7 +295,7 @@ func (frsc *ReplicaSetController) worker() {
 }
 
 func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, clusters []*fedv1.Cluster,
-	expected map[string]int64, actual map[string]int64) map[string]int64 {
+	current map[string]int64, estimatedCapacity map[string]int64) map[string]int64 {
 	// TODO: integrate real scheduler
 
 	plnr := frsc.defaultPlanner
@@ -314,14 +312,17 @@ func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, cluster
 	for _, cluster := range clusters {
 		clusterNames = append(clusterNames, cluster.Name)
 	}
-	scheduleResult, _ := plnr.Plan(replicas, clusterNames, expected, actual)
+	scheduleResult, overflow := plnr.Plan(replicas, clusterNames, current, estimatedCapacity)
 	// make sure the return contains clusters need to zero the replicas
 	result := make(map[string]int64)
-	for clusterName := range expected {
+	for clusterName := range current {
 		result[clusterName] = 0
 	}
 	for clusterName, replicas := range scheduleResult {
 		result[clusterName] = replicas
+	}
+	for clusterName, replicas := range overflow {
+		result[clusterName] += replicas
 	}
 	return result
 }
@@ -357,8 +358,8 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) error {
 		return err
 	}
 	podStatus, err := AnalysePods(frs, allPods, time.Now())
-	expected := make(map[string]int64)
-	actual := make(map[string]int64)
+	current := make(map[string]int64)
+	estimatedCapacity := make(map[string]int64)
 	for _, cluster := range clusters {
 		lrsObj, exists, err := frsc.fedReplicaSetInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
@@ -366,15 +367,15 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) error {
 		}
 		if exists {
 			lrs := lrsObj.(*extensionsv1.ReplicaSet)
-			expected[cluster.Name] = int64(*lrs.Spec.Replicas)
-			unscheduleable := int64(podStatus[cluster.Name].Unschedulable)
-			if unscheduleable > 0 {
-				actual[cluster.Name] = int64(*lrs.Spec.Replicas)
+			current[cluster.Name] = int64(podStatus[cluster.Name].RunningAndReady) // include pending as well?
+			unschedulable := int64(podStatus[cluster.Name].Unschedulable)
+			if unschedulable > 0 {
+				estimatedCapacity[cluster.Name] = int64(*lrs.Spec.Replicas) - unschedulable
 			}
 		}
 	}
 
-	scheduleResult := frsc.schedule(frs, clusters, expected, actual)
+	scheduleResult := frsc.schedule(frs, clusters, current, estimatedCapacity)
 
 	glog.Infof("Start syncing local replicaset %v", scheduleResult)
 
@@ -436,7 +437,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) error {
 	return nil
 }
 
-func (frsc *ReplicaSetController) reconcileNamespacesOnClusterChange() {
+func (frsc *ReplicaSetController) reconcileReplicaSetsOnClusterChange() {
 	if !frsc.isSynced() {
 		frsc.clusterDeliverer.DeliverAfter(allClustersKey, nil, clusterAvailableDelay)
 	}

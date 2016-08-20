@@ -46,7 +46,7 @@ func TestParseFederationReplicaSetReference(t *testing.T) {
 		`{`, // bad json
 	}
 
-	rs := mkReplicaSet("rs-1", 100)
+	rs := newReplicaSetWithReplicas("rs-1", 100)
 	accessor, _ := meta.Accessor(rs)
 	anno := accessor.GetAnnotations()
 	if anno == nil {
@@ -75,13 +75,14 @@ func TestReplicaSetController(t *testing.T) {
 	replicaSetReviewDelay = 10 * time.Millisecond
 	clusterAvailableDelay = 20 * time.Millisecond
 	clusterUnavailableDelay = 60 * time.Millisecond
+	allReplicaSetReviewDealy = 120 * time.Millisecond
 
 	fedclientset := fedclientfake.NewSimpleClientset()
 	fedrswatch := watch.NewFake()
 	fedclientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fedrswatch, nil))
 
-	fedclientset.Federation().Clusters().Create(mkCluster("k8s-1", apiv1.ConditionTrue))
-	fedclientset.Federation().Clusters().Create(mkCluster("k8s-2", apiv1.ConditionTrue))
+	fedclientset.Federation().Clusters().Create(newClusterWithReadyStatus("k8s-1", apiv1.ConditionTrue))
+	fedclientset.Federation().Clusters().Create(newClusterWithReadyStatus("k8s-2", apiv1.ConditionTrue))
 
 	kube1clientset := kubeclientfake.NewSimpleClientset()
 	kube1rswatch := watch.NewFake()
@@ -104,26 +105,29 @@ func TestReplicaSetController(t *testing.T) {
 			return nil, fmt.Errorf("Unknown cluster: %v", cluster.Name)
 		}
 	}
-	stopChan := make(chan struct{})
 	replicaSetController := NewReplicaSetController(fedclientset)
 	rsFedinformer := toFederatedInformerForTestOnly(replicaSetController.fedReplicaSetInformer)
 	rsFedinformer.SetClientFactory(fedInformerClientFactory)
 	podFedinformer := toFederatedInformerForTestOnly(replicaSetController.fedPodInformer)
 	podFedinformer.SetClientFactory(fedInformerClientFactory)
 
+	stopChan := make(chan struct{})
+	defer close(stopChan)
 	go replicaSetController.Run(1, stopChan)
 
-	rs := mkReplicaSet("rs", 9)
+	rs := newReplicaSetWithReplicas("rs", 9)
 	rs, _ = fedclientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Create(rs)
 	fedrswatch.Add(rs)
 	time.Sleep(1 * time.Second)
 
 	rs1, _ := kube1clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
+	kube1rswatch.Add(rs1)
 	rs1.Status.Replicas = *rs1.Spec.Replicas
 	rs1, _ = kube1clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).UpdateStatus(rs1)
 	kube1rswatch.Modify(rs1)
 
 	rs2, _ := kube2clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
+	kube2rswatch.Add(rs2)
 	rs2.Status.Replicas = *rs2.Spec.Replicas
 	rs2, _ = kube2clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).UpdateStatus(rs2)
 	kube2rswatch.Modify(rs2)
@@ -137,15 +141,22 @@ func TestReplicaSetController(t *testing.T) {
 	rs.Spec.Replicas = &replicas
 	rs, _ = fedclientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Update(rs)
 	fedrswatch.Modify(rs)
+	time.Sleep(1 * time.Second)
 
-	time.Sleep(2 * time.Second)
-	rs, _ = fedclientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	rs1, _ = kube1clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
+	rs1.Status.Replicas = *rs1.Spec.Replicas
+	rs1, _ = kube1clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).UpdateStatus(rs1)
+	kube1rswatch.Modify(rs1)
+
 	rs2, _ = kube2clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
+	rs2.Status.Replicas = *rs2.Spec.Replicas
+	rs2, _ = kube2clientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).UpdateStatus(rs2)
+	kube2rswatch.Modify(rs2)
+
+	time.Sleep(1 * time.Second)
+	rs, _ = fedclientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	assert.Equal(t, *rs.Spec.Replicas, *rs1.Spec.Replicas+*rs2.Spec.Replicas)
 	assert.Equal(t, rs.Status.Replicas, rs1.Status.Replicas+rs2.Status.Replicas)
-
-	close(stopChan)
 }
 
 func toFederatedInformerForTestOnly(informer fedutil.FederatedInformer) fedutil.FederatedInformerForTestOnly {
@@ -153,7 +164,7 @@ func toFederatedInformerForTestOnly(informer fedutil.FederatedInformer) fedutil.
 	return inter.(fedutil.FederatedInformerForTestOnly)
 }
 
-func mkCluster(name string, readyStatus apiv1.ConditionStatus) *fedv1.Cluster {
+func newClusterWithReadyStatus(name string, readyStatus apiv1.ConditionStatus) *fedv1.Cluster {
 	return &fedv1.Cluster{
 		ObjectMeta: apiv1.ObjectMeta{
 			Name: name,
@@ -166,7 +177,7 @@ func mkCluster(name string, readyStatus apiv1.ConditionStatus) *fedv1.Cluster {
 	}
 }
 
-func mkReplicaSet(name string, replicas int32) *extensionsv1.ReplicaSet {
+func newReplicaSetWithReplicas(name string, replicas int32) *extensionsv1.ReplicaSet {
 	return &extensionsv1.ReplicaSet{
 		ObjectMeta: apiv1.ObjectMeta{
 			Name:      name,
