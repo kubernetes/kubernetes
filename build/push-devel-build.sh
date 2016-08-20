@@ -30,5 +30,6 @@ KUBE_GCS_RELEASE_PREFIX="devel/${LATEST}"
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/lib/release.sh"
 
 kube::release::gcs::release
