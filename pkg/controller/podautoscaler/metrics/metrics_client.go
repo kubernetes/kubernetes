@@ -166,15 +166,15 @@ func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selec
 
 	glog.V(4).Infof("Heapster metrics result: %s", string(resultRaw))
 
-	metrics := make([]metrics_api.PodMetrics, 0)
+	metrics := metrics_api.PodMetricsList{}
 	err = json.Unmarshal(resultRaw, &metrics)
 	if err != nil {
 		return 0, time.Time{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
 	}
 
-	if len(metrics) != len(podNames) {
+	if len(metrics.Items) != len(podNames) {
 		present := sets.NewString()
-		for _, m := range metrics {
+		for _, m := range metrics.Items {
 			present.Insert(m.Name)
 		}
 		missing := make([]string, 0)
@@ -187,11 +187,11 @@ func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selec
 		if len(missing) > 0 {
 			hint = fmt.Sprintf(" (sample missing pod: %s/%s)", namespace, missing[0])
 		}
-		return 0, time.Time{}, fmt.Errorf("metrics obtained for %d/%d of pods%s", len(metrics), len(podNames), hint)
+		return 0, time.Time{}, fmt.Errorf("metrics obtained for %d/%d of pods%s", len(metrics.Items), len(podNames), hint)
 	}
 
 	sum := int64(0)
-	for _, m := range metrics {
+	for _, m := range metrics.Items {
 		if _, found := podNames[m.Name]; found {
 			for _, c := range m.Containers {
 				cpu, found := c.Usage[v1.ResourceCPU]
@@ -205,7 +205,7 @@ func (h *HeapsterMetricsClient) getCpuUtilizationForPods(namespace string, selec
 		}
 	}
 
-	return sum / int64(len(metrics)), metrics[0].Timestamp.Time, nil
+	return sum / int64(len(metrics.Items)), metrics.Items[0].Timestamp.Time, nil
 }
 
 // GetCustomMetric returns the average value of the given custom metric from the
