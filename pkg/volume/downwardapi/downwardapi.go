@@ -215,6 +215,7 @@ func (d *downwardAPIVolume) collectData(defaultMode *int32) (map[string]volumeut
 			fileProjection.Mode = *defaultMode
 		}
 		if fileInfo.FieldRef != nil {
+			// TODO: unify with Kubelet.podFieldSelectorRuntimeValue
 			if values, err := fieldpath.ExtractFieldPathAsString(d.pod, fileInfo.FieldRef.FieldPath); err != nil {
 				glog.Errorf("Unable to extract field %s: %s", fileInfo.FieldRef.FieldPath, err.Error())
 				errlist = append(errlist, err)
