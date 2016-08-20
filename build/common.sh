@@ -393,6 +393,9 @@ function kube::build::build_image() {
 
   cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+  dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+  chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+
   kube::build::update_dockerfile
 
   kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
@@ -592,15 +595,16 @@ function kube::build::sync_to_container() {
   kube::build::start_rsyncd_container
 
   rsync \
+    --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password" \
     --filter='- /.git/' \
     --filter='- /.make/' \
     --filter='- /_output/' \
     --filter='- /' \
     --prune-empty-dirs \
     -ap \
-    "${KUBE_ROOT}/" rsync://localhost:8730/k8s/
+    "${KUBE_ROOT}/" rsync://k8s@localhost:8730/k8s/
 
-  kube::build::stop_rsyncd_container
+  #kube::build::stop_rsyncd_container
 }
 
 # If the Docker server is remote, copy the results back out.
@@ -610,13 +614,14 @@ function kube::build::copy_output() {
   kube::build::start_rsyncd_container
 
   rsync \
+    --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password" \
     --prune-empty-dirs \
     --filter='+ /_output/dockerized/bin/**' \
     --filter='+ zz_generated.*' \
     --filter='+ */' \
     --filter='- /**' \
     -ap \
-    rsync://localhost:8730/k8s/ "${KUBE_ROOT}"
+    rsync://k8s@localhost:8730/k8s/ "${KUBE_ROOT}"
 
-  kube::build::stop_rsyncd_container
+  #kube::build::stop_rsyncd_container
 }
