@@ -29,31 +29,32 @@ import (
 // RegisteredRateLimiter records the registered RateLimters to avoid
 // duplication.
 type RegisteredRateLimiter struct {
-	rateLimiters map[unversioned.GroupVersion]struct{}
-	lock         sync.RWMutex
+	rateLimiters map[unversioned.GroupVersion]*sync.Once
 }
 
 // NewRegisteredRateLimiter returns a new RegisteredRateLimiater.
-func NewRegisteredRateLimiter() *RegisteredRateLimiter {
-	return &RegisteredRateLimiter{
-		rateLimiters: make(map[unversioned.GroupVersion]struct{}),
+// TODO: NewRegisteredRateLimiter is not dynamic. We need to find a better way
+// when GC dynamically change the resources it monitors.
+func NewRegisteredRateLimiter(resources []unversioned.GroupVersionResource) *RegisteredRateLimiter {
+	rateLimiters := make(map[unversioned.GroupVersion]*sync.Once)
+	for _, resource := range resources {
+		gv := resource.GroupVersion()
+		if _, found := rateLimiters[gv]; !found {
+			rateLimiters[gv] = &sync.Once{}
+		}
 	}
+	return &RegisteredRateLimiter{rateLimiters: rateLimiters}
 }
 
 func (r *RegisteredRateLimiter) registerIfNotPresent(gv unversioned.GroupVersion, client *dynamic.Client, prefix string) {
-	r.lock.RLock()
-	_, ok := r.rateLimiters[gv]
-	r.lock.RUnlock()
-	if ok {
+	once, found := r.rateLimiters[gv]
+	if !found {
 		return
 	}
-	r.lock.Lock()
-	defer r.lock.Unlock()
-	if _, ok := r.rateLimiters[gv]; !ok {
+	once.Do(func() {
 		if rateLimiter := client.GetRateLimiter(); rateLimiter != nil {
 			group := strings.Replace(gv.Group, ".", ":", -1)
 			metrics.RegisterMetricAndTrackRateLimiterUsage(fmt.Sprintf("%s_%s_%s", prefix, group, gv.Version), rateLimiter)
 		}
-		r.rateLimiters[gv] = struct{}{}
-	}
+	})
 }
