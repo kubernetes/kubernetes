@@ -125,6 +125,25 @@ function kubectl-with-retry()
   done
 }
 
+# Waits for the pods with the given label to match the list of names. Don't call
+# this function unless you know the exact pod names, or expect no pods.
+# $1: label to match
+# $2: list of pod names sorted by name
+# Example invocation:
+# wait-for-pods-with-label "app=foo" "nginx-0nginx-1"
+function wait-for-pods-with-label()
+{
+  for i in $(seq 1 10); do
+    kubeout=`kubectl get po -l $1 --template '{{range.items}}{{.metadata.name}}{{end}}' --sort-by metadata.name "${kube_flags[@]}"`
+    if [[ $kubeout = $2 ]]; then
+        return
+    fi
+    echo Waiting for pods: $2, found $kubeout
+    sleep $i
+  done
+  kube::log::error_exit "Timeout waiting for pods with label $1"
+}
+
 kube::util::trap_add cleanup EXIT SIGINT
 kube::util::ensure-temp-dir
 
@@ -311,6 +330,7 @@ runTests() {
   hpa_min_field=".spec.minReplicas"
   hpa_max_field=".spec.maxReplicas"
   hpa_cpu_field=".spec.targetCPUUtilizationPercentage"
+  petset_replicas_field=".spec.replicas"
   job_parallelism_field=".spec.parallelism"
   deployment_replicas=".spec.replicas"
   secret_data=".data"
@@ -2100,6 +2120,37 @@ __EOF__
   kubectl delete rs frontend "${kube_flags[@]}"
 
 
+
+  ############
+  # Pet Sets #
+  ############
+
+  kube::log::status "Testing kubectl(${version}:petsets)"
+
+  ### Create and stop petset, make sure it doesn't leak pods
+  # Pre-condition: no petset exists
+  kube::test::get_object_assert petset "{{range.items}}{{$id_field}}:{{end}}" ''
+  # Command: create petset
+  kubectl create -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
+
+  ### Scale petset test with current-replicas and replicas
+  # Pre-condition: 0 replicas
+  kube::test::get_object_assert 'petset nginx' "{{$petset_replicas_field}}" '0'
+  # Command: Scale up
+  kubectl scale --current-replicas=0 --replicas=1 petset nginx "${kube_flags[@]}"
+  # Post-condition: 1 replica, named nginx-0
+  kube::test::get_object_assert 'petset nginx' "{{$petset_replicas_field}}" '1'
+  # Typically we'd wait and confirm that N>1 replicas are up, but this framework
+  # doesn't start  the scheduler, so pet-0 will block all others.
+  # TODO: test robust scaling in an e2e.
+  wait-for-pods-with-label "app=nginx-petset" "nginx-0"
+
+  ### Clean up
+  kubectl delete -f hack/testdata/nginx-petset.yaml "${kube_flags[@]}"
+  # Post-condition: no pods from petset controller
+  wait-for-pods-with-label "app=nginx-petset" ""
+
+
   ######################
   # Lists              #
   ######################
@@ -2410,7 +2461,7 @@ __EOF__
     exit 1
   fi
   rm "${SAR_RESULT_FILE}"
- 
+
 
   #####################
   # Retrieve multiple #
