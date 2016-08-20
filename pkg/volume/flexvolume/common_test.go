@@ -105,7 +105,7 @@ func fakeVolumeSpec() *volume.Spec {
 			},
 		},
 	}
-	return volume.NewSpecFromVolume(vol, "default")
+	return volume.NewSpecFromVolume(vol)
 }
 
 func fakePersistentVolumeSpec() *volume.Spec {
@@ -122,7 +122,7 @@ func fakePersistentVolumeSpec() *volume.Spec {
 			},
 		},
 	}
-	return volume.NewSpecFromPersistentVolume(vol, false, "default")
+	return volume.NewSpecFromPersistentVolume(vol, false)
 }
 
 func specJson(plugin *flexVolumePlugin, spec *volume.Spec, extraOptions map[string]string) string {

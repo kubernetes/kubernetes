@@ -48,6 +48,7 @@ func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName string) (string,
 func (a *flexVolumeAttacher) WaitForAttach(spec *volume.Spec, devicePath string, timeout time.Duration) (string, error) {
 	call := a.plugin.NewDriverCallWithTimeout(waitForAttachCmd, timeout)
 	call.AppendSpec(spec, a.plugin.host, nil)
+	call.Append(devicePath)
 
 	status, err := call.Run()
 	if isCmdNotSupportedErr(err) {

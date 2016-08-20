@@ -166,17 +166,6 @@ func NewOptionsForDriver(spec *volume.Spec, host volume.VolumeHost, extraOptions
 		options[optionReadWrite] = "rw"
 	}
 
-	if volSource.SecretRef != nil {
-		// Extract secret and pass it as options.
-		secrets, err := getSecrets(spec, host)
-		if err != nil {
-			return nil, err
-		}
-		for name, secret := range secrets {
-			options[optionKeySecret+"/"+name] = secret
-		}
-	}
-
 	for key, value := range extraOptions {
 		options[key] = value
 	}

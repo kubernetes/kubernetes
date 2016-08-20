@@ -27,26 +27,28 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
-func getSecrets(spec *volume.Spec, host volume.VolumeHost) (map[string]string, error) {
+func addSecretsToOptions(options map[string]string, spec *volume.Spec, namespace string, host volume.VolumeHost) error {
 	fv, _ := getVolumeSource(spec)
-	secrets := make(map[string]string)
-	if fv.SecretRef != nil {
-		kubeClient := host.GetKubeClient()
-		if kubeClient == nil {
-			return nil, fmt.Errorf("Cannot get kube client")
-		}
-
-		secret, err := kubeClient.Core().Secrets(spec.Namespace).Get(fv.SecretRef.Name)
-		if err != nil {
-			err = fmt.Errorf("Couldn't get secret %v/%v err: %v", spec.Namespace, fv.SecretRef.Name, err)
-			return nil, err
-		}
-		for name, data := range secret.Data {
-			secrets[name] = base64.StdEncoding.EncodeToString(data)
-			glog.V(1).Infof("found flex volume secret info: %s", name)
-		}
+	if fv.SecretRef == nil {
+		return nil
 	}
-	return secrets, nil
+
+	kubeClient := host.GetKubeClient()
+	if kubeClient == nil {
+		return fmt.Errorf("Cannot get kube client")
+	}
+
+	secret, err := kubeClient.Core().Secrets(namespace).Get(fv.SecretRef.Name)
+	if err != nil {
+		err = fmt.Errorf("Couldn't get secret %v/%v err: %v", namespace, fv.SecretRef.Name, err)
+		return err
+	}
+	for name, data := range secret.Data {
+		options[optionKeySecret+"/"+name] = base64.StdEncoding.EncodeToString(data)
+		glog.V(1).Infof("found flex volume secret info: %s", name)
+	}
+
+	return nil
 }
 
 func getVolumeSource(spec *volume.Spec) (volumeSource *api.FlexVolumeSource, readOnly bool) {

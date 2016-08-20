@@ -984,7 +984,7 @@ func (ctrl *PersistentVolumeController) recycleVolumeOperation(arg interface{}) 
 	volume = newVolume
 
 	// Find a plugin.
-	spec := vol.NewSpecFromPersistentVolume(volume, false, "")
+	spec := vol.NewSpecFromPersistentVolume(volume, false)
 	plugin, err := ctrl.volumePluginMgr.FindRecyclablePluginBySpec(spec)
 	if err != nil {
 		// No recycler found. Emit an event and mark the volume Failed.
@@ -1154,7 +1154,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 		}
 	}
 
-	spec := vol.NewSpecFromPersistentVolume(volume, false, "")
+	spec := vol.NewSpecFromPersistentVolume(volume, false)
 	if plugin == nil {
 		// The plugin that provisioned the volume was not found or the volume
 		// was not dynamically provisioned. Try to find a plugin by spec.

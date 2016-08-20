@@ -94,7 +94,7 @@ func (plugin *configMapPlugin) ConstructVolumeSpec(volumeName, mountPath string)
 		},
 	}
 	// namespace is unknown here
-	return volume.NewSpecFromVolume(configMapVolume, ""), nil
+	return volume.NewSpecFromVolume(configMapVolume), nil
 }
 
 type configMapVolume struct {

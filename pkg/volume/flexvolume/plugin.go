@@ -100,24 +100,21 @@ func (plugin *flexVolumePlugin) GetAccessModes() []api.PersistentVolumeAccessMod
 
 // NewMounter is part of the volume.VolumePlugin interface.
 func (plugin *flexVolumePlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
-	secrets, err := getSecrets(spec, plugin.host)
-	if err != nil {
-		return nil, err
-	}
-	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), plugin.runner, secrets)
+	return plugin.newMounterInternal(spec, pod, plugin.host.GetMounter(), plugin.runner)
 }
 
 // newMounterInternal is the internal mounter routine to build the volume.
-func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, runner exec.Interface, secrets map[string]string) (volume.Mounter, error) {
+func (plugin *flexVolumePlugin) newMounterInternal(spec *volume.Spec, pod *api.Pod, mounter mount.Interface, runner exec.Interface) (volume.Mounter, error) {
 	source, readOnly := getVolumeSource(spec)
 	return &flexVolumeMounter{
 		flexVolume: &flexVolume{
-			driverName: source.Driver,
-			execPath:   plugin.getExecutable(),
-			mounter:    mounter,
-			plugin:     plugin,
-			podUID:     pod.UID,
-			volName:    spec.Name(),
+			driverName:   source.Driver,
+			execPath:     plugin.getExecutable(),
+			mounter:      mounter,
+			plugin:       plugin,
+			podUID:       pod.UID,
+			podNamespace: pod.Namespace,
+			volName:      spec.Name(),
 		},
 		runner:             runner,
 		spec:               spec,
@@ -167,7 +164,7 @@ func (plugin *flexVolumePlugin) ConstructVolumeSpec(volumeName, mountPath string
 		},
 	}
 	// namespace is unknown here
-	return volume.NewSpecFromVolume(flexVolume, ""), nil
+	return volume.NewSpecFromVolume(flexVolume), nil
 }
 
 // Mark the given commands as unsupported.

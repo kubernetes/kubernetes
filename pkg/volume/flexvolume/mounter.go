@@ -17,7 +17,6 @@ limitations under the License.
 package flexvolume
 
 import (
-	"fmt"
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/util/exec"
@@ -60,31 +59,27 @@ func (f *flexVolumeMounter) SetUpAt(dir string, fsGroup *int64) error {
 	}
 
 	call := f.plugin.NewDriverCall(mountCmd)
-	// Implicit parameters
-	if fsGroup == nil {
-		call.AppendSpec(f.spec, f.plugin.host, nil)
-	} else {
-		call.AppendSpec(f.spec, f.plugin.host, map[string]string{
-			optionFSGroup: strconv.FormatInt(*fsGroup, 10),
-		})
+
+	extraOptions := make(map[string]string)
+
+	// Extract secret and pass it as options.
+	if err := addSecretsToOptions(extraOptions, f.spec, f.podNamespace, f.plugin.host); err != nil {
+		return err
 	}
 
-	a, err := f.plugin.NewAttacher()
-	if err != nil {
-		return fmt.Errorf("NewAttacher failed: %v", err)
+	// Implicit parameters
+	if fsGroup != nil {
+		extraOptions[optionFSGroup] = strconv.FormatInt(*fsGroup, 10)
 	}
-	src, err := a.GetDeviceMountPath(f.spec)
-	if err != nil {
-		return fmt.Errorf("GetDeviceMountPath failed: %v", err)
-	}
-	call.Append(src)
+
+	call.AppendSpec(f.spec, f.plugin.host, extraOptions)
 
 	// Interface parameters
 	call.Append(dir)
 
 	_, err = call.Run()
 	if isCmdNotSupportedErr(err) {
-		return (*mounterDefaults)(f).SetUpAt(src, dir, fsGroup)
+		return (*mounterDefaults)(f).SetUpAt(dir, fsGroup)
 	}
 	return err
 }

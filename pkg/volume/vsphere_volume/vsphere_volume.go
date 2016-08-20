@@ -145,7 +145,7 @@ func (plugin *vsphereVolumePlugin) ConstructVolumeSpec(volumeName, mountPath str
 		},
 	}
 	// namespace is unknown here
-	return volume.NewSpecFromVolume(vsphereVolume, ""), nil
+	return volume.NewSpecFromVolume(vsphereVolume), nil
 }
 
 // Abstract interface to disk operations.

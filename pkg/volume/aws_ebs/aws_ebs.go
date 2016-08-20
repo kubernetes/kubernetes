@@ -204,7 +204,7 @@ func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath
 		},
 	}
 	// namespace is unknown here
-	return volume.NewSpecFromVolume(awsVolume, ""), nil
+	return volume.NewSpecFromVolume(awsVolume), nil
 }
 
 // Abstract interface to PD operations.

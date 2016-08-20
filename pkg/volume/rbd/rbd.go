@@ -175,7 +175,7 @@ func (plugin *rbdPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*vol
 		},
 	}
 	// namespace is unknown here
-	return volume.NewSpecFromVolume(rbdVolume, ""), nil
+	return volume.NewSpecFromVolume(rbdVolume), nil
 }
 
 type rbd struct {

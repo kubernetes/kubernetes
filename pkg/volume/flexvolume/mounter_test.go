@@ -29,25 +29,22 @@ func TestSetUpAt(t *testing.T) {
 	mounter := &mount.FakeMounter{}
 
 	plugin, rootDir := testPlugin()
-	mountsDir := rootDir + "/plugins/kubernetes.io/flexvolume/test/mounts"
 	plugin.unsupportedCommands = []string{getDeviceMountPathCmd}
 	plugin.runner = fakeRunner(
-		assertDriverCall(t, fakeDeviceNameOutput("sdx"), getVolumeNameCmd,
-			specJson(plugin, spec, nil)),
 		// first call without fsGroup
 		assertDriverCall(t, successOutput(), mountCmd,
-			specJson(plugin, spec, nil), mountsDir+"/sdx", rootDir+"/mount-dir"),
+			specJson(plugin, spec, nil), rootDir+"/mount-dir"),
 
-		assertDriverCall(t, fakeDeviceNameOutput("sdx"), getVolumeNameCmd,
-			specJson(plugin, spec, nil)),
 		// second test has fsGroup
 		assertDriverCall(t, notSupportedOutput(), mountCmd,
 			specJson(plugin, spec, map[string]string{
 				optionFSGroup: "42",
-			}), mountsDir+"/sdx", rootDir+"/mount-dir"),
+			}), rootDir+"/mount-dir"),
+		assertDriverCall(t, fakeDeviceNameOutput("sdx"), getVolumeNameCmd,
+			specJson(plugin, spec, nil)),
 	)
 
-	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner, nil)
+	m, _ := plugin.newMounterInternal(spec, pod, mounter, plugin.runner)
 	m.SetUpAt(rootDir+"/mount-dir", nil)
 
 	fsGroup := int64(42)

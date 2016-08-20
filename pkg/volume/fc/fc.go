@@ -149,7 +149,7 @@ func (plugin *fcPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volu
 		},
 	}
 	// namespace is unknown here
-	return volume.NewSpecFromVolume(fcVolume, ""), nil
+	return volume.NewSpecFromVolume(fcVolume), nil
 }
 
 type fcDisk struct {

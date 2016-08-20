@@ -40,7 +40,7 @@ func TestWaitForAttach(t *testing.T) {
 	plugin, _ := testPlugin()
 	plugin.runner = fakeRunner(
 		assertDriverCall(t, notSupportedOutput(), waitForAttachCmd,
-			specJson(plugin, spec, nil)),
+			specJson(plugin, spec, nil), "/dev/sdx"),
 	)
 
 	a, _ := plugin.NewAttacher()

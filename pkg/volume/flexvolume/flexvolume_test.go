@@ -55,7 +55,7 @@ elif [ "$1" == "attach" -a $# -eq 3 ]; then
     "device": "{{.DevicePath}}"
   }'
   exit 0
-elif [ "$1" == "waitforattach" -a $# -eq 2 ]; then
+elif [ "$1" == "waitforattach" -a $# -eq 3 ]; then
   echo -n '{
     "status": "Success",
     "device": "{{.DevicePath}}"
@@ -86,7 +86,7 @@ elif [ "$1" == "unmountdevice" -a $# -eq 2 ]; then
     "status": "Not supported"
   }'
   exit 0
-elif [ "$1" == "mount" -a $# -eq 4 ]; then
+elif [ "$1" == "mount" -a $# -eq 3 ]; then
   echo -n '{
     "status": "Not supported"
   }'
@@ -176,7 +176,7 @@ elif [ "$1" == "unmountdevice" -a $# -eq 2 ]; then
     "status": "Success"
   }'
   exit 0
-elif [ "$1" == "mount" -a $# -eq 4 ]; then
+elif [ "$1" == "mount" -a $# -eq 3 ]; then
   echo -n '{
     "status": "Not supported"
   }'
@@ -398,7 +398,7 @@ func doTestPluginMountUnmount(t *testing.T, spec *volume.Spec, tmpDir string) {
 	fake := &mount.FakeMounter{}
 	pod := &api.Pod{ObjectMeta: api.ObjectMeta{UID: types.UID("poduid")}}
 	// Use nil secret to test for nil secret case.
-	mounter, err := plugin.(*flexVolumePlugin).newMounterInternal(spec, pod, fake, exec.New(), nil)
+	mounter, err := plugin.(*flexVolumePlugin).newMounterInternal(spec, pod, fake, exec.New())
 	if err := mounter.SetUp(nil); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
@@ -427,7 +427,7 @@ func TestPluginVolumeAttacher(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/fakeAttacher", ReadOnly: false}},
 	}
-	doTestPluginAttachDetach(t, volume.NewSpecFromVolume(vol, "default"), tmpDir)
+	doTestPluginAttachDetach(t, volume.NewSpecFromVolume(vol), tmpDir)
 }
 
 func TestPluginVolumeMounter(t *testing.T) {
@@ -441,7 +441,7 @@ func TestPluginVolumeMounter(t *testing.T) {
 		Name:         "vol1",
 		VolumeSource: api.VolumeSource{FlexVolume: &api.FlexVolumeSource{Driver: "kubernetes.io/fakeMounter", ReadOnly: false}},
 	}
-	doTestPluginMountUnmount(t, volume.NewSpecFromVolume(vol, "default"), tmpDir)
+	doTestPluginMountUnmount(t, volume.NewSpecFromVolume(vol), tmpDir)
 }
 
 func TestPluginPersistentVolume(t *testing.T) {
@@ -462,5 +462,5 @@ func TestPluginPersistentVolume(t *testing.T) {
 		},
 	}
 
-	doTestPluginAttachDetach(t, volume.NewSpecFromPersistentVolume(vol, false, "default"), tmpDir)
+	doTestPluginAttachDetach(t, volume.NewSpecFromPersistentVolume(vol, false), tmpDir)
 }

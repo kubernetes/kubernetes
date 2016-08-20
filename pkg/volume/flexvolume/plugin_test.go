@@ -32,8 +32,8 @@ func TestInit(t *testing.T) {
 
 func fakeDeviceNameOutput(name string) exec.FakeCombinedOutputAction {
 	return fakeResultOutput(&DriverStatus{
-		Status: StatusSuccess,
-		Device: name,
+		Status:     StatusSuccess,
+		DevicePath: name,
 	})
 }
 

@@ -221,7 +221,7 @@ func (plugin *cinderPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*
 		},
 	}
 	// namespace is unknown here
-	return volume.NewSpecFromVolume(cinderVolume, ""), nil
+	return volume.NewSpecFromVolume(cinderVolume), nil
 }
 
 // Abstract interface to PD operations.

@@ -32,7 +32,9 @@ type flexVolume struct {
 	mounter mount.Interface
 	// podUID is the UID of the pod.
 	podUID types.UID
-	// volName is the name of the pod volume.
+	// podNamespace is the namespace of the pod.
+	podNamespace string
+	// volName is the name of the pod's volume.
 	volName string
 	// the underlying plugin
 	plugin *flexVolumePlugin
