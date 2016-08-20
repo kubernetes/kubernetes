@@ -36,6 +36,7 @@ KUBE_GCS_PUBLISH_VERSION="${LATEST}"
 : ${KUBE_GCS_UPDATE_LATEST:='y'}
 
 source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/lib/release.sh"
 
 MAX_ATTEMPTS=3
 attempt=0
