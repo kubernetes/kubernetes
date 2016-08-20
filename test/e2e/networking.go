@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -266,6 +266,137 @@ var _ = framework.KubeDescribe("Networking", func() {
 			framework.ExpectNoError(framework.CheckConnectivityToHost(f, node2.Name, "different-node-wget", ip, connectivityTimeout))
 		})
 	})
+
+	framework.KubeDescribe("Ping Test", func() {
+
+		It("should function for pod to pod ping", func() {
+
+			By("Picking multiple nodes")
+			nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+
+			if len(nodes.Items) == 1 {
+				framework.Skipf("The test requires two Ready nodes on %s, but found just one.", framework.TestContext.Provider)
+			}
+
+			node1 := nodes.Items[0]
+			node2 := nodes.Items[1]
+
+			By("Creating an exec pod on one of the node")
+			execPod1Name := createExecPodOnNode(f.Client, f.Namespace.Name, node1.Name, "execpod-ping1")
+			defer func() {
+				By("Cleaning up the exec pod 1")
+				err := f.Client.Pods(f.Namespace.Name).Delete(execPod1Name, nil)
+				Expect(err).NotTo(HaveOccurred())
+			}()
+			podClient := f.Client.Pods(f.Namespace.Name)
+			execPod1, err := podClient.Get(execPod1Name)
+			ExpectNoError(err)
+			execPod1Ip := execPod1.Status.PodIP
+			framework.Logf("Exec pod 1 ip: %s", execPod1Ip)
+
+			By("Creating another exec pod on the same node")
+			execPod2Name := createExecPodOnNode(f.Client, f.Namespace.Name, node1.Name, "execpod-ping2")
+			defer func() {
+				By("Cleaning up the exec pod 2")
+				err := f.Client.Pods(f.Namespace.Name).Delete(execPod2Name, nil)
+				Expect(err).NotTo(HaveOccurred())
+			}()
+
+			succeedMsg := "Ping succeed!"
+			By("Ping the first pod from pod on the same node")
+			stdout, err := execPingTest(f.Namespace.Name, execPod2Name, execPod1Ip, succeedMsg)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying ping result")
+			Expect(stdout).To(Equal(succeedMsg))
+
+			By("Creating an exec pod on another node")
+			execPod3Name := createExecPodOnNode(f.Client, f.Namespace.Name, node2.Name, "execpod-ping3")
+			defer func() {
+				By("Cleaning up the exec pod 3")
+				err := f.Client.Pods(f.Namespace.Name).Delete(execPod3Name, nil)
+				Expect(err).NotTo(HaveOccurred())
+			}()
+
+			By("Ping the first pod from another pod on a different node")
+			stdout, err = execPingTest(f.Namespace.Name, execPod3Name, execPod1Ip, succeedMsg)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying ping result")
+			Expect(stdout).To(Equal(succeedMsg))
+		})
+
+		It("should function for node to pod ping", func() {
+
+			By("Verifying each node on current provider is accessible with SSH")
+			if !isNodeSSHable() {
+				framework.Skipf("The test nodes on %s are not SSH-able. Skip test.", framework.TestContext.Provider)
+			}
+
+			By("Checking number of schedulable nodes")
+			nodes := framework.GetReadySchedulableNodesOrDie(f.Client)
+
+			if len(nodes.Items) == 1 {
+				framework.Logf("Only found one node on %s, would only ping the pod from the same node.", framework.TestContext.Provider)
+			}
+
+			By("Creating an exec pod")
+			execPodName := createExecPodOrFail(f.Client, f.Namespace.Name, "execpod-pingpod")
+			defer func() {
+				By("Cleaning up the exec pod")
+				err := f.Client.Pods(f.Namespace.Name).Delete(execPodName, nil)
+				Expect(err).NotTo(HaveOccurred())
+			}()
+			podClient := f.Client.Pods(f.Namespace.Name)
+			execPod, err := podClient.Get(execPodName)
+			ExpectNoError(err)
+			execPodIp := execPod.Status.PodIP
+			framework.Logf("Exec pod ip: %s", execPodIp)
+
+			By("Retriving SSH-able hosts (non-master)")
+			hosts, err := framework.NodeSSHHosts(f.Client)
+			Expect(err).NotTo(HaveOccurred())
+			if len(hosts) == 0 {
+				framework.Failf("No ssh-able nodes")
+			}
+			// [TODO] run ping test on two nodes --- the same node and one another node --- is enough, not necessarily all the nodes
+			By("Ping pod from all hosts")
+			for _, host := range hosts {
+				framework.Logf("Got ssh-able host: %s", host)
+
+				cmd := fmt.Sprintf(`ping -w 4 %s >/dev/null 2>&1 && echo "Ping succeed!"`, execPodIp)
+				framework.Logf("Executing cmd %q on host %v", cmd, host)
+				result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
+				if err != nil || result.Code != 0 {
+					framework.LogSSHResult(result)
+					framework.Failf("error while SSH-ing to node: %v", err)
+				}
+				By("Verifying ping result")
+				// the stdout returned seems to come with "\n", so TrimSpace is needed
+				Expect(strings.TrimSpace(result.Stdout)).To(Equal("Ping succeed!"))
+			}
+		})
+
+		It("should function for pod to internet ping", func() {
+
+			By("Creating an exec pod")
+			execPodName := createExecPodOrFail(f.Client, f.Namespace.Name, "execpod-pinginternet")
+			defer func() {
+				By("Cleaning up the exec pod")
+				err := f.Client.Pods(f.Namespace.Name).Delete(execPodName, nil)
+				Expect(err).NotTo(HaveOccurred())
+			}()
+
+			By("Executing internet ping")
+			pingHost := "google.com"
+			succeedMsg := "Ping succeed!"
+			stdout, err := execPingTest(f.Namespace.Name, execPodName, pingHost, succeedMsg)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Verifying ping result")
+			Expect(stdout).To(Equal(succeedMsg))
+		})
+	})
 })
 
 func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name string) []string {
@@ -306,4 +437,23 @@ func LaunchNetTestPodPerNode(f *framework.Framework, nodes *api.NodeList, name s
 		podNames = append(podNames, pod.ObjectMeta.Name)
 	}
 	return podNames
+}
+
+func execPingTest(ns, podName, host, succeedMsg string) (string, error) {
+	cmd := fmt.Sprintf(`ping -w 4 %s >/dev/null 2>&1 && echo "%s"`, host, succeedMsg)
+	stdout, err := framework.RunHostCmd(ns, podName, cmd)
+	// the stdout return from RunHostCmd seems to come with "\n", so TrimSpace is needed
+	stdout = strings.TrimSpace(stdout)
+	framework.Logf("Exec ping stdout: %s", stdout)
+	return stdout, err
+}
+
+func isNodeSSHable() bool {
+	flag := false
+	for _, v := range framework.ProvidersWithSSH {
+		if v == framework.TestContext.Provider {
+			flag = true
+		}
+	}
+	return flag
 }

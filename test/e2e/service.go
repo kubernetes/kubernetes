@@ -1100,11 +1100,8 @@ func validateEndpointsOrFail(c *client.Client, namespace, serviceName string, ex
 	framework.Failf("Timed out waiting for service %s in namespace %s to expose endpoints %v (%v elapsed)", serviceName, namespace, expectedEndpoints, framework.ServiceStartTimeout)
 }
 
-// createExecPodOrFail creates a simple busybox pod in a sleep loop used as a
-// vessel for kubectl exec commands.
-// Returns the name of the created pod.
-func createExecPodOrFail(c *client.Client, ns, generateName string) string {
-	framework.Logf("Creating new exec pod")
+// newExecPodSpec returns the pod spec of exec pod
+func newExecPodSpec(ns, generateName string) *api.Pod {
 	immediate := int64(0)
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
@@ -1122,10 +1119,38 @@ func createExecPodOrFail(c *client.Client, ns, generateName string) string {
 			},
 		},
 	}
-	created, err := c.Pods(ns).Create(pod)
+	return pod
+}
+
+// createExecPodOrFail creates a simple busybox pod in a sleep loop used as a
+// vessel for kubectl exec commands.
+// Returns the name of the created pod.
+func createExecPodOrFail(client *client.Client, ns, generateName string) string {
+	framework.Logf("Creating new exec pod")
+	execPod := newExecPodSpec(ns, generateName)
+	created, err := client.Pods(ns).Create(execPod)
 	Expect(err).NotTo(HaveOccurred())
 	err = wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := c.Pods(pod.Namespace).Get(created.Name)
+		retrievedPod, err := client.Pods(execPod.Namespace).Get(created.Name)
+		if err != nil {
+			return false, nil
+		}
+		return retrievedPod.Status.Phase == api.PodRunning, nil
+	})
+	Expect(err).NotTo(HaveOccurred())
+	return created.Name
+}
+
+// createExecPodOnNode launches a exec pod in the given namespace and node
+// waits until it's Running, created pod name would be returned
+func createExecPodOnNode(client *client.Client, ns, nodeName, generateName string) string {
+	framework.Logf("Creating exec pod %q in namespace %q", generateName, ns)
+	execPod := newExecPodSpec(ns, generateName)
+	execPod.Spec.NodeName = nodeName
+	created, err := client.Pods(ns).Create(execPod)
+	Expect(err).NotTo(HaveOccurred())
+	err = wait.PollImmediate(framework.Poll, 5*time.Minute, func() (bool, error) {
+		retrievedPod, err := client.Pods(execPod.Namespace).Get(created.Name)
 		if err != nil {
 			return false, nil
 		}
