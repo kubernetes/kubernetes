@@ -292,8 +292,8 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	indexer.Add(resourceQuota)
 
 	// old service was a load balancer, but updated version is a node port.
-	oldService := &api.Service{
-		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test"},
+	existingService := &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test", ResourceVersion: "1"},
 		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
 	}
 	newService := &api.Service{
@@ -303,7 +303,7 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 			Ports: []api.ServicePort{{Port: 1234}},
 		},
 	}
-	err := handler.Admit(admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, nil))
+	err := handler.Admit(admission.NewAttributesRecord(newService, existingService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, nil))
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
