@@ -252,7 +252,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"Pod",
-		labels.Set(PodToSelectableFields(&api.Pod{})),
+		PodToSelectableFields(&api.Pod{}),
 		nil,
 	)
 }

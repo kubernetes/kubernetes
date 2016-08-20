@@ -102,18 +102,21 @@ func (s strategy) Export(ctx api.Context, obj runtime.Object, exact bool) error 
 }
 
 // Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		sa, ok := obj.(*rbac.ClusterRole)
-		if !ok {
-			return false, fmt.Errorf("not a ClusterRole")
-		}
-		fields := SelectableFields(sa)
-		return label.Matches(labels.Set(sa.Labels)) && field.Matches(fields), nil
-	})
+func Matcher(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			role, ok := obj.(*rbac.ClusterRole)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a ClusterRole")
+			}
+			return labels.Set(role.Labels), SelectableFields(role), nil
+		},
+	}
 }
 
-// SelectableFields returns a label set that can be used for filter selection
-func SelectableFields(obj *rbac.ClusterRole) labels.Set {
-	return labels.Set{}
+// SelectableFields returns a field set that can be used for filter selection
+func SelectableFields(obj *rbac.ClusterRole) fields.Set {
+	return nil
 }

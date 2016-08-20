@@ -117,14 +117,3 @@ func TestSelectionPredicate(t *testing.T) {
 		}
 	}
 }
-
-func TestSingleMatch(t *testing.T) {
-	m := MatchOnKey("pod-name-here", func(obj runtime.Object) (bool, error) { return true, nil })
-	got, ok := m.MatchesSingle()
-	if !ok {
-		t.Errorf("Expected MatchesSingle to return true")
-	}
-	if e, a := "pod-name-here", got; e != a {
-		t.Errorf("Expected %#v, got %#v", e, a)
-	}
-}

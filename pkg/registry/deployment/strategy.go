@@ -118,7 +118,7 @@ func DeploymentToSelectableFields(deployment *extensions.Deployment) fields.Set 
 // MatchDeployment is the filter used by the generic etcd backend to route
 // watch events from etcd to clients of the apiserver only interested in specific
 // labels/fields.
-func MatchDeployment(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchDeployment(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

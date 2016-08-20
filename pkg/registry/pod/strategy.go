@@ -155,7 +155,7 @@ func (podStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object
 }
 
 // MatchPod returns a generic matcher for a given label and field selector.
-func MatchPod(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchPod(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

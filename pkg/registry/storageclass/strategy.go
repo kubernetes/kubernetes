@@ -77,7 +77,7 @@ func (storageClassStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // MatchStorageClass returns a generic matcher for a given label and field selector.
-func MatchStorageClasses(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchStorageClasses(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

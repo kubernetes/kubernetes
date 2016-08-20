@@ -98,18 +98,21 @@ func (resourcequotaStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runt
 }
 
 // MatchResourceQuota returns a generic matcher for a given label and field selector.
-func MatchResourceQuota(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		resourcequotaObj, ok := obj.(*api.ResourceQuota)
-		if !ok {
-			return false, fmt.Errorf("not a resourcequota")
-		}
-		fields := ResourceQuotaToSelectableFields(resourcequotaObj)
-		return label.Matches(labels.Set(resourcequotaObj.Labels)) && field.Matches(fields), nil
-	})
+func MatchResourceQuota(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			resourcequotaObj, ok := obj.(*api.ResourceQuota)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a resourcequota")
+			}
+			return labels.Set(resourcequotaObj.Labels), ResourceQuotaToSelectableFields(resourcequotaObj), nil
+		},
+	}
 }
 
-// ResourceQuotaToSelectableFields returns a label set that represents the object
-func ResourceQuotaToSelectableFields(resourcequota *api.ResourceQuota) labels.Set {
-	return labels.Set(generic.ObjectMetaFieldsSet(resourcequota.ObjectMeta, true))
+// ResourceQuotaToSelectableFields returns a field set that represents the object
+func ResourceQuotaToSelectableFields(resourcequota *api.ResourceQuota) fields.Set {
+	return generic.ObjectMetaFieldsSet(resourcequota.ObjectMeta, true)
 }

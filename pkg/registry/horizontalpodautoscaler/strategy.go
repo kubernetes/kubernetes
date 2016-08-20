@@ -85,10 +85,10 @@ func (autoscalerStrategy) AllowUnconditionalUpdate() bool {
 }
 
 func AutoscalerToSelectableFields(hpa *autoscaling.HorizontalPodAutoscaler) fields.Set {
-	return fields.Set{}
+	return nil
 }
 
-func MatchAutoscaler(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchAutoscaler(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

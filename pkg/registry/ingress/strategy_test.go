@@ -23,7 +23,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -136,7 +135,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Extensions.GroupVersion().String(),
 		"Ingress",
-		labels.Set(IngressToSelectableFields(&extensions.Ingress{})),
+		IngressToSelectableFields(&extensions.Ingress{}),
 		nil,
 	)
 }

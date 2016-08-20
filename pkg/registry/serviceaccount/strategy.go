@@ -77,18 +77,21 @@ func (strategy) AllowUnconditionalUpdate() bool {
 }
 
 // Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		sa, ok := obj.(*api.ServiceAccount)
-		if !ok {
-			return false, fmt.Errorf("not a serviceaccount")
-		}
-		fields := SelectableFields(sa)
-		return label.Matches(labels.Set(sa.Labels)) && field.Matches(fields), nil
-	})
+func Matcher(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			sa, ok := obj.(*api.ServiceAccount)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a serviceaccount")
+			}
+			return labels.Set(sa.Labels), SelectableFields(sa), nil
+		},
+	}
 }
 
-// SelectableFields returns a label set that represents the object
-func SelectableFields(obj *api.ServiceAccount) labels.Set {
-	return labels.Set(generic.ObjectMetaFieldsSet(obj.ObjectMeta, true))
+// SelectableFields returns a field set that represents the object
+func SelectableFields(obj *api.ServiceAccount) fields.Set {
+	return generic.ObjectMetaFieldsSet(obj.ObjectMeta, true)
 }

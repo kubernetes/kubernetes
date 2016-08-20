@@ -88,7 +88,7 @@ type Store struct {
 	TTLFunc func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 
 	// Returns a matcher corresponding to the provided labels and fields.
-	PredicateFunc func(label labels.Selector, field fields.Selector) generic.Matcher
+	PredicateFunc func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate
 
 	// DeleteCollectionWorkers is the maximum number of workers in a single
 	// DeleteCollection call.
@@ -188,7 +188,7 @@ func (e *Store) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Store) ListPredicate(ctx api.Context, m generic.Matcher, options *api.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx api.Context, m *generic.SelectionPredicate, options *api.ListOptions) (runtime.Object, error) {
 	list := e.NewListFunc()
 	filter := e.createFilter(m)
 	if name, ok := m.MatchesSingle(); ok {
@@ -797,7 +797,7 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 }
 
 // WatchPredicate starts a watch for the items that m matches.
-func (e *Store) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersion string) (watch.Interface, error) {
+func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
 	filter := e.createFilter(m)
 
 	if name, ok := m.MatchesSingle(); ok {
@@ -813,7 +813,7 @@ func (e *Store) WatchPredicate(ctx api.Context, m generic.Matcher, resourceVersi
 	return e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filter)
 }
 
-func (e *Store) createFilter(m generic.Matcher) storage.Filter {
+func (e *Store) createFilter(m *generic.SelectionPredicate) storage.Filter {
 	filterFunc := func(obj runtime.Object) bool {
 		matches, err := m.Matches(obj)
 		if err != nil {
