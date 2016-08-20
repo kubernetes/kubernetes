@@ -24,7 +24,10 @@ import (
 )
 
 func TestAddThirdPartyVersionsBasic(t *testing.T) {
-	clearForTesting()
+	m, err := NewAPIRegistrationManager("")
+	if err != nil {
+		t.Fatalf("Unexpected failure to make a manager: %v", err)
+	}
 
 	registered := []unversioned.GroupVersion{
 		{
@@ -45,8 +48,8 @@ func TestAddThirdPartyVersionsBasic(t *testing.T) {
 	}
 	gvs := append(registered, thirdParty...)
 
-	RegisterVersions(registered)
-	wasSkipped := AddThirdPartyAPIGroupVersions(gvs...)
+	m.RegisterVersions(registered)
+	wasSkipped := m.AddThirdPartyAPIGroupVersions(gvs...)
 	if len(wasSkipped) != len(skipped) {
 		t.Errorf("Expected %v, found %v", skipped, wasSkipped)
 	}
@@ -63,15 +66,13 @@ func TestAddThirdPartyVersionsBasic(t *testing.T) {
 		}
 	}
 	for _, gv := range thirdParty {
-		if !IsThirdPartyAPIGroupVersion(gv) {
+		if !m.IsThirdPartyAPIGroupVersion(gv) {
 			t.Errorf("Expected %v to be third party.", gv)
 		}
 	}
 }
 
 func TestAddThirdPartyVersionsMultiple(t *testing.T) {
-	clearForTesting()
-
 	thirdParty := []unversioned.GroupVersion{
 		{
 			Group:   "company.com",
@@ -82,14 +83,18 @@ func TestAddThirdPartyVersionsMultiple(t *testing.T) {
 			Version: "v2",
 		},
 	}
+	m, err := NewAPIRegistrationManager("")
+	if err != nil {
+		t.Fatalf("Unexpected failure to make a manager: %v", err)
+	}
 	for _, gv := range thirdParty {
-		wasSkipped := AddThirdPartyAPIGroupVersions(gv)
+		wasSkipped := m.AddThirdPartyAPIGroupVersions(gv)
 		if len(wasSkipped) != 0 {
 			t.Errorf("Expected length 0, found %v", wasSkipped)
 		}
 	}
 	for _, gv := range thirdParty {
-		if !IsThirdPartyAPIGroupVersion(gv) {
+		if !m.IsThirdPartyAPIGroupVersion(gv) {
 			t.Errorf("Expected %v to be third party.", gv)
 		}
 	}
@@ -128,13 +133,16 @@ func TestAllPreferredGroupVersions(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		for _, groupMeta := range testCase.groupMetas {
-			RegisterGroup(groupMeta)
+		m, err := NewAPIRegistrationManager("")
+		if err != nil {
+			t.Fatalf("Unexpected failure to make a manager: %v", err)
 		}
-		output := AllPreferredGroupVersions()
+		for _, groupMeta := range testCase.groupMetas {
+			m.RegisterGroup(groupMeta)
+		}
+		output := m.AllPreferredGroupVersions()
 		if testCase.expect != output {
 			t.Errorf("Error. expect: %s, got: %s", testCase.expect, output)
 		}
-		reset()
 	}
 }
