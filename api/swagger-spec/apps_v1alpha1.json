@@ -2169,7 +2169,7 @@
     "properties": {
      "fieldRef": {
       "$ref": "v1.ObjectFieldSelector",
-      "description": "Selects a field of the pod; only name and namespace are supported."
+      "description": "Selects a field of the pod: supports metadata.name, metadata.namespace, metadata.labels, metadata.annotations, spec.nodeName, spec.serviceAccountName, status.podIP."
      },
      "resourceFieldRef": {
       "$ref": "v1.ResourceFieldSelector",
