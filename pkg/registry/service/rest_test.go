@@ -18,6 +18,7 @@ package service
 
 import (
 	"net"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -112,6 +113,125 @@ func TestServiceRegistryCreate(t *testing.T) {
 	}
 	if srv == nil {
 		t.Errorf("Failed to find service: %s", svc.Name)
+	}
+}
+
+func TestServiceRegistryCreateMultiNodePortsService(t *testing.T) {
+	storage, registry := NewTestREST(t, nil)
+	testCases := []struct {
+		svc             *api.Service
+		name            string
+		expectNodePorts []int
+	}{
+		{
+			svc: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo1"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-tcp",
+							Port:       53,
+							NodePort:   30053,
+							TargetPort: intstr.FromInt(6503),
+							Protocol:   api.ProtocolTCP,
+						},
+						{
+							Name:       "port-udp",
+							Port:       53,
+							NodePort:   30053,
+							TargetPort: intstr.FromInt(6503),
+							Protocol:   api.ProtocolUDP,
+						},
+					},
+				},
+			},
+			name:            "foo1",
+			expectNodePorts: []int{30053, 30053},
+		},
+		{
+			svc: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo2"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-tcp",
+							Port:       54,
+							TargetPort: intstr.FromInt(6504),
+							Protocol:   api.ProtocolTCP,
+						},
+						{
+							Name:       "port-udp",
+							Port:       54,
+							NodePort:   30054,
+							TargetPort: intstr.FromInt(6504),
+							Protocol:   api.ProtocolUDP,
+						},
+					},
+				},
+			},
+			name:            "foo2",
+			expectNodePorts: []int{30054, 30054},
+		},
+		{
+			svc: &api.Service{
+				ObjectMeta: api.ObjectMeta{Name: "foo3"},
+				Spec: api.ServiceSpec{
+					Selector:        map[string]string{"bar": "baz"},
+					SessionAffinity: api.ServiceAffinityNone,
+					Type:            api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Name:       "port-tcp",
+							Port:       55,
+							NodePort:   30055,
+							TargetPort: intstr.FromInt(6505),
+							Protocol:   api.ProtocolTCP,
+						},
+						{
+							Name:       "port-udp",
+							Port:       55,
+							NodePort:   30056,
+							TargetPort: intstr.FromInt(6506),
+							Protocol:   api.ProtocolUDP,
+						},
+					},
+				},
+			},
+			name:            "foo3",
+			expectNodePorts: []int{30055, 30056},
+		},
+	}
+
+	ctx := api.NewDefaultContext()
+	for _, test := range testCases {
+		created_svc, err := storage.Create(ctx, test.svc)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		created_service := created_svc.(*api.Service)
+		if !api.HasObjectMetaSystemFieldValues(&created_service.ObjectMeta) {
+			t.Errorf("storage did not populate object meta field values")
+		}
+		if created_service.Name != test.name {
+			t.Errorf("Expected %s, but got %s", test.name, created_service.Name)
+		}
+		serviceNodePorts := CollectServiceNodePorts(created_service)
+		if !reflect.DeepEqual(serviceNodePorts, test.expectNodePorts) {
+			t.Errorf("Expected %v, but got %v", test.expectNodePorts, serviceNodePorts)
+		}
+		srv, err := registry.GetService(ctx, test.name)
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		if srv == nil {
+			t.Errorf("Failed to find service: %s", test.name)
+		}
 	}
 }
 
