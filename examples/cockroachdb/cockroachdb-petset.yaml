@@ -1,0 +1,96 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: cockroachdb
+  labels:
+    app: cockroachdb
+spec:
+  ports:
+  # The main port, served by gRPC, serves Postgres-flavor SQL, internode
+  # traffic and the cli.
+  - port: 26257
+    targetPort: 26257
+    name: grpc
+  # The secondary port serves the UI as well as health and debug endpoints.
+  - port: 8080
+    targetPort: 8080
+    name: http
+  clusterIP: None
+  selector:
+    app: cockroachdb
+---
+apiVersion: apps/v1alpha1
+kind: PetSet
+metadata:
+  name: cockroachdb
+spec:
+  serviceName: "cockroachdb"
+  replicas: 5
+  template:
+    metadata:
+      labels:
+        app: cockroachdb
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+    spec:
+      containers:
+      - name: cockroachdb
+        # Runs the master branch. Not recommended for production, but since
+        # CockroachDB is in Beta, you don't want to run it in production
+        # anyway. See
+        # https://hub.docker.com/r/cockroachdb/cockroach/tags/
+        # if you prefer to run a beta release.
+        image: cockroachdb/cockroach
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 26257
+          name: grpc
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: datadir
+          mountPath: /cockroach/cockroach-data
+        command:
+          - "/bin/bash"
+          - "-ecx"
+          - |
+            # The use of qualified `hostname -f` is crucial:
+            # Other nodes aren't able to look up the unqualified hostname.
+            CRARGS=("start" "--logtostderr" "--insecure" "--host" "$(hostname -f)")
+            # TODO(tschottdorf): really want to use an init container to do
+            # the bootstrapping. The idea is that the container would know
+            # whether it's on the first node and could check whether there's
+            # already a data directory. If not, it would bootstrap the cluster.
+            # We will need some version of `cockroach init` back for this to
+            # work. For now, just do the same in a shell snippet.
+            # Of course this isn't without danger - if node0 loses its data,
+            # upon restarting it will simply bootstrap a new cluster and smack
+            # it into our existing cluster.
+            # There are likely ways out. For example, the init container could
+            # query the kubernetes API and see whether any other nodes are
+            # around, etc. Or, of course, the admin can pre-seed the lost
+            # volume somehow (and in that case we should provide a better way,
+            # for example a marker file).
+            if [ ! "$(hostname)" == "cockroachdb-0" ] || \
+               [ -e "/cockroach/cockroach-data/COCKROACHDB_VERSION" ]
+            then
+              CRARGS+=("--join" "cockroachdb")
+            fi
+            /cockroach/cockroach ${CRARGS[*]}
+      volumes:
+      - name: datadir
+        persistentVolumeClaim:
+          claimName: datadir
+  volumeClaimTemplates:
+  - metadata:
+      name: datadir
+      annotations:
+        volume.alpha.kubernetes.io/storage-class: anything
+    spec:
+      accessModes:
+        - "ReadWriteOnce"
+      resources:
+        requests:
+          storage: 1Gi
