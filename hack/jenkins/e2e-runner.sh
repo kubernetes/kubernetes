@@ -212,6 +212,10 @@ if running_in_docker; then
     fi
 fi
 
+if [[ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]]; then
+  gcloud auth activate-service-account --key-file="${GOOGLE_APPLICATION_CREDENTIALS}"
+fi
+
 # Install gcloud from a custom path if provided. Used to test GKE with gcloud
 # at HEAD, release candidate.
 # TODO: figure out how to avoid installing the cloud sdk twice if run inside Docker.
@@ -235,16 +239,6 @@ fi
 # GCI specific settings.
 if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
   setup_gci_vars
-fi
-
-if [[ -f "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
-  echo 'Activating service account...'  # No harm in doing this multiple times.
-  gcloud auth activate-service-account --key-file="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
-  # https://developers.google.com/identity/protocols/application-default-credentials
-  export GOOGLE_APPLICATION_CREDENTIALS="${KUBEKINS_SERVICE_ACCOUNT_FILE}"
-  unset KUBEKINS_SERVICE_ACCOUNT_FILE
-elif [[ -n "${KUBEKINS_SERVICE_ACCOUNT_FILE:-}" ]]; then
-  echo "ERROR: cannot access service account file at: ${KUBEKINS_SERVICE_ACCOUNT_FILE}"
 fi
 
 echo "--------------------------------------------------------------------------------"
