@@ -102,9 +102,9 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 
 	if tc.useMetricsApi {
 		fakeClient.AddProxyReactor("services", func(action core.Action) (handled bool, ret restclient.ResponseWrapper, err error) {
-			metrics := []*metrics_api.PodMetrics{}
+			metrics := metrics_api.PodMetricsList{}
 			for i, containers := range tc.reportedPodMetrics {
-				metric := &metrics_api.PodMetrics{
+				metric := metrics_api.PodMetrics{
 					ObjectMeta: v1.ObjectMeta{
 						Name:      fmt.Sprintf("%s-%d", podNamePrefix, i),
 						Namespace: namespace,
@@ -126,7 +126,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) *fake.Clientset {
 					}
 					metric.Containers = append(metric.Containers, cm)
 				}
-				metrics = append(metrics, metric)
+				metrics.Items = append(metrics.Items, metric)
 			}
 			heapsterRawMemResponse, _ := json.Marshal(&metrics)
 			return true, newFakeResponseWrapper(heapsterRawMemResponse), nil

@@ -2464,13 +2464,13 @@
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/api/v1/types",
-			"Comment": "v1.1.0-beta2",
-			"Rev": "9cb18ac0ceb193eb530a1fe339355c94ea454d85"
+			"Comment": "v1.2.0-beta.1",
+			"Rev": "c2ac40f1adf8c42a79badddb2a2acd673cae3bcb"
 		},
 		{
 			"ImportPath": "k8s.io/heapster/metrics/apis/metrics/v1alpha1",
-			"Comment": "v1.1.0-beta2",
-			"Rev": "9cb18ac0ceb193eb530a1fe339355c94ea454d85"
+			"Comment": "v1.2.0-beta.1",
+			"Rev": "c2ac40f1adf8c42a79badddb2a2acd673cae3bcb"
 		}
 	]
 }

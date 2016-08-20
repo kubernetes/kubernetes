@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/heapster/metrics/apis/metrics/v1alpha1"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -70,7 +71,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 
 	// Check the presence of node names in the output.
 	result := buf.String()
-	for _, m := range metrics {
+	for _, m := range metrics.Items {
 		if !strings.Contains(result, m.Name) {
 			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
 		}
@@ -80,9 +81,12 @@ func TestTopNodeAllMetrics(t *testing.T) {
 func TestTopNodeWithNameMetrics(t *testing.T) {
 	initTestErrorHandler(t)
 	metrics, nodes := testNodeMetricsData()
-	expectedMetrics := metrics[0]
-	expectedNode := &nodes.Items[0]
-	nonExpectedMetrics := metrics[1:]
+	expectedMetrics := metrics.Items[0]
+	expectedNode := nodes.Items[0]
+	nonExpectedMetrics := v1alpha1.NodeMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[1:],
+	}
 	expectedPath := fmt.Sprintf("%s/%s/nodes/%s", baseMetricsAddress, metricsApiVersion, expectedMetrics.Name)
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
@@ -99,7 +103,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 				}
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, expectedNode)}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &expectedNode)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
 				return nil, nil
@@ -118,7 +122,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 	if !strings.Contains(result, expectedMetrics.Name) {
 		t.Errorf("missing metrics for %s: \n%s", expectedMetrics.Name, result)
 	}
-	for _, m := range nonExpectedMetrics {
+	for _, m := range nonExpectedMetrics.Items {
 		if strings.Contains(result, m.Name) {
 			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
 		}
@@ -128,12 +132,18 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	initTestErrorHandler(t)
 	metrics, nodes := testNodeMetricsData()
-	expectedMetrics := metrics[0:1]
-	expectedNodes := &api.NodeList{
+	expectedMetrics := v1alpha1.NodeMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[0:1],
+	}
+	expectedNodes := api.NodeList{
 		ListMeta: nodes.ListMeta,
 		Items:    nodes.Items[0:1],
 	}
-	nonExpectedMetrics := metrics[1:]
+	nonExpectedMetrics := v1alpha1.NodeMetricsList{
+		ListMeta: metrics.ListMeta,
+		Items:    metrics.Items[1:],
+	}
 	label := "key=value"
 	expectedPath := fmt.Sprintf("%s/%s/nodes", baseMetricsAddress, metricsApiVersion)
 	expectedQuery := fmt.Sprintf("labelSelector=%s", url.QueryEscape(label))
@@ -152,7 +162,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 				}
 				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
 			case p == expectedNodePath && m == "GET":
-				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, expectedNodes)}, nil
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, &expectedNodes)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
 				return nil, nil
@@ -169,12 +179,12 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 
 	// Check the presence of node names in the output.
 	result := buf.String()
-	for _, m := range expectedMetrics {
+	for _, m := range expectedMetrics.Items {
 		if !strings.Contains(result, m.Name) {
 			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
 		}
 	}
-	for _, m := range nonExpectedMetrics {
+	for _, m := range nonExpectedMetrics.Items {
 		if strings.Contains(result, m.Name) {
 			t.Errorf("unexpected metrics for %s: \n%s", m.Name, result)
 		}
