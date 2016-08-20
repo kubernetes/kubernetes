@@ -169,6 +169,7 @@ plugin/pkg/admission/admit
 plugin/pkg/admission/alwayspullimages
 plugin/pkg/admission/deny
 plugin/pkg/admission/exec
+plugin/pkg/admission/imagepolicy
 plugin/pkg/admission/namespace/autoprovision
 plugin/pkg/admission/namespace/exists
 plugin/pkg/admission/securitycontext/scdeny
