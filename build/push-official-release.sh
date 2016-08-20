@@ -42,6 +42,7 @@ KUBE_GCLOUD_PRODUCTION_ACCOUNT="k8s.production.user@gmail.com"
 
 KUBE_ROOT="$(dirname "${BASH_SOURCE}")/.."
 source "${KUBE_ROOT}/build/common.sh"
+source "${KUBE_ROOT}/build/lib/release.sh"
 
 if "${KUBE_ROOT}/cluster/kubectl.sh" 'version' | grep 'Client' | grep 'dirty'; then
   echo "!!! Tag at invalid point, or something else is bad. Build is dirty. Don't push this build." >&2
