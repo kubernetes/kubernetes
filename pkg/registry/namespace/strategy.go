@@ -135,24 +135,27 @@ func (namespaceFinalizeStrategy) PrepareForUpdate(ctx api.Context, obj, old runt
 }
 
 // MatchNamespace returns a generic matcher for a given label and field selector.
-func MatchNamespace(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		namespaceObj, ok := obj.(*api.Namespace)
-		if !ok {
-			return false, fmt.Errorf("not a namespace")
-		}
-		fields := NamespaceToSelectableFields(namespaceObj)
-		return label.Matches(labels.Set(namespaceObj.Labels)) && field.Matches(fields), nil
-	})
+func MatchNamespace(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			namespaceObj, ok := obj.(*api.Namespace)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a namespace")
+			}
+			return labels.Set(namespaceObj.Labels), NamespaceToSelectableFields(namespaceObj), nil
+		},
+	}
 }
 
-// NamespaceToSelectableFields returns a label set that represents the object
-func NamespaceToSelectableFields(namespace *api.Namespace) labels.Set {
+// NamespaceToSelectableFields returns a field set that represents the object
+func NamespaceToSelectableFields(namespace *api.Namespace) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(namespace.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
 		"status.phase": string(namespace.Status.Phase),
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": namespace.Name,
 	}
-	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet))
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

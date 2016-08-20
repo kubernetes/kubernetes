@@ -103,7 +103,7 @@ func PetSetToSelectableFields(petSet *apps.PetSet) fields.Set {
 
 // MatchPetSet is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
-func MatchPetSet(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchPetSet(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

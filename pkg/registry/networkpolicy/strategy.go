@@ -97,7 +97,7 @@ func NetworkPolicyToSelectableFields(networkPolicy *extensions.NetworkPolicy) fi
 
 // MatchNetworkPolicy is the filter used by the generic etcd backend to watch events
 // from etcd to clients of the apiserver only interested in specific labels/fields.
-func MatchNetworkPolicy(label labels.Selector, field fields.Selector) generic.Matcher {
+func MatchNetworkPolicy(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 	return &generic.SelectionPredicate{
 		Label: label,
 		Field: field,

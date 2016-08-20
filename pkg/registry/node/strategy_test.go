@@ -51,7 +51,7 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"Node",
-		labels.Set(NodeToSelectableFields(&api.Node{})),
+		NodeToSelectableFields(&api.Node{}),
 		nil,
 	)
 }

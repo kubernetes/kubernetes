@@ -83,45 +83,33 @@ func NewTestGenericStoreRegistry(t *testing.T) (*etcdtesting.EtcdTestServer, *St
 	return newTestGenericStoreRegistry(t, false)
 }
 
-// setMatcher is a matcher that matches any pod with id in the set.
+// matchPodName returns selection predicate that matches any pod with name in the set.
 // Makes testing simpler.
-type setMatcher struct {
-	sets.String
-}
-
-func (sm setMatcher) Matches(obj runtime.Object) (bool, error) {
-	pod, ok := obj.(*api.Pod)
-	if !ok {
-		return false, fmt.Errorf("wrong object")
+func matchPodName(names ...string) *generic.SelectionPredicate {
+	// Note: even if pod name is a field, we have to use labels,
+	// because field selector doesn't support "IN" operator.
+	l, err := labels.NewRequirement("name", labels.InOperator, sets.NewString(names...))
+	if err != nil {
+		panic("Labels requirement must validate successfully")
 	}
-	return sm.Has(pod.Name), nil
-}
-
-func (sm setMatcher) MatchesSingle() (string, bool) {
-	if sm.Len() == 1 {
-		// Since pod name is its key, we can optimize this case.
-		return sm.List()[0], true
+	return &generic.SelectionPredicate{
+		Label: labels.Everything().Add(*l),
+		Field: fields.Everything(),
+		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+			pod := obj.(*api.Pod)
+			return labels.Set{"name": pod.ObjectMeta.Name}, nil, nil
+		},
 	}
-	return "", false
 }
 
-func (sm setMatcher) MatcherIndex() []storage.MatchValue {
-	return nil
-}
-
-// everythingMatcher matches everything
-type everythingMatcher struct{}
-
-func (everythingMatcher) Matches(obj runtime.Object) (bool, error) {
-	return true, nil
-}
-
-func (everythingMatcher) MatchesSingle() (string, bool) {
-	return "", false
-}
-
-func (everythingMatcher) MatcherIndex() []storage.MatchValue {
-	return nil
+func matchEverything() *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.Everything(),
+		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+			return nil, nil, nil
+		},
+	}
 }
 
 func TestStoreList(t *testing.T) {
@@ -139,34 +127,34 @@ func TestStoreList(t *testing.T) {
 
 	table := map[string]struct {
 		in      *api.PodList
-		m       generic.Matcher
+		m       *generic.SelectionPredicate
 		out     runtime.Object
 		context api.Context
 	}{
 		"notFound": {
 			in:  nil,
-			m:   everythingMatcher{},
+			m:   matchEverything(),
 			out: &api.PodList{Items: []api.Pod{}},
 		},
 		"normal": {
 			in:  &api.PodList{Items: []api.Pod{*podA, *podB}},
-			m:   everythingMatcher{},
+			m:   matchEverything(),
 			out: &api.PodList{Items: []api.Pod{*podA, *podB}},
 		},
 		"normalFiltered": {
 			in:  &api.PodList{Items: []api.Pod{*podA, *podB}},
-			m:   setMatcher{sets.NewString("foo")},
+			m:   matchPodName("foo"),
 			out: &api.PodList{Items: []api.Pod{*podB}},
 		},
 		"normalFilteredNoNamespace": {
 			in:      &api.PodList{Items: []api.Pod{*podA, *podB}},
-			m:       setMatcher{sets.NewString("foo")},
+			m:       matchPodName("foo"),
 			out:     &api.PodList{Items: []api.Pod{*podB}},
 			context: noNamespaceContext,
 		},
 		"normalFilteredMatchMultiple": {
 			in:  &api.PodList{Items: []api.Pod{*podA, *podB}},
-			m:   setMatcher{sets.NewString("foo", "makeMatchSingleReturnFalse")},
+			m:   matchPodName("foo", "makeMatchSingleReturnFalse"),
 			out: &api.PodList{Items: []api.Pod{*podB}},
 		},
 	}
@@ -930,7 +918,7 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 	podCreated := objCreated.(*api.Pod)
 
-	watcher, err := registry.WatchPredicate(testContext, setMatcher{sets.NewString("foo")}, podCreated.ResourceVersion)
+	watcher, err := registry.WatchPredicate(testContext, matchPodName("foo"), podCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -960,18 +948,18 @@ func TestStoreWatch(t *testing.T) {
 	noNamespaceContext := api.NewContext()
 
 	table := map[string]struct {
-		generic.Matcher
-		context api.Context
+		selectPred *generic.SelectionPredicate
+		context    api.Context
 	}{
 		"single": {
-			Matcher: setMatcher{sets.NewString("foo")},
+			selectPred: matchPodName("foo"),
 		},
 		"multi": {
-			Matcher: setMatcher{sets.NewString("foo", "bar")},
+			selectPred: matchPodName("foo", "bar"),
 		},
 		"singleNoNamespace": {
-			Matcher: setMatcher{sets.NewString("foo")},
-			context: noNamespaceContext,
+			selectPred: matchPodName("foo"),
+			context:    noNamespaceContext,
 		},
 	}
 
@@ -989,7 +977,7 @@ func TestStoreWatch(t *testing.T) {
 		}
 
 		server, registry := NewTestGenericStoreRegistry(t)
-		wi, err := registry.WatchPredicate(ctx, m, "0")
+		wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		} else {
@@ -1048,7 +1036,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (*etcdtesti
 			return path.Join(podPrefix, id), nil
 		},
 		ObjectNameFunc: func(obj runtime.Object) (string, error) { return obj.(*api.Pod).Name, nil },
-		PredicateFunc: func(label labels.Selector, field fields.Selector) generic.Matcher {
+		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
 			return &generic.SelectionPredicate{
 				Label: label,
 				Field: field,

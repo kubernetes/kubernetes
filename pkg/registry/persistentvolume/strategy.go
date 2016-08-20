@@ -95,23 +95,26 @@ func (persistentvolumeStatusStrategy) ValidateUpdate(ctx api.Context, obj, old r
 }
 
 // MatchPersistentVolume returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumes(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		persistentvolumeObj, ok := obj.(*api.PersistentVolume)
-		if !ok {
-			return false, fmt.Errorf("not a persistentvolume")
-		}
-		fields := PersistentVolumeToSelectableFields(persistentvolumeObj)
-		return label.Matches(labels.Set(persistentvolumeObj.Labels)) && field.Matches(fields), nil
-	})
+func MatchPersistentVolumes(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			persistentvolumeObj, ok := obj.(*api.PersistentVolume)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a persistentvolume")
+			}
+			return labels.Set(persistentvolumeObj.Labels), PersistentVolumeToSelectableFields(persistentvolumeObj), nil
+		},
+	}
 }
 
-// PersistentVolumeToSelectableFields returns a label set that represents the object
-func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) labels.Set {
+// PersistentVolumeToSelectableFields returns a field set that represents the object
+func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(persistentvolume.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": persistentvolume.Name,
 	}
-	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet))
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

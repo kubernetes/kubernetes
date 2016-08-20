@@ -95,23 +95,26 @@ func (persistentvolumeclaimStatusStrategy) ValidateUpdate(ctx api.Context, obj, 
 }
 
 // MatchPersistentVolumeClaim returns a generic matcher for a given label and field selector.
-func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
-		if !ok {
-			return false, fmt.Errorf("not a persistentvolumeclaim")
-		}
-		fields := PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj)
-		return label.Matches(labels.Set(persistentvolumeclaimObj.Labels)) && field.Matches(fields), nil
-	})
+func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			persistentvolumeclaimObj, ok := obj.(*api.PersistentVolumeClaim)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a persistentvolumeclaim")
+			}
+			return labels.Set(persistentvolumeclaimObj.Labels), PersistentVolumeClaimToSelectableFields(persistentvolumeclaimObj), nil
+		},
+	}
 }
 
-// PersistentVolumeClaimToSelectableFields returns a label set that represents the object
-func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) labels.Set {
+// PersistentVolumeClaimToSelectableFields returns a field set that represents the object
+func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) fields.Set {
 	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(persistentvolumeclaim.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": persistentvolumeclaim.Name,
 	}
-	return labels.Set(generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet))
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }

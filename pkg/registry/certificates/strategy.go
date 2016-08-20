@@ -168,18 +168,21 @@ func (csrApprovalStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Obje
 }
 
 // Matcher returns a generic matcher for a given label and field selector.
-func Matcher(label labels.Selector, field fields.Selector) generic.Matcher {
-	return generic.MatcherFunc(func(obj runtime.Object) (bool, error) {
-		sa, ok := obj.(*certificates.CertificateSigningRequest)
-		if !ok {
-			return false, fmt.Errorf("not a CertificateSigningRequest")
-		}
-		fields := SelectableFields(sa)
-		return label.Matches(labels.Set(sa.Labels)) && field.Matches(fields), nil
-	})
+func Matcher(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			sa, ok := obj.(*certificates.CertificateSigningRequest)
+			if !ok {
+				return nil, nil, fmt.Errorf("not a CertificateSigningRequest")
+			}
+			return labels.Set(sa.Labels), SelectableFields(sa), nil
+		},
+	}
 }
 
-// SelectableFields returns a label set that can be used for filter selection
-func SelectableFields(obj *certificates.CertificateSigningRequest) labels.Set {
-	return labels.Set{}
+// SelectableFields returns a field set that can be used for filter selection
+func SelectableFields(obj *certificates.CertificateSigningRequest) fields.Set {
+	return nil
 }
