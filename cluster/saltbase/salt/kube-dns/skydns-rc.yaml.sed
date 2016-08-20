@@ -38,6 +38,9 @@ spec:
         k8s-app: kube-dns
         version: v17.1
         kubernetes.io/cluster-service: "true"
+      annotations:
+        k8s.mesosphere.io/port_UDP_53: 53
+        k8s.mesosphere.io/port_TCP_53: 53
     spec:
       containers:
       - name: kubedns
