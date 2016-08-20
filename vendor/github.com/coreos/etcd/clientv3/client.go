@@ -46,9 +46,11 @@ type Client struct {
 	Auth
 	Maintenance
 
-	conn  *grpc.ClientConn
-	cfg   Config
-	creds *credentials.TransportCredentials
+	conn         *grpc.ClientConn
+	cfg          Config
+	creds        *credentials.TransportCredentials
+	balancer     *simpleBalancer
+	retryWrapper retryRpcFunc
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -138,11 +140,10 @@ func (c *Client) dialTarget(endpoint string) (proto string, host string, creds *
 	return
 }
 
-// dialSetupOpts gives the dial opts prioer to any authentication
-func (c *Client) dialSetupOpts(endpoint string, dopts ...grpc.DialOption) []grpc.DialOption {
-	opts := []grpc.DialOption{
-		grpc.WithBlock(),
-		grpc.WithTimeout(c.cfg.DialTimeout),
+// dialSetupOpts gives the dial opts prior to any authentication
+func (c *Client) dialSetupOpts(endpoint string, dopts ...grpc.DialOption) (opts []grpc.DialOption) {
+	if c.cfg.DialTimeout > 0 {
+		opts = []grpc.DialOption{grpc.WithTimeout(c.cfg.DialTimeout)}
 	}
 	opts = append(opts, dopts...)
 
@@ -240,12 +241,30 @@ func newClient(cfg *Config) (*Client, error) {
 		client.Password = cfg.Password
 	}
 
-	b := newSimpleBalancer(cfg.Endpoints)
-	conn, err := client.dial(cfg.Endpoints[0], grpc.WithBalancer(b))
+	client.balancer = newSimpleBalancer(cfg.Endpoints)
+	conn, err := client.dial(cfg.Endpoints[0], grpc.WithBalancer(client.balancer))
 	if err != nil {
 		return nil, err
 	}
 	client.conn = conn
+	client.retryWrapper = client.newRetryWrapper()
+
+	// wait for a connection
+	if cfg.DialTimeout > 0 {
+		hasConn := false
+		waitc := time.After(cfg.DialTimeout)
+		select {
+		case <-client.balancer.readyc:
+			hasConn = true
+		case <-ctx.Done():
+		case <-waitc:
+		}
+		if !hasConn {
+			client.cancel()
+			conn.Close()
+			return nil, grpc.ErrClientConnTimeout
+		}
+	}
 
 	client.Cluster = NewCluster(client)
 	client.KV = NewKV(client)
@@ -280,8 +299,12 @@ func isHaltErr(ctx context.Context, err error) bool {
 		return eErr != rpctypes.ErrStopped && eErr != rpctypes.ErrNoLeader
 	}
 	// treat etcdserver errors not recognized by the client as halting
-	return strings.Contains(err.Error(), grpc.ErrClientConnClosing.Error()) ||
-		strings.Contains(err.Error(), "etcdserver:")
+	return isConnClosing(err) || strings.Contains(err.Error(), "etcdserver:")
+}
+
+// isConnClosing returns true if the error matches a grpc client closing error
+func isConnClosing(err error) bool {
+	return strings.Contains(err.Error(), grpc.ErrClientConnClosing.Error())
 }
 
 func toErr(ctx context.Context, err error) error {
@@ -289,9 +312,12 @@ func toErr(ctx context.Context, err error) error {
 		return nil
 	}
 	err = rpctypes.Error(err)
-	if ctx.Err() != nil && strings.Contains(err.Error(), "context") {
+	switch {
+	case ctx.Err() != nil && strings.Contains(err.Error(), "context"):
 		err = ctx.Err()
-	} else if strings.Contains(err.Error(), grpc.ErrClientConnClosing.Error()) {
+	case strings.Contains(err.Error(), ErrNoAvailableEndpoints.Error()):
+		err = ErrNoAvailableEndpoints
+	case strings.Contains(err.Error(), grpc.ErrClientConnClosing.Error()):
 		err = grpc.ErrClientConnClosing
 	}
 	return err

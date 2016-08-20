@@ -405,6 +405,10 @@ func NewServer(cfg *ServerConfig) (srv *EtcdServer, err error) {
 
 	srv.be = be
 	srv.lessor = lease.NewLessor(srv.be)
+
+	// always recover lessor before kv. When we recover the mvcc.KV it will reattach keys to its leases.
+	// If we recover mvcc.KV first, it will attach the keys to the wrong lessor before it recovers.
+	srv.lessor = lease.NewLessor(srv.be)
 	srv.kv = mvcc.New(srv.be, srv.lessor, &srv.consistIndex)
 	if beExist {
 		kvindex := srv.kv.ConsistentIndex()
@@ -413,6 +417,7 @@ func NewServer(cfg *ServerConfig) (srv *EtcdServer, err error) {
 		}
 	}
 	srv.consistIndex.setConsistentIndex(srv.kv.ConsistentIndex())
+
 	srv.authStore = auth.NewAuthStore(srv.be)
 	if h := cfg.AutoCompactionRetention; h != 0 {
 		srv.compactor = compactor.NewPeriodic(h, srv.kv, srv)
@@ -658,6 +663,14 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 
 	newbe := backend.NewDefaultBackend(fn)
 
+	// always recover lessor before kv. When we recover the mvcc.KV it will reattach keys to its leases.
+	// If we recover mvcc.KV first, it will attach the keys to the wrong lessor before it recovers.
+	if s.lessor != nil {
+		plog.Info("recovering lessor...")
+		s.lessor.Recover(newbe, s.kv)
+		plog.Info("finished recovering lessor")
+	}
+
 	plog.Info("restoring mvcc store...")
 
 	if err := s.kv.Restore(newbe); err != nil {
@@ -683,12 +696,6 @@ func (s *EtcdServer) applySnapshot(ep *etcdProgress, apply *apply) {
 
 	s.be = newbe
 	s.bemu.Unlock()
-
-	if s.lessor != nil {
-		plog.Info("recovering lessor...")
-		s.lessor.Recover(newbe, s.kv)
-		plog.Info("finished recovering lessor")
-	}
 
 	plog.Info("recovering alarms...")
 	if err := s.restoreAlarms(); err != nil {
