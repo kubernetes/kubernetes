@@ -19,15 +19,18 @@ import (
 	"fmt"
 	"path"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/blang/semver"
 	dockertypes "github.com/docker/engine-api/types"
 	"github.com/google/cadvisor/container"
 	"github.com/google/cadvisor/container/libcontainer"
 	"github.com/google/cadvisor/devicemapper"
 	"github.com/google/cadvisor/fs"
 	info "github.com/google/cadvisor/info/v1"
+	"github.com/google/cadvisor/machine"
 	"github.com/google/cadvisor/manager/watcher"
 	dockerutil "github.com/google/cadvisor/utils/docker"
 
@@ -178,6 +181,10 @@ func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolW
 		return nil, err
 	}
 
+	if err := ensureThinLsKernelVersion(machine.KernelVersion()); err != nil {
+		return nil, err
+	}
+
 	dockerThinPoolName, err := dockerutil.DockerThinPoolName(*dockerInfo)
 	if err != nil {
 		return nil, err
@@ -195,6 +202,66 @@ func startThinPoolWatcher(dockerInfo *dockertypes.Info) (*devicemapper.ThinPoolW
 
 	go thinPoolWatcher.Start()
 	return thinPoolWatcher, nil
+}
+
+func ensureThinLsKernelVersion(kernelVersion string) error {
+	// kernel 4.4.0 has the proper bug fixes to allow thin_ls to work without corrupting the thin pool
+	minKernelVersion := semver.MustParse("4.4.0")
+	// RHEL 7 kernel 3.10.0 release >= 366 has the proper bug fixes backported from 4.4.0 to allow
+	// thin_ls to work without corrupting the thin pool
+	minRhel7KernelVersion := semver.MustParse("3.10.0")
+
+	matches := version_re.FindStringSubmatch(kernelVersion)
+	if len(matches) < 4 {
+		return fmt.Errorf("error parsing kernel version: %q is not a semver", kernelVersion)
+	}
+
+	sem, err := semver.Make(matches[0])
+	if err != nil {
+		return err
+	}
+
+	if sem.GTE(minKernelVersion) {
+		// kernel 4.4+ - good
+		return nil
+	}
+
+	// Certain RHEL/Centos 7.x kernels have a backport to fix the corruption bug
+	if !strings.Contains(kernelVersion, ".el7") {
+		// not a RHEL 7.x kernel - won't work
+		return fmt.Errorf("kernel version 4.4.0 or later is required to use thin_ls - you have %q", kernelVersion)
+	}
+
+	// RHEL/Centos 7.x from here on
+	if sem.Major != 3 {
+		// only 3.x kernels *may* work correctly
+		return fmt.Errorf("RHEL/Centos 7.x kernel version 3.10.0-366 or later is required to use thin_ls - you have %q", kernelVersion)
+	}
+
+	if sem.GT(minRhel7KernelVersion) {
+		// 3.10.1+ - good
+		return nil
+	}
+
+	if sem.EQ(minRhel7KernelVersion) {
+		// need to check release
+		releaseRE := regexp.MustCompile(`^[^-]+-([0-9]+)\.`)
+		releaseMatches := releaseRE.FindStringSubmatch(kernelVersion)
+		if len(releaseMatches) != 2 {
+			return fmt.Errorf("unable to determine RHEL/Centos 7.x kernel release from %q", kernelVersion)
+		}
+
+		release, err := strconv.Atoi(releaseMatches[1])
+		if err != nil {
+			return fmt.Errorf("error parsing release %q: %v", releaseMatches[1], err)
+		}
+
+		if release >= 366 {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("RHEL/Centos 7.x kernel version 3.10.0-366 or later is required to use thin_ls - you have %q", kernelVersion)
 }
 
 // Register root container before running this function!
