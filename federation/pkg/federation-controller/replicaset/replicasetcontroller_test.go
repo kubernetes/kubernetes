@@ -17,22 +17,60 @@ limitations under the License.
 package replicaset
 
 import (
+	"flag"
 	"fmt"
 	"github.com/stretchr/testify/assert"
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
+	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/pkg/api/meta"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
-	"testing"
-	"time"
-	//kubeclientfake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
-	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	kubeclientfake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/watch"
+	"testing"
+	"time"
 )
 
+func TestParseFederationReplicaSetReference(t *testing.T) {
+	successPrefs := []string{
+		`{"rebalance": true,
+		  "clusters": {
+		    "k8s-1": {"minReplicas": 10, "maxReplicas": 20, "weight": 2},
+		    "*": {"weight": 1}
+		}}`,
+	}
+	failedPrefes := []string{
+		`{`, // bad json
+	}
+
+	rs := mkReplicaSet("rs-1", 100)
+	accessor, _ := meta.Accessor(rs)
+	anno := accessor.GetAnnotations()
+	if anno == nil {
+		anno = make(map[string]string)
+		accessor.SetAnnotations(anno)
+	}
+	for _, prefString := range successPrefs {
+		anno[FedReplicaSetPreferencesAnnotation] = prefString
+		pref, err := parseFederationReplicaSetReference(rs)
+		assert.NotNil(t, pref)
+		assert.Nil(t, err)
+	}
+	for _, prefString := range failedPrefes {
+		anno[FedReplicaSetPreferencesAnnotation] = prefString
+		pref, err := parseFederationReplicaSetReference(rs)
+		assert.Nil(t, pref)
+		assert.NotNil(t, err)
+	}
+}
+
 func TestReplicaSetController(t *testing.T) {
+	flag.Set("logtostderr", "true")
+	flag.Set("v", "5")
+	flag.Parse()
 
 	replicaSetReviewDelay = 10 * time.Millisecond
 	clusterAvailableDelay = 20 * time.Millisecond
@@ -45,17 +83,18 @@ func TestReplicaSetController(t *testing.T) {
 	fedclientset.Federation().Clusters().Create(mkCluster("k8s-1", apiv1.ConditionTrue))
 	fedclientset.Federation().Clusters().Create(mkCluster("k8s-2", apiv1.ConditionTrue))
 
-	kube1clientset := fedclientfake.NewSimpleClientset()
+	kube1clientset := kubeclientfake.NewSimpleClientset()
 	kube1rswatch := watch.NewFake()
 	kube1clientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(kube1rswatch, nil))
-	kube2clientset := fedclientfake.NewSimpleClientset()
+	kube1Podwatch := watch.NewFake()
+	kube1clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(kube1Podwatch, nil))
+	kube2clientset := kubeclientfake.NewSimpleClientset()
 	kube2rswatch := watch.NewFake()
 	kube2clientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(kube2rswatch, nil))
+	kube2Podwatch := watch.NewFake()
+	kube2clientset.PrependWatchReactor("pods", core.DefaultWatchReactor(kube2Podwatch, nil))
 
-	stopChan := make(chan struct{})
-	replicaSetController := NewReplicaSetController(fedclientset)
-	informer := toFederatedInformerForTestOnly(replicaSetController.fedInformer)
-	informer.SetClientFactory(func(cluster *fedv1.Cluster) (federation_release_1_4.Interface, error) {
+	fedInformerClientFactory := func(cluster *fedv1.Cluster) (kube_release_1_4.Interface, error) {
 		switch cluster.Name {
 		case "k8s-1":
 			return kube1clientset, nil
@@ -64,7 +103,13 @@ func TestReplicaSetController(t *testing.T) {
 		default:
 			return nil, fmt.Errorf("Unknown cluster: %v", cluster.Name)
 		}
-	})
+	}
+	stopChan := make(chan struct{})
+	replicaSetController := NewReplicaSetController(fedclientset)
+	rsFedinformer := toFederatedInformerForTestOnly(replicaSetController.fedReplicaSetInformer)
+	rsFedinformer.SetClientFactory(fedInformerClientFactory)
+	podFedinformer := toFederatedInformerForTestOnly(replicaSetController.fedPodInformer)
+	podFedinformer.SetClientFactory(fedInformerClientFactory)
 
 	go replicaSetController.Run(1, stopChan)
 
