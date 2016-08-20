@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/componentconfig/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/config"
 
 	"github.com/spf13/pflag"
 )
@@ -49,10 +50,10 @@ type ProxyServerConfig struct {
 }
 
 func NewProxyConfig() *ProxyServerConfig {
-	config := componentconfig.KubeProxyConfiguration{}
-	api.Scheme.Convert(&v1alpha1.KubeProxyConfiguration{}, &config, nil)
+	cfg := componentconfig.KubeProxyConfiguration{}
+	api.Scheme.Convert(&v1alpha1.KubeProxyConfiguration{}, &cfg, nil)
 	return &ProxyServerConfig{
-		KubeProxyConfiguration: config,
+		KubeProxyConfiguration: cfg,
 		ContentType:            "application/vnd.kubernetes.protobuf",
 		KubeAPIQPS:             5.0,
 		KubeAPIBurst:           10,
@@ -88,4 +89,5 @@ func (s *ProxyServerConfig) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.ConntrackMaxPerCore, "conntrack-max-per-core", s.ConntrackMaxPerCore,
 		"Maximum number of NAT connections to track per CPU core (0 to leave as-is). This is only considered if conntrack-max is 0.")
 	fs.DurationVar(&s.ConntrackTCPEstablishedTimeout.Duration, "conntrack-tcp-timeout-established", s.ConntrackTCPEstablishedTimeout.Duration, "Idle timeout for established TCP connections (0 to leave as-is)")
+	config.DefaultFeatureGate.AddFlag(fs)
 }

@@ -173,6 +173,7 @@ extra-peer-dirs
 failover-timeout
 failure-domains
 fake-clientset
+feature-gates
 federated-api-burst
 federated-api-qps
 federated-kube-context
