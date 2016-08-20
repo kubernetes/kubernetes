@@ -71,21 +71,27 @@ func (cm *containerMetric) desc(baseLabels []string) *prometheus.Desc {
 	return prometheus.NewDesc(cm.name, cm.help, append(baseLabels, cm.extraLabels...), nil)
 }
 
-type ContainerNameToLabelsFunc func(containerName string) map[string]string
+// ContainerLabelsFunc defines the base labels and their values attached to
+// each metric exported by cAdvisor.
+type ContainerLabelsFunc func(*info.ContainerInfo) map[string]string
 
 // PrometheusCollector implements prometheus.Collector.
 type PrometheusCollector struct {
-	infoProvider          infoProvider
-	errors                prometheus.Gauge
-	containerMetrics      []containerMetric
-	containerNameToLabels ContainerNameToLabelsFunc
+	infoProvider        infoProvider
+	errors              prometheus.Gauge
+	containerMetrics    []containerMetric
+	containerLabelsFunc ContainerLabelsFunc
 }
 
-// NewPrometheusCollector returns a new PrometheusCollector.
-func NewPrometheusCollector(infoProvider infoProvider, f ContainerNameToLabelsFunc) *PrometheusCollector {
+// NewPrometheusCollector returns a new PrometheusCollector. If
+// ContainerLabelsFunc is nil DefaultContainerLabels will be used.
+func NewPrometheusCollector(i infoProvider, f ContainerLabelsFunc) *PrometheusCollector {
+	if f == nil {
+		f = DefaultContainerLabels
+	}
 	c := &PrometheusCollector{
-		infoProvider:          infoProvider,
-		containerNameToLabels: f,
+		infoProvider:        i,
+		containerLabelsFunc: f,
 		errors: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: "container",
 			Name:      "scrape_error",
@@ -537,6 +543,26 @@ const (
 	containerEnvPrefix   = "container_env_"
 )
 
+// DefaultContainerLabels implements ContainerLabelsFunc. It exports the
+// container name, first alias, image name as well as all its env and label
+// values.
+func DefaultContainerLabels(container *info.ContainerInfo) map[string]string {
+	set := map[string]string{"id": container.Name}
+	if len(container.Aliases) > 0 {
+		set["name"] = container.Aliases[0]
+	}
+	if image := container.Spec.Image; len(image) > 0 {
+		set["image"] = image
+	}
+	for k, v := range container.Spec.Labels {
+		set[containerLabelPrefix+k] = v
+	}
+	for k, v := range container.Spec.Envs {
+		set[containerEnvPrefix+k] = v
+	}
+	return set
+}
+
 func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric) {
 	containers, err := c.infoProvider.SubcontainersInfo("/", &info.ContainerInfoRequest{NumStats: 1})
 	if err != nil {
@@ -545,56 +571,31 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 		return
 	}
 	for _, container := range containers {
-		baseLabels := []string{"id"}
-		id := container.Name
-		name := id
-		if len(container.Aliases) > 0 {
-			name = container.Aliases[0]
-			baseLabels = append(baseLabels, "name")
+		labels, values := []string{}, []string{}
+		for l, v := range c.containerLabelsFunc(container) {
+			labels = append(labels, sanitizeLabelName(l))
+			values = append(values, v)
 		}
-		image := container.Spec.Image
-		if len(image) > 0 {
-			baseLabels = append(baseLabels, "image")
-		}
-		baseLabelValues := []string{id, name, image}[:len(baseLabels)]
-
-		if c.containerNameToLabels != nil {
-			newLabels := c.containerNameToLabels(name)
-			for k, v := range newLabels {
-				baseLabels = append(baseLabels, sanitizeLabelName(k))
-				baseLabelValues = append(baseLabelValues, v)
-			}
-		}
-
-		for k, v := range container.Spec.Labels {
-			baseLabels = append(baseLabels, sanitizeLabelName(containerLabelPrefix+k))
-			baseLabelValues = append(baseLabelValues, v)
-		}
-		for k, v := range container.Spec.Envs {
-			baseLabels = append(baseLabels, sanitizeLabelName(containerEnvPrefix+k))
-			baseLabelValues = append(baseLabelValues, v)
-		}
-
 		// Container spec
-		desc := prometheus.NewDesc("container_start_time_seconds", "Start time of the container since unix epoch in seconds.", baseLabels, nil)
-		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.CreationTime.Unix()), baseLabelValues...)
+		desc := prometheus.NewDesc("container_start_time_seconds", "Start time of the container since unix epoch in seconds.", labels, nil)
+		ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.CreationTime.Unix()), values...)
 
 		if container.Spec.HasCpu {
-			desc = prometheus.NewDesc("container_spec_cpu_period", "CPU period of the container.", baseLabels, nil)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Period), baseLabelValues...)
+			desc = prometheus.NewDesc("container_spec_cpu_period", "CPU period of the container.", labels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Period), values...)
 			if container.Spec.Cpu.Quota != 0 {
-				desc = prometheus.NewDesc("container_spec_cpu_quota", "CPU quota of the container.", baseLabels, nil)
-				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Quota), baseLabelValues...)
+				desc = prometheus.NewDesc("container_spec_cpu_quota", "CPU quota of the container.", labels, nil)
+				ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Quota), values...)
 			}
-			desc := prometheus.NewDesc("container_spec_cpu_shares", "CPU share of the container.", baseLabels, nil)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Limit), baseLabelValues...)
+			desc := prometheus.NewDesc("container_spec_cpu_shares", "CPU share of the container.", labels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, float64(container.Spec.Cpu.Limit), values...)
 
 		}
 		if container.Spec.HasMemory {
-			desc := prometheus.NewDesc("container_spec_memory_limit_bytes", "Memory limit for the container.", baseLabels, nil)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, specMemoryValue(container.Spec.Memory.Limit), baseLabelValues...)
-			desc = prometheus.NewDesc("container_spec_memory_swap_limit_bytes", "Memory swap limit for the container.", baseLabels, nil)
-			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, specMemoryValue(container.Spec.Memory.SwapLimit), baseLabelValues...)
+			desc := prometheus.NewDesc("container_spec_memory_limit_bytes", "Memory limit for the container.", labels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, specMemoryValue(container.Spec.Memory.Limit), values...)
+			desc = prometheus.NewDesc("container_spec_memory_swap_limit_bytes", "Memory swap limit for the container.", labels, nil)
+			ch <- prometheus.MustNewConstMetric(desc, prometheus.GaugeValue, specMemoryValue(container.Spec.Memory.SwapLimit), values...)
 		}
 
 		// Now for the actual metrics
@@ -603,9 +604,9 @@ func (c *PrometheusCollector) collectContainersInfo(ch chan<- prometheus.Metric)
 			if cm.condition != nil && !cm.condition(container.Spec) {
 				continue
 			}
-			desc := cm.desc(baseLabels)
+			desc := cm.desc(labels)
 			for _, metricValue := range cm.getValues(stats) {
-				ch <- prometheus.MustNewConstMetric(desc, cm.valueType, float64(metricValue.value), append(baseLabelValues, metricValue.labels...)...)
+				ch <- prometheus.MustNewConstMetric(desc, cm.valueType, float64(metricValue.value), append(values, metricValue.labels...)...)
 			}
 		}
 	}
