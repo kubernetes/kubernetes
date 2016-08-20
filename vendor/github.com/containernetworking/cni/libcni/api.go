@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 CNI authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ package libcni
 import (
 	"strings"
 
-	"github.com/appc/cni/pkg/invoke"
-	"github.com/appc/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/invoke"
+	"github.com/containernetworking/cni/pkg/types"
 )
 
 type RuntimeConf struct {
@@ -43,12 +43,20 @@ type CNIConfig struct {
 }
 
 func (c *CNIConfig) AddNetwork(net *NetworkConfig, rt *RuntimeConf) (*types.Result, error) {
-	pluginPath := invoke.FindInPath(net.Network.Type, c.Path)
+	pluginPath, err := invoke.FindInPath(net.Network.Type, c.Path)
+	if err != nil {
+		return nil, err
+	}
+
 	return invoke.ExecPluginWithResult(pluginPath, net.Bytes, c.args("ADD", rt))
 }
 
 func (c *CNIConfig) DelNetwork(net *NetworkConfig, rt *RuntimeConf) error {
-	pluginPath := invoke.FindInPath(net.Network.Type, c.Path)
+	pluginPath, err := invoke.FindInPath(net.Network.Type, c.Path)
+	if err != nil {
+		return err
+	}
+
 	return invoke.ExecPluginWithoutResult(pluginPath, net.Bytes, c.args("DEL", rt))
 }
 

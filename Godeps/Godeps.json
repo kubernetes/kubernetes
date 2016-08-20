@@ -83,21 +83,6 @@
 			"Rev": "c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35"
 		},
 		{
-			"ImportPath": "github.com/appc/cni/libcni",
-			"Comment": "v0.1.0-27-g2a58bd9",
-			"Rev": "2a58bd9379ca33579f0cf631945b717aa4fa373d"
-		},
-		{
-			"ImportPath": "github.com/appc/cni/pkg/invoke",
-			"Comment": "v0.1.0-27-g2a58bd9",
-			"Rev": "2a58bd9379ca33579f0cf631945b717aa4fa373d"
-		},
-		{
-			"ImportPath": "github.com/appc/cni/pkg/types",
-			"Comment": "v0.1.0-27-g2a58bd9",
-			"Rev": "2a58bd9379ca33579f0cf631945b717aa4fa373d"
-		},
-		{
 			"ImportPath": "github.com/appc/spec/schema",
 			"Comment": "v0.8.1-6-gab50d12",
 			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
@@ -344,6 +329,21 @@
 			"ImportPath": "github.com/codegangsta/negroni",
 			"Comment": "v0.1.0-62-g8d75e11",
 			"Rev": "8d75e11374a1928608c906fe745b538483e7aeb2"
+		},
+		{
+			"ImportPath": "github.com/containernetworking/cni/libcni",
+			"Comment": "v0.3.0-61-g9d5e6e6",
+			"Rev": "9d5e6e60e79491207834ae8439e80c943db65a69"
+		},
+		{
+			"ImportPath": "github.com/containernetworking/cni/pkg/invoke",
+			"Comment": "v0.3.0-61-g9d5e6e6",
+			"Rev": "9d5e6e60e79491207834ae8439e80c943db65a69"
+		},
+		{
+			"ImportPath": "github.com/containernetworking/cni/pkg/types",
+			"Comment": "v0.3.0-61-g9d5e6e6",
+			"Rev": "9d5e6e60e79491207834ae8439e80c943db65a69"
 		},
 		{
 			"ImportPath": "github.com/coreos/etcd/alarm",
