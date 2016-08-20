@@ -40,7 +40,7 @@ for namespaced kernel parameters (sysctls) set for each pod.
   + node-level whitelist: `kernel.shm*`, `net.ipv4.ip_local_port_range`, `net.ipv4.tcp_max_syn_backlog`, `net.ipv4.tcp_syncookies`
   + greylist: `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`, `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`, `fs.mqueue.*`, `net.*`
   + PSP default: `*`
-  + new kubelet flags: `--whitelist-additional-sysctls` and `--sysctl-node-taint`
+  + new kubelet flag: `--experimental-sysctl-whitelist`
 - [ ] document node-level whitelist with kubectl flags and taints/tolerations
 - [ ] document host-level sysctls with daemon sets + taints/tolerations
 - in parallel: kernel upstream patches to fix ipc accounting for 4.5+
@@ -561,7 +561,7 @@ Pods that do not comply with the greylist will be rejected by the apiserver. Pod
 The kubelet will get a new flag:
 
 ```
---experimental-whitelisted-sysctls     Comma-separated whitelist of sysctls or sysctl patterns (ending in *).
+--experimental-sysctl-whitelist     Comma-separated whitelist of sysctls or sysctl patterns (ending in *).
 ```
 
 It defaults to the node-level whitelist.
