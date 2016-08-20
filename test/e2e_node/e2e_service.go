@@ -151,7 +151,8 @@ type e2eService struct {
 	logFiles map[string]logFileData
 
 	// All statically linked e2e services
-	etcdServer *EtcdServer
+	etcdServer   *EtcdServer
+	nsController *NamespaceController
 }
 
 type logFileData struct {
@@ -220,6 +221,11 @@ func (es *e2eService) start() error {
 	}
 	es.services = append(es.services, s)
 
+	err = es.startNamespaceController()
+	if err != nil {
+		return nil
+	}
+
 	return nil
 }
 
@@ -280,14 +286,23 @@ func isJournaldAvailable() bool {
 
 func (es *e2eService) stop() {
 	es.getLogFiles()
+	// TODO(random-liu): Use a loop to stop all services after introducing service interface.
+	// Stop namespace controller
+	if es.nsController != nil {
+		if err := es.nsController.Stop(); err != nil {
+			glog.Errorf("Failed to stop %q: %v", es.nsController.Name(), err)
+		}
+	}
 	for _, s := range es.services {
 		if err := s.kill(); err != nil {
 			glog.Errorf("Failed to stop %v: %v", s.name, err)
 		}
 	}
-	// TODO(random-liu): Use a loop to stop all services after introducing service interface.
-	if err := es.etcdServer.Stop(); err != nil {
-		glog.Errorf("Failed to stop %q: %v", es.etcdServer.Name(), err)
+	// Stop etcd
+	if es.etcdServer != nil {
+		if err := es.etcdServer.Stop(); err != nil {
+			glog.Errorf("Failed to stop %q: %v", es.etcdServer.Name(), err)
+		}
 	}
 	for _, d := range es.rmDirs {
 		err := os.RemoveAll(d)
@@ -324,6 +339,11 @@ func (es *e2eService) startApiServer() (*server, error) {
 		[]string{apiserverHealthCheckURL},
 		"kube-apiserver.log")
 	return server, server.start()
+}
+
+func (es *e2eService) startNamespaceController() error {
+	es.nsController = NewNamespaceController()
+	return es.nsController.Start()
 }
 
 func (es *e2eService) startKubeletServer() (*server, error) {
