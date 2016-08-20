@@ -220,21 +220,39 @@ func TestCheckInvalidErr(t *testing.T) {
 	}{
 		{
 			errors.NewInvalid(api.Kind("Invalid1"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
-			`Error from server: Invalid1 "invalidation" is invalid: field: Invalid value: "single": details`,
+			`error: The Invalid1 "invalidation" is invalid. field: Invalid value: "single": details`,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid2"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
-			`Error from server: Invalid2 "invalidation" is invalid: [field1: Invalid value: "multi1": details, field2: Invalid value: "multi2": details]`,
+			`error: The Invalid2 "invalidation" is invalid. * field1: Invalid value: "multi1": details, * field2: Invalid value: "multi2": details`,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid3"), "invalidation", field.ErrorList{}),
-			`Error from server: Invalid3 "invalidation" is invalid: <nil>`,
+			`error: The Invalid3 "invalidation" is invalid. %!s(<nil>)`,
+		},
+		{
+			errors.NewInvalid(api.Kind("Invalid4"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
+			`error: The Invalid4 "invalidation" is invalid. field4: Invalid value: "multi4": details`,
 		},
 	}
 
 	var errReturned string
 	errHandle := func(err string) {
-		errReturned = err
+		for _, v := range strings.Split(err, "\n") {
+			separator := " "
+			if errReturned == "" || v == "" {
+				separator = ""
+			} else if !strings.HasSuffix(errReturned, ".") {
+				separator = ", "
+			}
+			errReturned = fmt.Sprintf("%s%s%s", errReturned, separator, v)
+		}
+		if !strings.HasPrefix(errReturned, "error: ") {
+			errReturned = fmt.Sprintf("error: %s", errReturned)
+		}
+		if strings.HasSuffix(errReturned, ", ") {
+			errReturned = errReturned[:len(errReturned)-len(" ,")]
+		}
 	}
 
 	for _, test := range tests {
@@ -243,6 +261,7 @@ func TestCheckInvalidErr(t *testing.T) {
 		if errReturned != test.expected {
 			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
 		}
+		errReturned = ""
 	}
 }
 
