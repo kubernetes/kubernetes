@@ -36,7 +36,7 @@ import (
 )
 
 func TestMakePayload(t *testing.T) {
-	case_mapping_mode := int32(0400)
+	caseMappingMode := int32(0400)
 	cases := []struct {
 		name      string
 		mappings  []api.KeyToPath
@@ -168,12 +168,12 @@ func TestMakePayload(t *testing.T) {
 				{
 					Key:  "foo",
 					Path: "foo.txt",
-					Mode: &case_mapping_mode,
+					Mode: &caseMappingMode,
 				},
 				{
 					Key:  "bar",
 					Path: "bar.bin",
-					Mode: &case_mapping_mode,
+					Mode: &caseMappingMode,
 				},
 			},
 			configMap: &api.ConfigMap{
@@ -184,8 +184,8 @@ func TestMakePayload(t *testing.T) {
 			},
 			mode: 0644,
 			payload: map[string]util.FileProjection{
-				"foo.txt": {Data: []byte("foo"), Mode: case_mapping_mode},
-				"bar.bin": {Data: []byte("bar"), Mode: case_mapping_mode},
+				"foo.txt": {Data: []byte("foo"), Mode: caseMappingMode},
+				"bar.bin": {Data: []byte("bar"), Mode: caseMappingMode},
 			},
 			success: true,
 		},
