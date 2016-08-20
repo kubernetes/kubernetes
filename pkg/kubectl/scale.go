@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -51,6 +52,8 @@ func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
 		return &ReplicaSetScaler{c.Extensions()}, nil
 	case extensions.Kind("Job"), batch.Kind("Job"):
 		return &JobScaler{c.Batch()}, nil // Either kind of job can be scaled with Batch interface.
+	case apps.Kind("PetSet"):
+		return &PetSetScaler{c.Apps()}, nil
 	case extensions.Kind("Deployment"):
 		return &DeploymentScaler{c.Extensions()}, nil
 	}
@@ -124,6 +127,17 @@ func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name s
 		}
 		return false, err
 	}
+}
+
+// ValidatePetSet ensures that the preconditions match. Returns nil if they are valid, an error otherwise.
+func (precondition *ScalePrecondition) ValidatePetSet(ps *apps.PetSet) error {
+	if precondition.Size != -1 && int(ps.Spec.Replicas) != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(ps.Spec.Replicas))}
+	}
+	if len(precondition.ResourceVersion) != 0 && ps.ResourceVersion != precondition.ResourceVersion {
+		return PreconditionError{"resource version", precondition.ResourceVersion, ps.ResourceVersion}
+	}
+	return nil
 }
 
 // ValidateReplicationController ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
@@ -272,6 +286,56 @@ func (precondition *ScalePrecondition) ValidateJob(job *batch.Job) error {
 	}
 	if len(precondition.ResourceVersion) != 0 && job.ResourceVersion != precondition.ResourceVersion {
 		return PreconditionError{"resource version", precondition.ResourceVersion, job.ResourceVersion}
+	}
+	return nil
+}
+
+type PetSetScaler struct {
+	c client.AppsInterface
+}
+
+func (scaler *PetSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error {
+	ps, err := scaler.c.PetSets(namespace).Get(name)
+	if err != nil {
+		return ScaleError{ScaleGetFailure, "Unknown", err}
+	}
+	if preconditions != nil {
+		if err := preconditions.ValidatePetSet(ps); err != nil {
+			return err
+		}
+	}
+	ps.Spec.Replicas = int(newSize)
+	if _, err := scaler.c.PetSets(namespace).Update(ps); err != nil {
+		if errors.IsConflict(err) {
+			return ScaleError{ScaleUpdateConflictFailure, ps.ResourceVersion, err}
+		}
+		return ScaleError{ScaleUpdateFailure, ps.ResourceVersion, err}
+	}
+	return nil
+}
+
+func (scaler *PetSetScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
+	if preconditions == nil {
+		preconditions = &ScalePrecondition{-1, ""}
+	}
+	if retry == nil {
+		// Make it try only once, immediately
+		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
+	}
+	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
+	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
+		return err
+	}
+	if waitForReplicas != nil {
+		job, err := scaler.c.PetSets(namespace).Get(name)
+		if err != nil {
+			return err
+		}
+		err = wait.Poll(waitForReplicas.Interval, waitForReplicas.Timeout, client.PetSetHasDesiredPets(scaler.c, job))
+		if err == wait.ErrWaitTimeout {
+			return fmt.Errorf("timed out waiting for %q to be synced", name)
+		}
+		return err
 	}
 	return nil
 }

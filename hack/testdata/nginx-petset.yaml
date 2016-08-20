@@ -1,0 +1,44 @@
+# A headless service to create DNS records
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
+  name: nginx
+  labels:
+    app: nginx-petset
+spec:
+  ports:
+  - port: 80
+    name: web
+  # *.nginx.default.svc.cluster.local
+  clusterIP: None
+  selector:
+    app: nginx-petset
+---
+apiVersion: apps/v1alpha1
+kind: PetSet
+metadata:
+  name: nginx
+spec:
+  serviceName: "nginx"
+  replicas: 0
+  template:
+    metadata:
+      labels:
+        app: nginx-petset
+      annotations:
+        pod.alpha.kubernetes.io/initialized: "true"
+    spec:
+      terminationGracePeriodSeconds: 0
+      containers:
+      - name: nginx
+        image: gcr.io/google_containers/nginx-slim:0.7
+        ports:
+        - containerPort: 80
+          name: web
+        command:
+        - sh
+        - -c
+        - 'while true; do sleep 1; done'
+

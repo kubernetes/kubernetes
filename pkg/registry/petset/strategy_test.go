@@ -66,7 +66,7 @@ func TestPetSetStrategy(t *testing.T) {
 
 	// Just Spec.Replicas is allowed to change
 	validPs := &apps.PetSet{
-		ObjectMeta: api.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace},
+		ObjectMeta: api.ObjectMeta{Name: ps.Name, Namespace: ps.Namespace, ResourceVersion: "1", Generation: 1},
 		Spec: apps.PetSetSpec{
 			Selector: ps.Spec.Selector,
 			Template: validPodTemplate.Template,
@@ -76,7 +76,7 @@ func TestPetSetStrategy(t *testing.T) {
 	Strategy.PrepareForUpdate(ctx, validPs, ps)
 	errs = Strategy.ValidateUpdate(ctx, validPs, ps)
 	if len(errs) != 0 {
-		t.Errorf("Updating spec.Replicas is allowed on a petset.")
+		t.Errorf("Updating spec.Replicas is allowed on a petset: %v", errs)
 	}
 
 	validPs.Spec.Selector = &unversioned.LabelSelector{MatchLabels: map[string]string{"a": "bar"}}

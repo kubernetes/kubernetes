@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
@@ -82,6 +83,9 @@ func ReaperFor(kind unversioned.GroupKind, c client.Interface) (Reaper, error) {
 	case extensions.Kind("Job"), batch.Kind("Job"):
 		return &JobReaper{c, Interval, Timeout}, nil
 
+	case apps.Kind("PetSet"):
+		return &PetSetReaper{c, Interval, Timeout}, nil
+
 	case extensions.Kind("Deployment"):
 		return &DeploymentReaper{c, Interval, Timeout}, nil
 
@@ -118,6 +122,10 @@ type PodReaper struct {
 }
 type ServiceReaper struct {
 	client.Interface
+}
+type PetSetReaper struct {
+	client.Interface
+	pollInterval, timeout time.Duration
 }
 
 type objInterface interface {
@@ -307,12 +315,60 @@ func (reaper *DaemonSetReaper) Stop(namespace, name string, timeout time.Duratio
 		if err != nil {
 			return false, nil
 		}
+
 		return updatedDS.Status.CurrentNumberScheduled+updatedDS.Status.NumberMisscheduled == 0, nil
 	}); err != nil {
 		return err
 	}
 
 	return reaper.Extensions().DaemonSets(namespace).Delete(name)
+}
+
+func (reaper *PetSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
+	petsets := reaper.Apps().PetSets(namespace)
+	scaler, err := ScalerFor(apps.Kind("PetSet"), *reaper)
+	if err != nil {
+		return err
+	}
+	ps, err := petsets.Get(name)
+	if err != nil {
+		return err
+	}
+	if timeout == 0 {
+		numPets := ps.Spec.Replicas
+		timeout = Timeout + time.Duration(10*numPets)*time.Second
+	}
+	retry := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	waitForPetSet := NewRetryParams(reaper.pollInterval, reaper.timeout)
+	if err = scaler.Scale(namespace, name, 0, nil, retry, waitForPetSet); err != nil {
+		return err
+	}
+
+	// TODO: This shouldn't be needed, see corresponding TODO in PetSetHasDesiredPets.
+	// PetSet should track generation number.
+	pods := reaper.Pods(namespace)
+	selector, _ := unversioned.LabelSelectorAsSelector(ps.Spec.Selector)
+	options := api.ListOptions{LabelSelector: selector}
+	podList, err := pods.List(options)
+	if err != nil {
+		return err
+	}
+
+	errList := []error{}
+	for _, pod := range podList.Items {
+		if err := pods.Delete(pod.Name, gracePeriod); err != nil {
+			if !errors.IsNotFound(err) {
+				errList = append(errList, err)
+			}
+		}
+	}
+	if len(errList) > 0 {
+		return utilerrors.NewAggregate(errList)
+	}
+
+	// TODO: Cleanup volumes? We don't want to accidentally delete volumes from
+	// stop, so just leave this up to the the petset.
+	return petsets.Delete(name, nil)
 }
 
 func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
