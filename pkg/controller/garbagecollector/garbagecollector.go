@@ -478,8 +478,7 @@ func (gc *GarbageCollector) monitorFor(resource unversioned.GroupVersionResource
 	if err != nil {
 		return monitor, err
 	}
-	// TODO: remove the comment when we find an efficient way to do locking
-	// gc.registeredRateLimiterForMonitors.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
+	gc.registeredRateLimiterForMonitors.registerIfNotPresent(resource.GroupVersion(), client, "garbage_collector_monitoring")
 	setObjectTypeMeta := func(obj interface{}) {
 		runtimeObject, ok := obj.(runtime.Object)
 		if !ok {
@@ -542,8 +541,8 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		clock:                            clock.RealClock{},
 		dirtyQueue:                       workqueue.NewTimedWorkQueue(),
 		orphanQueue:                      workqueue.NewTimedWorkQueue(),
-		registeredRateLimiter:            NewRegisteredRateLimiter(),
-		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(),
+		registeredRateLimiter:            NewRegisteredRateLimiter(resources),
+		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(resources),
 	}
 	gc.propagator = &Propagator{
 		eventQueue: workqueue.NewTimedWorkQueue(),
@@ -604,8 +603,7 @@ func (gc *GarbageCollector) apiResource(apiVersion, kind string, namespaced bool
 func (gc *GarbageCollector) deleteObject(item objectReference) error {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	// TODO: remove the comment when we find an efficient way to do locking
-	// gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
+	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return err
@@ -619,8 +617,7 @@ func (gc *GarbageCollector) deleteObject(item objectReference) error {
 func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructured, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	// TODO: remove the comment when we find an efficient way to do locking
-	// gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
+	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return nil, err
@@ -631,8 +628,7 @@ func (gc *GarbageCollector) getObject(item objectReference) (*runtime.Unstructur
 func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unstructured) (*runtime.Unstructured, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	// TODO: remove the comment when we find an efficient way to do locking
-	// gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
+	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return nil, err
@@ -643,8 +639,7 @@ func (gc *GarbageCollector) updateObject(item objectReference, obj *runtime.Unst
 func (gc *GarbageCollector) patchObject(item objectReference, patch []byte) (*runtime.Unstructured, error) {
 	fqKind := unversioned.FromAPIVersionAndKind(item.APIVersion, item.Kind)
 	client, err := gc.clientPool.ClientForGroupVersion(fqKind.GroupVersion())
-	// TODO: remove the comment when we find an efficient way to do locking
-	// gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
+	gc.registeredRateLimiter.registerIfNotPresent(fqKind.GroupVersion(), client, "garbage_collector_operation")
 	resource, err := gc.apiResource(item.APIVersion, item.Kind, len(item.Namespace) != 0)
 	if err != nil {
 		return nil, err
