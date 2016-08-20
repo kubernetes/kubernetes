@@ -581,7 +581,7 @@ func lastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
 		if err != nil {
 			return d.CreationTimestamp
 		}
-		return unversioned.Time{parsedTime}
+		return unversioned.Time{Time: parsedTime}
 	}
 	// If it's never updated, use creation timestamp instead
 	return d.CreationTimestamp
