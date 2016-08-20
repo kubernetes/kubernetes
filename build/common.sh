@@ -70,10 +70,7 @@ readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
-readonly DOCKER_MOUNT_ARGS_BASE=(
-  # timezone
-  --volume /etc/localtime:/etc/localtime:ro
-)
+readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-8730}"
 
 # Get the set of master binaries that run in Docker (on Linux)
 # Entry format is "<name-of-binary>,<base-image>".
@@ -152,7 +149,7 @@ function kube::build::verify_prereqs() {
   KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
   KUBE_RSYNC_CONTAINER_NAME="kube-rsync-${KUBE_ROOT_HASH}"
   KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
-  DOCKER_MOUNT_ARGS=("${DOCKER_MOUNT_ARGS_BASE[@]}" --volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
+  DOCKER_MOUNT_ARGS=(--volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
   LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 }
 
@@ -282,13 +279,6 @@ function kube::build::ensure_tar() {
 function kube::build::clean_output() {
   # Clean out the output directory if it exists.
   if kube::build::has_docker ; then
-    if kube::build::build_image_built ; then
-      kube::log::status "Cleaning out _output/dockerized/bin/ via docker build image"
-      kube::build::run_build_command bash -c "rm -rf '${REMOTE_OUTPUT_BINPATH}'/*"
-    else
-      kube::log::error "Build image not built.  Cannot clean via docker build image."
-    fi
-
     kube::log::status "Removing data container ${KUBE_BUILD_DATA_CONTAINER_NAME}"
     "${DOCKER[@]}" rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
   fi
@@ -390,6 +380,8 @@ function kube::build::build_image() {
 
   kube::version::get_version_vars
   kube::version::save_version_vars "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-version-defs"
+
+  cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
   cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
   cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
@@ -583,8 +575,9 @@ function kube::build::run_build_command_ex() {
 
 function kube::build::start_rsyncd_container() {
   kube::build::stop_rsyncd_container
+  V=6 kube::log::status "Starting rsyncd container"
   kube::build::run_build_command_ex \
-    "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:8730:8730 -d \
+    "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:${KUBE_RSYNC_PORT}:8730 -d \
     -- /rsyncd.sh >/dev/null
 
   # Wait unil rsync is up and running.
@@ -615,6 +608,7 @@ function kube::build::start_rsyncd_container() {
 }
 
 function kube::build::stop_rsyncd_container() {
+  V=6 kube::log::status "Stopping any currently running rsyncd container"
   kube::build::destroy_container "${KUBE_RSYNC_CONTAINER_NAME}"
 }
 
@@ -638,10 +632,10 @@ function kube::build::sync_to_container() {
     --filter='- /_output/' \
     --filter='- /' \
     --prune-empty-dirs \
-    -ap \
-    "${KUBE_ROOT}/" rsync://k8s@localhost:8730/k8s/
+    --archive --perms \
+    "${KUBE_ROOT}/" rsync://k8s@localhost:${KUBE_RSYNC_PORT}/k8s/
 
-  #kube::build::stop_rsyncd_container
+  kube::build::stop_rsyncd_container
 }
 
 # If the Docker server is remote, copy the results back out.
@@ -663,8 +657,8 @@ function kube::build::copy_output() {
     --filter='+ zz_generated.*' \
     --filter='+ */' \
     --filter='- /**' \
-    -ap \
-    rsync://k8s@localhost:8730/k8s/ "${KUBE_ROOT}"
+    --archive --perms \
+    rsync://k8s@localhost:${KUBE_RSYNC_PORT}/k8s/ "${KUBE_ROOT}"
 
-  #kube::build::stop_rsyncd_container
+  kube::build::stop_rsyncd_container
 }

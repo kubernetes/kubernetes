@@ -15,6 +15,8 @@
 # This file creates a standard build environment for building Kubernetes
 FROM gcr.io/google_containers/kube-cross:KUBE_BUILD_IMAGE_CROSS_TAG
 
+ADD localtime /etc/localtime
+
 # Mark this as a kube-build container
 RUN touch /kube-build-image
 
