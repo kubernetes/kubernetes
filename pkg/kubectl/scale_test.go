@@ -66,7 +66,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 	name := "foo"
 	namespace := "default"
 
-	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
@@ -75,7 +75,7 @@ func TestReplicationControllerScaleRetry(t *testing.T) {
 		t.Errorf("Did not expect an error on update conflict failure, got %v", err)
 	}
 	preconditions = ScalePrecondition{3, ""}
-	scaleFunc = ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	scaleFunc = ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err = scaleFunc()
 	if err == nil {
 		t.Errorf("Expected error on precondition failure")
@@ -90,7 +90,7 @@ func TestReplicationControllerScaleInvalid(t *testing.T) {
 	name := "foo"
 	namespace := "default"
 
-	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
@@ -304,7 +304,7 @@ func TestJobScaleRetry(t *testing.T) {
 	name := "foo"
 	namespace := "default"
 
-	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
 	if pass != false {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
@@ -313,7 +313,7 @@ func TestJobScaleRetry(t *testing.T) {
 		t.Errorf("Did not expect an error on update failure, got %v", err)
 	}
 	preconditions = ScalePrecondition{3, ""}
-	scaleFunc = ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	scaleFunc = ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err = scaleFunc()
 	if err == nil {
 		t.Errorf("Expected error on precondition failure")
@@ -348,7 +348,7 @@ func TestJobScaleInvalid(t *testing.T) {
 	name := "foo"
 	namespace := "default"
 
-	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
@@ -553,7 +553,7 @@ func TestDeploymentScaleRetry(t *testing.T) {
 	name := "foo"
 	namespace := "default"
 
-	scaleFunc := ScaleCondition(scaler, preconditions, namespace, name, count)
+	scaleFunc := ScaleCondition(scaler, preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
 	if pass != false {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
@@ -562,7 +562,7 @@ func TestDeploymentScaleRetry(t *testing.T) {
 		t.Errorf("Did not expect an error on update failure, got %v", err)
 	}
 	preconditions = &ScalePrecondition{3, ""}
-	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count)
+	scaleFunc = ScaleCondition(scaler, preconditions, namespace, name, count, nil)
 	pass, err = scaleFunc()
 	if err == nil {
 		t.Errorf("Expected error on precondition failure")
@@ -597,7 +597,7 @@ func TestDeploymentScaleInvalid(t *testing.T) {
 	name := "foo"
 	namespace := "default"
 
-	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count)
+	scaleFunc := ScaleCondition(&scaler, &preconditions, namespace, name, count, nil)
 	pass, err := scaleFunc()
 	if pass {
 		t.Errorf("Expected an update failure to return pass = false, got pass = %v", pass)
