@@ -369,8 +369,14 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		if prevItem == nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("unable to get previous usage since prior version of object was not found"))
 		}
-		prevUsage := evaluator.Usage(prevItem)
-		deltaUsage = quota.Subtract(deltaUsage, prevUsage)
+
+		// if we can definitively determine that this is not a case of "create on update",
+		// then charge based on the delta.  Otherwise, bill the maximum
+		metadata, err := meta.Accessor(prevItem)
+		if err == nil && len(metadata.GetResourceVersion()) > 0 {
+			prevUsage := evaluator.Usage(prevItem)
+			deltaUsage = quota.Subtract(deltaUsage, prevUsage)
+		}
 	}
 	if quota.IsZero(deltaUsage) {
 		return quotas, nil
