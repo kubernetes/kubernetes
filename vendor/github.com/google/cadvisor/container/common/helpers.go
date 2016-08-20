@@ -110,6 +110,7 @@ func GetSpec(cgroupPaths map[string]string, machineInfoFactory info.MachineInfoF
 			spec.HasMemory = true
 			spec.Memory.Limit = readUInt64(memoryRoot, "memory.limit_in_bytes")
 			spec.Memory.SwapLimit = readUInt64(memoryRoot, "memory.memsw.limit_in_bytes")
+			spec.Memory.Reservation = readUInt64(memoryRoot, "memory.soft_limit_in_bytes")
 		}
 	}
 

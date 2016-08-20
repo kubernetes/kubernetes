@@ -89,7 +89,7 @@ func GetStats(cgroupManager cgroups.Manager, rootFs string, pid int, ignoreMetri
 	libcontainerStats := &libcontainer.Stats{
 		CgroupStats: cgroupStats,
 	}
-	stats := toContainerStats(libcontainerStats)
+	stats := newContainerStats(libcontainerStats)
 
 	// If we know the pid then get network stats from /proc/<pid>/net/dev
 	if pid == 0 {
@@ -350,7 +350,7 @@ func DiskStatsCopy(blkio_stats []cgroups.BlkioStatEntry) (stat []info.PerDiskSta
 }
 
 // Convert libcontainer stats to info.ContainerStats.
-func toContainerStats0(s *cgroups.Stats, ret *info.ContainerStats) {
+func setCpuStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Cpu.Usage.User = s.CpuStats.CpuUsage.UsageInUsermode
 	ret.Cpu.Usage.System = s.CpuStats.CpuUsage.UsageInKernelmode
 	n := len(s.CpuStats.CpuUsage.PercpuUsage)
@@ -361,9 +361,13 @@ func toContainerStats0(s *cgroups.Stats, ret *info.ContainerStats) {
 		ret.Cpu.Usage.PerCpu[i] = s.CpuStats.CpuUsage.PercpuUsage[i]
 		ret.Cpu.Usage.Total += s.CpuStats.CpuUsage.PercpuUsage[i]
 	}
+
+	ret.Cpu.CFS.Periods = s.CpuStats.ThrottlingData.Periods
+	ret.Cpu.CFS.ThrottledPeriods = s.CpuStats.ThrottlingData.ThrottledPeriods
+	ret.Cpu.CFS.ThrottledTime = s.CpuStats.ThrottlingData.ThrottledTime
 }
 
-func toContainerStats1(s *cgroups.Stats, ret *info.ContainerStats) {
+func setDiskIoStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.DiskIo.IoServiceBytes = DiskStatsCopy(s.BlkioStats.IoServiceBytesRecursive)
 	ret.DiskIo.IoServiced = DiskStatsCopy(s.BlkioStats.IoServicedRecursive)
 	ret.DiskIo.IoQueued = DiskStatsCopy(s.BlkioStats.IoQueuedRecursive)
@@ -374,11 +378,12 @@ func toContainerStats1(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.DiskIo.IoTime = DiskStatsCopy(s.BlkioStats.IoTimeRecursive)
 }
 
-func toContainerStats2(s *cgroups.Stats, ret *info.ContainerStats) {
+func setMemoryStats(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.Usage = s.MemoryStats.Usage.Usage
 	ret.Memory.Failcnt = s.MemoryStats.Usage.Failcnt
 	ret.Memory.Cache = s.MemoryStats.Stats["cache"]
 	ret.Memory.RSS = s.MemoryStats.Stats["rss"]
+	ret.Memory.Swap = s.MemoryStats.Stats["swap"]
 	if v, ok := s.MemoryStats.Stats["pgfault"]; ok {
 		ret.Memory.ContainerData.Pgfault = v
 		ret.Memory.HierarchicalData.Pgfault = v
@@ -399,7 +404,7 @@ func toContainerStats2(s *cgroups.Stats, ret *info.ContainerStats) {
 	ret.Memory.WorkingSet = workingSet
 }
 
-func toContainerStats3(libcontainerStats *libcontainer.Stats, ret *info.ContainerStats) {
+func setNetworkStats(libcontainerStats *libcontainer.Stats, ret *info.ContainerStats) {
 	ret.Network.Interfaces = make([]info.InterfaceStats, len(libcontainerStats.Interfaces))
 	for i := range libcontainerStats.Interfaces {
 		ret.Network.Interfaces[i] = info.InterfaceStats{
@@ -421,18 +426,18 @@ func toContainerStats3(libcontainerStats *libcontainer.Stats, ret *info.Containe
 	}
 }
 
-func toContainerStats(libcontainerStats *libcontainer.Stats) *info.ContainerStats {
-	s := libcontainerStats.CgroupStats
-	ret := new(info.ContainerStats)
-	ret.Timestamp = time.Now()
+func newContainerStats(libcontainerStats *libcontainer.Stats) *info.ContainerStats {
+	ret := &info.ContainerStats{
+		Timestamp: time.Now(),
+	}
 
-	if s != nil {
-		toContainerStats0(s, ret)
-		toContainerStats1(s, ret)
-		toContainerStats2(s, ret)
+	if s := libcontainerStats.CgroupStats; s != nil {
+		setCpuStats(s, ret)
+		setDiskIoStats(s, ret)
+		setMemoryStats(s, ret)
 	}
 	if len(libcontainerStats.Interfaces) > 0 {
-		toContainerStats3(libcontainerStats, ret)
+		setNetworkStats(libcontainerStats, ret)
 	}
 	return ret
 }
