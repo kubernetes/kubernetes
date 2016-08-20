@@ -166,7 +166,6 @@ func readWebSocket(r *Reader, t *testing.T, fn func(*websocket.Conn), protocols 
 	s, addr := newServer(func(ws *websocket.Conn) {
 		cfg := ws.Config()
 		cfg.Protocol = protocols
-		go IgnoreReceives(ws, 0)
 		go func() {
 			err := <-r.err
 			errCh <- err
@@ -198,7 +197,6 @@ func expectWebSocketFrames(r *Reader, t *testing.T, fn func(*websocket.Conn), fr
 	s, addr := newServer(func(ws *websocket.Conn) {
 		cfg := ws.Config()
 		cfg.Protocol = protocols
-		go IgnoreReceives(ws, 0)
 		go func() {
 			err := <-r.err
 			errCh <- err

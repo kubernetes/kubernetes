@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"sync"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -79,10 +80,26 @@ func (r *Reader) Copy(w http.ResponseWriter, req *http.Request) error {
 
 // handle implements a WebSocket handler.
 func (r *Reader) handle(ws *websocket.Conn) {
+	// Close the connection when the client requests it, or when we finish streaming, whichever happens first
+	closeConnOnce := &sync.Once{}
+	closeConn := func() {
+		closeConnOnce.Do(func() {
+			ws.Close()
+		})
+	}
+
 	encode := len(ws.Config().Protocol) > 0 && ws.Config().Protocol[0] == base64BinaryWebSocketProtocol
 	defer close(r.err)
-	defer ws.Close()
-	go IgnoreReceives(ws, r.timeout)
+	defer closeConn()
+
+	go func() {
+		defer runtime.HandleCrash()
+		// This blocks until the connection is closed.
+		// Client should not send anything.
+		IgnoreReceives(ws, r.timeout)
+		// Once the client closes, we should also close
+		closeConn()
+	}()
 	r.err <- messageCopy(ws, r.r, encode, r.ping, r.timeout)
 }
 
