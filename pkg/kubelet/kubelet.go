@@ -2409,6 +2409,13 @@ func (kl *Kubelet) HandlePodReconcile(pods []*api.Pod) {
 		// Update the pod in pod manager, status manager will do periodically reconcile according
 		// to the pod manager.
 		kl.podManager.UpdatePod(pod)
+
+		// After an evicted pod is synced, all dead containers in the pod can be removed.
+		if eviction.PodIsEvicted(pod.Status) {
+			if podStatus, err := kl.podCache.Get(pod.UID); err == nil {
+				kl.containerDeletor.deleteContainersInPod("", podStatus, true)
+			}
+		}
 	}
 }
 
@@ -2989,10 +2996,12 @@ func (kl *Kubelet) ListenAndServeReadOnly(address net.IP, port uint) {
 // Delete the eligible dead container instances in a pod. Depending on the configuration, the latest dead containers may be kept around.
 func (kl *Kubelet) cleanUpContainersInPod(podId types.UID, exitedContainerID string) {
 	if podStatus, err := kl.podCache.Get(podId); err == nil {
-		if status, ok := kl.statusManager.GetPodStatus(podId); ok {
-			// If a pod is evicted, we can delete all the dead containers.
-			kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, eviction.PodIsEvicted(status))
+		removeAll := false
+		if syncedPod, ok := kl.podManager.GetPodByUID(podId); ok {
+			// When an evicted pod has already synced, all containers can be removed.
+			removeAll = eviction.PodIsEvicted(syncedPod.Status)
 		}
+		kl.containerDeletor.deleteContainersInPod(exitedContainerID, podStatus, removeAll)
 	}
 }
 
