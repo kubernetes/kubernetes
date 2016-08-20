@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 CNI authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"os"
 )
@@ -61,16 +62,32 @@ type NetConf struct {
 	IPAM struct {
 		Type string `json:"type,omitempty"`
 	} `json:"ipam,omitempty"`
+	DNS DNS `json:"dns"`
 }
 
 // Result is what gets returned from the plugin (via stdout) to the caller
 type Result struct {
 	IP4 *IPConfig `json:"ip4,omitempty"`
 	IP6 *IPConfig `json:"ip6,omitempty"`
+	DNS DNS       `json:"dns,omitempty"`
 }
 
 func (r *Result) Print() error {
 	return prettyPrint(r)
+}
+
+// String returns a formatted string in the form of "[IP4: $1,][ IP6: $2,] DNS: $3" where
+// $1 represents the receiver's IPv4, $2 represents the receiver's IPv6 and $3 the
+// receiver's DNS. If $1 or $2 are nil, they won't be present in the returned string.
+func (r *Result) String() string {
+	var str string
+	if r.IP4 != nil {
+		str = fmt.Sprintf("IP4:%+v, ", *r.IP4)
+	}
+	if r.IP6 != nil {
+		str += fmt.Sprintf("IP6:%+v, ", *r.IP6)
+	}
+	return fmt.Sprintf("%sDNS:%+v", str, r.DNS)
 }
 
 // IPConfig contains values necessary to configure an interface
@@ -78,6 +95,14 @@ type IPConfig struct {
 	IP      net.IPNet
 	Gateway net.IP
 	Routes  []Route
+}
+
+// DNS contains values interesting for DNS resolvers
+type DNS struct {
+	Nameservers []string `json:"nameservers,omitempty"`
+	Domain      string   `json:"domain,omitempty"`
+	Search      []string `json:"search,omitempty"`
+	Options     []string `json:"options,omitempty"`
 }
 
 type Route struct {

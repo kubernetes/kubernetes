@@ -1,4 +1,4 @@
-// Copyright 2015 CoreOS, Inc.
+// Copyright 2015 CNI authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,9 +20,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 
-	"github.com/appc/cni/pkg/types"
+	"github.com/containernetworking/cni/pkg/types"
 )
 
 func pluginErr(err error, output []byte) error {
@@ -58,10 +57,6 @@ func ExecPluginWithoutResult(pluginPath string, netconf []byte, args CNIArgs) er
 }
 
 func execPlugin(pluginPath string, netconf []byte, args CNIArgs) ([]byte, error) {
-	if pluginPath == "" {
-		return nil, fmt.Errorf("could not find %q plugin", filepath.Base(pluginPath))
-	}
-
 	stdout := &bytes.Buffer{}
 
 	c := exec.Cmd{
