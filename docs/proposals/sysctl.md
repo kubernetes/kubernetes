@@ -37,8 +37,8 @@ for namespaced kernel parameters (sysctls) set for each pod.
 ### v1.4
 
 - [ ] initial implementation for v1.4 https://github.com/kubernetes/kubernetes/pull/27180
-  + validation greylist: `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`, `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`, `fs.mqueue.*`, `net.*`
   + node-level whitelist: `kernel.shm*`, `net.ipv4.ip_local_port_range`, `net.ipv4.tcp_max_syn_backlog`, `net.ipv4.tcp_syncookies`
+  + greylist: `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`, `kernel.shmall`, `kernel.shmmax`, `kernel.shmmni`, `kernel.shm_rmid_forced`, `fs.mqueue.*`, `net.*`
   + PSP default: `*`
   + new kubelet flags: `--whitelist-additional-sysctls` and `--sysctl-node-taint`
 - [ ] document node-level whitelist with kubectl flags and taints/tolerations
@@ -445,9 +445,9 @@ Footnote:
 
 Sysctls in pods and `PodSecurityPolicy` are first introduced as an alpha feature for Kubernetes 1.4. This means that the API will model these as annotations, with the plan to turn those in first class citizens in a later release when the feature is promoted to beta.
 
-It is proposed to add a greylist for validation in the apiserver **and** a node-level whitelist in the kubelet. The following rules apply:
+It is proposed to use a syntactical validation in the apiserver **and** a node-level whitelist in the kubelet. The whitelist shall be customizable and is checked against a greylist of known-to-be-namespaced sysctls. The following rules apply:
 
-- only sysctls shall be greylisted in the apiserver
+- only sysctls shall be greylisted
   + that are properly namespaced by the container or the pod (e.g. in the ipc or net namespace)
 - only sysctls shall be whitelisted in the kubelet
   + that are properly namespaced by the container or the pod (e.g. in the ipc or net namespace)
@@ -455,11 +455,7 @@ It is proposed to add a greylist for validation in the apiserver **and** a node-
 
 This means that sysctls that are not namespaced must be set by the admin on host level on his own risk, e.g. by running a *privileged daemonset*, possibly limited to a restricted, special-purpose set of nodes, if necessary with the host network namespace. This is considered out-of-scope of this proposal and out-of-scope of what the kubelet will do for the admin. A section is going to be added to the documentation describing this.
 
-The node-level whitelist will be extensible via flags of the kubelet. If this feature is used, a taint is applied to the node by default (can be customized):
-
-```
-sysctls.security.alpha.kubernetes.io/customSysctls: NoSchedule
-```
+The node-level whitelist will be extensible via flags of the kubelet.
 
 ### Pod API Changes
 
@@ -501,38 +497,8 @@ The value is a comma separated list of key-value pairs separated by colon.
 
 #### In the Apiserver
 
-The name of each sysctl in `PodSecurityContext.Sysctls[*].Name` (or the `annotation security.alpha.kubernetes.io/sysctls` during alpha) is validated by the apiserver against a static *greylist* of
+The name of each sysctl in `PodSecurityContext.Sysctls[*].Name` (or the `annotation security.alpha.kubernetes.io/sysctls` during alpha) is validated by the apiserver against:
 
-- specific sysctls
-- and a list of sysctl prefixes,
-
-all known to be namespaced by the kernel.
-
-The initial apiserver greylist will be:
-
-```go
-var greylist = map[string]string{
-    "kernel.shmall":                "ipc",
-    "kernel.shmmax":                "ipc",
-    "kernel.shmmni":                "ipc",
-    "kernel.shm_rmid_forced":       "ipc",
-    "kernel.msgmax":                "ipc",
-    "kernel.msgmnb":                "ipc",
-    "kernel.msgmni":                "ipc",
-    "kernel.sem":                   "ipc",
-    "net.ipv4.ip_local_port_range": "net",
-    "net.ipv4.tcp_syncookies":      "net",
-    "net.ipv4.tcp_max_syn_backlog": "net",
-}
-
-var greylistPrefixes = map[string]string{
-    "fs.mqueue.*": "ipc",
-}
-```
-
-The value of these two maps is the kernel namespace that must be enabled. If a pod is created with host ipc or network namespace, the respective sysctls are forbidden.
-
-In addition to the whitelisting, the general format of the sysctl name will be checked:
 - 253 characters in length
 - it matches `sysctlRegexp`:
 
@@ -554,42 +520,53 @@ These are defined under `pkg/kubelet` and to be maintained by the nodes team.
 The initial node-level whitelist will be:
 
 ```go
-var whitelist = map[string]string{
+var whitelist = []string{
+    "kernel.shm*",
+    "net.ipv4.ip_local_port_range",
+    "net.ipv4.tcp_syncookies",
+    "net.ipv4.tcp_max_syn_backlog",
+}
+```
+
+In parallel a greylist is maintained of all known namespaced sysctls, being initially:
+
+```go
+var greylist = map[string]string{
     "kernel.shmall":                "ipc",
     "kernel.shmmax":                "ipc",
     "kernel.shmmni":                "ipc",
     "kernel.shm_rmid_forced":       "ipc",
+    "kernel.msgmax":                "ipc",
+    "kernel.msgmnb":                "ipc",
+    "kernel.msgmni":                "ipc",
+    "kernel.sem":                   "ipc",
     "net.ipv4.ip_local_port_range": "net",
     "net.ipv4.tcp_syncookies":      "net",
     "net.ipv4.tcp_max_syn_backlog": "net",
 }
 
-var whitelistPrefixes = map[string]string{}
+var greylistPrefixes = map[string]string{
+    "fs.mqueue.": "ipc",
+}
 ```
+
+The value of these two maps is the kernel namespace that must be enabled. If a pod is created with host ipc or network namespace, the respective sysctls are forbidden.
 
 ### Error behavior
 
-Pods that do not comply with the greylist will be rejected by the apiserver. Pods that do not comply with the whitelist will fail to launch. An event will be created by the kubelet to notify the user. A node taint will make sure that those pods will not be scheduled to the node in the first place.
+Pods that do not comply with the greylist will be rejected by the apiserver. Pods that do not comply with the whitelist will fail to launch. An event will be created by the kubelet to notify the user.
 
 ### Kubelet Flags to Extend the Whitelist
 
-The kubelet will get two new flags:
+The kubelet will get a new flag:
 
 ```
---whitelist-additional-sysctls A comma separated list of sysctls or sysctl patterns (ending in *) that
-                               are added to the default whitelist. If this is set a taint is attached
-                               to the node.
---sysctl-node-taint taint      A taint attached to the node if additional sysctls are whitelisted
-                               (defaults to: "sysctls.security.alpha.kubernetes.io/customSysctls: NoSchedule"), or "none" to not attach any taint.
+--experimental-whitelisted-sysctls     Comma-separated whitelist of sysctls or sysctl patterns (ending in *).
 ```
 
-The use of the first flags will trigger that a taint is attached to the node whose name can be customized with the second flag.
+It defaults to the node-level whitelist.
 
-The whitelisted sysctls will be annotated on the node, e.g.:
-
-```
-sysctls.security.alpha.kubernetes.io/whitelist: kernel.shmmax,kernel.msg*
-```
+During kubelet launch the given value is checked against the greylist and refused if non-namespaced sysctls are passed.
 
 ### SecurityContext Enforcement
 
