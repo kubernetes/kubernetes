@@ -177,7 +177,11 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		return err
 	}
 	if waitForReplicas != nil {
-		watchOptions := api.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", name), ResourceVersion: "0"}
+		latestRC, err := scaler.c.ReplicationControllers(namespace).Get(name)
+		if err != nil {
+			return ScaleError{ScaleGetFailure, "Unknown", err}
+		}
+		watchOptions := api.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", name), ResourceVersion: latestRC.ResourceVersion}
 		watcher, err := scaler.c.ReplicationControllers(namespace).Watch(watchOptions)
 		if err != nil {
 			return err
