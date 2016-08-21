@@ -74,6 +74,8 @@ pkg/apis/imagepolicy/install
 pkg/api/v1
 pkg/auth/authenticator
 pkg/auth/authorizer/union
+pkg/client/metrics
+pkg/client/metrics/prometheus
 pkg/client/testing/core
 pkg/client/unversioned
 pkg/client/unversioned/adapters/internalclientset

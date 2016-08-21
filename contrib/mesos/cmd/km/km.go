@@ -19,6 +19,8 @@ package main
 
 import (
 	"os"
+
+	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 )
 
 func main() {

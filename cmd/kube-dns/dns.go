@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/cmd/kube-dns/app"
 	"k8s.io/kubernetes/cmd/kube-dns/app/options"
+	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
