@@ -152,16 +152,19 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	ic.federatedUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer,
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
+			glog.V(4).Infof("Attempting to create Ingress: %v", ingress)
 			_, err := client.Extensions().Ingresses(ingress.Namespace).Create(ingress)
 			return err
 		},
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
+			glog.V(4).Infof("Attempting to update Ingress: %v", ingress)
 			_, err := client.Extensions().Ingresses(ingress.Namespace).Update(ingress)
 			return err
 		},
 		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
+			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
 			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &api.DeleteOptions{})
 			return err
 		})
@@ -247,15 +250,6 @@ func (ic *IngressController) reconcileIngressesOnClusterChange() {
 	}
 }
 
-/*
-func backoff(trial int64) time.Duration {
-	if trial > 12 {
-		return 12 * 5 * time.Second
-	}
-	return time.Duration(trial) * 5 * time.Second
-}
-*/
-
 func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	glog.V(4).Infof("Reconciling ingress %q", ingress)
 	if !ic.isSynced() {
@@ -299,6 +293,9 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		}
 
 		if !found {
+			// We can't supply server-created fields when creating a new object.
+			desiredIngress.ObjectMeta.ResourceVersion = ""
+			desiredIngress.ObjectMeta.UID = ""
 			operations = append(operations, util.FederatedOperation{
 				Type:        util.OperationTypeAdd,
 				Obj:         desiredIngress,
@@ -306,9 +303,15 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			})
 		} else {
 			clusterIngress := clusterIngressObj.(*extensions_v1beta1.Ingress)
+			glog.V(4).Infof("Found existing Ingress %s in cluster %s - checking if update is required", ingress, cluster.Name)
 			// Update existing ingress, if needed.
-			if !reflect.DeepEqual(desiredIngress.ObjectMeta, clusterIngress.ObjectMeta) ||
+			if !util.ObjectMetaIsEquivalent(desiredIngress.ObjectMeta, clusterIngress.ObjectMeta) ||
 				!reflect.DeepEqual(desiredIngress.Spec, clusterIngress.Spec) {
+				glog.V(4).Infof("Ingress %s in cluster %s needs an update: cluster ingress %v is not equivalent to federated ingress %v", ingress, cluster.Name, clusterIngress, desiredIngress)
+				// We need to use server-created fields from the cluster, not the desired object when updating.
+				desiredIngress.ObjectMeta.ResourceVersion = clusterIngress.ObjectMeta.ResourceVersion
+				desiredIngress.ObjectMeta.UID = clusterIngress.ObjectMeta.UID
+
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
 					Obj:         desiredIngress,
@@ -322,6 +325,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		// Everything is in order
 		return
 	}
+	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
 	err = ic.federatedUpdater.Update(operations, ic.updateTimeout)
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", ingress, err)
