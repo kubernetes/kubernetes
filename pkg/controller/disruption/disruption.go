@@ -462,6 +462,10 @@ func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 
 func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBudget, pods []*api.Pod) (expectedCount, desiredHealthy int32, err error) {
 	err = nil
+	// TODO(davidopp): consider making the way expectedCount and rules about
+	// permitted controller configurations (specifically, considering it an error
+	// if a pod covered by a PDB has 0 controllers or > 1 controller) should be
+	// handled the same way for integer and percentage minAvailable
 	if pdb.Spec.MinAvailable.Type == intstr.Int {
 		desiredHealthy = pdb.Spec.MinAvailable.IntVal
 		expectedCount = int32(len(pods))
@@ -498,9 +502,11 @@ func (dc *DisruptionController) getExpectedPodCount(pdb *policy.PodDisruptionBud
 			}
 			if controllerCount == 0 {
 				err = fmt.Errorf("asked for percentage, but found no controllers for pod %q", pod.Name)
+				dc.recorder.Event(pdb, api.EventTypeWarning, "NoControllers", err.Error())
 				return
 			} else if controllerCount > 1 {
 				err = fmt.Errorf("pod %q has %v>1 controllers", pod.Name, controllerCount)
+				dc.recorder.Event(pdb, api.EventTypeWarning, "TooManyControllers", err.Error())
 				return
 			}
 		}
