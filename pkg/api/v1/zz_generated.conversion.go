@@ -3677,6 +3677,7 @@ func autoConvert_v1_ObjectMeta_To_api_ObjectMeta(in *ObjectMeta, out *api.Object
 		out.OwnerReferences = nil
 	}
 	out.Finalizers = in.Finalizers
+	out.ClusterName = in.ClusterName
 	return nil
 }
 
@@ -3711,6 +3712,7 @@ func autoConvert_api_ObjectMeta_To_v1_ObjectMeta(in *api.ObjectMeta, out *Object
 		out.OwnerReferences = nil
 	}
 	out.Finalizers = in.Finalizers
+	out.ClusterName = in.ClusterName
 	return nil
 }
 

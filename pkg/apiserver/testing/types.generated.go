@@ -1527,7 +1527,7 @@ func (x codecSelfer1234) decSliceSimple(v *[]Simple, d *codec1978.Decoder) {
 
 			yyrg132 := len(yyv132) > 0
 			yyv2132 := yyv132
-			yyrl132, yyrt132 = z.DecInferLen(yyl132, z.DecBasicHandle().MaxInitLen, 264)
+			yyrl132, yyrt132 = z.DecInferLen(yyl132, z.DecBasicHandle().MaxInitLen, 280)
 			if yyrt132 {
 				if yyrl132 <= cap(yyv132) {
 					yyv132 = yyv132[:yyrl132]
