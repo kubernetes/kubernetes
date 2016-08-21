@@ -43,7 +43,11 @@ readonly KUBE_BUILD_PPC64LE="${KUBE_BUILD_PPC64LE:-n}"
 # Constants
 readonly KUBE_BUILD_IMAGE_REPO=kube-build
 readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build/build-image/cross/VERSION)"
-# KUBE_BUILD_DATA_CONTAINER_NAME=kube-build-data-<hash>"
+# KUBE_DATA_CONTAINER_NAME=kube-build-data-<hash>"
+
+# Increment this version to cause everyone to rebuild images, including the data
+# container.
+readonly KUBE_IMAGE_VERSION=2
 
 # Here we map the output directories across both the local and remote _output
 # directories:
@@ -128,10 +132,15 @@ kube::build::get_docker_wrapped_binaries() {
 #
 # Vars set:
 #   KUBE_ROOT_HASH
+#   KUBE_BUILD_IMAGE_TAG_BASE
 #   KUBE_BUILD_IMAGE_TAG
 #   KUBE_BUILD_IMAGE
+#   KUBE_BUILD_CONTAINER_NAME_BASE
 #   KUBE_BUILD_CONTAINER_NAME
-#   KUBE_BUILD_DATA_CONTAINER_NAME
+#   KUBE_DATA_CONTAINER_NAME_BASE
+#   KUBE_DATA_CONTAINER_NAME
+#   KUBE_RSYNC_CONTAINER_NAME_BASE
+#   KUBE_RSYNC_CONTAINER_NAME
 #   DOCKER_MOUNT_ARGS
 #   LOCAL_OUTPUT_BUILD_CONTEXT
 function kube::build::verify_prereqs() {
@@ -144,12 +153,16 @@ function kube::build::verify_prereqs() {
   kube::build::ensure_docker_daemon_connectivity || return 1
 
   KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}")
-  KUBE_BUILD_IMAGE_TAG="build-${KUBE_ROOT_HASH}"
+  KUBE_BUILD_IMAGE_TAG_BASE="build-${KUBE_ROOT_HASH}"
+  KUBE_BUILD_IMAGE_TAG="${KUBE_BUILD_IMAGE_TAG_BASE}-${KUBE_IMAGE_VERSION}"
   KUBE_BUILD_IMAGE="${KUBE_BUILD_IMAGE_REPO}:${KUBE_BUILD_IMAGE_TAG}"
-  KUBE_BUILD_CONTAINER_NAME="kube-build-${KUBE_ROOT_HASH}"
-  KUBE_RSYNC_CONTAINER_NAME="kube-rsync-${KUBE_ROOT_HASH}"
-  KUBE_BUILD_DATA_CONTAINER_NAME="kube-build-data-${KUBE_ROOT_HASH}"
-  DOCKER_MOUNT_ARGS=(--volumes-from "${KUBE_BUILD_DATA_CONTAINER_NAME}")
+  KUBE_BUILD_CONTAINER_NAME_BASE="kube-build-${KUBE_ROOT_HASH}"
+  KUBE_BUILD_CONTAINER_NAME="${KUBE_BUILD_CONTAINER_NAME_BASE}-${KUBE_IMAGE_VERSION}"
+  KUBE_RSYNC_CONTAINER_NAME_BASE="kube-rsync-${KUBE_ROOT_HASH}"
+  KUBE_RSYNC_CONTAINER_NAME="${KUBE_RSYNC_CONTAINER_NAME_BASE}-${KUBE_IMAGE_VERSION}"
+  KUBE_DATA_CONTAINER_NAME_BASE="kube-build-data-${KUBE_ROOT_HASH}"
+  KUBE_DATA_CONTAINER_NAME="${KUBE_DATA_CONTAINER_NAME_BASE}-${KUBE_IMAGE_VERSION}"
+  DOCKER_MOUNT_ARGS=(--volumes-from "${KUBE_DATA_CONTAINER_NAME}")
   LOCAL_OUTPUT_BUILD_CONTEXT="${LOCAL_OUTPUT_IMAGE_STAGING}/${KUBE_BUILD_IMAGE}"
 }
 
@@ -276,50 +289,6 @@ function kube::build::ensure_tar() {
   fi
 }
 
-function kube::build::clean_output() {
-  # Clean out the output directory if it exists.
-  if kube::build::has_docker ; then
-    kube::log::status "Removing data container ${KUBE_BUILD_DATA_CONTAINER_NAME}"
-    "${DOCKER[@]}" rm -v "${KUBE_BUILD_DATA_CONTAINER_NAME}" >/dev/null 2>&1 || true
-  fi
-
-  kube::log::status "Removing _output directory"
-  rm -rf "${LOCAL_OUTPUT_ROOT}"
-}
-
-# Make sure the _output directory is created and mountable by docker
-function kube::build::prepare_output() {
-  # See auto-creation of host mounts: https://github.com/docker/docker/pull/21666
-  # if selinux is enabled, docker run -v /foo:/foo:Z will not autocreate the host dir
-  mkdir -p "${LOCAL_OUTPUT_SUBPATH}"
-  mkdir -p "${LOCAL_OUTPUT_BINPATH}"
-  # On RHEL/Fedora SELinux is enabled by default and currently breaks docker
-  # volume mounts.  We can work around this by explicitly adding a security
-  # context to the _output directory.
-  # Details: http://www.projectatomic.io/blog/2015/06/using-volumes-with-docker-can-cause-problems-with-selinux/
-  if which selinuxenabled &>/dev/null && \
-      selinuxenabled && \
-      which chcon >/dev/null ; then
-    if [[ ! $(ls -Zd "${LOCAL_OUTPUT_ROOT}") =~ svirt_sandbox_file_t ]] ; then
-      kube::log::status "Applying SELinux policy to '_output' directory."
-      if ! chcon -Rt svirt_sandbox_file_t "${LOCAL_OUTPUT_ROOT}"; then
-        echo "    ***Failed***.  This may be because you have root owned files under _output."
-        echo "    Continuing, but this build may fail later if SELinux prevents access."
-      fi
-    fi
-    number=${#DOCKER_MOUNT_ARGS[@]}
-    for (( i=0; i<number; i++ )); do
-      if [[ "${DOCKER_MOUNT_ARGS[i]}" =~ "${KUBE_ROOT}" ]]; then
-        ## Ensure we don't label the argument multiple times
-        if [[ ! "${DOCKER_MOUNT_ARGS[i]}" == *:Z ]]; then
-          DOCKER_MOUNT_ARGS[i]="${DOCKER_MOUNT_ARGS[i]}:Z"
-        fi
-      fi
-    done
-  fi
-
-}
-
 function kube::build::has_docker() {
   which docker &> /dev/null
 }
@@ -334,11 +303,47 @@ function kube::build::docker_image_exists() {
     exit 2
   }
 
-  # We cannot just specify the IMAGE here as `docker images` doesn't behave as
-  # expected.  See: https://github.com/docker/docker/issues/8048
-  # Also we cannot use the `-q` option on grep as it causes pipefail to trigger.
-  # See http://stackoverflow.com/questions/19120263/why-exit-code-141-with-grep-q
-  "${DOCKER[@]}" images | grep -E "^(\S+/)?${1}\s+${2}\s+" > /dev/null
+  [[ $(docker images -q "${1}:${2}" -q) ]]
+}
+
+# Delete all images that match a tag prefix except for the "current" version
+#
+# $1: The image repo/name
+# $2: The tag base. We consider any image that matches $2*
+# $3: The current image not to delete if provided
+function kube::build::docker_delete_old_images() {
+  for tag in $(docker images $1 --format "{{.Tag}}") ; do
+    if [[ "$tag" != "$2"* ]] ; then
+      V=6 kube::log::status "Keeping image $1:$tag"
+      continue
+    fi
+
+    if [[ -z "${3:-}" || "$tag" != $3 ]] ; then
+      V=2 kube::log::status "Deleting image $1:$tag"
+      "${DOCKER[@]}" rmi "$1:$tag" >/dev/null
+    else
+      V=6 kube::log::status "Keeping image $1:$tag"
+    fi
+  done
+}
+
+# Stop and delete all containers that match a pattern
+#
+# $1: The base container prefix
+# $2: The current container to keep, if provided
+function kube::build::docker_delete_old_containers() {
+  for container in $(docker ps -a --format="{{.Names}}") ; do
+    if [[ "$container" != "$1"* ]] ; then
+      V=6 kube::log::status "Keeping container $container"
+      continue
+    fi
+    if [[ -z "${2:-}" || "$container" != "$2" ]] ; then
+      V=2 kube::log::status "Deleting container $container"
+      kube::build::destroy_container "$container"
+    else
+      V=6 kube::log::status "Keeping container $container"
+    fi
+  done
 }
 
 # Takes $1 and computes a short has for it. Useful for unique tag generation
@@ -370,28 +375,53 @@ function kube::build::destroy_container() {
 # ---------------------------------------------------------------------------
 # Building
 
+
+function kube::build::clean() {
+  if kube::build::has_docker ; then
+    kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}"
+    kube::build::docker_delete_old_containers "${KUBE_RSYNC_CONTAINER_NAME_BASE}"
+    kube::build::docker_delete_old_containers "${KUBE_DATA_CONTAINER_NAME_BASE}"
+    kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}"
+
+    V=2 kube::log::status "Cleaning all untagged docker images"
+    "${DOCKER[@]}" rmi $("${DOCKER[@]}" images -q --filter 'dangling=true') 2> /dev/null || true
+  fi
+
+  kube::log::status "Removing _output directory"
+  rm -rf "${LOCAL_OUTPUT_ROOT}"
+}
+
 function kube::build::build_image_built() {
   kube::build::docker_image_exists "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG}"
 }
 
 # Set up the context directory for the kube-build image and build it.
 function kube::build::build_image() {
-  mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
+  if ! kube::build::build_image_built; then
+    mkdir -p "${LOCAL_OUTPUT_BUILD_CONTEXT}"
 
-  kube::version::get_version_vars
-  kube::version::save_version_vars "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-version-defs"
+    kube::version::get_version_vars
+    kube::version::save_version_vars "${LOCAL_OUTPUT_BUILD_CONTEXT}/kube-version-defs"
 
-  cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+    cp /etc/localtime "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
 
-  cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
-  cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
-  dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
-  chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+    cp build/build-image/Dockerfile "${LOCAL_OUTPUT_BUILD_CONTEXT}/Dockerfile"
+    cp build/build-image/rsyncd.sh "${LOCAL_OUTPUT_BUILD_CONTEXT}/"
+    dd if=/dev/urandom bs=512 count=1 2>/dev/null | LC_ALL=C tr -dc 'A-Za-z0-9' | dd bs=32 count=1 2>/dev/null > "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
+    chmod go= "${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password"
 
-  kube::build::update_dockerfile
+    kube::build::update_dockerfile
 
-  kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
+    kube::build::docker_build "${KUBE_BUILD_IMAGE}" "${LOCAL_OUTPUT_BUILD_CONTEXT}" 'false'
+  fi
 
+  # Clean up old versions of everything
+  kube::build::docker_delete_old_containers "${KUBE_BUILD_CONTAINER_NAME_BASE}" "${KUBE_BUILD_CONTAINER_NAME}"
+  kube::build::docker_delete_old_containers "${KUBE_RSYNC_CONTAINER_NAME_BASE}" "${KUBE_RSYNC_CONTAINER_NAME}"
+  kube::build::docker_delete_old_containers "${KUBE_DATA_CONTAINER_NAME_BASE}" "${KUBE_DATA_CONTAINER_NAME}"
+  kube::build::docker_delete_old_images "${KUBE_BUILD_IMAGE_REPO}" "${KUBE_BUILD_IMAGE_TAG_BASE}" "${KUBE_BUILD_IMAGE_TAG}"
+
+  kube::build::ensure_data_container
   kube::build::sync_to_container
 }
 
@@ -422,35 +452,19 @@ EOF
   }
 }
 
-function kube::build::clean_image() {
-  local -r image=$1
-
-  kube::log::status "Deleting docker image ${image}"
-  "${DOCKER[@]}" rmi ${image} 2> /dev/null || true
-}
-
-function kube::build::clean_images() {
-  kube::build::has_docker || return 0
-
-  kube::build::clean_image "${KUBE_BUILD_IMAGE}"
-
-  kube::log::status "Cleaning all other untagged docker images"
-  "${DOCKER[@]}" rmi $("${DOCKER[@]}" images -q --filter 'dangling=true') 2> /dev/null || true
-}
-
 function kube::build::ensure_data_container() {
   # If the data container exists AND exited successfully, we can use it.
   # Otherwise nuke it and start over.
   local ret=0
   local code=$(docker inspect \
       -f '{{.State.ExitCode}}' \
-      "${KUBE_BUILD_DATA_CONTAINER_NAME}" 2>/dev/null || ret=$?)
+      "${KUBE_DATA_CONTAINER_NAME}" 2>/dev/null || ret=$?)
   if [[ "${ret}" == 0 && "${code}" != 0 ]]; then
-    kube::build::destroy_container "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+    kube::build::destroy_container "${KUBE_DATA_CONTAINER_NAME}"
     ret=1
   fi
   if [[ "${ret}" != 0 ]]; then
-    kube::log::status "Creating data container ${KUBE_BUILD_DATA_CONTAINER_NAME}"
+    kube::log::status "Creating data container ${KUBE_DATA_CONTAINER_NAME}"
     # We have to ensure the directory exists, or else the docker run will
     # create it as root.
     mkdir -p "${LOCAL_OUTPUT_GOPATH}"
@@ -474,7 +488,7 @@ function kube::build::ensure_data_container() {
       --volume /usr/local/go/pkg/darwin_386_cgo
       --volume /usr/local/go/pkg/windows_amd64_cgo
       --volume /usr/local/go/pkg/windows_386_cgo
-      --name "${KUBE_BUILD_DATA_CONTAINER_NAME}"
+      --name "${KUBE_DATA_CONTAINER_NAME}"
       --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
       chown -R $(id -u).$(id -g)
@@ -506,9 +520,6 @@ function kube::build::run_build_command() {
 # Arguments are in the form of
 #  <container name> <extra docker args> -- <command>
 function kube::build::run_build_command_ex() {
-  kube::build::ensure_data_container
-  kube::build::prepare_output
-
   [[ $# != 0 ]] || { echo "Invalid input - please specify a the container name." >&2; return 4; }
   local container_name="${1}"
   shift
