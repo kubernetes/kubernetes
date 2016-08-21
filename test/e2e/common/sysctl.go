@@ -76,11 +76,15 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		pod := testPod(false, false)
 		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
 			{
-				Name:  "net.foo-bar",
+				Name:  "foo-",
 				Value: "bar",
 			},
 			{
-				Name:  "vm.swappiness",
+				Name:  "kernel.shmmax",
+				Value: "100000000",
+			},
+			{
+				Name:  "bar..",
 				Value: "42",
 			},
 		})
@@ -91,8 +95,9 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		defer client.Delete(pod.Name, nil)
 
 		Expect(err).NotTo(BeNil())
-		Expect(err.Error()).To(ContainSubstring(`Invalid value: "net.foo-bar"`))
-		Expect(err.Error()).To(ContainSubstring(`Forbidden: sysctl "vm.swappiness" cannot be set in a pod`))
+		Expect(err.Error()).To(ContainSubstring(`Invalid value: "foo-"`))
+		Expect(err.Error()).To(ContainSubstring(`Invalid value: "bar.."`))
+		Expect(err.Error()).NotTo(ContainSubstring("kernel.shmmax"))
 	})
 
 	It("should not launch greylisted, but not whitelisted sysctls on the node", func() {
