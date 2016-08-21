@@ -107,6 +107,7 @@ func addRunFlags(cmd *cobra.Command) {
 	cmd.Flags().String("generator", "", "The name of the API generator to use.  Default is 'deployment/v1beta1' if --restart=Always, 'job/v1' for OnFailure and 'run-pod/v1' for Never.  This will happen only for cluster version at least 1.3, for 1.2 we will fallback to 'deployment/v1beta1' for --restart=Always, 'job/v1' for others, for olders we will fallback to 'run/v1' for --restart=Always, 'run-pod/v1' for others.")
 	cmd.Flags().String("image", "", "The image for the container to run.")
 	cmd.MarkFlagRequired("image")
+	cmd.Flags().String("image-pull-policy", "", "The image pull policy for the container. If left empty, this value will not be specified by the client and defaulted by the server")
 	cmd.Flags().IntP("replicas", "r", 1, "Number of replicas to create for this container. Default is 1.")
 	cmd.Flags().Bool("rm", false, "If true, delete resources created in this command for attached containers.")
 	cmd.Flags().String("overrides", "", "An inline JSON override for the generated object. If this is non-empty, it is used to override the generated object. Requires that the object supply a valid apiVersion field.")
@@ -166,6 +167,10 @@ func Run(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer, cmd *cob
 	}
 	if restartPolicy != api.RestartPolicyAlways && replicas != 1 {
 		return cmdutil.UsageError(cmd, fmt.Sprintf("--restart=%s requires that --replicas=1, found %d", restartPolicy, replicas))
+	}
+
+	if err := verifyImagePullPolicy(cmd); err != nil {
+		return err
 	}
 
 	generatorName := cmdutil.GetFlagString(cmd, "generator")
@@ -508,6 +513,18 @@ func getRestartPolicy(cmd *cobra.Command, interactive bool) (api.RestartPolicy, 
 		return api.RestartPolicyNever, nil
 	default:
 		return "", cmdutil.UsageError(cmd, fmt.Sprintf("invalid restart policy: %s", restart))
+	}
+}
+
+func verifyImagePullPolicy(cmd *cobra.Command) error {
+	pullPolicy := cmdutil.GetFlagString(cmd, "image-pull-policy")
+	switch api.PullPolicy(pullPolicy) {
+	case api.PullAlways, api.PullIfNotPresent, api.PullNever:
+		return nil
+	case "":
+		return nil
+	default:
+		return cmdutil.UsageError(cmd, fmt.Sprintf("invalid image pull policy: %s", pullPolicy))
 	}
 }
 
