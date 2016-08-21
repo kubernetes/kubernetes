@@ -718,11 +718,16 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	pv1 := testVolume("pv1", "1Gi")
 	pv5 := testVolume("pv5", "5Gi")
 	pv8 := testVolume("pv8", "8Gi")
+	pvBadSize := testVolume("pvBadSize", "1Mi")
+	pvBadMode := testVolume("pvBadMode", "1Gi")
+	pvBadMode.Spec.AccessModes = []api.PersistentVolumeAccessMode{api.ReadOnlyMany}
 
 	index := newPersistentVolumeOrderedIndex()
 	index.store.Add(pv1)
 	index.store.Add(pv5)
 	index.store.Add(pv8)
+	index.store.Add(pvBadSize)
+	index.store.Add(pvBadMode)
 
 	// expected exact match on size
 	volume, _ := index.findBestMatchForClaim(claim)
@@ -743,6 +748,22 @@ func TestFindingPreboundVolumes(t *testing.T) {
 	volume, _ = index.findBestMatchForClaim(claim)
 	if volume.Name != pv8.Name {
 		t.Errorf("Expected %s but got volume %s instead", pv8.Name, volume.Name)
+	}
+
+	// pretend the volume with too small a size is pre-bound to the claim. should get the exact match.
+	pv8.Spec.ClaimRef = nil
+	pvBadSize.Spec.ClaimRef = claimRef
+	volume, _ = index.findBestMatchForClaim(claim)
+	if volume.Name != pv1.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
+	}
+
+	// pretend the volume without the right access mode is pre-bound to the claim. should get the exact match.
+	pvBadSize.Spec.ClaimRef = nil
+	pvBadMode.Spec.ClaimRef = claimRef
+	volume, _ = index.findBestMatchForClaim(claim)
+	if volume.Name != pv1.Name {
+		t.Errorf("Expected %s but got volume %s instead", pv1.Name, volume.Name)
 	}
 }
 

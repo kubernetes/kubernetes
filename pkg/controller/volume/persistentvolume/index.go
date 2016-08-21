@@ -118,9 +118,14 @@ func (pvIndex *persistentVolumeOrderedIndex) findByClaim(claim *api.PersistentVo
 		//   the claim.
 		for _, volume := range volumes {
 			if isVolumeBoundToClaim(volume, claim) {
-				// this claim and volume are bound; return it,
-				// whether the claim is prebound or for volumes
-				// intended for dynamic provisioning v1
+				// this claim and volume are pre-bound; return
+				// the volume if the size request is satisfied,
+				// otherwise continue searching for a match
+				volumeQty := volume.Spec.Capacity[api.ResourceStorage]
+				volumeSize := volumeQty.Value()
+				if volumeSize < requestedSize {
+					continue
+				}
 				return volume, nil
 			}
 
