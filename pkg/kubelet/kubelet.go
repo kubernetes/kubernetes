@@ -54,6 +54,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/eviction"
 	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/pkg/kubelet/network"
@@ -61,6 +62,7 @@ import (
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
 	"k8s.io/kubernetes/pkg/kubelet/prober"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/rkt"
 	"k8s.io/kubernetes/pkg/kubelet/server"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -212,6 +214,8 @@ func NewMainKubelet(
 	CgroupsPerQOS bool,
 	cgroupRoot string,
 	containerRuntime string,
+	remoteRuntimeEndpoint string,
+	remoteImageEndpoint string,
 	runtimeRequestTimeout time.Duration,
 	rktPath string,
 	rktAPIEndpoint string,
@@ -415,6 +419,15 @@ func NewMainKubelet(
 	klet.podCache = kubecontainer.NewCache()
 	klet.podManager = kubepod.NewBasicPodManager(kubepod.NewBasicMirrorClient(klet.kubeClient))
 
+	if remoteRuntimeEndpoint != "" {
+		containerRuntime = "remote"
+
+		// remoteImageEndpoint is same as remoteRuntimeEndpoint if not explicitly specified
+		if remoteImageEndpoint == "" {
+			remoteImageEndpoint = remoteRuntimeEndpoint
+		}
+	}
+
 	// Initialize the runtime.
 	switch containerRuntime {
 	case "docker":
@@ -479,6 +492,32 @@ func NewMainKubelet(
 			return nil, err
 		}
 		klet.containerRuntime = rktRuntime
+	case "remote":
+		remoteRuntimeService, err := remote.NewRemoteRuntimeService(remoteRuntimeEndpoint, runtimeRequestTimeout)
+		if err != nil {
+			return nil, err
+		}
+		remoteImageService, err := remote.NewRemoteImageService(remoteImageEndpoint, runtimeRequestTimeout)
+		if err != nil {
+			return nil, err
+		}
+		klet.containerRuntime, err = kuberuntime.NewKubeGenericRuntimeManager(
+			kubecontainer.FilterEventRecorder(recorder),
+			klet.livenessManager,
+			containerRefManager,
+			osInterface,
+			klet.networkPlugin,
+			klet,
+			klet.httpClient,
+			imageBackOff,
+			serializeImagePulls,
+			klet.cpuCFSQuota,
+			remoteRuntimeService,
+			remoteImageService,
+		)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("unsupported container runtime %q specified", containerRuntime)
 	}
