@@ -2022,6 +2022,7 @@ func TestIsValidSysctlPattern(t *testing.T) {
 		"a.b.c.d",
 		"a",
 		"a_b",
+		"a-b",
 		"abc",
 		"abc.def",
 		"*",

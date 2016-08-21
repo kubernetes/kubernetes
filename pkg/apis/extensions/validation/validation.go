@@ -671,7 +671,7 @@ func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []extensions.
 	return allErrs
 }
 
-const sysctlPatternSegmentFmt string = "([a-z0-9][_a-z0-9]*)?[a-z0-9*]"
+const sysctlPatternSegmentFmt string = "([a-z0-9][-_a-z0-9]*)?[a-z0-9*]"
 const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
 
 var sysctlPatternRegexp = regexp.MustCompile("^" + SysctlPatternFmt + "$")

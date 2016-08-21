@@ -2043,7 +2043,7 @@ func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field
 
 const (
 	// a sysctl segment regex, concatenated with dots to form a sysctl name
-	SysctlSegmentFmt string = "[a-z0-9]([_a-z0-9]*[a-z0-9])?"
+	SysctlSegmentFmt string = "[a-z0-9]([-_a-z0-9]*[a-z0-9])?"
 
 	// a sysctl name regex
 	SysctlFmt string = "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
