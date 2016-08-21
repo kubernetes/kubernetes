@@ -162,6 +162,8 @@ func (e *streamExecutor) Stream(options StreamOptions) error {
 	var streamer streamProtocolHandler
 
 	switch protocol {
+	case remotecommand.StreamProtocolV4Name:
+		streamer = newStreamProtocolV4(options)
 	case remotecommand.StreamProtocolV3Name:
 		streamer = newStreamProtocolV3(options)
 	case remotecommand.StreamProtocolV2Name:

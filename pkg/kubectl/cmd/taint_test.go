@@ -296,7 +296,7 @@ func TestTaint(t *testing.T) {
 				// Restore cmdutil behavior
 				cmdutil.DefaultBehaviorOnFatal()
 			}()
-			cmdutil.BehaviorOnFatal(func(e string) { saw_fatal = true; panic(e) })
+			cmdutil.BehaviorOnFatal(func(e string, code int) { saw_fatal = true; panic(e) })
 			cmd.SetArgs(test.args)
 			cmd.Execute()
 		}()
