@@ -74,35 +74,36 @@ func NewWhitelist(patterns []string) (*patternWhitelist, error) {
 	return w, nil
 }
 
-// valid checks that a sysctl is whitelisted because it is known
+// validateSysctl checks that a sysctl is whitelisted because it is known
 // to be namespaced by the Linux kernel. Note that being whitelisted is required, but not
 // sufficient: the container runtime might have a stricter check and refuse to launch a pod.
 //
 // The parameters hostNet and hostIPC are used to forbid sysctls for pod sharing the
 // respective namespaces with the host. This check is only possible for sysctls on
 // the static default whitelist, not those on the custom whitelist provided by the admin.
-func (w *patternWhitelist) valid(val string, hostNet, hostIPC bool) bool {
-	if ns, found := w.sysctls[val]; found {
+func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) error {
+	nsErrorFmt := "%q not allowed with host %s enabled"
+	if ns, found := w.sysctls[sysctl]; found {
 		if ns == IpcNamespace && hostIPC {
-			return false
+			return fmt.Errorf(nsErrorFmt, sysctl, ns)
 		}
 		if ns == NetNamespace && hostNet {
-			return false
+			return fmt.Errorf(nsErrorFmt, sysctl, ns)
 		}
-		return true
+		return nil
 	}
 	for p, ns := range w.prefixes {
-		if strings.HasPrefix(val, p) {
+		if strings.HasPrefix(sysctl, p) {
 			if ns == IpcNamespace && hostIPC {
-				return false
+				return fmt.Errorf(nsErrorFmt, sysctl, ns)
 			}
 			if ns == NetNamespace && hostNet {
-				return false
+				return fmt.Errorf(nsErrorFmt, sysctl, ns)
 			}
-			return true
+			return nil
 		}
 	}
-	return false
+	return fmt.Errorf("%q not whitelisted", sysctl)
 }
 
 // Validate checks that all sysctls given in a api.SysctlsPodAnnotationKey annotation
@@ -124,8 +125,8 @@ func (w *patternWhitelist) Validate(pod *api.Pod) error {
 		hostIPC = pod.Spec.SecurityContext.HostIPC
 	}
 	for _, s := range sysctls {
-		if !w.valid(s.Name, hostNet, hostIPC) {
-			return fmt.Errorf("pod with UID %q specified a not whitelisted sysctl: %s", pod.UID, s)
+		if err := w.validateSysctl(s.Name, hostNet, hostIPC); err != nil {
+			return fmt.Errorf("pod with UID %q specifies an invalid sysctl: %v", pod.UID, err)
 		}
 	}
 
