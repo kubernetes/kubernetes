@@ -366,7 +366,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
 		}()
 
-		externalNameService := createServiceSpec("externalName-test-service", "foo.bar.com", true, nil)
+		externalNameService := createServiceSpec("externalname-test-service", "foobar.example.com", false, nil)
 		_, err = f.Client.Services(f.Namespace.Name).Create(externalNameService)
 		Expect(err).NotTo(HaveOccurred())
 		defer func() {
@@ -485,7 +485,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		By("creating a second pod to probe DNS")
 		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
 
 		validateUDPDNSResults(f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com")
@@ -503,7 +503,7 @@ var _ = framework.KubeDescribe("DNS", func() {
 		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
+		By("creating a third pod to probe DNS")
 		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
 
 		validateUDPDNSResults(f, pod3, []string{wheezyFileName, jessieFileName}, "127.1.2.3")
