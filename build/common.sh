@@ -604,7 +604,7 @@ function kube::build::sync_to_container() {
 
   kube::build::start_rsyncd_container
 
-  local rsync_extra
+  local rsync_extra=""
   if (( $KUBE_VERBOSE >= 6 )); then
     rsync_extra="-iv"
   fi
@@ -630,7 +630,7 @@ function kube::build::copy_output() {
 
   kube::build::start_rsyncd_container
 
-  local rsync_extra
+  local rsync_extra=""
   if (( $KUBE_VERBOSE >= 6 )); then
     rsync_extra="-iv"
   fi
