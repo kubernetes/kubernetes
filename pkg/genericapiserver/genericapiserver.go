@@ -723,7 +723,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			alternateDNS := []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}
 			// It would be nice to set a fqdn subject alt name, but only the kubelets know, the apiserver is clueless
 			// alternateDNS = append(alternateDNS, "kubernetes.default.svc.CLUSTER.DNS.NAME")
-			if crypto.ShouldGenSelfSignedCerts(options.TLSCertFile, options.TLSPrivateKeyFile) {
+			if !crypto.FoundCertOrKey(options.TLSCertFile, options.TLSPrivateKeyFile) {
 				if err := crypto.GenerateSelfSignedCert(s.ClusterIP.String(), options.TLSCertFile, options.TLSPrivateKeyFile, alternateIPs, alternateDNS); err != nil {
 					glog.Errorf("Unable to generate self signed cert: %v", err)
 				} else {
