@@ -2336,6 +2336,11 @@ func getOSReleaseInfo() (map[string]string, error) {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := scanner.Text()
+		if len(strings.TrimSpace(line)) == 0 {
+			// Skips empty lines
+			continue
+		}
+
 		info := strings.SplitN(line, "=", 2)
 		if len(info) != 2 {
 			glog.Warningf("Unexpected entry in os-release %q", line)
