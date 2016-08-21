@@ -531,6 +531,8 @@ function kube::build::run_build_command_ex() {
     "${DOCKER_MOUNT_ARGS[@]}"
   )
 
+  local detach=false
+
   [[ $# != 0 ]] || { echo "Invalid input - please specify docker arguments followed by --." >&2; return 4; }
   # Everything before "--" is an arg to docker
   until [ -z "${1-}" ] ; do
@@ -539,6 +541,9 @@ function kube::build::run_build_command_ex() {
       break
     fi
     docker_run_opts+=("$1")
+    if [[ "$1" == "-d" || "$1" == "--detach" ]] ; then
+      detach=true
+    fi
     shift
   done
 
@@ -566,7 +571,7 @@ function kube::build::run_build_command_ex() {
   # attach stderr/stdout but don't bother asking for a tty.
   if [[ -t 0 ]]; then
     docker_run_opts+=(--interactive --tty)
-  else
+  elif [[ "$detach" == false ]]; then
     docker_run_opts+=(--attach=stdout --attach=stderr)
   fi
 
