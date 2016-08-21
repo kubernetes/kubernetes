@@ -175,7 +175,8 @@ func TestControllerSync(t *testing.T) {
 		}
 
 		// Start the controller
-		go ctrl.Run()
+		stopCh := make(chan struct{})
+		ctrl.Run(stopCh)
 
 		// Wait for the controller to pass initial sync and fill its caches.
 		for !ctrl.volumeController.HasSynced() ||
@@ -201,7 +202,7 @@ func TestControllerSync(t *testing.T) {
 		if err != nil {
 			t.Errorf("Failed to run test %s: %v", test.name, err)
 		}
-		ctrl.Stop()
+		close(stopCh)
 
 		evaluateTestResults(ctrl, reactor, test, t)
 	}

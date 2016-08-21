@@ -442,33 +442,12 @@ func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 }
 
 // Run starts all of this controller's control loops
-func (ctrl *PersistentVolumeController) Run() {
+func (ctrl *PersistentVolumeController) Run(stopCh <-chan struct{}) {
 	glog.V(4).Infof("starting PersistentVolumeController")
-
 	ctrl.initializeCaches(ctrl.volumeSource, ctrl.claimSource)
-
-	if ctrl.volumeControllerStopCh == nil {
-		ctrl.volumeControllerStopCh = make(chan struct{})
-		go ctrl.volumeController.Run(ctrl.volumeControllerStopCh)
-	}
-
-	if ctrl.claimControllerStopCh == nil {
-		ctrl.claimControllerStopCh = make(chan struct{})
-		go ctrl.claimController.Run(ctrl.claimControllerStopCh)
-	}
-
-	if ctrl.classReflectorStopCh == nil {
-		ctrl.classReflectorStopCh = make(chan struct{})
-		go ctrl.classReflector.RunUntil(ctrl.classReflectorStopCh)
-	}
-}
-
-// Stop gracefully shuts down this controller
-func (ctrl *PersistentVolumeController) Stop() {
-	glog.V(4).Infof("stopping PersistentVolumeController")
-	close(ctrl.volumeControllerStopCh)
-	close(ctrl.claimControllerStopCh)
-	close(ctrl.classReflectorStopCh)
+	go ctrl.volumeController.Run(stopCh)
+	go ctrl.claimController.Run(stopCh)
+	go ctrl.classReflector.RunUntil(stopCh)
 }
 
 const (
