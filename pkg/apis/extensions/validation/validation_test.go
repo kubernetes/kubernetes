@@ -1673,7 +1673,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		"invalid sysctl pattern": {
 			psp:         invalidSysctlPattern,
 			errorType:   field.ErrorTypeInvalid,
-			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", sysctlPatternFmt),
+			errorDetail: fmt.Sprintf("must have at most 253 characters and match regex %s", SysctlPatternFmt),
 		},
 	}
 

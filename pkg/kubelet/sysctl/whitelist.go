@@ -21,6 +21,8 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/validation"
+	extvalidation "k8s.io/kubernetes/pkg/apis/extensions/validation"
 )
 
 // Whitelist provides a list of allowed sysctls and sysctl patterns (ending in *)
@@ -47,6 +49,13 @@ func NewWhitelist(patterns []string) (*patternWhitelist, error) {
 	}
 
 	for _, s := range patterns {
+		if !extvalidation.IsValidSysctlPattern(s) {
+			return nil, fmt.Errorf("sysctl %q must have at most %d characters and match regex %s",
+				s,
+				validation.SysctlMaxLength,
+				extvalidation.SysctlPatternFmt,
+			)
+		}
 		if strings.HasSuffix(s, "*") {
 			prefix := s[:len(s)-1]
 			ns := NamespacedBy(prefix)

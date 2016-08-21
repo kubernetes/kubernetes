@@ -29,6 +29,10 @@ func TestNewWhitelist(t *testing.T) {
 	}
 	for _, test := range []Test{
 		{sysctls: []string{"kernel.msg*", "kernel.sem"}},
+		{sysctls: []string{" kernel.msg*"}, err: true},
+		{sysctls: []string{"kernel.msg* "}, err: true},
+		{sysctls: []string{"net.-"}, err: true},
+		{sysctls: []string{"net.*.foo"}, err: true},
 		{sysctls: []string{"foo"}, err: true},
 	} {
 		_, err := NewWhitelist(append(types.DefaultSysctlWhitelist(), test.sysctls...))

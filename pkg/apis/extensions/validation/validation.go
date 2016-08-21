@@ -672,9 +672,9 @@ func validatePodSecurityPolicyVolumes(fldPath *field.Path, volumes []extensions.
 }
 
 const sysctlPatternSegmentFmt string = "([a-z0-9][_a-z0-9]*)?[a-z0-9*]"
-const sysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
+const SysctlPatternFmt string = "(" + apivalidation.SysctlSegmentFmt + "\\.)*" + sysctlPatternSegmentFmt
 
-var sysctlPatternRegexp = regexp.MustCompile("^" + sysctlPatternFmt + "$")
+var sysctlPatternRegexp = regexp.MustCompile("^" + SysctlPatternFmt + "$")
 
 func IsValidSysctlPattern(name string) bool {
 	if len(name) > apivalidation.SysctlMaxLength {
@@ -692,7 +692,7 @@ func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) fie
 				allErrs,
 				field.Invalid(fldPath.Index(i), sysctls[i], fmt.Sprintf("must have at most %d characters and match regex %s",
 					apivalidation.SysctlMaxLength,
-					sysctlPatternFmt,
+					SysctlPatternFmt,
 				)),
 			)
 		}
