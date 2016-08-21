@@ -350,6 +350,33 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 
 	if kcfg == nil {
 		var kubeClient, eventClient *clientset.Clientset
+		var autoDetectCloudProvider bool
+		var cloud cloudprovider.Interface
+
+		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
+			autoDetectCloudProvider = true
+		} else {
+			cloud, err = cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
+			if err != nil {
+				return err
+			}
+			if cloud == nil {
+				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			} else {
+				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
+			}
+		}
+
+		if s.BootstrapKubeconfig != "" {
+			nodeName, err := getNodeName(cloud, nodeutil.GetHostname(s.HostnameOverride))
+			if err != nil {
+				return err
+			}
+			if err := bootstrapClientCert(s.KubeConfig.Value(), s.BootstrapKubeconfig, s.CertDirectory, nodeName); err != nil {
+				return err
+			}
+		}
+
 		clientConfig, err := CreateAPIServerClientConfig(s)
 		if err == nil {
 			kubeClient, err = clientset.NewForConfig(clientConfig)
@@ -374,24 +401,12 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 		if err != nil {
 			return err
 		}
+
 		kcfg = cfg
+		kcfg.AutoDetectCloudProvider = autoDetectCloudProvider
+		kcfg.Cloud = cloud
 		kcfg.KubeClient = kubeClient
 		kcfg.EventClient = eventClient
-
-		if s.CloudProvider == kubeExternal.AutoDetectCloudProvider {
-			kcfg.AutoDetectCloudProvider = true
-		} else {
-			cloud, err := cloudprovider.InitCloudProvider(s.CloudProvider, s.CloudConfigFile)
-			if err != nil {
-				return err
-			}
-			if cloud == nil {
-				glog.V(2).Infof("No cloud provider specified: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-			} else {
-				glog.V(2).Infof("Successfully initialized cloud provider: %q from the config file: %q\n", s.CloudProvider, s.CloudConfigFile)
-				kcfg.Cloud = cloud
-			}
-		}
 	}
 
 	if kcfg.CAdvisorInterface == nil {
@@ -454,13 +469,35 @@ func run(s *options.KubeletServer, kcfg *KubeletConfig) (err error) {
 	return nil
 }
 
+// getNodeName returns the node name according to the cloud provider
+// if cloud provider is specified. Otherwise, returns the hostname of the node.
+func getNodeName(cloud cloudprovider.Interface, hostname string) (string, error) {
+	if cloud == nil {
+		return hostname, nil
+	}
+
+	instances, ok := cloud.Instances()
+	if !ok {
+		return "", fmt.Errorf("failed to get instances from cloud provider")
+	}
+
+	nodeName, err := instances.CurrentNodeName(hostname)
+	if err != nil {
+		return "", fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
+	}
+
+	glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+
+	return nodeName, nil
+}
+
 // InitializeTLS checks for a configured TLSCertFile and TLSPrivateKeyFile: if unspecified a new self-signed
 // certificate and key file are generated. Returns a configured server.TLSOptions object.
 func InitializeTLS(s *options.KubeletServer) (*server.TLSOptions, error) {
 	if s.TLSCertFile == "" && s.TLSPrivateKeyFile == "" {
 		s.TLSCertFile = path.Join(s.CertDirectory, "kubelet.crt")
 		s.TLSPrivateKeyFile = path.Join(s.CertDirectory, "kubelet.key")
-		if crypto.ShouldGenSelfSignedCerts(s.TLSCertFile, s.TLSPrivateKeyFile) {
+		if !crypto.FoundCertOrKey(s.TLSCertFile, s.TLSPrivateKeyFile) {
 			if err := crypto.GenerateSelfSignedCert(nodeutil.GetHostname(s.HostnameOverride), s.TLSCertFile, s.TLSPrivateKeyFile, nil, nil); err != nil {
 				return nil, fmt.Errorf("unable to generate self signed cert: %v", err)
 			}
@@ -693,23 +730,10 @@ func RunKubelet(kcfg *KubeletConfig) error {
 	kcfg.Hostname = nodeutil.GetHostname(kcfg.HostnameOverride)
 
 	if len(kcfg.NodeName) == 0 {
-		// Query the cloud provider for our node name, default to Hostname
-		nodeName := kcfg.Hostname
-		if kcfg.Cloud != nil {
-			var err error
-			instances, ok := kcfg.Cloud.Instances()
-			if !ok {
-				return fmt.Errorf("failed to get instances from cloud provider")
-			}
-
-			nodeName, err = instances.CurrentNodeName(kcfg.Hostname)
-			if err != nil {
-				return fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-			}
-
-			glog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
+		nodeName, err := getNodeName(kcfg.Cloud, kcfg.Hostname)
+		if err != nil {
+			return err
 		}
-
 		kcfg.NodeName = nodeName
 	}
 
