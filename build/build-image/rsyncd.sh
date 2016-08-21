@@ -25,8 +25,9 @@ set -o pipefail
 # The directory that gets sync'd
 VOLUME=${HOME}
 
- # By default only allow connections from RFC1918 networks.
-ALLOW=${ALLOW:-192.168.0.0/16 172.16.0.0/12 10.0.0./8}
+# Assume that this is running in Docker on a bridge.  Allow connections from the
+# host. From the point of view, this'll be the gateway on default route.
+ALLOW=$(ip route | awk '/^default/ { print $3 }')
 
 CONFDIR="/tmp/rsync.k8s"
 PIDFILE="${CONFDIR}/rsyncd.pid"
