@@ -795,3 +795,25 @@ func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployme
 	}
 	return copied, nil
 }
+
+// SelectorUpdatedBefore returns true if the former deployment's selector
+// is updated before the latter, false otherwise
+func SelectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
+	t1, t2 := LastSelectorUpdate(d1), LastSelectorUpdate(d2)
+	return t1.Before(t2)
+}
+
+// LastSelectorUpdate returns the last time given deployment's selector is updated
+func LastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
+	t := d.Annotations[SelectorUpdateAnnotation]
+	if len(t) > 0 {
+		parsedTime, err := time.Parse(t, time.RFC3339)
+		// If failed to parse the time, use creation timestamp instead
+		if err != nil {
+			return d.CreationTimestamp
+		}
+		return unversioned.Time{Time: parsedTime}
+	}
+	// If it's never updated, use creation timestamp instead
+	return d.CreationTimestamp
+}

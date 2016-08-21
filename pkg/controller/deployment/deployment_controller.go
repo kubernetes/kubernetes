@@ -266,7 +266,7 @@ func (dc *DeploymentController) getDeploymentForReplicaSet(rs *extensions.Replic
 	// If that happens we should probably dynamically repair the situation by ultimately
 	// trying to clean up one of the controllers, for now we just return the older one
 	if len(deployments) > 1 {
-		sort.Sort(byCreationTimestamp(deployments))
+		sort.Sort(bySelectorLastUpdateTime(deployments))
 		glog.Errorf("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s", rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
 	return &deployments[0]
@@ -336,7 +336,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.De
 	}
 
 	if len(deployments) > 1 {
-		sort.Sort(byCreationTimestamp(deployments))
+		sort.Sort(bySelectorLastUpdateTime(deployments))
 		glog.Errorf("user error! more than one deployment is selecting pod %s/%s with labels: %#v, returning %s/%s", pod.Namespace, pod.Name, pod.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
 	return &deployments[0]
@@ -508,36 +508,8 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	}
 
 	// Handle overlapping deployments by deterministically avoid syncing deployments that fight over ReplicaSets.
-	// Relist all deployment in the same namespace for overlaps, and avoid syncing the newer overlapping ones (only sync the oldest one)
-	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
-	if err != nil {
-		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
-	}
-	deployments, err := dc.dStore.Deployments(d.Namespace).List(labels.Everything())
-	if err != nil {
-		return fmt.Errorf("error listing deployments in namespace %s: %v", d.Namespace, err)
-	}
-	overlapping := false
-	for i := range deployments {
-		other := &deployments[i]
-		if !selector.Empty() && selector.Matches(labels.Set(other.Spec.Template.Labels)) && d.UID != other.UID {
-			overlapping = true
-			// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
-			d, _ = dc.markDeploymentOverlap(d, other.Name)
-			other, _ = dc.markDeploymentOverlap(other, d.Name)
-			// Skip syncing this one if older overlapping one is found
-			// TODO: figure out a better way to determine which deployment to skip,
-			// either with controller reference, or with validation.
-			// Using oldest active replica set to determine which deployment to skip wouldn't make much difference,
-			// since new replica set hasn't been created after selector update
-			if selectorUpdatedBefore(other, d) {
-				return fmt.Errorf("found deployment %s/%s has overlapping selector with an older deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
-			}
-		}
-	}
-	if !overlapping {
-		// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
-		d, _ = dc.clearDeploymentOverlap(d)
+	if err = dc.handleOverlap(d); err != nil {
+		return err
 	}
 
 	if d.Spec.Paused {
@@ -568,44 +540,56 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 	return fmt.Errorf("unexpected deployment strategy type: %s", d.Spec.Strategy.Type)
 }
 
-func selectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
-	t1, t2 := lastSelectorUpdate(d1), lastSelectorUpdate(d2)
-	return t1.Before(t2)
-}
-
-func lastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
-	t := d.Annotations[util.SelectorUpdateAnnotation]
-	if len(t) > 0 {
-		parsedTime, err := time.Parse(t, time.RFC3339)
-		// If failed to parse the time, use creation timestamp instead
-		if err != nil {
-			return d.CreationTimestamp
+// handleOverlap relists all deployment in the same namespace for overlaps, and avoid syncing
+// the newer overlapping ones (only sync the oldest one). New/old is determined by when the
+// deployment's selector is last updated.
+func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
+	selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
+	if err != nil {
+		return fmt.Errorf("deployment %s/%s has invalid label selector: %v", d.Namespace, d.Name, err)
+	}
+	deployments, err := dc.dStore.Deployments(d.Namespace).List(labels.Everything())
+	if err != nil {
+		return fmt.Errorf("error listing deployments in namespace %s: %v", d.Namespace, err)
+	}
+	overlapping := false
+	for i := range deployments {
+		other := &deployments[i]
+		if !selector.Empty() && selector.Matches(labels.Set(other.Spec.Template.Labels)) && d.UID != other.UID {
+			overlapping = true
+			// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
+			d, _ = dc.markDeploymentOverlap(d, other.Name)
+			other, _ = dc.markDeploymentOverlap(other, d.Name)
+			// Skip syncing this one if older overlapping one is found
+			// TODO: figure out a better way to determine which deployment to skip,
+			// either with controller reference, or with validation.
+			// Using oldest active replica set to determine which deployment to skip wouldn't make much difference,
+			// since new replica set hasn't been created after selector update
+			if util.SelectorUpdatedBefore(other, d) {
+				return fmt.Errorf("found deployment %s/%s has overlapping selector with an older deployment %s/%s, skip syncing it", d.Namespace, d.Name, other.Namespace, other.Name)
+			}
 		}
-		return unversioned.Time{Time: parsedTime}
 	}
-	// If it's never updated, use creation timestamp instead
-	return d.CreationTimestamp
+	if !overlapping {
+		// We don't care if the overlapping annotation update failed or not (we don't make decision on it)
+		d, _ = dc.clearDeploymentOverlap(d)
+	}
+	return nil
 }
 
-// byCreationTimestamp sorts a list of deployments by creation timestamp, using their names as a tie breaker.
-type byCreationTimestamp []extensions.Deployment
+// bySelectorLastUpdateTime sorts a list of deployments by the last update time of their selector,
+// first using their creation timestamp and then their names as a tie breaker.
+type bySelectorLastUpdateTime []extensions.Deployment
 
-func (o byCreationTimestamp) Len() int      { return len(o) }
-func (o byCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-func (o byCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
+func (o bySelectorLastUpdateTime) Len() int      { return len(o) }
+func (o bySelectorLastUpdateTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o bySelectorLastUpdateTime) Less(i, j int) bool {
+	ti, tj := util.LastSelectorUpdate(&o[i]), util.LastSelectorUpdate(&o[j])
+	if ti.Equal(tj) {
+		if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+			return o[i].Name < o[j].Name
+		}
+		return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
 	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-}
-
-type rsByCreationTimestamp []extensions.ReplicaSet
-
-func (o rsByCreationTimestamp) Len() int      { return len(o) }
-func (o rsByCreationTimestamp) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-func (o rsByCreationTimestamp) Less(i, j int) bool {
-	if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	return ti.Before(tj)
 }
