@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package authorizer
 
 import (
 	"testing"
+
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 )
 
 // NewAlwaysAllowAuthorizer must return a struct which implements authorizer.Authorizer
@@ -42,7 +44,7 @@ func TestNewAlwaysDenyAuthorizer(t *testing.T) {
 // validates that errors are returned only when proper.
 func TestNewAuthorizerFromAuthorizationConfig(t *testing.T) {
 
-	examplePolicyFile := "../auth/authorizer/abac/example_policy_file.jsonl"
+	examplePolicyFile := "../../auth/authorizer/abac/example_policy_file.jsonl"
 
 	tests := []struct {
 		modes   []string
@@ -59,25 +61,25 @@ func TestNewAuthorizerFromAuthorizationConfig(t *testing.T) {
 		{
 			// ModeAlwaysAllow and ModeAlwaysDeny should return without authorizationPolicyFile
 			// but error if one is given
-			modes: []string{ModeAlwaysAllow, ModeAlwaysDeny},
+			modes: []string{options.ModeAlwaysAllow, options.ModeAlwaysDeny},
 			msg:   "returned an error for valid config",
 		},
 		{
 			// ModeABAC requires a policy file
-			modes:   []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC},
+			modes:   []string{options.ModeAlwaysAllow, options.ModeAlwaysDeny, options.ModeABAC},
 			wantErr: true,
 			msg:     "specifying ABAC with no policy file should return an error",
 		},
 		{
 			// ModeABAC should not error if a valid policy path is provided
-			modes:  []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC},
+			modes:  []string{options.ModeAlwaysAllow, options.ModeAlwaysDeny, options.ModeABAC},
 			config: AuthorizationConfig{PolicyFile: examplePolicyFile},
 			msg:    "errored while using a valid policy file",
 		},
 		{
 
 			// Authorization Policy file cannot be used without ModeABAC
-			modes:   []string{ModeAlwaysAllow, ModeAlwaysDeny},
+			modes:   []string{options.ModeAlwaysAllow, options.ModeAlwaysDeny},
 			config:  AuthorizationConfig{PolicyFile: examplePolicyFile},
 			wantErr: true,
 			msg:     "should have errored when Authorization Policy File is used without ModeABAC",
@@ -91,13 +93,13 @@ func TestNewAuthorizerFromAuthorizationConfig(t *testing.T) {
 		},
 		{
 			// ModeWebhook requires at minimum a target.
-			modes:   []string{ModeWebhook},
+			modes:   []string{options.ModeWebhook},
 			wantErr: true,
 			msg:     "should have errored when config was empty with ModeWebhook",
 		},
 		{
 			// Cannot provide webhook flags without ModeWebhook
-			modes:   []string{ModeAlwaysAllow},
+			modes:   []string{options.ModeAlwaysAllow},
 			config:  AuthorizationConfig{WebhookConfigFile: "authz_webhook_config.yml"},
 			wantErr: true,
 			msg:     "should have errored when Webhook config file is used without ModeWebhook",

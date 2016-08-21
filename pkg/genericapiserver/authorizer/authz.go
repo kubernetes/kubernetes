@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package apiserver
+package authorizer
 
 import (
 	"errors"
@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/authorizer/abac"
 	"k8s.io/kubernetes/pkg/auth/authorizer/union"
+	"k8s.io/kubernetes/pkg/genericapiserver/options"
 	"k8s.io/kubernetes/pkg/registry/clusterrole"
 	"k8s.io/kubernetes/pkg/registry/clusterrolebinding"
 	"k8s.io/kubernetes/pkg/registry/role"
@@ -31,11 +32,6 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/webhook"
 )
-
-// Attributes implements authorizer.Attributes interface.
-type Attributes struct {
-	// TODO: add fields and methods when authorizer.Attributes is completed.
-}
 
 // alwaysAllowAuthorizer is an implementation of authorizer.Attributes
 // which always says yes to an authorization request.
@@ -76,17 +72,6 @@ func NewAlwaysFailAuthorizer() authorizer.Authorizer {
 	return new(alwaysFailAuthorizer)
 }
 
-const (
-	ModeAlwaysAllow string = "AlwaysAllow"
-	ModeAlwaysDeny  string = "AlwaysDeny"
-	ModeABAC        string = "ABAC"
-	ModeWebhook     string = "Webhook"
-	ModeRBAC        string = "RBAC"
-)
-
-// Keep this list in sync with constant list above.
-var AuthorizationModeChoices = []string{ModeAlwaysAllow, ModeAlwaysDeny, ModeABAC, ModeWebhook, ModeRBAC}
-
 type AuthorizationConfig struct {
 	// Options for ModeABAC
 
@@ -115,7 +100,7 @@ type AuthorizationConfig struct {
 
 // NewAuthorizerFromAuthorizationConfig returns the right sort of union of multiple authorizer.Authorizer objects
 // based on the authorizationMode or an error.  authorizationMode should be a comma separated values
-// of AuthorizationModeChoices.
+// of options.AuthorizationModeChoices.
 func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config AuthorizationConfig) (authorizer.Authorizer, error) {
 
 	if len(authorizationModes) == 0 {
@@ -131,11 +116,11 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 		}
 		// Keep cases in sync with constant list above.
 		switch authorizationMode {
-		case ModeAlwaysAllow:
+		case options.ModeAlwaysAllow:
 			authorizers = append(authorizers, NewAlwaysAllowAuthorizer())
-		case ModeAlwaysDeny:
+		case options.ModeAlwaysDeny:
 			authorizers = append(authorizers, NewAlwaysDenyAuthorizer())
-		case ModeABAC:
+		case options.ModeABAC:
 			if config.PolicyFile == "" {
 				return nil, errors.New("ABAC's authorization policy file not passed")
 			}
@@ -144,7 +129,7 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 				return nil, err
 			}
 			authorizers = append(authorizers, abacAuthorizer)
-		case ModeWebhook:
+		case options.ModeWebhook:
 			if config.WebhookConfigFile == "" {
 				return nil, errors.New("Webhook's configuration file not passed")
 			}
@@ -155,7 +140,7 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 				return nil, err
 			}
 			authorizers = append(authorizers, webhookAuthorizer)
-		case ModeRBAC:
+		case options.ModeRBAC:
 			rbacAuthorizer := rbac.New(
 				config.RBACRoleRegistry,
 				config.RBACRoleBindingRegistry,
@@ -170,13 +155,13 @@ func NewAuthorizerFromAuthorizationConfig(authorizationModes []string, config Au
 		authorizerMap[authorizationMode] = true
 	}
 
-	if !authorizerMap[ModeABAC] && config.PolicyFile != "" {
+	if !authorizerMap[options.ModeABAC] && config.PolicyFile != "" {
 		return nil, errors.New("Cannot specify --authorization-policy-file without mode ABAC")
 	}
-	if !authorizerMap[ModeWebhook] && config.WebhookConfigFile != "" {
+	if !authorizerMap[options.ModeWebhook] && config.WebhookConfigFile != "" {
 		return nil, errors.New("Cannot specify --authorization-webhook-config-file without mode Webhook")
 	}
-	if !authorizerMap[ModeRBAC] && config.RBACSuperUser != "" {
+	if !authorizerMap[options.ModeRBAC] && config.RBACSuperUser != "" {
 		return nil, errors.New("Cannot specify --authorization-rbac-super-user without mode RBAC")
 	}
 
