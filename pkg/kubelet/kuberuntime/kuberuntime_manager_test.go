@@ -20,13 +20,25 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	apitest "k8s.io/kubernetes/pkg/kubelet/api/testing"
+	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/network"
+	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 )
 
 func createTestFakeRuntimeManager() (*apitest.FakeRuntimeService, *apitest.FakeImageService, *kubeGenericRuntimeManager, error) {
 	fakeRuntimeService := apitest.NewFakeRuntimeService()
 	fakeImageService := apitest.NewFakeImageService()
-	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService)
+	networkPlugin, _ := network.InitNetworkPlugin(
+		[]network.NetworkPlugin{},
+		"",
+		nettest.NewFakeHost(nil),
+		componentconfig.HairpinNone,
+		"10.0.0.0/8",
+	)
+	osInterface := &containertest.FakeOS{}
+	manager, err := NewFakeKubeRuntimeManager(fakeRuntimeService, fakeImageService, networkPlugin, osInterface)
 	return fakeRuntimeService, fakeImageService, manager, err
 }
 

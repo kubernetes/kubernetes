@@ -22,13 +22,13 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/componentconfig"
 	"k8s.io/kubernetes/pkg/client/record"
+	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/images"
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
-	nettest "k8s.io/kubernetes/pkg/kubelet/network/testing"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
@@ -76,27 +76,36 @@ func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int
 	return nil
 }
 
-func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageService internalApi.ImageManagerService) (*kubeGenericRuntimeManager, error) {
-	networkPlugin, _ := network.InitNetworkPlugin(
-		[]network.NetworkPlugin{},
-		"",
-		nettest.NewFakeHost(nil),
-		componentconfig.HairpinNone,
-		"10.0.0.0/8",
-	)
+func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageService internalApi.ImageManagerService, networkPlugin network.NetworkPlugin, osInterface kubecontainer.OSInterface) (*kubeGenericRuntimeManager, error) {
+	recorder := &record.FakeRecorder{}
+	kubeRuntimeManager := &kubeGenericRuntimeManager{
+		recorder:            recorder,
+		cpuCFSQuota:         false,
+		livenessManager:     proberesults.NewManager(),
+		containerRefManager: kubecontainer.NewRefManager(),
+		osInterface:         osInterface,
+		networkPlugin:       networkPlugin,
+		runtimeHelper:       &fakeRuntimeHelper{},
+		runtimeService:      runtimeService,
+		imageService:        imageService,
+		keyring:             credentialprovider.NewDockerKeyring(),
+	}
 
-	return NewKubeGenericRuntimeManager(
-		&record.FakeRecorder{},
-		proberesults.NewManager(),
-		kubecontainer.NewRefManager(),
-		&containertest.FakeOS{},
-		networkPlugin,
-		&fakeRuntimeHelper{},
-		&fakeHTTP{},
+	typedVersion, err := runtimeService.Version(kubeRuntimeAPIVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	kubeRuntimeManager.runtimeName = typedVersion.GetRuntimeName()
+	kubeRuntimeManager.imagePuller = images.NewImageManager(
+		kubecontainer.FilterEventRecorder(recorder),
+		kubeRuntimeManager,
 		flowcontrol.NewBackOff(time.Second, 300*time.Second),
-		false,
-		false,
-		runtimeService,
-		imageService,
-	)
+		false)
+	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(
+		&fakeHTTP{},
+		kubeRuntimeManager,
+		kubeRuntimeManager)
+
+	return kubeRuntimeManager, nil
 }

@@ -279,6 +279,10 @@ type KubeletConfiguration struct {
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
+	// remoteRuntimeEndpoint is the endpoint of remote runtime service
+	RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint"`
+	// remoteImageEndpoint is the endpoint of remote image service
+	RemoteImageEndpoint string `json:"remoteImageEndpoint"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout,omitempty"`

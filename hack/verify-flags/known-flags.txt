@@ -90,6 +90,7 @@ consumer-service-namespace
 contain-pod-resources
 container-port
 container-runtime
+container-runtime-endpoint
 controller-start-interval
 cors-allowed-origins
 cpu-cfs-quota
@@ -223,6 +224,7 @@ image-gc-high-threshold
 image-gc-low-threshold
 image-project
 image-pull-policy
+image-service-endpoint
 include-extended-apis
 included-types-overrides
 input-base
