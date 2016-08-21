@@ -85,7 +85,7 @@ func (g *ClientConfigGetter) GetLoadingPrecedence() []string {
 	return nil
 }
 func (g *ClientConfigGetter) GetStartingConfig() (*clientcmdapi.Config, error) {
-	return nil, nil
+	return g.kubeconfigGetter()
 }
 func (g *ClientConfigGetter) GetDefaultFilename() string {
 	return ""
