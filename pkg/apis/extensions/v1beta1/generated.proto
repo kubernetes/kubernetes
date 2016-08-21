@@ -847,6 +847,9 @@ message ReplicaSetStatus {
   // The number of pods that have labels matching the labels of the pod template of the replicaset.
   optional int32 fullyLabeledReplicas = 2;
 
+  // The number of ready replicas for this replica set.
+  optional int32 readyReplicas = 4;
+
   // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
   optional int64 observedGeneration = 3;
 }

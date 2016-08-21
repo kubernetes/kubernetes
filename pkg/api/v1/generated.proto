@@ -2464,6 +2464,9 @@ message ReplicationControllerStatus {
   // The number of pods that have labels matching the labels of the pod template of the replication controller.
   optional int32 fullyLabeledReplicas = 2;
 
+  // The number of ready replicas for this replication controller.
+  optional int32 readyReplicas = 4;
+
   // ObservedGeneration reflects the generation of the most recently observed replication controller.
   optional int64 observedGeneration = 3;
 }
