@@ -35,11 +35,12 @@ const (
 )
 
 var greylist = map[string]Namespace{
-	"kernel.sem": IpcNamespace,
+	"kernel.sem":             IpcNamespace,
+	"kernel.shm_rmid_forced": IpcNamespace,
+	"kernel.shmmni":          IpcNamespace,
 }
 
 var greylistPrefixes = map[string]Namespace{
-	"kernel.shm": IpcNamespace,
 	"kernel.msg": IpcNamespace,
 	"net.":       NetNamespace,
 	"fs.mqueue.": IpcNamespace,

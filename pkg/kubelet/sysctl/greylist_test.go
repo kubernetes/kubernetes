@@ -22,10 +22,10 @@ import (
 
 func TestNamespacedBy(t *testing.T) {
 	tests := map[string]Namespace{
-		"kernel.shmall":   IpcNamespace,
-		"net.a.b.c":       NetNamespace,
-		"fs.mqueue.a.b.c": IpcNamespace,
-		"foo":             UnknownNamespace,
+		"kernel.shm_rmid_forced": IpcNamespace,
+		"net.a.b.c":              NetNamespace,
+		"fs.mqueue.a.b.c":        IpcNamespace,
+		"foo":                    UnknownNamespace,
 	}
 
 	for sysctl, ns := range tests {

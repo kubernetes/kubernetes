@@ -50,13 +50,13 @@ func TestWhitelist(t *testing.T) {
 		hostNet, hostIPC bool
 	}
 	valid := []Test{
-		{sysctl: "kernel.shmall"},
+		{sysctl: "kernel.shm_rmid_forced"},
 		{sysctl: "net.ipv4.ip_local_port_range"},
 		{sysctl: "kernel.msgmax"},
 		{sysctl: "kernel.sem"},
 	}
 	invalid := []Test{
-		{sysctl: "kernel.shmall", hostIPC: true},
+		{sysctl: "kernel.shm_rmid_forced", hostIPC: true},
 		{sysctl: "net.ipv4.ip_local_port_range", hostNet: true},
 		{sysctl: "foo"},
 		{sysctl: "net.a.b.c", hostNet: false},
