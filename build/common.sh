@@ -717,6 +717,8 @@ function kube::build::copy_output() {
     --filter='- /_temp/' \
     --filter='+ /_output/dockerized/bin/**' \
     --filter='+ zz_generated.*' \
+    --filter='+ generated.proto' \
+    --filter='+ *.pb.go' \
     --filter='+ */' \
     --filter='- /**' \
     "rsync://k8s@${KUBE_RSYNC_ADDR}/k8s/" "${KUBE_ROOT}"
