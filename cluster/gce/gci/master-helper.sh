@@ -37,8 +37,32 @@ function create-master-instance {
 
   write-master-env
   ensure-gci-metadata-files
-  gcloud compute instances create "${MASTER_NAME}" \
-    ${address_opt} \
+  create-master-instance-internal "${MASTER_NAME}" "${address_opt}"
+}
+
+function replicate-master-instance() {
+  local existing_master_zone="${1}"
+  local existing_master_name="${2}"
+  local existing_master_replicas="${3}"
+
+  local kube_env="$(get-metadata "${existing_master_zone}" "${existing_master_name}" kube-env)"
+  # Substitute INITIAL_ETCD_CLUSTER to enable etcd clustering.
+  kube_env="$(echo "${kube_env}" | grep -v "INITIAL_ETCD_CLUSTER")"
+  kube_env="$(echo -e "${kube_env}\nINITIAL_ETCD_CLUSTER: '${existing_master_replicas},${REPLICA_NAME}'")"
+  echo "${kube_env}" > ${KUBE_TEMP}/master-kube-env.yaml
+  get-metadata "${existing_master_zone}" "${existing_master_name}" cluster-name > "${KUBE_TEMP}/cluster-name.txt"
+  get-metadata "${existing_master_zone}" "${existing_master_name}" gci-update-strategy > "${KUBE_TEMP}/gci-update.txt"
+  get-metadata "${existing_master_zone}" "${existing_master_name}" gci-ensure-gke-docker > "${KUBE_TEMP}/gci-ensure-gke-docker.txt"
+  get-metadata "${existing_master_zone}" "${existing_master_name}" gci-docker-version > "${KUBE_TEMP}/gci-docker-version.txt"
+
+  create-master-instance-internal "${REPLICA_NAME}"
+}
+
+function create-master-instance-internal() {
+  local -r master_name="${1}"
+  local -r address_option="${2:-}"
+  gcloud compute instances create "${master_name}" \
+    ${address_option} \
     --project "${PROJECT}" \
     --zone "${ZONE}" \
     --machine-type "${MASTER_SIZE}" \
@@ -50,6 +74,16 @@ function create-master-instance {
     --can-ip-forward \
     --metadata-from-file \
       "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt,gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt" \
-    --disk "name=${MASTER_NAME}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
+    --disk "name=${master_name}-pd,device-name=master-pd,mode=rw,boot=no,auto-delete=no" \
     --boot-disk-size "${MASTER_ROOT_DISK_SIZE:-10}"
+}
+
+function get-metadata() {
+  local zone="${1}"
+  local name="${2}"
+  local key="${3}"
+  gcloud compute ssh "${name}" \
+    --project "${PROJECT}" \
+    --zone "${zone}" \
+    --command "curl \"http://metadata.google.internal/computeMetadata/v1/instance/attributes/${key}\" -H \"Metadata-Flavor: Google\"" 2>/dev/null
 }
