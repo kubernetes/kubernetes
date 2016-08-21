@@ -31,17 +31,37 @@ func TestObjectMeta(t *testing.T) {
 		UID:             "1231231412",
 		ResourceVersion: "999",
 	}
+	o2 := CopyObjectMeta(o1)
 	o3 := api_v1.ObjectMeta{
 		Namespace:   "ns1",
 		Name:        "s1",
 		UID:         "1231231412",
 		Annotations: map[string]string{"A": "B"},
 	}
-
-	o2 := CopyObjectMeta(o1)
+	o4 := api_v1.ObjectMeta{
+		Namespace:   "ns1",
+		Name:        "s1",
+		UID:         "1231255531412",
+		Annotations: map[string]string{"A": "B"},
+	}
+	o5 := api_v1.ObjectMeta{
+		Namespace:       "ns1",
+		Name:            "s1",
+		ResourceVersion: "1231231412",
+		Annotations:     map[string]string{"A": "B"},
+	}
+	o6 := api_v1.ObjectMeta{
+		Namespace:       "ns1",
+		Name:            "s1",
+		ResourceVersion: "1231255531412",
+		Annotations:     map[string]string{"A": "B"},
+	}
 	assert.Equal(t, 0, len(o2.UID))
 	assert.Equal(t, 0, len(o2.ResourceVersion))
 	assert.Equal(t, o1.Name, o2.Name)
 	assert.True(t, ObjectMetaEquivalent(o1, o2))
 	assert.False(t, ObjectMetaEquivalent(o1, o3))
+	assert.True(t, ObjectMetaEquivalent(o3, o4))
+	assert.True(t, ObjectMetaEquivalent(o5, o6))
+	assert.True(t, ObjectMetaEquivalent(o3, o5))
 }

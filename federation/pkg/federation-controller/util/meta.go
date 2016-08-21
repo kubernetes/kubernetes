@@ -22,6 +22,9 @@ import (
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 )
 
+// Copies cluster-independent, user provided data from the given ObjectMeta struct. If in
+// the future the ObjectMeta structure is expanded then any field that is not populared
+// by the api server should be included here.
 func CopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
 	return api_v1.ObjectMeta{
 		Name:        obj.Name,
@@ -31,6 +34,9 @@ func CopyObjectMeta(obj api_v1.ObjectMeta) api_v1.ObjectMeta {
 	}
 }
 
+// Checks if cluster-independed, user provided data in two given ObjectMeta are eqaul. If in
+// the future the ObjectMeta structure is expanded then any field that is not populared
+// by the api server should be included here.
 func ObjectMetaEquivalent(a, b api_v1.ObjectMeta) bool {
 	if a.Name != b.Name {
 		return false
