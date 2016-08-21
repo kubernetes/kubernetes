@@ -22,6 +22,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"net/http"
+	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -368,6 +370,140 @@ mFlG6tStAWz3TmydciZNdiEbeqHw5uaIYWj1zC5AdvFXBFue0ojIrJ5JtbTWccH9
 2LgPxxqc8z/MEWDvVDo9uI0JgP6++e8=
 -----END CERTIFICATE-----
 `
+
+	/*
+		openssl genrsa -out ca.key 4096
+		openssl req -new -x509 -days 36500 \
+		    -sha256 -key ca.key -extensions v3_ca \
+		    -out ca.crt \
+		    -subj "/C=US/ST=My State/L=My City/O=My Org/O=My Org 1/O=My Org 2/CN=ROOT CA WITH GROUPS"
+		openssl x509 -in ca.crt -text
+	*/
+
+	// A certificate with multiple organizations.
+	caWithGroups = `Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            bc:57:6d:0b:7c:ff:cb:52
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=US, ST=My State, L=My City, O=My Org, O=My Org 1, O=My Org 2, CN=ROOT CA WITH GROUPS
+        Validity
+            Not Before: Aug 10 19:22:03 2016 GMT
+            Not After : Jul 17 19:22:03 2116 GMT
+        Subject: C=US, ST=My State, L=My City, O=My Org, O=My Org 1, O=My Org 2, CN=ROOT CA WITH GROUPS
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (4096 bit)
+                Modulus:
+                    00:ba:3a:40:34:1a:ba:13:87:0d:c9:c7:bf:e5:8e:
+                    6a:c7:d5:0f:8f:e3:e1:ac:9e:a5:fd:35:e1:39:52:
+                    1d:22:77:c1:d2:3f:74:02:2e:23:c6:c1:fc:cd:30:
+                    b4:33:e7:12:04:6f:90:27:e1:be:8e:ec:c8:dc:87:
+                    91:da:7d:5b:8a:1f:41:fb:62:24:d0:26:98:c6:f7:
+                    f8:ca:8a:56:15:c4:b3:5f:43:86:28:f6:4d:fc:e4:
+                    03:52:1d:2b:25:f7:19:5c:13:c3:0e:04:91:06:f3:
+                    29:b6:3f:8b:86:6d:b5:8e:43:2d:69:4e:60:53:5b:
+                    75:8f:e7:d2:57:8c:db:bb:a1:0b:d7:c7:62:41:bc:
+                    f2:87:be:66:bb:b9:bf:8b:85:97:19:98:18:50:7b:
+                    ee:31:88:47:99:c1:04:e4:12:d2:a6:e2:bf:61:33:
+                    82:11:79:c3:d5:39:7c:1c:15:9e:d2:61:f7:16:9f:
+                    97:f1:39:05:8f:b9:f8:e0:5b:16:ca:da:bf:10:45:
+                    10:0f:14:f9:67:10:66:77:05:f3:fe:21:d6:69:fb:
+                    1e:dc:fd:f7:97:40:db:0d:59:99:8a:9d:e4:31:a3:
+                    b9:c2:4d:ff:85:ae:ea:da:18:d8:c7:a5:b7:ea:f3:
+                    a8:38:a5:44:1f:3b:23:71:fc:4c:5b:bd:36:6f:e0:
+                    28:6d:f3:be:e8:c9:74:64:af:89:54:b3:12:c8:2d:
+                    27:2d:1c:22:23:81:bd:69:b7:8b:76:63:e1:bf:80:
+                    a1:ba:d6:c6:fc:aa:37:2e:44:94:4b:4c:3f:c4:f2:
+                    c3:f8:25:54:ab:1f:0f:4c:19:2f:9c:b6:46:09:db:
+                    26:52:b4:03:0a:35:75:53:94:33:5d:22:29:48:4a:
+                    61:9c:d0:5a:6d:91:f5:18:bb:93:99:30:02:5c:6d:
+                    7c:3f:4d:5a:ea:6f:ee:f7:7a:f9:07:9d:fe:e0:6f:
+                    75:02:4a:ef:1e:25:c2:d5:8d:2c:57:a2:95:a7:df:
+                    37:4f:32:60:94:09:85:4d:a7:67:05:e9:29:db:45:
+                    a8:89:ec:1e:e9:3a:49:92:23:17:5b:4a:9c:b8:0d:
+                    6f:2a:54:ba:47:45:f8:d3:34:30:e8:db:48:6d:c7:
+                    82:08:01:d5:93:6a:08:7c:4b:43:78:04:df:57:b7:
+                    fe:e3:d7:4c:ec:9c:dc:2d:0b:8c:e4:6f:aa:e2:30:
+                    66:74:16:10:b9:44:c9:1e:73:53:86:25:25:cc:60:
+                    3a:94:79:18:f1:c9:31:b0:e1:ca:b9:21:44:75:0a:
+                    6c:e4:58:c1:37:ee:69:28:d1:d4:b8:78:21:64:ea:
+                    27:d3:67:25:cf:3a:82:8d:de:27:51:b4:33:a2:85:
+                    db:07:89
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Subject Key Identifier: 
+                AB:3A:46:07:46:0C:68:F0:64:C7:73:A8:7C:8A:20:66:A8:DA:1C:E4
+            X509v3 Authority Key Identifier: 
+                keyid:AB:3A:46:07:46:0C:68:F0:64:C7:73:A8:7C:8A:20:66:A8:DA:1C:E4
+
+            X509v3 Basic Constraints: 
+                CA:TRUE
+    Signature Algorithm: sha256WithRSAEncryption
+         1c:af:04:c9:10:f2:43:03:b6:24:2e:20:2e:47:46:4d:7f:b9:
+         fa:1c:ea:8d:f0:30:a5:42:93:fe:e0:55:4a:b5:8b:4d:30:f4:
+         e1:04:1f:20:ec:a1:27:ab:1f:b2:9d:da:58:2e:04:5c:b6:7c:
+         69:8c:00:59:42:4f:cc:c7:3c:d4:f7:30:84:2a:14:8e:5d:3a:
+         20:91:63:5c:ac:5c:e7:0c:78:fc:28:f3:f9:24:de:3d:30:e3:
+         64:ca:5d:a6:86:30:76:5e:53:a4:99:77:a4:7a:c5:52:62:cd:
+         f9:79:42:69:57:1b:79:25:c5:51:45:42:ed:ae:9c:bc:f2:4c:
+         4d:9d:3a:17:73:b1:d2:94:ab:61:4a:90:fa:59:f1:96:c7:7c:
+         26:5b:0c:75:4b:94:6f:76:ac:6c:70:8f:68:5c:e3:e7:7b:b9:
+         38:c2:0f:f2:e3:2d:96:ec:79:fa:bf:df:33:02:f2:67:a1:19:
+         d1:7d:ed:c4:3b:14:b8:1f:53:c5:6a:52:ad:19:2d:4c:43:19:
+         c7:d3:14:75:7f:e7:18:40:38:79:b7:2c:ce:91:6f:cd:16:e3:
+         d9:8f:87:be:bc:c0:c0:53:1a:93:d6:ff:a9:17:c0:d9:6f:6a:
+         cc:0b:57:37:b8:da:30:98:4a:fc:e5:e9:dc:49:1a:33:35:f0:
+         e9:9a:a7:a2:fd:6a:13:9e:85:df:66:a8:15:3f:94:30:4b:ca:
+         61:72:7e:1a:b1:83:88:65:21:e8:f6:58:4a:22:48:b5:29:3d:
+         00:6c:3e:a2:e5:bd:a5:a3:d9:5a:4d:a9:cb:2a:f8:47:ca:72:
+         ea:9d:e1:87:e1:d1:75:5d:07:36:ba:ab:fd:7f:5f:d3:66:d0:
+         41:86:7c:6b:1e:a7:7c:9f:dc:26:7a:37:70:54:1e:7c:b3:66:
+         7f:f1:99:93:f4:8a:aa:81:02:e9:bf:5d:a5:90:94:82:6e:2a:
+         a6:c8:e1:77:df:66:59:d8:6c:b1:55:a0:77:d6:53:6b:78:aa:
+         4b:0d:fc:34:06:5c:52:4e:e6:5e:c7:94:13:19:70:e8:2b:00:
+         6d:ea:90:b9:f4:6f:74:3f:cc:e7:1d:3e:22:ec:66:cb:84:19:
+         7a:40:3c:7e:38:77:b4:4e:da:8c:4b:af:dc:c2:23:28:9d:60:
+         a5:4f:5a:c8:9e:17:df:b9:9d:92:bc:d3:c0:20:12:ec:22:d4:
+         e8:d4:97:9f:da:3c:35:a0:e9:a3:8c:d1:42:7c:c1:27:1f:8a:
+         9b:5b:03:3d:2b:9b:df:25:b6:a8:a7:5a:48:0f:e8:1f:26:4b:
+         0e:3c:a2:50:0a:cd:02:33:4c:e4:7a:c9:2d:b8:b8:bf:80:5a:
+         6e:07:49:c4:c3:23:a0:2e
+-----BEGIN CERTIFICATE-----
+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
+PKJQCs0CM0zkesktuLi/gFpuB0nEwyOgLg==
+-----END CERTIFICATE-----`
 )
 
 func TestX509(t *testing.T) {
@@ -379,6 +515,7 @@ func TestX509(t *testing.T) {
 		User UserConversion
 
 		ExpectUserName string
+		ExpectGroups   []string
 		ExpectOK       bool
 		ExpectErr      bool
 	}{
@@ -415,6 +552,7 @@ func TestX509(t *testing.T) {
 			User:  CommonNameUserConversion,
 
 			ExpectUserName: "127.0.0.1",
+			ExpectGroups:   []string{"My Org"},
 			ExpectOK:       true,
 			ExpectErr:      false,
 		},
@@ -425,10 +563,22 @@ func TestX509(t *testing.T) {
 			User:  CommonNameUserConversion,
 
 			ExpectUserName: "client_cn",
+			ExpectGroups:   []string{"My Org"},
 			ExpectOK:       true,
 			ExpectErr:      false,
 		},
+		"ca with multiple organizations": {
+			Opts: x509.VerifyOptions{
+				Roots: getRootCertPoolFor(t, caWithGroups),
+			},
+			Certs: getCerts(t, caWithGroups),
+			User:  CommonNameUserConversion,
 
+			ExpectUserName: "ROOT CA WITH GROUPS",
+			ExpectGroups:   []string{"My Org", "My Org 1", "My Org 2"},
+			ExpectOK:       true,
+			ExpectErr:      false,
+		},
 		"empty dns": {
 			Opts:  getDefaultVerifyOptions(t),
 			Certs: getCerts(t, clientCNCert),
@@ -538,7 +688,13 @@ func TestX509(t *testing.T) {
 		if testCase.ExpectOK {
 			if testCase.ExpectUserName != user.GetName() {
 				t.Errorf("%s: Expected user.name=%v, got %v", k, testCase.ExpectUserName, user.GetName())
-				continue
+			}
+
+			groups := user.GetGroups()
+			sort.Strings(testCase.ExpectGroups)
+			sort.Strings(groups)
+			if !reflect.DeepEqual(testCase.ExpectGroups, groups) {
+				t.Errorf("%s: Expected user.groups=%v, got %v", k, testCase.ExpectGroups, groups)
 			}
 		}
 	}
@@ -551,8 +707,14 @@ func getDefaultVerifyOptions(t *testing.T) x509.VerifyOptions {
 }
 
 func getRootCertPool(t *testing.T) *x509.CertPool {
+	return getRootCertPoolFor(t, rootCACert)
+}
+
+func getRootCertPoolFor(t *testing.T, certs ...string) *x509.CertPool {
 	pool := x509.NewCertPool()
-	pool.AddCert(getCert(t, rootCACert))
+	for _, cert := range certs {
+		pool.AddCert(getCert(t, cert))
+	}
 	return pool
 }
 
