@@ -3496,7 +3496,7 @@ func TestValidatePod(t *testing.T) {
 				DNSPolicy:     api.DNSClusterFirst,
 			},
 		},
-		{ // valid, greylisted sysctls
+		{ // syntactically valid sysctls
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",
