@@ -78,7 +78,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager [Skip]", func() {
 		Context("On scheduling a Guaranteed Pod", func() {
 			It("Pod containers should have been created under the cgroup-root", func() {
 				if framework.TestContext.CgroupsPerQOS {
-					var podUID string
+					var guaranteedPod api.Pod
 					By("Creating a Guaranteed pod in Namespace", func() {
 						podName := "qos-pod" + string(uuid.NewUUID())
 						contName := "qos-container" + string(uuid.NewUUID())
@@ -98,8 +98,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager [Skip]", func() {
 							},
 						}
 						podClient := f.PodClient()
-						apiPod := podClient.Create(pod)
-						podUID = string(apiPod.UID)
+						guaranteedPod := podClient.Create(pod)
 					})
 					By("Checking if the pod cgroup was created", func() {
 						podName := "qos-pod" + string(uuid.NewUUID())
@@ -114,7 +113,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager [Skip]", func() {
 									{
 										Image:   "gcr.io/google_containers/busybox:1.24",
 										Name:    contName,
-										Command: []string{"sh", "-c", "if [ -d /tmp/memory/pod#" + podUID + " ] && [ -d /tmp/cpu/pod#" + podUID + " ]; then exit 0; else exit 1; fi"},
+										Command: []string{"sh", "-c", "if [ -d /tmp/memory/pod#" + guaranteedPod.UID + " ] && [ -d /tmp/cpu/pod#" + guaranteedPod.UID + " ]; then exit 0; else exit 1; fi"},
 										VolumeMounts: []api.VolumeMount{
 											{
 												Name:      "sysfscgroup",
@@ -138,13 +137,59 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager [Skip]", func() {
 						err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
 						Expect(err).NotTo(HaveOccurred())
 					})
+					By("Checking if the pod cgroup was deleted", func() {
+						// delete the guaranteed pod.
+						podUID := guaranteedPod.UID
+						podClient := f.PodClient()
+						Expect(podClient.Delete(guaranteedPod)).NotTo(HaveOccurred())
+						// Now check that the cgroups get deleted eventually
+						podName := "qos-pod" + string(uuid.NewUUID())
+						contName := "qos-container" + string(uuid.NewUUID())
+						pod := &api.Pod{
+							ObjectMeta: api.ObjectMeta{
+								Name:      podName,
+								Namespace: f.Namespace.Name,
+							},
+							Spec: api.PodSpec{
+								RestartPolicy: api.RestartPolicyOnFailure,
+								Containers: []api.Container{
+									{
+										Image:   "gcr.io/google_containers/busybox:1.24",
+										Name:    contName,
+										Command: []string{"sh", "-c", "if [ -d /tmp/memory/pod#" + podUID + " ] || [ -d /tmp/cpu/pod#" + podUID + " ]; then exit 1; else exit 0; fi"},
+										VolumeMounts: []api.VolumeMount{
+											{
+												Name:      "sysfscgroup",
+												MountPath: "/tmp",
+											},
+										},
+									},
+								},
+								Volumes: []api.Volume{
+									{
+										Name: "sysfscgroup",
+										VolumeSource: api.VolumeSource{
+											HostPath: &api.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+										},
+									},
+								},
+							},
+						}
+						podClient := f.PodClient()
+						podClient.Create(pod)
+						// This currently waits for five minutes before failing.
+						err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+						Expect(err).NotTo(HaveOccurred())
+					})
 				}
 			})
+
 		})
 		Context("On scheduling a BestEffort Pod", func() {
 			It("Pod containers should have been created under the BestEffort cgroup", func() {
 				if framework.TestContext.CgroupsPerQOS {
 					var podUID string
+					var bestEffortPod *api.Pod
 					By("Creating a BestEffort pod in Namespace", func() {
 						podName := "qos-pod" + string(uuid.NewUUID())
 						contName := "qos-container" + string(uuid.NewUUID())
@@ -166,7 +211,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager [Skip]", func() {
 							},
 						}
 						podClient := f.PodClient()
-						apiPod := podClient.Create(pod)
+						bestEffortPod := podClient.Create(pod)
 						podUID = string(apiPod.UID)
 					})
 					By("Checking if the pod cgroup was created", func() {
@@ -208,6 +253,50 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager [Skip]", func() {
 						err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
 						Expect(err).NotTo(HaveOccurred())
 					})
+					By("Checking if the pod cgroup was deleted", func() {
+						// delete the best-effort pod.
+						podClient := f.PodClient()
+						Expect(podClient.Delete(bestEffortPod)).NotTo(HaveOccurred())
+						// Now check that the cgroups get deleted eventually
+						podName := "qos-pod" + string(uuid.NewUUID())
+						contName := "qos-container" + string(uuid.NewUUID())
+						pod := &api.Pod{
+							ObjectMeta: api.ObjectMeta{
+								Name:      podName,
+								Namespace: f.Namespace.Name,
+							},
+							Spec: api.PodSpec{
+								RestartPolicy: api.RestartPolicyOnFailure,
+								Containers: []api.Container{
+									{
+										Image:   "gcr.io/google_containers/busybox:1.24",
+										Name:    contName,
+										Command: []string{"sh", "-c", "if [ -d /tmp/memory/BestEffort/pod#" + podUID + " ] || [ -d /tmp/cpu/BestEffort/pod#" + podUID + " ]; then exit 1; else exit 0; fi"},
+										VolumeMounts: []api.VolumeMount{
+											{
+												Name:      "sysfscgroup",
+												MountPath: "/tmp",
+											},
+										},
+									},
+								},
+								Volumes: []api.Volume{
+									{
+										Name: "sysfscgroup",
+										VolumeSource: api.VolumeSource{
+											HostPath: &api.HostPathVolumeSource{Path: "/sys/fs/cgroup"},
+										},
+									},
+								},
+							},
+						}
+						podClient := f.PodClient()
+						podClient.Create(pod)
+						// This currently waits for five minutes before failing.
+						err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+						Expect(err).NotTo(HaveOccurred())
+					})
+
 				}
 			})
 		})
