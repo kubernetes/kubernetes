@@ -120,15 +120,13 @@ func RunE2EServices() {
 
 // Ports of different e2e services.
 const (
-	apiserverPort       = "8080"
 	kubeletPort         = "10250"
 	kubeletReadOnlyPort = "10255"
 )
 
 // Health check urls of different e2e services.
 var (
-	apiserverHealthCheckURL = getEndpoint(apiserverPort) + "/healthz"
-	kubeletHealthCheckURL   = getEndpoint(kubeletReadOnlyPort) + "/healthz"
+	kubeletHealthCheckURL = getEndpoint(kubeletReadOnlyPort) + "/healthz"
 )
 
 // getEndpoint generates endpoint url from service port.
@@ -139,7 +137,7 @@ func getEndpoint(port string) string {
 func getHealthCheckURLs() []string {
 	return []string{
 		getEtcdHealthCheckURL(),
-		apiserverHealthCheckURL,
+		getAPIServerHealthCheckURL(),
 		kubeletHealthCheckURL,
 	}
 }
@@ -152,6 +150,7 @@ type e2eService struct {
 
 	// All statically linked e2e services
 	etcdServer   *EtcdServer
+	apiServer    *APIServer
 	nsController *NamespaceController
 }
 
@@ -200,22 +199,18 @@ func (es *e2eService) start() error {
 	if _, err := getK8sBin("kubelet"); err != nil {
 		return err
 	}
-	if _, err := getK8sBin("kube-apiserver"); err != nil {
-		return err
-	}
 
 	err := es.startEtcd()
 	if err != nil {
 		return err
 	}
 
-	s, err := es.startApiServer()
+	err = es.startApiServer()
 	if err != nil {
 		return err
 	}
-	es.services = append(es.services, s)
 
-	s, err = es.startKubeletServer()
+	s, err := es.startKubeletServer()
 	if err != nil {
 		return err
 	}
@@ -293,6 +288,12 @@ func (es *e2eService) stop() {
 			glog.Errorf("Failed to stop %q: %v", es.nsController.Name(), err)
 		}
 	}
+	// Stop apiserver
+	if es.apiServer != nil {
+		if err := es.apiServer.Stop(); err != nil {
+			glog.Errorf("Failed to stop %q: %v", es.apiServer.Name(), err)
+		}
+	}
 	for _, s := range es.services {
 		if err := s.kill(); err != nil {
 			glog.Errorf("Failed to stop %v: %v", s.name, err)
@@ -323,22 +324,9 @@ func (es *e2eService) startEtcd() error {
 	return es.etcdServer.Start()
 }
 
-func (es *e2eService) startApiServer() (*server, error) {
-	cmd := exec.Command("sudo", getApiServerBin(),
-		"--etcd-servers", getEtcdClientURL(),
-		"--insecure-bind-address", "0.0.0.0",
-		"--service-cluster-ip-range", "10.0.0.1/24",
-		"--kubelet-port", kubeletPort,
-		"--allow-privileged", "true",
-		"--v", LOG_VERBOSITY_LEVEL, "--logtostderr",
-	)
-	server := newServer(
-		"apiserver",
-		cmd,
-		nil,
-		[]string{apiserverHealthCheckURL},
-		"kube-apiserver.log")
-	return server, server.start()
+func (es *e2eService) startApiServer() error {
+	es.apiServer = NewAPIServer()
+	return es.apiServer.Start()
 }
 
 func (es *e2eService) startNamespaceController() error {
@@ -370,7 +358,7 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		)
 	}
 	cmdArgs = append(cmdArgs,
-		"--api-servers", getEndpoint(apiserverPort),
+		"--api-servers", getAPIServerClientURL(),
 		"--address", "0.0.0.0",
 		"--port", kubeletPort,
 		"--read-only-port", kubeletReadOnlyPort,
