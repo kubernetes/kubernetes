@@ -272,7 +272,7 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 		}
 
 		desiredSecret := &api_v1.Secret{
-			ObjectMeta: baseSecret.ObjectMeta,
+			ObjectMeta: util.CopyObjectMeta(baseSecret.ObjectMeta),
 			Data:       baseSecret.Data,
 			Type:       baseSecret.Type,
 		}
@@ -287,7 +287,9 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 			clusterSecret := clusterSecretObj.(*api_v1.Secret)
 
 			// Update existing secret, if needed.
-			if !reflect.DeepEqual(desiredSecret.ObjectMeta, clusterSecret.ObjectMeta) {
+			if !util.ObjectMetaEquivalent(desiredSecret.ObjectMeta, clusterSecret.ObjectMeta) ||
+				!reflect.DeepEqual(desiredSecret.Data, clusterSecret.Data) ||
+				!reflect.DeepEqual(desiredSecret.Type, clusterSecret.Type) {
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
 					Obj:         desiredSecret,
