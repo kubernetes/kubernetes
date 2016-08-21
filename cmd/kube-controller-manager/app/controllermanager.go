@@ -436,7 +436,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		nil, // eventRecorder
 		s.VolumeConfiguration.EnableDynamicProvisioning,
 	)
-	volumeController.Run()
+	volumeController.Run(wait.NeverStop)
 	time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 
 	attachDetachController, attachDetachControllerErr :=

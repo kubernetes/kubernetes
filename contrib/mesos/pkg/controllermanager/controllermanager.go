@@ -302,7 +302,7 @@ func (s *CMServer) Run(_ []string) error {
 		nil, // eventRecorder
 		s.VolumeConfiguration.EnableDynamicProvisioning,
 	)
-	volumeController.Run()
+	volumeController.Run(wait.NeverStop)
 
 	var rootCA []byte
 
