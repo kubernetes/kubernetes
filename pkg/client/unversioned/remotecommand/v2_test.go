@@ -199,7 +199,7 @@ func TestV2ErrorStreamReading(t *testing.T) {
 		h := newStreamProtocolV2(StreamOptions{}).(*streamProtocolV2)
 		h.errorStream = test.stream
 
-		ch := h.setupErrorStreamReading()
+		ch := watchErrorStream(h.errorStream, &errorDecoderV2{})
 		if ch == nil {
 			t.Fatalf("%s: unexpected nil channel", test.name)
 		}

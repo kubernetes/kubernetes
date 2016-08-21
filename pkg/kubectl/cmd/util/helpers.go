@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
+	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
 
@@ -50,6 +51,7 @@ import (
 
 const (
 	ApplyAnnotationsFlag = "save-config"
+	DefaultErrorExitCode = 1
 )
 
 type debugError interface {
@@ -74,9 +76,9 @@ func AddSourceToErr(verb string, source string, err error) error {
 var fatalErrHandler = fatal
 
 // BehaviorOnFatal allows you to override the default behavior when a fatal
-// error occurs, which is call os.Exit(1). You can pass 'panic' as a function
+// error occurs, which is to call os.Exit(code). You can pass 'panic' as a function
 // here if you prefer the panic() over os.Exit(1).
-func BehaviorOnFatal(f func(string)) {
+func BehaviorOnFatal(f func(string, int)) {
 	fatalErrHandler = f
 }
 
@@ -86,19 +88,21 @@ func DefaultBehaviorOnFatal() {
 	fatalErrHandler = fatal
 }
 
-// fatal prints the message and then exits. If V(2) or greater, glog.Fatal
+// fatal prints the message if set and then exits. If V(2) or greater, glog.Fatal
 // is invoked for extended information.
-func fatal(msg string) {
-	// add newline if needed
-	if !strings.HasSuffix(msg, "\n") {
-		msg += "\n"
-	}
+func fatal(msg string, code int) {
+	if len(msg) > 0 {
+		// add newline if needed
+		if !strings.HasSuffix(msg, "\n") {
+			msg += "\n"
+		}
 
-	if glog.V(2) {
-		glog.FatalDepth(2, msg)
+		if glog.V(2) {
+			glog.FatalDepth(2, msg)
+		}
+		fmt.Fprint(os.Stderr, msg)
 	}
-	fmt.Fprint(os.Stderr, msg)
-	os.Exit(1)
+	os.Exit(code)
 }
 
 // CheckErr prints a user friendly error to STDERR and exits with a non-zero
@@ -115,51 +119,52 @@ func checkErrWithPrefix(prefix string, err error) {
 	checkErr(prefix, err, fatalErrHandler)
 }
 
-func checkErr(pref string, err error, handleErr func(string)) {
-	if err == nil {
+// checkErr formats a given error as a string and calls the passed handleErr
+// func with that string and an kubectl exit code.
+func checkErr(prefix string, err error, handleErr func(string, int)) {
+	switch {
+	case err == nil:
 		return
-	}
-
-	if kerrors.IsInvalid(err) {
+	case kerrors.IsInvalid(err):
 		details := err.(*kerrors.StatusError).Status().Details
-		prefix := fmt.Sprintf("%sThe %s %q is invalid.\n", pref, details.Kind, details.Name)
-		errs := statusCausesToAggrError(details.Causes)
-		handleErr(MultilineError(prefix, errs))
-		return
-	}
-
-	if noMatch, ok := err.(*meta.NoResourceMatchError); ok {
-		switch {
-		case len(noMatch.PartialResource.Group) > 0 && len(noMatch.PartialResource.Version) > 0:
-			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q and version %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Group, noMatch.PartialResource.Version))
-		case len(noMatch.PartialResource.Group) > 0:
-			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Group))
-		case len(noMatch.PartialResource.Version) > 0:
-			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in version %q", pref, noMatch.PartialResource.Resource, noMatch.PartialResource.Version))
-		default:
-			handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q", pref, noMatch.PartialResource.Resource))
+		s := fmt.Sprintf("%sThe %s %q is invalid", prefix, details.Kind, details.Name)
+		if len(details.Causes) > 0 {
+			errs := statusCausesToAggrError(details.Causes)
+			handleErr(MultilineError(s+": ", errs), DefaultErrorExitCode)
+		} else {
+			handleErr(s, DefaultErrorExitCode)
 		}
-		return
-	}
-
-	// handle multiline errors
-	if clientcmd.IsConfigurationInvalid(err) {
-		handleErr(MultilineError(fmt.Sprintf("%sError in configuration: ", pref), err))
-		return
-	}
-	if agg, ok := err.(utilerrors.Aggregate); ok && len(agg.Errors()) > 0 {
-		handleErr(MultipleErrors(pref, agg.Errors()))
-		return
-	}
-
-	msg, ok := StandardErrorMessage(err)
-	if !ok {
-		msg = err.Error()
-		if !strings.HasPrefix(msg, "error: ") {
-			msg = fmt.Sprintf("error: %s", msg)
+	case clientcmd.IsConfigurationInvalid(err):
+		handleErr(MultilineError(fmt.Sprintf("%sError in configuration: ", prefix), err), DefaultErrorExitCode)
+	default:
+		switch err := err.(type) {
+		case *meta.NoResourceMatchError:
+			switch {
+			case len(err.PartialResource.Group) > 0 && len(err.PartialResource.Version) > 0:
+				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q and version %q", prefix, err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version), DefaultErrorExitCode)
+			case len(err.PartialResource.Group) > 0:
+				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in group %q", prefix, err.PartialResource.Resource, err.PartialResource.Group), DefaultErrorExitCode)
+			case len(err.PartialResource.Version) > 0:
+				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q in version %q", prefix, err.PartialResource.Resource, err.PartialResource.Version), DefaultErrorExitCode)
+			default:
+				handleErr(fmt.Sprintf("%sthe server doesn't have a resource type %q", prefix, err.PartialResource.Resource), DefaultErrorExitCode)
+			}
+		case utilerrors.Aggregate:
+			handleErr(MultipleErrors(prefix, err.Errors()), DefaultErrorExitCode)
+		case utilexec.ExitError:
+			// do not print anything, only terminate with given error
+			handleErr("", err.ExitStatus())
+		default: // for any other error type
+			msg, ok := StandardErrorMessage(err)
+			if !ok {
+				msg = err.Error()
+				if !strings.HasPrefix(msg, "error: ") {
+					msg = fmt.Sprintf("error: %s", msg)
+				}
+			}
+			handleErr(msg, DefaultErrorExitCode)
 		}
 	}
-	handleErr(fmt.Sprintf("%s%s", pref, msg))
 }
 
 func statusCausesToAggrError(scs []unversioned.StatusCause) utilerrors.Aggregate {

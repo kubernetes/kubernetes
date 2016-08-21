@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/runtime"
+	uexec "k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -213,91 +214,88 @@ func (f *fileHandler) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 	res.Write(f.data)
 }
 
+type checkErrTestCase struct {
+	err          error
+	expectedErr  string
+	expectedCode int
+}
+
 func TestCheckInvalidErr(t *testing.T) {
-	tests := []struct {
-		err      error
-		expected string
-	}{
+	testCheckError(t, []checkErrTestCase{
 		{
 			errors.NewInvalid(api.Kind("Invalid1"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
-			`error: The Invalid1 "invalidation" is invalid. field: Invalid value: "single": details`,
+			"The Invalid1 \"invalidation\" is invalid: field: Invalid value: \"single\": details\n",
+			DefaultErrorExitCode,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid2"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field1"), "multi1", "details"), field.Invalid(field.NewPath("field2"), "multi2", "details")}),
-			`error: The Invalid2 "invalidation" is invalid. * field1: Invalid value: "multi1": details, * field2: Invalid value: "multi2": details`,
+			"The Invalid2 \"invalidation\" is invalid: \n* field1: Invalid value: \"multi1\": details\n* field2: Invalid value: \"multi2\": details\n",
+			DefaultErrorExitCode,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid3"), "invalidation", field.ErrorList{}),
-			`error: The Invalid3 "invalidation" is invalid. %!s(<nil>)`,
+			"The Invalid3 \"invalidation\" is invalid",
+			DefaultErrorExitCode,
 		},
 		{
 			errors.NewInvalid(api.Kind("Invalid4"), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
-			`error: The Invalid4 "invalidation" is invalid. field4: Invalid value: "multi4": details`,
+			"The Invalid4 \"invalidation\" is invalid: field4: Invalid value: \"multi4\": details\n",
+			DefaultErrorExitCode,
 		},
-	}
-
-	var errReturned string
-	errHandle := func(err string) {
-		for _, v := range strings.Split(err, "\n") {
-			separator := " "
-			if errReturned == "" || v == "" {
-				separator = ""
-			} else if !strings.HasSuffix(errReturned, ".") {
-				separator = ", "
-			}
-			errReturned = fmt.Sprintf("%s%s%s", errReturned, separator, v)
-		}
-		if !strings.HasPrefix(errReturned, "error: ") {
-			errReturned = fmt.Sprintf("error: %s", errReturned)
-		}
-		if strings.HasSuffix(errReturned, ", ") {
-			errReturned = errReturned[:len(errReturned)-len(" ,")]
-		}
-	}
-
-	for _, test := range tests {
-		checkErr("", test.err, errHandle)
-
-		if errReturned != test.expected {
-			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
-		}
-		errReturned = ""
-	}
+	})
 }
 
 func TestCheckNoResourceMatchError(t *testing.T) {
-	tests := []struct {
-		err      error
-		expected string
-	}{
+	testCheckError(t, []checkErrTestCase{
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Resource: "foo"}},
 			`the server doesn't have a resource type "foo"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Version: "theversion", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in version "theversion"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Version: "theversion", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in group "thegroup" and version "theversion"`,
+			DefaultErrorExitCode,
 		},
 		{
 			&meta.NoResourceMatchError{PartialResource: unversioned.GroupVersionResource{Group: "thegroup", Resource: "foo"}},
 			`the server doesn't have a resource type "foo" in group "thegroup"`,
+			DefaultErrorExitCode,
 		},
-	}
+	})
+}
 
+func TestCheckExitError(t *testing.T) {
+	testCheckError(t, []checkErrTestCase{
+		{
+			uexec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 42},
+			"",
+			42,
+		},
+	})
+}
+
+func testCheckError(t *testing.T, tests []checkErrTestCase) {
 	var errReturned string
-	errHandle := func(err string) {
+	var codeReturned int
+	errHandle := func(err string, code int) {
 		errReturned = err
+		codeReturned = code
 	}
 
 	for _, test := range tests {
 		checkErr("", test.err, errHandle)
 
-		if errReturned != test.expected {
-			t.Fatalf("Got: %s, expected: %s", errReturned, test.expected)
+		if errReturned != test.expectedErr {
+			t.Fatalf("Got: %s, expected: %s", errReturned, test.expectedErr)
+		}
+		if codeReturned != test.expectedCode {
+			t.Fatalf("Got: %d, expected: %d", codeReturned, test.expectedCode)
 		}
 	}
 }
