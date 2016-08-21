@@ -116,10 +116,11 @@ func hasKeyPrefixAccess(sec auth.Store, r *http.Request, key string, recursive, 
 	}
 
 	var user *auth.User
-	if r.Header.Get("Authorization") == "" && clientCertAuthEnabled {
-		user = userFromClientCertificate(sec, r)
+	if r.Header.Get("Authorization") == "" {
+		if clientCertAuthEnabled {
+			user = userFromClientCertificate(sec, r)
+		}
 		if user == nil {
-			plog.Warningf("auth: no authorization provided, checking guest access")
 			return hasGuestAccess(sec, r, key)
 		}
 	} else {

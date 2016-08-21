@@ -64,6 +64,9 @@ type TLSInfo struct {
 	TrustedCAFile  string
 	ClientCertAuth bool
 
+	// ServerName ensures the cert matches the given host in case of discovery / virtual hosting
+	ServerName string
+
 	selfCert bool
 
 	// parseFunc exists to simplify testing. Typically, parseFunc
@@ -164,6 +167,7 @@ func (info TLSInfo) baseConfig() (*tls.Config, error) {
 	cfg := &tls.Config{
 		Certificates: []tls.Certificate{*tlsCert},
 		MinVersion:   tls.VersionTLS12,
+		ServerName:   info.ServerName,
 	}
 	return cfg, nil
 }
@@ -215,7 +219,7 @@ func (info TLSInfo) ClientConfig() (*tls.Config, error) {
 			return nil, err
 		}
 	} else {
-		cfg = &tls.Config{}
+		cfg = &tls.Config{ServerName: info.ServerName}
 	}
 
 	CAFiles := info.cafiles()
@@ -224,6 +228,8 @@ func (info TLSInfo) ClientConfig() (*tls.Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		// if given a CA, trust any host with a cert signed by the CA
+		cfg.ServerName = ""
 	}
 
 	if info.selfCert {

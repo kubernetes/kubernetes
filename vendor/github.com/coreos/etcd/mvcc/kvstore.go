@@ -367,6 +367,8 @@ func (s *store) restore() error {
 	revToBytes(revision{main: 1}, min)
 	revToBytes(revision{main: math.MaxInt64, sub: math.MaxInt64}, max)
 
+	keyToLease := make(map[string]lease.LeaseID)
+
 	// restore index
 	tx := s.b.BatchTx()
 	tx.Lock()
@@ -390,31 +392,30 @@ func (s *store) restore() error {
 		switch {
 		case isTombstone(key):
 			s.kvindex.Tombstone(kv.Key, rev)
-			if lease.LeaseID(kv.Lease) != lease.NoLease {
-				err := s.le.Detach(lease.LeaseID(kv.Lease), []lease.LeaseItem{{Key: string(kv.Key)}})
-				if err != nil && err != lease.ErrLeaseNotFound {
-					plog.Fatalf("unexpected Detach error %v", err)
-				}
-			}
+			delete(keyToLease, string(kv.Key))
+
 		default:
 			s.kvindex.Restore(kv.Key, revision{kv.CreateRevision, 0}, rev, kv.Version)
-			if lease.LeaseID(kv.Lease) != lease.NoLease {
-				if s.le == nil {
-					panic("no lessor to attach lease")
-				}
-				err := s.le.Attach(lease.LeaseID(kv.Lease), []lease.LeaseItem{{Key: string(kv.Key)}})
-				// We are walking through the kv history here. It is possible that we attached a key to
-				// the lease and the lease was revoked later.
-				// Thus attaching an old version of key to a none existing lease is possible here, and
-				// we should just ignore the error.
-				if err != nil && err != lease.ErrLeaseNotFound {
-					panic("unexpected Attach error")
-				}
+
+			if lid := lease.LeaseID(kv.Lease); lid != lease.NoLease {
+				keyToLease[string(kv.Key)] = lid
+			} else {
+				delete(keyToLease, string(kv.Key))
 			}
 		}
 
 		// update revision
 		s.currentRev = rev
+	}
+
+	for key, lid := range keyToLease {
+		if s.le == nil {
+			panic("no lessor to attach lease")
+		}
+		err := s.le.Attach(lid, []lease.LeaseItem{{Key: key}})
+		if err != nil {
+			plog.Errorf("unexpected Attach error: %v", err)
+		}
 	}
 
 	_, scheduledCompactBytes := tx.UnsafeRange(metaBucketName, scheduledCompactKeyName, nil, 0)
@@ -497,7 +498,7 @@ func (s *store) rangeKeys(key, end []byte, limit, rangeRev int64, countOnly bool
 			break
 		}
 	}
-	return kvs, len(kvs), curRev, nil
+	return kvs, len(revpairs), curRev, nil
 }
 
 func (s *store) put(key, value []byte, leaseID lease.LeaseID) {
@@ -550,7 +551,7 @@ func (s *store) put(key, value []byte, leaseID lease.LeaseID) {
 
 		err = s.le.Detach(oldLease, []lease.LeaseItem{{Key: string(key)}})
 		if err != nil {
-			panic("unexpected error from lease detach")
+			plog.Errorf("unexpected error from lease detach: %v", err)
 		}
 	}
 
@@ -619,7 +620,7 @@ func (s *store) delete(key []byte, rev revision) {
 	if lease.LeaseID(kv.Lease) != lease.NoLease {
 		err = s.le.Detach(lease.LeaseID(kv.Lease), []lease.LeaseItem{{Key: string(kv.Key)}})
 		if err != nil {
-			plog.Fatalf("cannot detach %v", err)
+			plog.Errorf("cannot detach %v", err)
 		}
 	}
 }

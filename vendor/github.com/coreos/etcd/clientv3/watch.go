@@ -242,6 +242,7 @@ func (w *watcher) Watch(ctx context.Context, key string, opts ...OpOption) Watch
 	case reqc <- wr:
 		ok = true
 	case <-wr.ctx.Done():
+		wgs.stopIfEmpty()
 	case <-donec:
 		if wgs.closeErr != nil {
 			closeCh <- WatchResponse{closeErr: wgs.closeErr}
@@ -285,7 +286,12 @@ func (w *watcher) Close() (err error) {
 }
 
 func (w *watchGrpcStream) Close() (err error) {
-	close(w.stopc)
+	w.mu.Lock()
+	if w.stopc != nil {
+		close(w.stopc)
+		w.stopc = nil
+	}
+	w.mu.Unlock()
 	<-w.donec
 	select {
 	case err = <-w.errc:
@@ -348,11 +354,13 @@ func (w *watchGrpcStream) addStream(resp *pb.WatchResponse, pendingReq *watchReq
 
 // closeStream closes the watcher resources and removes it
 func (w *watchGrpcStream) closeStream(ws *watcherStream) {
+	w.mu.Lock()
 	// cancels request stream; subscriber receives nil channel
 	close(ws.initReq.retc)
 	// close subscriber's channel
 	close(ws.outc)
 	delete(w.streams, ws.id)
+	w.mu.Unlock()
 }
 
 // run is the root of the goroutines for managing a watcher client
@@ -370,6 +378,14 @@ func (w *watchGrpcStream) run() {
 		w.owner.mu.Unlock()
 		w.cancel()
 	}()
+
+	// already stopped?
+	w.mu.RLock()
+	stopc := w.stopc
+	w.mu.RUnlock()
+	if stopc == nil {
+		return
+	}
 
 	// start a stream with the etcd grpc server
 	if wc, closeErr = w.newWatchClient(); closeErr != nil {
@@ -446,7 +462,7 @@ func (w *watchGrpcStream) run() {
 				failedReq = pendingReq
 			}
 			cancelSet = make(map[int64]struct{})
-		case <-w.stopc:
+		case <-stopc:
 			return
 		}
 
@@ -586,10 +602,18 @@ func (w *watchGrpcStream) serveStream(ws *watcherStream) {
 		}
 	}
 
-	w.mu.Lock()
 	w.closeStream(ws)
-	w.mu.Unlock()
+	w.stopIfEmpty()
 	// lazily send cancel message if events on missing id
+}
+
+func (wgs *watchGrpcStream) stopIfEmpty() {
+	wgs.mu.Lock()
+	if len(wgs.streams) == 0 && wgs.stopc != nil {
+		close(wgs.stopc)
+		wgs.stopc = nil
+	}
+	wgs.mu.Unlock()
 }
 
 func (w *watchGrpcStream) newWatchClient() (pb.Watch_WatchClient, error) {
@@ -616,13 +640,14 @@ func (w *watchGrpcStream) resume() (ws pb.Watch_WatchClient, err error) {
 // openWatchClient retries opening a watchclient until retryConnection fails
 func (w *watchGrpcStream) openWatchClient() (ws pb.Watch_WatchClient, err error) {
 	for {
-		select {
-		case <-w.stopc:
+		w.mu.Lock()
+		stopc := w.stopc
+		w.mu.Unlock()
+		if stopc == nil {
 			if err == nil {
 				err = context.Canceled
 			}
 			return nil, err
-		default:
 		}
 		if ws, err = w.remote.Watch(w.ctx, grpc.FailFast(false)); ws != nil && err == nil {
 			break
