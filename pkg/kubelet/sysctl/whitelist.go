@@ -100,8 +100,13 @@ func (w *Whitelist) Validate(pod *api.Pod) error {
 		return fmt.Errorf("pod with UID %q specified an invalid %s annotation: %v", pod.UID, api.SysctlsPodAnnotationKey, err)
 	}
 
+	var hostNet, hostIPC bool
+	if pod.Spec.SecurityContext != nil {
+		hostNet = pod.Spec.SecurityContext.HostNetwork
+		hostIPC = pod.Spec.SecurityContext.HostIPC
+	}
 	for _, s := range sysctls {
-		if !w.Valid(s.Name, pod.Spec.SecurityContext.HostNetwork, pod.Spec.SecurityContext.HostIPC) {
+		if !w.Valid(s.Name, hostNet, hostIPC) {
 			return fmt.Errorf("pod with UID %q specified a not whitelisted sysctl: %s", pod.UID, s)
 		}
 	}
