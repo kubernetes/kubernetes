@@ -640,8 +640,11 @@ function kube::build::copy_output() {
     --compress \
     --password-file="${LOCAL_OUTPUT_BUILD_CONTEXT}/rsyncd.password" \
     --prune-empty-dirs \
+    --filter='- /vendor/' \
     --filter='+ /_output/dockerized/bin/**' \
     --filter='+ zz_generated.*' \
+    --filter='+ generated.proto' \
+    --filter='+ *.pb.go' \
     --filter='+ */' \
     --filter='- /**' \
     --archive --perms \
