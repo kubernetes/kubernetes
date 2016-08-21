@@ -41,7 +41,7 @@ import (
 	"github.com/pborman/uuid"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
-	"google.golang.org/api/compute/v1"
+	compute "google.golang.org/api/compute/v1"
 )
 
 var testArgs = flag.String("test_args", "", "Space-separated list of arguments to pass to Ginkgo test runner.")
@@ -58,16 +58,22 @@ var buildOnly = flag.Bool("build-only", false, "If true, build e2e_node_test.tar
 var setupNode = flag.Bool("setup-node", false, "When true, current user will be added to docker group on the test machine")
 var instanceMetadata = flag.String("instance-metadata", "", "key/value metadata for instances separated by '=' or '<', 'k=v' means the key is 'k' and the value is 'v'; 'k<p' means the key is 'k' and the value is extracted from the local path 'p', e.g. k1=v1,k2<p2")
 var gubernator = flag.Bool("gubernator", false, "If true, output Gubernator link to view logs")
+var ginkgoFlags = flag.String("ginkgo-flags", "", "Passed to ginkgo to specify additional flags such as --skip=.")
 
-var computeService *compute.Service
+const (
+	defaultMachine = "n1-standard-1"
+)
+
+var (
+	computeService *compute.Service
+	arc            Archive
+)
 
 type Archive struct {
 	sync.Once
 	path string
 	err  error
 }
-
-var arc Archive
 
 type TestResult struct {
 	output string
@@ -85,6 +91,11 @@ type TestResult struct {
 //       short-name:
 //         image: gce-image-name
 //         project: gce-image-project
+//         machine: for benchmark only, the machine type (GCE instance) to run test
+//         tests: for benchmark only, a list of ginkgo focus strings to match tests
+
+// TODO(coufon): replace 'image' with 'node' in configurations
+// and we plan to support testing custom machines other than GCE by specifying host
 type ImageConfig struct {
 	Images map[string]GCEImage `json:"images"`
 }
@@ -97,6 +108,10 @@ type GCEImage struct {
 	// Defaults to using only the latest image. Acceptible values are [0, # of images that match the regex).
 	// If the number of existing previous images is lesser than what is desired, the test will use that is available.
 	PreviousImages int `json:"previous_images, omitempty"`
+
+	Machine string `json:"machine, omitempty"`
+	// The test is regarded as 'benchmark' is Tests is non-empty
+	Tests []string `json:"tests, omitempty"`
 }
 
 type internalImageConfig struct {
@@ -107,6 +122,8 @@ type internalGCEImage struct {
 	image    string
 	project  string
 	metadata *compute.Metadata
+	machine  string
+	tests    []string
 }
 
 func main() {
@@ -141,9 +158,11 @@ func main() {
 		if err != nil {
 			glog.Fatalf("Could not parse image config file: %v", err)
 		}
-		for _, imageConfig := range externalImageConfig.Images {
+		for shortName, imageConfig := range externalImageConfig.Images {
 			var images []string
+			isRegex, name := false, shortName
 			if imageConfig.ImageRegex != "" && imageConfig.Image == "" {
+				isRegex = true
 				images, err = getGCEImages(imageConfig.ImageRegex, imageConfig.Project, imageConfig.PreviousImages)
 				if err != nil {
 					glog.Fatalf("Could not retrieve list of images based on image prefix %q: %v", imageConfig.ImageRegex, err)
@@ -156,8 +175,13 @@ func main() {
 					image:    image,
 					project:  imageConfig.Project,
 					metadata: getImageMetadata(imageConfig.Metadata),
+					machine:  imageConfig.Machine,
+					tests:    imageConfig.Tests,
 				}
-				gceImages.images[image] = gceImage
+				if isRegex {
+					name = shortName + "-" + image
+				}
+				gceImages.images[name] = gceImage
 			}
 		}
 	}
@@ -224,7 +248,7 @@ func main() {
 			fmt.Printf("Initializing e2e tests using host %s.\n", host)
 			running++
 			go func(host string, junitFilePrefix string) {
-				results <- testHost(host, *cleanup, junitFilePrefix, *setupNode)
+				results <- testHost(host, *cleanup, junitFilePrefix, *setupNode, *ginkgoFlags)
 			}(host, host)
 		}
 	}
@@ -303,7 +327,7 @@ func getImageMetadata(input string) *compute.Metadata {
 }
 
 // Run tests in archive against host
-func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode bool) *TestResult {
+func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode bool, ginkgoFlagsStr string) *TestResult {
 	instance, err := computeService.Instances.Get(*project, *zone, host).Do()
 	if err != nil {
 		return &TestResult{
@@ -333,7 +357,7 @@ func testHost(host string, deleteFiles bool, junitFilePrefix string, setupNode b
 		}
 	}
 
-	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs)
+	output, exitOk, err := e2e_node.RunRemote(path, host, deleteFiles, junitFilePrefix, setupNode, *testArgs, ginkgoFlagsStr)
 	return &TestResult{
 		output: output,
 		err:    err,
@@ -393,30 +417,41 @@ func getGCEImages(imageRegex, project string, previousImages int) ([]string, err
 
 // Provision a gce instance using image and run the tests in archive against the instance.
 // Delete the instance afterward.
-func testImage(image *internalGCEImage, junitFilePrefix string) *TestResult {
-	host, err := createInstance(image)
+func testImage(imageConfig *internalGCEImage, junitFilePrefix string) *TestResult {
+	ginkgoFlagsStr := *ginkgoFlags
+	// Check whether the test is for benchmark.
+	if len(imageConfig.tests) > 0 {
+		// Benchmark needs machine type non-empty.
+		if imageConfig.machine == "" {
+			imageConfig.machine = defaultMachine
+		}
+		// Use the Ginkgo focus in benchmark config.
+		ginkgoFlagsStr += (" " + testsToGinkgoFocus(imageConfig.tests))
+	}
+
+	host, err := createInstance(imageConfig)
 	if *deleteInstances {
-		defer deleteInstance(image.image)
+		defer deleteInstance(host)
 	}
 	if err != nil {
 		return &TestResult{
-			err: fmt.Errorf("unable to create gce instance with running docker daemon for image %s.  %v", image.image, err),
+			err: fmt.Errorf("unable to create gce instance with running docker daemon for image %s.  %v", imageConfig.image, err),
 		}
 	}
 
 	// Only delete the files if we are keeping the instance and want it cleaned up.
 	// If we are going to delete the instance, don't bother with cleaning up the files
 	deleteFiles := !*deleteInstances && *cleanup
-	return testHost(host, deleteFiles, junitFilePrefix, *setupNode)
+	return testHost(host, deleteFiles, junitFilePrefix, *setupNode, ginkgoFlagsStr)
 }
 
 // Provision a gce instance using image
-func createInstance(image *internalGCEImage) (string, error) {
-	glog.V(1).Infof("Creating instance %+v", *image)
-	name := imageToInstanceName(image.image)
+func createInstance(imageConfig *internalGCEImage) (string, error) {
+	glog.V(1).Infof("Creating instance %+v", *imageConfig)
+	name := imageToInstanceName(imageConfig)
 	i := &compute.Instance{
 		Name:        name,
-		MachineType: machineType(),
+		MachineType: machineType(imageConfig.machine),
 		NetworkInterfaces: []*compute.NetworkInterface{
 			{
 				AccessConfigs: []*compute.AccessConfig{
@@ -432,12 +467,12 @@ func createInstance(image *internalGCEImage) (string, error) {
 				Boot:       true,
 				Type:       "PERSISTENT",
 				InitializeParams: &compute.AttachedDiskInitializeParams{
-					SourceImage: sourceImage(image.image, image.project),
+					SourceImage: sourceImage(imageConfig.image, imageConfig.project),
 				},
 			},
 		},
 	}
-	i.Metadata = image.metadata
+	i.Metadata = imageConfig.metadata
 	op, err := computeService.Instances.Insert(*project, *zone, i).Do()
 	if err != nil {
 		return "", err
@@ -520,12 +555,11 @@ func getComputeClient() (*compute.Service, error) {
 	return nil, err
 }
 
-func deleteInstance(image string) {
-	instanceName := imageToInstanceName(image)
-	glog.Infof("Deleting instance %q", instanceName)
-	_, err := computeService.Instances.Delete(*project, *zone, instanceName).Do()
+func deleteInstance(host string) {
+	glog.Infof("Deleting instance %q", host)
+	_, err := computeService.Instances.Delete(*project, *zone, host).Do()
 	if err != nil {
-		glog.Errorf("Error deleting instance %q: %v", instanceName, err)
+		glog.Errorf("Error deleting instance %q: %v", host, err)
 	}
 }
 
@@ -553,14 +587,32 @@ func parseInstanceMetadata(str string) map[string]string {
 	return metadata
 }
 
-func imageToInstanceName(image string) string {
-	return *instanceNamePrefix + "-" + image
+func imageToInstanceName(imageConfig *internalGCEImage) string {
+	if imageConfig.machine == "" {
+		return *instanceNamePrefix + "-" + imageConfig.image
+	}
+	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.NewUUID().String()[:8]
 }
 
 func sourceImage(image, imageProject string) string {
 	return fmt.Sprintf("projects/%s/global/images/%s", imageProject, image)
 }
 
-func machineType() string {
-	return fmt.Sprintf("zones/%s/machineTypes/n1-standard-1", *zone)
+func machineType(machine string) string {
+	if machine == "" {
+		machine = defaultMachine
+	}
+	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, machine)
+}
+
+func testsToGinkgoFocus(tests []string) string {
+	focus := "--focus=\""
+	for i, test := range tests {
+		if i == 0 {
+			focus += test
+		} else {
+			focus += ("|" + test)
+		}
+	}
+	return focus + "\""
 }
