@@ -3,6 +3,10 @@
   "apiVersion": "autoscaling/v1",
   "basePath": "https://10.10.10.10:6443",
   "resourcePath": "/apis/autoscaling/v1",
+  "info": {
+   "title": "",
+   "description": ""
+  },
   "apis": [
    {
     "path": "/apis/autoscaling/v1/namespaces/{namespace}/horizontalpodautoscalers",
