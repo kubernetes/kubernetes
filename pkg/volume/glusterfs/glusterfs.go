@@ -18,33 +18,43 @@ package glusterfs
 
 import (
 	"fmt"
-	"os"
-	"path"
-
 	"github.com/golang/glog"
+	gcli "github.com/heketi/heketi/client/api/go-client"
+	gapi "github.com/heketi/heketi/pkg/glusterfs/api"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/volume"
+	"os"
+	"path"
+	"strconv"
+	dstrings "strings"
 )
 
 // This is the primary entrypoint for volume plugins.
 func ProbeVolumePlugins() []volume.VolumePlugin {
-	return []volume.VolumePlugin{&glusterfsPlugin{nil, exec.New()}}
+	return []volume.VolumePlugin{&glusterfsPlugin{nil, exec.New(), new(glusterfsClusterConf)}}
 }
 
 type glusterfsPlugin struct {
-	host volume.VolumeHost
-	exe  exec.Interface
+	host        volume.VolumeHost
+	exe         exec.Interface
+	clusterconf *glusterfsClusterConf
 }
 
 var _ volume.VolumePlugin = &glusterfsPlugin{}
 var _ volume.PersistentVolumePlugin = &glusterfsPlugin{}
+var _ volume.DeletableVolumePlugin = &glusterfsPlugin{}
+var _ volume.ProvisionableVolumePlugin = &glusterfsPlugin{}
+var _ volume.Provisioner = &glusterfsVolumeProvisioner{}
+var _ volume.Deleter = &glusterfsVolumeDeleter{}
 
 const (
 	glusterfsPluginName = "kubernetes.io/glusterfs"
+	volprefix           = "vol_"
 )
 
 func (plugin *glusterfsPlugin) Init(host volume.VolumeHost) error {
@@ -314,4 +324,159 @@ func getVolumeSource(
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a Gluster volume type")
+}
+
+func (plugin *glusterfsPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	if len(options.AccessModes) == 0 {
+		options.AccessModes = plugin.GetAccessModes()
+	}
+	return plugin.newProvisionerInternal(options)
+}
+
+func (plugin *glusterfsPlugin) newProvisionerInternal(options volume.VolumeOptions) (volume.Provisioner, error) {
+	return &glusterfsVolumeProvisioner{
+		glusterfsMounter: &glusterfsMounter{
+			glusterfs: &glusterfs{
+				plugin: plugin,
+			},
+		},
+		options: options,
+	}, nil
+}
+
+type glusterfsClusterConf struct {
+	glusterep          string
+	glusterRestvolpath string
+	glusterRestUrl     string
+	glusterRestAuth    bool
+	glusterRestUser    string
+	glusterRestUserKey string
+}
+
+type glusterfsVolumeProvisioner struct {
+	*glusterfsMounter
+	*glusterfsClusterConf
+	options volume.VolumeOptions
+}
+
+func (plugin *glusterfsPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	return plugin.newDeleterInternal(spec)
+}
+
+func (plugin *glusterfsPlugin) newDeleterInternal(spec *volume.Spec) (volume.Deleter, error) {
+	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.Glusterfs == nil {
+		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.Glusterfs is nil")
+	}
+	return &glusterfsVolumeDeleter{
+		glusterfsMounter: &glusterfsMounter{
+			glusterfs: &glusterfs{
+				volName: spec.Name(),
+				plugin:  plugin,
+			},
+			path: spec.PersistentVolume.Spec.Glusterfs.Path,
+		}}, nil
+}
+
+type glusterfsVolumeDeleter struct {
+	*glusterfsMounter
+	*glusterfsClusterConf
+}
+
+func (d *glusterfsVolumeDeleter) GetPath() string {
+	name := glusterfsPluginName
+	return d.plugin.host.GetPodVolumeDir(d.glusterfsMounter.glusterfs.pod.UID, strings.EscapeQualifiedNameForDisk(name), d.glusterfsMounter.glusterfs.volName)
+}
+
+func (d *glusterfsVolumeDeleter) Delete() error {
+	var err error
+	glog.V(2).Infof("glusterfs: delete volume :%s ", d.glusterfsMounter.path)
+	volumetodel := d.glusterfsMounter.path
+	d.glusterfsClusterConf = d.plugin.clusterconf
+	newvolumetodel := dstrings.TrimPrefix(volumetodel, volprefix)
+	cli := gcli.NewClient(d.glusterRestUrl, d.glusterRestUser, d.glusterRestUserKey)
+	if cli == nil {
+		glog.Errorf("glusterfs: failed to create gluster rest client")
+		return fmt.Errorf("glusterfs: failed to create gluster rest client, REST server authentication failed")
+	}
+	err = cli.VolumeDelete(newvolumetodel)
+	if err != nil {
+		glog.V(4).Infof("glusterfs: error when deleting the volume :%s", err)
+		return err
+	}
+	glog.V(2).Infof("glusterfs: volume %s deleted successfully", volumetodel)
+	return nil
+
+}
+
+func (r *glusterfsVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
+	var err error
+	if r.options.Selector != nil {
+		glog.V(4).Infof("glusterfs: not able to parse your claim Selector")
+		return nil, fmt.Errorf("glusterfs: not able to parse your claim Selector")
+	}
+	glog.V(4).Infof("glusterfs: Provison VolumeOptions %v", r.options)
+	for k, v := range r.options.Parameters {
+		switch dstrings.ToLower(k) {
+		case "endpoint":
+			r.plugin.clusterconf.glusterep = v
+		case "path":
+			r.plugin.clusterconf.glusterRestvolpath = v
+		case "resturl":
+			r.plugin.clusterconf.glusterRestUrl = v
+		case "restauthenabled":
+			r.plugin.clusterconf.glusterRestAuth, err = strconv.ParseBool(v)
+		case "restuser":
+			r.plugin.clusterconf.glusterRestUser = v
+		case "restuserkey":
+			r.plugin.clusterconf.glusterRestUserKey = v
+		default:
+			return nil, fmt.Errorf("glusterfs: invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
+		}
+	}
+	glog.V(4).Infof("glusterfs: storage class parameters in plugin clusterconf %v", r.plugin.clusterconf)
+	if !r.plugin.clusterconf.glusterRestAuth {
+		r.plugin.clusterconf.glusterRestUser = ""
+		r.plugin.clusterconf.glusterRestUserKey = ""
+	}
+	r.glusterfsClusterConf = r.plugin.clusterconf
+	glusterfs, sizeGB, err := r.CreateVolume()
+	if err != nil {
+		glog.Errorf("glusterfs: create volume err: %s.", err)
+		return nil, fmt.Errorf("glusterfs: create volume err: %s.", err)
+	}
+	pv := new(api.PersistentVolume)
+	pv.Spec.PersistentVolumeSource.Glusterfs = glusterfs
+	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
+	pv.Spec.AccessModes = r.options.AccessModes
+	pv.Spec.Capacity = api.ResourceList{
+		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dGi", sizeGB)),
+	}
+	return pv, nil
+}
+
+func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSource, size int, err error) {
+	volSizeBytes := p.options.Capacity.Value()
+	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024*1024))
+	glog.V(2).Infof("glusterfs: create volume of size:%d bytes", volSizeBytes)
+	if p.glusterfsClusterConf.glusterRestUrl == "" {
+		glog.Errorf("glusterfs : rest server endpoint is empty")
+		return nil, 0, fmt.Errorf("failed to create gluster REST client, REST URL is empty")
+	}
+	cli := gcli.NewClient(p.glusterRestUrl, p.glusterRestUser, p.glusterRestUserKey)
+	if cli == nil {
+		glog.Errorf("glusterfs: failed to create gluster rest client")
+		return nil, 0, fmt.Errorf("failed to create gluster REST client, REST server authentication failed")
+	}
+	volumeReq := &gapi.VolumeCreateRequest{Size: sz}
+	volume, err := cli.VolumeCreate(volumeReq)
+	if err != nil {
+		glog.Errorf("glusterfs: error creating volume %s ", err)
+		return nil, 0, fmt.Errorf("error creating volume %v", err)
+	}
+	glog.V(1).Infof("glusterfs: volume with size :%d and name:%s created", volume.Size, volume.Name)
+	return &api.GlusterfsVolumeSource{
+		EndpointsName: p.glusterfsClusterConf.glusterep,
+		Path:          volume.Name,
+		ReadOnly:      false,
+	}, sz, nil
 }

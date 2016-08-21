@@ -1371,6 +1371,21 @@
 			"Rev": "1d46ce7e1eca635f372357a8ccbf1fa7cc28b7d2"
 		},
 		{
+			"ImportPath": "github.com/heketi/heketi/client/api/go-client",
+			"Comment": "v2.1.0-dev-2-gcb07059",
+			"Rev": "cb07059aed8760ef857a58d37598b9e51c36a9ae"
+		},
+		{
+			"ImportPath": "github.com/heketi/heketi/pkg/glusterfs/api",
+			"Comment": "v2.1.0-dev-2-gcb07059",
+			"Rev": "cb07059aed8760ef857a58d37598b9e51c36a9ae"
+		},
+		{
+			"ImportPath": "github.com/heketi/heketi/pkg/utils",
+			"Comment": "v2.1.0-dev-2-gcb07059",
+			"Rev": "cb07059aed8760ef857a58d37598b9e51c36a9ae"
+		},
+		{
 			"ImportPath": "github.com/imdario/mergo",
 			"Comment": "0.1.3-8-g6633656",
 			"Rev": "6633656539c1639d9d78127b7d47c622b5d7b6dc"
@@ -1440,6 +1455,11 @@
 			"ImportPath": "github.com/kr/pty",
 			"Comment": "release.r56-29-gf7ee69f",
 			"Rev": "f7ee69f31298ecbe5d2b349c711e2547a617d398"
+		},
+		{
+			"ImportPath": "github.com/lpabon/godbc",
+			"Comment": "v1.0-1-g9577782",
+			"Rev": "9577782540c1398b710ddae1b86268ba03a19b0c"
 		},
 		{
 			"ImportPath": "github.com/mailru/easyjson/buffer",
