@@ -47,7 +47,7 @@ readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build/build-image/cross/
 
 # Increment this version to cause everyone to rebuild images, including the data
 # container.
-readonly KUBE_IMAGE_VERSION=2
+readonly KUBE_IMAGE_VERSION=1
 
 # Here we map the output directories across both the local and remote _output
 # directories:
