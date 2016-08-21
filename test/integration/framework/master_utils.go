@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apiserver"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -46,6 +45,7 @@ import (
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
 	"k8s.io/kubernetes/pkg/kubectl"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master"
@@ -216,7 +216,7 @@ func NewMasterConfig() *master.Config {
 			APIResourceConfigSource: master.DefaultAPIResourceConfigSource(),
 			APIPrefix:               "/api",
 			APIGroupPrefix:          "/apis",
-			Authorizer:              apiserver.NewAlwaysAllowAuthorizer(),
+			Authorizer:              authorizer.NewAlwaysAllowAuthorizer(),
 			AdmissionControl:        admit.NewAlwaysAdmit(),
 			Serializer:              api.Codecs,
 			EnableWatchCache:        true,
