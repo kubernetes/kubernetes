@@ -325,6 +325,43 @@ kube::util::gv-to-swagger-name() {
   esac
 }
 
+
+# Fetches swagger spec from apiserver.
+# Assumed vars:
+# SWAGGER_API_PATH: Base path for swaggerapi on apiserver. Ex:
+# http://localhost:8080/swaggerapi.
+# SWAGGER_ROOT_DIR: Root dir where we want to to save the fetched spec.
+# VERSIONS: Array of group versions to include in swagger spec.
+kube::util::fetch-swagger-spec() {
+  for ver in ${VERSIONS}; do
+    # fetch the swagger spec for each group version.
+    if [[ ${ver} == "v1" ]]; then
+      SUBPATH="api"
+    else
+      SUBPATH="apis"
+    fi
+    SUBPATH="${SUBPATH}/${ver}"
+    SWAGGER_JSON_NAME="$(kube::util::gv-to-swagger-name ${ver}).json"
+    curl -w "\n" -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
+
+    # fetch the swagger spec for the discovery mechanism at group level.
+    if [[ ${ver} == "v1" ]]; then
+      continue
+    fi
+    SUBPATH="apis/"${ver%/*}
+    SWAGGER_JSON_NAME="${ver%/*}.json"
+    curl -w "\n" -fs "${SWAGGER_API_PATH}${SUBPATH}" > "${SWAGGER_ROOT_DIR}/${SWAGGER_JSON_NAME}"
+  done
+
+  # fetch swagger specs for other discovery mechanism.
+  curl -w "\n" -fs "${SWAGGER_API_PATH}" > "${SWAGGER_ROOT_DIR}/resourceListing.json"
+  curl -w "\n" -fs "${SWAGGER_API_PATH}version" > "${SWAGGER_ROOT_DIR}/version.json"
+  curl -w "\n" -fs "${SWAGGER_API_PATH}api" > "${SWAGGER_ROOT_DIR}/api.json"
+  curl -w "\n" -fs "${SWAGGER_API_PATH}apis" > "${SWAGGER_ROOT_DIR}/apis.json"
+  curl -w "\n" -fs "${SWAGGER_API_PATH}logs" > "${SWAGGER_ROOT_DIR}/logs.json"
+}
+
+
 # Returns the name of the upstream remote repository name for the local git
 # repo, e.g. "upstream" or "origin".
 kube::util::git_upstream_remote_name() {
