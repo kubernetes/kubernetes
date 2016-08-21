@@ -26,6 +26,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,6 +59,7 @@ import (
 	probetest "k8s.io/kubernetes/pkg/kubelet/prober/testing"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	"k8s.io/kubernetes/pkg/kubelet/status"
+	"k8s.io/kubernetes/pkg/kubelet/sysctl"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	kubeletvolume "k8s.io/kubernetes/pkg/kubelet/volumemanager"
@@ -254,6 +256,11 @@ func newTestKubeletWithImageList(
 		kubelet.recorder)
 	if err != nil {
 		t.Fatalf("failed to initialize volume manager: %v", err)
+	}
+
+	kubelet.sysctlWhitelist, err = sysctl.NewWhitelist(kubetypes.DefaultSysctlWhitelist())
+	if err != nil {
+		t.Fatalf("failed to create sysctl whitelist: %v", err)
 	}
 
 	// enable active deadline handler
@@ -2928,6 +2935,34 @@ func TestPrivilegedContainerDisallowed(t *testing.T) {
 	})
 	if err == nil {
 		t.Errorf("expected pod infra creation to fail")
+	}
+}
+
+func TestNotWhitelistedSysctlsDisallowed(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	testKubelet.fakeCadvisor.On("VersionInfo").Return(&cadvisorapi.VersionInfo{}, nil)
+	testKubelet.fakeCadvisor.On("MachineInfo").Return(&cadvisorapi.MachineInfo{}, nil)
+	testKubelet.fakeCadvisor.On("ImagesFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	testKubelet.fakeCadvisor.On("RootFsInfo").Return(cadvisorapiv2.FsInfo{}, nil)
+	kubelet := testKubelet.kubelet
+
+	pod := podWithUidNameNsSpec("12345678", "foo", "new", api.PodSpec{
+		Containers: []api.Container{
+			{Name: "foo"},
+		},
+	})
+	pod.Annotations[api.SysctlsPodAnnotationKey] = "kernel.nmi_watchdog=0"
+
+	err := kubelet.syncPod(syncPodOptions{
+		pod:        pod,
+		podStatus:  &kubecontainer.PodStatus{},
+		updateType: kubetypes.SyncPodUpdate,
+	})
+	if err == nil {
+		t.Fatalf("expected pod infra creation to fail")
+	}
+	if !strings.Contains(err.Error(), "sysctl") {
+		t.Fatalf("expected sysctl error, got: %v", err)
 	}
 }
 

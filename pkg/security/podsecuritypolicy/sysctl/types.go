@@ -1,5 +1,5 @@
 /*
-Copyright 2015 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,19 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package types
+package sysctl
 
-const (
-	// system default DNS resolver configuration
-	ResolvConfDefault = "/etc/resolv.conf"
+import (
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
-// DefaultSysctlWhitelist returns the default whitelist of sysctls and sysctl patterns (ending in *).
-func DefaultSysctlWhitelist() []string {
-	return []string{
-		"kernel.shm_rmid_forced",
-		"net.ipv4.ip_local_port_range",
-		"net.ipv4.tcp_max_syn_backlog",
-		"net.ipv4.tcp_syncookies",
-	}
+// SysctlsStrategy defines the interface for all sysctl strategies.
+type SysctlsStrategy interface {
+	// Validate ensures that the specified values fall within the range of the strategy.
+	Validate(pod *api.Pod) field.ErrorList
 }
