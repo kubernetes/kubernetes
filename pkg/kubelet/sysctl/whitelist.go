@@ -25,19 +25,28 @@ import (
 
 // Whitelist provides a list of allowed sysctls and sysctl patterns (ending in *)
 // and a function to check whether a given sysctl matches this list.
-type Whitelist struct {
+type Whitelist interface {
+	// Validate checks that all sysctls given in a api.SysctlsPodAnnotationKey annotation
+	// are valid according to the whitelist.
+	Validate(pod *api.Pod) error
+}
+
+// patternWhitelist takes a list of sysctls or sysctl patterns (ending in *) and
+// checks validity via a sysctl and prefix map, rejecting those which are not known
+// to be namespaced.
+type patternWhitelist struct {
 	sysctls  map[string]Namespace
 	prefixes map[string]Namespace
 }
 
 // NewWhitelist creates a new Whitelist from a list of sysctls and sysctl pattern (ending in *).
-func NewWhitelist(sysctls []string) (*Whitelist, error) {
-	w := &Whitelist{
+func NewWhitelist(patterns []string) (*patternWhitelist, error) {
+	w := &patternWhitelist{
 		sysctls:  map[string]Namespace{},
 		prefixes: map[string]Namespace{},
 	}
 
-	for _, s := range sysctls {
+	for _, s := range patterns {
 		if strings.HasSuffix(s, "*") {
 			prefix := s[:len(s)-1]
 			ns := NamespacedBy(prefix)
@@ -56,14 +65,14 @@ func NewWhitelist(sysctls []string) (*Whitelist, error) {
 	return w, nil
 }
 
-// Valid checks that a sysctl is whitelisted because it is known
+// valid checks that a sysctl is whitelisted because it is known
 // to be namespaced by the Linux kernel. Note that being whitelisted is required, but not
 // sufficient: the container runtime might have a stricter check and refuse to launch a pod.
 //
 // The parameters hostNet and hostIPC are used to forbid sysctls for pod sharing the
 // respective namespaces with the host. This check is only possible for sysctls on
 // the static default whitelist, not those on the custom whitelist provided by the admin.
-func (w *Whitelist) Valid(val string, hostNet, hostIPC bool) bool {
+func (w *patternWhitelist) valid(val string, hostNet, hostIPC bool) bool {
 	if ns, found := w.sysctls[val]; found {
 		if ns == IpcNamespace && hostIPC {
 			return false
@@ -89,7 +98,7 @@ func (w *Whitelist) Valid(val string, hostNet, hostIPC bool) bool {
 
 // Validate checks that all sysctls given in a api.SysctlsPodAnnotationKey annotation
 // are valid according to the whitelist.
-func (w *Whitelist) Validate(pod *api.Pod) error {
+func (w *patternWhitelist) Validate(pod *api.Pod) error {
 	a := pod.Annotations[api.SysctlsPodAnnotationKey]
 	if a == "" {
 		return nil
@@ -106,7 +115,7 @@ func (w *Whitelist) Validate(pod *api.Pod) error {
 		hostIPC = pod.Spec.SecurityContext.HostIPC
 	}
 	for _, s := range sysctls {
-		if !w.Valid(s.Name, hostNet, hostIPC) {
+		if !w.valid(s.Name, hostNet, hostIPC) {
 			return fmt.Errorf("pod with UID %q specified a not whitelisted sysctl: %s", pod.UID, s)
 		}
 	}

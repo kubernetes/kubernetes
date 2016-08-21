@@ -67,13 +67,13 @@ func TestWhitelist(t *testing.T) {
 	}
 
 	for _, test := range valid {
-		if !w.Valid(test.sysctl, test.hostNet, test.hostIPC) {
+		if !w.valid(test.sysctl, test.hostNet, test.hostIPC) {
 			t.Errorf("expected to be whitelisted: %+v", test)
 		}
 	}
 
 	for _, test := range invalid {
-		if w.Valid(test.sysctl, test.hostNet, test.hostIPC) {
+		if w.valid(test.sysctl, test.hostNet, test.hostIPC) {
 			t.Errorf("expected to be rejected: %+v", test)
 		}
 	}

@@ -870,7 +870,7 @@ type Kubelet struct {
 	iptablesDropBit int
 
 	// allowed sysctls for this node
-	sysctlWhitelist *sysctl.Whitelist
+	sysctlWhitelist sysctl.Whitelist
 }
 
 // setupDataDirs creates:
