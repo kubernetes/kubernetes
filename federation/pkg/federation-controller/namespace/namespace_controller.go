@@ -263,7 +263,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 			return
 		}
 		desiredNamespace := &api_v1.Namespace{
-			ObjectMeta: baseNamespace.ObjectMeta,
+			ObjectMeta: util.CopyObjectMeta(baseNamespace.ObjectMeta),
 			Spec:       baseNamespace.Spec,
 		}
 
@@ -277,7 +277,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 			clusterNamespace := clusterNamespaceObj.(*api_v1.Namespace)
 
 			// Update existing namespace, if needed.
-			if !reflect.DeepEqual(desiredNamespace.ObjectMeta, clusterNamespace.ObjectMeta) ||
+			if !util.ObjectMetaEquivalent(desiredNamespace.ObjectMeta, clusterNamespace.ObjectMeta) ||
 				!reflect.DeepEqual(desiredNamespace.Spec, clusterNamespace.Spec) {
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
