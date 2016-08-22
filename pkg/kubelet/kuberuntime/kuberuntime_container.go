@@ -191,6 +191,37 @@ func makeMounts(cid string, opts *kubecontainer.RunContainerOptions, container *
 	return volumeMounts
 }
 
+// getKubeletContainers lists containers managed by kubelet.
+// The boolean parameter specifies whether returns all containers including
+// those already exited and dead containers (used for garbage collection).
+func (m *kubeGenericRuntimeManager) getKubeletContainers(allContainers bool) ([]*runtimeApi.Container, error) {
+	filter := &runtimeApi.ContainerFilter{
+		LabelSelector: map[string]string{kubernetesManagedLabel: "true"},
+	}
+	if !allContainers {
+		runningState := runtimeApi.ContainerState_RUNNING
+		filter.State = &runningState
+	}
+
+	containers, err := m.getContainersHelper(filter)
+	if err != nil {
+		glog.Errorf("getKubeletContainers failed: %v", err)
+		return nil, err
+	}
+
+	return containers, nil
+}
+
+// getContainers lists containers by filter.
+func (m *kubeGenericRuntimeManager) getContainersHelper(filter *runtimeApi.ContainerFilter) ([]*runtimeApi.Container, error) {
+	resp, err := m.runtimeService.ListContainers(filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, err
+}
+
 // AttachContainer attaches to the container's console
 func (m *kubeGenericRuntimeManager) AttachContainer(id kubecontainer.ContainerID, stdin io.Reader, stdout, stderr io.WriteCloser, tty bool, resize <-chan term.Size) (err error) {
 	return fmt.Errorf("not implemented")
