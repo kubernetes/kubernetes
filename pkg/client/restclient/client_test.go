@@ -49,6 +49,7 @@ type TestParam struct {
 func TestDoRequestSuccess(t *testing.T) {
 	testServer, fakeHandler, status := testServerEnv(t, 200)
 	defer testServer.Close()
+
 	c, err := restClient(testServer)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -76,6 +77,7 @@ func TestDoRequestFailed(t *testing.T) {
 	}
 	testServer := httptest.NewServer(&fakeHandler)
 	defer testServer.Close()
+
 	c, err := restClient(testServer)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

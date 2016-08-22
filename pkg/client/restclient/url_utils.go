@@ -54,6 +54,9 @@ func DefaultServerURL(host string, defaultTLS bool) (*url.URL, error) {
 
 }
 
+// DefaultServerURLsForHosts converts a collection of hosts, host:port pairs, or URL strings to the default base server API path
+// to use with a Client at a given API version following the standard conventions for a Kubernetes API.
+// If hosts are empty - localhost will be added.
 func DefaultServerURLsForHosts(hosts []string, apiPath string, groupVersion unversioned.GroupVersion, defaultTLS bool) ([]*url.URL, string, error) {
 	if len(hosts) == 0 {
 		hosts = []string{"localhost"}
@@ -90,9 +93,9 @@ func DefaultServerURLsForHosts(hosts []string, apiPath string, groupVersion unve
 	return hostsURLs, versionedAPIPath, nil
 }
 
-// defaultServerUrlFor is shared between IsConfigTransportTLS and RESTClientFor. It
+// defaultServerUrlsFor is shared between IsConfigTransportTLS and RESTClientFor. It
 // requires Host and Version to be set prior to being called.
-func defaultServerUrlFor(config *Config) ([]*url.URL, string, error) {
+func defaultServerUrlsFor(config *Config) ([]*url.URL, string, error) {
 	// TODO: move the default to secure when the apiserver supports TLS by default
 	// config.Insecure is taken to mean "I want HTTPS but don't bother checking the certs against a CA."
 	hasCA := len(config.CAFile) != 0 || len(config.CAData) != 0

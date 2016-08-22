@@ -46,7 +46,7 @@ func ServerAPIVersions(c *Config) (groupVersions []string, err error) {
 	configCopy := *c
 	configCopy.GroupVersion = nil
 	configCopy.APIPath = ""
-	baseURLs, _, err := defaultServerUrlFor(&configCopy)
+	baseURLs, _, err := defaultServerUrlsFor(&configCopy)
 	if err != nil {
 		return nil, err
 	}

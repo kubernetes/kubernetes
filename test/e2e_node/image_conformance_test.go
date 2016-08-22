@@ -32,7 +32,6 @@ const (
 
 var _ = Describe("Image Container Conformance Test", func() {
 	Describe("[Flaky] image conformance blackbox test", func() {
-
 		Context("when testing images that exist", func() {
 			var conformImages []ConformanceImage
 			BeforeEach(func() {
