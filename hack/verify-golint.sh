@@ -82,13 +82,14 @@ if [ ${#linted[@]} -eq 0 ]; then
 	echo 'Success! All packages that should pass lint are listed in the linted file.'
 else
 	{
-		echo "The following packages passed golint but are not listed in $linted_file:"
+		echo "Some packages passed golint but are not listed in $linted_file:"
+		echo
 		for p in "${linted[@]}"; do
 			echo "echo $p >> hack/.linted_packages"
 		done
 		echo "sort -o hack/.linted_packages hack/.linted_packages"
 		echo
-		echo 'Please add the following packages to the linted file. You can test via this script and commit the result.'
+		echo 'Please add those packages to the linted file. You can test via this script and commit the result.'
 		echo
 	} >&2
 	false
