@@ -1314,7 +1314,7 @@ func (f *Factory) NewBuilder(thirdPartyDiscovery bool) *resource.Builder {
 
 func (f *Factory) ResourcesWithPodSpecs() []*meta.RESTMapping {
 	restMaps := []*meta.RESTMapping{}
-	resourcesWithTemplates := []string{"Pod", "ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
+	resourcesWithTemplates := []string{"ReplicationController", "Deployment", "DaemonSet", "Job", "ReplicaSet"}
 	mapper, _ := f.Object(false)
 
 	for _, resource := range resourcesWithTemplates {
