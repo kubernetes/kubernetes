@@ -76,15 +76,8 @@ var (
 func NewCmdTaint(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TaintOptions{}
 
-	// retrieve a list of handled resources from printer as valid args
-	validArgs := []string{}
-	p, err := f.Printer(nil, kubectl.PrintOptions{
-		ColumnLabels: []string{},
-	})
-	cmdutil.CheckErr(err)
-	if p != nil {
-		validArgs = p.HandledResources()
-	}
+	validArgs := []string{"node"}
+	argAliases := kubectl.ResourceAliases(validArgs)
 
 	cmd := &cobra.Command{
 		Use:     "taint NODE NAME KEY_1=VAL_1:TAINT_EFFECT_1 ... KEY_N=VAL_N:TAINT_EFFECT_N",
@@ -102,7 +95,8 @@ func NewCmdTaint(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 				cmdutil.CheckErr(err)
 			}
 		},
-		ValidArgs: validArgs,
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	cmdutil.AddValidateFlags(cmd)
 

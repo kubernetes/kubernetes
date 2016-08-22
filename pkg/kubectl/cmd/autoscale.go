@@ -55,6 +55,9 @@ var (
 func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AutoscaleOptions{}
 
+	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
+	argAliases := kubectl.ResourceAliases(validArgs)
+
 	cmd := &cobra.Command{
 		Use:     "autoscale (-f FILENAME | TYPE NAME | TYPE/NAME) [--min=MINPODS] --max=MAXPODS [--cpu-percent=CPU] [flags]",
 		Short:   "Auto-scale a Deployment, ReplicaSet, or ReplicationController",
@@ -64,6 +67,8 @@ func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			err := RunAutoscale(f, out, cmd, args, options)
 			cmdutil.CheckErr(err)
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 	cmdutil.AddPrinterFlags(cmd)
 	cmd.Flags().String("generator", "horizontalpodautoscaler/v1", "The name of the API generator to use. Currently there is only 1 generator.")
