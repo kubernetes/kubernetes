@@ -139,15 +139,15 @@ __kubectl_require_pod_and_container()
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit | kubectl_patch |\
-        kubectl_annotate | kubectl_expose)
+        kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_*)
             __kubectl_get_resource
             return
             ;;
-        kubectl_logs)
+        kubectl_logs | kubectl_attach)
             __kubectl_require_pod_and_container
             return
             ;;
-        kubectl_exec)
+        kubectl_exec | kubectl_port-forward | kubectl_top_pod)
             __kubectl_get_resource_pod
             return
             ;;
