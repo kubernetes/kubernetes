@@ -105,6 +105,22 @@ parameters:
 * `restuser` : Gluster REST service user who has access to create volumes in the Gluster Trusted Pool.
 * `restuserkey` : Gluster REST service user's password which will be used for authentication to the REST server.
 
+#### OpenStack Cinder
+
+```yaml
+kind: StorageClass
+apiVersion: extensions/v1beta1
+metadata:
+  name: gold
+provisioner: kubernetes.io/cinder
+parameters:
+  type: fast
+  availability: nova
+```
+
+* `type`: [VolumeType](http://docs.openstack.org/admin-guide/dashboard-manage-volumes.html) created in Cinder. Default is empty.
+* `availability`: Availability Zone. Default is empty.
+
 ### User provisioning requests
 
 Users request dynamically provisioned storage by including a storage class in their `PersistentVolumeClaim`.
