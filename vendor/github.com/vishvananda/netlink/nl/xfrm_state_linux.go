@@ -5,12 +5,14 @@ import (
 )
 
 const (
-	SizeofXfrmUsersaId   = 0x18
-	SizeofXfrmStats      = 0x0c
-	SizeofXfrmUsersaInfo = 0xe0
-	SizeofXfrmAlgo       = 0x44
-	SizeofXfrmAlgoAuth   = 0x48
-	SizeofXfrmEncapTmpl  = 0x18
+	SizeofXfrmUsersaId    = 0x18
+	SizeofXfrmStats       = 0x0c
+	SizeofXfrmUsersaInfo  = 0xe0
+	SizeofXfrmAlgo        = 0x44
+	SizeofXfrmAlgoAuth    = 0x48
+	SizeofXfrmAlgoAEAD    = 0x48
+	SizeofXfrmEncapTmpl   = 0x18
+	SizeofXfrmUsersaFlush = 0x8
 )
 
 // struct xfrm_usersa_id {
@@ -193,6 +195,35 @@ func (msg *XfrmAlgoAuth) Serialize() []byte {
 //   char    alg_key[0];
 // }
 
+type XfrmAlgoAEAD struct {
+	AlgName   [64]byte
+	AlgKeyLen uint32
+	AlgICVLen uint32
+	AlgKey    []byte
+}
+
+func (msg *XfrmAlgoAEAD) Len() int {
+	return SizeofXfrmAlgoAEAD + int(msg.AlgKeyLen/8)
+}
+
+func DeserializeXfrmAlgoAEAD(b []byte) *XfrmAlgoAEAD {
+	ret := XfrmAlgoAEAD{}
+	copy(ret.AlgName[:], b[0:64])
+	ret.AlgKeyLen = *(*uint32)(unsafe.Pointer(&b[64]))
+	ret.AlgICVLen = *(*uint32)(unsafe.Pointer(&b[68]))
+	ret.AlgKey = b[72:ret.Len()]
+	return &ret
+}
+
+func (msg *XfrmAlgoAEAD) Serialize() []byte {
+	b := make([]byte, msg.Len())
+	copy(b[0:64], msg.AlgName[:])
+	copy(b[64:68], (*(*[4]byte)(unsafe.Pointer(&msg.AlgKeyLen)))[:])
+	copy(b[68:72], (*(*[4]byte)(unsafe.Pointer(&msg.AlgICVLen)))[:])
+	copy(b[72:msg.Len()], msg.AlgKey[:])
+	return b
+}
+
 // struct xfrm_encap_tmpl {
 //   __u16   encap_type;
 //   __be16    encap_sport;
@@ -218,4 +249,24 @@ func DeserializeXfrmEncapTmpl(b []byte) *XfrmEncapTmpl {
 
 func (msg *XfrmEncapTmpl) Serialize() []byte {
 	return (*(*[SizeofXfrmEncapTmpl]byte)(unsafe.Pointer(msg)))[:]
+}
+
+// struct xfrm_usersa_flush {
+//    __u8 proto;
+// };
+
+type XfrmUsersaFlush struct {
+	Proto uint8
+}
+
+func (msg *XfrmUsersaFlush) Len() int {
+	return SizeofXfrmUsersaFlush
+}
+
+func DeserializeXfrmUsersaFlush(b []byte) *XfrmUsersaFlush {
+	return (*XfrmUsersaFlush)(unsafe.Pointer(&b[0:SizeofXfrmUsersaFlush][0]))
+}
+
+func (msg *XfrmUsersaFlush) Serialize() []byte {
+	return (*(*[SizeofXfrmUsersaFlush]byte)(unsafe.Pointer(msg)))[:]
 }
