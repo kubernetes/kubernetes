@@ -78,7 +78,10 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		Context("On scheduling a Guaranteed Pod", func() {
 			It("Pod containers should have been created under the cgroup-root", func() {
 				if framework.TestContext.CgroupsPerQOS {
-					var guaranteedPod api.Pod
+					var (
+						guaranteedPod api.Pod
+						podUID        string
+					)
 					By("Creating a Guaranteed pod in Namespace", func() {
 						podName := "qos-pod" + string(uuid.NewUUID())
 						contName := "qos-container" + string(uuid.NewUUID())
@@ -99,6 +102,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 						}
 						podClient := f.PodClient()
 						guaranteedPod := podClient.Create(pod)
+						podUID = string(guaranteedPod.UID)
 					})
 					By("Checking if the pod cgroup was created", func() {
 						podName := "qos-pod" + string(uuid.NewUUID())
@@ -113,7 +117,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 									{
 										Image:   "gcr.io/google_containers/busybox:1.24",
 										Name:    contName,
-										Command: []string{"sh", "-c", "if [ -d /tmp/memory/pod#" + guaranteedPod.UID + " ] && [ -d /tmp/cpu/pod#" + guaranteedPod.UID + " ]; then exit 0; else exit 1; fi"},
+										Command: []string{"sh", "-c", "if [ -d /tmp/memory/pod#" + podUID + " ] && [ -d /tmp/cpu/pod#" + podUID + " ]; then exit 0; else exit 1; fi"},
 										VolumeMounts: []api.VolumeMount{
 											{
 												Name:      "sysfscgroup",
@@ -139,9 +143,9 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 					})
 					By("Checking if the pod cgroup was deleted", func() {
 						// delete the guaranteed pod.
-						podUID := guaranteedPod.UID
 						podClient := f.PodClient()
-						Expect(podClient.Delete(guaranteedPod)).NotTo(HaveOccurred())
+						var gp int64 = 1
+						Expect(podClient.Delete(guaranteedPod.Name, &api.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 						// Now check that the cgroups get deleted eventually
 						podName := "qos-pod" + string(uuid.NewUUID())
 						contName := "qos-container" + string(uuid.NewUUID())
@@ -175,7 +179,6 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 								},
 							},
 						}
-						podClient := f.PodClient()
 						podClient.Create(pod)
 						// This currently waits for five minutes before failing.
 						err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
@@ -188,8 +191,10 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 		Context("On scheduling a BestEffort Pod", func() {
 			It("Pod containers should have been created under the BestEffort cgroup", func() {
 				if framework.TestContext.CgroupsPerQOS {
-					var podUID string
-					var bestEffortPod *api.Pod
+					var (
+						podUID        string
+						bestEffortPod *api.Pod
+					)
 					By("Creating a BestEffort pod in Namespace", func() {
 						podName := "qos-pod" + string(uuid.NewUUID())
 						contName := "qos-container" + string(uuid.NewUUID())
@@ -212,7 +217,7 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 						}
 						podClient := f.PodClient()
 						bestEffortPod := podClient.Create(pod)
-						podUID = string(apiPod.UID)
+						podUID = string(bestEffortPod.UID)
 					})
 					By("Checking if the pod cgroup was created", func() {
 						podName := "qos-pod" + string(uuid.NewUUID())
@@ -256,7 +261,8 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 					By("Checking if the pod cgroup was deleted", func() {
 						// delete the best-effort pod.
 						podClient := f.PodClient()
-						Expect(podClient.Delete(bestEffortPod)).NotTo(HaveOccurred())
+						var gp int64 = 1
+						Expect(podClient.Delete(bestEffortPod.Name, &api.DeleteOptions{GracePeriodSeconds: &gp})).NotTo(HaveOccurred())
 						// Now check that the cgroups get deleted eventually
 						podName := "qos-pod" + string(uuid.NewUUID())
 						contName := "qos-container" + string(uuid.NewUUID())
@@ -290,7 +296,6 @@ var _ = framework.KubeDescribe("Kubelet Cgroup Manager", func() {
 								},
 							},
 						}
-						podClient := f.PodClient()
 						podClient.Create(pod)
 						// This currently waits for five minutes before failing.
 						err := framework.WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
