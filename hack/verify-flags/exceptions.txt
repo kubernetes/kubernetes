@@ -50,7 +50,7 @@ cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_p
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:  {% set cluster_cidr=" --cluster-cidr=" + pillar['cluster_cidr'] %}
 cluster/saltbase/salt/kube-proxy/kube-proxy.manifest:{% set params = log_level + " " + feature_gates + " " + test_args -%}
-cluster/saltbase/salt/kube-scheduler/kube-scheduler.manifest:{% set params = params + log_level + " " + feature_gates -%}
+cluster/saltbase/salt/kube-scheduler/kube-scheduler.manifest:{% set params = params + log_level + " " + feature_gates + " " + scheduling_algorithm_provider -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers + ":6443" -%}
 cluster/saltbase/salt/kubelet/default:  {% set api_servers_with_port = api_servers -%}
 cluster/saltbase/salt/kubelet/default:  {% set enable_custom_metrics="--enable-custom-metrics=" + pillar['enable_custom_metrics'] %}
@@ -84,10 +84,6 @@ federation/config.default.json:      "cluster_name": "cluster3-kubernetes",
 federation/config.default.json:      "num_nodes": 3,
 federation/config.default.json:      "num_nodes": 3,
 federation/config.default.json:      "num_nodes": 3,
-hack/fed-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST}"
-hack/fed-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
-hack/fed-up-cluster.sh:    advertise_address=""
-hack/fed-up-cluster.sh:    runtime_config=""
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    advertise_address=""
