@@ -89,6 +89,8 @@ NON_MASQUERADE_CIDR="${NON_MASQUERADE_CIDR:-10.0.0.0/8}" # Traffic to IPs outsid
 SERVICE_CLUSTER_IP_RANGE="${SERVICE_CLUSTER_IP_RANGE:-10.0.0.0/16}"  # formerly PORTAL_NET
 CLUSTER_IP_RANGE="${CLUSTER_IP_RANGE:-10.244.0.0/16}"
 MASTER_IP_RANGE="${MASTER_IP_RANGE:-10.246.0.0/24}"
+SSH_CIDR="${SSH_CIDR:-0.0.0.0/0}" # IP to restrict ssh access to nodes/master
+HTTP_API_CIDR="${HTTP_API_CIDR:-0.0.0.0/0}" # IP to restrict HTTP API access
 # If set to an Elastic IP address, the master instance will be associated with this IP.
 # Otherwise a new Elastic IP will be acquired
 # (We used to accept 'auto' to mean 'allocate elastic ip', but that is now the default)
