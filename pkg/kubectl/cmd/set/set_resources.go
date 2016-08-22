@@ -48,7 +48,6 @@ type ResourcesOptions struct {
 	All               bool
 	Record            bool
 	ChangeCause       string
-	Local             bool
 	Cmd               *cobra.Command
 
 	Limits               string
@@ -79,7 +78,7 @@ kubectl set resources deployment nginx --limits=cpu=200m,memory=512Mi --requests
 
 # Print the result (in yaml format) of updating nginx container limits from a local, without hitting the server
 
-kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --local -o yaml
+kubectl set resources -f path/to/file.yaml --limits=cpu=200m,memory=512Mi --dry-run -o yaml
 `
 )
 
@@ -113,7 +112,7 @@ func NewCmdResources(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra
 	cmd.Flags().BoolVar(&options.All, "all", false, "select all resources in the namespace of the specified resource types")
 	cmd.Flags().StringVarP(&options.Selector, "selector", "l", "", "Selector (label query) to filter on")
 	cmd.Flags().StringVarP(&options.ContainerSelector, "containers", "c", "*", "The names of containers in the selected pod templates to change, all containers are selected by default - may use wildcards")
-	cmd.Flags().BoolVar(&options.Local, "local", false, "If true, set resources will NOT contact api-server but run locally")
+	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddRecordFlag(cmd)
 	cmd.Flags().BoolVar(&options.Remove, "remove", false, "If true, set resources will remove resource limit/requests from pod template")
 	cmd.Flags().StringVar(&options.Limits, "limits", options.Limits, "The resource requirement requests for this container.  For example, 'cpu=100m,memory=256Mi'.  Note that server side components may assign requests depending on the server configuration, such as limit ranges.")
@@ -142,7 +141,7 @@ func (o *ResourcesOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args
 		NamespaceParam(cmdNamespace).DefaultNamespace().
 		FilenameParam(enforceNamespace, o.Recursive, o.Filenames...).
 		Flatten()
-	if !o.Local {
+	if !cmdutil.GetDryRunFlag(cmd) {
 		builder = builder.
 			SelectorParam(o.Selector).
 			ResourceTypeOrNameArgs(o.All, args...).
@@ -202,7 +201,7 @@ func (o *ResourcesOptions) Run() error {
 			continue
 		}
 
-		if o.Local {
+		if cmdutil.GetDryRunFlag(o.Cmd) {
 			fmt.Fprintln(o.Err, "info: running in local mode...")
 			return o.PrintObject(o.Cmd, o.Mapper, info.Object, o.Out)
 		}
