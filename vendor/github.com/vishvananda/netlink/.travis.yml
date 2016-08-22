@@ -1,8 +1,3 @@
 language: go
-before_script:
-  # make sure we keep path in tact when we sudo
-  - sudo sed -i -e 's/^Defaults\tsecure_path.*$//' /etc/sudoers
-  # modprobe ip_gre or else the first gre device can't be deleted
-  - sudo modprobe ip_gre
 install:
-  - go get github.com/vishvananda/netns
+      - go get github.com/vishvananda/netns
