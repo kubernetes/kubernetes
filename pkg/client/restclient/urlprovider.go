@@ -28,6 +28,8 @@ type URLProvider interface {
 	// Next selects any other URL, it is upto implementation to provide any
 	// health checking/load balancing, it might be as simple as an iterator.
 	Next() *url.URL
+	// Total returns number of available URLs.
+	Total() int
 }
 
 // A RoundRobinProvider allows to iterate over URLs, doesnt provide any health checking.
@@ -54,6 +56,11 @@ func (p *RoundRobinProvider) Next() *url.URL {
 		p.current++
 	}
 	return p.urls[p.current]
+}
+
+// Total returns number of available URLs.
+func (p *RoundRobinProvider) Total() int {
+	return len(p.urls)
 }
 
 // NewRoundRobinProvider returns pointer to new RoundRobinProvider with passed URLs.

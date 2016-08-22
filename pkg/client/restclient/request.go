@@ -695,10 +695,10 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 	}
 	// If we have an error (i.e. apiserver down) we report that as a metric label.
 	if err != nil {
-		metrics.RequestResult.Increment(err.Error(), req.verb, url)
+		metrics.RequestResult.Increment(err.Error(), req.verb, host)
 	} else {
 		//Metrics for failure codes
-		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, url)
+		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, host)
 	}
 }
 
@@ -798,7 +798,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	// TODO: Change to a timeout based approach.
 	maxRetries := 10
 	retries := 0
-	initialUrl := r.urlProvider.Get()
+	observedURLs := 1
 	for {
 		url := r.URL()
 		req, err := http.NewRequest(r.verb, url.String(), r.body)
@@ -816,9 +816,11 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 			r.backoffMgr.UpdateBackoff(url, err, resp.StatusCode)
 		}
 		if err != nil {
-			if r.urlProvider.Next() == initialUrl {
+			if observedURLs == r.urlProvider.Total() {
 				return err
 			}
+			observedURLs++
+			r.urlProvider.Next()
 			continue
 		}
 

@@ -40,3 +40,31 @@ func TestRoundRobinProvider(t *testing.T) {
 		t.Errorf("Expected %v != Returned %v", url1, returned)
 	}
 }
+
+func TestRoundRobinSameURLs(t *testing.T) {
+	url, _ := url.Parse("http://master:8000")
+	rr := NewRoundRobinProvider(url, url)
+	expectedTotal := 2
+
+	if rst := rr.Total(); rst != expectedTotal {
+		t.Errorf("Total returned incorrect number of urls: Expected %v != %v", rst, expectedTotal)
+	}
+	if u := rr.Get(); u != url {
+		t.Errorf("Unexpected URL %v on Get", u)
+	}
+	if u := rr.Next(); u != url {
+		t.Errorf("Unexpected URL %v on Next", u)
+	}
+}
+
+func TestRoundRobinSingleURL(t *testing.T) {
+	url, _ := url.Parse("http://master:8000")
+	rr := NewRoundRobinProvider(url)
+	expectedTotal := 1
+	if rst := rr.Total(); rst != expectedTotal {
+		t.Errorf("Total returned incorrect number: Expected %v != %v", rst, expectedTotal)
+	}
+	if u := rr.Next(); u != url {
+		t.Errorf("Unexpected URL %v on Next", u)
+	}
+}

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"strings"
 
@@ -87,6 +88,21 @@ func (config *DirectClientConfig) RawConfig() (clientcmdapi.Config, error) {
 	return config.config, nil
 }
 
+// cleanHost cleans URI, checks if any opaque data is present and
+// path is longer than 1 symbol.
+func cleanHost(host string) (string, error) {
+	u, err := url.ParseRequestURI(host)
+	if err != nil {
+		return "", err
+	}
+	if u.Opaque != "" && len(u.Path) <= 1 {
+		return "", fmt.Errorf("Host: %v has opaque data or path is too short.", host)
+	}
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String(), nil
+}
+
 // ClientConfig implements ClientConfig
 func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	if err := config.ConfirmUsable(); err != nil {
@@ -95,12 +111,22 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 
 	configAuthInfo := config.getAuthInfo()
 	configClusterInfo := config.getCluster()
-
 	clientConfig := &restclient.Config{}
 
-	clientConfig.AlternateHosts = configClusterInfo.Servers
-	if configClusterInfo.Server != "" {
+	host, err := cleanHost(configClusterInfo.Server)
+	if err == nil {
+		clientConfig.Host = host
+	} else {
 		clientConfig.Host = configClusterInfo.Server
+	}
+
+	for _, server := range configClusterInfo.Servers {
+		host, err = cleanHost(server)
+		if err == nil {
+			clientConfig.AlternateHosts = append(clientConfig.AlternateHosts, host)
+		} else {
+			clientConfig.AlternateHosts = append(clientConfig.AlternateHosts, server)
+		}
 	}
 
 	if len(configAuthInfo.Impersonate) > 0 {
@@ -108,7 +134,11 @@ func (config *DirectClientConfig) ClientConfig() (*restclient.Config, error) {
 	}
 
 	// only try to read the auth information if we are secure
-	if restclient.IsConfigTransportTLS(*clientConfig) {
+	tlsEnabled, err := restclient.IsConfigTransportTLS(*clientConfig)
+	if err != nil {
+		return nil, err
+	}
+	if tlsEnabled {
 		var err error
 
 		// mergo is a first write wins for map value and a last writing wins for interface values

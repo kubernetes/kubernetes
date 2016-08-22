@@ -157,7 +157,8 @@ type ContentConfig struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 }
 
-// Returns Host and AlternateHosts as a single slice, without duplicates
+// Returns Host and AlternateHosts as a single slice, if Host is already present
+// in AlternateHosts it won't be repeated
 func (c *Config) Hosts() []string {
 	var hosts []string
 	if len(c.Host) > 0 {
@@ -298,21 +299,29 @@ func InClusterConfig() (*Config, error) {
 // IsConfigTransportTLS returns true if and only if the provided
 // config will result in a protected connection to the server when it
 // is passed to restclient.RESTClientFor().  Use to determine when to
-// send credentials over the wire.
+// send credentials over the wire. Any non-https host will return false.
+// All Hosts in Config must be either TLS enabled or not.
 //
 // Note: the Insecure flag is ignored when testing for this value, so MITM attacks are
 // still possible.
-func IsConfigTransportTLS(config Config) bool {
+func IsConfigTransportTLS(config Config) (bool, error) {
 	hosts, _, err := defaultServerUrlFor(&config)
+	allHttps := 0
+	// TODO Propagate errors from defaultServerUrlFor
 	if err != nil {
-		return false
+		return false, nil
 	}
 	for _, host := range hosts {
-		if !(host.Scheme == "https") {
-			return false
+		if host.Scheme == "https" {
+			allHttps++
 		}
 	}
-	return true
+	if allHttps == 0 {
+		return false, nil
+	} else if allHttps == len(hosts) {
+		return true, nil
+	}
+	return false, fmt.Errorf("All or none hosts must be TLS enabled %v", hosts)
 }
 
 // LoadTLSFiles copies the data from the CertFile, KeyFile, and CAFile fields into the CertData,

@@ -79,12 +79,15 @@ type Serializers struct {
 // such as Get, Put, Post, and Delete on specified paths.  Codec controls encoding and
 // decoding of responses from the server.
 func NewRESTClient(hosts []*url.URL, versionedAPIPath string, config ContentConfig, maxQPS float32, maxBurst int, rateLimiter flowcontrol.RateLimiter, client *http.Client) (*RESTClient, error) {
+	var clientHosts []*url.URL
 	for _, host := range hosts {
-		if !strings.HasSuffix(host.Path, "/") {
-			host.Path += "/"
+		u := *host
+		if !strings.HasSuffix(u.Path, "/") {
+			u.Path += "/"
 		}
-		host.RawQuery = ""
-		host.Fragment = ""
+		u.RawQuery = ""
+		u.Fragment = ""
+		clientHosts = append(clientHosts, &u)
 	}
 
 	if config.GroupVersion == nil {
@@ -104,9 +107,9 @@ func NewRESTClient(hosts []*url.URL, versionedAPIPath string, config ContentConf
 	} else if rateLimiter != nil {
 		throttle = rateLimiter
 	}
-	glog.V(4).Infof("Rest client initialized with following urls %v", hosts)
+	glog.V(4).Infof("Rest client initialized with following urls %v", clientHosts)
 	return &RESTClient{
-		urlProvider:      NewRoundRobinProvider(hosts...),
+		urlProvider:      NewRoundRobinProvider(clientHosts...),
 		versionedAPIPath: versionedAPIPath,
 		contentConfig:    config,
 		serializers:      *serializers,
