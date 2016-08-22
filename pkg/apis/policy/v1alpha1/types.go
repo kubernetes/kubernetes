@@ -78,5 +78,5 @@ type Eviction struct {
 	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
 	// DeleteOptions may be provided
-	DeleteOptions *v1.DeleteOptions `json:"deleteOptions,omitempty"`
+	DeleteOptions *v1.DeleteOptions `json:"deleteOptions,omitempty" protobuf:"bytes,2,opt,name=deleteOptions"`
 }

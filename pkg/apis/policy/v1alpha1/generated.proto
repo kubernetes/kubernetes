@@ -30,6 +30,15 @@ import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+message Eviction {
+  // ObjectMeta describes the object that is being evicted.
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  // DeleteOptions may be provided
+  optional k8s.io.kubernetes.pkg.api.v1.DeleteOptions deleteOptions = 2;
+}
+
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 message PodDisruptionBudget {
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
