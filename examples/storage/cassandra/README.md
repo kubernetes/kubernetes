@@ -139,6 +139,7 @@ kubectl create -f examples/storage/cassandra/cassandra-daemonset.yaml --validate
 kubectl delete service -l app=cassandra
 kubectl delete daemonset cassandra
 ```
+
 ## Step 1: Create a Cassandra Headless Service
 
 A Kubernetes _[Service](../../../docs/user-guide/services.md)_ describes a set of
@@ -199,7 +200,7 @@ Pet Sets are a new feature that was added as an <i>Alpha</i> component in Kubern
 1.3.  Deploying stateful distributed applications, like Cassandra, within a clustered
 environment can be challenging.  We implemented Pet Set to greatly simplify this
 process.  Multiple Pet Set features are used within this example, but is out of
-scope of this documentation.  [Please refer to the Pet Set documentation.](../docs/user-guide/petsets.md)
+scope of this documentation.  [Please refer to the Pet Set documentation.](../../../docs/user-guide/petsets.md)
 
 The Pet Set manifest that is included below, creates a Cassandra ring that consists
 of three pods.
@@ -290,6 +291,7 @@ spec:
         requests:
           storage: 1Gi
 ```
+
 [Download example](cassandra-petset.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE cassandra-petset.yaml -->
 
@@ -496,8 +498,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: status.podIP
-          image: gcr.io/aronchick-apollobit/cassandra:v11
-          #image: gcr.io/google-samples/cassandra:v11
+          image: gcr.io/google-samples/cassandra:v11
           name: cassandra
           ports:
             - containerPort: 7000
@@ -738,7 +739,7 @@ spec:
               #- containerPort: 9160
               #  name: thrift
           resources:
-            request:
+            requests:
               cpu: 0.5
           volumeMounts:
             - mountPath: /cassandra_data
