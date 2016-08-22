@@ -17,8 +17,6 @@ limitations under the License.
 package factory
 
 import (
-	"strings"
-
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd3"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
@@ -39,12 +37,8 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, error) {
 		return nil, err
 	}
 
-	endpoints := c.ServerList
-	for i, s := range endpoints {
-		endpoints[i] = strings.TrimLeft(s, "http://")
-	}
 	cfg := clientv3.Config{
-		Endpoints: endpoints,
+		Endpoints: c.ServerList,
 		TLS:       tlsConfig,
 	}
 	client, err := clientv3.New(cfg)
