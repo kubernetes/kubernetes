@@ -2668,6 +2668,17 @@ func (c *Cloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error)
 // Almost identical to updateInstanceSecurityGroupsForLoadBalancer, but it only adds ssg rules to
 // instances' inbound rules.
 func (c Cloud) updateInstanceSharedSecurityGroups(ssgID string, allInstances []*ec2.Instance) error {
+
+	// Get the actual list of groups that have this ssgID as part of its ingress rule.
+	describeRequest := &ec2.DescribeSecurityGroupsInput{}
+	filters := []*ec2.Filter{}
+	filters = append(filters, newEc2Filter("ip-permission.group-id", ssgID))
+	describeRequest.Filters = c.addFilters(filters)
+	actualGroups, err := c.ec2.DescribeSecurityGroups(describeRequest)
+	if err != nil {
+		return fmt.Errorf("error querying security groups for ssgID: %v", err)
+	}
+
 	taggedSecurityGroups, err := c.getTaggedSecurityGroups()
 	if err != nil {
 		return fmt.Errorf("error querying for tagged security groups: %v", err)
@@ -2699,6 +2710,21 @@ func (c Cloud) updateInstanceSharedSecurityGroups(ssgID string, allInstances []*
 		}
 
 		instanceSecurityGroupIds[id] = true
+	}
+
+	// Compare to actual groups
+	for _, actualGroup := range actualGroups {
+		actualGroupID := aws.StringValue(actualGroup.GroupId)
+		if actualGroupID == "" {
+			glog.Warning("Ignoring group without ID: ", actualGroup)
+			continue
+		}
+
+		adding, found := instanceSecurityGroupIds[actualGroupID]
+		if found && adding {
+			// We don't need to make a change; the permission is already in place
+			delete(instanceSecurityGroupIds, actualGroupID)
+		}
 	}
 
 	for instanceSecurityGroupId, _ := range instanceSecurityGroupIds {
