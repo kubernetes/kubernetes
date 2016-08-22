@@ -143,7 +143,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				},
 			},
 			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
-				return lister.ReplicationControllers(api.NamespaceAll).List(labels.Set{}.AsSelector())
+				return lister.ReplicationControllers(api.NamespaceAll).List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm", "foo"),
 		},
@@ -158,7 +158,7 @@ func TestStoreToReplicationControllerLister(t *testing.T) {
 				},
 			},
 			list: func(lister StoreToReplicationControllerLister) ([]api.ReplicationController, error) {
-				return lister.ReplicationControllers("hmm").List(labels.Set{}.AsSelector())
+				return lister.ReplicationControllers("hmm").List(labels.Set{}.AsSelectorPreValidated())
 			},
 			outRCNames: sets.NewString("hmm"),
 		},
@@ -715,7 +715,7 @@ func TestStoreToPodLister(t *testing.T) {
 		spl := StoreToPodLister{store}
 
 		// Verify that we can always look up by Namespace.
-		defaultPods, err := spl.Pods(api.NamespaceDefault).List(labels.Set{}.AsSelector())
+		defaultPods, err := spl.Pods(api.NamespaceDefault).List(labels.Set{}.AsSelectorPreValidated())
 		if err != nil {
 			t.Errorf("Unexpected error: %v", err)
 		} else if e, a := 1, len(defaultPods); e != a {
@@ -725,7 +725,7 @@ func TestStoreToPodLister(t *testing.T) {
 		}
 
 		for _, id := range ids {
-			got, err := spl.List(labels.Set{"name": id}.AsSelector())
+			got, err := spl.List(labels.Set{"name": id}.AsSelectorPreValidated())
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				continue
