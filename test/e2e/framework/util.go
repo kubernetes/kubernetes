@@ -3315,7 +3315,8 @@ func DeleteRCAndPods(c *client.Client, ns, name string) error {
 		}
 		return err
 	}
-	reaper, err := kubectl.ReaperForReplicationController(clientsetadapter.FromUnversionedClient(c).Core(), 10*time.Minute)
+	clientset := clientsetadapter.FromUnversionedClient(c)
+	reaper, err := kubectl.ReaperForReplicationController(clientset.Core(), clientset.Extensions(), 10*time.Minute)
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("RC %s was already deleted: %v", name, err)
