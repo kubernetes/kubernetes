@@ -267,7 +267,7 @@ func UsageError(cmd *cobra.Command, format string, args ...interface{}) error {
 }
 
 // Whether this cmd need watching objects.
-func isWatch(cmd *cobra.Command) bool {
+func IsWatch(cmd *cobra.Command) bool {
 	if w, err := cmd.Flags().GetBool("watch"); w && err == nil {
 		return true
 	}

@@ -235,7 +235,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			if err := printer.PrintObj(obj, out); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
-			printer.FinishPrint(errOut, mapping.Resource)
+			printer.FinishPrint(errOut, mapping.Resource, 0)
 		}
 
 		// print watched changes
@@ -253,7 +253,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			err := printer.PrintObj(e.Object, out)
 			if err == nil {
-				printer.FinishPrint(errOut, mapping.Resource)
+				printer.FinishPrint(errOut, mapping.Resource, 0)
 			}
 			return err
 		})
@@ -281,11 +281,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 
 	if generic {
-		clientConfig, err := f.ClientConfig()
-		if err != nil {
-			return err
-		}
-
 		allErrs := []error{}
 		singular := false
 		infos, err := r.IntoSingular(&singular).Infos()
@@ -296,26 +291,24 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			allErrs = append(allErrs, err)
 		}
 
-		// the outermost object will be converted to the output-version, but inner
-		// objects can use their mappings
-		version, err := cmdutil.OutputVersion(cmd, clientConfig.GroupVersion)
-		if err != nil {
-			return err
-		}
 		res := ""
 		if len(infos) > 0 {
 			res = infos[0].ResourceMapping().Resource
 		}
 
-		obj, err := resource.AsVersionedObject(infos, !singular, version, f.JSONEncoder())
-		if err != nil {
-			return err
+		hiddenObjNum := 0
+
+		for ix := range infos {
+			filter := kubectl.NewResourceFilter(filterOptionsForCommand(cmd, allNamespaces))
+			if isFiltered, _ := filter.Filter(infos[ix].Object); !isFiltered {
+				hiddenObjNum++
+				if err := printer.PrintObj(infos[ix].Object, out); err != nil {
+					allErrs = append(allErrs, err)
+				}
+			}
 		}
 
-		if err := printer.PrintObj(obj, out); err != nil {
-			allErrs = append(allErrs, err)
-		}
-		printer.FinishPrint(errOut, res)
+		printer.FinishPrint(errOut, res, hiddenObjNum)
 		return utilerrors.NewAggregate(allErrs)
 	}
 
@@ -364,6 +357,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	printer = nil
 	var lastMapping *meta.RESTMapping
 	w := kubectl.GetNewTabWriter(out)
+	hiddenObjNum := 0
 
 	if mustPrintWithKinds(objs, infos, sorter) {
 		showKind = true
@@ -382,7 +376,8 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
 			if printer != nil {
 				w.Flush()
-				printer.FinishPrint(errOut, lastMapping.Resource)
+				printer.FinishPrint(errOut, lastMapping.Resource, hiddenObjNum)
+				hiddenObjNum = 0
 			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
@@ -391,6 +386,14 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			lastMapping = mapping
 		}
+
+		// filter objects if filter has been defined for current object
+		filter := kubectl.NewResourceFilter(filterOptionsForCommand(cmd, allNamespaces))
+		if isFiltered, _ := filter.Filter(original); isFiltered {
+			hiddenObjNum++
+			continue
+		}
+
 		if resourcePrinter, found := printer.(*kubectl.HumanReadablePrinter); found {
 			resourceName := resourcePrinter.GetResourceKind()
 			if mapping != nil {
@@ -422,7 +425,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 	w.Flush()
 	if printer != nil {
-		printer.FinishPrint(errOut, lastMapping.Resource)
+		printer.FinishPrint(errOut, lastMapping.Resource, hiddenObjNum)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -450,4 +453,24 @@ func mustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *k
 	}
 
 	return false
+}
+
+// filterOptionsForCommand instantiates FilterOptions which makes use of PrintOptions in order
+// implement specific filter handlers for resources before they are printed
+func filterOptionsForCommand(cmd *cobra.Command, withNamespace bool) *kubectl.FilterOptions {
+	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
+	if err != nil {
+		columnLabel = []string{}
+	}
+	return &kubectl.FilterOptions{
+		kubectl.PrintOptions{
+			NoHeaders:          cmdutil.GetFlagBool(cmd, "no-headers"),
+			WithNamespace:      withNamespace,
+			Wide:               cmdutil.GetWideFlag(cmd),
+			ShowAll:            cmdutil.GetFlagBool(cmd, "show-all"),
+			ShowLabels:         cmdutil.GetFlagBool(cmd, "show-labels"),
+			AbsoluteTimestamps: cmdutil.IsWatch(cmd),
+			ColumnLabels:       columnLabel,
+		},
+	}
 }

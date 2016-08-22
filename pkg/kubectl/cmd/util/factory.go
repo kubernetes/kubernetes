@@ -1293,7 +1293,7 @@ func (f *Factory) PrinterForMapping(cmd *cobra.Command, mapping *meta.RESTMappin
 			Wide:               GetWideFlag(cmd),
 			ShowAll:            GetFlagBool(cmd, "show-all"),
 			ShowLabels:         GetFlagBool(cmd, "show-labels"),
-			AbsoluteTimestamps: isWatch(cmd),
+			AbsoluteTimestamps: IsWatch(cmd),
 			ColumnLabels:       columnLabel,
 		})
 		if err != nil {
