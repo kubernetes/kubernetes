@@ -100,6 +100,8 @@ func TestIngressController(t *testing.T) {
 	assert.True(t, reflect.DeepEqual(&ing1, updatedIngress))
 
 	// Test add cluster
+	ing1.Annotations[staticIPAnnotationKey] = "foo" // Make sure that the base object has a static IP name first.
+	ingressWatch.Modify(&ing1)
 	clusterWatch.Add(cluster2)
 	createdIngress2 := GetIngressFromChan(cluster2CreateChan)
 	assert.NotNil(t, createdIngress2)

@@ -39,7 +39,8 @@ import (
 )
 
 const (
-	allClustersKey = "ALL_CLUSTERS"
+	allClustersKey        = "ALL_CLUSTERS"
+	staticIPAnnotationKey = "ingress.kubernetes.io/static-ip" // TODO: Get this directly from the Kubernetes Ingress Controller constant
 )
 
 type IngressController struct {
@@ -72,16 +73,6 @@ type IngressController struct {
 	smallDelay            time.Duration
 	updateTimeout         time.Duration
 }
-
-// A structure passed by delaying deliverer. It contains an ingress that should be reconciled and
-// the number of previous attempts that ended up in some kind of ingress-related
-// error (like failure to create).
-/*
-type ingressItem struct {
-	ingress      string
-	prevAttempts int64
-}
-*/
 
 // NewIngressController returns a new ingress controller
 func NewIngressController(client federation_release_1_4.Interface) *IngressController {
@@ -280,7 +271,8 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 
 	operations := make([]util.FederatedOperation, 0)
 
-	for _, cluster := range clusters {
+	for clusterIndex, cluster := range clusters {
+		_, baseIPExists := baseIngress.ObjectMeta.Annotations[staticIPAnnotationKey]
 		clusterIngressObj, found, err := ic.ingressFederatedInformer.GetTargetStore().GetByKey(cluster.Name, key)
 		if err != nil {
 			glog.Errorf("Failed to get %s from %s: %v", ingress, cluster.Name, err)
@@ -296,22 +288,51 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 			// We can't supply server-created fields when creating a new object.
 			desiredIngress.ObjectMeta.ResourceVersion = ""
 			desiredIngress.ObjectMeta.UID = ""
-			operations = append(operations, util.FederatedOperation{
-				Type:        util.OperationTypeAdd,
-				Obj:         desiredIngress,
-				ClusterName: cluster.Name,
-			})
+			// We always first create an ingress in the first available cluster.  Once that ingress
+			// has been created and allocated a global IP (visible via an annotation),
+			// we record that annotation on the federated ingress, and create all other cluster
+			// ingresses with that same global IP.
+			// Note: If the first cluster becomes (e.g. temporarily) unavailable, the second cluster will be allocated
+			// index 0, but eventually all ingresses will share the single global IP recorded in the annotation
+			// of the federated ingress.
+			if baseIPExists || (clusterIndex == 0) {
+				operations = append(operations, util.FederatedOperation{
+					Type:        util.OperationTypeAdd,
+					Obj:         desiredIngress,
+					ClusterName: cluster.Name,
+				})
+			}
 		} else {
 			clusterIngress := clusterIngressObj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Found existing Ingress %s in cluster %s - checking if update is required", ingress, cluster.Name)
+			clusterIPName, clusterIPExists := clusterIngress.ObjectMeta.Annotations[staticIPAnnotationKey]
+			if !baseIPExists && clusterIPExists {
+				// Add annotation to federated ingress via API.
+				original, err := ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Get(baseIngress.Name)
+				if err == nil {
+					original.ObjectMeta.Annotations[staticIPAnnotationKey] = clusterIPName
+					if _, err = ic.federatedApiClient.Extensions().Ingresses(baseIngress.Namespace).Update(original); err != nil {
+						glog.Errorf("Failed to add static IP annotation to federated ingress %q: %v", ingress, err)
+					}
+				} else {
+					glog.Errorf("Failed to get federated ingress %q: %v", ingress, err)
+				}
+			}
 			// Update existing ingress, if needed.
 			if !util.ObjectMetaIsEquivalent(desiredIngress.ObjectMeta, clusterIngress.ObjectMeta) ||
 				!reflect.DeepEqual(desiredIngress.Spec, clusterIngress.Spec) {
+				// TODO: In some cases Ingress controllers in the clusters add annotations, so we ideally need to exclude those from
+				// the equivalence comparison to cut down on unnecessary updates.
 				glog.V(4).Infof("Ingress %s in cluster %s needs an update: cluster ingress %v is not equivalent to federated ingress %v", ingress, cluster.Name, clusterIngress, desiredIngress)
 				// We need to use server-created fields from the cluster, not the desired object when updating.
 				desiredIngress.ObjectMeta.ResourceVersion = clusterIngress.ObjectMeta.ResourceVersion
 				desiredIngress.ObjectMeta.UID = clusterIngress.ObjectMeta.UID
-
+				// Merge any annotations on the federated ingress onto the underlying cluster ingress,
+				// overwriting duplicates.
+				// TODO: We should probably use a PATCH operation for this instead.
+				for key, val := range baseIngress.ObjectMeta.Annotations {
+					desiredIngress.ObjectMeta.Annotations[key] = val
+				}
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
 					Obj:         desiredIngress,
@@ -333,6 +354,6 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 		return
 	}
 
-	// Evertyhing is in order but lets be double sure
+	// Evertyhing is in order but lets be double sure - TODO: quinton: Why? This seems like a hack.
 	ic.deliverIngress(ingress, ic.ingressReviewDelay, false)
 }
