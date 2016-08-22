@@ -1237,46 +1237,49 @@ func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
 }
 
 // waitForAttachmentStatus polls until the attachment status is the expected value
-// TODO(justinsb): return (bool, error)
-func (d *awsDisk) waitForAttachmentStatus(status string) error {
-	// TODO: There may be a faster way to get this when we're attaching locally
+// On success, it returns the last attachment state.
+func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
 	attempt := 0
 	maxAttempts := 60
 
 	for {
 		info, err := d.describeVolume()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if len(info.Attachments) > 1 {
+			// Shouldn't happen; log so we know if it is
 			glog.Warningf("Found multiple attachments for volume: %v", info)
 		}
+		var attachment *ec2.VolumeAttachment
 		attachmentStatus := ""
-		for _, attachment := range info.Attachments {
+		for _, a := range info.Attachments {
 			if attachmentStatus != "" {
-				glog.Warning("Found multiple attachments: ", info)
+				// Shouldn't happen; log so we know if it is
+				glog.Warningf("Found multiple attachments: %v", info)
 			}
-			if attachment.State != nil {
-				attachmentStatus = *attachment.State
+			if a.State != nil {
+				attachment = a
+				attachmentStatus = *a.State
 			} else {
-				// Shouldn't happen, but don't panic...
-				glog.Warning("Ignoring nil attachment state: ", attachment)
+				// Shouldn't happen; log so we know if it is
+				glog.Warningf("Ignoring nil attachment state: %v", a)
 			}
 		}
 		if attachmentStatus == "" {
 			attachmentStatus = "detached"
 		}
 		if attachmentStatus == status {
-			return nil
+			return attachment, nil
 		}
-
-		glog.V(2).Infof("Waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 
 		attempt++
 		if attempt > maxAttempts {
 			glog.Warningf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
-			return errors.New("Timeout waiting for volume state")
+			return nil, fmt.Errorf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 		}
+
+		glog.V(2).Infof("Waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 
 		time.Sleep(1 * time.Second)
 	}
@@ -1397,13 +1400,27 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 		glog.V(2).Infof("AttachVolume request returned %v", attachResponse)
 	}
 
-	err = disk.waitForAttachmentStatus("attached")
+	attachment, err := disk.waitForAttachmentStatus("attached")
 	if err != nil {
 		return "", err
 	}
 
 	// The attach operation has finished
 	attachEnded = true
+
+	// Double check the attachment to be 100% sure we attached the correct volume at the correct mountpoint
+	// It could happen otherwise that we see the volume attached from a previous/separate AttachVolume call,
+	// which could theoretically be against a different device (or even instance).
+	if attachment == nil {
+		// Impossible?
+		return "", fmt.Errorf("unexpected state: attachment nil after attached")
+	}
+	if ec2Device != aws.StringValue(attachment.Device) {
+		return "", fmt.Errorf("disk attachment failed: requested device %q but found %q", ec2Device, aws.StringValue(attachment.Device))
+	}
+	if awsInstance.awsID != aws.StringValue(attachment.InstanceId) {
+		return "", fmt.Errorf("disk attachment failed: requested instance %q but found %q", awsInstance.awsID, aws.StringValue(attachment.InstanceId))
+	}
 
 	return hostDevice, nil
 }
@@ -1452,9 +1469,13 @@ func (c *Cloud) DetachDisk(diskName string, instanceName string) (string, error)
 		return "", errors.New("no response from DetachVolume")
 	}
 
-	err = disk.waitForAttachmentStatus("detached")
+	attachment, err := disk.waitForAttachmentStatus("detached")
 	if err != nil {
 		return "", err
+	}
+	if attachment != nil {
+		// We expect it to be nil, it is (maybe) interesting if it is not
+		glog.V(2).Infof("waitForAttachmentStatus returned non-nil attachment with state=detached: %v", attachment)
 	}
 
 	if mountDevice != "" {
