@@ -102,7 +102,7 @@ here are the steps:
 #
 
 # create a service to track all cassandra petset nodes
-kubectl create -f examples/storage/cassandra/cassandra-service-petset.yaml
+kubectl create -f examples/storage/cassandra/cassandra-service.yaml
 
 # create a petset
 kubectl create -f examples/storage/cassandra/cassandra-petset.yaml
@@ -111,19 +111,15 @@ kubectl create -f examples/storage/cassandra/cassandra-petset.yaml
 kubectl exec -ti cassandra-0 -- nodetool status
 
 # cleanup
-kubectl delete petset cassandra
-kubectl delete po cassandra-0
-kubectl delete po cassandra-1
-# till pods terminate
-kubectl get pv,pvc
-# use `kubectl delete pv` to delete the pv and pvc
+grace=$(kubectl get po cassandra-0 --template '{{.spec.terminationGracePeriodSeconds}}') \
+  && kubectl delete petset,po -l app=cassandra \
+  && echo "Sleeping $grace" \
+  && sleep $grace \
+  && kubectl delete pvc -l app=cassandra
 
 #
 # Resource Controller Example
 #
-
-# create a service to track all cassandra nodes
-kubectl create -f examples/storage/cassandra/cassandra-service.yaml
 
 # create a replication controller to replicate cassandra nodes
 kubectl create -f examples/storage/cassandra/cassandra-controller.yaml
@@ -159,7 +155,7 @@ within the Kubernetes Cluster.
 
 Here is the service description:
 
-<!-- BEGIN MUNGE: EXAMPLE cassandra-service-petset.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE cassandra-service.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -183,7 +179,7 @@ Create the service for the Pet Set:
 
 
 ```console
-$ kubectl create -f examples/storage/cassandra/cassandra-service-petset.yaml
+$ kubectl create -f examples/storage/cassandra/cassandra-service.yaml
 ```
 
 The following command shows if the service has been created.
