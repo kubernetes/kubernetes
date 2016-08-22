@@ -34,6 +34,8 @@ func TestFeatureGateFlag(t *testing.T) {
 		{fmt.Sprintf("--%s=", flagName), false, nil},
 		{fmt.Sprintf("--%s=allAlpha=false", flagName), false, nil},
 		{fmt.Sprintf("--%s=allAlpha=true", flagName), true, nil},
+		{fmt.Sprintf("--%s=allAlpha=true,allAlpha=false", flagName), false, nil},
+		{fmt.Sprintf("--%s=allAlpha=false,allAlpha=true", flagName), true, nil},
 		{fmt.Sprintf("--%s=allAlpha=banana", flagName), false, fmt.Errorf("invalid value of allAlpha")},
 	}
 	for i, test := range tests {
