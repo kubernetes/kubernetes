@@ -155,12 +155,13 @@ junitFilenamePrefix() {
     return
   fi
   mkdir -p "${KUBE_JUNIT_REPORT_DIR}"
-  local KUBE_TEST_API_NO_SLASH="${KUBE_TEST_API//\//-}"
-  # This filename isn't parsed by anything,
-  # and we must avoid exceeding 255 character filename limit.
-  KUBE_TEST_API_NO_SLASH="${KUBE_TEST_API_NO_SLASH//k8s.io-/}"
-  KUBE_TEST_API_NO_SLASH="$(echo "$KUBE_TEST_API_NO_SLASH"|sed 's/\([0-9]\)alpha\([0-9]\)/\1a\2/g;s/\([0-9]\)beta\([0-9]\)/\1b\2/g')"
-  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_NO_SLASH}_$(kube::util::sortable_date)"
+  # This filename isn't parsed by anything, and we must avoid
+  # exceeding 255 character filename limit. KUBE_TEST_API
+  # barely fits there and in coverage mode test names are
+  # appended to generated file names, easily exceeding
+  # 255 chars in length. So let's just sha1sum it.
+  local KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"|sha1sum|awk '{print $1}')"
+  echo "${KUBE_JUNIT_REPORT_DIR}/junit_${KUBE_TEST_API_HASH}_$(kube::util::sortable_date)"
 }
 
 produceJUnitXMLReport() {
