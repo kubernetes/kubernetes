@@ -37,8 +37,8 @@ Documentation for other releases can be found at
   - [tl;dr Quickstart](#tldr-quickstart)
   - [Step 1: Create a Cassandra Headless Service](#step-1-create-a-cassandra-headless-service)
   - [Step 2: Use a Pet Set to create Cassandra Ring](#step-2-create-a-cassandra-petset)
-  - [Step 3: Validate and Modify The Cassandra Pet Set](step-3-validate-and-modify-the-cassandra-pet-set)
-  - [Step 4: Delete Cassandra Pet Set](step-4-delete-cassandra-pet-set)
+  - [Step 3: Validate and Modify The Cassandra Pet Set](#step-3-validate-and-modify-the-cassandra-pet-set)
+  - [Step 4: Delete Cassandra Pet Set](#step-4-delete-cassandra-pet-set)
   - [Step 5: Use a Replication Controller to create Cassandra node pods](#step-5-use-a-replication-controller-to-create-cassandra-node-pods)
   - [Step 6: Scale up the Cassandra cluster](#step-6-scale-up-the-cassandra-cluster)
   - [Step 7: Delete the Replication Controller](#step-7-delete-the-replication-controller)
@@ -79,17 +79,13 @@ computer.
 The pods use the [```gcr.io/google-samples/cassandra:v11```](image/Dockerfile)
 image from Google's [container registry](https://cloud.google.com/container-registry/docs/).
 The docker is based on `debian:jessie` and includes OpenJDK 8. This image
-includes a standard Cassandra installation from the Apache Debian repo.  Through the use
-of environment variables you are able to change values that a:0
-re inserted into the `cassandra.yaml`.
+includes a standard Cassandra installation from the Apache Debian repo.  Through the use of environment variables you are able to change values that are inserted into the `cassandra.yaml`.
 
 | ENV VAR       | DEFAULT VALUE  |
 | ------------- |:-------------: |
 | CASSANDRA_CLUSTER_NAME | 'Test Cluster'  |
 | CASSANDRA_NUM_TOKENS  | 32               |
 | CASSANDRA_RPC_ADDRESS | 0.0.0.0          |
-
-<!-- TODO update with all options -->
 
 ## tl;dr Quickstart
 
@@ -150,7 +146,7 @@ A Kubernetes _[Service](../../../docs/user-guide/services.md)_ describes a set o
 Kubernetes, the atomic unit of an application is a Pod: one or more containers
 that _must_ be scheduled onto the same host.
 
-The Service is used for DNS lookups between Cassanadra Pods, and Cassandra clients
+The Service is used for DNS lookups between Cassandra Pods, and Cassandra clients
 within the Kubernetes Cluster.
 
 Here is the service description:
@@ -294,6 +290,8 @@ spec:
         requests:
           storage: 1Gi
 ```
+[Download example](cassandra-petset.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE cassandra-petset.yaml -->
 
 Create the Cassandra Pet Set as follows:
 
@@ -533,8 +531,6 @@ by the Service."
 
 The `replicas` attribute specifies the desired number of replicas, in this
 case 2 initially.  We'll scale up to more shortly.
-
-
 
 Create the Replication Controller:
 
