@@ -138,6 +138,6 @@ func NeighList(linkIndex, family int) ([]Neigh, error) {
 	return nil, ErrNotImplemented
 }
 
-func NeighDeserialize(m []byte) (*Ndmsg, *Neigh, error) {
-	return nil, nil, ErrNotImplemented
+func NeighDeserialize(m []byte) (*Neigh, error) {
+	return nil, ErrNotImplemented
 }

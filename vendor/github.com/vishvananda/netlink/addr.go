@@ -11,11 +11,13 @@ import (
 type Addr struct {
 	*net.IPNet
 	Label string
+	Flags int
+	Scope int
 }
 
 // String returns $ip/$netmask $label
 func (a Addr) String() string {
-	return fmt.Sprintf("%s %s", a.IPNet, a.Label)
+	return strings.TrimSpace(fmt.Sprintf("%s %s", a.IPNet, a.Label))
 }
 
 // ParseAddr parses the string representation of an address in the

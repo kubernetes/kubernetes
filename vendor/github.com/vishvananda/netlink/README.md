@@ -8,7 +8,7 @@ the kernel. It can be used to add and remove interfaces, set ip addresses
 and routes, and configure ipsec. Netlink communication requires elevated
 privileges, so in most cases this code needs to be run as root. Since
 low-level netlink messages are inscrutable at best, the library attempts
-to provide an api that is loosely modeled on the CLI provied by iproute2.
+to provide an api that is loosely modeled on the CLI provided by iproute2.
 Actions like `ip link add` will be accomplished via a similarly named
 function like AddLink(). This library began its life as a fork of the
 netlink functionality in
