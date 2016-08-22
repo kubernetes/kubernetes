@@ -33,7 +33,7 @@ import (
 )
 
 const (
-	PluginName = "SimpleDefaultStorageClassForPVC"
+	PluginName = "DefaultStorageClass"
 )
 
 func init() {
