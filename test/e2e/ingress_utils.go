@@ -43,6 +43,7 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
@@ -58,6 +59,9 @@ import (
 const (
 	rsaBits  = 2048
 	validFor = 365 * 24 * time.Hour
+
+	// Ingress class annotation defined in ingress repository.
+	ingressClass = "kubernetes.io/ingress.class"
 )
 
 type testJig struct {
@@ -65,6 +69,10 @@ type testJig struct {
 	rootCAs map[string][]byte
 	address string
 	ing     *extensions.Ingress
+	// class is the value of the annotation keyed under
+	// `kubernetes.io/ingress.class`. It's added to all ingresses created by
+	// this jig.
+	class string
 }
 
 type conformanceTests struct {
@@ -529,6 +537,7 @@ func gcloudDelete(resource, name, project string, args ...string) error {
 func gcloudCreate(resource, name, project string, args ...string) error {
 	framework.Logf("Creating %v in project %v: %v", resource, project, name)
 	argsList := append([]string{"compute", resource, "create", name, fmt.Sprintf("--project=%v", project)}, args...)
+	framework.Logf("Running command: gcloud %+v", strings.Join(argsList, " "))
 	output, err := exec.Command("gcloud", argsList...).CombinedOutput()
 	if err != nil {
 		framework.Logf("Error creating %v, output: %v\nerror: %+v", resource, string(output), err)
@@ -557,8 +566,9 @@ func (j *testJig) createIngress(manifestPath, ns string, ingAnnotations map[stri
 	}
 	j.ing = ingFromManifest(mkpath("ing.yaml"))
 	j.ing.Namespace = ns
-	if len(ingAnnotations) != 0 {
-		j.ing.Annotations = ingAnnotations
+	j.ing.Annotations = map[string]string{ingressClass: j.class}
+	for k, v := range ingAnnotations {
+		j.ing.Annotations[k] = v
 	}
 	framework.Logf(fmt.Sprintf("creating" + j.ing.Name + " ingress"))
 	var err error
@@ -717,4 +727,38 @@ type GCEIngressController struct {
 
 func newTestJig(c *client.Client) *testJig {
 	return &testJig{client: c, rootCAs: map[string][]byte{}}
+}
+
+// NginxIngressController manages implementation details of Ingress on Nginx.
+type NginxIngressController struct {
+	ns         string
+	rc         *api.ReplicationController
+	pod        *api.Pod
+	c          *client.Client
+	externalIP string
+}
+
+func (cont *NginxIngressController) init() {
+	mkpath := func(file string) string {
+		return filepath.Join(framework.TestContext.RepoRoot, ingressManifestPath, "nginx", file)
+	}
+	framework.Logf("initializing nginx ingress controller")
+	framework.RunKubectlOrDie("create", "-f", mkpath("rc.yaml"), fmt.Sprintf("--namespace=%v", cont.ns))
+
+	rc, err := cont.c.ReplicationControllers(cont.ns).Get("nginx-ingress-controller")
+	ExpectNoError(err)
+	cont.rc = rc
+
+	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
+	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
+	ExpectNoError(framework.WaitForPodsWithLabelRunning(cont.c, cont.ns, sel))
+	pods, err := cont.c.Pods(cont.ns).List(api.ListOptions{LabelSelector: sel})
+	ExpectNoError(err)
+	if len(pods.Items) == 0 {
+		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)
+	}
+	cont.pod = &pods.Items[0]
+	cont.externalIP, err = framework.GetHostExternalAddress(cont.c, cont.pod)
+	ExpectNoError(err)
+	framework.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
 }
