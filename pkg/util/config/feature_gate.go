@@ -33,9 +33,11 @@ const (
 	// To add a new feature, define a key for it below and add
 	// a featureInfo entry to knownFeatures.
 
-	// allAlpha is a global toggle for alpha features. Per feature key
-	// values override the default set by allAlpha.
-	// e.g. allAlpha=false,newFeature=true will result in newFeature=true
+	// allAlpha is a global toggle for alpha features. Per-feature key
+	// values override the default set by allAlpha, if they come later in the
+	// specification of gates. Examples:
+	//   allAlpha=false,newFeature=true  will result in newFeature=true
+	//   allAlpha=true,newFeature=false  will result in newFeature=false
 	allAlpha = "allAlpha"
 )
 
@@ -48,6 +50,12 @@ var (
 		allAlpha: {false, alpha},
 	}
 
+	// Special handling for a few gates.
+	specialFeatures = map[string]func(f *featureGate, val bool){
+		allAlpha: setUnsetAlphaGates,
+	}
+
+	// Values for prerelease.
 	alpha = prerelease("ALPHA")
 	beta  = prerelease("BETA")
 	ga    = prerelease("")
@@ -75,6 +83,16 @@ type featureGate struct {
 	features map[string]bool
 }
 
+func setUnsetAlphaGates(f *featureGate, val bool) {
+	for k, v := range knownFeatures {
+		if v.prerelease == alpha {
+			if _, found := f.features[k]; !found {
+				f.features[k] = val
+			}
+		}
+	}
+}
+
 // Set, String, and Type implement pflag.Value
 
 // Set Parses a string of the form // "key1=value1,key2=value2,..." into a
@@ -100,7 +118,13 @@ func (f *featureGate) Set(value string) error {
 			return fmt.Errorf("invalid value of %s: %s, err: %v", k, v, err)
 		}
 		f.features[k] = boolValue
+
+		// Handle "special" features like "all alpha gates"
+		if fn, found := specialFeatures[k]; found {
+			fn(f, boolValue)
+		}
 	}
+
 	glog.Infof("feature gates: %v", f.features)
 	return nil
 }
