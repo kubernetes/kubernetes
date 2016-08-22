@@ -94,12 +94,6 @@ type Store struct {
 	// DeleteCollection call.
 	DeleteCollectionWorkers int
 
-	// Called on all objects returned from the underlying store, after
-	// the exit hooks are invoked. Decorators are intended for integrations
-	// that are above storage and should only be used for specific cases where
-	// storage of the value is not appropriate, since they cannot
-	// be watched.
-	Decorator rest.ObjectFunc
 	// Allows extended behavior during creation, required
 	CreateStrategy rest.RESTCreateStrategy
 	// On create of an object, attempt to run a further operation.
@@ -231,11 +225,6 @@ func (e *Store) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	}
 	if e.AfterCreate != nil {
 		if err := e.AfterCreate(out); err != nil {
-			return nil, err
-		}
-	}
-	if e.Decorator != nil {
-		if err := e.Decorator(obj); err != nil {
 			return nil, err
 		}
 	}
@@ -413,11 +402,6 @@ func (e *Store) Update(ctx api.Context, name string, objInfo rest.UpdatedObjectI
 			}
 		}
 	}
-	if e.Decorator != nil {
-		if err := e.Decorator(out); err != nil {
-			return nil, false, err
-		}
-	}
 	return out, creating, nil
 }
 
@@ -430,11 +414,6 @@ func (e *Store) Get(ctx api.Context, name string) (runtime.Object, error) {
 	}
 	if err := e.Storage.Get(ctx, key, obj, false); err != nil {
 		return nil, storeerr.InterpretGetError(err, e.QualifiedResource, name)
-	}
-	if e.Decorator != nil {
-		if err := e.Decorator(obj); err != nil {
-			return nil, err
-		}
 	}
 	return obj, nil
 }
@@ -766,11 +745,6 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 		}
 	}
 	if e.ReturnDeletedObject {
-		if e.Decorator != nil {
-			if err := e.Decorator(obj); err != nil {
-				return nil, err
-			}
-		}
 		return obj, nil
 	}
 	return &unversioned.Status{Status: unversioned.StatusSuccess}, nil
@@ -819,12 +793,6 @@ func (e *Store) createFilter(m *generic.SelectionPredicate) storage.Filter {
 		if err != nil {
 			glog.Errorf("unable to match watch: %v", err)
 			return false
-		}
-		if matches && e.Decorator != nil {
-			if err := e.Decorator(obj); err != nil {
-				glog.Errorf("unable to decorate watch: %v", err)
-				return false
-			}
 		}
 		return matches
 	}
