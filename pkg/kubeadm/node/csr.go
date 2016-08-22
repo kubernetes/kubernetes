@@ -42,24 +42,25 @@ func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Conf
 		return nil, err
 	}
 	// TODO try all the api servers until we find one that works
-	configBootstrap := kubeadmutil.CreateBasicClientConfig(
+	bareClientConfig := kubeadmutil.CreateBasicClientConfig(
 		"kubernetes", strings.Split(params.Discovery.ApiServerURLs, ",")[0], pemData,
 	)
 
 	nodeName := getNodeName()
 
-	configBootstrap = kubeadmutil.MakeClientConfigWithToken(
-		configBootstrap, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName), params.Discovery.BearerToken,
-	)
-	clientConfig, err := clientcmd.NewDefaultClientConfig(
-		*configBootstrap,
+	bootstrapClientConfig, err := clientcmd.NewDefaultClientConfig(
+		*kubeadmutil.MakeClientConfigWithToken(
+			bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName), params.Discovery.BearerToken,
+		),
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("loaded bootstrap client configuration: %#v\n", bootstrapClientConfig)
 
-	client, err := unversionedcertificates.NewForConfig(clientConfig)
+	fmt.Println("creating CSR...")
+	client, err := unversionedcertificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create certificates signing request client: %v", err)
 	}
@@ -69,16 +70,16 @@ func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Conf
 	if err != nil {
 		return nil, fmt.Errorf("error generating key: %v", err)
 	}
+	fmt.Println("CSR created, asking the API server to sign it...")
 	// Pass 'requestClientCertificate()' the CSR client, existing key data, and node name to
 	// request for client certificate from the API server.
 	certData, err := kubeletapp.RequestClientCertificate(csrClient, keyData, nodeName)
 	if err != nil {
 		return nil, fmt.Errorf("unable to request certificate from API server: %v", err)
 	}
-	// TODO transform clientcert into kubeconfig so that it can be written out on the node
 
 	finalConfig := kubeadmutil.MakeClientConfigWithCerts(
-		configBootstrap, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName),
+		bareClientConfig, "kubernetes", fmt.Sprintf("kubelet-%s", nodeName),
 		keyData, certData,
 	)
 
