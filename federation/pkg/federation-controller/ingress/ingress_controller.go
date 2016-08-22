@@ -29,6 +29,7 @@ import (
 	// "k8s.io/kubernetes/pkg/apis/extensions"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
+	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
@@ -110,7 +111,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	// Federated informer on ingresses in members of federation.
 	ic.ingressFederatedInformer = util.NewFederatedInformer(
 		client,
-		func(cluster *federation_api.Cluster, targetClient federation_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
+		func(cluster *federation_api.Cluster, targetClient kube_release_1_4.Interface) (cache.Store, framework.ControllerInterface) {
 			return framework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
@@ -141,19 +142,19 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 
 	// Federated updater along with Create/Update/Delete operations.
 	ic.federatedUpdater = util.NewFederatedUpdater(ic.ingressFederatedInformer,
-		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to create Ingress: %v", ingress)
 			_, err := client.Extensions().Ingresses(ingress.Namespace).Create(ingress)
 			return err
 		},
-		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to update Ingress: %v", ingress)
 			_, err := client.Extensions().Ingresses(ingress.Namespace).Update(ingress)
 			return err
 		},
-		func(client federation_release_1_4.Interface, obj pkg_runtime.Object) error {
+		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
 			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &api.DeleteOptions{})
