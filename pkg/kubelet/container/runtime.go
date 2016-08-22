@@ -392,6 +392,9 @@ type RunContainerOptions struct {
 	ReadOnly bool
 	// hostname for pod containers
 	Hostname string
+	// EnableHostUserNamespace is true if it is recommended to use the host user namespace in the container
+	// runtime.  This is experimental.
+	EnableHostUserNamespace bool
 }
 
 // VolumeInfo contains information about the volume.

@@ -166,6 +166,7 @@ executor-suicide-timeout
 exit-on-lock-contention
 experimental-bootstrap-kubeconfig
 experimental-flannel-overlay
+experimental-host-user-namespace-defaulting
 experimental-keystone-url
 experimental-nvidia-gpus
 experimental-prefix
