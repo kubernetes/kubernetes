@@ -661,15 +661,15 @@ var _ = framework.KubeDescribe("Density", func() {
 				framework.ExpectNoError(framework.VerifyPodStartupLatency(podStartupLatency))
 
 				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
+
+				By("Removing additional replication controllers")
+				for i := 1; i <= nodeCount; i++ {
+					name := additionalPodsPrefix + "-" + strconv.Itoa(i)
+					c.ReplicationControllers(ns).Delete(name, nil)
+				}
 			}
 
 			cleanupDensityTest(dConfig)
-
-			By("Removing additional replication controllers if any")
-			for i := 1; i <= nodeCount; i++ {
-				name := additionalPodsPrefix + "-" + strconv.Itoa(i)
-				c.ReplicationControllers(ns).Delete(name, nil)
-			}
 		})
 	}
 
