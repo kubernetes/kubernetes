@@ -264,9 +264,10 @@ func (kd *KubeDNS) removeService(obj interface{}) {
 		subCachePath := append(kd.domainPath, serviceSubdomain, s.Namespace, s.Name)
 		kd.cacheLock.Lock()
 		defer kd.cacheLock.Unlock()
-		kd.cache.deletePath(subCachePath...)
+		success := kd.cache.deletePath(subCachePath...)
+		glog.V(2).Infof("Removing service %v at path %v. Success: ", s.Name, subCachePath, success)
 		// ExternalName services have no IP
-		if s.Spec.ClusterIP != kapi.ClusterIPNone {
+		if kapi.IsServiceIPSet(s) {
 			delete(kd.reverseRecordMap, s.Spec.ClusterIP)
 			delete(kd.clusterIPServiceMap, s.Spec.ClusterIP)
 		}
@@ -445,11 +446,12 @@ func (kd *KubeDNS) newExternalNameService(service *kapi.Service) {
 	// Create a CNAME record for the service's ExternalName.
 	// TODO: TTL?
 	recordValue, _ := getSkyMsg(service.Spec.ExternalName, 0)
-	cachePath := (append(kd.domainPath, serviceSubdomain, service.Namespace))
+	cachePath := append(kd.domainPath, serviceSubdomain, service.Namespace)
 	fqdn := kd.fqdn(service)
 	glog.V(2).Infof("newExternalNameService: storing key %s with value %v as %s under %v", service.Name, recordValue, fqdn, cachePath)
 	kd.cacheLock.Lock()
 	defer kd.cacheLock.Unlock()
+	// Store the service name directly as the leaf key
 	kd.cache.setEntry(service.Name, recordValue, fqdn, cachePath...)
 }
 

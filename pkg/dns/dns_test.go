@@ -261,7 +261,7 @@ func TestSkyNamedPortSRVLookup(t *testing.T) {
 
 func TestSimpleExternalService(t *testing.T) {
 	kd := newKubeDNS()
-	s := newExternalService()
+	s := newExternalNameService()
 	assert.NoError(t, kd.servicesStore.Add(s))
 
 	kd.newService(s)
@@ -572,7 +572,7 @@ func newService(namespace, serviceName, clusterIP, portName string, portNumber i
 	return &service
 }
 
-func newExternalService() *kapi.Service {
+func newExternalNameService() *kapi.Service {
 	service := kapi.Service{
 		ObjectMeta: kapi.ObjectMeta{
 			Name:      testService,
