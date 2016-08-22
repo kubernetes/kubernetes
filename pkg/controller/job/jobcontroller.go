@@ -94,7 +94,7 @@ func NewJobController(podInformer framework.SharedIndexInformer, kubeClient clie
 			Recorder:   eventBroadcaster.NewRecorder(api.EventSource{Component: "job-controller"}),
 		},
 		expectations: controller.NewControllerExpectations(),
-		queue:        workqueue.New(),
+		queue:        workqueue.NewNamed("job"),
 		recorder:     eventBroadcaster.NewRecorder(api.EventSource{Component: "job-controller"}),
 	}
 

@@ -67,7 +67,7 @@ func NewNamespaceController(
 	namespaceController := &NamespaceController{
 		kubeClient: kubeClient,
 		clientPool: clientPool,
-		queue:      workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "namespace"),
 		groupVersionResources: groupVersionResources,
 		opCache:               operationNotSupportedCache{},
 		finalizerToken:        finalizerToken,

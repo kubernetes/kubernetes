@@ -81,8 +81,8 @@ func NewTokensController(cl clientset.Interface, options TokensControllerOptions
 		token:  options.TokenGenerator,
 		rootCA: options.RootCA,
 
-		syncServiceAccountQueue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
-		syncSecretQueue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		syncServiceAccountQueue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_service"),
+		syncSecretQueue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "serviceaccount_tokens_secret"),
 
 		maxRetries: maxRetries,
 	}

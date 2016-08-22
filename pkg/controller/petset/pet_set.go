@@ -94,7 +94,7 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 		newSyncer: func(blockingPet *pcb) *petSyncer {
 			return &petSyncer{pc, blockingPet}
 		},
-		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		queue: workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "petset"),
 	}
 
 	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{

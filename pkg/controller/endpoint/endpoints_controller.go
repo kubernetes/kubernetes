@@ -76,7 +76,7 @@ func NewEndpointController(podInformer framework.SharedIndexInformer, client *cl
 	}
 	e := &EndpointController{
 		client: client,
-		queue:  workqueue.New(),
+		queue:  workqueue.NewNamed("endpoint"),
 	}
 
 	e.serviceStore.Store, e.serviceController = framework.NewInformer(
