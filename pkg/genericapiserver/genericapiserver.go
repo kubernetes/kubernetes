@@ -58,7 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/ui"
 	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/crypto"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -210,27 +209,22 @@ type GenericAPIServer struct {
 	// "Inputs", Copied from Config
 	ServiceClusterIPRange *net.IPNet
 	ServiceNodePortRange  utilnet.PortRange
-	cacheTimeout          time.Duration
 	MinRequestTimeout     time.Duration
 
-	mux                   apiserver.Mux
-	MuxHelper             *apiserver.MuxHelper
-	HandlerContainer      *restful.Container
-	RootWebService        *restful.WebService
-	enableLogsSupport     bool
-	enableUISupport       bool
-	enableSwaggerSupport  bool
-	enableSwaggerUI       bool
-	enableProfiling       bool
-	enableWatchCache      bool
-	APIPrefix             string
-	APIGroupPrefix        string
-	corsAllowedOriginList []string
-	authenticator         authenticator.Request
-	authorizer            authorizer.Authorizer
-	AdmissionControl      admission.Interface
-	MasterCount           int
-	RequestContextMapper  api.RequestContextMapper
+	mux                  apiserver.Mux
+	MuxHelper            *apiserver.MuxHelper
+	HandlerContainer     *restful.Container
+	RootWebService       *restful.WebService
+	enableSwaggerSupport bool
+	enableSwaggerUI      bool
+	enableWatchCache     bool
+	APIPrefix            string
+	APIGroupPrefix       string
+	authenticator        authenticator.Request
+	authorizer           authorizer.Authorizer
+	AdmissionControl     admission.Interface
+	MasterCount          int
+	RequestContextMapper api.RequestContextMapper
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -240,7 +234,6 @@ type GenericAPIServer struct {
 	PublicReadWritePort  int
 	ServiceReadWriteIP   net.IP
 	ServiceReadWritePort int
-	masterServices       *async.Runner
 	ExtraServicePorts    []api.ServicePort
 	ExtraEndpointPorts   []api.EndpointPort
 
@@ -366,22 +359,17 @@ func New(c *Config) (*GenericAPIServer, error) {
 		ServiceClusterIPRange: c.ServiceClusterIPRange,
 		ServiceNodePortRange:  c.ServiceNodePortRange,
 		RootWebService:        new(restful.WebService),
-		enableLogsSupport:     c.EnableLogsSupport,
-		enableUISupport:       c.EnableUISupport,
 		enableSwaggerSupport:  c.EnableSwaggerSupport,
 		enableSwaggerUI:       c.EnableSwaggerUI,
-		enableProfiling:       c.EnableProfiling,
 		enableWatchCache:      c.EnableWatchCache,
 		APIPrefix:             c.APIPrefix,
 		APIGroupPrefix:        c.APIGroupPrefix,
-		corsAllowedOriginList: c.CorsAllowedOriginList,
 		authenticator:         c.Authenticator,
 		authorizer:            c.Authorizer,
 		AdmissionControl:      c.AdmissionControl,
 		RequestContextMapper:  c.RequestContextMapper,
 		Serializer:            c.Serializer,
 
-		cacheTimeout:      c.CacheTimeout,
 		MinRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
 
 		MasterCount:          c.MasterCount,
