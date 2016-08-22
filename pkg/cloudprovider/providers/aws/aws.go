@@ -1252,28 +1252,13 @@ func (d *awsDisk) describeVolume() (*ec2.Volume, error) {
 // waitForAttachmentStatus polls until the attachment status is the expected value
 // On success, it returns the last attachment state.
 func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment, error) {
-	// We wait up to 30 minutes for the attachment to complete.
-	// This mirrors the GCE timeout.
-	timeoutAt := time.Now().UTC().Add(volumeAttachmentStatusTimeout).Unix()
-
-	// Because of rate limiting, we often see errors from describeVolume
-	// So we tolerate a limited number of failures.
-	// But once we see more than 10 errors in a row, we return the error
-	describeErrorCount := 0
+	attempt := 0
+	maxAttempts := 60
 
 	for {
 		info, err := d.describeVolume()
 		if err != nil {
-			describeErrorCount++
-			if describeErrorCount > volumeAttachmentStatusConsecutiveErrorLimit {
-				return nil, err
-			} else {
-				glog.Warningf("Ignoring error from describe volume; will retry: %q", err)
-				time.Sleep(volumeAttachmentStatusErrorDelay)
-				continue
-			}
-		} else {
-			describeErrorCount = 0
+			return nil, err
 		}
 		if len(info.Attachments) > 1 {
 			// Shouldn't happen; log so we know if it is
@@ -1301,14 +1286,15 @@ func (d *awsDisk) waitForAttachmentStatus(status string) (*ec2.VolumeAttachment,
 			return attachment, nil
 		}
 
-		if time.Now().Unix() > timeoutAt {
+		attempt++
+		if attempt > maxAttempts {
 			glog.Warningf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 			return nil, fmt.Errorf("Timeout waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 		}
 
 		glog.V(2).Infof("Waiting for volume state: actual=%s, desired=%s", attachmentStatus, status)
 
-		time.Sleep(volumeAttachmentStatusPollInterval)
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -1445,13 +1431,13 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 	// which could theoretically be against a different device (or even instance).
 	if attachment == nil {
 		// Impossible?
-		return "", fmt.Errorf("unexpected state: attachment nil after attached %q to %q", diskName, instanceName)
+		return "", fmt.Errorf("unexpected state: attachment nil after attached")
 	}
 	if ec2Device != aws.StringValue(attachment.Device) {
-		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, instanceName, ec2Device, aws.StringValue(attachment.Device))
+		return "", fmt.Errorf("disk attachment failed: requested device %q but found %q", ec2Device, aws.StringValue(attachment.Device))
 	}
 	if awsInstance.awsID != aws.StringValue(attachment.InstanceId) {
-		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, instanceName, awsInstance.awsID, aws.StringValue(attachment.InstanceId))
+		return "", fmt.Errorf("disk attachment failed: requested instance %q but found %q", awsInstance.awsID, aws.StringValue(attachment.InstanceId))
 	}
 
 	return hostDevice, nil
