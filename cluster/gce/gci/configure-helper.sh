@@ -504,7 +504,7 @@ function start-kubelet {
      flags+=" --configure-cbr0=${ALLOCATE_NODE_CIDRS}"
   fi
   if [[ -n "${FEATURE_GATES:-}" ]]; then
-     flags+=" --feature-gates=${feature_gates}"
+     flags+=" --feature-gates=${FEATURE_GATES}"
   fi
   echo "KUBELET_OPTS=\"${flags}\"" > /etc/default/kubelet
 
