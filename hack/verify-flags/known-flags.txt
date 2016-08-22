@@ -50,7 +50,7 @@ build-tag
 cadvisor-port
 cert-dir
 certificate-authority
-cgroups-per-qos
+experimental-cgroups-per-qos
 cgroup-root
 chaos-chance
 clean-start

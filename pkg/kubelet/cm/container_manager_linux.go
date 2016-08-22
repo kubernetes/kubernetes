@@ -168,7 +168,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	// Check if Cgroup-root actually exists on the node
 	if nodeConfig.CgroupsPerQOS {
 		if nodeConfig.CgroupRoot == "" {
-			return nil, fmt.Errorf("invalid configuration: cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
+			return nil, fmt.Errorf("invalid configuration: experimental-cgroups-per-qos was specified and cgroup-root was not specified. To enable the QoS cgroup hierarchy you need to specify a valid cgroup-root")
 		}
 		if _, err := os.Stat(nodeConfig.CgroupRoot); err != nil {
 			return nil, fmt.Errorf("invalid configuration: cgroup-root doesn't exist : %v", err)

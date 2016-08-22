@@ -82,7 +82,7 @@ func (e *E2EServices) Start() error {
 		// out of the test.
 		"--node-name", framework.TestContext.NodeName,
 		"--disable-kubenet="+strconv.FormatBool(framework.TestContext.DisableKubenet),
-		"--cgroups-per-qos="+strconv.FormatBool(framework.TestContext.CgroupsPerQOS),
+		"--experimental-cgroups-per-qos="+strconv.FormatBool(framework.TestContext.CgroupsPerQOS),
 		"--manifest-path", framework.TestContext.ManifestPath,
 		"--eviction-hard", framework.TestContext.EvictionHard,
 	)
@@ -374,7 +374,7 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 	)
 	if framework.TestContext.CgroupsPerQOS {
 		cmdArgs = append(cmdArgs,
-			"--cgroups-per-qos", "true",
+			"--experimental-cgroups-per-qos", "true",
 		)
 	}
 	if !framework.TestContext.DisableKubenet {
