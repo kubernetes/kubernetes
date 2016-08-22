@@ -33,7 +33,7 @@
 				"containers": [
 				{
 					"name": "heapster",
-					"image": "gcr.io/google_containers/heapster:v1.1.0",
+					"image": "gcr.io/google_containers/heapster:v1.2.0-beta.1",
 					"resources": {
 						"requests": {
 							"cpu": "100m",
@@ -55,7 +55,7 @@
 				},
 				{
 					"name": "eventer",
-					"image": "gcr.io/google_containers/heapster:v1.1.0",
+					"image": "gcr.io/google_containers/heapster:v1.2.0-beta.1",
 					"resources": {
 						"requests": {
 							"cpu": "100m",
