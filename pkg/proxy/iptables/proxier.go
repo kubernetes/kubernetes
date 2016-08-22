@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/types"
+	featuregate "k8s.io/kubernetes/pkg/util/config"
 	utilexec "k8s.io/kubernetes/pkg/util/exec"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -453,7 +454,7 @@ func (proxier *Proxier) OnServiceUpdate(allServices []api.Service) {
 			info.loadBalancerStatus = *api.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
 			info.sessionAffinityType = service.Spec.SessionAffinity
 			info.loadBalancerSourceRanges = service.Spec.LoadBalancerSourceRanges
-			info.onlyNodeLocalEndpoints = apiservice.NeedsHealthCheck(service)
+			info.onlyNodeLocalEndpoints = apiservice.NeedsHealthCheck(service) && featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly()
 			if info.onlyNodeLocalEndpoints {
 				p := apiservice.GetServiceHealthCheckNodePort(service)
 				if p == 0 {
@@ -558,6 +559,7 @@ func (proxier *Proxier) OnEndpointsUpdate(allEndpoints []api.Endpoints) {
 					var isLocalEndpoint bool
 					if addr.NodeName != nil {
 						isLocalEndpoint = *addr.NodeName == proxier.hostname
+						isLocalEndpoint = featuregate.DefaultFeatureGate.ExternalTrafficLocalOnly() && isLocalEndpoint
 					}
 					hostPortObject := hostPortInfo{
 						host:          addr.IP,

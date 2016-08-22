@@ -37,6 +37,8 @@ const (
 	// values override the default set by allAlpha.
 	// e.g. allAlpha=false,newFeature=true will result in newFeature=true
 	allAlpha = "allAlpha"
+
+	externalTrafficLocalOnly = "externalTrafficLocalOnly"
 )
 
 var (
@@ -45,7 +47,8 @@ var (
 
 	// Default values for recorded features.
 	knownFeatures = map[string]featureInfo{
-		allAlpha: {false, alpha},
+		allAlpha:                 {false, alpha},
+		externalTrafficLocalOnly: {false, alpha},
 	}
 
 	alpha = prerelease("ALPHA")
@@ -67,6 +70,9 @@ type FeatureGate interface {
 	// owner: @jlowdermilk
 	// alpha: v1.4
 	AllAlpha() bool
+	// owner: @girishkalele
+	// alpha: v1.4
+	ExternalTrafficLocalOnly() bool
 	// TODO: Define accessors for each non-API alpha feature.
 }
 
@@ -121,6 +127,11 @@ func (f *featureGate) Type() string {
 // AllAlpha returns value for allAlpha.
 func (f *featureGate) AllAlpha() bool {
 	return f.lookup(allAlpha)
+}
+
+// ExternalTrafficLocalOnly returns value for ExternalTrafficLocalOnly
+func (f *featureGate) ExternalTrafficLocalOnly() bool {
+	return f.lookup(externalTrafficLocalOnly)
 }
 
 func (f *featureGate) lookup(key string) bool {
