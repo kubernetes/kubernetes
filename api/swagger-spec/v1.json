@@ -18975,6 +18975,11 @@
       "format": "int32",
       "description": "The number of pods that have labels matching the labels of the pod template of the replication controller."
      },
+     "readyReplicas": {
+      "type": "integer",
+      "format": "int32",
+      "description": "The number of ready replicas for this replication controller."
+     },
      "observedGeneration": {
       "type": "integer",
       "format": "int64",

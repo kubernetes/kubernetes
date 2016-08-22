@@ -908,6 +908,9 @@ type ReplicaSetStatus struct {
 	// The number of pods that have labels matching the labels of the pod template of the replicaset.
 	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty" protobuf:"varint,2,opt,name=fullyLabeledReplicas"`
 
+	// The number of ready replicas for this replica set.
+	ReadyReplicas int32 `json:"readyReplicas,omitempty" protobuf:"varint,4,opt,name=readyReplicas"`
+
 	// ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" protobuf:"varint,3,opt,name=observedGeneration"`
 }

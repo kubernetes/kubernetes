@@ -1452,6 +1452,7 @@ var map_ReplicationControllerStatus = map[string]string{
 	"":                     "ReplicationControllerStatus represents the current status of a replication controller.",
 	"replicas":             "Replicas is the most recently oberved number of replicas. More info: http://releases.k8s.io/HEAD/docs/user-guide/replication-controller.md#what-is-a-replication-controller",
 	"fullyLabeledReplicas": "The number of pods that have labels matching the labels of the pod template of the replication controller.",
+	"readyReplicas":        "The number of ready replicas for this replication controller.",
 	"observedGeneration":   "ObservedGeneration reflects the generation of the most recently observed replication controller.",
 }
 
