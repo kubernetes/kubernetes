@@ -83,7 +83,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--secure-port=443",
 				"--allow-privileged",
 				COMPONENT_LOGLEVEL,
-				"--token-auth-file=/etc/kubernetes/pki/token.csv",
+				"--token-auth-file=/etc/kubernetes/pki/tokens.csv",
 			},
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
