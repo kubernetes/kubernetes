@@ -22,12 +22,15 @@ import (
 )
 
 // A URLProvider allows to use multiple URLs.
+// Also maintains state of currently working URL.
 type URLProvider interface {
 	// Get returns currently selected URL.
 	Get() *url.URL
 	// Next selects any other URL, it is upto implementation to provide any
 	// health checking/load balancing, it might be as simple as an iterator.
 	Next() *url.URL
+	// WrapWithRetry executes function until success or until all urls were visited.
+	WrapWithRetry(func() error) error
 }
 
 // A RoundRobinProvider allows to iterate over URLs, doesnt provide any health checking.
@@ -54,6 +57,25 @@ func (p *RoundRobinProvider) Next() *url.URL {
 		p.current++
 	}
 	return p.urls[p.current]
+}
+
+// Total returns number of available URLs.
+func (p *RoundRobinProvider) Total() int {
+	return len(p.urls)
+}
+
+// WrapWithRetry executes any function until success or all urls were visited.
+func (p *RoundRobinProvider) WrapWithRetry(f func() error) error {
+	var err error
+	for _ = range p.urls {
+		err = f()
+		if err != nil {
+			p.Next()
+		} else {
+			return nil
+		}
+	}
+	return err
 }
 
 // NewRoundRobinProvider returns pointer to new RoundRobinProvider with passed URLs.

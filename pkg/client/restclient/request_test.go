@@ -145,7 +145,7 @@ func TestRequestSetsNamespace(t *testing.T) {
 		t.Errorf("namespace should be set: %#v", r)
 	}
 
-	if s := r.URL().String(); s != "namespaces/foo" {
+	if s := r.URL().String(); s != "/namespaces/foo" {
 		t.Errorf("namespace should be in path: %s", s)
 	}
 }
@@ -885,6 +885,10 @@ func TestRequestDo(t *testing.T) {
 		Err     bool
 	}{
 		{
+			Request: &Request{urlProvider: NewRoundRobinProvider(&url.URL{}), err: errors.New("bail")},
+			Err:     true,
+		},
+		{
 			Request: &Request{urlProvider: NewRoundRobinProvider(&url.URL{}), pathPrefix: "%"},
 			Err:     true,
 		},
@@ -956,6 +960,38 @@ func TestRequestDoWithMultipleUrls(t *testing.T) {
 			})},
 			Err:      false,
 			Expected: map[string]int{firstURL.String(): 0, secondURL.String(): 1},
+		},
+		{Request: &Request{
+			urlProvider: NewRoundRobinProvider(firstURL),
+			client: clientFunc(func(req *http.Request) (*http.Response, error) {
+				tracker[req.URL.String()]++
+				return nil, errors.New("err")
+			})},
+			Err:      true,
+			Expected: map[string]int{firstURL.String(): 1},
+		},
+		{Request: &Request{
+			urlProvider: NewRoundRobinProvider(firstURL, firstURL),
+			client: clientFunc(func(req *http.Request) (*http.Response, error) {
+				tracker[req.URL.String()]++
+				return nil, errors.New("err")
+			})},
+			Err:      true,
+			Expected: map[string]int{firstURL.String(): 2},
+		},
+		{Request: &Request{
+			urlProvider: NewRoundRobinProvider(firstURL, firstURL, secondURL),
+			client: clientFunc(func(req *http.Request) (*http.Response, error) {
+				tracker[req.URL.String()]++
+				if req.URL.String() == firstURL.String() {
+					return nil, errors.New("err")
+				}
+				return &http.Response{
+					StatusCode: 200,
+					Body:       ioutil.NopCloser(bytes.NewReader([]byte(req.URL.String())))}, nil
+			})},
+			Err:      false,
+			Expected: map[string]int{firstURL.String(): 2, secondURL.String(): 1},
 		},
 	}
 	for i, testCase := range testCases {

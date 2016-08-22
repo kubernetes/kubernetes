@@ -125,15 +125,11 @@ func NewRequest(client HTTPClient, verb string, urlProvider URLProvider, version
 		glog.V(2).Infof("Not implementing request backoff strategy.")
 		backoff = &NoBackoff{}
 	}
-	pathPrefix := "/"
-	if u := urlProvider.Get(); u != nil {
-		pathPrefix = path.Join(pathPrefix, u.Path)
-	}
 	r := &Request{
 		client:      client,
 		verb:        verb,
 		urlProvider: urlProvider,
-		pathPrefix:  path.Join(pathPrefix, versionedAPIPath),
+		pathPrefix:  path.Join("/", versionedAPIPath),
 		content:     content,
 		serializers: serializers,
 		backoffMgr:  backoff,
@@ -582,10 +578,14 @@ func (r *Request) URL() *url.URL {
 	}
 
 	finalURL := &url.URL{}
-	if url := r.urlProvider.Get(); url != nil {
-		*finalURL = *url
+	if u := r.urlProvider.Get(); u != nil {
+		*finalURL = *u
 	}
-	finalURL.Path = p
+	finalURL.Path = path.Join(finalURL.Path, p)
+	// preserve trailing slash
+	if r.pathPrefix == p && strings.HasSuffix(r.pathPrefix, "/") {
+		finalURL.Path += "/"
+	}
 
 	query := url.Values{}
 	for key, values := range r.params {
@@ -621,8 +621,8 @@ func (r Request) finalURLTemplate() url.URL {
 		newParams[k] = v
 	}
 	r.params = newParams
-	url := r.URL()
-	return *url
+	u := r.URL()
+	return *u
 }
 
 func (r *Request) tryThrottle() {
@@ -647,8 +647,8 @@ func (r *Request) Watch() (watch.Interface, error) {
 		return nil, fmt.Errorf("watching resources is not possible with this client (content-type: %s)", r.content.ContentType)
 	}
 
-	url := r.URL()
-	req, err := http.NewRequest(r.verb, url.String(), r.body)
+	u := r.URL()
+	req, err := http.NewRequest(r.verb, u.String(), r.body)
 	if err != nil {
 		return nil, err
 	}
@@ -657,13 +657,13 @@ func (r *Request) Watch() (watch.Interface, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(url))
+	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(u))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if err != nil {
-		r.backoffMgr.UpdateBackoff(url, err, 0)
+		r.backoffMgr.UpdateBackoff(u, err, 0)
 	} else {
-		r.backoffMgr.UpdateBackoff(url, err, resp.StatusCode)
+		r.backoffMgr.UpdateBackoff(u, err, resp.StatusCode)
 	}
 
 	if err != nil {
@@ -679,7 +679,7 @@ func (r *Request) Watch() (watch.Interface, error) {
 		if result := r.transformResponse(resp, req); result.err != nil {
 			return nil, result.err
 		}
-		return nil, fmt.Errorf("for request '%+v', got status: %v", url, resp.StatusCode)
+		return nil, fmt.Errorf("for request '%+v', got status: %v", u, resp.StatusCode)
 	}
 	framer := r.serializers.Framer.NewFrameReader(resp.Body)
 	decoder := streaming.NewDecoder(framer, r.serializers.StreamingSerializer)
@@ -690,15 +690,15 @@ func (r *Request) Watch() (watch.Interface, error) {
 // It also handles corner cases for incomplete/invalid request data.
 func updateURLMetrics(req *Request, resp *http.Response, err error) {
 	host := "none"
-	if url := req.urlProvider.Get(); url != nil {
-		host = url.Host
+	if u := req.urlProvider.Get(); u != nil {
+		host = u.Host
 	}
 	// If we have an error (i.e. apiserver down) we report that as a metric label.
 	if err != nil {
-		metrics.RequestResult.Increment(err.Error(), req.verb, url)
+		metrics.RequestResult.Increment(err.Error(), req.verb, host)
 	} else {
 		//Metrics for failure codes
-		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, url)
+		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, host)
 	}
 }
 
@@ -713,8 +713,8 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 
 	r.tryThrottle()
 
-	url := r.URL()
-	req, err := http.NewRequest(r.verb, url.String(), nil)
+	u := r.URL()
+	req, err := http.NewRequest(r.verb, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -723,13 +723,13 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
-	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(url))
+	r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(u))
 	resp, err := client.Do(req)
 	updateURLMetrics(r, resp, err)
 	if err != nil {
-		r.backoffMgr.UpdateBackoff(url, err, 0)
+		r.backoffMgr.UpdateBackoff(u, err, 0)
 	} else {
-		r.backoffMgr.UpdateBackoff(url, err, resp.StatusCode)
+		r.backoffMgr.UpdateBackoff(u, err, resp.StatusCode)
 	}
 
 	if err != nil {
@@ -748,7 +748,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		// we have a decent shot at taking the object returned, parsing it as a status object and returning a more normal error
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("%v while accessing %v", resp.Status, url)
+			return nil, fmt.Errorf("%v while accessing %v", resp.Status, u)
 		}
 
 		// TODO: Check ContentType.
@@ -761,7 +761,7 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 		}
 
 		bodyText := string(bodyBytes)
-		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, url, bodyText)
+		return nil, fmt.Errorf("%s while accessing %v: %s", resp.Status, u, bodyText)
 	}
 }
 
@@ -798,28 +798,33 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	// TODO: Change to a timeout based approach.
 	maxRetries := 10
 	retries := 0
-	initialUrl := r.urlProvider.Get()
+	var req *http.Request
+	var resp *http.Response
+	var u *url.URL
 	for {
-		url := r.URL()
-		req, err := http.NewRequest(r.verb, url.String(), r.body)
+		err := r.urlProvider.WrapWithRetry(
+			func() error {
+				var err error
+				u = r.URL()
+				req, err = http.NewRequest(r.verb, u.String(), r.body)
+				if err != nil {
+					return err
+				}
+				req.Header = r.headers
+
+				r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(u))
+				resp, err = client.Do(req)
+				updateURLMetrics(r, resp, err)
+				if err != nil {
+					r.backoffMgr.UpdateBackoff(u, err, 0)
+				} else {
+					r.backoffMgr.UpdateBackoff(u, err, resp.StatusCode)
+				}
+				return err
+			},
+		)
 		if err != nil {
 			return err
-		}
-		req.Header = r.headers
-
-		r.backoffMgr.Sleep(r.backoffMgr.CalculateBackoff(url))
-		resp, err := client.Do(req)
-		updateURLMetrics(r, resp, err)
-		if err != nil {
-			r.backoffMgr.UpdateBackoff(url, err, 0)
-		} else {
-			r.backoffMgr.UpdateBackoff(url, err, resp.StatusCode)
-		}
-		if err != nil {
-			if r.urlProvider.Next() == initialUrl {
-				return err
-			}
-			continue
 		}
 
 		done := func() bool {
@@ -845,7 +850,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 					}
 				}
 
-				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, url)
+				glog.V(4).Infof("Got a Retry-After %s response for attempt %d to %v", seconds, retries, u)
 				r.backoffMgr.Sleep(time.Duration(seconds) * time.Second)
 				return false
 			}
