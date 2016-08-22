@@ -92,9 +92,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	// Initialize node name here, so that the following code can get right node name.
 	if framework.TestContext.NodeName == "" {
 		hostname, err := os.Hostname()
-		if err != nil {
-			glog.Fatalf("Could not get node name: %v", err)
-		}
+		Expect(err).NotTo(HaveOccurred(), "should be able to get node name")
 		framework.TestContext.NodeName = hostname
 	}
 	// Pre-pull the images tests depend on so we can fail immediately if there is an image pull issue
@@ -112,9 +110,7 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 	if *startServices {
 		e2es = NewE2EServices()
-		if err := e2es.Start(); err != nil {
-			glog.Fatalf("Unable to start node services: %v", err)
-		}
+		Expect(e2es.Start()).To(Succeed(), "should be able to start node services.")
 		glog.Infof("Node services started.  Running tests...")
 	} else {
 		glog.Infof("Running tests without starting services.")
@@ -127,16 +123,13 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	commontest.CurrentSuite = commontest.NodeE2E
 
 	data, err := json.Marshal(&framework.TestContext.NodeTestContextType)
-	if err != nil {
-		glog.Fatalf("Failed to serialize node test context: %v", err)
-	}
+	Expect(err).NotTo(HaveOccurred(), "should be able to serialize node test context.")
+
 	return data
 }, func(data []byte) {
 	// The node test context is updated in the first function, update it on every test node.
 	err := json.Unmarshal(data, &framework.TestContext.NodeTestContextType)
-	if err != nil {
-		glog.Fatalf("Failed to deserialize node test context: %v", err)
-	}
+	Expect(err).NotTo(HaveOccurred(), "should be able to deserialize node test context.")
 })
 
 // Tear down the kubelet on the node
@@ -159,9 +152,8 @@ func maskLocksmithdOnCoreos() {
 		return
 	}
 	if bytes.Contains(data, []byte("ID=coreos")) {
-		if output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput(); err != nil {
-			glog.Fatalf("Could not mask locksmithd: %v, output: %q", err, string(output))
-		}
+		output, err := exec.Command("sudo", "systemctl", "mask", "--now", "locksmithd").CombinedOutput()
+		Expect(err).NotTo(HaveOccurred(), fmt.Sprintf("should be able to mask locksmithd - output: %q", string(output)))
 		glog.Infof("Locksmithd is masked successfully")
 	}
 }
