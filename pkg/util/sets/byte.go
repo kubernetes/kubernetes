@@ -174,6 +174,15 @@ func (s Byte) List() []byte {
 	return []byte(res)
 }
 
+// UnsortedList returns the slice with contents in random order.
+func (s Byte) UnsortedList() []byte {
+	res := make([]byte, 0, len(s))
+	for key := range s {
+		res = append(res, key)
+	}
+	return res
+}
+
 // Returns a single element from the set.
 func (s Byte) PopAny() (byte, bool) {
 	for key := range s {
