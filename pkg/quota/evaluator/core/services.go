@@ -17,6 +17,9 @@ limitations under the License.
 package core
 
 import (
+	"fmt"
+	"strings"
+
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -24,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/quota"
 	"k8s.io/kubernetes/pkg/quota/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/sets"
 )
 
 // NewServiceEvaluator returns an evaluator that can evaluate service quotas
@@ -42,7 +46,7 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 		},
 		MatchedResourceNames: allResources,
 		MatchesScopeFunc:     generic.MatchesNoScopeFunc,
-		ConstraintsFunc:      generic.ObjectCountConstraintsFunc(api.ResourceServices),
+		ConstraintsFunc:      ServiceConstraintsFunc,
 		UsageFunc:            ServiceUsageFunc,
 		ListFuncByNamespace: func(namespace string, options api.ListOptions) (runtime.Object, error) {
 			return kubeClient.Core().Services(namespace).List(options)
@@ -54,12 +58,17 @@ func NewServiceEvaluator(kubeClient clientset.Interface) quota.Evaluator {
 func ServiceUsageFunc(object runtime.Object) api.ResourceList {
 	result := api.ResourceList{}
 	if service, ok := object.(*api.Service); ok {
+		// default service usage
 		result[api.ResourceServices] = resource.MustParse("1")
+		result[api.ResourceServicesLoadBalancers] = resource.MustParse("0")
+		result[api.ResourceServicesNodePorts] = resource.MustParse("0")
 		switch service.Spec.Type {
 		case api.ServiceTypeNodePort:
+			// node port services need to count node ports
 			value := resource.NewQuantity(int64(len(service.Spec.Ports)), resource.DecimalSI)
 			result[api.ResourceServicesNodePorts] = *value
 		case api.ServiceTypeLoadBalancer:
+			// load balancer services need to count load balancers
 			result[api.ResourceServicesLoadBalancers] = resource.MustParse("1")
 		}
 	}
@@ -84,4 +93,25 @@ func GetQuotaServiceType(service *api.Service) api.ServiceType {
 		return api.ServiceTypeLoadBalancer
 	}
 	return api.ServiceType("")
+}
+
+// ServiceConstraintsFunc verifies that all required resources are captured in service usage.
+func ServiceConstraintsFunc(required []api.ResourceName, object runtime.Object) error {
+	service, ok := object.(*api.Service)
+	if !ok {
+		return fmt.Errorf("unexpected input object %v", object)
+	}
+
+	requiredSet := quota.ToSet(required)
+	missingSet := sets.NewString()
+	serviceUsage := ServiceUsageFunc(service)
+	serviceSet := quota.ToSet(quota.ResourceNames(serviceUsage))
+	if diff := requiredSet.Difference(serviceSet); len(diff) > 0 {
+		missingSet.Insert(diff.List()...)
+	}
+
+	if len(missingSet) == 0 {
+		return nil
+	}
+	return fmt.Errorf("must specify %s", strings.Join(missingSet.List(), ","))
 }
