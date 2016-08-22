@@ -63,6 +63,10 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 
 		`),
 	}
+	// TODO find a way to set master node `Unschedulable`, also make sure that setting
+	// persists over reboots and kubelet doesn't attempt to re-register itself with
+	// default schedulable
+	//
 	// TODO also print the alpha warning when running any commands, as well as
 	// in the help text.
 	//
