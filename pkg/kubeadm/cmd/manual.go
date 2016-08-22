@@ -140,6 +140,7 @@ func NewCmdManualBootstrapJoinNode(out io.Writer, params *kubeadmapi.BootstrapPa
 				out.Write([]byte(fmt.Sprintf("Failed to perform TLS bootstrap: %s\n", err)))
 				return
 			}
+			fmt.Println("recieved signed certificate from the API server, will write `/etc/kubernetes/kubelet.conf`...")
 
 			err = kubeadmutil.WriteKubeconfigIfNotExists(params, "kubelet", kubeconfig)
 			if err != nil {
