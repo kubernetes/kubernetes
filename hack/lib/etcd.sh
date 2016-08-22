@@ -32,7 +32,7 @@ kube::etcd::start() {
     exit 1
   fi
 
-  version=$(etcd -version | cut -d " " -f 3)
+  version=$(etcd --version | head -n 1 | cut -d " " -f 3)
   if [[ "${version}" < "${ETCD_VERSION}" ]]; then
    kube::log::usage "etcd version ${ETCD_VERSION} or greater required."
    kube::log::info "You can use 'hack/install-etcd.sh' to install a copy in third_party/."
