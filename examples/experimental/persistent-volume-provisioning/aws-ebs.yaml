@@ -7,3 +7,4 @@ parameters:
   type: io1
   zone: us-east-1d
   iopsPerGB: "10"
+  encrypted: "true"

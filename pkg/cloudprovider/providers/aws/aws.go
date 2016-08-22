@@ -232,6 +232,8 @@ type VolumeOptions struct {
 	// IOPSPerGB must be bigger than zero and smaller or equal to 30.
 	// Calculated total IOPS will be capped at 20000 IOPS.
 	IOPSPerGB int
+	Encrypted bool
+	KMSKeyId  string
 }
 
 // Volumes is an interface for managing cloud-provisioned volumes
@@ -1531,6 +1533,12 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 	volSize := int64(volumeOptions.CapacityGB)
 	request.Size = &volSize
 	request.VolumeType = &createType
+	encrypted := volumeOptions.Encrypted
+	request.Encrypted = &encrypted
+	kmsKeyId := volumeOptions.KMSKeyId
+	if encrypted && kmsKeyId != "" {
+		request.KmsKeyId = &kmsKeyId
+	}
 	if iops > 0 {
 		request.Iops = &iops
 	}
