@@ -444,13 +444,13 @@ func (kd *KubeDNS) newHeadlessService(service *kapi.Service) error {
 func (kd *KubeDNS) newExternalNameService(service *kapi.Service) {
 	// Create a CNAME record for the service's ExternalName.
 	// TODO: TTL?
-	recordValue, recordLabel := getSkyMsg(service.Spec.ExternalName, 0)
-	cachePath := (append(kd.domainPath, serviceSubdomain, service.Namespace, service.Name))
+	recordValue, _ := getSkyMsg(service.Spec.ExternalName, 0)
+	cachePath := (append(kd.domainPath, serviceSubdomain, service.Namespace))
+	fqdn := kd.fqdn(service)
+	glog.V(2).Infof("newExternalNameService: storing key %s with value %v as %s under %v", service.Name, recordValue, fqdn, cachePath)
 	kd.cacheLock.Lock()
 	defer kd.cacheLock.Unlock()
-	fqdn := kd.fqdn(service)
-	glog.V(2).Infof("newExternalNameService: storing key %s with value %v as %s under %v", recordLabel, recordValue, fqdn, cachePath)
-	kd.cache.setEntry(recordLabel, recordValue, fqdn, cachePath...)
+	kd.cache.setEntry(service.Name, recordValue, fqdn, cachePath...)
 }
 
 // Records responds with DNS records that match the given name, in a format
@@ -546,8 +546,10 @@ func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Servic
 		kd.cacheLock.RLock()
 		defer kd.cacheLock.RUnlock()
 		if record, ok := kd.cache.getEntry(key, path[:len(path)-1]...); ok {
+			glog.V(2).Infof("Exact match %v for %v received from cache", record, path[:len(path)-1])
 			return []skymsg.Service{*(record.(*skymsg.Service))}, nil
 		}
+		glog.V(2).Infof("Exact match for %v not found in cache", path)
 		return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
 	}
 

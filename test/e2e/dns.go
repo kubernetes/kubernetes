@@ -342,8 +342,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
@@ -400,8 +400,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
@@ -433,8 +433,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 		namesToResolve := []string{hostFQDN}
 		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostNames, "", "wheezy", f.Namespace.Name)
 		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostNames, "", "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
@@ -464,8 +464,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, f.Namespace.Name)
 		wheezyProbeCmd, wheezyFileName := createUDPProbeCommand(hostFQDN, "CNAME", "wheezy")
 		jessieProbeCmd, jessieFileName := createUDPProbeCommand(hostFQDN, "CNAME", "jessie")
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
@@ -481,8 +481,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 		Expect(err).NotTo(HaveOccurred())
 		wheezyProbeCmd, wheezyFileName = createUDPProbeCommand(hostFQDN, "CNAME", "wheezy")
 		jessieProbeCmd, jessieFileName = createUDPProbeCommand(hostFQDN, "CNAME", "jessie")
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a second pod to probe DNS")
@@ -499,8 +499,8 @@ var _ = framework.KubeDescribe("DNS", func() {
 		Expect(err).NotTo(HaveOccurred())
 		wheezyProbeCmd, wheezyFileName = createUDPProbeCommand(hostFQDN, "A", "wheezy")
 		jessieProbeCmd, jessieFileName = createUDPProbeCommand(hostFQDN, "A", "jessie")
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
+		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a third pod to probe DNS")
