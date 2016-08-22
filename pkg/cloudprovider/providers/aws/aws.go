@@ -96,11 +96,12 @@ const ServiceAnnotationLoadBalancerCertificate = "service.beta.kubernetes.io/aws
 const ServiceAnnotationLoadBalancerSSLPorts = "service.beta.kubernetes.io/aws-load-balancer-ssl-ports"
 
 // ServiceAnnotationLoadBalancerBEProtocol is the annotation used on the service
-// to specify the protocol spoken by the backend (pod) behind a secure listener.
-// Only inspected when `aws-load-balancer-ssl-cert` is used.
+// to specify the protocol spoken by the backend (pod) behind a listener.
 // If `http` (default) or `https`, an HTTPS listener that terminates the
 //  connection and parses headers is created.
 // If set to `ssl` or `tcp`, a "raw" SSL listener is used.
+// If set to `http` and `aws-load-balancer-ssl-cert` is not used then
+// a HTTP listener is used.
 const ServiceAnnotationLoadBalancerBEProtocol = "service.beta.kubernetes.io/aws-load-balancer-backend-protocol"
 
 // Maps from backend protocol to ELB protocol
@@ -2351,7 +2352,11 @@ func buildListener(port api.ServicePort, annotations map[string]string, sslPorts
 			}
 		}
 		listener.SSLCertificateId = &certID
+	} else if annotationProtocol := annotations[ServiceAnnotationLoadBalancerBEProtocol]; annotationProtocol == "http" {
+		instanceProtocol = annotationProtocol
+		protocol = "http"
 	}
+
 	listener.Protocol = &protocol
 	listener.InstanceProtocol = &instanceProtocol
 

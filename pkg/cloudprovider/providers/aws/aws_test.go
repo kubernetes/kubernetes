@@ -1291,6 +1291,11 @@ func TestBuildListener(t *testing.T) {
 			443, "", 8011, "tcp", "cert", "foo,bar",
 			false, "tcp", "tcp", "",
 		},
+		{
+			"HTTP->HTTP",
+			80, "", 8012, "http", "", "",
+			false, "http", "http", "",
+		},
 	}
 
 	for _, test := range tests {
