@@ -137,6 +137,7 @@ func (r *EvictionREST) New() runtime.Object {
 	return &policy.Eviction{}
 }
 
+// Create attempts to create a new eviction.  That is, it tries to evict a pod.
 func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, error) {
 	eviction := obj.(*policy.Eviction)
 
@@ -192,10 +193,14 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 // runtime.Objects.  EvictionREST implements it directly.
 var _ = rest.UpdatedObjectInfo(&EvictionREST{})
 
+// Preconditions returns any preconditions required prior to updating the
+// PDB.  None currently.
 func (r *EvictionREST) Preconditions() *api.Preconditions {
 	return nil
 }
 
+// UpdatedObject returns the updated PDB if it is able to update
+// PodDisruptionAllowed from true->false.
 func (r *EvictionREST) UpdatedObject(ctx api.Context, oldObj runtime.Object) (newObj runtime.Object, err error) {
 	copy, err := api.Scheme.DeepCopy(oldObj)
 	if err != nil {
