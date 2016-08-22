@@ -36,7 +36,7 @@ Documentation for other releases can be found at
   - [Cassandra Docker](#cassandra-docker)
   - [tl;dr Quickstart](#tldr-quickstart)
   - [Step 1: Create a Cassandra Headless Service](#step-1-create-a-cassandra-headless-service)
-  - [Step 2: Use a Pet Set to create Cassandra Ring](#step-1-create-a-cassandra-petset)
+  - [Step 2: Use a Pet Set to create Cassandra Ring](#step-2-create-a-cassandra-petset)
   - [Step 3: Validate and Modify The Cassandra Pet Set](step-3-validate-and-modify-the-cassandra-pet-set)
   - [Step 4: Delete Cassandra Pet Set](step-4-delete-cassandra-pet-set)
   - [Step 5: Use a Replication Controller to create Cassandra node pods](#step-5-use-a-replication-controller-to-create-cassandra-node-pods)
@@ -176,7 +176,7 @@ spec:
     app: cassandra
 ```
 
-[Download example](cassandra-service-petset.yaml?raw=true)
+[Download example](cassandra-service.yaml?raw=true)
 <!-- END MUNGE: EXAMPLE cassandra-service.yaml -->
 
 Create the service for the Pet Set:
@@ -304,6 +304,7 @@ Create the Cassandra Pet Set as follows:
 ```console
 $ kubectl create -f examples/storage/cassandra/cassandra-petset.yaml
 ```
+
 ## Step 3: Validate and Modify The Cassandra Pet Set
 
 Deploying this Pet Set shows off two of the new features that Pet Sets provides.
