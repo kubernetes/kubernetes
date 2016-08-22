@@ -28,24 +28,27 @@ var _ volume.SnapshottableVolumePlugin = &gcePersistentDiskPlugin{}
 // snapshot with the given name.
 // Callers are responsible for retrying on failure.
 // Callers are responsible for thread safety between concurrent snapshot operations.
-func (plugin *gcePersistentDiskPlugin) CreateSnapshot(spec *Spec, snapshotName string) (string, error) {
+func (plugin *gcePersistentDiskPlugin) CreateSnapshot(spec *volume.Spec, snapshotName string) (string, error) {
 	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
 	if err != nil {
 		return "", err
 	}
-	snapshot := compute.Snapshot{
-		Name: snapshotName,
-	}
 
-	volumeSource, readOnly, err := getVolumeSource(spec)
+	volumeSource, _, err := getVolumeSource(spec)
 	if err != nil {
 		return "", err
 	}
 
 	pdName := volumeSource.PDName
 
-	if err := gceCloud.CreateSnapshot(pdName, &snapshot); err != nil {
+	if err := gceCloud.CreateSnapshot(pdName, &compute.Snapshot{Name: snapshotName}); err != nil {
 		glog.Errorf("Error creating snapshot (name: %q) of PD %q: %+v", snapshotName, pdName, err)
+		return "", err
+	}
+
+	// Verify it was created
+	snapshot, err := gceCloud.GetSnapshot(snapshotName)
+	if err != nil {
 		return "", err
 	}
 

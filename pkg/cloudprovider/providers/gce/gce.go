@@ -147,6 +147,9 @@ type Disks interface {
 
 	// CreateSnapshot creates a snapshot of a disk
 	CreateSnapshot(diskName string, snapshot *compute.Snapshot) error
+
+	// GetSnapshot gets the snapshot with the specified name
+	GetSnapshot(snapshotName string) (*compute.Snapshot, error)
 }
 
 func init() {
@@ -2547,6 +2550,15 @@ func (gce *GCECloud) CreateSnapshot(diskName string, snapshot *compute.Snapshot)
 	}
 
 	return gce.waitForZoneOp(createOp, disk.Zone)
+}
+
+func (gce *GCECloud) GetSnapshot(snapshotName string) (*compute.Snapshot, error) {
+	snapshot, err := gce.service.Snapshots.Get(gce.projectID, snapshotName).Do()
+	if err != nil {
+		return nil, err
+	}
+
+	return snapshot, nil
 }
 
 // Returns a gceDisk for the disk, if it is found in the specified zone.
