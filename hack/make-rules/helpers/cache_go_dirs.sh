@@ -28,6 +28,8 @@ if [[ -z "${1:-}" ]]; then
 fi
 CACHE="$1"; shift
 
+trap "rm -f '${CACHE}'" HUP INT TERM ERR
+
 # This is a partial 'find' command.  The caller is expected to pass the
 # remaining arguments.
 #
