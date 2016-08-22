@@ -90,6 +90,7 @@ type KubeDNS struct {
 
 	// stores DNS records for the domain.
 	// A Records and SRV Records for (regular) services and headless Services.
+	// CNAME Records for ExternalName Services.
 	cache *TreeCache
 
 	// TODO(nikhiljindal): Remove this. It can be recreated using clusterIPServiceMap.
@@ -241,6 +242,11 @@ func assertIsService(obj interface{}) (*kapi.Service, bool) {
 func (kd *KubeDNS) newService(obj interface{}) {
 	if service, ok := assertIsService(obj); ok {
 		glog.V(4).Infof("Add/Updated for service %v", service.Name)
+		// ExternalName services are a special kind that return CNAME records
+		if service.Spec.Type == kapi.ServiceTypeExternalName {
+			kd.newExternalNameService(service)
+			return
+		}
 		// if ClusterIP is not set, a DNS entry should not be created
 		if !kapi.IsServiceIPSet(service) {
 			kd.newHeadlessService(service)
@@ -258,14 +264,27 @@ func (kd *KubeDNS) removeService(obj interface{}) {
 		subCachePath := append(kd.domainPath, serviceSubdomain, s.Namespace, s.Name)
 		kd.cacheLock.Lock()
 		defer kd.cacheLock.Unlock()
-		kd.cache.deletePath(subCachePath...)
-		delete(kd.reverseRecordMap, s.Spec.ClusterIP)
-		delete(kd.clusterIPServiceMap, s.Spec.ClusterIP)
+		success := kd.cache.deletePath(subCachePath...)
+		glog.V(2).Infof("Removing service %v at path %v. Success: ", s.Name, subCachePath, success)
+		// ExternalName services have no IP
+		if kapi.IsServiceIPSet(s) {
+			delete(kd.reverseRecordMap, s.Spec.ClusterIP)
+			delete(kd.clusterIPServiceMap, s.Spec.ClusterIP)
+		}
 	}
 }
 
 func (kd *KubeDNS) updateService(oldObj, newObj interface{}) {
-	kd.newService(newObj)
+	if new, ok := assertIsService(newObj); ok {
+		if old, ok := assertIsService(oldObj); ok {
+			// Remove old cache path only if changing type to/from ExternalName.
+			// In all other cases, we'll update records in place.
+			if (new.Spec.Type == kapi.ServiceTypeExternalName) != (old.Spec.Type == kapi.ServiceTypeExternalName) {
+				kd.removeService(oldObj)
+			}
+			kd.newService(newObj)
+		}
+	}
 }
 
 func (kd *KubeDNS) handleEndpointAdd(obj interface{}) {
@@ -431,6 +450,20 @@ func (kd *KubeDNS) newHeadlessService(service *kapi.Service) error {
 	return nil
 }
 
+// Generates skydns records for an ExternalName service.
+func (kd *KubeDNS) newExternalNameService(service *kapi.Service) {
+	// Create a CNAME record for the service's ExternalName.
+	// TODO: TTL?
+	recordValue, _ := getSkyMsg(service.Spec.ExternalName, 0)
+	cachePath := append(kd.domainPath, serviceSubdomain, service.Namespace)
+	fqdn := kd.fqdn(service)
+	glog.V(2).Infof("newExternalNameService: storing key %s with value %v as %s under %v", service.Name, recordValue, fqdn, cachePath)
+	kd.cacheLock.Lock()
+	defer kd.cacheLock.Unlock()
+	// Store the service name directly as the leaf key
+	kd.cache.setEntry(service.Name, recordValue, fqdn, cachePath...)
+}
+
 // Records responds with DNS records that match the given name, in a format
 // understood by the skydns server. If "exact" is true, a single record
 // matching the given name is returned, otherwise all records stored under
@@ -524,15 +557,17 @@ func (kd *KubeDNS) getRecordsForPath(path []string, exact bool) ([]skymsg.Servic
 		kd.cacheLock.RLock()
 		defer kd.cacheLock.RUnlock()
 		if record, ok := kd.cache.getEntry(key, path[:len(path)-1]...); ok {
+			glog.V(2).Infof("Exact match %v for %v received from cache", record, path[:len(path)-1])
 			return []skymsg.Service{*(record.(*skymsg.Service))}, nil
 		}
+		glog.V(2).Infof("Exact match for %v not found in cache", path)
 		return nil, etcd.Error{Code: etcd.ErrorCodeKeyNotFound}
 	}
 
 	kd.cacheLock.RLock()
 	defer kd.cacheLock.RUnlock()
 	records := kd.cache.getValuesForPathWithWildcards(path...)
-	glog.V(2).Infof("Received %d records from cache", len(records))
+	glog.V(2).Infof("Received %d records for %v from cache", len(records), path)
 	for _, val := range records {
 		retval = append(retval, *val)
 	}
