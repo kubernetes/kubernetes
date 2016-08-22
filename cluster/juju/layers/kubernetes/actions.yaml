@@ -1,2 +1,21 @@
 guestbook-example:
     description: Launch the guestbook example in your k8s cluster
+microbot:
+    description: Launch microbot containers
+    options:
+      replicas:
+        type: int
+        default: 3
+        description: Number of microbots to launch in kubernetes
+      delete:
+        type: bool
+        default: False
+        description: If true removes the microbots
+pause:
+    description: |
+      Cordon the unit, pausing all future workload scheduling on this unit,
+      and drains active workloads
+resume:
+    description: |
+      UnCordon the unit, enabling workload scheduling. Workloads
+      will automatically balance into the unit
