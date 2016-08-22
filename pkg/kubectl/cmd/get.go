@@ -316,12 +316,9 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			return err
 		}
 
-		for ix := range infos {
-			objs[ix], err = infos[ix].Mapping.ConvertToVersion(infos[ix].Object, version)
-			if err != nil {
-				allErrs = append(allErrs, err)
-				continue
-			}
+		objs, err = resource.AsVersionedObjects(infos, version, f.JSONEncoder())
+		if err != nil {
+			return err
 		}
 
 		// TODO: questionable

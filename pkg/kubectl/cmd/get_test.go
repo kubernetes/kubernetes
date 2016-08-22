@@ -26,12 +26,14 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
@@ -356,6 +358,81 @@ func TestGetSortedObjects(t *testing.T) {
 		t.Errorf("unexpected empty output")
 	}
 
+}
+
+func TestGetSortedReplicaSets(t *testing.T) {
+	rss := &extensions.ReplicaSetList{
+		ListMeta: unversioned.ListMeta{
+			ResourceVersion: "15",
+		},
+		Items: []extensions.ReplicaSet{
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "s",
+					Namespace:         "test",
+					ResourceVersion:   "10",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(0, 0, -10)},
+				},
+				Spec: extensions.ReplicaSetSpec{},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "r",
+					Namespace:         "test",
+					ResourceVersion:   "11",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(0, 0, -9)},
+				},
+				Spec: extensions.ReplicaSetSpec{},
+			},
+			{
+				ObjectMeta: api.ObjectMeta{
+					Name:              "t",
+					Namespace:         "test",
+					ResourceVersion:   "9",
+					CreationTimestamp: unversioned.Time{Time: time.Now().AddDate(0, 0, -12)},
+				},
+				Spec: extensions.ReplicaSetSpec{},
+			},
+		},
+	}
+
+	f, tf, codec, ns := NewAPIFactory()
+	codec = testapi.Extensions.Codec()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Resp:                 &http.Response{StatusCode: 200, Header: defaultHeader(), Body: objBody(codec, rss)},
+	}
+	tf.Namespace = "test"
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Group: "extensions", Version: "v1beta1"}}}
+
+	buf := bytes.NewBuffer([]byte{})
+	errBuf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdGet(f, buf, errBuf)
+	cmd.SetOutput(buf)
+
+	// sorting with metadata.creationTimestamp
+	cmd.Flags().Set("sort-by", ".metadata.creationTimestamp")
+	cmd.Run(cmd, []string{"replicasets"})
+
+	// expect sorted: t,s,r
+	expected := []string{"t", "s", "r"}
+	actualObjs := tf.Printer.(*testPrinter).Objects
+	actual := make([]string, len(actualObjs))
+	for i := range actualObjs {
+		accessor, err := meta.Accessor(actualObjs[i])
+		if err != nil {
+			continue
+		}
+		actual[i] = accessor.GetName()
+	}
+	if !reflect.DeepEqual(expected, actual) {
+		t.Errorf("unexpected object: %#v", actual)
+	}
+	if len(buf.String()) == 0 {
+		t.Errorf("unexpected empty output")
+	}
 }
 
 func TestGetObjectsIdentifiedByFile(t *testing.T) {
