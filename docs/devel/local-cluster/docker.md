@@ -116,7 +116,7 @@ Here's a diagram of what the final result will look like:
 
   This actually runs the kubelet, which in turn runs a [pod](http://kubernetes.io/docs/user-guide/pods/) that contains the other master components.
 
-  ** **SECURITY WARNING** ** services exposed via Kubernetes using Hyperkube are available on the host node's public network interface / IP address.  Because of this, this guide is not suitable for any host node/server that is directly internet accessible.  Refer to [#21735](https://github.com/kubernetes/kubernetes/issues/21735) for addtional info.
+  ** **SECURITY WARNING** ** services exposed via Kubernetes using Hyperkube are available on the host node's public network interface / IP address.  Because of this, this guide is not suitable for any host node/server that is directly internet accessible.  Refer to [#21735](https://github.com/kubernetes/kubernetes/issues/21735) for additional info.
 
 ### Download `kubectl`
 
@@ -220,7 +220,7 @@ Read [documentation for manually deploying a DNS](http://kubernetes.io/docs/gett
 
 ### Turning down your cluster
 
-1\. Delete the nginx service and deployment:
+1. Delete the nginx service and deployment:
 
 If you plan on re-creating your nginx deployment and service you will need to clean it up.
 
@@ -228,14 +228,14 @@ If you plan on re-creating your nginx deployment and service you will need to cl
 kubectl delete service,deployments nginx
 ```
 
-2\. Delete all the containers including the kubelet:
+2. Delete all the containers including the kubelet:
 
 ```shell
 docker rm -f kubelet
 docker rm -f `docker ps | grep k8s | awk '{print $1}'`
 ```
 
-3\. Cleanup the filesystem:
+3. Cleanup the filesystem:
 
 On OS X, first ssh into the docker VM:
 
