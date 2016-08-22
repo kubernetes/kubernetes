@@ -167,7 +167,8 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 func createUDPProbeCommand(nameToResolve string, lookup string, fileNamePrefix string) (string, string) {
 	probeCmd := ""
 	fileName := fmt.Sprintf("%s_udp@%s", fileNamePrefix, nameToResolve)
-	probeCmd += fmt.Sprintf("dig +notcp +short +tries=12 +norecurse %s %s > /results/%s", nameToResolve, lookup, fileName)
+	//probeCmd += fmt.Sprintf("dig +notcp +short +tries=12 +norecurse %s %s > /results/%s", nameToResolve, lookup, fileName)
+	probeCmd += fmt.Sprintf("dig +notcp +tries=12 +norecurse %s %s > /results/%s", nameToResolve, lookup, fileName)
 	return probeCmd, fileName
 }
 
