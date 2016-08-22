@@ -139,7 +139,7 @@ func newReplicaSetController(eventRecorder record.EventRecorder, podInformer fra
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:         workqueue.New(),
+		queue:         workqueue.NewNamed("controller_replicaset"),
 		garbageCollectorEnabled: garbageCollectorEnabled,
 	}
 
