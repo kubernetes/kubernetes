@@ -221,6 +221,14 @@ const (
 	VolumeTypeST1 = "st1"
 )
 
+// AWS provisioning limits.
+// Source: http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSVolumeTypes.html
+const (
+	MaxIOPSPerGB = 50
+	MinTotalIOPS = 100
+	MaxTotalIOPS = 20000
+)
+
 // VolumeOptions specifies capacity and tags for a volume.
 type VolumeOptions struct {
 	CapacityGB       int
@@ -229,8 +237,8 @@ type VolumeOptions struct {
 	VolumeType       string
 	AvailabilityZone string
 	// IOPSPerGB x CapacityGB will give total IOPS of the volume to create.
-	// IOPSPerGB must be bigger than zero and smaller or equal to 30.
-	// Calculated total IOPS will be capped at 20000 IOPS.
+	// IOPSPerGB must be bigger than zero and smaller or equal to MaxIOPSPerGB.
+	// Calculated total IOPS will be capped at MaxTotalIOPS.
 	IOPSPerGB int
 	Encrypted bool
 	// fully qualified resource name to the key to use for encryption.
@@ -1510,16 +1518,16 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 
 	case VolumeTypeIO1:
 		// See http://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateVolume.html for IOPS constraints
-		if volumeOptions.IOPSPerGB <= 0 || volumeOptions.IOPSPerGB > 30 {
-			return "", fmt.Errorf("invalid iopsPerGB value %d, must be 0 < IOPSPerGB <= 30", volumeOptions.IOPSPerGB)
+		if volumeOptions.IOPSPerGB <= 0 || volumeOptions.IOPSPerGB > MaxIOPSPerGB {
+			return "", fmt.Errorf("invalid iopsPerGB value %d, must be 0 < IOPSPerGB <= %d", volumeOptions.IOPSPerGB, MaxIOPSPerGB)
 		}
 		createType = volumeOptions.VolumeType
 		iops = int64(volumeOptions.CapacityGB * volumeOptions.IOPSPerGB)
-		if iops < 100 {
-			iops = 100
+		if iops < MinTotalIOPS {
+			iops = MinTotalIOPS
 		}
-		if iops > 20000 {
-			iops = 20000
+		if iops > MaxTotalIOPS {
+			iops = MaxTotalIOPS
 		}
 
 	case "":
