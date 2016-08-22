@@ -102,6 +102,11 @@ __kubectl_get_resource_rc()
     __kubectl_parse_get "rc"
 }
 
+__kubectl_get_resource_node()
+{
+    __kubectl_parse_get "node"
+}
+
 # $1 is the name of the pod we want to get the list of containers inside
 __kubectl_get_containers()
 {
@@ -134,20 +139,24 @@ __kubectl_require_pod_and_container()
 __custom_func() {
     case ${last_command} in
         kubectl_get | kubectl_describe | kubectl_delete | kubectl_label | kubectl_stop | kubectl_edit | kubectl_patch |\
-        kubectl_annotate | kubectl_expose)
+        kubectl_annotate | kubectl_expose | kubectl_scale | kubectl_autoscale | kubectl_taint | kubectl_rollout_*)
             __kubectl_get_resource
             return
             ;;
-        kubectl_logs)
+        kubectl_logs | kubectl_attach)
             __kubectl_require_pod_and_container
             return
             ;;
-        kubectl_exec)
+        kubectl_exec | kubectl_port-forward | kubectl_top_pod)
             __kubectl_get_resource_pod
             return
             ;;
         kubectl_rolling-update)
             __kubectl_get_resource_rc
+            return
+            ;;
+        kubectl_cordon | kubectl_uncordon | kubectl_drain | kubectl_top_node)
+            __kubectl_get_resource_node
             return
             ;;
         *)

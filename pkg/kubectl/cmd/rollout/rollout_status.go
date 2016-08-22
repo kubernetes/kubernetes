@@ -47,6 +47,9 @@ var (
 func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &StatusOptions{}
 
+	validArgs := []string{"deployment"}
+	argAliases := kubectl.ResourceAliases(validArgs)
+
 	cmd := &cobra.Command{
 		Use:     "status (TYPE NAME | TYPE/NAME) [flags]",
 		Short:   "Watch rollout status until it's done",
@@ -55,6 +58,8 @@ func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(RunStatus(f, cmd, out, args, options))
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
