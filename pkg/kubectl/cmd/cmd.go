@@ -102,6 +102,11 @@ __kubectl_get_resource_rc()
     __kubectl_parse_get "rc"
 }
 
+__kubectl_get_resource_node()
+{
+    __kubectl_parse_get "node"
+}
+
 # $1 is the name of the pod we want to get the list of containers inside
 __kubectl_get_containers()
 {
@@ -148,6 +153,10 @@ __custom_func() {
             ;;
         kubectl_rolling-update)
             __kubectl_get_resource_rc
+            return
+            ;;
+        kubectl_cordon | kubectl_uncordon | kubectl_drain | kubectl_top_node)
+            __kubectl_get_resource_node
             return
             ;;
         *)
