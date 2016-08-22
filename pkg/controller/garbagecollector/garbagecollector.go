@@ -443,6 +443,8 @@ type GarbageCollector struct {
 	clock                            clock.Clock
 	registeredRateLimiter            *RegisteredRateLimiter
 	registeredRateLimiterForMonitors *RegisteredRateLimiter
+	// GC caches the owners that do not exist according to the API server.
+	absentOwnerCache *UIDCache
 }
 
 func gcListWatcher(client *dynamic.Client, resource unversioned.GroupVersionResource) *cache.ListWatch {
@@ -543,6 +545,7 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		orphanQueue:                      workqueue.NewTimedWorkQueue(),
 		registeredRateLimiter:            NewRegisteredRateLimiter(resources),
 		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(resources),
+		absentOwnerCache:                 NewUIDCache(100),
 	}
 	gc.propagator = &Propagator{
 		eventQueue: workqueue.NewTimedWorkQueue(),
@@ -708,6 +711,10 @@ func (gc *GarbageCollector) processItem(item *node) error {
 	// TODO: we need to remove dangling references if the object is not to be
 	// deleted.
 	for _, reference := range ownerReferences {
+		if gc.absentOwnerCache.Has(reference.UID) {
+			glog.V(6).Infof("according to the absentOwnerCache, object %s's owner %s/%s, %s does not exist", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+			continue
+		}
 		// TODO: we need to verify the reference resource is supported by the
 		// system. If it's not a valid resource, the garbage collector should i)
 		// ignore the reference when decide if the object should be deleted, and
@@ -727,11 +734,13 @@ func (gc *GarbageCollector) processItem(item *node) error {
 		if err == nil {
 			if owner.GetUID() != reference.UID {
 				glog.V(6).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+				gc.absentOwnerCache.Add(reference.UID)
 				continue
 			}
 			glog.V(6).Infof("object %s has at least an existing owner, will not garbage collect", item.identity.UID)
 			return nil
 		} else if errors.IsNotFound(err) {
+			gc.absentOwnerCache.Add(reference.UID)
 			glog.V(6).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		} else {
 			return err
