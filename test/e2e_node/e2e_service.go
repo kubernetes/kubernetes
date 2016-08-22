@@ -340,6 +340,7 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		es.logFiles["kubelet.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
+		framework.TestContext.EvictionHard = adjustConfigForSystemd(framework.TestContext.EvictionHard)
 	} else {
 		cmdArgs = append(cmdArgs, getKubeletServerBin())
 		cmdArgs = append(cmdArgs,
@@ -580,4 +581,8 @@ func (s *server) kill() error {
 	}
 
 	return fmt.Errorf("unable to stop %q", name)
+}
+
+func adjustConfigForSystemd(config string) string {
+	return strings.Replace(config, "%", "%%", -1)
 }
