@@ -153,15 +153,22 @@ func getNodeAddress(node *api.Node) string {
 }
 
 func (c *REST) GetConnectionInfo(ctx api.Context, nodeName string) (*client.ConnectionInfo, error) {
+	// build generic connection info
+	connectionInfo, err := c.connection.GetRawConnectionInfo(ctx, nodeName)
+	if err != nil {
+		return nil, err
+	}
+	// get and overwrite specific host/port information for this node
 	hostname, port, err := c.getKubeletHostPortPair(nodeName)
 	if err != nil {
 		return nil, err
 	}
-	connectionInfo, err := c.connection.GetRawConnectionInfo(ctx, hostname)
-	if err != nil {
-		return nil, err
+	if len(hostname) > 0 {
+		connectionInfo.Hostname = hostname
 	}
-	connectionInfo.Port = uint(port)
+	if port > 0 {
+		connectionInfo.Port = uint(port)
+	}
 
 	return connectionInfo, nil
 }

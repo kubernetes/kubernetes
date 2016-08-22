@@ -113,7 +113,12 @@ func (c *HTTPKubeletClient) GetRawConnectionInfo(ctx api.Context, nodeName strin
 	if c.Config.EnableHttps {
 		scheme = "https"
 	}
-	return &ConnectionInfo{scheme, nodeName, c.Config.Port, c.Client.Transport}, nil
+	return &ConnectionInfo{
+		Scheme:    scheme,
+		Hostname:  nodeName,
+		Port:      c.Config.Port,
+		Transport: c.Client.Transport,
+	}, nil
 }
 
 // FakeKubeletClient is a fake implementation of KubeletClient which returns an error
