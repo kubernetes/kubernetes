@@ -105,6 +105,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--service-account-private-key-file=/etc/kubernetes/pki/apiserver-key.pem",
 				"--cluster-signing-cert-file=/etc/kubernetes/pki/ca.pem",
 				"--cluster-signing-key-file=/etc/kubernetes/pki/ca-key.pem",
+				"--insecure-experimental-approve-all-kubelet-csrs-for-group=system:kubelet-bootstrap",
 				COMPONENT_LOGLEVEL,
 			},
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
