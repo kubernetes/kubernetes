@@ -8553,6 +8553,67 @@
     ]
    },
    {
+    "path": "/api/v1/namespaces/{namespace}/pods/{name}/eviction",
+    "description": "API at /api/v1",
+    "operations": [
+     {
+      "type": "v1alpha1.Eviction",
+      "method": "POST",
+      "summary": "create eviction of a Eviction",
+      "nickname": "createNamespacedEvictionEviction",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1alpha1.Eviction",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "name",
+        "description": "name of the Eviction",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.Eviction"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/api/v1/namespaces/{namespace}/pods/{name}/exec",
     "description": "API at /api/v1",
     "operations": [
@@ -18818,6 +18879,28 @@
      "containerID": {
       "type": "string",
       "description": "Container's ID in the format 'docker://\u003ccontainer_id\u003e'"
+     }
+    }
+   },
+   "v1alpha1.Eviction": {
+    "id": "v1alpha1.Eviction",
+    "description": "Eviction evicts a pod from its node subject to certain policies and safety constraints. This is a subresource of Pod.  A request to cause such an eviction is created by POSTing to .../pods/foo/evictions.",
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "ObjectMeta describes the pod that is being evicted."
+     },
+     "deleteOptions": {
+      "$ref": "v1.DeleteOptions",
+      "description": "DeleteOptions may be provided"
      }
     }
    },
