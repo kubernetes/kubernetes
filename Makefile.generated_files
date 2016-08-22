@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Don't allow users to call this directly.  There are too many variables this
+# assumes to inherit from the main Makefile.  This is not a user-facing file.
+ifeq ($(CALLED_FROM_MAIN_MAKEFILE),)
+    $(error Please use the main Makefile, e.g. `make generated_files`)
+endif
+
 # Don't allow an implicit 'all' rule.  This is not a user-facing file.
 ifeq ($(MAKECMDGOALS),)
     $(error This Makefile requires an explicit rule to be specified)
