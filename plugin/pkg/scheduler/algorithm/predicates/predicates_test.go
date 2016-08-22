@@ -253,19 +253,16 @@ func TestPodFitsResources(t *testing.T) {
 			test:    "opaque resource allocatable enforced",
 			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 1, 5, 5)},
 		},
-		// TODO(CD): This test is still failing (does not get rejected by predicate).
-		/*
-			{
-				pod: newResourcePod(
-					schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}},
-					schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}}),
-				nodeInfo: schedulercache.NewNodeInfo(
-					newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 2}})),
-				fits:    false,
-				test:    "opaque resource allocatable enforced for multiple containers",
-				reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 6, 2, 5)},
-			},
-		*/
+		{
+			pod: newResourcePod(
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}},
+				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 3}}),
+			nodeInfo: schedulercache.NewNodeInfo(
+				newResourcePod(schedulercache.Resource{MilliCPU: 0, Memory: 0, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceA: 2}})),
+			fits:    false,
+			test:    "opaque resource allocatable enforced for multiple containers",
+			reasons: []algorithm.PredicateFailureReason{NewInsufficientResourceError(opaqueResourceA, 6, 2, 5)},
+		},
 		{
 			pod: newResourcePod(
 				schedulercache.Resource{MilliCPU: 1, Memory: 1, OpaqueIntResources: map[api.ResourceName]int64{opaqueResourceB: 1}}),

@@ -435,7 +435,7 @@ func getResourceRequest(pod *api.Pod) *schedulercache.Resource {
 					if result.OpaqueIntResources == nil {
 						result.OpaqueIntResources = map[api.ResourceName]int64{}
 					}
-					result.OpaqueIntResources[rName] = rQuantity.Value()
+					result.OpaqueIntResources[rName] += rQuantity.Value()
 				}
 			}
 		}
