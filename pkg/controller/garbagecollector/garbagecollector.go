@@ -541,8 +541,8 @@ func NewGarbageCollector(metaOnlyClientPool dynamic.ClientPool, clientPool dynam
 		clock:                            clock.RealClock{},
 		dirtyQueue:                       workqueue.NewTimedWorkQueue(),
 		orphanQueue:                      workqueue.NewTimedWorkQueue(),
-		registeredRateLimiter:            NewRegisteredRateLimiter(),
-		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(),
+		registeredRateLimiter:            NewRegisteredRateLimiter(resources),
+		registeredRateLimiterForMonitors: NewRegisteredRateLimiter(resources),
 	}
 	gc.propagator = &Propagator{
 		eventQueue: workqueue.NewTimedWorkQueue(),
