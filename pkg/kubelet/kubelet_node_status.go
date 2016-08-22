@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/events"
+	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
@@ -430,7 +431,7 @@ func (kl *Kubelet) setNodeStatusImages(node *api.Node) {
 		glog.Errorf("Error getting image list: %v", err)
 	} else {
 		// sort the images from max to min, and only set top N images into the node status.
-		sort.Sort(byImageSize(containerImages))
+		sort.Sort(sliceutils.ByImageSize(containerImages))
 		if maxImagesInNodeStatus < len(containerImages) {
 			containerImages = containerImages[0:maxImagesInNodeStatus]
 		}
