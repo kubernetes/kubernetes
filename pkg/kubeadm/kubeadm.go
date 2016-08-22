@@ -71,7 +71,8 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 	//
 	// TODO create an bastraction that defines files and the content that needs to
 	// be written to disc and write it all in one go at the end as we have a lot of
-	// crapy little files written from different parts of this code
+	// crapy little files written from different parts of this code; this could also
+	// be useful for testing
 
 	bootstrapParams := &kubeadmapi.BootstrapParams{
 		Discovery: &kubeadmapi.OutOfBandDiscovery{},
