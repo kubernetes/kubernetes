@@ -27,6 +27,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/storage/etcd/testing/testingcert"
 	"k8s.io/kubernetes/pkg/util/wait"
 
 	etcd "github.com/coreos/etcd/client"
@@ -125,15 +126,15 @@ func configureTestCluster(t *testing.T, name string, https bool) *EtcdTestServer
 			t.Fatal(err)
 		}
 		m.CertFile = path.Join(m.CertificatesDir, "etcdcert.pem")
-		if err = ioutil.WriteFile(m.CertFile, []byte(CertFileContent), 0644); err != nil {
+		if err = ioutil.WriteFile(m.CertFile, []byte(testingcert.CertFileContent), 0644); err != nil {
 			t.Fatal(err)
 		}
 		m.KeyFile = path.Join(m.CertificatesDir, "etcdkey.pem")
-		if err = ioutil.WriteFile(m.KeyFile, []byte(KeyFileContent), 0644); err != nil {
+		if err = ioutil.WriteFile(m.KeyFile, []byte(testingcert.KeyFileContent), 0644); err != nil {
 			t.Fatal(err)
 		}
 		m.CAFile = path.Join(m.CertificatesDir, "ca.pem")
-		if err = ioutil.WriteFile(m.CAFile, []byte(CAFileContent), 0644); err != nil {
+		if err = ioutil.WriteFile(m.CAFile, []byte(testingcert.CAFileContent), 0644); err != nil {
 			t.Fatal(err)
 		}
 
