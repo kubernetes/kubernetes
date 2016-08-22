@@ -62,6 +62,15 @@ func TestReplicationControllerStop(t *testing.T) {
 						},
 					},
 				},
+				&extensions.Scale{
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.ScaleSpec{
+						Replicas: 0,
+					},
+				},
 			},
 			StopError:       nil,
 			ExpectedActions: []string{"get", "list", "get", "update", "get", "delete"},
@@ -89,6 +98,15 @@ func TestReplicationControllerStop(t *testing.T) {
 								Replicas: 0,
 								Selector: map[string]string{"k1": "v1"}},
 						},
+					},
+				},
+				&extensions.Scale{
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.ScaleSpec{
+						Replicas: 0,
 					},
 				},
 			},
@@ -208,12 +226,19 @@ func TestReplicationControllerStop(t *testing.T) {
 		fake := fake.NewSimpleClientset(test.Objs...)
 		fakeWatch := watch.NewFake()
 		fake.PrependWatchReactor("replicationcontrollers", testcore.DefaultWatchReactor(fakeWatch, nil))
+		fake.PrependReactor("*", "*",
+			func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				if action.GetSubresource() == "scale" {
+					return true, &extensions.Scale{}, nil
+				}
+				return false, nil, nil
+			})
 
 		go func() {
 			fakeWatch.Add(copiedForWatch)
 		}()
 
-		reaper := ReplicationControllerReaper{fake.Core(), time.Millisecond, time.Millisecond}
+		reaper := ReplicationControllerReaper{fake.Core(), fake.Extensions(), time.Millisecond, time.Millisecond}
 		err = reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
@@ -226,7 +251,7 @@ func TestReplicationControllerStop(t *testing.T) {
 			continue
 		}
 		for i, verb := range test.ExpectedActions {
-			if actions[i].GetResource().GroupResource() != api.Resource("replicationcontrollers") {
+			if actions[i].GetResource().GroupResource() != api.Resource("replicationcontrollers") && actions[i].GetSubresource() != "scale" {
 				t.Errorf("%s unexpected action: %+v, expected %s-replicationController", test.Name, actions[i], verb)
 			}
 			if actions[i].GetVerb() != verb {
@@ -262,6 +287,15 @@ func TestReplicaSetStop(t *testing.T) {
 						},
 					},
 				},
+				&extensions.Scale{
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.ScaleSpec{
+						Replicas: 0,
+					},
+				},
 			},
 			StopError:       nil,
 			ExpectedActions: []string{"get", "get", "update", "get", "get", "delete"},
@@ -293,6 +327,15 @@ func TestReplicaSetStop(t *testing.T) {
 						},
 					},
 				},
+				&extensions.Scale{
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+					},
+					Spec: extensions.ScaleSpec{
+						Replicas: 0,
+					},
+				},
 			},
 			StopError:       nil,
 			ExpectedActions: []string{"get", "get", "update", "get", "get", "delete"},
@@ -303,7 +346,14 @@ func TestReplicaSetStop(t *testing.T) {
 
 	for _, test := range tests {
 		fake := fake.NewSimpleClientset(test.Objs...)
-		reaper := ReplicaSetReaper{fake.Extensions(), time.Millisecond, time.Millisecond}
+		fake.PrependReactor("*", "*",
+			func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				if action.GetSubresource() == "scale" {
+					return true, &extensions.Scale{}, nil
+				}
+				return false, nil, nil
+			})
+		reaper := ReplicaSetReaper{fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond}
 		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
@@ -316,7 +366,7 @@ func TestReplicaSetStop(t *testing.T) {
 			continue
 		}
 		for i, verb := range test.ExpectedActions {
-			if actions[i].GetResource().GroupResource() != extensions.Resource("replicasets") {
+			if actions[i].GetResource().GroupResource() != extensions.Resource("replicasets") && actions[i].GetSubresource() != "scale" {
 				t.Errorf("%s unexpected action: %+v, expected %s-replicaSet", test.Name, actions[i], verb)
 			}
 			if actions[i].GetVerb() != verb {
@@ -485,6 +535,16 @@ func TestDeploymentStop(t *testing.T) {
 						},
 					},
 				},
+				&extensions.Scale{
+					ObjectMeta: api.ObjectMeta{
+						Name:      name,
+						Namespace: ns,
+						Labels:    map[string]string{"k1": "v1"},
+					},
+					Spec: extensions.ScaleSpec{
+						Replicas: 0,
+					},
+				},
 			},
 			StopError: nil,
 			ExpectedActions: []string{"get:deployments", "update:deployments",
@@ -496,7 +556,14 @@ func TestDeploymentStop(t *testing.T) {
 
 	for _, test := range tests {
 		fake := fake.NewSimpleClientset(test.Objs...)
-		reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond}
+		fake.PrependReactor("*", "*",
+			func(action testcore.Action) (handled bool, ret runtime.Object, err error) {
+				if action.GetSubresource() == "scale" {
+					return true, &extensions.Scale{}, nil
+				}
+				return false, nil, nil
+			})
+		reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond}
 		err := reaper.Stop(ns, name, 0, nil)
 		if !reflect.DeepEqual(err, test.StopError) {
 			t.Errorf("%s unexpected error: %v", test.Name, err)
@@ -513,7 +580,7 @@ func TestDeploymentStop(t *testing.T) {
 			if actions[i].GetVerb() != action[0] {
 				t.Errorf("%s unexpected verb: %+v, expected %s", test.Name, actions[i], expAction)
 			}
-			if actions[i].GetResource().Resource != action[1] {
+			if actions[i].GetResource().Resource != action[1] && actions[i].GetSubresource() != "scale" {
 				t.Errorf("%s unexpected resource: %+v, expected %s", test.Name, actions[i], expAction)
 			}
 			if len(action) == 3 && actions[i].GetSubresource() != action[2] {
@@ -697,7 +764,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 		return true, nil, ScaleError{ActualError: errors.NewNotFound(api.Resource("replicaset"), "doesn't-matter")}
 	})
 
-	reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond}
+	reaper := DeploymentReaper{fake.Extensions(), fake.Extensions(), fake.Extensions(), time.Millisecond, time.Millisecond}
 	if err := reaper.Stop(ns, name, 0, nil); err != nil {
 		t.Fatalf("unexpected error: %#v", err)
 	}
