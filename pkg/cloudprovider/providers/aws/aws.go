@@ -1374,10 +1374,16 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	// mountDevice will hold the device where we should try to attach the disk
-	var mountDevice mountDevice
-	// alreadyAttached is true if we have already called AttachVolume on this disk
-	var alreadyAttached bool
+	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, disk.awsID, true)
+	if err != nil {
+		return "", err
+	}
+
+	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
+	hostDevice := "/dev/xvd" + string(mountDevice)
+	// We are using xvd names (so we are HVM only)
+	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
+	ec2Device := "/dev/xvd" + string(mountDevice)
 
 	// attachEnded is set to true if the attach operation completed
 	// (successfully or not), and is thus no longer in progress
@@ -1389,17 +1395,6 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 			}
 		}
 	}()
-
-	mountDevice, alreadyAttached, err = c.getMountDevice(awsInstance, disk.awsID, true)
-	if err != nil {
-		return "", err
-	}
-
-	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
-	hostDevice := "/dev/xvd" + string(mountDevice)
-	// We are using xvd names (so we are HVM only)
-	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-	ec2Device := "/dev/xvd" + string(mountDevice)
 
 	if !alreadyAttached {
 		request := &ec2.AttachVolumeInput{
