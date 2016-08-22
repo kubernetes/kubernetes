@@ -24,6 +24,6 @@ KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
 # source tree.  This is managed in kube::build::copy_output in build/common.sh.
 # If the output set is changed update that function.
 
-"${KUBE_ROOT}/build/run.sh" hack/update-generated-protobuf-dockerized.sh "$@"
+bash -x "${KUBE_ROOT}/build/run.sh" hack/update-generated-protobuf-dockerized.sh "$@"
 
 # ex: ts=2 sw=2 et filetype=sh

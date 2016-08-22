@@ -308,7 +308,7 @@ function kube::build::docker_image_exists() {
     exit 2
   }
 
-  [[ $(docker images -q "${1}:${2}" -q) ]]
+  [[ $(docker images -q "${1}:${2}") ]]
 }
 
 # Delete all images that match a tag prefix except for the "current" version
