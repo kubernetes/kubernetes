@@ -549,6 +549,32 @@ func TestValidatePersistentVolumes(t *testing.T) {
 				},
 			}),
 		},
+		"host mount of / with recycle reclaim policy": {
+			isExpectedFailure: true,
+			volume: testVolume("bad-recycle-do-not-want", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/"},
+				},
+				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
+			}),
+		},
+		"host mount of / with recycle reclaim policy 2": {
+			isExpectedFailure: true,
+			volume: testVolume("bad-recycle-do-not-want", "", api.PersistentVolumeSpec{
+				Capacity: api.ResourceList{
+					api.ResourceName(api.ResourceStorage): resource.MustParse("10G"),
+				},
+				AccessModes: []api.PersistentVolumeAccessMode{api.ReadWriteOnce},
+				PersistentVolumeSource: api.PersistentVolumeSource{
+					HostPath: &api.HostPathVolumeSource{Path: "/a/.."},
+				},
+				PersistentVolumeReclaimPolicy: api.PersistentVolumeReclaimRecycle,
+			}),
+		},
 	}
 
 	for name, scenario := range scenarios {
