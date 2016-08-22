@@ -57,7 +57,7 @@ func ValidatePodTemplateSpecForPetSet(template *api.PodTemplateSpec, selector la
 		// allErrs = append(allErrs, apivalidation.ValidatePodTemplateSpec(template, fldPath)...)
 		allErrs = append(allErrs, unversionedvalidation.ValidateLabels(template.Labels, fldPath.Child("labels"))...)
 		allErrs = append(allErrs, apivalidation.ValidateAnnotations(template.Annotations, fldPath.Child("annotations"))...)
-		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, fldPath.Child("annotations"))...)
+		allErrs = append(allErrs, apivalidation.ValidatePodSpecificAnnotations(template.Annotations, &template.Spec, fldPath.Child("annotations"))...)
 	}
 	return allErrs
 }
