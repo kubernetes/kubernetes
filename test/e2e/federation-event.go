@@ -40,23 +40,26 @@ var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() 
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
 
+			nsName := f.FederationNamespace.Name
 			// Delete registered events.
-			eventList, err := f.FederationClientset_1_4.Core().Events(f.Namespace.Name).List(api.ListOptions{})
+			eventList, err := f.FederationClientset_1_4.Core().Events(nsName).List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, event := range eventList.Items {
-				err := f.FederationClientset_1_4.Core().Events(f.Namespace.Name).Delete(event.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Core().Events(nsName).Delete(event.Name, &api.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.Client)
-			event := createEventOrFail(f.FederationClientset_1_4, f.Namespace.Name)
-			By(fmt.Sprintf("Creation of event %q in namespace %q succeeded.  Deleting event.", event.Name, f.Namespace.Name))
+
+			nsName := f.FederationNamespace.Name
+			event := createEventOrFail(f.FederationClientset_1_4, nsName)
+			By(fmt.Sprintf("Creation of event %q in namespace %q succeeded.  Deleting event.", event.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Core().Events(f.Namespace.Name).Delete(event.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_4.Core().Events(nsName).Delete(event.Name, &api.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting event %q in namespace %q", event.Name, event.Namespace)
-			By(fmt.Sprintf("Deletion of event %q in namespace %q succeeded.", event.Name, f.Namespace.Name))
+			By(fmt.Sprintf("Deletion of event %q in namespace %q succeeded.", event.Name, nsName))
 		})
 
 	})

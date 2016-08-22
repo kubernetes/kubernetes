@@ -89,33 +89,19 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			framework.SkipUnlessFederated(f.Client)
 		})
 
-		It("Namespace lifecycle admission control should work as expected", func() {
+		It("should not be able to create resources if namespace does not exist", func() {
 			framework.SkipUnlessFederated(f.Client)
 
-			// Ensure that a service can be created in default namespace.
-			svcName := "mysvc"
-			clientSet := f.FederationClientset_1_4
-			framework.Logf("Creating service %s in default namespace", svcName)
-			if _, err := clientSet.Core().Services(api.NamespaceDefault).Create(newService(svcName, api.NamespaceDefault)); err != nil {
-				framework.Failf("Expected service to be created fine in default namespace, got error: %v", err)
-			}
-
 			// Creating a service in a non-existing namespace should fail.
-			svcNamespace := "myns"
+			svcNamespace := "federation-admission-test-ns"
+			svcName := "myns"
+			clientset := f.FederationClientset_1_4
 			framework.Logf("Trying to create service %s in namespace %s, expect to get error", svcName, svcNamespace)
-			if _, err := clientSet.Core().Services(svcNamespace).Create(newService(svcName, svcNamespace)); err == nil {
+			if _, err := clientset.Core().Services(svcNamespace).Create(newService(svcName, svcNamespace)); err == nil {
 				framework.Failf("Expected to get an error while creating a service in a non-existing namespace")
 			}
 
-			// Verify that we can create the service after first creating the namespace.
-			framework.Logf("Creating namespace %s", svcNamespace)
-			if _, err := clientSet.Core().Namespaces().Create(newNamespace(svcNamespace)); err != nil {
-				framework.Failf("unexpected error in creating namespace: %v", err)
-			}
-			framework.Logf("Creating service %s in namespace %s", svcName, svcNamespace)
-			if _, err := clientSet.Core().Services(svcNamespace).Create(newService(svcName, svcNamespace)); err != nil {
-				framework.Failf("unexpected error in creating service after creating the namespace: %v", err)
-			}
+			// Note: We have other tests that verify that we can create resources in existing namespaces, so we dont test it again here.
 		})
 	})
 })
@@ -132,14 +118,6 @@ func newService(name, namespace string) *v1.Service {
 					Port: 80,
 				},
 			},
-		},
-	}
-}
-
-func newNamespace(name string) *v1.Namespace {
-	return &v1.Namespace{
-		ObjectMeta: v1.ObjectMeta{
-			Name: name,
 		},
 	}
 }
