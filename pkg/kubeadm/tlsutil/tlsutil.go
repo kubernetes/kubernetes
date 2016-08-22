@@ -1,5 +1,6 @@
 // Copied from https://github.com/coreos/bootkube/blob/master/pkg/tlsutil/tlsutil.go
 // TODO vendor it properly
+// TODO also see whether some of these should just go into "pkg/util/certificates"
 
 package tlsutil
 

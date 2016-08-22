@@ -119,6 +119,7 @@ func newServiceAccountKey() (*rsa.PrivateKey, error) {
 	return key, err
 }
 
+// TODO this probably shouldn't call `createClientCertsAndConfigs()`, and should just return `caKey` and `caCert`
 func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (map[string]*clientcmdapi.Config, error) {
 	var (
 		err      error
