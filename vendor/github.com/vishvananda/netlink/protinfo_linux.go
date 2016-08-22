@@ -8,14 +8,10 @@ import (
 )
 
 func LinkGetProtinfo(link Link) (Protinfo, error) {
-	return pkgHandle.LinkGetProtinfo(link)
-}
-
-func (h *Handle) LinkGetProtinfo(link Link) (Protinfo, error) {
 	base := link.Attrs()
-	h.ensureIndex(base)
+	ensureIndex(base)
 	var pi Protinfo
-	req := h.newNetlinkRequest(syscall.RTM_GETLINK, syscall.NLM_F_DUMP)
+	req := nl.NewNetlinkRequest(syscall.RTM_GETLINK, syscall.NLM_F_DUMP)
 	msg := nl.NewIfInfomsg(syscall.AF_BRIDGE)
 	req.AddData(msg)
 	msgs, err := req.Execute(syscall.NETLINK_ROUTE, 0)
