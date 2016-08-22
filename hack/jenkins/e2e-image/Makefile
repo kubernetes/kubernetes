@@ -15,6 +15,8 @@
 IMG = gcr.io/google-containers/kubekins-e2e
 TAG = $(shell date +v%Y%m%d)
 
+all: build
+
 e2e:
 	cp ../../e2e.go .
 
@@ -29,8 +31,6 @@ upload-to-gcs.sh:
 
 clean:
 	rm -rf e2e.go e2e-runner.sh sh2ju.sh upload-to-gcs.sh
-
-all: push
 
 build: e2e e2e-runner sh2ju upload-to-gcs
 	docker build -t $(IMG):$(TAG) .
