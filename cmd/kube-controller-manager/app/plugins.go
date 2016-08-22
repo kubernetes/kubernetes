@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/gce"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/cloudprovider/providers/vsphere"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
@@ -125,6 +126,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 // TODO: remove in Kubernetes 1.5
 func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
 	switch {
+	case !utilconfig.DefaultFeatureGate.DynamicVolumeProvisioning():
+		return nil, nil
 	case cloud == nil && config.EnableHostPathProvisioning:
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(
 			volume.VolumeConfig{
