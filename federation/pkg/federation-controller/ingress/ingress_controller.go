@@ -195,7 +195,7 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 
 func (ic *IngressController) deliverIngressObj(obj interface{}, delay time.Duration, failed bool) {
 	ingress := obj.(*extensions_v1beta1.Ingress)
-	ic.deliverIngress(types.NamespacedName{ingress.Namespace, ingress.Name}, delay, failed)
+	ic.deliverIngress(types.NamespacedName{Namespace: ingress.Namespace, Name: ingress.Name}, delay, failed)
 }
 
 func (ic *IngressController) deliverIngress(ingress types.NamespacedName, delay time.Duration, failed bool) {
