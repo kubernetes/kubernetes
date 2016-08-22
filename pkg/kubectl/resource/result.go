@@ -250,7 +250,7 @@ func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder
 
 		// objects that are not part of api.Scheme must be converted to JSON
 		// TODO: convert to map[string]interface{}, attach to runtime.Unknown?
-		if !version.IsEmpty() {
+		if !version.Empty() {
 			if _, _, err := api.Scheme.ObjectKinds(info.Object); runtime.IsNotRegisteredError(err) {
 				// TODO: ideally this would encode to version, but we don't expose multiple codecs here.
 				data, err := runtime.Encode(encoder, info.Object)
@@ -277,7 +277,7 @@ func AsVersionedObjects(infos []*Info, version unversioned.GroupVersion, encoder
 func tryConvert(converter runtime.ObjectConvertor, object runtime.Object, versions ...unversioned.GroupVersion) (runtime.Object, error) {
 	var last error
 	for _, version := range versions {
-		if version.IsEmpty() {
+		if version.Empty() {
 			return object, nil
 		}
 		obj, err := converter.ConvertToVersion(object, version)

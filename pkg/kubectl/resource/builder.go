@@ -458,7 +458,7 @@ func (b *Builder) mappingFor(resourceArg string) (*meta.RESTMapping, error) {
 	if fullySpecifiedGVR != nil {
 		gvk, _ = b.mapper.KindFor(*fullySpecifiedGVR)
 	}
-	if gvk.IsEmpty() {
+	if gvk.Empty() {
 		var err error
 		gvk, err = b.mapper.KindFor(groupResource.WithVersion(""))
 		if err != nil {

@@ -137,7 +137,7 @@ func (a *APIInstaller) getResourceKind(path string, storage rest.Storage) (unver
 			fqKindToRegister = a.group.GroupVersion.WithKind(fqKind.Kind)
 		}
 	}
-	if fqKindToRegister.IsEmpty() {
+	if fqKindToRegister.Empty() {
 		return unversioned.GroupVersionKind{}, fmt.Errorf("unable to locate fully qualified kind for %v: found %v when registering for %v", reflect.TypeOf(object), fqKinds, a.group.GroupVersion)
 	}
 	return fqKindToRegister, nil

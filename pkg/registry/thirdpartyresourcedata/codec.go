@@ -517,7 +517,7 @@ func (t *thirdPartyResourceDataEncoder) Encode(obj runtime.Object, stream io.Wri
 			listItems[ix] = json.RawMessage(buff.Bytes())
 		}
 
-		if t.gvk.IsEmpty() {
+		if t.gvk.Empty() {
 			return fmt.Errorf("thirdPartyResourceDataEncoder was not given a target version")
 		}
 
