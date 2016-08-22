@@ -71,11 +71,11 @@ Possible resources include (case insensitive):`
 
 kubectl set resources deployment nginx -c=nginx --limits=cpu=200m,memory=512Mi
 
-# Set the resource limits and requests for all containers in nginx
+# Set the resource request and limits for all containers in nginx
 
 kubectl set resources deployment nginx --limits=cpu=200m,memory=512Mi --requests=cpu=100m,memory=256Mi
 
-# Remove the resource limits and requests for resources on containers in nginx
+# Remove the resource requests for resources on containers in nginx
 
 kubectl set resources deployment nginx --limits=cpu=0,memory=0 --requests=cpu=0,memory=0
 
@@ -99,7 +99,7 @@ func NewCmdResources(f *cmdutil.Factory, out io.Writer, errOut io.Writer) *cobra
 
 	cmd := &cobra.Command{
 		Use:     "resources (-f FILENAME | TYPE NAME)  ([--limits=LIMITS & --requests=REQUESTS]",
-		Short:   "update resource limits/requests on objects with pod templates",
+		Short:   "update resource reques on objects with pod templates",
 		Long:    resources_long + "\n" + pod_specs[2:],
 		Example: resources_example,
 		Run: func(cmd *cobra.Command, args []string) {
@@ -160,7 +160,7 @@ func (o *ResourcesOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args
 func (o *ResourcesOptions) Validate() error {
 	var err error
 	if len(o.Limits) == 0 && len(o.Requests) == 0 {
-		return fmt.Errorf("you must specify an update to limits or requests (in the form of --limits/--requests)")
+		return fmt.Errorf("you must specify an update to requests or limits or  (in the form of --requests/--limits)")
 	}
 
 	o.ResourceRequirements, err = kubectl.HandleResourceRequirements(map[string]string{"limits": o.Limits, "requests": o.Requests})
