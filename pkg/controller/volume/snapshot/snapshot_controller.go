@@ -137,7 +137,7 @@ func (sc *snapshotController) pvcAdd(obj interface{}) {
 		return
 	}
 
-	snapshotName, found := pvc.ObjectMeta.Annotations[api.AnnSnapshotCreate]
+	snapshotName, found := pvc.Annotations[api.AnnSnapshotCreate]
 	if !found {
 		// Ignore PVCs without the snapshot creation annotation
 		return
@@ -380,4 +380,8 @@ func (sc *snapshotController) GetHostIP() (net.IP, error) {
 
 func (sc *snapshotController) GetRootContext() string {
 	return ""
+}
+
+func (sc *snapshotController) GetNodeAllocatable() (api.ResourceList, error) {
+	return api.ResourceList{}, nil
 }

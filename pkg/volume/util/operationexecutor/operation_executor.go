@@ -465,6 +465,7 @@ func (oe *operationExecutor) CreateSnapshot(
 	volumeToSnapshot VolumeToSnapshot,
 	snapshotName string,
 	actualStateOfWorld ActualStateOfWorldSnapshotUpdater) error {
+
 	createSnapshotFunc, err :=
 		oe.generateCreateSnapshotFunc(volumeToSnapshot, snapshotName, actualStateOfWorld)
 
@@ -1026,6 +1027,7 @@ func (oe *operationExecutor) generateCreateSnapshotFunc(
 	volumeToSnapshot VolumeToSnapshot,
 	snapshotName string,
 	actualStateOfWorld ActualStateOfWorldSnapshotUpdater) (func() error, error) {
+
 	snapshottableVolumePlugin, err :=
 		oe.volumePluginMgr.FindSnapshottablePluginBySpec(volumeToSnapshot.VolumeSpec)
 	if err != nil || snapshottableVolumePlugin == nil {
@@ -1056,17 +1058,25 @@ func (oe *operationExecutor) generateCreateSnapshotFunc(
 			volumeToSnapshot.VolumeSpec.Name())
 
 		// Update PVC object
-		delete(volumeToSnapshot.PersistentVolumeClaim.ObjectMeta.Annotations, api.AnnSnapshotCreate)
-		volumeToSnapshot.PersistentVolumeClaim.ObjectMeta.Annotations[snapshotTimestamp] = snapshotName
-		_, updateErr := oe.kubeClient.Core().PersistentVolumeClaims(api.NamespaceAll).Update(volumeToSnapshot.PersistentVolumeClaim)
+		delete(volumeToSnapshot.PersistentVolumeClaim.Annotations, api.AnnSnapshotCreate)
+		volumeToSnapshot.PersistentVolumeClaim.Annotations[snapshotName] = snapshotTimestamp
+
+		glog.Infof(
+			"xcxc Posting pvc to the api server: %v",
+			volumeToSnapshot.PersistentVolumeClaim.Annotations)
+		namespace := volumeToSnapshot.PersistentVolumeClaim.Namespace
+		_, updateErr := oe.kubeClient.Core().PersistentVolumeClaims(namespace).Update(volumeToSnapshot.PersistentVolumeClaim)
 		if updateErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
-				"CreateSnapshot failed posting PVC to API server for volume %q (spec.Name: %q) from node %q with: %v",
-				volumeToSnapshot.VolumeName,
-				volumeToSnapshot.VolumeSpec.Name(),
+				"CreateSnapshot failed removing create-snapshot annotation from PVC %q with: %v",
+				volumeToSnapshot.PersistentVolumeClaim.Name,
 				updateErr)
 		}
+
+		glog.Infof(
+			"CreateSnapshot.CreateSnapshot succeeded removing create-snapshot annotation from PVC %q.",
+			volumeToSnapshot.PersistentVolumeClaim.Name)
 
 		actualStateOfWorld.MarkVolumeAsSnapshotted(volumeToSnapshot.VolumeName)
 
