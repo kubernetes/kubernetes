@@ -165,8 +165,12 @@ func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, p
 			return err
 		}
 	}
-	controller.Spec.Replicas = int32(newSize)
-	if _, err := scaler.c.ReplicationControllers(namespace).Update(controller); err != nil {
+	scale := extensions.Scale{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec:       extensions.ScaleSpec{Replicas: int32(newSize)},
+	}
+	if _, err := scaler.c.Extensions().Scales(namespace).Update("ReplicationController", &scale); err != nil {
+		// ReplicationControllers(namespace).Update(controller); err != nil {
 		if errors.IsConflict(err) {
 			return ScaleError{ScaleUpdateConflictFailure, controller.ResourceVersion, err}
 		}
@@ -237,8 +241,11 @@ func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, precondition
 			return err
 		}
 	}
-	rs.Spec.Replicas = int32(newSize)
-	if _, err := scaler.c.ReplicaSets(namespace).Update(rs); err != nil {
+	scale := extensions.Scale{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec:       extensions.ScaleSpec{Replicas: int32(newSize)},
+	}
+	if _, err := scaler.c.Scales(namespace).Update("ReplicaSet", &scale); err != nil {
 		if errors.IsConflict(err) {
 			return ScaleError{ScaleUpdateConflictFailure, rs.ResourceVersion, err}
 		}
@@ -424,8 +431,11 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 
 	// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
 	// For now I'm falling back to regular Deployment update operation.
-	deployment.Spec.Replicas = int32(newSize)
-	if _, err := scaler.c.Deployments(namespace).Update(deployment); err != nil {
+	scale := extensions.Scale{
+		ObjectMeta: api.ObjectMeta{Name: name, Namespace: namespace},
+		Spec:       extensions.ScaleSpec{Replicas: int32(newSize)},
+	}
+	if _, err := scaler.c.Scales(namespace).Update("Deployment", &scale); err != nil {
 		if errors.IsConflict(err) {
 			return ScaleError{ScaleUpdateConflictFailure, deployment.ResourceVersion, err}
 		}
