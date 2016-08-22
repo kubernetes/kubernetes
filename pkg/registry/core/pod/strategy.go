@@ -332,7 +332,7 @@ func LogLocation(
 	}
 	loc := &url.URL{
 		Scheme:   connectionInfo.Scheme,
-		Host:     fmt.Sprintf("%s:%d", connectionInfo.Hostname, connectionInfo.Port),
+		Host:     net.JoinHostPort(connectionInfo.Hostname, fmt.Sprint(connectionInfo.Port)),
 		Path:     fmt.Sprintf("/containerLogs/%s/%s/%s", pod.Namespace, pod.Name, container),
 		RawQuery: params.Encode(),
 	}
@@ -465,7 +465,7 @@ func streamLocation(
 	}
 	loc := &url.URL{
 		Scheme:   connectionInfo.Scheme,
-		Host:     fmt.Sprintf("%s:%d", connectionInfo.Hostname, connectionInfo.Port),
+		Host:     net.JoinHostPort(connectionInfo.Hostname, fmt.Sprint(connectionInfo.Port)),
 		Path:     fmt.Sprintf("/%s/%s/%s/%s", path, pod.Namespace, pod.Name, container),
 		RawQuery: params.Encode(),
 	}
@@ -495,7 +495,7 @@ func PortForwardLocation(
 	}
 	loc := &url.URL{
 		Scheme: connectionInfo.Scheme,
-		Host:   fmt.Sprintf("%s:%d", connectionInfo.Hostname, connectionInfo.Port),
+		Host:   net.JoinHostPort(connectionInfo.Hostname, fmt.Sprint(connectionInfo.Port)),
 		Path:   fmt.Sprintf("/portForward/%s/%s", pod.Namespace, pod.Name),
 	}
 	return loc, connectionInfo.Transport, nil
