@@ -2518,7 +2518,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, 
 			return nil, err
 		}
 		// Should add the shared securityGroupID too.
-		securityGroupIDs = []string{sharedSecurityGroupID}
+		securityGroupIDs = append(securityGroupIDs, sharedSecurityGroupID)
 	}
 
 	// Build the load balancer itself
@@ -2541,25 +2541,21 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, 
 	}
 
 	// Add loadbalancer's security group's rules into instances' security groups' rules.
-	if c.cfg.Global.EnableSharedSecurityGroupIngress {
-		err = nil
-	} else {
+	if !c.cfg.Global.EnableSharedSecurityGroupIngress {
 		err = c.updateInstanceSecurityGroupsForLoadBalancer(loadBalancer, instances)
-	}
-	if err != nil {
-		glog.Warningf("Error opening ingress rules for the load balancer to the instances: %v", err)
-		return nil, err
+		if err != nil {
+			glog.Warningf("Error opening ingress rules for the load balancer to the instances: %v", err)
+			return nil, err
+		}
 	}
 
 	// Add sharedSecurityGroupID into instances' rules only.
-	if !c.cfg.Global.EnableSharedSecurityGroupIngress {
-		err = nil
-	} else {
+	if c.cfg.Global.EnableSharedSecurityGroupIngress {
 		err = s.updateInstanceSharedSecurityGroups(sharedSecurityGroupID, instances)
-	}
-	if err != nil {
-		glog.Warningf("Error opening ingress rules for the shared security group to the instances: %v", err)
-		return nil, err
+		if err != nil {
+			glog.Warningf("Error opening ingress rules for the shared security group to the instances: %v", err)
+			return nil, err
+		}
 	}
 
 	err = c.ensureLoadBalancerInstances(orEmpty(loadBalancer.LoadBalancerName), loadBalancer.Instances, instances)
@@ -2671,8 +2667,8 @@ func (c *Cloud) getTaggedSecurityGroups() (map[string]*ec2.SecurityGroup, error)
 
 // Almost identical to updateInstanceSecurityGroupsForLoadBalancer, but it only adds ssg rules to
 // instances' inbound rules.
-func (s *AWSCloud) updateInstanceSharedSecurityGroups(ssgID string, allInstances []*ec2.Instance) error {
-	taggedSecurityGroups, err := s.getTaggedSecurityGroups()
+func (c Cloud) updateInstanceSharedSecurityGroups(ssgID string, allInstances []*ec2.Instance) error {
+	taggedSecurityGroups, err := c.getTaggedSecurityGroups()
 	if err != nil {
 		return fmt.Errorf("error querying for tagged security groups: %v", err)
 	}
@@ -2718,7 +2714,7 @@ func (s *AWSCloud) updateInstanceSharedSecurityGroups(ssgID string, allInstances
 
 		permissions := []*ec2.IpPermission{permission}
 
-		changed, err := s.addSecurityGroupIngress(instanceSecurityGroupId, permissions)
+		changed, err := c.addSecurityGroupIngress(instanceSecurityGroupId, permissions)
 		if err != nil {
 			return err
 		}
