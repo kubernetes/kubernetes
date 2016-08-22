@@ -71,10 +71,10 @@ func IsNoSuchReaperError(err error) bool {
 func ReaperFor(kind unversioned.GroupKind, c internalclientset.Interface) (Reaper, error) {
 	switch kind {
 	case api.Kind("ReplicationController"):
-		return &ReplicationControllerReaper{c.Core(), Interval, Timeout}, nil
+		return &ReplicationControllerReaper{c.Core(), c.Extensions(), Interval, Timeout}, nil
 
 	case extensions.Kind("ReplicaSet"):
-		return &ReplicaSetReaper{c.Extensions(), Interval, Timeout}, nil
+		return &ReplicaSetReaper{c.Extensions(), c.Extensions(), Interval, Timeout}, nil
 
 	case extensions.Kind("DaemonSet"):
 		return &DaemonSetReaper{c.Extensions(), Interval, Timeout}, nil
@@ -92,22 +92,24 @@ func ReaperFor(kind unversioned.GroupKind, c internalclientset.Interface) (Reape
 		return &PetSetReaper{c.Apps(), c.Core(), Interval, Timeout}, nil
 
 	case extensions.Kind("Deployment"):
-		return &DeploymentReaper{c.Extensions(), c.Extensions(), Interval, Timeout}, nil
+		return &DeploymentReaper{c.Extensions(), c.Extensions(), c.Extensions(), Interval, Timeout}, nil
 
 	}
 	return nil, &NoSuchReaperError{kind}
 }
 
-func ReaperForReplicationController(rcClient coreclient.ReplicationControllersGetter, timeout time.Duration) (Reaper, error) {
-	return &ReplicationControllerReaper{rcClient, Interval, timeout}, nil
+func ReaperForReplicationController(rcClient coreclient.ReplicationControllersGetter, scaleClient extensionsclient.ScalesGetter, timeout time.Duration) (Reaper, error) {
+	return &ReplicationControllerReaper{rcClient, scaleClient, Interval, timeout}, nil
 }
 
 type ReplicationControllerReaper struct {
 	client                coreclient.ReplicationControllersGetter
+	scaleClient           extensionsclient.ScalesGetter
 	pollInterval, timeout time.Duration
 }
 type ReplicaSetReaper struct {
 	client                extensionsclient.ReplicaSetsGetter
+	scaleClient           extensionsclient.ScalesGetter
 	pollInterval, timeout time.Duration
 }
 type DaemonSetReaper struct {
@@ -122,6 +124,7 @@ type JobReaper struct {
 type DeploymentReaper struct {
 	dClient               extensionsclient.DeploymentsGetter
 	rsClient              extensionsclient.ReplicaSetsGetter
+	scaleClient           extensionsclient.ScalesGetter
 	pollInterval, timeout time.Duration
 }
 type PodReaper struct {
@@ -160,7 +163,7 @@ func getOverlappingControllers(rcClient coreclient.ReplicationControllerInterfac
 
 func (reaper *ReplicationControllerReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	rc := reaper.client.ReplicationControllers(namespace)
-	scaler := &ReplicationControllerScaler{reaper.client}
+	scaler := &ReplicationControllerScaler{reaper.client, reaper.scaleClient}
 	ctrl, err := rc.Get(name)
 	if err != nil {
 		return err
@@ -229,7 +232,7 @@ func getOverlappingReplicaSets(c client.ReplicaSetInterface, rs *extensions.Repl
 
 func (reaper *ReplicaSetReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	rsc := reaper.client.ReplicaSets(namespace)
-	scaler := &ReplicaSetScaler{reaper.client}
+	scaler := &ReplicaSetScaler{reaper.client, reaper.scaleClient}
 	rs, err := rsc.Get(name)
 	if err != nil {
 		return err
@@ -416,7 +419,7 @@ func (reaper *JobReaper) Stop(namespace, name string, timeout time.Duration, gra
 func (reaper *DeploymentReaper) Stop(namespace, name string, timeout time.Duration, gracePeriod *api.DeleteOptions) error {
 	deployments := reaper.dClient.Deployments(namespace)
 	replicaSets := reaper.rsClient.ReplicaSets(namespace)
-	rsReaper := &ReplicaSetReaper{reaper.rsClient, reaper.pollInterval, reaper.timeout}
+	rsReaper := &ReplicaSetReaper{reaper.rsClient, reaper.scaleClient, reaper.pollInterval, reaper.timeout}
 
 	deployment, err := reaper.updateDeploymentWithRetries(namespace, name, func(d *extensions.Deployment) {
 		// set deployment's history and scale to 0

@@ -66,6 +66,9 @@ func ObjectReaction(tracker ObjectTracker, mapper meta.RESTMapper) ReactionFunc 
 	return func(action Action) (bool, runtime.Object, error) {
 		ns := action.GetNamespace()
 		gvr := action.GetResource()
+		if action.GetSubresource() == "scale" {
+			gvr = unversioned.GroupVersionResource{Resource: action.GetSubresource()}
+		}
 
 		gvk, err := mapper.KindFor(gvr)
 		if err != nil {

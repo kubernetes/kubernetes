@@ -54,13 +54,22 @@ type ObjectScheme interface {
 // Object or error that matches the requested action. For instance, list-replicationControllers
 // should attempt to return a list of replication controllers. This method delegates to the
 // ObjectRetriever interface to satisfy retrieval of lists or retrieval of single items.
-// TODO: add support for sub resources
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 
 	return func(action Action) (bool, runtime.Object, error) {
-		kind, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
-		if err != nil {
-			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
+		var err error
+		var kind unversioned.GroupVersionKind
+
+		if action.GetSubresource() != "" {
+			kind, err = mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetSubresource()})
+			if err != nil {
+				return false, nil, fmt.Errorf("unrecognized subresource action %s/%s: %v", action.GetResource(), action.GetSubresource(), err)
+			}
+		} else {
+			kind, err = mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
+			if err != nil {
+				return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
+			}
 		}
 
 		// TODO: have mapper return a Kind for a subresource?

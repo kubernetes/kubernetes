@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	coreclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
+	extensionsclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/extensions/unversioned"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/labels"
@@ -110,8 +111,9 @@ const (
 // RollingUpdater provides methods for updating replicated pods in a predictable,
 // fault-tolerant way.
 type RollingUpdater struct {
-	rcClient  coreclient.ReplicationControllersGetter
-	podClient coreclient.PodsGetter
+	rcClient    coreclient.ReplicationControllersGetter
+	podClient   coreclient.PodsGetter
+	scaleClient extensionsclient.ScalesGetter
 	// Namespace for resources
 	ns string
 	// scaleAndWait scales a controller and returns its updated state.
@@ -128,11 +130,12 @@ type RollingUpdater struct {
 }
 
 // NewRollingUpdater creates a RollingUpdater from a client.
-func NewRollingUpdater(namespace string, rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter) *RollingUpdater {
+func NewRollingUpdater(namespace string, rcClient coreclient.ReplicationControllersGetter, podClient coreclient.PodsGetter, scaleClient extensionsclient.ScalesGetter) *RollingUpdater {
 	updater := &RollingUpdater{
-		rcClient:  rcClient,
-		podClient: podClient,
-		ns:        namespace,
+		rcClient:    rcClient,
+		podClient:   podClient,
+		scaleClient: scaleClient,
+		ns:          namespace,
 	}
 	// Inject real implementations.
 	updater.scaleAndWait = updater.scaleAndWaitWithScaler
@@ -392,7 +395,7 @@ func (r *RollingUpdater) scaleDown(newRc, oldRc *api.ReplicationController, desi
 
 // scalerScaleAndWait scales a controller using a Scaler and a real client.
 func (r *RollingUpdater) scaleAndWaitWithScaler(rc *api.ReplicationController, retry *RetryParams, wait *RetryParams) (*api.ReplicationController, error) {
-	scaler := &ReplicationControllerScaler{r.rcClient}
+	scaler := &ReplicationControllerScaler{r.rcClient, r.scaleClient}
 	if err := scaler.Scale(rc.Namespace, rc.Name, uint(rc.Spec.Replicas), &ScalePrecondition{-1, ""}, retry, wait); err != nil {
 		return nil, err
 	}
