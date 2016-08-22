@@ -17,23 +17,29 @@ limitations under the License.
 package factory
 
 import (
-	"strings"
-
-	"github.com/coreos/etcd/clientv3"
-	"golang.org/x/net/context"
-
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd3"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+
+	"github.com/coreos/etcd/clientv3"
+	"github.com/coreos/etcd/pkg/transport"
+	"golang.org/x/net/context"
 )
 
 func newETCD3Storage(c storagebackend.Config) (storage.Interface, error) {
-	endpoints := c.ServerList
-	for i, s := range endpoints {
-		endpoints[i] = strings.TrimLeft(s, "http://")
+	tlsInfo := transport.TLSInfo{
+		CertFile: c.CertFile,
+		KeyFile:  c.KeyFile,
+		CAFile:   c.CAFile,
 	}
+	tlsConfig, err := tlsInfo.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	cfg := clientv3.Config{
-		Endpoints: endpoints,
+		Endpoints: c.ServerList,
+		TLS:       tlsConfig,
 	}
 	client, err := clientv3.New(cfg)
 	if err != nil {
