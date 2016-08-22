@@ -59,8 +59,10 @@ const (
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
 	// OverlapAnnotation marks deployments with overlapping selector with other deployments
+	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
 	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
 	// SelectorUpdateAnnotation marks the last time deployment selector update
+	// TODO: Delete this annotation when we gracefully handle overlapping selectors.
 	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
 )
 
@@ -816,4 +818,21 @@ func LastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
 	}
 	// If it's never updated, use creation timestamp instead
 	return d.CreationTimestamp
+}
+
+// BySelectorLastUpdateTime sorts a list of deployments by the last update time of their selector,
+// first using their creation timestamp and then their names as a tie breaker.
+type BySelectorLastUpdateTime []extensions.Deployment
+
+func (o BySelectorLastUpdateTime) Len() int      { return len(o) }
+func (o BySelectorLastUpdateTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o BySelectorLastUpdateTime) Less(i, j int) bool {
+	ti, tj := LastSelectorUpdate(&o[i]), LastSelectorUpdate(&o[j])
+	if ti.Equal(tj) {
+		if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+			return o[i].Name < o[j].Name
+		}
+		return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	}
+	return ti.Before(tj)
 }

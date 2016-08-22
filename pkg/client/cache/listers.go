@@ -286,20 +286,17 @@ func (s *StoreToDeploymentLister) List() (deployments []extensions.Deployment, e
 
 // GetDeploymentsForReplicaSet returns a list of deployments managing a replica set. Returns an error only if no matching deployments are found.
 func (s *StoreToDeploymentLister) GetDeploymentsForReplicaSet(rs *extensions.ReplicaSet) (deployments []extensions.Deployment, err error) {
-	var d extensions.Deployment
-
 	if len(rs.Labels) == 0 {
 		err = fmt.Errorf("no deployments found for ReplicaSet %v because it has no labels", rs.Name)
 		return
 	}
 
 	// TODO: MODIFY THIS METHOD so that it checks for the podTemplateSpecHash label
-	for _, m := range s.Indexer.List() {
-		d = *m.(*extensions.Deployment)
-		if d.Namespace != rs.Namespace {
-			continue
-		}
-
+	dList, err := s.Deployments(rs.Namespace).List(labels.Everything())
+	if err != nil {
+		return
+	}
+	for _, d := range dList {
 		selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)
@@ -366,15 +363,15 @@ func (s *StoreToDeploymentLister) GetDeploymentsForPod(pod *api.Pod) (deployment
 		return
 	}
 
+	if len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
+		return
+	}
+
 	dList, err := s.Deployments(pod.Namespace).List(labels.Everything())
 	if err != nil {
 		return
 	}
 	for _, d := range dList {
-		if len(pod.Labels[extensions.DefaultDeploymentUniqueLabelKey]) == 0 {
-			continue
-		}
-
 		selector, err := unversioned.LabelSelectorAsSelector(d.Spec.Selector)
 		if err != nil {
 			return nil, fmt.Errorf("invalid label selector: %v", err)

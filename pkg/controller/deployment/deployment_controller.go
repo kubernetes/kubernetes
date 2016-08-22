@@ -266,7 +266,7 @@ func (dc *DeploymentController) getDeploymentForReplicaSet(rs *extensions.Replic
 	// If that happens we should probably dynamically repair the situation by ultimately
 	// trying to clean up one of the controllers, for now we just return the older one
 	if len(deployments) > 1 {
-		sort.Sort(bySelectorLastUpdateTime(deployments))
+		sort.Sort(util.BySelectorLastUpdateTime(deployments))
 		glog.Errorf("user error! more than one deployment is selecting replica set %s/%s with labels: %#v, returning %s/%s", rs.Namespace, rs.Name, rs.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
 	return &deployments[0]
@@ -336,7 +336,7 @@ func (dc *DeploymentController) getDeploymentForPod(pod *api.Pod) *extensions.De
 	}
 
 	if len(deployments) > 1 {
-		sort.Sort(bySelectorLastUpdateTime(deployments))
+		sort.Sort(util.BySelectorLastUpdateTime(deployments))
 		glog.Errorf("user error! more than one deployment is selecting pod %s/%s with labels: %#v, returning %s/%s", pod.Namespace, pod.Name, pod.Labels, deployments[0].Namespace, deployments[0].Name)
 	}
 	return &deployments[0]
@@ -575,21 +575,4 @@ func (dc *DeploymentController) handleOverlap(d *extensions.Deployment) error {
 		d, _ = dc.clearDeploymentOverlap(d)
 	}
 	return nil
-}
-
-// bySelectorLastUpdateTime sorts a list of deployments by the last update time of their selector,
-// first using their creation timestamp and then their names as a tie breaker.
-type bySelectorLastUpdateTime []extensions.Deployment
-
-func (o bySelectorLastUpdateTime) Len() int      { return len(o) }
-func (o bySelectorLastUpdateTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-func (o bySelectorLastUpdateTime) Less(i, j int) bool {
-	ti, tj := util.LastSelectorUpdate(&o[i]), util.LastSelectorUpdate(&o[j])
-	if ti.Equal(tj) {
-		if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
-			return o[i].Name < o[j].Name
-		}
-		return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
-	}
-	return ti.Before(tj)
 }
