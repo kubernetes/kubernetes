@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
+	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/types"
 
 	"github.com/Azure/azure-sdk-for-go/arm/compute"
@@ -37,6 +38,35 @@ func TestReconcileLoadBalancerAddPort(t *testing.T) {
 	svc := getTestService("servicea", 80)
 	pip := getTestPublicIP()
 	lb := getTestLoadBalancer()
+	hosts := []string{}
+
+	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, hosts)
+	if err != nil {
+		t.Errorf("Unexpected error: %q", err)
+	}
+
+	if !updated {
+		t.Error("Expected the loadbalancer to need an update")
+	}
+
+	// ensure we got a frontend ip configuration
+	if len(*lb.Properties.FrontendIPConfigurations) != 1 {
+		t.Error("Expected the loadbalancer to have a frontend ip configuration")
+	}
+
+	validateLoadBalancer(t, lb, svc)
+}
+
+func TestReconcileLoadBalancerNodeHealth(t *testing.T) {
+	az := getTestCloud()
+	svc := getTestService("servicea", 80)
+	svc.Annotations = map[string]string{
+		serviceapi.BetaAnnotationExternalTraffic:     serviceapi.AnnotationValueExternalTrafficLocal,
+		serviceapi.BetaAnnotationHealthCheckNodePort: "32456",
+	}
+	pip := getTestPublicIP()
+	lb := getTestLoadBalancer()
+
 	hosts := []string{}
 
 	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, hosts)
@@ -283,14 +313,30 @@ func validateLoadBalancer(t *testing.T, loadBalancer network.LoadBalancer, servi
 			}
 
 			foundProbe := false
-			for _, actualProbe := range *loadBalancer.Properties.Probes {
-				if strings.EqualFold(*actualProbe.Name, wantedRuleName) &&
-					*actualProbe.Properties.Port == wantedRule.NodePort {
-					foundProbe = true
-					break
+			if serviceapi.NeedsHealthCheck(&svc) {
+				path, port := serviceapi.GetServiceHealthCheckPathPort(&svc)
+				for _, actualProbe := range *loadBalancer.Properties.Probes {
+					if strings.EqualFold(*actualProbe.Name, wantedRuleName) &&
+						*actualProbe.Properties.Port == port &&
+						*actualProbe.Properties.RequestPath == path &&
+						actualProbe.Properties.Protocol == network.ProbeProtocolHTTP {
+						foundProbe = true
+						break
+					}
+				}
+			} else {
+				for _, actualProbe := range *loadBalancer.Properties.Probes {
+					if strings.EqualFold(*actualProbe.Name, wantedRuleName) &&
+						*actualProbe.Properties.Port == wantedRule.NodePort {
+						foundProbe = true
+						break
+					}
 				}
 			}
 			if !foundProbe {
+				for _, actualProbe := range *loadBalancer.Properties.Probes {
+					t.Logf("Probe: %s %d", *actualProbe.Name, *actualProbe.Properties.Port)
+				}
 				t.Errorf("Expected loadbalancer probe but didn't find it: %q", wantedRuleName)
 			}
 		}

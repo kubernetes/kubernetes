@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	serviceapi "k8s.io/kubernetes/pkg/api/service"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 
 	"github.com/Azure/azure-sdk-for-go/arm/network"
@@ -339,14 +340,29 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 			return lb, false, err
 		}
 
-		expectedProbes[i] = network.Probe{
-			Name: &lbRuleName,
-			Properties: &network.ProbePropertiesFormat{
-				Protocol:          probeProto,
-				Port:              to.Int32Ptr(port.NodePort),
-				IntervalInSeconds: to.Int32Ptr(5),
-				NumberOfProbes:    to.Int32Ptr(2),
-			},
+		if serviceapi.NeedsHealthCheck(service) {
+			podPresencePath, podPresencePort := serviceapi.GetServiceHealthCheckPathPort(service)
+
+			expectedProbes[i] = network.Probe{
+				Name: &lbRuleName,
+				Properties: &network.ProbePropertiesFormat{
+					RequestPath:       to.StringPtr(podPresencePath),
+					Protocol:          network.ProbeProtocolHTTP,
+					Port:              to.Int32Ptr(podPresencePort),
+					IntervalInSeconds: to.Int32Ptr(5),
+					NumberOfProbes:    to.Int32Ptr(2),
+				},
+			}
+		} else {
+			expectedProbes[i] = network.Probe{
+				Name: &lbRuleName,
+				Properties: &network.ProbePropertiesFormat{
+					Protocol:          probeProto,
+					Port:              to.Int32Ptr(port.NodePort),
+					IntervalInSeconds: to.Int32Ptr(5),
+					NumberOfProbes:    to.Int32Ptr(2),
+				},
+			}
 		}
 
 		expectedRules[i] = network.LoadBalancingRule{
@@ -369,7 +385,7 @@ func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.Pub
 		}
 	}
 
-	// remove unwated probes
+	// remove unwanted probes
 	dirtyProbes := false
 	var updatedProbes []network.Probe
 	if lb.Properties.Probes != nil {
