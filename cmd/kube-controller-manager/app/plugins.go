@@ -122,6 +122,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 // TODO: remove in Kubernetes 1.5
 func NewAlphaVolumeProvisioner(cloud cloudprovider.Interface, config componentconfig.VolumeConfiguration) (volume.ProvisionableVolumePlugin, error) {
 	switch {
+	case !config.DefaultFeatureGate.DynamicVolumeProvisioning():
+		return nil, nil
 	case cloud == nil && config.EnableHostPathProvisioning:
 		return getProvisionablePluginFromVolumePlugins(host_path.ProbeVolumePlugins(
 			volume.VolumeConfig{

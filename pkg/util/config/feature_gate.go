@@ -39,13 +39,18 @@ const (
 	//   AllAlpha=false,NewFeature=true  will result in newFeature=true
 	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
 	allAlphaGate = "AllAlpha"
+
+	// dynamicVolumeProvisioningGate is a toggle for alpha dynamic volume
+	// provisioning support, which is controlled by annotations.
+	dynamicVolumeProvisioningGate = "DynamicVolumeProvisioning"
 )
 
 var (
 	// Default values for recorded features.  Every new feature gate should be
 	// represented here.
 	knownFeatures = map[string]featureSpec{
-		allAlphaGate: {false, alpha},
+		allAlphaGate:                  {false, alpha},
+		dynamicVolumeProvisioningGate: {true, alpha},
 	}
 
 	// Special handling for a few gates.
@@ -84,6 +89,12 @@ type FeatureGate interface {
 	// // owner: @username
 	// // alpha: v1.4
 	// MyFeature() bool
+
+	// DynamicVolumeProvisioningGate is a toggle for alpha dynamic volume
+	// provisioning support, which is controlled by annotations.
+	// owner: @saadali
+	// alpha: v1.3
+	DynamicVolumeProvisioning() bool
 
 	// TODO: Define accessors for each non-API alpha feature.
 }
@@ -152,6 +163,10 @@ func (f *featureGate) String() string {
 
 func (f *featureGate) Type() string {
 	return "mapStringBool"
+}
+
+func (f *featureGate) DynamicVolumeProvisioning() bool {
+	return lookup(dynamicVolumeProvisioningGate)
 }
 
 func (f *featureGate) lookup(key string) bool {
