@@ -85,7 +85,7 @@ func (f FakeServiceLister) GetPodServices(pod *api.Pod) (services []api.Service,
 		if service.Namespace != pod.Namespace {
 			continue
 		}
-		selector = labels.Set(service.Spec.Selector).AsSelector()
+		selector = labels.Set(service.Spec.Selector).AsSelectorPreValidated()
 		if selector.Matches(labels.Set(pod.Labels)) {
 			services = append(services, service)
 		}
@@ -134,7 +134,7 @@ func (f FakeControllerLister) GetPodControllers(pod *api.Pod) (controllers []api
 		if controller.Namespace != pod.Namespace {
 			continue
 		}
-		selector = labels.Set(controller.Spec.Selector).AsSelector()
+		selector = labels.Set(controller.Spec.Selector).AsSelectorPreValidated()
 		if selector.Matches(labels.Set(pod.Labels)) {
 			controllers = append(controllers, controller)
 		}
