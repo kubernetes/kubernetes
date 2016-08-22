@@ -21,6 +21,7 @@ package kubenet
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -318,13 +319,11 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
+	// TODO: check and set promiscuous mode with netlink once vishvananda/netlink supports it
 	if plugin.hairpinMode == componentconfig.PromiscuousBridge {
-		link, err := netlink.LinkByName(BridgeName)
-		if err != nil {
-			return err
-		}
-		if link.Attrs().Promisc != 1 {
-			err := netlink.SetPromiscOn(link)
+		output, err := plugin.execer.Command("ip", "link", "show", "dev", BridgeName).CombinedOutput()
+		if err != nil || strings.Index(string(output), "PROMISC") < 0 {
+			_, err := plugin.execer.Command("ip", "link", "set", BridgeName, "promisc", "on").CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("Error setting promiscuous mode on %s: %v", BridgeName, err)
 			}
