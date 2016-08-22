@@ -58,6 +58,9 @@ var (
 func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	opts := &UndoOptions{}
 
+	validArgs := []string{"deployment"}
+	argAliases := kubectl.ResourceAliases(validArgs)
+
 	cmd := &cobra.Command{
 		Use:     "undo (TYPE NAME | TYPE/NAME) [flags]",
 		Short:   "Undo a previous rollout",
@@ -75,6 +78,8 @@ func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			}
 			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 
 	cmd.Flags().Int64("to-revision", 0, "The revision to rollback to. Default to 0 (last revision).")

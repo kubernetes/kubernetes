@@ -49,6 +49,9 @@ var (
 func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &HistoryOptions{}
 
+	validArgs := []string{"deployment"}
+	argAliases := kubectl.ResourceAliases(validArgs)
+
 	cmd := &cobra.Command{
 		Use:     "history (TYPE NAME | TYPE/NAME) [flags]",
 		Short:   "View rollout history",
@@ -57,6 +60,8 @@ func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmdutil.CheckErr(RunHistory(f, cmd, out, args, options))
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 
 	cmd.Flags().Int64("revision", 0, "See the details, including podTemplate of the revision specified")
