@@ -41,15 +41,22 @@ const (
 	allAlphaGate             = "AllAlpha"
 	externalTrafficLocalOnly = "AllowExtTrafficLocalEndpoints"
 	dynamicKubeletConfig     = "DynamicKubeletConfig"
+
+	// experimentalHostUserNamespaceDefaulting Default userns=host for containers
+	// that are using other host namespaces, host mounts, or specific non-namespaced capabilities
+	// (MKNOD, SYS_MODULE, SYS_TIME). This should only be enabled is user namespace remapping is enabled
+	// in the docker daemon.
+	experimentalHostUserNamespaceDefaultingGate = "ExperimentalHostUserNamespaceDefaulting"
 )
 
 var (
 	// Default values for recorded features.  Every new feature gate should be
 	// represented here.
 	knownFeatures = map[string]featureSpec{
-		allAlphaGate:             {false, alpha},
-		externalTrafficLocalOnly: {false, alpha},
-		dynamicKubeletConfig:     {false, alpha},
+		allAlphaGate:                                {false, alpha},
+		externalTrafficLocalOnly:                    {false, alpha},
+		dynamicKubeletConfig:                        {false, alpha},
+		experimentalHostUserNamespaceDefaultingGate: {false, alpha},
 	}
 
 	// Special handling for a few gates.
@@ -92,6 +99,10 @@ type FeatureGate interface {
 	// owner: @girishkalele
 	// alpha: v1.4
 	ExternalTrafficLocalOnly() bool
+
+	// owner: @pweil-
+	// alpha: v1.4
+	ExperimentalHostUserNamespaceDefaulting() bool
 
 	// TODO: Define accessors for each non-API alpha feature.
 	DynamicKubeletConfig() bool
@@ -171,6 +182,11 @@ func (f *featureGate) ExternalTrafficLocalOnly() bool {
 // DynamicKubeletConfig returns value for dynamicKubeletConfig
 func (f *featureGate) DynamicKubeletConfig() bool {
 	return f.lookup(dynamicKubeletConfig)
+}
+
+// ExperimentalHostUserNamespaceDefaulting returns value for experimentalHostUserNamespaceDefaulting
+func (f *featureGate) ExperimentalHostUserNamespaceDefaulting() bool {
+	return f.lookup(experimentalHostUserNamespaceDefaultingGate)
 }
 
 func (f *featureGate) lookup(key string) bool {

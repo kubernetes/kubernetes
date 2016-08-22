@@ -305,6 +305,8 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		MakeIPTablesUtilChains: s.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:  int(s.IPTablesMasqueradeBit),
 		iptablesDropBit:        int(s.IPTablesDropBit),
+		// TODO this can be removed when feature config is part of the kubelet configuration
+		ExperimentalHostUserNamespaceDefaulting: utilconfig.DefaultFeatureGate.ExperimentalHostUserNamespaceDefaulting(),
 	}, nil
 }
 
@@ -1115,6 +1117,8 @@ type KubeletConfig struct {
 	MakeIPTablesUtilChains     bool
 	iptablesMasqueradeBit      int
 	iptablesDropBit            int
+
+	ExperimentalHostUserNamespaceDefaulting bool
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -1218,6 +1222,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.MakeIPTablesUtilChains,
 		kc.iptablesMasqueradeBit,
 		kc.iptablesDropBit,
+		kc.ExperimentalHostUserNamespaceDefaulting,
 	)
 
 	if err != nil {
