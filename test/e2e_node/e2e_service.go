@@ -355,6 +355,11 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 			"--cgroup-root=/",
 			"--system-cgroups=/system",
 		)
+		if framework.TestContext.CgroupsPerQOS {
+			cmdArgs = append(cmdArgs,
+				"--experimental-cgroups-per-qos", "true",
+			)
+		}
 	}
 	cmdArgs = append(cmdArgs,
 		"--api-servers", getAPIServerClientURL(),
@@ -372,11 +377,6 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--eviction-pressure-transition-period", "30s",
 	)
-	if framework.TestContext.CgroupsPerQOS {
-		cmdArgs = append(cmdArgs,
-			"--experimental-cgroups-per-qos", "true",
-		)
-	}
 	if !framework.TestContext.DisableKubenet {
 		cwd, err := os.Getwd()
 		if err != nil {
