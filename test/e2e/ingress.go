@@ -144,4 +144,41 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 		// TODO: Implement a multizone e2e that verifies traffic reaches each
 		// zone based on pod labels.
 	})
+
+	framework.KubeDescribe("Nginx [Feature: Ingress]", func() {
+		var nginxController *NginxIngressController
+
+		// Platform specific setup
+		BeforeEach(func() {
+			By("Initializing nginx controller")
+			jig.class = "nginx"
+			nginxController = &NginxIngressController{ns: ns, c: jig.client}
+			ExpectNoError(gcloudCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", "e2e"))
+			nginxController.init()
+		})
+
+		// Platform specific cleanup
+		AfterEach(func() {
+			ExpectNoError(gcloudDelete("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID))
+			if CurrentGinkgoTestDescription().Failed {
+				describeIng(ns)
+			}
+			if jig.ing == nil {
+				By("No ingress created, no cleanup necessary")
+				return
+			}
+			By("Deleting ingress")
+			jig.deleteIngress()
+		})
+
+		It("should conform to Ingress spec", func() {
+			conformanceTests = createComformanceTests(jig, ns)
+			for _, t := range conformanceTests {
+				By(t.entryLog)
+				t.execute()
+				By(t.exitLog)
+				jig.waitForIngress()
+			}
+		})
+	})
 })
