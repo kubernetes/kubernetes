@@ -134,34 +134,41 @@ func createClientsetForCluster(c federationapi.Cluster, i int, userAgentName str
 	return release_1_3.NewForConfigOrDie(restclient.AddUserAgent(cfg, userAgentName))
 }
 
+// Creates the federation namespace in all underlying clusters.
 func createNamespaceInClusters(clusters map[string]*cluster, f *framework.Framework) {
+	nsName := f.FederationNamespace.Name
 	for name, c := range clusters {
-		// The e2e Framework created the required namespace in one of the clusters, but we need to create it in all the others, if it doesn't yet exist.
-		if _, err := c.Clientset.Core().Namespaces().Get(f.Namespace.Name); errors.IsNotFound(err) {
+		// The e2e Framework created the required namespace in federation control plane, but we need to create it in all the others, if it doesn't yet exist.
+		// TODO(nikhiljindal): remove this once we have the namespace controller working as expected.
+		if _, err := c.Clientset.Core().Namespaces().Get(nsName); errors.IsNotFound(err) {
 			ns := &v1.Namespace{
 				ObjectMeta: v1.ObjectMeta{
-					Name: f.Namespace.Name,
+					Name: nsName,
 				},
 			}
 			_, err := c.Clientset.Core().Namespaces().Create(ns)
 			if err == nil {
 				c.namespaceCreated = true
 			}
-			framework.ExpectNoError(err, "Couldn't create the namespace %s in cluster %q", f.Namespace.Name, name)
-			framework.Logf("Namespace %s created in cluster %q", f.Namespace.Name, name)
+			framework.ExpectNoError(err, "Couldn't create the namespace %s in cluster %q", nsName, name)
+			framework.Logf("Namespace %s created in cluster %q", nsName, name)
 		} else if err != nil {
-			framework.Logf("Couldn't create the namespace %s in cluster %q: %v", f.Namespace.Name, name, err)
+			framework.Logf("Couldn't create the namespace %s in cluster %q: %v", nsName, name, err)
 		}
 	}
 }
+
+// Unregisters the given clusters from federation control plane.
+// Also deletes the federation namespace from each cluster.
 func unregisterClusters(clusters map[string]*cluster, f *framework.Framework) {
+	nsName := f.FederationNamespace.Name
 	for name, c := range clusters {
 		if c.namespaceCreated {
-			if _, err := c.Clientset.Core().Namespaces().Get(f.Namespace.Name); !errors.IsNotFound(err) {
-				err := c.Clientset.Core().Namespaces().Delete(f.Namespace.Name, &api.DeleteOptions{})
-				framework.ExpectNoError(err, "Couldn't delete the namespace %s in cluster %q: %v", f.Namespace.Name, name, err)
+			if _, err := c.Clientset.Core().Namespaces().Get(nsName); !errors.IsNotFound(err) {
+				err := c.Clientset.Core().Namespaces().Delete(nsName, &api.DeleteOptions{})
+				framework.ExpectNoError(err, "Couldn't delete the namespace %s in cluster %q: %v", nsName, name, err)
 			}
-			framework.Logf("Namespace %s deleted in cluster %q", f.Namespace.Name, name)
+			framework.Logf("Namespace %s deleted in cluster %q", nsName, name)
 		}
 	}
 
@@ -248,7 +255,8 @@ func createService(clientset *federation_release_1_4.Clientset, namespace, name 
 
 	service := &v1.Service{
 		ObjectMeta: v1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: namespace,
 		},
 		Spec: v1.ServiceSpec{
 			Selector: FederatedServiceLabels,
@@ -281,7 +289,7 @@ func deleteServiceOrFail(clientset *federation_release_1_4.Clientset, namespace 
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 }
 
-func podExitCodeDetector(f *framework.Framework, name string, code int32) func() error {
+func podExitCodeDetector(f *framework.Framework, name, namespace string, code int32) func() error {
 	// If we ever get any container logs, stash them here.
 	logs := ""
 
@@ -296,7 +304,7 @@ func podExitCodeDetector(f *framework.Framework, name string, code int32) func()
 	}
 
 	return func() error {
-		pod, err := f.Client.Pods(f.Namespace.Name).Get(name)
+		pod, err := f.Client.Pods(namespace).Get(name)
 		if err != nil {
 			return logerr(err)
 		}
@@ -305,7 +313,7 @@ func podExitCodeDetector(f *framework.Framework, name string, code int32) func()
 		}
 
 		// Best effort attempt to grab pod logs for debugging
-		logs, err = framework.GetPodLogs(f.Client, f.Namespace.Name, name, pod.Spec.Containers[0].Name)
+		logs, err = framework.GetPodLogs(f.Client, namespace, name, pod.Spec.Containers[0].Name)
 		if err != nil {
 			framework.Logf("Cannot fetch pod logs: %v", err)
 		}
@@ -342,23 +350,24 @@ func discoverService(f *framework.Framework, name string, exists bool, podName s
 		},
 	}
 
-	By(fmt.Sprintf("Creating pod %q in namespace %q", pod.Name, f.Namespace.Name))
-	_, err := f.Client.Pods(f.Namespace.Name).Create(pod)
+	nsName := f.FederationNamespace.Name
+	By(fmt.Sprintf("Creating pod %q in namespace %q", pod.Name, nsName))
+	_, err := f.Client.Pods(nsName).Create(pod)
 	framework.ExpectNoError(err, "Trying to create pod to run %q", command)
-	By(fmt.Sprintf("Successfully created pod %q in namespace %q", pod.Name, f.Namespace.Name))
+	By(fmt.Sprintf("Successfully created pod %q in namespace %q", pod.Name, nsName))
 	defer func() {
-		By(fmt.Sprintf("Deleting pod %q from namespace %q", podName, f.Namespace.Name))
-		err := f.Client.Pods(f.Namespace.Name).Delete(podName, api.NewDeleteOptions(0))
-		framework.ExpectNoError(err, "Deleting pod %q from namespace %q", podName, f.Namespace.Name)
-		By(fmt.Sprintf("Deleted pod %q from namespace %q", podName, f.Namespace.Name))
+		By(fmt.Sprintf("Deleting pod %q from namespace %q", podName, nsName))
+		err := f.Client.Pods(nsName).Delete(podName, api.NewDeleteOptions(0))
+		framework.ExpectNoError(err, "Deleting pod %q from namespace %q", podName, nsName)
+		By(fmt.Sprintf("Deleted pod %q from namespace %q", podName, nsName))
 	}()
 
 	if exists {
 		// TODO(mml): Eventually check the IP address is correct, too.
-		Eventually(podExitCodeDetector(f, podName, 0), 3*DNSTTL, time.Second*2).
+		Eventually(podExitCodeDetector(f, podName, nsName, 0), 3*DNSTTL, time.Second*2).
 			Should(BeNil(), "%q should exit 0, but it never did", command)
 	} else {
-		Eventually(podExitCodeDetector(f, podName, 0), 3*DNSTTL, time.Second*2).
+		Eventually(podExitCodeDetector(f, podName, nsName, 0), 3*DNSTTL, time.Second*2).
 			ShouldNot(BeNil(), "%q should eventually not exit 0, but it always did", command)
 	}
 }

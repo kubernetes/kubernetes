@@ -40,24 +40,27 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
 
+			nsName := f.FederationNamespace.Name
 			// Delete registered secrets.
 			// This is if a test failed, it should not affect other tests.
-			secretList, err := f.FederationClientset_1_4.Core().Secrets(f.Namespace.Name).List(api.ListOptions{})
+			secretList, err := f.FederationClientset_1_4.Core().Secrets(nsName).List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, secret := range secretList.Items {
-				err := f.FederationClientset_1_4.Core().Secrets(f.Namespace.Name).Delete(secret.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.Client)
-			secret := createSecretOrFail(f.FederationClientset_1_4, f.Namespace.Name)
-			By(fmt.Sprintf("Creation of secret %q in namespace %q succeeded.  Deleting secret.", secret.Name, f.Namespace.Name))
+
+			nsName := f.FederationNamespace.Name
+			secret := createSecretOrFail(f.FederationClientset_1_4, nsName)
+			By(fmt.Sprintf("Creation of secret %q in namespace %q succeeded.  Deleting secret.", secret.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Core().Secrets(f.Namespace.Name).Delete(secret.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secret.Name, secret.Namespace)
-			By(fmt.Sprintf("Deletion of secret %q in namespace %q succeeded.", secret.Name, f.Namespace.Name))
+			By(fmt.Sprintf("Deletion of secret %q in namespace %q succeeded.", secret.Name, nsName))
 		})
 
 	})
