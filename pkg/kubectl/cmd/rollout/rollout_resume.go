@@ -59,6 +59,9 @@ var (
 func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	opts := &ResumeConfig{}
 
+	validArgs := []string{"deployment"}
+	argAliases := kubectl.ResourceAliases(validArgs)
+
 	cmd := &cobra.Command{
 		Use:     "resume RESOURCE",
 		Short:   "Resume a paused resource",
@@ -76,6 +79,8 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			}
 			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
