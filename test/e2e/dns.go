@@ -366,15 +366,6 @@ var _ = framework.KubeDescribe("DNS", func() {
 			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
 		}()
 
-		externalNameService := createServiceSpec("externalname-test-service", "foobar.example.com", false, nil)
-		_, err = f.Client.Services(f.Namespace.Name).Create(externalNameService)
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			By("deleting the test externalName service")
-			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(externalNameService.Name)
-		}()
-
 		regularService := createServiceSpec("test-service-2", "", false, testServiceSelector)
 		regularService, err = f.Client.Services(f.Namespace.Name).Create(regularService)
 		Expect(err).NotTo(HaveOccurred())
@@ -391,9 +382,6 @@ var _ = framework.KubeDescribe("DNS", func() {
 			fmt.Sprintf("%s", headlessService.Name),
 			fmt.Sprintf("%s.%s", headlessService.Name, f.Namespace.Name),
 			fmt.Sprintf("%s.%s.svc", headlessService.Name, f.Namespace.Name),
-			fmt.Sprintf("%s", externalNameService.Name),
-			fmt.Sprintf("%s.%s", externalNameService.Name, f.Namespace.Name),
-			fmt.Sprintf("%s.%s.svc", externalNameService.Name, f.Namespace.Name),
 			fmt.Sprintf("_http._tcp.%s.%s.svc", headlessService.Name, f.Namespace.Name),
 			fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
 		}
