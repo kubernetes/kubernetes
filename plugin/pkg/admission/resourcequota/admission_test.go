@@ -351,6 +351,102 @@ func TestAdmitHandlesOldObjects(t *testing.T) {
 	}
 }
 
+// TestAdmitHandlesCreatingUpdates verifies that admit handles updates which behave as creates
+func TestAdmitHandlesCreatingUpdates(t *testing.T) {
+	// in this scenario, there is an existing service
+	resourceQuota := &api.ResourceQuota{
+		ObjectMeta: api.ObjectMeta{Name: "quota", Namespace: "test", ResourceVersion: "124"},
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceServices:              resource.MustParse("10"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("10"),
+				api.ResourceServicesNodePorts:     resource.MustParse("10"),
+			},
+			Used: api.ResourceList{
+				api.ResourceServices:              resource.MustParse("1"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				api.ResourceServicesNodePorts:     resource.MustParse("0"),
+			},
+		},
+	}
+
+	// start up quota system
+	kubeClient := fake.NewSimpleClientset(resourceQuota)
+	indexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{"namespace": cache.MetaNamespaceIndexFunc})
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	quotaAccessor, _ := newQuotaAccessor(kubeClient)
+	quotaAccessor.indexer = indexer
+	go quotaAccessor.Run(stopCh)
+	evaluator := NewQuotaEvaluator(quotaAccessor, install.NewRegistry(kubeClient), nil, 5, stopCh)
+
+	handler := &quotaAdmission{
+		Handler:   admission.NewHandler(admission.Create, admission.Update),
+		evaluator: evaluator,
+	}
+	indexer.Add(resourceQuota)
+
+	// old service didn't exist, so this update is actually a create
+	oldService := &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test", ResourceVersion: ""},
+		Spec:       api.ServiceSpec{Type: api.ServiceTypeLoadBalancer},
+	}
+	newService := &api.Service{
+		ObjectMeta: api.ObjectMeta{Name: "service", Namespace: "test"},
+		Spec: api.ServiceSpec{
+			Type:  api.ServiceTypeNodePort,
+			Ports: []api.ServicePort{{Port: 1234}},
+		},
+	}
+	err := handler.Admit(admission.NewAttributesRecord(newService, oldService, api.Kind("Service").WithVersion("version"), newService.Namespace, newService.Name, api.Resource("services").WithVersion("version"), "", admission.Update, nil))
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	if len(kubeClient.Actions()) == 0 {
+		t.Errorf("Expected a client action")
+	}
+
+	// the only action should have been to update the quota (since we should not have fetched the previous item)
+	expectedActionSet := sets.NewString(
+		strings.Join([]string{"update", "resourcequotas", "status"}, "-"),
+	)
+	actionSet := sets.NewString()
+	for _, action := range kubeClient.Actions() {
+		actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+	}
+	if !actionSet.HasAll(expectedActionSet.List()...) {
+		t.Errorf("Expected actions:\n%v\n but got:\n%v\nDifference:\n%v", expectedActionSet, actionSet, expectedActionSet.Difference(actionSet))
+	}
+
+	// verify that the "old" object was ignored for calculating the new usage
+	decimatedActions := removeListWatch(kubeClient.Actions())
+	lastActionIndex := len(decimatedActions) - 1
+	usage := decimatedActions[lastActionIndex].(testcore.UpdateAction).GetObject().(*api.ResourceQuota)
+	expectedUsage := api.ResourceQuota{
+		Status: api.ResourceQuotaStatus{
+			Hard: api.ResourceList{
+				api.ResourceServices:              resource.MustParse("10"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("10"),
+				api.ResourceServicesNodePorts:     resource.MustParse("10"),
+			},
+			Used: api.ResourceList{
+				api.ResourceServices:              resource.MustParse("2"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
+				api.ResourceServicesNodePorts:     resource.MustParse("1"),
+			},
+		},
+	}
+	for k, v := range expectedUsage.Status.Used {
+		actual := usage.Status.Used[k]
+		actualValue := actual.String()
+		expectedValue := v.String()
+		if expectedValue != actualValue {
+			t.Errorf("Usage Used: Key: %v, Expected: %v, Actual: %v", k, expectedValue, actualValue)
+		}
+	}
+}
+
 // TestAdmitExceedQuotaLimit verifies that if a pod exceeded allowed usage that its rejected during admission.
 func TestAdmitExceedQuotaLimit(t *testing.T) {
 	resourceQuota := &api.ResourceQuota{
