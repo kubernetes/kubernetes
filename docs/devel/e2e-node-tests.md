@@ -42,6 +42,8 @@ Node e2e tests are run as both pre- and post- submit tests by the Kubernetes pro
 
 *Note: Linux only. Mac and Windows unsupported.*
 
+*Note: There is no scheduler running. The e2e tests have to do manual scheduling, e.g. by using `framework.PodClient`.*
+
 # Running tests
 
 ## Locally
