@@ -79,7 +79,7 @@ func NewCertificateController(kubeClient clientset.Interface, syncPeriod time.Du
 
 	cc := &CertificateController{
 		kubeClient: kubeClient,
-		queue:      workqueue.New(),
+		queue:      workqueue.NewNamed("certificate"),
 		signer:     ca,
 		approveAllKubeletCSRsForGroup: approveAllKubeletCSRsForGroup,
 	}

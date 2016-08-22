@@ -143,7 +143,7 @@ func newReplicationManager(eventRecorder record.EventRecorder, podInformer frame
 		},
 		burstReplicas: burstReplicas,
 		expectations:  controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
-		queue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "replicationmanager"),
 		garbageCollectorEnabled: garbageCollectorEnabled,
 	}
 
