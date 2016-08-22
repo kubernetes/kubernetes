@@ -206,7 +206,7 @@ func assertFilesContain(fileNames []string, fileDir string, pod *api.Pod, client
 			if err != nil {
 				framework.Logf("Unable to read %s from pod %s: %v", fileName, pod.Name, err)
 				failed = append(failed, fileName)
-			} else if check && string(contents) != expected {
+			} else if check && strings.TrimSpace(string(contents)) != expected {
 				framework.Logf("File %s from pod %s contains '%s' instead of '%s'", fileName, pod.Name, string(contents), expected)
 				failed = append(failed, fileName)
 			}
