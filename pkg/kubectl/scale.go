@@ -143,13 +143,13 @@ func (precondition *ScalePrecondition) ValidatePetSet(ps *apps.PetSet) error {
 	return nil
 }
 
-// ValidateReplicationController ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
-func (precondition *ScalePrecondition) ValidateReplicationController(controller *api.ReplicationController) error {
-	if precondition.Size != -1 && int(controller.Spec.Replicas) != precondition.Size {
-		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(controller.Spec.Replicas))}
+// ValidateScale ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
+func (precondition *ScalePrecondition) ValidateScale(scale *extensions.Scale) error {
+	if precondition.Size != -1 && int(scale.Spec.Replicas) != precondition.Size {
+		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(scale.Spec.Replicas))}
 	}
-	if len(precondition.ResourceVersion) != 0 && controller.ResourceVersion != precondition.ResourceVersion {
-		return PreconditionError{"resource version", precondition.ResourceVersion, controller.ResourceVersion}
+	if len(precondition.ResourceVersion) != 0 && scale.ResourceVersion != precondition.ResourceVersion {
+		return PreconditionError{"resource version", precondition.ResourceVersion, scale.ResourceVersion}
 	}
 	return nil
 }
@@ -161,24 +161,24 @@ type ReplicationControllerScaler struct {
 // ScaleSimple does a simple one-shot attempt at scaling. It returns the
 // resourceVersion of the replication controller if the update is successful.
 func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
-	controller, err := scaler.c.ReplicationControllers(namespace).Get(name)
+	sc := scaler.c.Extensions().Scales(namespace)
+	scale, err := sc.Get("ReplicationController", name)
 	if err != nil {
 		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
-		if err := preconditions.ValidateReplicationController(controller); err != nil {
+		if err := preconditions.ValidateScale(scale); err != nil {
 			return "", err
 		}
 	}
-	controller.Spec.Replicas = int32(newSize)
-	updatedRC, err := scaler.c.ReplicationControllers(namespace).Update(controller)
-	if err != nil {
+	scale.Spec.Replicas = int32(newSize)
+	if _, err := sc.Update("ReplicationController", scale); err != nil {
 		if errors.IsConflict(err) {
-			return "", ScaleError{ScaleUpdateConflictFailure, controller.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, scale.ResourceVersion, err}
 		}
-		return "", ScaleError{ScaleUpdateFailure, controller.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, scale.ResourceVersion, err}
 	}
-	return updatedRC.ObjectMeta.ResourceVersion, nil
+	return scale.ObjectMeta.ResourceVersion, nil
 }
 
 // Scale updates a ReplicationController to a new size, with optional precondition check (if preconditions is not nil),
@@ -223,17 +223,6 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 	return nil
 }
 
-// ValidateReplicaSet ensures that the preconditions match.  Returns nil if they are valid, an error otherwise
-func (precondition *ScalePrecondition) ValidateReplicaSet(replicaSet *extensions.ReplicaSet) error {
-	if precondition.Size != -1 && int(replicaSet.Spec.Replicas) != precondition.Size {
-		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(replicaSet.Spec.Replicas))}
-	}
-	if len(precondition.ResourceVersion) != 0 && replicaSet.ResourceVersion != precondition.ResourceVersion {
-		return PreconditionError{"resource version", precondition.ResourceVersion, replicaSet.ResourceVersion}
-	}
-	return nil
-}
-
 type ReplicaSetScaler struct {
 	c client.ExtensionsInterface
 }
@@ -241,24 +230,24 @@ type ReplicaSetScaler struct {
 // ScaleSimple does a simple one-shot attempt at scaling. It returns the
 // resourceVersion of the replicaset if the update is successful.
 func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
-	rs, err := scaler.c.ReplicaSets(namespace).Get(name)
+	sc := scaler.c.Scales(namespace)
+	scale, err := sc.Get("ReplicaSet", name)
 	if err != nil {
 		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
-		if err := preconditions.ValidateReplicaSet(rs); err != nil {
+		if err := preconditions.ValidateScale(scale); err != nil {
 			return "", err
 		}
 	}
-	rs.Spec.Replicas = int32(newSize)
-	updatedRS, err := scaler.c.ReplicaSets(namespace).Update(rs)
-	if err != nil {
+	scale.Spec.Replicas = int32(newSize)
+	if _, err := sc.Update("ReplicaSet", scale); err != nil {
 		if errors.IsConflict(err) {
-			return "", ScaleError{ScaleUpdateConflictFailure, rs.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, scale.ResourceVersion, err}
 		}
-		return "", ScaleError{ScaleUpdateFailure, rs.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, scale.ResourceVersion, err}
 	}
-	return updatedRS.ObjectMeta.ResourceVersion, nil
+	return scale.ObjectMeta.ResourceVersion, nil
 }
 
 // Scale updates a ReplicaSet to a new size, with optional precondition check (if preconditions is
@@ -415,17 +404,6 @@ func (scaler *JobScaler) Scale(namespace, name string, newSize uint, preconditio
 	return nil
 }
 
-// ValidateDeployment ensures that the preconditions match.  Returns nil if they are valid, an error otherwise.
-func (precondition *ScalePrecondition) ValidateDeployment(deployment *extensions.Deployment) error {
-	if precondition.Size != -1 && int(deployment.Spec.Replicas) != precondition.Size {
-		return PreconditionError{"replicas", strconv.Itoa(precondition.Size), strconv.Itoa(int(deployment.Spec.Replicas))}
-	}
-	if len(precondition.ResourceVersion) != 0 && deployment.ResourceVersion != precondition.ResourceVersion {
-		return PreconditionError{"resource version", precondition.ResourceVersion, deployment.ResourceVersion}
-	}
-	return nil
-}
-
 type DeploymentScaler struct {
 	c client.ExtensionsInterface
 }
@@ -434,27 +412,25 @@ type DeploymentScaler struct {
 // count. It returns the resourceVersion of the deployment if the update is
 // successful.
 func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (string, error) {
-	deployment, err := scaler.c.Deployments(namespace).Get(name)
+	sc := scaler.c.Scales(namespace)
+	scale, err := sc.Get("Deployment", name)
 	if err != nil {
 		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
-		if err := preconditions.ValidateDeployment(deployment); err != nil {
+		if err := preconditions.ValidateScale(scale); err != nil {
 			return "", err
 		}
 	}
 
-	// TODO(madhusudancs): Fix this when Scale group issues are resolved (see issue #18528).
-	// For now I'm falling back to regular Deployment update operation.
-	deployment.Spec.Replicas = int32(newSize)
-	updatedDeployment, err := scaler.c.Deployments(namespace).Update(deployment)
-	if err != nil {
+	scale.Spec.Replicas = int32(newSize)
+	if _, err := sc.Update("Deployment", scale); err != nil {
 		if errors.IsConflict(err) {
-			return "", ScaleError{ScaleUpdateConflictFailure, deployment.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, scale.ResourceVersion, err}
 		}
-		return "", ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, scale.ResourceVersion, err}
 	}
-	return updatedDeployment.ObjectMeta.ResourceVersion, nil
+	return scale.ObjectMeta.ResourceVersion, nil
 }
 
 // Scale updates a deployment to a new size, with optional precondition check (if preconditions is not nil),

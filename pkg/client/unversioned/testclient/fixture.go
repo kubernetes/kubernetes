@@ -58,7 +58,14 @@ type ObjectScheme interface {
 func ObjectReaction(o ObjectRetriever, mapper meta.RESTMapper) ReactionFunc {
 
 	return func(action Action) (bool, runtime.Object, error) {
-		kind, err := mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
+		var err error
+		var kind unversioned.GroupVersionKind
+
+		if action.GetSubresource() != "" {
+			kind, err = mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetSubresource()})
+		} else {
+			kind, err = mapper.KindFor(unversioned.GroupVersionResource{Resource: action.GetResource()})
+		}
 		if err != nil {
 			return false, nil, fmt.Errorf("unrecognized action %s: %v", action.GetResource(), err)
 		}
