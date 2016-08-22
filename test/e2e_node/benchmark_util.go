@@ -20,6 +20,7 @@ package e2e_node
 
 import (
 	"sort"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -28,9 +29,9 @@ import (
 
 const (
 	// TODO(coufon): be consistent with perf_util.go version
-	currentTimeSeriesVersion = "v1"
-	TimeSeriesTag            = "[Result:TimeSeries]"
-	TimeSeriesEnd            = "[Finish:TimeSeries]"
+	currentDataVersion = "v1"
+	TimeSeriesTag      = "[Result:TimeSeries]"
+	TimeSeriesEnd      = "[Finish:TimeSeries]"
 )
 
 type NodeTimeSeries struct {
@@ -48,7 +49,7 @@ func logDensityTimeSeries(rc *ResourceCollector, create, watch map[string]unvers
 			"node": framework.TestContext.NodeName,
 			"test": testName,
 		},
-		Version: currentTimeSeriesVersion,
+		Version: currentDataVersion,
 	}
 	// Attach operation time series.
 	timeSeries.OperationData = map[string][]int64{
@@ -78,10 +79,10 @@ func getCumulatedPodTimeSeries(timePerPod map[string]unversioned.Time) []int64 {
 	return timeSeries
 }
 
-// getLatencyPerfData returns perf data from latency
+// getLatencyPerfData returns perf data of pod startup latency.
 func getLatencyPerfData(latency framework.LatencyMetric, testName string) *perftype.PerfData {
 	return &perftype.PerfData{
-		Version: "v1",
+		Version: currentDataVersion,
 		DataItems: []perftype.DataItem{
 			{
 				Data: map[string]float64{
@@ -93,6 +94,30 @@ func getLatencyPerfData(latency framework.LatencyMetric, testName string) *perft
 				Unit: "ms",
 				Labels: map[string]string{
 					"datatype":    "latency",
+					"latencytype": "create-pod",
+				},
+			},
+		},
+		Labels: map[string]string{
+			"node": framework.TestContext.NodeName,
+			"test": testName,
+		},
+	}
+}
+
+// getThroughputPerfData returns perf data of pod creation startup throughput.
+func getThroughputPerfData(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testName string) *perftype.PerfData {
+	return &perftype.PerfData{
+		Version: currentDataVersion,
+		DataItems: []perftype.DataItem{
+			{
+				Data: map[string]float64{
+					"batch":        float64(podsNr) / batchLag.Minutes(),
+					"single-worst": 1.0 / e2eLags[len(e2eLags)-1].Latency.Minutes(),
+				},
+				Unit: "pods/min",
+				Labels: map[string]string{
+					"datatype":    "throughput",
 					"latencytype": "create-pod",
 				},
 			},

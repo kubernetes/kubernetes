@@ -343,12 +343,13 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	sort.Sort(framework.LatencySlice(e2eLags))
 	batchLag := lastRunning.Time.Sub(firstCreate.Time)
 
+	testName := testArg.getTestName()
 	// Log time series data.
 	if isLogTimeSeries {
-		logDensityTimeSeries(rc, createTimes, watchTimes, testArg.getTestName())
+		logDensityTimeSeries(rc, createTimes, watchTimes, testName)
 	}
 	// Log throughput data.
-	logPodCreateThroughput(batchLag, e2eLags, testArg.podsNr)
+	logPodCreateThroughput(batchLag, e2eLags, testArg.podsNr, testName)
 
 	return batchLag, e2eLags
 }
@@ -376,7 +377,7 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 	batchlag, e2eLags := createBatchPodSequential(f, testPods)
 
 	// Log throughput data.
-	logPodCreateThroughput(batchlag, e2eLags, testArg.podsNr)
+	logPodCreateThroughput(batchlag, e2eLags, testArg.podsNr, testArg.getTestName())
 
 	return batchlag, e2eLags
 }
@@ -526,9 +527,6 @@ func logAndVerifyLatency(batchLag time.Duration, e2eLags []framework.PodLatencyD
 }
 
 // logThroughput calculates and logs pod creation throughput.
-func logPodCreateThroughput(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int) {
-	throughputBatch := float64(podsNr) / batchLag.Minutes()
-	framework.Logf("Batch creation throughput is %.1f pods/min", throughputBatch)
-	throughputSequential := 1.0 / e2eLags[len(e2eLags)-1].Latency.Minutes()
-	framework.Logf("Sequential creation throughput is %.1f pods/min", throughputSequential)
+func logPodCreateThroughput(batchLag time.Duration, e2eLags []framework.PodLatencyData, podsNr int, testName string) {
+	framework.PrintPerfData(getThroughputPerfData(batchLag, e2eLags, podsNr, testName))
 }
