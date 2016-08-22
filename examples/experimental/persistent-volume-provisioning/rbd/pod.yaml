@@ -13,7 +13,7 @@ spec:
     spec:
       containers:
       - name: server
-        image: ngnix
+        image: nginx
         volumeMounts:
           - mountPath: /var/lib/www/html
             name: mypvc
