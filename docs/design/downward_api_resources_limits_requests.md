@@ -106,7 +106,7 @@ the values. As kubelet operates on internal objects (without json tags),
 and the selectors are part of versioned objects, retrieving values of
 the limits and requests can be handled using these two solutions:
 
-1. By converting an internal object to versioned obejct, and then using
+1. By converting an internal object to versioned object, and then using
 the json path library to retrieve the values from the versioned object
 by processing the selector.
 
