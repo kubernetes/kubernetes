@@ -296,13 +296,14 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		HairpinMode:                    s.HairpinMode,
 		BabysitDaemons:                 s.BabysitDaemons,
 		ExperimentalFlannelOverlay:     s.ExperimentalFlannelOverlay,
-		NodeIP:                 net.ParseIP(s.NodeIP),
-		EvictionConfig:         evictionConfig,
-		PodsPerCore:            int(s.PodsPerCore),
-		ProtectKernelDefaults:  s.ProtectKernelDefaults,
-		MakeIPTablesUtilChains: s.MakeIPTablesUtilChains,
-		iptablesMasqueradeBit:  int(s.IPTablesMasqueradeBit),
-		iptablesDropBit:        int(s.IPTablesDropBit),
+		NodeIP:                                  net.ParseIP(s.NodeIP),
+		EvictionConfig:                          evictionConfig,
+		PodsPerCore:                             int(s.PodsPerCore),
+		ProtectKernelDefaults:                   s.ProtectKernelDefaults,
+		MakeIPTablesUtilChains:                  s.MakeIPTablesUtilChains,
+		iptablesMasqueradeBit:                   int(s.IPTablesMasqueradeBit),
+		iptablesDropBit:                         int(s.IPTablesDropBit),
+		ExperimentalHostUserNamespaceDefaulting: s.ExperimentalHostUserNamespaceDefaulting,
 	}, nil
 }
 
@@ -964,6 +965,8 @@ type KubeletConfig struct {
 	MakeIPTablesUtilChains     bool
 	iptablesMasqueradeBit      int
 	iptablesDropBit            int
+
+	ExperimentalHostUserNamespaceDefaulting bool
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -1066,6 +1069,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.MakeIPTablesUtilChains,
 		kc.iptablesMasqueradeBit,
 		kc.iptablesDropBit,
+		kc.ExperimentalHostUserNamespaceDefaulting,
 	)
 
 	if err != nil {

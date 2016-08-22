@@ -392,6 +392,9 @@ type RunContainerOptions struct {
 	ReadOnly bool
 	// hostname for pod containers
 	Hostname string
+	// EnableHostUserNamespace sets userns=true when users request host namespaces (pid, ipc, net),
+	// are using non-namespaced capabilities (mknod, sys_time, sys_module), or using host path volumes.
+	EnableHostUserNamespace bool
 }
 
 // VolumeInfo contains information about the volume.

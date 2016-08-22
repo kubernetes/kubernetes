@@ -470,4 +470,7 @@ type KubeletConfiguration struct {
 	// iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
 	// Values must be within the range [0, 31]. Must be different from other mark bits.
 	IPTablesDropBit *int32 `json:"iptablesDropBit"`
+	// experimentalHostUserNamespaceDefaulting is an experimental flag to enable defaulting of the UsernsMode for
+	// a container.
+	ExperimentalHostUserNamespaceDefaulting bool `json:"experimentalHostUserNamespaceDefaulting"`
 }
