@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 			})
 
 			BeforeEach(func() {
-				if !evictionOptionIsSet() {
+				if !isImageSupported() || !evictionOptionIsSet() {
 					return
 				}
 
@@ -97,6 +97,10 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 			})
 
 			It("should evict the pod using the most disk space [Slow]", func() {
+				if !isImageSupported() {
+					framework.Logf("test skipped because the image is not supported by the test")
+					return
+				}
 				if !evictionOptionIsSet() {
 					framework.Logf("test skipped because eviction option is not set")
 					return
@@ -216,4 +220,10 @@ func recordContainerId(containersToCleanUp map[string]bool, containerStatuses []
 
 func evictionOptionIsSet() bool {
 	return len(framework.TestContext.EvictionHard) > 0
+}
+
+func isImageSupported() bool {
+	// TODO: Only images with image fs is selected for testing for now. When the kubelet settings can be dynamically updated,
+	// instead of skipping images the eviction thresholds should be adjusted based on the images.
+	return strings.Contains(framework.TestContext.NodeName, "-gci-dev-")
 }
