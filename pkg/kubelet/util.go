@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/capabilities"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
@@ -128,3 +129,32 @@ func dirExists(path string) bool {
 	}
 	return s.IsDir()
 }
+
+// empty is a placeholder type used to implement a set
+type empty struct{}
+
+// podsByCreationTime makes an array of pods sortable by their creation
+// timestamps.
+// TODO: move into util package
+type podsByCreationTime []*api.Pod
+
+func (s podsByCreationTime) Len() int {
+	return len(s)
+}
+
+func (s podsByCreationTime) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s podsByCreationTime) Less(i, j int) bool {
+	return s[i].CreationTimestamp.Before(s[j].CreationTimestamp)
+}
+
+type byImageSize []kubecontainer.Image
+
+// Sort from max to min
+func (a byImageSize) Less(i, j int) bool {
+	return a[i].Size > a[j].Size
+}
+func (a byImageSize) Len() int      { return len(a) }
+func (a byImageSize) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
