@@ -49,7 +49,7 @@ func CreateTokenAuthFile(params *kubeadmapi.BootstrapParams) error {
 	}
 	// <random-token>,<username>,<uid>,system:kubelet-bootstrap
 	serialized := fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", params.Discovery.BearerToken, uuid.NewUUID())
-	if err := util.DumpReaderToFile(bytes.NewReader([]byte(serialized)), path.Join(params.EnvParams["host_pki_path"], "tokens.cvs")); err != nil {
+	if err := util.DumpReaderToFile(bytes.NewReader([]byte(serialized)), path.Join(params.EnvParams["host_pki_path"], "tokens.csv")); err != nil {
 		return err
 	}
 	return nil
