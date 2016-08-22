@@ -74,7 +74,7 @@ readonly REMOTE_OUTPUT_SUBPATH="${REMOTE_OUTPUT_ROOT}/dockerized"
 readonly REMOTE_OUTPUT_BINPATH="${REMOTE_OUTPUT_SUBPATH}/bin"
 readonly REMOTE_OUTPUT_GOPATH="${REMOTE_OUTPUT_SUBPATH}/go"
 
-readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-8730}"
+readonly KUBE_RSYNC_PORT="${KUBE_RSYNC_PORT:-}"
 
 # Get the set of master binaries that run in Docker (on Linux)
 # Entry format is "<name-of-binary>,<base-image>".
@@ -591,6 +591,11 @@ function kube::build::start_rsyncd_container() {
     "${KUBE_RSYNC_CONTAINER_NAME}" -p 127.0.0.1:${KUBE_RSYNC_PORT}:8730 -d \
     -- /rsyncd.sh >/dev/null
 
+  if ! KUBE_REAL_RSYNC_PORT=$(docker port "${KUBE_RSYNC_CONTAINER_NAME}" 8730 2> /dev/null | cut -d: -f 2) ; then
+    kube:log:error "Could not get effective rsync port"
+    return 1
+  fi
+
   # Wait unil rsync is up and running.
   if ! which nc >/dev/null ; then
     V=6 kube::log::info "netcat not installed, waiting for 1s for rsyncd to come up."
@@ -598,16 +603,18 @@ function kube::build::start_rsyncd_container() {
     return 0
   fi
 
+  # Apple has an ancient version of netcat with custom timeout flags.  This is
+  # the best way I (jbeda) could find to test for that.
   local nc
   if nc 2>&1 | grep -e 'apple' >/dev/null ; then
-    nc="nc -G 1"
+    netcat="nc -G 1"
   else
-    nc="nc -w 1"
+    netcat="nc -w 1"
   fi
 
   local tries=10
   while (( $tries > 0 )) ; do
-    if $nc -z 127.0.0.1 ${KUBE_RSYNC_PORT} 2> /dev/null ; then
+    if $netcat -z 127.0.0.1 ${KUBE_REAL_RSYNC_PORT} 2> /dev/null ; then
       sleep 0.5
       return 0
     fi
@@ -644,7 +651,7 @@ function kube::build::sync_to_container() {
     --filter='- /' \
     --prune-empty-dirs \
     --archive --perms \
-    "${KUBE_ROOT}/" rsync://k8s@localhost:${KUBE_RSYNC_PORT}/k8s/
+    "${KUBE_ROOT}/" rsync://k8s@localhost:${KUBE_REAL_RSYNC_PORT}/k8s/
 
   kube::build::stop_rsyncd_container
 }
@@ -672,7 +679,7 @@ function kube::build::copy_output() {
     --filter='+ */' \
     --filter='- /**' \
     --archive --perms \
-    rsync://k8s@localhost:${KUBE_RSYNC_PORT}/k8s/ "${KUBE_ROOT}"
+    rsync://k8s@localhost:${KUBE_REAL_RSYNC_PORT}/k8s/ "${KUBE_ROOT}"
 
   kube::build::stop_rsyncd_container
 }

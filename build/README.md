@@ -36,7 +36,7 @@ The scripts directly under `build/` are used to build and test.  They will ensur
 
 The `kube-build` container image is built by first creating a "context" directory in `_output/images/build-image`.  It is done there instead of at the root of the Kubernetes repo to minimize the amount of data we need to package up when building the image.
 
-`rsync` is used transparently behind the scenes to efficiently move data in and and of the container.  This will use port `8730` by default.  You can modify this by setting the `KUBE_RSYNC_PORT` env variable.  
+`rsync` is used transparently behind the scenes to efficiently move data in and and of the container.  This will use port an ephemeral port picked by Docker.  You can modify this by setting the `KUBE_RSYNC_PORT` env variable.  
 
 ## Proxy Settings
 
@@ -76,8 +76,11 @@ docker-machine create \
 # Set up local docker to talk to that machine
 eval $(docker-machine env ${KUBE_BUILD_VM})
 
+# Pin down the port that rsync will be exposed on on the remote machine
+export KUBE_RSYNC_PORT=8370
+
 # forward local 8730 to that machine so that rsync works
-docker-machine ssh ${KUBE_BUILD_VM} -L 8730:localhost:8730 -N &
+docker-machine ssh ${KUBE_BUILD_VM} -L ${KUBE_RSYNC_PORT}:localhost:8730 -N &
 ```
 
 Look at `docker-machine stop`, `docker-machine start` and `docker-machine rm` to manage this VM.
