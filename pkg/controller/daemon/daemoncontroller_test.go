@@ -41,6 +41,31 @@ var (
 	simpleNodeLabel       = map[string]string{"color": "blue", "speed": "fast"}
 	simpleNodeLabel2      = map[string]string{"color": "red", "speed": "fast"}
 	alwaysReady           = func() bool { return true }
+	podAffinity           = map[string]string{
+		api.AffinityAnnotationKey: `
+			{"podAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": [{
+				"labelSelector": {
+					"matchLabels": {
+						"foobar": "foo"
+					}
+				},
+				"topologyKey": "kubernetes.io/hostname",
+				"namespaces": []
+		}]}}`,
+	}
+	podAntiAffinity = map[string]string{
+		// make the pod "antiaffine" with itself, too
+		api.AffinityAnnotationKey: `
+			{"podAntiAffinity": { "requiredDuringSchedulingIgnoredDuringExecution": [{
+				"labelSelector": {
+					"matchLabels": {
+						"type": "production"
+					}
+				},
+				"topologyKey": "kubernetes.io/hostname",
+				"namespaces": []
+		}]}}`,
+	}
 )
 
 func getKey(ds *extensions.DaemonSet, t *testing.T) string {
@@ -594,4 +619,56 @@ func TestNumberReadyStatus(t *testing.T) {
 	if daemon.Status.NumberReady != 2 {
 		t.Errorf("Wrong daemon %s status: %v", daemon.Name, daemon.Status)
 	}
+}
+
+func testAffinityUsingSinglePod(t *testing.T, annotations map[string]string, expectedCreates int) {
+	manager, podControl := newTestController()
+	addNodes(manager.nodeStore.Store, 0, 1, map[string]string{
+		"kubernetes.io/hostname": "node-0",
+	})
+	daemon := newDaemonSet("foo")
+	daemon.Spec.Template.ObjectMeta.Annotations = annotations
+	manager.dsStore.Add(daemon)
+	syncAndValidateDaemonSets(t, manager, daemon, podControl, expectedCreates, 0)
+}
+
+func testAffinityUsingTwoPods(t *testing.T, annotations map[string]string, expectedCreates int) {
+	manager, podControl := newTestController()
+	addNodes(manager.nodeStore.Store, 0, 1, map[string]string{
+		"kubernetes.io/hostname": "node-0",
+	})
+	manager.podStore.Indexer.Add(&api.Pod{
+		TypeMeta: unversioned.TypeMeta{APIVersion: testapi.Default.GroupVersion().String()},
+		ObjectMeta: api.ObjectMeta{
+			Name: "samplepod",
+			Labels: map[string]string{
+				"type":   "production",
+				"foobar": "foo",
+			},
+			Namespace: api.NamespaceDefault,
+		},
+		Spec: api.PodSpec{
+			NodeName: "default/node-0",
+		},
+	})
+	daemon := newDaemonSet("foo")
+	daemon.Spec.Template.ObjectMeta.Annotations = annotations
+	manager.dsStore.Add(daemon)
+	syncAndValidateDaemonSets(t, manager, daemon, podControl, expectedCreates, 0)
+}
+
+func TestPodAffinityDaemonDoesntLaunchNonMatchingPods(t *testing.T) {
+	testAffinityUsingSinglePod(t, podAffinity, 0)
+}
+
+func TestPodAffinityDaemonLaunchesMatchingPods(t *testing.T) {
+	testAffinityUsingTwoPods(t, podAffinity, 1)
+}
+
+func TestPodAntiAffinityDaemonLaunchesMatchingPods(t *testing.T) {
+	testAffinityUsingSinglePod(t, podAntiAffinity, 1)
+}
+
+func TestPodAntiAffinityDaemonDoesntLaunchNonMatchingPods(t *testing.T) {
+	testAffinityUsingTwoPods(t, podAntiAffinity, 0)
 }
