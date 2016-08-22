@@ -26,8 +26,8 @@ import (
 
 func TestFeatureGateFlag(t *testing.T) {
 	// gates for testing
-	const testAlpha = "testAlpha"
-	const testBeta = "testBeta"
+	const testAlphaGate = "TestAlpha"
+	const testBetaGate = "TestBeta"
 
 	tests := []struct {
 		arg        string
@@ -37,91 +37,91 @@ func TestFeatureGateFlag(t *testing.T) {
 		{
 			arg: "",
 			expect: map[string]bool{
-				allAlpha:  false,
-				testAlpha: false,
-				testBeta:  false,
+				allAlphaGate:  false,
+				testAlphaGate: false,
+				testBetaGate:  false,
 			},
 		},
 		{
 			arg: "fooBarBaz=maybeidk",
 			expect: map[string]bool{
-				allAlpha:  false,
-				testAlpha: false,
-				testBeta:  false,
+				allAlphaGate:  false,
+				testAlphaGate: false,
+				testBetaGate:  false,
 			},
 			parseError: "unrecognized key: fooBarBaz",
 		},
 		{
-			arg: "allAlpha=false",
+			arg: "AllAlpha=false",
 			expect: map[string]bool{
-				allAlpha:  false,
-				testAlpha: false,
-				testBeta:  false,
+				allAlphaGate:  false,
+				testAlphaGate: false,
+				testBetaGate:  false,
 			},
 		},
 		{
-			arg: "allAlpha=true",
+			arg: "AllAlpha=true",
 			expect: map[string]bool{
-				allAlpha:  true,
-				testAlpha: true,
-				testBeta:  false,
+				allAlphaGate:  true,
+				testAlphaGate: true,
+				testBetaGate:  false,
 			},
 		},
 		{
-			arg: "allAlpha=banana",
+			arg: "AllAlpha=banana",
 			expect: map[string]bool{
-				allAlpha:  false,
-				testAlpha: false,
-				testBeta:  false,
+				allAlphaGate:  false,
+				testAlphaGate: false,
+				testBetaGate:  false,
 			},
-			parseError: "invalid value of allAlpha",
+			parseError: "invalid value of AllAlpha",
 		},
 		{
-			arg: "allAlpha=false,testAlpha=true",
+			arg: "AllAlpha=false,TestAlpha=true",
 			expect: map[string]bool{
-				allAlpha:  false,
-				testAlpha: true,
-				testBeta:  false,
-			},
-		},
-		{
-			arg: "testAlpha=true,allAlpha=false",
-			expect: map[string]bool{
-				allAlpha:  false,
-				testAlpha: true,
-				testBeta:  false,
+				allAlphaGate:  false,
+				testAlphaGate: true,
+				testBetaGate:  false,
 			},
 		},
 		{
-			arg: "allAlpha=true,testAlpha=false",
+			arg: "TestAlpha=true,AllAlpha=false",
 			expect: map[string]bool{
-				allAlpha:  true,
-				testAlpha: false,
-				testBeta:  false,
+				allAlphaGate:  false,
+				testAlphaGate: true,
+				testBetaGate:  false,
 			},
 		},
 		{
-			arg: "testAlpha=false,allAlpha=true",
+			arg: "AllAlpha=true,TestAlpha=false",
 			expect: map[string]bool{
-				allAlpha:  true,
-				testAlpha: false,
-				testBeta:  false,
+				allAlphaGate:  true,
+				testAlphaGate: false,
+				testBetaGate:  false,
 			},
 		},
 		{
-			arg: "testBeta=true,allAlpha=false",
+			arg: "TestAlpha=false,AllAlpha=true",
 			expect: map[string]bool{
-				allAlpha:  false,
-				testAlpha: false,
-				testBeta:  true,
+				allAlphaGate:  true,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "TestBeta=true,AllAlpha=false",
+			expect: map[string]bool{
+				allAlphaGate:  false,
+				testAlphaGate: false,
+				testBetaGate:  true,
 			},
 		},
 	}
 	for i, test := range tests {
 		fs := pflag.NewFlagSet("testfeaturegateflag", pflag.ContinueOnError)
 		f := DefaultFeatureGate
-		f.known[testAlpha] = featureSpec{false, alpha}
-		f.known[testBeta] = featureSpec{false, beta}
+		f.known[testAlphaGate] = featureSpec{false, alpha}
+		f.known[testBetaGate] = featureSpec{false, beta}
 		f.AddFlag(fs)
 
 		err := fs.Parse([]string{fmt.Sprintf("--%s=%s", flagName, test.arg)})

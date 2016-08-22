@@ -33,24 +33,24 @@ const (
 	// To add a new feature, define a key for it below and add
 	// a featureSpec entry to knownFeatures.
 
-	// allAlpha is a global toggle for alpha features. Per-feature key
-	// values override the default set by allAlpha, if they come later in the
+	// allAlphaGate is a global toggle for alpha features. Per-feature key
+	// values override the default set by allAlphaGate, if they come later in the
 	// specification of gates. Examples:
-	//   allAlpha=false,newFeature=true  will result in newFeature=true
-	//   allAlpha=true,newFeature=false  will result in newFeature=false
-	allAlpha = "allAlpha"
+	//   AllAlpha=false,NewFeature=true  will result in newFeature=true
+	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
+	allAlphaGate = "AllAlpha"
 )
 
 var (
 	// Default values for recorded features.  Every new feature gate should be
 	// represented here.
 	knownFeatures = map[string]featureSpec{
-		allAlpha: {false, alpha},
+		allAlphaGate: {false, alpha},
 	}
 
 	// Special handling for a few gates.
 	specialFeatures = map[string]func(f *featureGate, val bool){
-		allAlpha: setUnsetAlphaGates,
+		allAlphaGate: setUnsetAlphaGates,
 	}
 
 	// DefaultFeatureGate is a shared global FeatureGate.
