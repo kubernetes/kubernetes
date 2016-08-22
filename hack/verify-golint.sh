@@ -86,6 +86,7 @@ else
 		for p in "${linted[@]}"; do
 			echo "echo $p >> hack/.linted_packages"
 		done
+		echo "sort -o hack/.linted_packages hack/.linted_packages"
 		echo
 		echo 'Please add the following packages to the linted file. You can test via this script and commit the result.'
 		echo
