@@ -278,4 +278,4 @@ $(notdir $(abspath $(wildcard federation/cmd/*/))): generated_files
 #   make generated_files
 .PHONY: generated_files
 generated_files:
-	$(MAKE) -f Makefile.$@ $@
+	$(MAKE) -f Makefile.$@ $@ CALLED_FROM_MAIN_MAKEFILE=1
