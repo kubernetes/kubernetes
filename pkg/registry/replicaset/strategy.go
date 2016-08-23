@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
 	"k8s.io/kubernetes/pkg/fields"
@@ -41,6 +42,12 @@ type rsStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating ReplicaSet objects.
 var Strategy = rsStrategy{api.Scheme, api.SimpleNameGenerator}
+
+// DefaultGarbageCollectionPolicy returns Orphan because that's the default
+// behavior before the server-side garbage collection is implemented.
+func (rsStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+	return rest.OrphanDependents
+}
 
 // NamespaceScoped returns true because all ReplicaSets need to be within a namespace.
 func (rsStrategy) NamespaceScoped() bool {

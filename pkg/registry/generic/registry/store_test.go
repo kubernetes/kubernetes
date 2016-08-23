@@ -46,6 +46,14 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
+type testOrphanDeleteStrategy struct {
+	*testRESTStrategy
+}
+
+func (t *testOrphanDeleteStrategy) DefaultGarbageCollectionPolicy() rest.GarbageCollectionPolicy {
+	return rest.OrphanDependents
+}
+
 type testRESTStrategy struct {
 	runtime.ObjectTyper
 	api.NameGenerator
@@ -680,9 +688,16 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	nonOrphanOptions := &api.DeleteOptions{OrphanDependents: &falseVar}
 	nilOrphanOptions := &api.DeleteOptions{}
 
+	// defaultDeleteStrategy doesn't implement rest.GarbageCollectionDeleteStrategy.
+	defaultDeleteStrategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
+	// orphanDeleteStrategy indicates the default garbage collection policy is
+	// to orphan dependentes.
+	orphanDeleteStrategy := &testOrphanDeleteStrategy{defaultDeleteStrategy}
+
 	testcases := []struct {
 		pod               *api.Pod
 		options           *api.DeleteOptions
+		strategy          rest.RESTDeleteStrategy
 		expectNotFound    bool
 		updatedFinalizers []string
 	}{
@@ -690,99 +705,179 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 		{
 			podWithOrphanFinalizer("pod1"),
 			orphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
 		},
 		{
 			podWithOtherFinalizers("pod2"),
 			orphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
 		},
 		{
 			podWithNoFinalizer("pod3"),
 			orphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{api.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod4"),
 			orphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{api.FinalizerOrphan},
 		},
 		// cases run with DeleteOptions.OrphanDedependents=false
+		// these cases all have oprhanDeleteStrategy, which should be ignored
+		// because DeleteOptions has the highest priority.
 		{
 			podWithOrphanFinalizer("pod5"),
 			nonOrphanOptions,
+			orphanDeleteStrategy,
 			false,
 			[]string{"foo.com/x", "bar.com/y"},
 		},
 		{
 			podWithOtherFinalizers("pod6"),
 			nonOrphanOptions,
+			orphanDeleteStrategy,
 			false,
 			[]string{"foo.com/x", "bar.com/y"},
 		},
 		{
 			podWithNoFinalizer("pod7"),
 			nonOrphanOptions,
+			orphanDeleteStrategy,
 			true,
 			[]string{},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod8"),
 			nonOrphanOptions,
+			orphanDeleteStrategy,
 			true,
 			[]string{},
 		},
-		// cases run with nil DeleteOptions, the finalizers are not updated.
+		// cases run with nil DeleteOptions.OrphanDependents. If the object
+		// already has the orphan finalizer, then the DeleteStrategy should be
+		// ignored. Otherwise the DeleteStrategy decides whether to add the
+		// orphan finalizer.
 		{
 			podWithOrphanFinalizer("pod9"),
-			nil,
+			nilOrphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
 		},
 		{
-			podWithOtherFinalizers("pod10"),
-			nil,
+			podWithOrphanFinalizer("pod10"),
+			nilOrphanOptions,
+			orphanDeleteStrategy,
+			false,
+			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+		},
+		{
+			podWithOtherFinalizers("pod11"),
+			nilOrphanOptions,
+			defaultDeleteStrategy,
 			false,
 			[]string{"foo.com/x", "bar.com/y"},
 		},
 		{
-			podWithNoFinalizer("pod11"),
-			nil,
+			podWithOtherFinalizers("pod12"),
+			nilOrphanOptions,
+			orphanDeleteStrategy,
+			false,
+			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
+		},
+		{
+			podWithNoFinalizer("pod13"),
+			nilOrphanOptions,
+			defaultDeleteStrategy,
 			true,
 			[]string{},
 		},
 		{
-			podWithOnlyOrphanFinalizer("pod12"),
-			nil,
+			podWithNoFinalizer("pod14"),
+			nilOrphanOptions,
+			orphanDeleteStrategy,
 			false,
 			[]string{api.FinalizerOrphan},
 		},
-		// cases run with non-nil DeleteOptions, but nil OrphanDependents, it's treated as OrphanDependents=true
 		{
-			podWithOrphanFinalizer("pod13"),
+			podWithOnlyOrphanFinalizer("pod15"),
 			nilOrphanOptions,
+			defaultDeleteStrategy,
 			false,
-			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
-		},
-		{
-			podWithOtherFinalizers("pod14"),
-			nilOrphanOptions,
-			false,
-			[]string{"foo.com/x", "bar.com/y"},
-		},
-		{
-			podWithNoFinalizer("pod15"),
-			nilOrphanOptions,
-			true,
-			[]string{},
+			[]string{api.FinalizerOrphan},
 		},
 		{
 			podWithOnlyOrphanFinalizer("pod16"),
 			nilOrphanOptions,
+			orphanDeleteStrategy,
+			false,
+			[]string{api.FinalizerOrphan},
+		},
+
+		// cases run with nil DeleteOptions should have exact same behavior.
+		// They should be exactly the same as above cases where
+		// DeleteOptions.OrphanDependents is nil.
+		{
+			podWithOrphanFinalizer("pod17"),
+			nil,
+			defaultDeleteStrategy,
+			false,
+			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+		},
+		{
+			podWithOrphanFinalizer("pod18"),
+			nil,
+			orphanDeleteStrategy,
+			false,
+			[]string{"foo.com/x", api.FinalizerOrphan, "bar.com/y"},
+		},
+		{
+			podWithOtherFinalizers("pod19"),
+			nil,
+			defaultDeleteStrategy,
+			false,
+			[]string{"foo.com/x", "bar.com/y"},
+		},
+		{
+			podWithOtherFinalizers("pod20"),
+			nil,
+			orphanDeleteStrategy,
+			false,
+			[]string{"foo.com/x", "bar.com/y", api.FinalizerOrphan},
+		},
+		{
+			podWithNoFinalizer("pod21"),
+			nil,
+			defaultDeleteStrategy,
+			true,
+			[]string{},
+		},
+		{
+			podWithNoFinalizer("pod22"),
+			nil,
+			orphanDeleteStrategy,
+			false,
+			[]string{api.FinalizerOrphan},
+		},
+		{
+			podWithOnlyOrphanFinalizer("pod23"),
+			nil,
+			defaultDeleteStrategy,
+			false,
+			[]string{api.FinalizerOrphan},
+		},
+		{
+			podWithOnlyOrphanFinalizer("pod24"),
+			nil,
+			orphanDeleteStrategy,
 			false,
 			[]string{api.FinalizerOrphan},
 		},
@@ -793,6 +888,7 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	defer server.Terminate(t)
 
 	for _, tc := range testcases {
+		registry.DeleteStrategy = tc.strategy
 		// create pod
 		_, err := registry.Create(testContext, tc.pod)
 		if err != nil {

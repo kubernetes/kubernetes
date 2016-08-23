@@ -32,6 +32,20 @@ type RESTDeleteStrategy interface {
 	runtime.ObjectTyper
 }
 
+type GarbageCollectionPolicy string
+
+const (
+	DeleteDependents GarbageCollectionPolicy = "DeleteDependents"
+	OrphanDependents GarbageCollectionPolicy = "OrphanDependents"
+)
+
+// GarbageCollectionDeleteStrategy must be implemented by the registry that wants to
+// orphan dependents by default.
+type GarbageCollectionDeleteStrategy interface {
+	// DefaultGarbageCollectionPolicy returns the default garbage collection behavior.
+	DefaultGarbageCollectionPolicy() GarbageCollectionPolicy
+}
+
 // RESTGracefulDeleteStrategy must be implemented by the registry that supports
 // graceful deletion.
 type RESTGracefulDeleteStrategy interface {
