@@ -191,7 +191,7 @@ func (p *Priority) Add(obj interface{}) error {
 }
 
 // Update
-// can modify any part of the object, especially it's priority
+// can modify any part of the object, especially its priority
 // However, if the keyfunc result is not identical to the original object, then
 // this acts like Add. The controller currently creates the key based on
 // GetNamespace() and GetLabels(), so it should be safe to update anything
@@ -292,10 +292,6 @@ func (p *Priority) GetByKey(key string) (item interface{}, exists bool, err erro
 // will contain the items in the map, in priority order.
 func (p *Priority) Replace(list []interface{}, resourceVersion string) error {
 
-    //holder := NewPriority(p.keyFunc)
-	//for _, item := range list {
-    //   holder.Add(item)
-    //} 
     pq := NewPriorityQueue(p.keyFunc)
     for _, item := range list {
         heap.Push(pq, item)
@@ -332,14 +328,6 @@ func (p *Priority) Resync() error {
 	}
 	for key, item := range pq.items {
 		if !inQueue.Has(key) {
-            //priority, _ := MetaPriorityFunc(item)
-            //n := len(pq.queue)
-            //pk := PriorityKey{
-            //    key:        key,
-            //    priority:   priority,
-            //    index:      n,
-            //}
-
             heap.Push(pq, item)
 		}
 	}
@@ -370,7 +358,6 @@ func (p *Priority) Pop(process PopProcessFunc) (interface{}, error) {
             p.cond.Wait()
 		}
 
-        fmt.Println("popping")
         item := heap.Pop(p.queue)
 		if p.initialPopulationCount > 0 {
 			p.initialPopulationCount--
@@ -378,12 +365,10 @@ func (p *Priority) Pop(process PopProcessFunc) (interface{}, error) {
 
         err := process(item)
 		if e, ok := err.(ErrRequeue); ok {
-            fmt.Println("requeue")
             key, _ := p.keyFunc(item) //TODO: add error handling
 			p.addIfNotPresent(key, item)
 			err = e.Err
 		}
-        fmt.Println("returning from Pop")
         return item, err
 	}
 }

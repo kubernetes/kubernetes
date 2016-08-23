@@ -17,7 +17,7 @@ limitations under the License.
 package cache
 
 import (
-	"fmt"
+	//"fmt"
 	"reflect"
 	"testing"
 	//"time"
@@ -325,253 +325,336 @@ func TestPriority_Add(t *testing.T) {
     }
 }
 
-//func TestPriority_Update(t *testing.T) {
-//func TestPriority_Delete(t *testing.T) {
-//func TestPriority_List(t *testing.T) {
-//func TestPriority_ListKeys(t *testing.T) {
-//func TestPriority_Get(t *testing.T) {
-//func TestPriority_GetByKey(t *testing.T) {
-//func TestPriority_Replace(t *testing.T) {
-//func TestPriority_Resync(t *testing.T) {
-//func TestPriority_HasSynced(t *testing.T) {
-
-func TestPriority_Pop(t *testing.T) {
-	p := NewPriority(testPriorityObjectKeyFunc)
-
-	_ = p.Add(mkPriorityObj("foo", 10))
-	_ = p.Add(mkPriorityObj("bar", 9))
-	_ = p.Add(mkPriorityObj("baz", 11))
-
-    fn := func(obj interface{}) error {
-        fmt.Println("Obj: %v", obj)
-        return ErrRequeue{Err: nil}
-        //return ErrRequeue{Err: errors.New("not a droid")}
-    }
-    got, err := p.Pop(fn)
-	if err != nil {
-		t.Errorf("unexpected error on Pop: %v", err)
+func TestPriority_Update(t *testing.T) {
+	tests := []struct {
+		actions          []func(p *Priority)
+		expectedPriority int
+        expectedLength   int
+	}{
+		{
+			actions: []func(p *Priority){
+				func(p *Priority) { p.Add(mkPriorityObj("foo", 10)) },
+				func(p *Priority) { p.Update(mkPriorityObj("foo", 11)) },
+			},
+			expectedPriority: 11,
+            expectedLength:    1,
+		},
+		{
+			actions: []func(p *Priority){
+				func(p *Priority) { p.Add(mkPriorityObj("foo", 10)) },
+				func(p *Priority) { p.Update(mkPriorityObj("bar", 11)) },
+			},
+			expectedPriority: 10,
+            expectedLength:    2,
+		},
 	}
 
-    expect := mkPriorityObj("baz", 11)
-    if !reflect.DeepEqual(expect, got) {
-	    t.Errorf("Pop didn't match Add. Expected '%v', got '%v'", expect, got)
-    }
-    l := p.queue.Len()
-    if l != 2 {
-        t.Errorf("Not enough left in queue. Expected '%v', got '%v'", 2, l)
+	for i, test := range tests {
+		p := NewPriority(testPriorityObjectKeyFunc)
+
+		for _, action := range test.actions {
+			action(p)
+		}
+        got, _ := MetaPriorityFunc(p.queue.items["foo"])
+        if test.expectedPriority != got {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, test.expectedPriority, got)
+		}
+        l := p.queue.Len()
+        if l != test.expectedLength {
+			t.Errorf("test case %v failed, expected length did not match: %v , got %v", i, test.expectedLength, l)
+	    }
     }
 }
 
+func TestPriority_Delete(t *testing.T) {
+	tests := []struct {
+		actions          []func(p *Priority)
+		expectedObj      interface{}
+        expectedLength   int
+	}{
+		{
+			actions: []func(p *Priority){
+				func(p *Priority) { p.Add(mkPriorityObj("foo", 10)) },
+				func(p *Priority) { p.Add(mkPriorityObj("bar", 11)) },
+				func(p *Priority) { p.Delete(mkPriorityObj("foo", 10)) },
+			},
+			expectedObj:       nil,
+            expectedLength:    1,
+		},
+	}
 
-//func TestPriority_requeueOnPop(t *testing.T) {
-//	//p := NewPriority(testPriorityObjectKeyFunc)
-//
-//	//p.Add(mkPriorityObj("foo", 10))
-//	//_, err := p.Pop(func(obj interface{}) error {
-//	//	if obj.(api.Pod).name != "foo" {
-//	//		t.Fatalf("unexpected object: %#v", obj)
-//	//	}
-//	//	return ErrRequeue{Err: nil}
-//	//})
-//	//if err != nil {
-//	//	t.Fatalf("unexpected error: %v", err)
-//	//}
-//	//if _, ok, err := p.GetByKey("foo"); !ok || err != nil {
-//	//	t.Fatalf("object should have been requeued: %t %v", ok, err)
-//	//}
-//
-//	//_, err = f.Pop(func(obj interface{}) error {
-//	//	if obj.(testPriorityObject).name != "foo" {
-//	//		t.Fatalf("unexpected object: %#v", obj)
-//	//	}
-//	//	return ErrRequeue{Err: fmt.Errorf("test error")}
-//	//})
-//	//if err == nil || err.Error() != "test error" {
-//	//	t.Fatalf("unexpected error: %v", err)
-//	//}
-//	//if _, ok, err := f.GetByKey("foo"); !ok || err != nil {
-//	//	t.Fatalf("object should have been requeued: %t %v", ok, err)
-//	//}
-//
-//	//_, err = f.Pop(func(obj interface{}) error {
-//	//	if obj.(testPriorityObject).name != "foo" {
-//	//		t.Fatalf("unexpected object: %#v", obj)
-//	//	}
-//	//	return nil
-//	//})
-//	//if err != nil {
-//	//	t.Fatalf("unexpected error: %v", err)
-//	//}
-//	//if _, ok, err := f.GetByKey("foo"); ok || err != nil {
-//	//	t.Fatalf("object should have been removed: %t %v", ok, err)
-//	//}
-//}
+	for i, test := range tests {
+		p := NewPriority(testPriorityObjectKeyFunc)
 
-//func TestPriority_addUpdate(t *testing.T) {
-//	f := NewPriority(testPriorityObjectKeyFunc)
-//	f.Add(mkPriorityObj("foo", 10))
-//	f.Update(mkPriorityObj("foo", 15))
-//
-//	if e, a := []interface{}{mkPriorityObj("foo", 15)}, f.List(); !reflect.DeepEqual(e, a) {
-//		t.Errorf("Expected %+v, got %+v", e, a)
-//	}
-//	if e, a := []string{"foo"}, f.ListKeys(); !reflect.DeepEqual(e, a) {
-//		t.Errorf("Expected %+v, got %+v", e, a)
-//	}
-//
-//	got := make(chan testPriorityObject, 2)
-//	go func() {
-//		for {
-//			got <- Pop(f).(testPriorityObject)
-//		}
-//	}()
-//
-//	first := <-got
-//	if e, a := 15, first.val; e != a {
-//		t.Errorf("Didn't get updated value (%v), got %v", e, a)
-//	}
-//	select {
-//	case unexpected := <-got:
-//		t.Errorf("Got second value %v", unexpected.val)
-//	case <-time.After(50 * time.Millisecond):
-//	}
-//	_, exists, _ := f.Get(mkPriorityObj("foo", ""))
-//	if exists {
-//		t.Errorf("item did not get removed")
-//	}
-//}
-//
-//func TestPriority_addReplace(t *testing.T) {
-//	f := NewPriority(testPriorityObjectKeyFunc)
-//	f.Add(mkPriorityObj("foo", 10))
-//	f.Replace([]interface{}{mkPriorityObj("foo", 15)}, "15")
-//	got := make(chan testPriorityObject, 2)
-//	go func() {
-//		for {
-//			got <- Pop(f).(testPriorityObject)
-//		}
-//	}()
-//
-//	first := <-got
-//	if e, a := 15, first.val; e != a {
-//		t.Errorf("Didn't get updated value (%v), got %v", e, a)
-//	}
-//	select {
-//	case unexpected := <-got:
-//		t.Errorf("Got second value %v", unexpected.val)
-//	case <-time.After(50 * time.Millisecond):
-//	}
-//	_, exists, _ := f.Get(mkPriorityObj("foo", ""))
-//	if exists {
-//		t.Errorf("item did not get removed")
-//	}
-//}
-//
-//func TestPriority_detectLineJumpers(t *testing.T) {
-//	f := NewPriority(testPriorityObjectKeyFunc)
-//
-//	f.Add(mkPriorityObj("foo", 10))
-//	f.Add(mkPriorityObj("bar", 1))
-//	f.Add(mkPriorityObj("foo", 11))
-//	f.Add(mkPriorityObj("foo", 13))
-//	f.Add(mkPriorityObj("zab", 30))
-//
-//	if e, a := 13, Pop(f).(testPriorityObject).val; a != e {
-//		t.Fatalf("expected %d, got %d", e, a)
-//	}
-//
-//	f.Add(mkPriorityObj("foo", 14)) // ensure foo doesn't jump back in line
-//
-//	if e, a := 1, Pop(f).(testPriorityObject).val; a != e {
-//		t.Fatalf("expected %d, got %d", e, a)
-//	}
-//
-//	if e, a := 30, Pop(f).(testPriorityObject).val; a != e {
-//		t.Fatalf("expected %d, got %d", e, a)
-//	}
-//
-//	if e, a := 14, Pop(f).(testPriorityObject).val; a != e {
-//		t.Fatalf("expected %d, got %d", e, a)
-//	}
-//}
-//
-//func TestPriority_addIfNotPresent(t *testing.T) {
-//	f := NewPriority(testPriorityObjectKeyFunc)
-//
-//	f.Add(mkPriorityObj("a", 1))
-//	f.Add(mkPriorityObj("b", 2))
-//	f.AddIfNotPresent(mkPriorityObj("b", 3))
-//	f.AddIfNotPresent(mkPriorityObj("c", 4))
-//
-//	if e, a := 3, len(f.items); a != e {
-//		t.Fatalf("expected queue length %d, got %d", e, a)
-//	}
-//
-//	expectedValues := []int{1, 2, 4}
-//	for _, expected := range expectedValues {
-//		if actual := Pop(f).(testPriorityObject).val; actual != expected {
-//			t.Fatalf("expected value %d, got %d", expected, actual)
-//		}
-//	}
-//}
-//
-////+1
-//func TestPriority_HasSynced(t *testing.T) {
-//	tests := []struct {
-//		actions        []func(f *Priority)
-//		expectedSynced bool
-//	}{
+		for _, action := range test.actions {
+			action(p)
+		}
+        got := p.queue.items["foo"]
+        if test.expectedObj != got {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, test.expectedObj, got)
+		}
+        l := p.queue.Len()
+        if l != test.expectedLength {
+			t.Errorf("test case %v failed, expected length did not match: %v , got %v", i, test.expectedLength, l)
+	    }
+    }
+}
+
+func TestPriority_List(t *testing.T) {
+	p := NewPriority(testPriorityObjectKeyFunc)
+    p.Add(mkPriorityObj("foo", 10))
+    p.Add(mkPriorityObj("bar", 11))
+    got := p.List()
+
+    expected := make([]interface{}, 0)
+    expected = append(expected, mkPriorityObj("foo", 10))
+    expected = append(expected, mkPriorityObj("bar", 11))
+    if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %v , got %v", expected, got)
+	}
+}
+
+func TestPriority_ListKeys(t *testing.T) {
+	p := NewPriority(testPriorityObjectKeyFunc)
+    p.Add(mkPriorityObj("foo", 10))
+    p.Add(mkPriorityObj("bar", 11))
+    got := p.ListKeys()
+
+    expected := make([]string, 0)
+    expected = append(expected, "foo")
+    expected = append(expected, "bar")
+    if !reflect.DeepEqual(expected, got) {
+		t.Errorf("expected: %v , got %v", expected, got)
+	}
+}
+
+func TestPriority_Get(t *testing.T) {
+	tests := []struct {
+		actions          []func(p *Priority)
+        requestItem      interface{}
+		expectedItem     interface{}
+        expectedExists   bool
+        expectedErr      interface{}
+	}{
+		{
+			actions: []func(p *Priority){
+				func(p *Priority) { p.Add(mkPriorityObj("foo", 10)) },
+			},
+            requestItem:        mkPriorityObj("foo", 10),
+			expectedItem:       mkPriorityObj("foo", 10),
+            expectedExists:     true,
+            expectedErr:        nil,
+		},
+		{
+			actions: []func(p *Priority){
+				func(p *Priority) { p.Add(mkPriorityObj("foo", 10)) },
+			},
+            requestItem:        mkPriorityObj("bar", 10),
+			expectedItem:       nil,
+            expectedExists:     false,
+            expectedErr:        nil,
+		},
+        //TODO: test case for invalid object?
+	}
+
+	for i, test := range tests {
+		p := NewPriority(testPriorityObjectKeyFunc)
+
+		for _, action := range test.actions {
+			action(p)
+		}
+        got, exists, err := p.Get(test.requestItem)
+
+        if !reflect.DeepEqual(test.expectedItem, got) {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, test.expectedItem, got)
+		}
+        if test.expectedExists != exists {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, test.expectedExists, exists)
+		}
+        if test.expectedErr != err {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, test.expectedErr, err)
+		}
+    }
+}
+
+func TestPriority_GetByKey(t *testing.T) {
+	tests := []struct {
+		actions          []func(p *Priority)
+        requestKey       string
+		expectedItem     interface{}
+        expectedExists   bool
+        expectedErr      interface{}
+	}{
+		{
+			actions: []func(p *Priority){
+				func(p *Priority) { p.Add(mkPriorityObj("foo", 10)) },
+			},
+            requestKey:        "foo",
+			expectedItem:       mkPriorityObj("foo", 10),
+            expectedExists:     true,
+            expectedErr:        nil,
+		},
+		{
+			actions: []func(p *Priority){
+				func(p *Priority) { p.Add(mkPriorityObj("foo", 10)) },
+			},
+            requestKey:        "bar",
+			expectedItem:       nil,
+            expectedExists:     false,
+            expectedErr:        nil,
+		},
+	}
+
+	for i, test := range tests {
+		p := NewPriority(testPriorityObjectKeyFunc)
+
+		for _, action := range test.actions {
+			action(p)
+		}
+        got, exists, err := p.GetByKey(test.requestKey)
+
+        if !reflect.DeepEqual(test.expectedItem, got) {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, test.expectedItem, got)
+		}
+        if test.expectedExists != exists {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, test.expectedExists, exists)
+		}
+        if test.expectedErr != err {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, test.expectedErr, err)
+		}
+    }
+}
+//TODO:
+//func TestPriority_Replace(t *testing.T) {
+
+//TODO:
+//func TestPriority_Resync(t *testing.T) {
+
+func TestPriority_Pop(t *testing.T) {
+    //TODO: make sure requeue was actually requeued correctly, not just with obj count (GetByKey)
+    //TODO: test for concurrency bugs
+    tests := []struct{
+        fn                  func(obj interface{}) error
+        expectedObj         api.Pod
+        expectedLength      int
+    }{
+        {
+            //pop but then requeue
+            fn:                 func(obj interface{}) error {return ErrRequeue{Err: nil}},
+            expectedObj:        mkPriorityObj("bar", 11),
+            expectedLength:     3,
+        },
+        {
+            //pop but don't requeue
+            fn:                 func(obj interface{}) error {return nil},
+            expectedObj:        mkPriorityObj("bar", 11),
+            expectedLength:     2,
+        },
+    } 
+    for i, test := range tests {
+	    p := NewPriority(testPriorityObjectKeyFunc)
+
+	    _ = p.Add(mkPriorityObj("foo", 10))
+	    _ = p.Add(mkPriorityObj("bar", 11))
+	    _ = p.Add(mkPriorityObj("baz", 9))
+
+        got, err := p.Pop(test.fn)
+        if err != nil {
+        	t.Errorf("test case %v failed, unexpected error on Pop: %v", i, err)
+        }
+
+        if !reflect.DeepEqual(test.expectedObj, got) {
+	        t.Errorf("test case %v failed, Pop didn't match Add. Expected '%v', got '%v'", i, test.expectedObj, got)
+        }
+        l := p.queue.Len()
+        if l != test.expectedLength {
+            t.Errorf("test case %v failed, Queue remainder not as expected. Expected '%v', got '%v'", i, test.expectedLength, l)
+        }
+    }
+}
+
+func TestPriority_AddIfNotPresent(t *testing.T) {
+    //TODO: test concurrency: add+update, add+replace, etc
+	p := NewPriority(testPriorityObjectKeyFunc)
+
+	_ = p.AddIfNotPresent(mkPriorityObj("foo", 10))
+	_ = p.AddIfNotPresent(mkPriorityObj("bar", 15))
+	_ = p.AddIfNotPresent(mkPriorityObj("bar", 11))
+	_ = p.AddIfNotPresent(mkPriorityObj("baz", 14))
+ 
+    fn := func(obj interface{}) error {return nil}
+    got, err := p.Pop(fn)
+    if err != nil {
+    	t.Errorf("unexpected error on Pop: %v", err)
+    }
+
+    expect := mkPriorityObj("bar", 15)
+    if !reflect.DeepEqual(expect, got) {
+        t.Errorf("Pop didn't match AddIfNotPresent. Expected '%v', got '%v'", expect, got)
+    }
+    l := p.queue.Len()
+    if l != 2 {
+        t.Errorf("Queue remainder not as expected. Expected '%v', got '%v'", 2, l)
+    }
+}
+
+func TestPriority_HasSynced(t *testing.T) {
+	tests := []struct {
+		actions        []func(p *Priority)
+		expectedSynced bool
+	}{
+		{
+			actions:        []func(p *Priority){},
+			expectedSynced: false,
+		},
+		{
+			actions: []func(p *Priority){
+				func(p *Priority) { p.Add(mkPriorityObj("a", 1)) },
+			},
+			expectedSynced: true,
+		},
+//TODO: add testing for Replace first
 //		{
-//			actions:        []func(f *Priority){},
-//			expectedSynced: false,
-//		},
-//		{
-//			actions: []func(f *Priority){
-//				func(f *Priority) { f.Add(mkPriorityObj("a", 1)) },
+//			actions: []func(p *Priority){
+//				func(p *Priority) { p.Replace([]interface{}{}, "0") },
 //			},
 //			expectedSynced: true,
 //		},
 //		{
-//			actions: []func(f *Priority){
-//				func(f *Priority) { f.Replace([]interface{}{}, "0") },
-//			},
-//			expectedSynced: true,
-//		},
-//		{
-//			actions: []func(f *Priority){
-//				func(f *Priority) { f.Replace([]interface{}{mkPriorityObj("a", 1), mkPriorityObj("b", 2)}, "0") },
+//			actions: []func(p *Priority){
+//				func(p *Priority) { p.Replace([]interface{}{mkPriorityObj("a", 1), mkPriorityObj("b", 2)}, "0") },
 //			},
 //			expectedSynced: false,
 //		},
 //		{
-//			actions: []func(f *Priority){
-//				func(f *Priority) { f.Replace([]interface{}{mkPriorityObj("a", 1), mkPriorityObj("b", 2)}, "0") },
-//				func(f *Priority) { Pop(f) },
+//			actions: []func(p *Priority){
+//				func(p *Priority) { p.Replace([]interface{}{mkPriorityObj("a", 1), mkPriorityObj("b", 2)}, "0") },
+//				func(p *Priority) { Pop(p) },
 //			},
 //			expectedSynced: false,
 //		},
 //		{
-//			actions: []func(f *Priority){
-//				func(f *Priority) { f.Replace([]interface{}{mkPriorityObj("a", 1), mkPriorityObj("b", 2)}, "0") },
-//				func(f *Priority) { Pop(f) },
-//				func(f *Priority) { Pop(f) },
+//			actions: []func(p *Priority){
+//				func(p *Priority) { p.Replace([]interface{}{mkPriorityObj("a", 1), mkPriorityObj("b", 2)}, "0") },
+//				func(p *Priority) { Pop(p) },
+//				func(p *Priority) { Pop(p) },
 //			},
 //			expectedSynced: true,
 //		},
-//	}
-//
-//	for i, test := range tests {
-//		f := NewPriority(testPriorityObjectKeyFunc)
-//
-//		for _, action := range test.actions {
-//			action(f)
-//		}
-//		if e, a := test.expectedSynced, f.HasSynced(); a != e {
-//			t.Errorf("test case %v failed, expected: %v , got %v", i, e, a)
-//		}
-//	}
-//}
-//
+	}
+
+	for i, test := range tests {
+		p := NewPriority(testPriorityObjectKeyFunc)
+
+		for _, action := range test.actions {
+			action(p)
+		}
+		if e, a := test.expectedSynced, p.HasSynced(); a != e {
+			t.Errorf("test case %v failed, expected: %v , got %v", i, e, a)
+		}
+	}
+}
+
 ////https://github.com/kubernetes/kubernetes/blob/f2ddd60eb9e7e9e29f7a105a9a8fa020042e8e52/pkg/controller/lookup_cache.go#L28
 //func mkTestAPIObjectWithPriority(priority string) interface{} {
 //    p := api.Pod{
