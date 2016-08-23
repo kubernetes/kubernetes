@@ -35,7 +35,7 @@
 Package transport defines and implements message oriented communication channel
 to complete various transactions (e.g., an RPC).
 */
-package transport
+package transport // import "google.golang.org/grpc/transport"
 
 import (
 	"bytes"

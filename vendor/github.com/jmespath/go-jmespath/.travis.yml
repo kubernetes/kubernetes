@@ -1,9 +1,0 @@
-language: go
-
-sudo: false
-
-go:
-  - 1.4
-
-install: go get -v -t ./...
-script: make test

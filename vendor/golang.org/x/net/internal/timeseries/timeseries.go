@@ -3,7 +3,7 @@
 // license that can be found in the LICENSE file.
 
 // Package timeseries implements a time series structure for stats collection.
-package timeseries
+package timeseries // import "golang.org/x/net/internal/timeseries"
 
 import (
 	"fmt"
