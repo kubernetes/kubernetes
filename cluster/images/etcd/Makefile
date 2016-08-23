@@ -17,9 +17,10 @@
 # Usage:
 # 	[TAG=2.2.1] [REGISTRY=gcr.io/google_containers] [ARCH=amd64] [BASEIMAGE=busybox] make (build|push)
 
-TAG?=3.0.4
+ETCD_TAG?=3.0.4
+TAG?=3.0.4-migration.3
 ARCH?=amd64
-REGISTRY?=gcr.io/google_containers
+REGISTRY?=gcr.io/groovy-sentry-504
 GOLANG_VERSION?=1.6.3
 GOARM=6
 TEMP_DIR:=$(shell mktemp -d)
@@ -41,17 +42,21 @@ build:
 	# Copy the content in this dir to the temp dir
 	cp ./* $(TEMP_DIR)
 
+	KUBE_ROOT=$(dirname "${BASH_SOURCE}")/../../..
+	cd "../../.."; make WHAT=cluster/images/etcd
+	cp "../../../_output/bin/etcd" $(TEMP_DIR)/attachlease
+
 ifeq ($(ARCH),amd64)
 
 	# Do not compile if we should make an image for amd64, use the official etcd binaries instead
-	curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$(TAG)/etcd-v$(TAG)-linux-amd64.tar.gz | tar -xz -C $(TEMP_DIR) --strip-components=1
+	curl -sSL --retry 5 https://github.com/coreos/etcd/releases/download/v$(ETCD_TAG)/etcd-v$(ETCD_TAG)-linux-amd64.tar.gz | tar -xz -C $(TEMP_DIR) --strip-components=1
 else
 	
 	# Download etcd in a golang container and cross-compile it statically
 	docker run -it -v $(TEMP_DIR):/etcdbin golang:$(GOLANG_VERSION) /bin/bash -c \
 		"git clone https://github.com/coreos/etcd /go/src/github.com/coreos/etcd \
 		&& cd /go/src/github.com/coreos/etcd \
-		&& git checkout v$(TAG) \
+		&& git checkout v$(ETCD_TAG) \
 		&& GOARM=$(GOARM) GOARCH=$(ARCH) ./build \
 		&& cp bin/$(ARCH)/* /etcdbin"
 
