@@ -78,7 +78,7 @@ var _ = framework.KubeDescribe("Federation ingresses [Feature:Federation]", func
 	})
 
 	// e2e cases for federation ingress controller
-	var _ = Describe("Federated Ingresses", func() {
+	var _ = Describe("Federated Ingress controller", func() {
 		var (
 			clusters                               map[string]*cluster // All clusters, keyed by cluster name
 			primaryClusterName, federationName, ns string
