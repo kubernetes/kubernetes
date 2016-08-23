@@ -131,21 +131,21 @@ parameters:
 provisioner: kubernetes.io/rbd
 parameters:
     monitors: 10.16.153.105:6789
-    adminID: kube
+    adminId: kube
     adminSecretName: ceph-secret
     adminSecretNamespace: kube-system
     pool: kube
     userId: kube
-    secretName: ceph-secret-user
+    userSecretName: ceph-secret-user
 ```
 
-* `monitors`: Ceph monitors, comma delimited
-* `adminID`: Ceph client ID that is capable of creating images in the pool. Default is "admin"
-* `adminSecret`: Secret Name for `adminID`
-* `adminSecretNamespace`: The namespace for `adminSecret`. Default is "default"
-* `pool`: Ceph RBD pool. Default is "rbd"
-* `userId`: Ceph client ID that is used to map the RBD image. Default is the same as `adminID`
-* `secretName`: The name of Ceph Secret. It must exist in the same namespace as PVCs.
+* `monitors`: Ceph monitors, comma delimited. It is required.
+* `adminId`: Ceph client ID that is capable of creating images in the pool. Default is "admin".
+* `adminSecret`: Secret Name for `adminId`. It is required.
+* `adminSecretNamespace`: The namespace for `adminSecret`. Default is "default".
+* `pool`: Ceph RBD pool. Default is "rbd".
+* `userId`: Ceph client ID that is used to map the RBD image. Default is the same as `adminId`.
+* `userSecretName`: The name of Ceph Secret for `userId` to map RBD image. It must exist in the same namespace as PVCs. It is required.
 
 ### User provisioning requests
 
@@ -179,6 +179,7 @@ In the future, the storage class may remain in an annotation or become a field o
 ### Sample output
 
 #### GCE
+
 This example uses GCE but any provisioner would follow the same flow.
 
 First we note there are no Persistent Volumes in the cluster.  After creating a storage class and a claim including that storage class, we see a new PV is created
@@ -231,6 +232,7 @@ Before creating PVC in user's namespace (e.g. myns), make sure the Ceph user's S
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-user.yaml --namespace=myns
 ```
+
 Now create a PVC in user's namespace (e.g. myns):
 
 ```
@@ -238,6 +240,7 @@ $ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.
 ```
 
 Check the PV and PVC are created:
+
 ```
 $ kubectl describe pvc --namespace=myns
 Name:		claim1

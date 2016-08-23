@@ -41,6 +41,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 )
 
+const (
+	imageWatcherStr = "watcher="
+)
+
 // search /sys/bus for rbd device that matches given pool and image
 func getDevFromImageAndPool(pool, image string) (string, bool) {
 	// /sys/bus/rbd/devices/X/name and /sys/bus/rbd/devices/X/pool
@@ -312,8 +316,7 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSource, size int, err error) {
 	volSizeBytes := p.options.Capacity.Value()
 	// convert to MB that rbd defaults on
-	const mb = 1024 * 1024
-	sz := int((volSizeBytes + mb - 1) / mb)
+	sz := int(volume.RoundUpSize(volSizeBytes, 1024*1024))
 	volSz := fmt.Sprintf("%d", sz)
 	// rbd create
 	l := len(p.rbdMounter.Mon)
@@ -322,24 +325,15 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSourc
 	// iterate all monitors until create succeeds.
 	for i := start; i < start+l; i++ {
 		mon := p.Mon[i%l]
-		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.Id, p.rbdMounter.Secret)
+		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
 		var output []byte
 		output, err = p.rbdMounter.plugin.execCommand("rbd",
-			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.Id, "-m", mon, "--key=" + p.rbdMounter.Secret})
+			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret, "--image-format", "1"})
 		if err == nil {
 			break
 		} else {
-			glog.V(4).Infof("failed to create rbd image, output %v", string(output))
+			glog.Warningf("failed to create rbd image, output %v", string(output))
 		}
-		// if failed, fall back to image format 1
-		output, err = p.rbdMounter.plugin.execCommand("rbd",
-			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.Id, "-m", mon, "--key=" + p.rbdMounter.Secret, "--image-format", "1"})
-		if err == nil {
-			break
-		} else {
-			glog.V(4).Infof("failed to create rbd image, output %v", string(output))
-		}
-
 	}
 
 	if err != nil {
@@ -355,8 +349,15 @@ func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSourc
 }
 
 func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
-	var err error
 	var output []byte
+	found, err := util.rbdStatus(p.rbdMounter)
+	if err != nil {
+		return err
+	}
+	if found {
+		glog.Info("rbd is still being used ", p.rbdMounter.Image)
+		return fmt.Errorf("rbd %s is still being used", p.rbdMounter.Image)
+	}
 	// rbd rm
 	l := len(p.rbdMounter.Mon)
 	// pick a mon randomly
@@ -364,9 +365,9 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 	// iterate all monitors until rm succeeds.
 	for i := start; i < start+l; i++ {
 		mon := p.rbdMounter.Mon[i%l]
-		glog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.Id, p.rbdMounter.Secret)
+		glog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.adminId, p.rbdMounter.adminSecret)
 		output, err = p.plugin.execCommand("rbd",
-			[]string{"rm", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.Id, "-m", mon, "--key=" + p.rbdMounter.Secret})
+			[]string{"rm", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.adminId, "-m", mon, "--key=" + p.rbdMounter.adminSecret})
 		if err == nil {
 			return nil
 		} else {
@@ -374,4 +375,39 @@ func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
 		}
 	}
 	return err
+}
+
+// run rbd status command to check if there is watcher on the image
+func (util *RBDUtil) rbdStatus(b *rbdMounter) (bool, error) {
+	var err error
+	var output string
+	var cmd []byte
+
+	l := len(b.Mon)
+	start := rand.Int() % l
+	// iterate all hosts until mount succeeds.
+	for i := start; i < start+l; i++ {
+		mon := b.Mon[i%l]
+		// cmd "rbd status" list the rbd client watch with the following output:
+		// Watchers:
+		//   watcher=10.16.153.105:0/710245699 client.14163 cookie=1
+		glog.V(4).Infof("rbd: status %s using mon %s, pool %s id %s key %s", b.Image, mon, b.Pool, b.adminId, b.adminSecret)
+		cmd, err = b.plugin.execCommand("rbd",
+			[]string{"status", b.Image, "--pool", b.Pool, "-m", mon, "--id", b.adminId, "--key=" + b.adminSecret})
+		output = string(cmd)
+
+		if err != nil {
+			// ignore error code, just checkout output for watcher string
+			glog.Warningf("failed to execute rbd status on mon %s", mon)
+		}
+
+		if strings.Contains(output, imageWatcherStr) {
+			glog.V(4).Infof("rbd: watchers on %s: %s", b.Image, output)
+			return true, nil
+		} else {
+			glog.Warningf("rbd: no watchers on %s", b.Image)
+			return false, nil
+		}
+	}
+	return false, nil
 }
