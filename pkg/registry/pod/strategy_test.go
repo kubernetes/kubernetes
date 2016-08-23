@@ -79,7 +79,8 @@ func TestMatchPod(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		result, err := MatchPod(labels.Everything(), testCase.fieldSelector).Matches(testCase.in)
+		m := MatchPod(labels.Everything(), testCase.fieldSelector)
+		result, err := m.Matches(testCase.in)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}

@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
@@ -196,12 +197,12 @@ type injectListError struct {
 	storage.Interface
 }
 
-func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, filter storage.Filter, listObj runtime.Object) error {
+func (self *injectListError) List(ctx context.Context, key string, resourceVersion string, p storage.SelectionPredicate, listObj runtime.Object) error {
 	if self.errors > 0 {
 		self.errors--
 		return fmt.Errorf("injected error")
 	}
-	return self.Interface.List(ctx, key, resourceVersion, filter, listObj)
+	return self.Interface.List(ctx, key, resourceVersion, p, listObj)
 }
 
 func TestWatch(t *testing.T) {
@@ -355,17 +356,18 @@ func TestFiltering(t *testing.T) {
 	}
 
 	// Set up Watch for object "podFoo" with label filter set.
-	selector := labels.SelectorFromSet(labels.Set{"filter": "foo"})
-	filterFunc := func(obj runtime.Object) bool {
-		metadata, err := meta.Accessor(obj)
-		if err != nil {
-			t.Errorf("Unexpected error: %v", err)
-			return false
-		}
-		return selector.Matches(labels.Set(metadata.GetLabels()))
+	pred := storage.SelectionPredicate{
+		Label: labels.SelectorFromSet(labels.Set{"filter": "foo"}),
+		Field: fields.Everything(),
+		GetAttrs: func(obj runtime.Object) (label labels.Set, field fields.Set, err error) {
+			metadata, err := meta.Accessor(obj)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+			return labels.Set(metadata.GetLabels()), nil, nil
+		},
 	}
-	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
-	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, filter)
+	watcher, err := cacher.Watch(context.TODO(), "pods/ns/foo", fooCreated.ResourceVersion, pred)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}

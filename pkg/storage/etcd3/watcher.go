@@ -51,7 +51,7 @@ type watchChan struct {
 	key               string
 	initialRev        int64
 	recursive         bool
-	filter            storage.Filter
+	filter            storage.FilterFunc
 	ctx               context.Context
 	cancel            context.CancelFunc
 	incomingEventChan chan *event
@@ -74,7 +74,7 @@ func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.
 // If recursive is false, it watches on given key.
 // If recursive is true, it watches any children and directories under the key, excluding the root key itself.
 // filter must be non-nil. Only if filter returns true will the changes be returned.
-func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.Filter) (watch.Interface, error) {
+func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) (watch.Interface, error) {
 	if recursive && !strings.HasSuffix(key, "/") {
 		key += "/"
 	}
@@ -83,7 +83,7 @@ func (w *watcher) Watch(ctx context.Context, key string, rev int64, recursive bo
 	return wc, nil
 }
 
-func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.Filter) *watchChan {
+func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, recursive bool, filter storage.FilterFunc) *watchChan {
 	wc := &watchChan{
 		watcher:           w,
 		key:               key,
@@ -241,7 +241,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 
 	switch {
 	case e.isDeleted:
-		if !wc.filter.Filter(oldObj) {
+		if !wc.filter(oldObj) {
 			return nil
 		}
 		res = &watch.Event{
@@ -249,7 +249,7 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: oldObj,
 		}
 	case e.isCreated:
-		if !wc.filter.Filter(curObj) {
+		if !wc.filter(curObj) {
 			return nil
 		}
 		res = &watch.Event{
@@ -257,8 +257,8 @@ func (wc *watchChan) transform(e *event) (res *watch.Event) {
 			Object: curObj,
 		}
 	default:
-		curObjPasses := wc.filter.Filter(curObj)
-		oldObjPasses := wc.filter.Filter(oldObj)
+		curObjPasses := wc.filter(curObj)
+		oldObjPasses := wc.filter(oldObj)
 		switch {
 		case curObjPasses && oldObjPasses:
 			res = &watch.Event{
