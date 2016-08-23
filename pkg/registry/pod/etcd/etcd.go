@@ -160,7 +160,7 @@ func (r *EvictionREST) Create(ctx api.Context, obj runtime.Object) (runtime.Obje
 		// Try to verify-and-decrement
 
 		// If it was false already, or if it becomes false during the course of our retries,
-		// raise an error marked as a ... 429 maybe?
+		// raise an error marked as a 429.
 		ok, err := r.checkAndDecrement(ctx, pdb)
 		if err != nil {
 			return nil, err
