@@ -39,6 +39,10 @@ type SubjectAccessReview struct {
 	Status SubjectAccessReviewStatus `json:"status,omitempty" protobuf:"bytes,3,opt,name=status"`
 }
 
+// +genclient=true
+// +nonNamespaced=true
+// +noMethods=true
+
 // SelfSubjectAccessReview checks whether or the current user can perform an action.  Not filling in a
 // spec.namespace means "in all namespaces".  Self is a special case, because users should always be able
 // to check whether they can perform an action
