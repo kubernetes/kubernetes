@@ -42,55 +42,15 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 	})
 
 	It("should create a PodDisruptionBudget", func() {
-		pdb := policy.PodDisruptionBudget{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "foo",
-				Namespace: ns,
-			},
-			Spec: policy.PodDisruptionBudgetSpec{
-				Selector:     &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-				MinAvailable: intstr.FromString("1%"),
-			},
-		}
-		_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
-		Expect(err).NotTo(HaveOccurred())
+		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromString("1%"))
 	})
 
 	It("should update PodDisruptionBudget status", func() {
-		pdb := policy.PodDisruptionBudget{
-			ObjectMeta: api.ObjectMeta{
-				Name:      "foo",
-				Namespace: ns,
-			},
-			Spec: policy.PodDisruptionBudgetSpec{
-				Selector:     &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
-				MinAvailable: intstr.FromInt(2),
-			},
-		}
-		_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
-		Expect(err).NotTo(HaveOccurred())
-		for i := 0; i < 2; i++ {
-			pod := &api.Pod{
-				ObjectMeta: api.ObjectMeta{
-					Name:      fmt.Sprintf("pod-%d", i),
-					Namespace: ns,
-					Labels:    map[string]string{"foo": "bar"},
-				},
-				Spec: api.PodSpec{
-					Containers: []api.Container{
-						{
-							Name:  "busybox",
-							Image: "gcr.io/google_containers/echoserver:1.4",
-						},
-					},
-					RestartPolicy: api.RestartPolicyAlways,
-				},
-			}
+		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(2))
 
-			_, err := cs.Pods(ns).Create(pod)
-			framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
-		}
-		err = wait.PollImmediate(framework.Poll, 60*time.Second, func() (bool, error) {
+		createPodsOrDie(cs, ns, 2)
+
+		err := wait.PollImmediate(framework.Poll, 60*time.Second, func() (bool, error) {
 			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo")
 			if err != nil {
 				return false, err
@@ -102,3 +62,42 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 	})
 
 })
+
+func createPodDisruptionBudgetOrDie(cs *release_1_4.Clientset, ns string, minAvailable intstr.IntOrString) {
+	pdb := policy.PodDisruptionBudget{
+		ObjectMeta: api.ObjectMeta{
+			Name:      "foo",
+			Namespace: ns,
+		},
+		Spec: policy.PodDisruptionBudgetSpec{
+			Selector:     &unversioned.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+			MinAvailable: minAvailable,
+		},
+	}
+	_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func createPodsOrDie(cs *release_1_4.Clientset, ns string, n int) {
+	for i := 0; i < n; i++ {
+		pod := &api.Pod{
+			ObjectMeta: api.ObjectMeta{
+				Name:      fmt.Sprintf("pod-%d", i),
+				Namespace: ns,
+				Labels:    map[string]string{"foo": "bar"},
+			},
+			Spec: api.PodSpec{
+				Containers: []api.Container{
+					{
+						Name:  "busybox",
+						Image: "gcr.io/google_containers/echoserver:1.4",
+					},
+				},
+				RestartPolicy: api.RestartPolicyAlways,
+			},
+		}
+
+		_, err := cs.Pods(ns).Create(pod)
+		framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
+	}
+}
