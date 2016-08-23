@@ -67,10 +67,6 @@ const (
 	// the mark-for-masquerade chain
 	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
-	// the mark we apply to traffic needing SNAT
-	// TODO(thockin): Remove this for v1.3 or v1.4.
-	oldIptablesMasqueradeMark = "0x4d415351"
-
 	// the mark-for-drop chain
 	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
 )
@@ -317,21 +313,6 @@ func CleanupLeftovers(ipt utiliptables.Interface) (encounteredError bool) {
 			encounteredError = true
 		}
 	}
-
-	// Clean up the older SNAT rule which was directly in POSTROUTING.
-	// TODO(thockin): Remove this for v1.3 or v1.4.
-	args = []string{
-		"-m", "comment", "--comment", "kubernetes service traffic requiring SNAT",
-		"-m", "mark", "--mark", oldIptablesMasqueradeMark,
-		"-j", "MASQUERADE",
-	}
-	if err := ipt.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-		if !utiliptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing old-style SNAT rule: %v", err)
-			encounteredError = true
-		}
-	}
-
 	return encounteredError
 }
 
@@ -1101,19 +1082,6 @@ func (proxier *Proxier) syncProxyRules() {
 		}
 	}
 	proxier.portsMap = replacementPortsMap
-
-	// Clean up the older SNAT rule which was directly in POSTROUTING.
-	// TODO(thockin): Remove this for v1.3 or v1.4.
-	args := []string{
-		"-m", "comment", "--comment", "kubernetes service traffic requiring SNAT",
-		"-m", "mark", "--mark", oldIptablesMasqueradeMark,
-		"-j", "MASQUERADE",
-	}
-	if err := proxier.iptables.DeleteRule(utiliptables.TableNAT, utiliptables.ChainPostrouting, args...); err != nil {
-		if !utiliptables.IsNotFoundError(err) {
-			glog.Errorf("Error removing old-style SNAT rule: %v", err)
-		}
-	}
 }
 
 // Join all words with spaces, terminate with newline and write to buf.
