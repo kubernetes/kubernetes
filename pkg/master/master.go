@@ -179,7 +179,7 @@ func New(c *Config) (*Master, error) {
 		return nil, fmt.Errorf("Master.New() called with config.KubeletClient == nil")
 	}
 
-	s, err := genericapiserver.New(c.Config)
+	s, err := c.Config.New()
 	if err != nil {
 		return nil, err
 	}
