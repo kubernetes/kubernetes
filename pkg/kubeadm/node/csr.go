@@ -57,9 +57,9 @@ func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Conf
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("loaded bootstrap client configuration: %#v\n", bootstrapClientConfig)
+	//fmt.Printf("loaded bootstrap client configuration: %#v\n", bootstrapClientConfig)
 
-	fmt.Println("creating CSR...")
+	//fmt.Println("creating CSR...")
 	client, err := unversionedcertificates.NewForConfig(bootstrapClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create certificates signing request client: %v", err)
@@ -70,7 +70,7 @@ func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Conf
 	if err != nil {
 		return nil, fmt.Errorf("error generating key: %v", err)
 	}
-	fmt.Println("CSR created, asking the API server to sign it...")
+	//fmt.Println("CSR created, asking the API server to sign it...")
 	// Pass 'requestClientCertificate()' the CSR client, existing key data, and node name to
 	// request for client certificate from the API server.
 	certData, err := kubeletapp.RequestClientCertificate(csrClient, keyData, nodeName)
