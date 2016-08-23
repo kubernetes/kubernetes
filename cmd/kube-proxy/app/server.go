@@ -173,10 +173,16 @@ func NewProxyServerDefault(config *options.ProxyServerConfig) (*ProxyServer, err
 	}
 	// This creates a client, first loading any specified kubeconfig
 	// file, and then overriding the Master flag, if non-empty.
+
+	// Otherwise default value from client_config is used which is http://localhost:8080
+	master := config.Master
+	if master == "" && len(config.APIServerList) > 0 {
+		master = config.APIServerList[0]
+	}
 	kubeconfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: config.Kubeconfig},
 		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{
-			Server: config.Master, Servers: config.APIServerList}}).ClientConfig()
+			Server: master, Servers: config.APIServerList}}).ClientConfig()
 	if err != nil {
 		return nil, err
 	}

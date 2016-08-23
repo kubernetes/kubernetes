@@ -94,16 +94,16 @@ func TestIsConfigTransportTLS(t *testing.T) {
 	}
 	for i, testCase := range testCases {
 		if err := SetKubernetesDefaults(testCase.Config); err != nil {
-			t.Errorf("%v: setting defaults failed for %#v: %v", i, testCase.Config, err)
+			t.Errorf("%d: setting defaults failed for %#v: %v", i, testCase.Config, err)
 			continue
 		}
 		useTLS, err := IsConfigTransportTLS(*testCase.Config)
 		isErr := err != nil
 		if isErr != testCase.Err {
-			t.Errorf("%v: Unexpected error %v", i, err)
+			t.Errorf("%d: Unexpected error %v", i, err)
 		}
 		if !isErr && testCase.TransportTLS != useTLS {
-			t.Errorf("%v: expected %v for %#v", i, testCase.TransportTLS, testCase.Config)
+			t.Errorf("%d: expected %v for %#v", i, testCase.TransportTLS, testCase.Config)
 		}
 	}
 }

@@ -1398,7 +1398,7 @@ func TestWasCreated(t *testing.T) {
 }
 
 func TestVerbs(t *testing.T) {
-	c := testRESTClient(t, nil)
+	c := testRESTClient(t)
 	if r := c.Post(); r.verb != "POST" {
 		t.Errorf("Post verb is wrong")
 	}
@@ -1478,7 +1478,7 @@ func TestUnacceptableParamNames(t *testing.T) {
 	}
 
 	for _, item := range table {
-		c := testRESTClient(t, nil)
+		c := testRESTClient(t)
 		r := c.Get().setParam(item.name, item.testVal)
 		if e, a := item.expectSuccess, r.err == nil; e != a {
 			t.Errorf("expected %v, got %v (%v)", e, a, r.err)
@@ -1503,7 +1503,7 @@ func TestBody(t *testing.T) {
 
 	var nilObject *api.DeleteOptions
 	typedObject := interface{}(nilObject)
-	c := testRESTClient(t, nil)
+	c := testRESTClient(t)
 	tests := []struct {
 		input    interface{}
 		expected string
@@ -1556,7 +1556,7 @@ func TestWatch(t *testing.T) {
 		{watch.Modified, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "second"}}},
 		{watch.Deleted, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "last"}}},
 	}
-
+	badServer := &httptest.Server{URL: "http://fail"}
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -1577,7 +1577,7 @@ func TestWatch(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	s := testRESTClient(t, testServer)
+	s := testRESTClient(t, badServer, testServer)
 	watching, err := s.Get().Prefix("path/to/watch/thing").Watch()
 	if err != nil {
 		t.Fatalf("Unexpected error")
@@ -1602,9 +1602,18 @@ func TestWatch(t *testing.T) {
 	}
 }
 
+func TestWatchFailOnLookup(t *testing.T) {
+	testServer := &httptest.Server{URL: "http://fail"}
+	s := testRESTClient(t, testServer)
+	_, err := s.Get().Prefix("/path/to/watch").Watch()
+	if err == nil {
+		t.Errorf(" %v", err)
+	}
+}
+
 func TestStream(t *testing.T) {
 	expectedBody := "expected body"
-
+	badServer := &httptest.Server{URL: "http://fail"}
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -1617,7 +1626,7 @@ func TestStream(t *testing.T) {
 	}))
 	defer testServer.Close()
 
-	s := testRESTClient(t, testServer)
+	s := testRESTClient(t, badServer, testServer)
 	readCloser, err := s.Get().Prefix("path/to/stream/thing").Stream()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -1632,17 +1641,31 @@ func TestStream(t *testing.T) {
 	}
 }
 
-func testRESTClient(t testing.TB, srv *httptest.Server) *RESTClient {
-	baseURL, _ := url.Parse("http://localhost")
-	if srv != nil {
-		var err error
-		baseURL, err = url.Parse(srv.URL)
-		if err != nil {
-			t.Fatalf("failed to parse test URL: %v", err)
+func TestStreamFailOnLookup(t *testing.T) {
+	testServer := &httptest.Server{URL: "http://fail"}
+	s := testRESTClient(t, testServer)
+	_, err := s.Get().Prefix("/path/to/stream").Stream()
+	if err == nil {
+		t.Errorf(" %v", err)
+	}
+}
+
+func testRESTClient(t testing.TB, servers ...*httptest.Server) *RESTClient {
+	baseURLs := []*url.URL{}
+	if len(servers) != 0 {
+		for _, srv := range servers {
+			baseURL, err := url.Parse(srv.URL)
+			if err != nil {
+				t.Fatalf("failed to parse test URL: %v", err)
+			}
+			baseURLs = append(baseURLs, baseURL)
 		}
+	} else {
+		baseURL, _ := url.Parse("http://localhost")
+		baseURLs = append(baseURLs, baseURL)
 	}
 	versionedAPIPath := testapi.Default.ResourcePath("", "", "")
-	client, err := NewRESTClient([]*url.URL{baseURL}, versionedAPIPath, defaultContentConfig(), 0, 0, nil, nil)
+	client, err := NewRESTClient(baseURLs, versionedAPIPath, defaultContentConfig(), 0, 0, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to create a client: %v", err)
 	}

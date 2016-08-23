@@ -67,7 +67,7 @@ func (p *RoundRobinProvider) Total() int {
 // WrapWithRetry executes any function until success or all urls were visited.
 func (p *RoundRobinProvider) WrapWithRetry(f func() error) error {
 	var err error
-	for _ = range p.urls {
+	for range p.urls {
 		err = f()
 		if err != nil {
 			p.Next()
