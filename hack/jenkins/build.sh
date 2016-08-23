@@ -62,7 +62,8 @@ git clean -fdx
 # docker images -q | xargs -r docker rmi
 
 # Build
-go run ./hack/e2e.go -v --build
+# Jobs explicitly set KUBE_FASTBUILD to desired settings.
+make release
 
 # Push to GCS?
 if [[ ${KUBE_SKIP_PUSH_GCS:-} =~ ^[yY]$ ]]; then
