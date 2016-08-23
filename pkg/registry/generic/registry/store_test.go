@@ -193,7 +193,8 @@ func TestStoreList(t *testing.T) {
 			}
 		}
 
-		list, err := registry.ListPredicate(ctx, item.m, nil)
+		pred := (*storage.SelectionPredicate)(item.m)
+		list, err := registry.ListPredicate(ctx, *pred, nil)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 			continue
@@ -1111,7 +1112,8 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 	podCreated := objCreated.(*api.Pod)
 
-	watcher, err := registry.WatchPredicate(testContext, matchPodName("foo"), podCreated.ResourceVersion)
+	pred := (*storage.SelectionPredicate)(matchPodName("foo"))
+	watcher, err := registry.WatchPredicate(testContext, *pred, podCreated.ResourceVersion)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1170,7 +1172,8 @@ func TestStoreWatch(t *testing.T) {
 		}
 
 		destroyFunc, registry := NewTestGenericStoreRegistry(t)
-		wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
+		pred := (*storage.SelectionPredicate)(m.selectPred)
+		wi, err := registry.WatchPredicate(ctx, *pred, "0")
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", name, err)
 		} else {

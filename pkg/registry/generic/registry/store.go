@@ -188,7 +188,8 @@ func (e *Store) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 	if options != nil && options.FieldSelector != nil {
 		field = options.FieldSelector
 	}
-	out, err := e.ListPredicate(ctx, e.PredicateFunc(label, field), options)
+	pred := (*storage.SelectionPredicate)(e.PredicateFunc(label, field))
+	out, err := e.ListPredicate(ctx, *pred, options)
 	if err != nil {
 		return nil, err
 	}
@@ -201,12 +202,11 @@ func (e *Store) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Store) ListPredicate(ctx api.Context, m *generic.SelectionPredicate, options *api.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx api.Context, p storage.SelectionPredicate, options *api.ListOptions) (runtime.Object, error) {
 	list := e.NewListFunc()
-	filter := e.createFilter(m)
-	if name, ok := m.MatchesSingle(); ok {
+	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			err := e.Storage.GetToList(ctx, key, filter, list)
+			err := e.Storage.GetToList(ctx, key, p, list)
 			return list, storeerr.InterpretListError(err, e.QualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
@@ -215,7 +215,7 @@ func (e *Store) ListPredicate(ctx api.Context, m *generic.SelectionPredicate, op
 	if options == nil {
 		options = &api.ListOptions{ResourceVersion: "0"}
 	}
-	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, filter, list)
+	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
 	return list, storeerr.InterpretListError(err, e.QualifiedResource)
 }
 
@@ -868,19 +868,18 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 	if options != nil {
 		resourceVersion = options.ResourceVersion
 	}
-	return e.WatchPredicate(ctx, e.PredicateFunc(label, field), resourceVersion)
+	pred := (*storage.SelectionPredicate)(e.PredicateFunc(label, field))
+	return e.WatchPredicate(ctx, *pred, resourceVersion)
 }
 
 // WatchPredicate starts a watch for the items that m matches.
-func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
-	filter := e.createFilter(m)
-
-	if name, ok := m.MatchesSingle(); ok {
+func (e *Store) WatchPredicate(ctx api.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
+	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			if err != nil {
 				return nil, err
 			}
-			w, err := e.Storage.Watch(ctx, key, resourceVersion, filter)
+			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
 			if err != nil {
 				return nil, err
 			}
@@ -892,7 +891,7 @@ func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, r
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filter)
+	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, p)
 	if err != nil {
 		return nil, err
 	}
@@ -900,18 +899,6 @@ func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, r
 		return newDecoratedWatcher(w, e.Decorator), nil
 	}
 	return w, nil
-}
-
-func (e *Store) createFilter(m *generic.SelectionPredicate) storage.Filter {
-	filterFunc := func(obj runtime.Object) bool {
-		matches, err := m.Matches(obj)
-		if err != nil {
-			glog.Errorf("unable to match watch: %v", err)
-			return false
-		}
-		return matches
-	}
-	return storage.NewSimpleFilter(filterFunc, m.MatcherIndex)
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or returning an error

@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/storage"
 )
 
 func TestMatchPod(t *testing.T) {
@@ -79,7 +80,9 @@ func TestMatchPod(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		result, err := MatchPod(labels.Everything(), testCase.fieldSelector).Matches(testCase.in)
+		m := MatchPod(labels.Everything(), testCase.fieldSelector)
+		p := (*storage.SelectionPredicate)(m)
+		result, err := p.Matches(testCase.in)
 		if err != nil {
 			t.Errorf("Unexpected error %v", err)
 		}
