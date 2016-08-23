@@ -757,9 +757,9 @@ func (m *Master) thirdpartyapi(group, kind, version, pluralResource string) *api
 		Serializer:     thirdpartyresourcedata.NewNegotiatedSerializer(api.Codecs, kind, externalVersion, internalVersion),
 		ParameterCodec: thirdpartyresourcedata.NewThirdPartyParameterCodec(api.ParameterCodec),
 
-		Context: m.RequestContextMapper,
+		Context: m.RequestContextMapper(),
 
-		MinRequestTimeout: m.MinRequestTimeout,
+		MinRequestTimeout: m.MinRequestTimeout(),
 
 		ResourceLister: dynamicLister{m, makeThirdPartyPath(group)},
 	}
