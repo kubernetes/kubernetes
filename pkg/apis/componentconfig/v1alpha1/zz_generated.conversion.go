@@ -331,6 +331,7 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := api.Convert_Pointer_int32_To_int32(&in.IPTablesDropBit, &out.IPTablesDropBit, s); err != nil {
 		return err
 	}
+	out.ExperimentalHostUserNamespaceDefaulting = in.ExperimentalHostUserNamespaceDefaulting
 	return nil
 }
 
@@ -507,6 +508,7 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	if err := api.Convert_int32_To_Pointer_int32(&in.IPTablesDropBit, &out.IPTablesDropBit, s); err != nil {
 		return err
 	}
+	out.ExperimentalHostUserNamespaceDefaulting = in.ExperimentalHostUserNamespaceDefaulting
 	return nil
 }
 

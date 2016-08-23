@@ -335,6 +335,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.MakeIPTablesUtilChains = in.MakeIPTablesUtilChains
 		out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
 		out.IPTablesDropBit = in.IPTablesDropBit
+		out.ExperimentalHostUserNamespaceDefaulting = in.ExperimentalHostUserNamespaceDefaulting
 		return nil
 	}
 }
