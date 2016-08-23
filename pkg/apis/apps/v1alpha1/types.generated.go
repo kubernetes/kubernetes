@@ -1461,7 +1461,7 @@ func (x codecSelfer1234) decSlicev1_PersistentVolumeClaim(v *[]pkg2_v1.Persisten
 
 			yyrg125 := len(yyv125) > 0
 			yyv2125 := yyv125
-			yyrl125, yyrt125 = z.DecInferLen(yyl125, z.DecBasicHandle().MaxInitLen, 352)
+			yyrl125, yyrt125 = z.DecInferLen(yyl125, z.DecBasicHandle().MaxInitLen, 368)
 			if yyrt125 {
 				if yyrl125 <= cap(yyv125) {
 					yyv125 = yyv125[:yyrl125]
@@ -1577,7 +1577,7 @@ func (x codecSelfer1234) decSlicePetSet(v *[]PetSet, d *codec1978.Decoder) {
 
 			yyrg131 := len(yyv131) > 0
 			yyv2131 := yyv131
-			yyrl131, yyrt131 = z.DecInferLen(yyl131, z.DecBasicHandle().MaxInitLen, 768)
+			yyrl131, yyrt131 = z.DecInferLen(yyl131, z.DecBasicHandle().MaxInitLen, 800)
 			if yyrt131 {
 				if yyrl131 <= cap(yyv131) {
 					yyv131 = yyv131[:yyrl131]

@@ -190,7 +190,7 @@ type ObjectMeta struct {
 	// The name of the cluster which the object belongs to.
 	// This is used to distinguish resources with same name and namespace in different clusters.
 	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
-	ClusterName string `json:"clusterName,omitempty"`
+	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 }
 
 const (

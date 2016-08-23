@@ -2778,7 +2778,7 @@ func (x codecSelfer1234) decSliceCluster(v *[]Cluster, d *codec1978.Decoder) {
 
 			yyrg222 := len(yyv222) > 0
 			yyv2222 := yyv222
-			yyrl222, yyrt222 = z.DecInferLen(yyl222, z.DecBasicHandle().MaxInitLen, 336)
+			yyrl222, yyrt222 = z.DecInferLen(yyl222, z.DecBasicHandle().MaxInitLen, 352)
 			if yyrt222 {
 				if yyrl222 <= cap(yyv222) {
 					yyv222 = yyv222[:yyrl222]
