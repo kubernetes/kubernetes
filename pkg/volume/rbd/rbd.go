@@ -201,7 +201,7 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	}
 	admin, adminSecretName, adminSecretNamespace, err := selectorToParam(spec.PersistentVolume)
 	if err != nil {
-		return nil, fmt.Errorf("cannot find Ceph credentials to delete rbd PV")
+		return nil, fmt.Errorf("cannot find Ceph credentials to delete rbd PV: %v", err)
 	}
 	secret := ""
 	if secret, err = plugin.getSecret(adminSecretNamespace, adminSecretName); err != nil {
@@ -357,7 +357,7 @@ func paramToSelector(admin, adminSecretNamespace, adminSecretName string, pv *ap
 
 func selectorToParam(pv *api.PersistentVolume) (string, string, string, error) {
 	if pv.Annotations == nil {
-		return "", "", "", fmt.Errorf("PV has no annotation, cannot get Ceph admin cedentials")
+		return "", "", "", fmt.Errorf("PV has no annotation, cannot get Ceph admin credentials")
 	}
 	var admin, adminSecretName, adminSecretNamespace string
 	found := false
