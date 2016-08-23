@@ -390,7 +390,7 @@ type KubeletConfiguration struct {
 	// cpuCFSQuota is Enable CPU CFS quota enforcement for containers that
 	// specify CPU limits
 	CPUCFSQuota *bool `json:"cpuCFSQuota"`
-	// containerized should be set to true if kubelet is running in a container.
+	// containerized should be set to true if kubelet is running in a container with docker < 1.10. Deprecated.
 	Containerized *bool `json:"containerized"`
 	// maxOpenFiles is Number of files that can be opened by Kubelet process.
 	MaxOpenFiles int64 `json:"maxOpenFiles"`
