@@ -226,7 +226,18 @@ func (frsc *ReplicaSetController) isSynced() bool {
 		glog.V(2).Infof("Cluster list not synced")
 		return false
 	}
+	clusters2, err := frsc.fedPodInformer.GetReadyClusters()
+	if err != nil {
+		glog.Errorf("Failed to get ready clusters: %v", err)
+		return false
+	}
+
+	// This also checks whether podInformer and replicaSetInformer have the
+	// same cluster lists.
 	if !frsc.fedPodInformer.GetTargetStore().ClustersSynced(clusters) {
+		return false
+	}
+	if !frsc.fedPodInformer.GetTargetStore().ClustersSynced(clusters2) {
 		return false
 	}
 
