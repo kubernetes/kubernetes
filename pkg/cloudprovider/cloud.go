@@ -85,13 +85,15 @@ type LoadBalancer interface {
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
 	GetLoadBalancer(clusterName string, service *api.Service) (status *api.LoadBalancerStatus, exists bool, err error)
 	// EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Implementations must treat the *api.Service and *api.Node
+	// parameters as read-only and not modify them.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	EnsureLoadBalancer(clusterName string, service *api.Service, nodeNames []string) (*api.LoadBalancerStatus, error)
+	EnsureLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) (*api.LoadBalancerStatus, error)
 	// UpdateLoadBalancer updates hosts under the specified load balancer.
-	// Implementations must treat the *api.Service parameter as read-only and not modify it.
+	// Implementations must treat the *api.Service and *api.Node
+	// parameters as read-only and not modify them.
 	// Parameter 'clusterName' is the name of the cluster as presented to kube-controller-manager
-	UpdateLoadBalancer(clusterName string, service *api.Service, nodeNames []string) error
+	UpdateLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) error
 	// EnsureLoadBalancerDeleted deletes the specified load balancer if it
 	// exists, returning nil if the load balancer specified either didn't exist or
 	// was successfully deleted.

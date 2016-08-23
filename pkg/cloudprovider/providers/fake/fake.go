@@ -36,12 +36,12 @@ type FakeBalancer struct {
 	Region         string
 	LoadBalancerIP string
 	Ports          []api.ServicePort
-	Hosts          []string
+	Nodes          []*api.Node
 }
 
 type FakeUpdateBalancerCall struct {
 	Service *api.Service
-	Hosts   []string
+	Nodes   []*api.Node
 }
 
 // FakeCloud is a test-double implementation of Interface, LoadBalancer, Instances, and Routes. It is useful for testing.
@@ -131,7 +131,7 @@ func (f *FakeCloud) GetLoadBalancer(clusterName string, service *api.Service) (*
 
 // EnsureLoadBalancer is a test-spy implementation of LoadBalancer.EnsureLoadBalancer.
 // It adds an entry "create" into the internal method call record.
-func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *api.Service, hosts []string) (*api.LoadBalancerStatus, error) {
+func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) (*api.LoadBalancerStatus, error) {
 	f.addCall("create")
 	if f.Balancers == nil {
 		f.Balancers = make(map[string]FakeBalancer)
@@ -146,7 +146,7 @@ func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *api.Service,
 	}
 	region := zone.Region
 
-	f.Balancers[name] = FakeBalancer{name, region, spec.LoadBalancerIP, spec.Ports, hosts}
+	f.Balancers[name] = FakeBalancer{name, region, spec.LoadBalancerIP, spec.Ports, nodes}
 
 	status := &api.LoadBalancerStatus{}
 	status.Ingress = []api.LoadBalancerIngress{{IP: f.ExternalIP.String()}}
@@ -156,9 +156,9 @@ func (f *FakeCloud) EnsureLoadBalancer(clusterName string, service *api.Service,
 
 // UpdateLoadBalancer is a test-spy implementation of LoadBalancer.UpdateLoadBalancer.
 // It adds an entry "update" into the internal method call record.
-func (f *FakeCloud) UpdateLoadBalancer(clusterName string, service *api.Service, hosts []string) error {
+func (f *FakeCloud) UpdateLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) error {
 	f.addCall("update")
-	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{service, hosts})
+	f.UpdateCalls = append(f.UpdateCalls, FakeUpdateBalancerCall{service, nodes})
 	return f.Err
 }
 
