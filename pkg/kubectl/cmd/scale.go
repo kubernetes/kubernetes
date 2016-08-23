@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -161,22 +162,34 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
 			return err
 		}
+
+		var patchBytes []byte
+		var patchType api.PatchType
 		if cmdutil.ShouldRecord(cmd, info) {
-			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command())
+			patchBytes, err = cmdutil.ChangeResourcePatch(info, f.Command())
 			if err != nil {
 				return err
 			}
-			mapping := info.ResourceMapping()
-			client, err := f.ClientForMapping(mapping)
+			patchType = api.StrategicMergePatchType
+		} else {
+			patchBytes, err = json.Marshal(info.Object)
 			if err != nil {
 				return err
 			}
-			helper := resource.NewHelper(client, mapping)
-			_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patchBytes)
-			if err != nil {
-				return err
-			}
+			patchType = api.JSONPatchType
 		}
+
+		mapping = info.ResourceMapping()
+		client, err := f.ClientForMapping(mapping)
+		if err != nil {
+			return err
+		}
+		helper := resource.NewHelper(client, mapping)
+		_, err = helper.Patch(info.Namespace, info.Name, patchType, patchBytes)
+		if err != nil {
+			return err
+		}
+
 		counter++
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "scaled")
 		return nil
