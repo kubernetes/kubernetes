@@ -94,7 +94,7 @@ function create-federation-api-objects {
     export FEDERATION_API_NODEPORT=32111
     export FEDERATION_NAMESPACE
     export FEDERATION_NAME="${FEDERATION_NAME:-federation}"
-    export DNS_ZONE_NAME="${DNS_ZONE_NAME:-federation.example}"  # See https://tools.ietf.org/html/rfc2606
+    export DNS_ZONE_NAME="${DNS_ZONE_NAME:-federation.example.}"  # See https://tools.ietf.org/html/rfc2606
 
     template="go run ${KUBE_ROOT}/federation/cluster/template.go"
 
@@ -185,6 +185,9 @@ function create-federation-api-objects {
     export FEDERATION_APISERVER_CA_CERT_BASE64="${FEDERATION_APISERVER_CA_CERT_BASE64}"
     export FEDERATION_APISERVER_CERT_BASE64="${FEDERATION_APISERVER_CERT_BASE64}"
     export FEDERATION_APISERVER_KEY_BASE64="${FEDERATION_APISERVER_KEY_BASE64}"
+
+    # Enable the NamespaceLifecycle admission control by default.
+    export FEDERATION_ADMISSION_CONTROL="${FEDERATION_ADMISSION_CONTROL:-NamespaceLifecycle}"
 
     for file in federation-etcd-pvc.yaml federation-apiserver-{deployment,secrets}.yaml federation-controller-manager-deployment.yaml; do
       $template "${manifests_root}/${file}" | $host_kubectl create -f -

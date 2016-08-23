@@ -76,23 +76,27 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 			It("should succeed", func() {
 				framework.SkipUnlessFederated(f.Client)
-				service := createServiceOrFail(f.FederationClientset_1_4, f.Namespace.Name, FederatedServiceName)
-				By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, f.Namespace.Name))
+
+				nsName := f.FederationNamespace.Name
+				service := createServiceOrFail(f.FederationClientset_1_4, nsName, FederatedServiceName)
+				By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
 				// Cleanup
-				err := f.FederationClientset_1_4.Services(f.Namespace.Name).Delete(service.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Services(nsName).Delete(service.Name, &api.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
-				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, f.Namespace.Name))
+				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
 			})
 
 			It("should create matching services in underlying clusters", func() {
 				framework.SkipUnlessFederated(f.Client)
-				service := createServiceOrFail(f.FederationClientset_1_4, f.Namespace.Name, FederatedServiceName)
+
+				nsName := f.FederationNamespace.Name
+				service := createServiceOrFail(f.FederationClientset_1_4, nsName, FederatedServiceName)
 				defer func() { // Cleanup
-					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, f.Namespace.Name))
-					err := f.FederationClientset_1_4.Services(f.Namespace.Name).Delete(service.Name, &api.DeleteOptions{})
-					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, f.Namespace.Name)
+					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
+					err := f.FederationClientset_1_4.Services(nsName).Delete(service.Name, &api.DeleteOptions{})
+					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
 				}()
-				waitForServiceShardsOrFail(f.Namespace.Name, service, clusters)
+				waitForServiceShardsOrFail(nsName, service, clusters)
 			})
 		})
 
@@ -104,17 +108,21 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 
 			BeforeEach(func() {
 				framework.SkipUnlessFederated(f.Client)
-				createBackendPodsOrFail(clusters, f.Namespace.Name, FederatedServicePodName)
-				service = createServiceOrFail(f.FederationClientset_1_4, f.Namespace.Name, FederatedServiceName)
-				waitForServiceShardsOrFail(f.Namespace.Name, service, clusters)
+
+				nsName := f.FederationNamespace.Name
+				createBackendPodsOrFail(clusters, nsName, FederatedServicePodName)
+				service = createServiceOrFail(f.FederationClientset_1_4, nsName, FederatedServiceName)
+				waitForServiceShardsOrFail(nsName, service, clusters)
 			})
 
 			AfterEach(func() {
 				framework.SkipUnlessFederated(f.Client)
-				deleteBackendPodsOrFail(clusters, f.Namespace.Name)
+
+				nsName := f.FederationNamespace.Name
+				deleteBackendPodsOrFail(clusters, nsName)
 
 				if service != nil {
-					deleteServiceOrFail(f.FederationClientset_1_4, f.Namespace.Name, service.Name)
+					deleteServiceOrFail(f.FederationClientset_1_4, nsName, service.Name)
 					service = nil
 				} else {
 					By("No service to delete.  Service is nil")
@@ -124,12 +132,13 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 			It("should be able to discover a federated service", func() {
 				framework.SkipUnlessFederated(f.Client)
 
+				nsName := f.FederationNamespace.Name
 				svcDNSNames := []string{
 					FederatedServiceName,
-					fmt.Sprintf("%s.%s", FederatedServiceName, f.Namespace.Name),
-					fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name),
-					fmt.Sprintf("%s.%s.%s", FederatedServiceName, f.Namespace.Name, federationName),
-					fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name, federationName),
+					fmt.Sprintf("%s.%s", FederatedServiceName, nsName),
+					fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, nsName),
+					fmt.Sprintf("%s.%s.%s", FederatedServiceName, nsName, federationName),
+					fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, nsName, federationName),
 				}
 				// TODO(mml): This could be much faster.  We can launch all the test
 				// pods, perhaps in the BeforeEach, and then just poll until we get
@@ -151,9 +160,10 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				It("should be able to discover a non-local federated service", func() {
 					framework.SkipUnlessFederated(f.Client)
 
+					nsName := f.FederationNamespace.Name
 					svcDNSNames := []string{
-						fmt.Sprintf("%s.%s.%s", FederatedServiceName, f.Namespace.Name, federationName),
-						fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name, federationName),
+						fmt.Sprintf("%s.%s.%s", FederatedServiceName, nsName, federationName),
+						fmt.Sprintf("%s.%s.%s.svc.cluster.local.", FederatedServiceName, nsName, federationName),
 					}
 					for i, name := range svcDNSNames {
 						discoverService(f, name, true, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))
@@ -166,10 +176,11 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 					It("should never find DNS entries for a missing local service", func() {
 						framework.SkipUnlessFederated(f.Client)
 
+						nsName := f.FederationNamespace.Name
 						localSvcDNSNames := []string{
 							FederatedServiceName,
-							fmt.Sprintf("%s.%s", FederatedServiceName, f.Namespace.Name),
-							fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, f.Namespace.Name),
+							fmt.Sprintf("%s.%s", FederatedServiceName, nsName),
+							fmt.Sprintf("%s.%s.svc.cluster.local.", FederatedServiceName, nsName),
 						}
 						for i, name := range localSvcDNSNames {
 							discoverService(f, name, false, "federated-service-e2e-discovery-pod-"+strconv.Itoa(i))

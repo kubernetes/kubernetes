@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -62,8 +63,6 @@ type Framework struct {
 	Clientset_1_3 *release_1_3.Clientset
 	StagingClient *release_1_4.Clientset
 
-	FederationClientset_1_4 *federation_release_1_4.Clientset
-
 	Namespace                *api.Namespace   // Every test has at least one namespace
 	namespacesToDelete       []*api.Namespace // Some tests have more than one.
 	NamespaceDeletionTimeout time.Duration
@@ -88,6 +87,10 @@ type Framework struct {
 
 	// will this framework exercise a federated cluster as well
 	federated bool
+
+	// Federation specific params. These are set only if federated = true.
+	FederationClientset_1_4 *federation_release_1_4.Clientset
+	FederationNamespace     *v1.Namespace
 }
 
 type TestDataSummary interface {
@@ -198,16 +201,16 @@ func (f *Framework) BeforeEach() {
 			f.FederationClientset_1_4, err = LoadFederationClientset_1_4()
 			Expect(err).NotTo(HaveOccurred())
 		}
-		if f.FederationClientset_1_4 == nil {
-			By("Creating a release 1.4 federation Clientset")
-			var err error
-			f.FederationClientset_1_4, err = LoadFederationClientset_1_4()
-			Expect(err).NotTo(HaveOccurred())
-		}
 		By("Waiting for federation-apiserver to be ready")
 		err := WaitForFederationApiserverReady(f.FederationClientset_1_4)
 		Expect(err).NotTo(HaveOccurred())
 		By("federation-apiserver is ready")
+
+		By("Creating a federation namespace")
+		ns, err := f.createFederationNamespace(f.BaseName)
+		Expect(err).NotTo(HaveOccurred())
+		f.FederationNamespace = ns
+		By(fmt.Sprintf("Created federation namespace %s", ns.Name))
 	}
 
 	By("Building a namespace api object")
@@ -250,6 +253,41 @@ func (f *Framework) BeforeEach() {
 	}
 }
 
+func (f *Framework) deleteFederationNs() {
+	ns := f.FederationNamespace
+	By(fmt.Sprintf("Destroying federation namespace %q for this suite.", ns.Name))
+	timeout := 5 * time.Minute
+	if f.NamespaceDeletionTimeout != 0 {
+		timeout = f.NamespaceDeletionTimeout
+	}
+
+	clientset := f.FederationClientset_1_4
+	// First delete the namespace from federation apiserver.
+	if err := clientset.Core().Namespaces().Delete(ns.Name, &api.DeleteOptions{}); err != nil {
+		Failf("Error while deleting federation namespace %s: %s", ns.Name, err)
+	}
+	// Verify that it got deleted.
+	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
+		if _, err := clientset.Core().Namespaces().Get(ns.Name); err != nil {
+			if apierrs.IsNotFound(err) {
+				return true, nil
+			}
+			Logf("Error while waiting for namespace to be terminated: %v", err)
+			return false, nil
+		}
+		return false, nil
+	})
+	if err != nil {
+		if !apierrs.IsNotFound(err) {
+			Failf("Couldn't delete ns %q: %s", ns.Name, err)
+		} else {
+			Logf("Namespace %v was already deleted", ns.Name)
+		}
+	}
+
+	// TODO: Delete the namespace from underlying clusters.
+}
+
 // AfterEach deletes the namespace, after reading its events.
 func (f *Framework) AfterEach() {
 	RemoveCleanupAction(f.cleanupHandle)
@@ -274,12 +312,20 @@ func (f *Framework) AfterEach() {
 				}
 			}
 			f.namespacesToDelete = nil
+
+			// Delete the federation namespace.
+			// TODO(nikhiljindal): Uncomment this, once https://github.com/kubernetes/kubernetes/issues/31077 is fixed.
+			// In the meantime, we will have these extra namespaces in all clusters.
+			// Note: this will not cause any failure since we create a new namespace for each test in BeforeEach().
+			// f.deleteFederationNs()
+
 		} else {
 			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 		}
 
 		// Paranoia-- prevent reuse!
 		f.Namespace = nil
+		f.FederationNamespace = nil
 		f.Client = nil
 	}()
 
@@ -373,6 +419,29 @@ func (f *Framework) CreateNamespace(baseName string, labels map[string]string) (
 		f.namespacesToDelete = append(f.namespacesToDelete, ns)
 	}
 	return ns, err
+}
+
+func (f *Framework) createFederationNamespace(baseName string) (*v1.Namespace, error) {
+	clientset := f.FederationClientset_1_4
+	namespaceObj := &v1.Namespace{
+		ObjectMeta: v1.ObjectMeta{
+			GenerateName: fmt.Sprintf("e2e-tests-%v-", baseName),
+		},
+	}
+	// Be robust about making the namespace creation call.
+	var got *v1.Namespace
+	if err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
+		var err error
+		got, err = clientset.Core().Namespaces().Create(namespaceObj)
+		if err != nil {
+			Logf("Unexpected error while creating namespace: %v", err)
+			return false, nil
+		}
+		return true, nil
+	}); err != nil {
+		return nil, err
+	}
+	return got, nil
 }
 
 // WaitForPodTerminated waits for the pod to be terminated with the given reason.
