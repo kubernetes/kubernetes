@@ -242,15 +242,17 @@ func (m *Master) InstallAPIs(c *Config) {
 			VersionedResourcesStorageMap: map[string]map[string]rest.Storage{
 				"v1": m.v1ResourcesStorage,
 			},
-			IsLegacyGroup:        true,
-			Scheme:               api.Scheme,
-			ParameterCodec:       api.ParameterCodec,
-			NegotiatedSerializer: api.Codecs,
+			IsLegacyGroup:               true,
+			Scheme:                      api.Scheme,
+			ParameterCodec:              api.ParameterCodec,
+			NegotiatedSerializer:        api.Codecs,
+			SubresourceGroupVersionKind: map[string]unversioned.GroupVersionKind{},
 		}
 		if autoscalingGroupVersion := (unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}); registered.IsEnabledVersion(autoscalingGroupVersion) {
-			apiGroupInfo.SubresourceGroupVersionKind = map[string]unversioned.GroupVersionKind{
-				"replicationcontrollers/scale": autoscalingGroupVersion.WithKind("Scale"),
-			}
+			apiGroupInfo.SubresourceGroupVersionKind["replicationcontrollers/scale"] = autoscalingGroupVersion.WithKind("Scale")
+		}
+		if policyGroupVersion := (unversioned.GroupVersion{Group: "policy", Version: "v1alpha1"}); registered.IsEnabledVersion(policyGroupVersion) {
+			apiGroupInfo.SubresourceGroupVersionKind["pods/eviction"] = policyGroupVersion.WithKind("Eviction")
 		}
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
 	}
@@ -298,6 +300,19 @@ func (m *Master) InstallAPIs(c *Config) {
 		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(c.APIResourceConfigSource, restOptionsGetter)
 		if !enabled {
 			continue
+		}
+
+		// This is here so that, if the policy group is present, the eviction
+		// subresource handler wil be able to find poddisruptionbudgets
+		// TODO(lavalamp) find a better way for groups to discover and interact
+		// with each other
+		if group == "policy" {
+			storage := apiGroupsInfo[0].VersionedResourcesStorageMap["v1"]["pods/eviction"]
+			evictionStorage := storage.(*podetcd.EvictionREST)
+
+			storage = apiGroupInfo.VersionedResourcesStorageMap["v1alpha1"]["poddisruptionbudgets"]
+			evictionStorage.PodDisruptionBudgetLister = storage.(rest.Lister)
+			evictionStorage.PodDisruptionBudgetUpdater = storage.(rest.Updater)
 		}
 
 		apiGroupsInfo = append(apiGroupsInfo, apiGroupInfo)
@@ -425,6 +440,9 @@ func (m *Master) initV1ResourcesStorage(c *Config) {
 	}
 	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		m.v1ResourcesStorage["replicationControllers/scale"] = controllerStorage.Scale
+	}
+	if registered.IsEnabledVersion(unversioned.GroupVersion{Group: "policy", Version: "v1alpha1"}) {
+		m.v1ResourcesStorage["pods/eviction"] = podStorage.Eviction
 	}
 }
 
