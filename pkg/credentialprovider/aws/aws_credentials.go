@@ -51,7 +51,7 @@ var AWSRegions = [...]string{
 const registryURLTemplate = "*.dkr.ecr.%s.amazonaws.com"
 
 // awsHandlerLogger is a handler that logs all AWS SDK requests
-// Copied from cloudprovider/aws/log_handler.go
+// Copied from pkg/cloudprovider/providers/aws/log_handler.go
 func awsHandlerLogger(req *request.Request) {
 	service := req.ClientInfo.ServiceName
 	region := req.Config.Region
