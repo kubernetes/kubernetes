@@ -47,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/httplog"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	tracing "k8s.io/kubernetes/pkg/kubelet/metrics/tracing"
 	"k8s.io/kubernetes/pkg/kubelet/server/portforward"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
@@ -260,6 +261,9 @@ func (s *Server) InstallDefaultHandlers() {
 
 	s.restfulCont.Add(stats.CreateHandlers(s.host, s.resourceAnalyzer))
 	s.restfulCont.Handle("/metrics", prometheus.Handler())
+
+	// Handler of tracing manager
+	s.restfulCont.Handle("/traces", tracing.GetManager())
 
 	ws = new(restful.WebService)
 	ws.

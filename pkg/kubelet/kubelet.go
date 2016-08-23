@@ -57,6 +57,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/kuberuntime"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	tracing "k8s.io/kubernetes/pkg/kubelet/metrics/tracing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
@@ -250,6 +251,7 @@ func NewMainKubelet(
 	makeIPTablesUtilChains bool,
 	iptablesMasqueradeBit int,
 	iptablesDropBit int,
+	EnableTracing bool,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -378,6 +380,9 @@ func NewMainKubelet(
 		iptablesMasqueradeBit:        iptablesMasqueradeBit,
 		iptablesDropBit:              iptablesDropBit,
 	}
+
+	// Set 'enable' for the tracing package
+	tracing.SetEnableTracing(EnableTracing)
 
 	if klet.flannelExperimentalOverlay {
 		klet.flannelHelper = NewFlannelHelper()
@@ -1663,6 +1668,12 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	if !ok || existingStatus.Phase == api.PodPending && apiPodStatus.Phase == api.PodRunning &&
 		!firstSeenTime.IsZero() {
 		metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
+
+		// Tracing probe
+		if ok {
+			tracing.SetProbeWithTs(pod.UID, "firstSeen", firstSeenTime)
+			tracing.SetProbe(pod.UID, "running")
+		}
 	}
 
 	// Update status in the status manager
@@ -1720,6 +1731,11 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	if err != nil {
 		glog.Errorf("Unable to get pull secrets for pod %q: %v", format.Pod(pod), err)
 		return err
+	}
+
+	// Tracing probe
+	if updateType == kubetypes.SyncPodCreate {
+		tracing.SetProbe(pod.UID, "container")
 	}
 
 	// Call the container runtime's SyncPod callback
