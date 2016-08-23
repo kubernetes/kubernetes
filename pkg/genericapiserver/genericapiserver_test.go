@@ -77,13 +77,10 @@ func TestNew(t *testing.T) {
 
 	// Verify many of the variables match their config counterparts
 	assert.Equal(s.enableSwaggerSupport, config.EnableSwaggerSupport)
-	assert.Equal(s.enableSwaggerUI, config.EnableSwaggerUI)
-	assert.Equal(s.APIPrefix, config.APIPrefix)
-	assert.Equal(s.APIGroupPrefix, config.APIGroupPrefix)
-	assert.Equal(s.authenticator, config.Authenticator)
-	assert.Equal(s.authorizer, config.Authorizer)
-	assert.Equal(s.AdmissionControl, config.AdmissionControl)
-	assert.Equal(s.RequestContextMapper, config.RequestContextMapper)
+	assert.Equal(s.legacyAPIPrefix, config.APIPrefix)
+	assert.Equal(s.apiPrefix, config.APIGroupPrefix)
+	assert.Equal(s.admissionControl, config.AdmissionControl)
+	assert.Equal(s.RequestContextMapper(), config.RequestContextMapper)
 	assert.Equal(s.ExternalAddress, config.ExternalHost)
 	assert.Equal(s.ClusterIP, config.PublicAddress)
 	assert.Equal(s.PublicReadWritePort, config.ReadWritePort)

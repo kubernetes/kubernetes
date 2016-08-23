@@ -206,25 +206,48 @@ type Config struct {
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
 type GenericAPIServer struct {
-	// "Inputs", Copied from Config
+	// ServiceClusterIPRange is used to build cluster IPs for discovery.  It is exposed so that `master.go` can
+	// construct service storage.
+	// TODO refactor this so that `master.go` drives the value used for discovery and the value here isn't exposed.
+	// that structure will force usage in the correct direction where the "owner" of the value is the source of
+	// truth for its value.
 	ServiceClusterIPRange *net.IPNet
-	ServiceNodePortRange  utilnet.PortRange
-	MinRequestTimeout     time.Duration
 
-	mux                  apiserver.Mux
-	MuxHelper            *apiserver.MuxHelper
-	HandlerContainer     *restful.Container
-	RootWebService       *restful.WebService
+	// ServiceNodePortRange is only used for `master.go` to construct its RESTStorage for the legacy API group
+	// TODO refactor this closer to the point of use.
+	ServiceNodePortRange utilnet.PortRange
+
+	// minRequestTimeout is how short the request timeout can be.  This is used to build the RESTHandler
+	minRequestTimeout time.Duration
+
+	// enableSwaggerSupport indicates that swagger should be served.  This is currently separate because
+	// the API group routes are created *after* initialization and you can't generate the swagger routes until
+	// after those are available.
+	// TODO eventually we should be able to factor this out to take place during initialization.
 	enableSwaggerSupport bool
-	enableSwaggerUI      bool
-	enableWatchCache     bool
-	APIPrefix            string
-	APIGroupPrefix       string
-	authenticator        authenticator.Request
-	authorizer           authorizer.Authorizer
-	AdmissionControl     admission.Interface
-	MasterCount          int
-	RequestContextMapper api.RequestContextMapper
+
+	// legacyAPIPrefix is the prefix used for legacy API groups that existed before we had API groups
+	// usuallly /api
+	legacyAPIPrefix string
+
+	// apiPrefix is the prefix where API groups live, usually /apis
+	apiPrefix string
+
+	// admissionControl is used to build the RESTStorage that backs an API Group.
+	admissionControl admission.Interface
+
+	// requestContextMapper provides a way to get the context for a request.  It may be nil.
+	requestContextMapper api.RequestContextMapper
+
+	// storageDecorator provides a decoration function for storage.  It will never be nil.
+	// TODO: this may be an abstraction at the wrong layer.  It doesn't seem like a genericAPIServer
+	// should be determining the backing storage for the RESTStorage interfaces
+	storageDecorator generic.StorageDecorator
+
+	mux              apiserver.Mux
+	MuxHelper        *apiserver.MuxHelper
+	HandlerContainer *restful.Container
+	MasterCount      int
 
 	// ExternalAddress is the address (hostname or IP and port) that should be used in
 	// external (public internet) URLs for this GenericAPIServer.
@@ -265,10 +288,19 @@ type GenericAPIServer struct {
 }
 
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
-	if s.enableWatchCache {
-		return registry.StorageWithCacher
-	}
-	return generic.UndecoratedStorage
+	return s.storageDecorator
+}
+
+// RequestContextMapper is exposed so that third party resource storage can be build in a different location.
+// TODO refactor third party resource storage
+func (s *GenericAPIServer) RequestContextMapper() api.RequestContextMapper {
+	return s.requestContextMapper
+}
+
+// MinRequestTimeout is exposed so that third party resource storage can be build in a different location.
+// TODO refactor third party resource storage
+func (s *GenericAPIServer) MinRequestTimeout() time.Duration {
+	return s.minRequestTimeout
 }
 
 // setDefaults fills in any fields not set that are required to have valid data.
@@ -358,19 +390,14 @@ func New(c *Config) (*GenericAPIServer, error) {
 	s := &GenericAPIServer{
 		ServiceClusterIPRange: c.ServiceClusterIPRange,
 		ServiceNodePortRange:  c.ServiceNodePortRange,
-		RootWebService:        new(restful.WebService),
-		enableSwaggerSupport:  c.EnableSwaggerSupport,
-		enableSwaggerUI:       c.EnableSwaggerUI,
-		enableWatchCache:      c.EnableWatchCache,
-		APIPrefix:             c.APIPrefix,
-		APIGroupPrefix:        c.APIGroupPrefix,
-		authenticator:         c.Authenticator,
-		authorizer:            c.Authorizer,
-		AdmissionControl:      c.AdmissionControl,
-		RequestContextMapper:  c.RequestContextMapper,
+		legacyAPIPrefix:       c.APIPrefix,
+		apiPrefix:             c.APIGroupPrefix,
+		admissionControl:      c.AdmissionControl,
+		requestContextMapper:  c.RequestContextMapper,
 		Serializer:            c.Serializer,
 
-		MinRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
+		minRequestTimeout:    time.Duration(c.MinRequestTimeout) * time.Second,
+		enableSwaggerSupport: c.EnableSwaggerSupport,
 
 		MasterCount:          c.MasterCount,
 		ExternalAddress:      c.ExternalHost,
@@ -387,6 +414,12 @@ func New(c *Config) (*GenericAPIServer, error) {
 		enableOpenAPISupport:   c.EnableOpenAPISupport,
 		openAPIInfo:            c.OpenAPIInfo,
 		openAPIDefaultResponse: c.OpenAPIDefaultResponse,
+	}
+
+	if c.EnableWatchCache {
+		s.storageDecorator = registry.StorageWithCacher
+	} else {
+		s.storageDecorator = generic.UndecoratedStorage
 	}
 
 	if c.RestfulContainer != nil {
@@ -408,8 +441,8 @@ func New(c *Config) (*GenericAPIServer, error) {
 
 func (s *GenericAPIServer) NewRequestInfoResolver() *apiserver.RequestInfoResolver {
 	return &apiserver.RequestInfoResolver{
-		APIPrefixes:          sets.NewString(strings.Trim(s.APIPrefix, "/"), strings.Trim(s.APIGroupPrefix, "/")), // all possible API prefixes
-		GrouplessAPIPrefixes: sets.NewString(strings.Trim(s.APIPrefix, "/")),                                      // APIPrefixes that won't have groups (legacy)
+		APIPrefixes:          sets.NewString(strings.Trim(s.legacyAPIPrefix, "/"), strings.Trim(s.apiPrefix, "/")), // all possible API prefixes
+		GrouplessAPIPrefixes: sets.NewString(strings.Trim(s.legacyAPIPrefix, "/")),                                 // APIPrefixes that won't have groups (legacy)
 	}
 }
 
@@ -461,7 +494,7 @@ func (s *GenericAPIServer) init(c *Config) {
 		apiserver.InstallLogsSupport(s.MuxHelper, s.HandlerContainer)
 	}
 	if c.EnableUISupport {
-		ui.InstallSupport(s.MuxHelper, s.enableSwaggerSupport && s.enableSwaggerUI)
+		ui.InstallSupport(s.MuxHelper, c.EnableSwaggerSupport && c.EnableSwaggerUI)
 	}
 
 	if c.EnableProfiling {
@@ -488,8 +521,8 @@ func (s *GenericAPIServer) init(c *Config) {
 
 	s.InsecureHandler = handler
 
-	attributeGetter := apiserver.NewRequestAttributeGetter(s.RequestContextMapper, s.NewRequestInfoResolver())
-	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, s.authorizer)
+	attributeGetter := apiserver.NewRequestAttributeGetter(c.RequestContextMapper, s.NewRequestInfoResolver())
+	handler = apiserver.WithAuthorizationCheck(handler, attributeGetter, c.Authorizer)
 	if len(c.AuditLogPath) != 0 {
 		// audit handler must comes before the impersonationFilter to read the original user
 		writer := &lumberjack.Logger{
@@ -498,14 +531,14 @@ func (s *GenericAPIServer) init(c *Config) {
 			MaxBackups: c.AuditLogMaxBackups,
 			MaxSize:    c.AuditLogMaxSize,
 		}
-		handler = audit.WithAudit(handler, s.RequestContextMapper, writer)
+		handler = audit.WithAudit(handler, c.RequestContextMapper, writer)
 		defer writer.Close()
 	}
-	handler = apiserver.WithImpersonation(handler, s.RequestContextMapper, s.authorizer)
+	handler = apiserver.WithImpersonation(handler, c.RequestContextMapper, c.Authorizer)
 
 	// Install Authenticator
 	if c.Authenticator != nil {
-		authenticatedHandler, err := handlers.NewRequestAuthenticator(s.RequestContextMapper, c.Authenticator, handlers.Unauthorized(c.SupportsBasicAuth), handler)
+		authenticatedHandler, err := handlers.NewRequestAuthenticator(c.RequestContextMapper, c.Authenticator, handlers.Unauthorized(c.SupportsBasicAuth), handler)
 		if err != nil {
 			glog.Fatalf("Could not initialize authenticator: %v", err)
 		}
@@ -517,13 +550,13 @@ func (s *GenericAPIServer) init(c *Config) {
 
 	// After all wrapping is done, put a context filter around both handlers
 	var err error
-	handler, err = api.NewRequestContextFilter(s.RequestContextMapper, s.Handler)
+	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.Handler)
 	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.Handler: %v", err)
 	}
 	s.Handler = handler
 
-	handler, err = api.NewRequestContextFilter(s.RequestContextMapper, s.InsecureHandler)
+	handler, err = api.NewRequestContextFilter(c.RequestContextMapper, s.InsecureHandler)
 	if err != nil {
 		glog.Fatalf("Could not initialize request context filter for s.InsecureHandler: %v", err)
 	}
@@ -544,7 +577,7 @@ func (s *GenericAPIServer) InstallAPIGroups(groupsInfo []APIGroupInfo) error {
 
 // Installs handler at /apis to list all group versions for discovery
 func (s *GenericAPIServer) installGroupsDiscoveryHandler() {
-	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.APIGroupPrefix, func(req *restful.Request) []unversioned.APIGroup {
+	apiserver.AddApisWebService(s.Serializer, s.HandlerContainer, s.apiPrefix, func(req *restful.Request) []unversioned.APIGroup {
 		// Return the list of supported groups in sorted order (to have a deterministic order).
 		groups := []unversioned.APIGroup{}
 		groupNames := make([]string, len(s.apiGroupsForDiscovery))
@@ -762,9 +795,9 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 // Exposes the given group version in API.
 func (s *GenericAPIServer) InstallAPIGroup(apiGroupInfo *APIGroupInfo) error {
-	apiPrefix := s.APIGroupPrefix
+	apiPrefix := s.apiPrefix
 	if apiGroupInfo.IsLegacyGroup {
-		apiPrefix = s.APIPrefix
+		apiPrefix = s.legacyAPIPrefix
 	}
 
 	// Install REST handlers for all the versions in this group.
@@ -884,9 +917,9 @@ func (s *GenericAPIServer) newAPIGroupVersion(apiGroupInfo *APIGroupInfo, groupV
 		Linker: apiGroupInfo.GroupMeta.SelfLinker,
 		Mapper: apiGroupInfo.GroupMeta.RESTMapper,
 
-		Admit:             s.AdmissionControl,
-		Context:           s.RequestContextMapper,
-		MinRequestTimeout: s.MinRequestTimeout,
+		Admit:             s.admissionControl,
+		Context:           s.RequestContextMapper(),
+		MinRequestTimeout: s.minRequestTimeout,
 	}, nil
 }
 

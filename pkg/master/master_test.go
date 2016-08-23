@@ -173,9 +173,7 @@ func TestNew(t *testing.T) {
 	// Verify many of the variables match their config counterparts
 	assert.Equal(master.enableCoreControllers, config.EnableCoreControllers)
 	assert.Equal(master.tunneler, config.Tunneler)
-	assert.Equal(master.APIPrefix, config.APIPrefix)
-	assert.Equal(master.APIGroupPrefix, config.APIGroupPrefix)
-	assert.Equal(master.RequestContextMapper, config.RequestContextMapper)
+	assert.Equal(master.RequestContextMapper(), config.RequestContextMapper)
 	assert.Equal(master.MasterCount, config.MasterCount)
 	assert.Equal(master.ClusterIP, config.PublicAddress)
 	assert.Equal(master.PublicReadWritePort, config.ReadWritePort)
