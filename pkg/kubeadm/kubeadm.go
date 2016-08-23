@@ -17,7 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
-	"fmt"
+	//"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
@@ -46,18 +46,20 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 			Example usage:
 
 			    Create a two-machine cluster with one master (which controls the cluster),
-			    and one node (where workloads, like pods and replica sets).
+			    and one node (where workloads, like pods and replica sets run).
 
 			    ┌──────────────────────────────────────────────────────────┐
 			    │  On the first machine                                    │
-			    ├──────────────────────────────────────────────────────────┘
-			    │ master# kubeadm init master
-			    │ Your token is: <token>
+			    ├──────────────────────────────────────────────────────────┤
+			    │ master# kubeadm init master                              │
+			    │ Your token is: <token>                                   │
+			    └──────────────────────────────────────────────────────────┘
 
 			    ┌──────────────────────────────────────────────────────────┐
-			    │ On the second machine				       │
-			    ├──────────────────────────────────────────────────────────┘
-			    │ node# kubeadm join node --token=<token> <ip-of-master>
+			    │ On the second machine                                    │
+			    ├──────────────────────────────────────────────────────────┤
+			    │ node# kubeadm join node --token=<token> <ip-of-master>   │
+			    └──────────────────────────────────────────────────────────┘
 
 			    You can then repeat the second step on as many other machines as you like.
 
@@ -95,7 +97,7 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 		Discovery: &kubeadmapi.OutOfBandDiscovery{},
 		EnvParams: envParams,
 	}
-	fmt.Printf("env: %#v\n", bootstrapParams.EnvParams)
+	//fmt.Printf("env: %#v\n", bootstrapParams.EnvParams)
 	cmds.AddCommand(kubecmd.NewCmdInit(out, bootstrapParams))
 	cmds.AddCommand(kubecmd.NewCmdJoin(out, bootstrapParams))
 	cmds.AddCommand(kubecmd.NewCmdUser(out, bootstrapParams))
