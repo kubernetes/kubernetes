@@ -28,7 +28,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
 )
 
-func createClientCertsAndConfigs(params *kubeadmapi.BootstrapParams, clientNames []string, caCert *x509.Certificate, caKey *rsa.PrivateKey) (map[string]*clientcmdapi.Config, error) {
+func CreateCertsAndConfigForClients(params *kubeadmapi.BootstrapParams, clientNames []string, caKey *rsa.PrivateKey, caCert *x509.Certificate) (map[string]*clientcmdapi.Config, error) {
 
 	basicClientConfig := kubeadmutil.CreateBasicClientConfig(
 		"kubernetes",
@@ -38,7 +38,7 @@ func createClientCertsAndConfigs(params *kubeadmapi.BootstrapParams, clientNames
 
 	configs := map[string]*clientcmdapi.Config{}
 
-	for _, client := range []string{"kubelet", "admin"} {
+	for _, client := range clientNames {
 		key, cert, err := newClientKeyAndCert(caCert, caKey)
 		if err != nil {
 			return nil, err
