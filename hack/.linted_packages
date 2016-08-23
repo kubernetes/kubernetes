@@ -207,3 +207,4 @@ pkg/volume/quobyte
 test/integration/discoverysummarizer
 test/integration/examples
 test/integration/federation
+pkg/security/podsecuritypolicy/apparmor
