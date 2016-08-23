@@ -1575,7 +1575,7 @@ type ContainerFilter struct {
 	Name *string `protobuf:"bytes,1,opt,name=name" json:"name,omitempty"`
 	// ID of the container.
 	Id *string `protobuf:"bytes,2,opt,name=id" json:"id,omitempty"`
-	// State of the contianer.
+	// State of the container.
 	State *ContainerState `protobuf:"varint,3,opt,name=state,enum=runtime.ContainerState" json:"state,omitempty"`
 	// The id of the pod sandbox
 	PodSandboxId *string `protobuf:"bytes,4,opt,name=pod_sandbox_id,json=podSandboxId" json:"pod_sandbox_id,omitempty"`

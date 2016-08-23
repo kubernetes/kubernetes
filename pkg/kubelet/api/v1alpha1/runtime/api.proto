@@ -464,7 +464,7 @@ message ContainerFilter {
     optional string name = 1;
     // ID of the container.
     optional string id = 2;
-    // State of the contianer.
+    // State of the container.
     optional ContainerState state = 3;
     // The id of the pod sandbox
     optional string pod_sandbox_id = 4;
