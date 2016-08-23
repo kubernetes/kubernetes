@@ -35,7 +35,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	commontest "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e_node/pkg/services"
+	"k8s.io/kubernetes/test/e2e_node/services"
 
 	"github.com/golang/glog"
 	. "github.com/onsi/ginkgo"

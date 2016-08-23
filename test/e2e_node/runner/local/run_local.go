@@ -23,7 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/kubernetes/test/e2e_node/pkg/build"
+	"k8s.io/kubernetes/test/e2e_node/build"
 
 	"github.com/golang/glog"
 )
