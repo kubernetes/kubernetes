@@ -129,10 +129,10 @@ type Factory struct {
 	LabelsForObject func(object runtime.Object) (map[string]string, error)
 	// LogsForObject returns a request for the logs associated with the provided object
 	LogsForObject func(object, options runtime.Object) (*restclient.Request, error)
-	// PauseObject marks the provided object as paused ie. it will not be reconciled by its controller.
-	PauseObject func(object runtime.Object) (bool, error)
-	// ResumeObject resumes a paused object ie. it will be reconciled by its controller.
-	ResumeObject func(object runtime.Object) (bool, error)
+	// PauseFn marks the provided object as paused ie. it will not be reconciled by its controller.
+	PauseFn func(info *resource.Info) (bool, error)
+	// ResumeFn resumes a paused object ie. it will be reconciled by its controller.
+	ResumeFn func(info *resource.Info) (bool, error)
 	// Returns a schema that can validate objects stored on disk.
 	Validator func(validate bool, cacheDir string) (validation.Schema, error)
 	// SwaggerSchema returns the schema declaration for the provided group version kind.
@@ -596,44 +596,32 @@ func NewFactory(optionalClientConfig clientcmd.ClientConfig) *Factory {
 				return nil, fmt.Errorf("cannot get the logs from %v", gvks[0])
 			}
 		},
-		PauseObject: func(object runtime.Object) (bool, error) {
-			clientset, err := clients.ClientSetForVersion(nil)
-			if err != nil {
-				return false, err
-			}
-
-			switch t := object.(type) {
+		PauseFn: func(info *resource.Info) (bool, error) {
+			switch obj := info.Object.(type) {
 			case *extensions.Deployment:
-				if t.Spec.Paused {
-					return true, nil
+				if obj.Spec.Paused {
+					return true, errors.New("is already paused")
 				}
-				body := []byte("{\"spec\":{\"paused\":true}}")
-				_, err = c.Extensions().Deployments(t.Namespace).Patch(t.Name, api.StrategicMergePatchType, body)
-				return false, err
+				obj.Spec.Paused = true
+				return true, nil
 			default:
-				gvks, _, err := api.Scheme.ObjectKinds(object)
+				gvks, _, err := api.Scheme.ObjectKinds(info.Object)
 				if err != nil {
 					return false, err
 				}
 				return false, fmt.Errorf("cannot pause %v", gvks[0])
 			}
 		},
-		ResumeObject: func(object runtime.Object) (bool, error) {
-			clientset, err := clients.ClientSetForVersion(nil)
-			if err != nil {
-				return false, err
-			}
-
-			switch t := object.(type) {
+		ResumeFn: func(info *resource.Info) (bool, error) {
+			switch obj := info.Object.(type) {
 			case *extensions.Deployment:
-				if !t.Spec.Paused {
-					return true, nil
+				if !obj.Spec.Paused {
+					return true, errors.New("is not paused")
 				}
-				body := []byte("{\"spec\":{\"paused\":false}}")
-				_, err = c.Extensions().Deployments(t.Namespace).Patch(t.Name, api.StrategicMergePatchType, body)
-				return false, err
+				obj.Spec.Paused = false
+				return true, nil
 			default:
-				gvks, _, err := api.Scheme.ObjectKinds(object)
+				gvks, _, err := api.Scheme.ObjectKinds(info.Object)
 				if err != nil {
 					return false, err
 				}
