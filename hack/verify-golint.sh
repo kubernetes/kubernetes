@@ -39,6 +39,11 @@ array_contains () {
 
 # Check that the file is in alphabetical order
 linted_file="${KUBE_ROOT}/hack/.linted_packages"
+
+cat "${linted_file}"
+sort --help
+set -x
+
 if ! sort -C "${linted_file}"; then
 	{
 		echo "hack/.linted_packages is not in alphabetical order. Please sort it:"
