@@ -90,5 +90,5 @@ func MatchPodSecurityPolicy(label labels.Selector, field fields.Selector) *gener
 
 // PodSecurityPolicyToSelectableFields returns a label set that represents the object
 func PodSecurityPolicyToSelectableFields(obj *extensions.PodSecurityPolicy) fields.Set {
-	return generic.ObjectMetaFieldsSet(obj.ObjectMeta, false)
+	return generic.ObjectMetaFieldsSet(&obj.ObjectMeta, false)
 }

@@ -24,7 +24,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/fields"
-	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
 
@@ -60,13 +59,7 @@ func TestGetAttrs(t *testing.T) {
 		Source: api.EventSource{Component: "test"},
 		Type:   api.EventTypeNormal,
 	}
-	label, field, err := getAttrs(eventA)
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
-	if e, a := label, (labels.Set{}); !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", diff.ObjectDiff(e, a))
-	}
+	field := EventToSelectableFields(eventA)
 	expect := fields.Set{
 		"metadata.name":                  "f0118",
 		"metadata.namespace":             "default",
@@ -87,10 +80,7 @@ func TestGetAttrs(t *testing.T) {
 }
 
 func TestSelectableFieldLabelConversions(t *testing.T) {
-	_, fset, err := getAttrs(&api.Event{})
-	if err != nil {
-		t.Fatalf("Unexpected error %v", err)
-	}
+	fset := EventToSelectableFields(&api.Event{})
 	apitesting.TestSelectableFieldLabelConversionsOfKind(t,
 		testapi.Default.GroupVersion().String(),
 		"Event",

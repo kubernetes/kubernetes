@@ -112,7 +112,7 @@ func (deploymentStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runtime
 
 // DeploymentToSelectableFields returns a field set that represents the object.
 func DeploymentToSelectableFields(deployment *extensions.Deployment) fields.Set {
-	return generic.ObjectMetaFieldsSet(deployment.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&deployment.ObjectMeta, true)
 }
 
 // MatchDeployment is the filter used by the generic etcd backend to route

@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -71,20 +70,22 @@ func (eventStrategy) AllowUnconditionalUpdate() bool {
 }
 
 func MatchEvent(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: getAttrs}
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			event, ok := obj.(*api.Event)
+			if !ok {
+				return nil, nil, fmt.Errorf("not an event")
+			}
+			return labels.Set(event.Labels), EventToSelectableFields(event), nil
+		},
+	}
 }
 
-func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, nil, errors.NewInternalError(fmt.Errorf("object is not of type event: %#v", obj))
-	}
-	l := event.Labels
-	if l == nil {
-		l = labels.Set{}
-	}
-
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(event.ObjectMeta, true)
+// EventToSelectableFields returns a field set that represents the object
+func EventToSelectableFields(event *api.Event) fields.Set {
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&event.ObjectMeta, true)
 	specificFieldsSet := fields.Set{
 		"involvedObject.kind":            event.InvolvedObject.Kind,
 		"involvedObject.namespace":       event.InvolvedObject.Namespace,
@@ -97,5 +98,5 @@ func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, e
 		"source":                         event.Source.Component,
 		"type":                           event.Type,
 	}
-	return l, generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet), nil
+	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
 }
