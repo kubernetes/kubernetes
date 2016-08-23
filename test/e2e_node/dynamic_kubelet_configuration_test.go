@@ -38,7 +38,8 @@ var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:dynamicKube
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 
 	Context("When a configmap called `kubelet-<node-name>` is added to the `kube-system` namespace", func() {
-		It("The Kubelet on that node should restart to take up the new config", func() {
+		// TODO(random-liu): Re-enable the test after we fix the bug.
+		PIt("The Kubelet on that node should restart to take up the new config", func() {
 			const (
 				restartGap = 40 * time.Second
 			)
