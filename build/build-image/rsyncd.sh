@@ -18,6 +18,7 @@
 # and forth.  It is assumed that rsyncd will be run under the UID and GID that
 # will end up owning all of the files that are written.
 
+set -x
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -44,6 +45,9 @@ if [[ -f "${PIDFILE}" ]]; then
 fi
 
 PASSWORD=$(</rsyncd.password)
+
+ip addr
+ip route
 
 cat <<EOF >"${SECRETS}"
 k8s:${PASSWORD}

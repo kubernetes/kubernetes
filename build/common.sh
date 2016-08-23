@@ -47,7 +47,7 @@ readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build/build-image/cross/
 
 # Increment this version to cause everyone to rebuild images, including the data
 # container.
-readonly KUBE_IMAGE_VERSION=1
+readonly KUBE_IMAGE_VERSION=2
 
 # Here we map the output directories across both the local and remote _output
 # directories:
@@ -502,15 +502,7 @@ function kube::build::ensure_data_container() {
       "${KUBE_BUILD_IMAGE}"
       chown -R $(id -u).$(id -g)
         "${REMOTE_ROOT}"
-        /usr/local/go/pkg/linux_386_cgo
-        /usr/local/go/pkg/linux_amd64_cgo
-        /usr/local/go/pkg/linux_arm_cgo
-        /usr/local/go/pkg/linux_arm64_cgo
-        /usr/local/go/pkg/linux_ppc64le_cgo
-        /usr/local/go/pkg/darwin_amd64_cgo
-        /usr/local/go/pkg/darwin_386_cgo
-        /usr/local/go/pkg/windows_amd64_cgo
-        /usr/local/go/pkg/windows_386_cgo
+        /usr/local/go/pkg/
     )
     "${docker_cmd[@]}"
   fi
@@ -621,16 +613,27 @@ function kube::build::start_rsyncd_container() {
     netcat="nc -w 1"
   fi
 
-  local tries=10
+  local tries=60
   while (( $tries > 0 )) ; do
     if $netcat -z 127.0.0.1 ${KUBE_REAL_RSYNC_PORT} 2> /dev/null ; then
       sleep 0.5
+      "${DOCKER[@]}" logs ${KUBE_RSYNC_CONTAINER_NAME}
+      "${DOCKER[@]}" port ${KUBE_RSYNC_CONTAINER_NAME}
+      "${DOCKER[@]}" inspect ${KUBE_RSYNC_CONTAINER_NAME}
+      ip addr
+      ip route
       return 0
     fi
     tries=$(($tries-1))
     sleep 0.1
   done
+
   kube::log::error "Could not connect to rsync container. See build/README.md for setting up remote Docker engine."
+  "${DOCKER[@]}" logs ${KUBE_RSYNC_CONTAINER_NAME}
+  "${DOCKER[@]}" port ${KUBE_RSYNC_CONTAINER_NAME}
+  "${DOCKER[@]}" inspect ${KUBE_RSYNC_CONTAINER_NAME}
+  ip addr
+  ip route
   return 1
 }
 
