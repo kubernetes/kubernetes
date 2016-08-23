@@ -80,11 +80,14 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 			if err := kubemaster.WriteStaticPodManifests(params); err != nil {
 				return err
 			}
-			kubeconfigs, err := kubemaster.CreatePKIAssets(params)
+			caKey, caCert, err := kubemaster.CreatePKIAssets(params)
 			if err != nil {
 				return err
 			}
-
+			kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(params, []string{"kubelet", "admin"}, caKey, caCert)
+			if err != nil {
+				return err
+			}
 			for name, kubeconfig := range kubeconfigs {
 				if err := kubeadmutil.WriteKubeconfigIfNotExists(params, name, kubeconfig); err != nil {
 					out.Write([]byte(fmt.Sprintf("Unable to write admin for master:\n%s\n", err)))
@@ -144,7 +147,7 @@ func NewCmdManualBootstrapJoinNode(out io.Writer, params *kubeadmapi.BootstrapPa
 				return
 			}
 
-			kubeconfig, err := kubenode.PerformTLSBootstrap(params)
+			kubeconfig, err := kubenode.PerformTLSBootstrapFromParams(params)
 			if err != nil {
 				out.Write([]byte(fmt.Sprintf("Failed to perform TLS bootstrap: %s\n", err)))
 				return

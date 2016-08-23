@@ -32,3 +32,10 @@ type OutOfBandDiscovery struct {
 	ApiServerDNSName string // optional, used in master bootstrap
 	ListenIP         string // optional IP for master to listen on, rather than autodetect
 }
+
+type ClusterInfo struct {
+	// TODO Kind, apiVersion
+	// TODO clusterId, fetchedTime, expiredTime
+	CertificateAuthorities []string `json:"certificateAuthorities"`
+	Endpoints              []string `json:"endpoints"`
+}
