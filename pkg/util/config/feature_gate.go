@@ -156,11 +156,10 @@ func (f *featureGate) Type() string {
 
 func (f *featureGate) lookup(key string) bool {
 	defaultValue := f.known[key].enabled
-	if f.enabled == nil {
-		panic(fmt.Sprintf("--%s has not been parsed", flagName))
-	}
-	if v, ok := f.enabled[key]; ok {
-		return v
+	if f.enabled != nil {
+		if v, ok := f.enabled[key]; ok {
+			return v
+		}
 	}
 	return defaultValue
 
