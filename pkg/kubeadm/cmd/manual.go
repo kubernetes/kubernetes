@@ -93,11 +93,20 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 			}
 
 			out.Write([]byte(fmt.Sprintf(dedent.Dedent(`
-				Static pods written and kubelet's kubeconfig written.
-				Kubelet should be able to start soon (try 'systemctl restart kubelet' or equivalent
-				if it doesn't). CA cert is written to /etc/kubernetes/pki/ca.pem. Please copy this file
-				(scp, rsync or through other means) to all your nodes and then run on them:
-				kubeadm manual bootstrap node --ca-cert-file <path-to-ca-cert> --token %s --api-server-urls https://%s:443/
+			    Master initialization complete:
+
+				* Static pods written and kubelet's kubeconfig written.
+				* Kubelet should start soon.  Try 'systemctl restart kubelet'
+				  or equivalent if it doesn't.
+
+				CA cert is written to:
+				    /etc/kubernetes/pki/ca.pem.
+
+				**Please copy this file (scp, rsync or through other means) to
+				all your nodes and then run on them**:
+
+				kubeadm manual bootstrap join-node --ca-cert-file <path-to-ca-cert> \
+				    --token %s --api-server-urls https://%s:443/
 
 			`),
 				params.Discovery.BearerToken, params.Discovery.ListenIP,
@@ -140,7 +149,7 @@ func NewCmdManualBootstrapJoinNode(out io.Writer, params *kubeadmapi.BootstrapPa
 				out.Write([]byte(fmt.Sprintf("Failed to perform TLS bootstrap: %s\n", err)))
 				return
 			}
-			fmt.Println("recieved signed certificate from the API server, will write `/etc/kubernetes/kubelet.conf`...")
+			//fmt.Println("recieved signed certificate from the API server, will write `/etc/kubernetes/kubelet.conf`...")
 
 			err = kubeadmutil.WriteKubeconfigIfNotExists(params, "kubelet", kubeconfig)
 			if err != nil {
@@ -148,8 +157,13 @@ func NewCmdManualBootstrapJoinNode(out io.Writer, params *kubeadmapi.BootstrapPa
 				return
 			}
 			out.Write([]byte(dedent.Dedent(`
-			    Kubelet informed of new config.
-			    Run 'kubectl get nodes' on the master to see it join.
+				Node join complete:
+				* Certificate signing request sent to master and response
+				  received.
+			    * Kubelet informed of new secure connection details.
+
+			    Run 'kubectl get nodes' on the master to see this node join.
+
 			`)))
 		},
 	}
