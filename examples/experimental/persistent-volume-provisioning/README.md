@@ -176,7 +176,7 @@ In the future, the storage class may remain in an annotation or become a field o
 }
 ```
 
-### Sample output
+### Usage Examples
 
 #### GCE
 This example uses GCE but any provisioner would follow the same flow.
@@ -214,30 +214,49 @@ $ kubectl get pv
 
 #### Ceph RBD
 
-First create Ceph admin's Secret in the system namespace. Here the Secret is created in `kube-system`:
+First we must identify the Ceph client admin key. This is usually found in `/etc/ceph/ceph.client.admin.keyring` on your Ceph cluster nodes. The file will look something like this:
 
 ```
-$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-admin.yaml --namespace=kube-system
+[client.admin]
+  key = AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==
+  auid = 0
+  caps mds = "allow"
+  caps mon = "allow *"
+  caps osd = "allow *"
 ```
 
-Then create RBD Storage Class:
+From the key value, we will create a secret. We must create the Ceph admin Secret in the namespace defined in our `StorageClass`. In this example we set the namespace to `kube-system`.
+
+```
+$ kubectl create secret generic ceph-secret --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system
+```
+
+We are now ready to create our RBD Storage Class:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
 ```
 
-Before creating PVC in user's namespace (e.g. myns), make sure the Ceph user's Secret exists, if not, create the Secret:
+The kube-controller-manager is now able to provision storage, however we still need to be able to mount it. Mounting should be done with a non-privileged key, if you have existing users you can get all keys by running `ceph auth list` on your Ceph cluster with the admin key. For this example we will create a new user:
 
 ```
-$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-user.yaml --namespace=myns
+$ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rw pool=kube'
+[client.kube]
+	key = AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==
 ```
-Now create a PVC in user's namespace (e.g. myns):
+
+As before with the admin key, we will now create a secret in a user's namespace for the non-priviledged client key:
+
+```
+$ kubectl create secret generic ceph-secret-user --from-literal=key='AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==' --namespace=myns
+```
+Now we can create a PVC in user's namespace:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json --namespace=myns
 ```
 
-Check the PV and PVC are created:
+The PVC should kick off the provisioning of an RBD volume, and will also create a PV:
 ```
 $ kubectl describe pvc --namespace=myns
 Name:		claim1
@@ -271,12 +290,16 @@ Source:
 No events.
 ```
 
-Create a Pod to use the PVC:
+With our storage provisioned, we can now create a Pod to use the PVC:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/pod.yaml --namespace=myns
 ```
-
+Now our pod has an RBD mount!
+```
+$ kubectl exec -it server-fzawv -- df -h | grep rbd
+/dev/rbd1       2.9G  4.5M  2.8G   1% /var/lib/www/html
+```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()
