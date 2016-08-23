@@ -248,7 +248,7 @@ message FSGroupStrategyOptions {
 // HTTPIngressPath associates a path regex with a backend. Incoming urls matching
 // the path are forwarded to the backend.
 message HTTPIngressPath {
-  // Path is a extended POSIX regex as defined by IEEE Std 1003.1,
+  // Path is an extended POSIX regex as defined by IEEE Std 1003.1,
   // (i.e this follows the egrep/unix syntax, not the perl syntax)
   // matched against the path of an incoming request. Currently it can
   // contain characters disallowed from the conventional "path"
