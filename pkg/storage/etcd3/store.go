@@ -255,7 +255,7 @@ func (s *store) GuaranteedUpdate(ctx context.Context, key string, out runtime.Ob
 }
 
 // GetToList implements storage.Interface.GetToList.
-func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter, listObj runtime.Object) error {
+func (s *store) GetToList(ctx context.Context, key string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -273,7 +273,7 @@ func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter
 		data: getResp.Kvs[0].Value,
 		rev:  uint64(getResp.Kvs[0].ModRevision),
 	}}
-	if err := decodeList(elems, filter, listPtr, s.codec, s.versioner); err != nil {
+	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 		return err
 	}
 	// update version with cluster level revision
@@ -281,7 +281,7 @@ func (s *store) GetToList(ctx context.Context, key string, filter storage.Filter
 }
 
 // List implements storage.Interface.List.
-func (s *store) List(ctx context.Context, key, resourceVersion string, filter storage.Filter, listObj runtime.Object) error {
+func (s *store) List(ctx context.Context, key, resourceVersion string, pred storage.SelectionPredicate, listObj runtime.Object) error {
 	listPtr, err := meta.GetItemsPtr(listObj)
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 			rev:  uint64(kv.ModRevision),
 		}
 	}
-	if err := decodeList(elems, filter, listPtr, s.codec, s.versioner); err != nil {
+	if err := decodeList(elems, storage.SimpleFilter(pred), listPtr, s.codec, s.versioner); err != nil {
 		return err
 	}
 	// update version with cluster level revision
@@ -313,16 +313,16 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, filter st
 }
 
 // Watch implements storage.Interface.Watch.
-func (s *store) Watch(ctx context.Context, key string, resourceVersion string, filter storage.Filter) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, filter, false)
+func (s *store) Watch(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+	return s.watch(ctx, key, resourceVersion, storage.SimpleFilter(pred), false)
 }
 
 // WatchList implements storage.Interface.WatchList.
-func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, filter storage.Filter) (watch.Interface, error) {
-	return s.watch(ctx, key, resourceVersion, filter, true)
+func (s *store) WatchList(ctx context.Context, key string, resourceVersion string, pred storage.SelectionPredicate) (watch.Interface, error) {
+	return s.watch(ctx, key, resourceVersion, storage.SimpleFilter(pred), true)
 }
 
-func (s *store) watch(ctx context.Context, key string, rv string, filter storage.Filter, recursive bool) (watch.Interface, error) {
+func (s *store) watch(ctx context.Context, key string, rv string, filter storage.FilterFunc, recursive bool) (watch.Interface, error) {
 	rev, err := storage.ParseWatchResourceVersion(rv)
 	if err != nil {
 		return nil, err
@@ -416,7 +416,7 @@ func decode(codec runtime.Codec, versioner storage.Versioner, value []byte, objP
 
 // decodeList decodes a list of values into a list of objects, with resource version set to corresponding rev.
 // On success, ListPtr would be set to the list of objects.
-func decodeList(elems []*elemForDecode, filter storage.Filter, ListPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
+func decodeList(elems []*elemForDecode, filter storage.FilterFunc, ListPtr interface{}, codec runtime.Codec, versioner storage.Versioner) error {
 	v, err := conversion.EnforcePtr(ListPtr)
 	if err != nil || v.Kind() != reflect.Slice {
 		panic("need ptr to slice")
@@ -428,7 +428,7 @@ func decodeList(elems []*elemForDecode, filter storage.Filter, ListPtr interface
 		}
 		// being unable to set the version does not prevent the object from being extracted
 		versioner.UpdateObject(obj, elem.rev)
-		if filter.Filter(obj) {
+		if filter(obj) {
 			v.Set(reflect.Append(v, reflect.ValueOf(obj).Elem()))
 		}
 	}
