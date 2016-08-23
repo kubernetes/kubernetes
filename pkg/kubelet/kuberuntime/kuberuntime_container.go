@@ -66,7 +66,7 @@ func (m *kubeGenericRuntimeManager) generateContainerConfig(container *api.Conta
 		Linux:       m.generateLinuxContainerConfig(container),
 	}
 
-	// set priviledged and readonlyRootfs
+	// set privileged and readonlyRootfs
 	if container.SecurityContext != nil {
 		securityContext := container.SecurityContext
 		if securityContext.Privileged != nil {

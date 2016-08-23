@@ -197,7 +197,7 @@ func parseSandboxName(name string) (string, string, string, uint32, error) {
 }
 
 // buildContainerName creates a name which can be reversed to identify container name.
-// This function returns stable name, unique name and an unique id.
+// This function returns stable name, unique name and a unique id.
 func buildContainerName(sandboxConfig *runtimeApi.PodSandboxConfig, containerConfig *runtimeApi.ContainerConfig) string {
 	containerName := fmt.Sprintf("%s.%d", containerConfig.Metadata.GetName(), containerConfig.Metadata.GetAttempt())
 	return buildKubeGenericName(sandboxConfig, containerName)
