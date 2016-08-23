@@ -29,7 +29,7 @@ import (
 )
 
 // This test requires Rescheduler to be enabled.
-var _ = framework.KubeDescribe("Rescheduler [Feature:Rescheduler]", func() {
+var _ = framework.KubeDescribe("Rescheduler [Serial]", func() {
 	f := framework.NewDefaultFramework("rescheduler")
 	var ns string
 	var totalMillicores int
