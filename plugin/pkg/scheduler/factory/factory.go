@@ -56,7 +56,7 @@ const (
 type ConfigFactory struct {
 	Client *client.Client
 	// queue for pods that need scheduling
-	PodQueue *cache.FIFO
+	PodQueue *cache.Priority
 	// a means to list all known scheduled pods.
 	ScheduledPodLister *cache.StoreToPodLister
 	// a means to list all known scheduled pods and pods assumed to have been scheduled.
