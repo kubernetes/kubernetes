@@ -16662,7 +16662,7 @@ func (x codecSelfer1234) decSliceThirdPartyResource(v *[]ThirdPartyResource, d *
 
 			yyrg1377 := len(yyv1377) > 0
 			yyv21377 := yyv1377
-			yyrl1377, yyrt1377 = z.DecInferLen(yyl1377, z.DecBasicHandle().MaxInitLen, 280)
+			yyrl1377, yyrt1377 = z.DecInferLen(yyl1377, z.DecBasicHandle().MaxInitLen, 296)
 			if yyrt1377 {
 				if yyrl1377 <= cap(yyv1377) {
 					yyv1377 = yyv1377[:yyrl1377]
@@ -16778,7 +16778,7 @@ func (x codecSelfer1234) decSliceDeployment(v *[]Deployment, d *codec1978.Decode
 
 			yyrg1383 := len(yyv1383) > 0
 			yyv21383 := yyv1383
-			yyrl1383, yyrt1383 = z.DecInferLen(yyl1383, z.DecBasicHandle().MaxInitLen, 768)
+			yyrl1383, yyrt1383 = z.DecInferLen(yyl1383, z.DecBasicHandle().MaxInitLen, 800)
 			if yyrt1383 {
 				if yyrl1383 <= cap(yyv1383) {
 					yyv1383 = yyv1383[:yyrl1383]
@@ -16894,7 +16894,7 @@ func (x codecSelfer1234) decSliceDaemonSet(v *[]DaemonSet, d *codec1978.Decoder)
 
 			yyrg1389 := len(yyv1389) > 0
 			yyv21389 := yyv1389
-			yyrl1389, yyrt1389 = z.DecInferLen(yyl1389, z.DecBasicHandle().MaxInitLen, 696)
+			yyrl1389, yyrt1389 = z.DecInferLen(yyl1389, z.DecBasicHandle().MaxInitLen, 728)
 			if yyrt1389 {
 				if yyrl1389 <= cap(yyv1389) {
 					yyv1389 = yyv1389[:yyrl1389]
@@ -17010,7 +17010,7 @@ func (x codecSelfer1234) decSliceThirdPartyResourceData(v *[]ThirdPartyResourceD
 
 			yyrg1395 := len(yyv1395) > 0
 			yyv21395 := yyv1395
-			yyrl1395, yyrt1395 = z.DecInferLen(yyl1395, z.DecBasicHandle().MaxInitLen, 264)
+			yyrl1395, yyrt1395 = z.DecInferLen(yyl1395, z.DecBasicHandle().MaxInitLen, 280)
 			if yyrt1395 {
 				if yyrl1395 <= cap(yyv1395) {
 					yyv1395 = yyv1395[:yyrl1395]
@@ -17126,7 +17126,7 @@ func (x codecSelfer1234) decSliceIngress(v *[]Ingress, d *codec1978.Decoder) {
 
 			yyrg1401 := len(yyv1401) > 0
 			yyv21401 := yyv1401
-			yyrl1401, yyrt1401 = z.DecInferLen(yyl1401, z.DecBasicHandle().MaxInitLen, 320)
+			yyrl1401, yyrt1401 = z.DecInferLen(yyl1401, z.DecBasicHandle().MaxInitLen, 336)
 			if yyrt1401 {
 				if yyrl1401 <= cap(yyv1401) {
 					yyv1401 = yyv1401[:yyrl1401]
@@ -17590,7 +17590,7 @@ func (x codecSelfer1234) decSliceReplicaSet(v *[]ReplicaSet, d *codec1978.Decode
 
 			yyrg1425 := len(yyv1425) > 0
 			yyv21425 := yyv1425
-			yyrl1425, yyrt1425 = z.DecInferLen(yyl1425, z.DecBasicHandle().MaxInitLen, 712)
+			yyrl1425, yyrt1425 = z.DecInferLen(yyl1425, z.DecBasicHandle().MaxInitLen, 744)
 			if yyrt1425 {
 				if yyrl1425 <= cap(yyv1425) {
 					yyv1425 = yyv1425[:yyrl1425]
@@ -18158,7 +18158,7 @@ func (x codecSelfer1234) decSlicePodSecurityPolicy(v *[]PodSecurityPolicy, d *co
 
 			yyrg1454 := len(yyv1454) > 0
 			yyv21454 := yyv1454
-			yyrl1454, yyrt1454 = z.DecInferLen(yyl1454, z.DecBasicHandle().MaxInitLen, 536)
+			yyrl1454, yyrt1454 = z.DecInferLen(yyl1454, z.DecBasicHandle().MaxInitLen, 552)
 			if yyrt1454 {
 				if yyrl1454 <= cap(yyv1454) {
 					yyv1454 = yyv1454[:yyrl1454]
@@ -18622,7 +18622,7 @@ func (x codecSelfer1234) decSliceNetworkPolicy(v *[]NetworkPolicy, d *codec1978.
 
 			yyrg1478 := len(yyv1478) > 0
 			yyv21478 := yyv1478
-			yyrl1478, yyrt1478 = z.DecInferLen(yyl1478, z.DecBasicHandle().MaxInitLen, 296)
+			yyrl1478, yyrt1478 = z.DecInferLen(yyl1478, z.DecBasicHandle().MaxInitLen, 312)
 			if yyrt1478 {
 				if yyrl1478 <= cap(yyv1478) {
 					yyv1478 = yyv1478[:yyrl1478]
@@ -18738,7 +18738,7 @@ func (x codecSelfer1234) decSliceStorageClass(v *[]StorageClass, d *codec1978.De
 
 			yyrg1484 := len(yyv1484) > 0
 			yyv21484 := yyv1484
-			yyrl1484, yyrt1484 = z.DecInferLen(yyl1484, z.DecBasicHandle().MaxInitLen, 264)
+			yyrl1484, yyrt1484 = z.DecInferLen(yyl1484, z.DecBasicHandle().MaxInitLen, 280)
 			if yyrt1484 {
 				if yyrl1484 <= cap(yyv1484) {
 					yyv1484 = yyv1484[:yyrl1484]

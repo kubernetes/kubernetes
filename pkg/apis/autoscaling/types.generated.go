@@ -2575,7 +2575,7 @@ func (x codecSelfer1234) decSliceHorizontalPodAutoscaler(v *[]HorizontalPodAutos
 
 			yyrg220 := len(yyv220) > 0
 			yyv2220 := yyv220
-			yyrl220, yyrt220 = z.DecInferLen(yyl220, z.DecBasicHandle().MaxInitLen, 344)
+			yyrl220, yyrt220 = z.DecInferLen(yyl220, z.DecBasicHandle().MaxInitLen, 360)
 			if yyrt220 {
 				if yyrl220 <= cap(yyv220) {
 					yyv220 = yyv220[:yyrl220]

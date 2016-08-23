@@ -2872,7 +2872,7 @@ func (x codecSelfer1234) decSliceJob(v *[]Job, d *codec1978.Decoder) {
 
 			yyrg245 := len(yyv245) > 0
 			yyv2245 := yyv245
-			yyrl245, yyrt245 = z.DecInferLen(yyl245, z.DecBasicHandle().MaxInitLen, 792)
+			yyrl245, yyrt245 = z.DecInferLen(yyl245, z.DecBasicHandle().MaxInitLen, 824)
 			if yyrt245 {
 				if yyrl245 <= cap(yyv245) {
 					yyv245 = yyv245[:yyrl245]
