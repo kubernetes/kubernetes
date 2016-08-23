@@ -538,13 +538,11 @@ var greylist = map[string]string{
     "kernel.msgmnb":                "ipc",
     "kernel.msgmni":                "ipc",
     "kernel.sem":                   "ipc",
-    "net.ipv4.ip_local_port_range": "net",
-    "net.ipv4.tcp_syncookies":      "net",
-    "net.ipv4.tcp_max_syn_backlog": "net",
 }
 
 var greylistPrefixes = map[string]string{
     "fs.mqueue.": "ipc",
+    "net.":       "net",
 }
 ```
 
