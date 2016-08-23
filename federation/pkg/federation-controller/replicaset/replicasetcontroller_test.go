@@ -19,10 +19,12 @@ package replicaset
 import (
 	"flag"
 	"fmt"
-	"github.com/stretchr/testify/assert"
+	"testing"
+	"time"
+
 	fedv1 "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fedclientfake "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
-	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	"k8s.io/kubernetes/pkg/api/meta"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -30,8 +32,8 @@ import (
 	kubeclientfake "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/watch"
-	"testing"
-	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestParseFederationReplicaSetReference(t *testing.T) {
@@ -81,8 +83,8 @@ func TestReplicaSetController(t *testing.T) {
 	fedrswatch := watch.NewFake()
 	fedclientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fedrswatch, nil))
 
-	fedclientset.Federation().Clusters().Create(newClusterWithReadyStatus("k8s-1", apiv1.ConditionTrue))
-	fedclientset.Federation().Clusters().Create(newClusterWithReadyStatus("k8s-2", apiv1.ConditionTrue))
+	fedclientset.Federation().Clusters().Create(testutil.NewCluster("k8s-1", apiv1.ConditionTrue))
+	fedclientset.Federation().Clusters().Create(testutil.NewCluster("k8s-2", apiv1.ConditionTrue))
 
 	kube1clientset := kubeclientfake.NewSimpleClientset()
 	kube1rswatch := watch.NewFake()
@@ -106,9 +108,9 @@ func TestReplicaSetController(t *testing.T) {
 		}
 	}
 	replicaSetController := NewReplicaSetController(fedclientset)
-	rsFedinformer := toFederatedInformerForTestOnly(replicaSetController.fedReplicaSetInformer)
+	rsFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.fedReplicaSetInformer)
 	rsFedinformer.SetClientFactory(fedInformerClientFactory)
-	podFedinformer := toFederatedInformerForTestOnly(replicaSetController.fedPodInformer)
+	podFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.fedPodInformer)
 	podFedinformer.SetClientFactory(fedInformerClientFactory)
 
 	stopChan := make(chan struct{})
@@ -157,24 +159,6 @@ func TestReplicaSetController(t *testing.T) {
 	rs, _ = fedclientset.Extensions().ReplicaSets(apiv1.NamespaceDefault).Get(rs.Name)
 	assert.Equal(t, *rs.Spec.Replicas, *rs1.Spec.Replicas+*rs2.Spec.Replicas)
 	assert.Equal(t, rs.Status.Replicas, rs1.Status.Replicas+rs2.Status.Replicas)
-}
-
-func toFederatedInformerForTestOnly(informer fedutil.FederatedInformer) fedutil.FederatedInformerForTestOnly {
-	inter := informer.(interface{})
-	return inter.(fedutil.FederatedInformerForTestOnly)
-}
-
-func newClusterWithReadyStatus(name string, readyStatus apiv1.ConditionStatus) *fedv1.Cluster {
-	return &fedv1.Cluster{
-		ObjectMeta: apiv1.ObjectMeta{
-			Name: name,
-		},
-		Status: fedv1.ClusterStatus{
-			Conditions: []fedv1.ClusterCondition{
-				{Type: fedv1.ClusterReady, Status: readyStatus},
-			},
-		},
-	}
 }
 
 func newReplicaSetWithReplicas(name string, replicas int32) *extensionsv1.ReplicaSet {
