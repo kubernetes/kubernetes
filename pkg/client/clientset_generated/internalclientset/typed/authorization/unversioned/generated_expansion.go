@@ -20,7 +20,6 @@ import (
 	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
 )
 
-// The PodExpansion interface allows manually adding extra methods to the PodInterface.
 type SubjectAccessReviewExpansion interface {
 	Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error)
 }
@@ -29,6 +28,20 @@ func (c *subjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview)
 	result = &authorizationapi.SubjectAccessReview{}
 	err = c.client.Post().
 		Resource("subjectaccessreviews").
+		Body(sar).
+		Do().
+		Into(result)
+	return
+}
+
+type SelfSubjectAccessReviewExpansion interface {
+	Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error)
+}
+
+func (c *selfSubjectAccessReviews) Create(sar *authorizationapi.SelfSubjectAccessReview) (result *authorizationapi.SelfSubjectAccessReview, err error) {
+	result = &authorizationapi.SelfSubjectAccessReview{}
+	err = c.client.Post().
+		Resource("selfsubjectaccessreviews").
 		Body(sar).
 		Do().
 		Into(result)
