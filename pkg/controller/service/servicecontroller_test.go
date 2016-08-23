@@ -145,7 +145,11 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 
 // TODO: Finish converting and update comments
 func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
-	hosts := []string{"node0", "node1", "node73"}
+	nodes := []*v1.Node{
+		{ObjectMeta: v1.ObjectMeta{Name: "node0"}},
+		{ObjectMeta: v1.ObjectMeta{Name: "node1"}},
+		{ObjectMeta: v1.ObjectMeta{Name: "node73"}},
+	}
 	table := []struct {
 		services            []*v1.Service
 		expectedUpdateCalls []fakecloud.FakeUpdateBalancerCall
@@ -169,7 +173,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s0", "333", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "333", v1.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "333", v1.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -180,9 +184,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s2", "666", v1.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "444", v1.ServiceTypeLoadBalancer), hosts},
-				{newService("s1", "555", v1.ServiceTypeLoadBalancer), hosts},
-				{newService("s2", "666", v1.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "444", v1.ServiceTypeLoadBalancer), nodes},
+				{newService("s1", "555", v1.ServiceTypeLoadBalancer), nodes},
+				{newService("s2", "666", v1.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -194,8 +198,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s4", "123", v1.ServiceTypeClusterIP),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s1", "888", v1.ServiceTypeLoadBalancer), hosts},
-				{newService("s3", "999", v1.ServiceTypeLoadBalancer), hosts},
+				{newService("s1", "888", v1.ServiceTypeLoadBalancer), nodes},
+				{newService("s3", "999", v1.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -205,7 +209,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				nil,
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "234", v1.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "234", v1.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 	}
@@ -222,65 +226,11 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		for _, service := range item.services {
 			services = append(services, service)
 		}
-		if err := controller.updateLoadBalancerHosts(services, hosts); err != nil {
+		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
 			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
-		}
-	}
-}
-
-func TestHostsFromNodeList(t *testing.T) {
-	tests := []struct {
-		nodes         *v1.NodeList
-		expectedHosts []string
-	}{
-		{
-			nodes:         &v1.NodeList{},
-			expectedHosts: []string{},
-		},
-		{
-			nodes: &v1.NodeList{
-				Items: []v1.Node{
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "foo"},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "bar"},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-				},
-			},
-			expectedHosts: []string{"foo", "bar"},
-		},
-		{
-			nodes: &v1.NodeList{
-				Items: []v1.Node{
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "foo"},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "bar"},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "unschedulable"},
-						Spec:       v1.NodeSpec{Unschedulable: true},
-						Status:     v1.NodeStatus{Phase: v1.NodeRunning},
-					},
-				},
-			},
-			expectedHosts: []string{"foo", "bar"},
-		},
-	}
-
-	for _, test := range tests {
-		hosts := hostsFromNodeList(test.nodes)
-		if !reflect.DeepEqual(hosts, test.expectedHosts) {
-			t.Errorf("expected: %v, saw: %v", test.expectedHosts, hosts)
 		}
 	}
 }
