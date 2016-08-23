@@ -145,7 +145,11 @@ func TestCreateExternalLoadBalancer(t *testing.T) {
 
 // TODO: Finish converting and update comments
 func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
-	hosts := []string{"node0", "node1", "node73"}
+	nodes := []*api.Node{
+		{ObjectMeta: api.ObjectMeta{Name: "node0"}},
+		{ObjectMeta: api.ObjectMeta{Name: "node1"}},
+		{ObjectMeta: api.ObjectMeta{Name: "node73"}},
+	}
 	table := []struct {
 		services            []*api.Service
 		expectedUpdateCalls []fakecloud.FakeUpdateBalancerCall
@@ -169,7 +173,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s0", "333", api.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "333", api.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "333", api.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -180,9 +184,9 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s2", "666", api.ServiceTypeLoadBalancer),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "444", api.ServiceTypeLoadBalancer), hosts},
-				{newService("s1", "555", api.ServiceTypeLoadBalancer), hosts},
-				{newService("s2", "666", api.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "444", api.ServiceTypeLoadBalancer), nodes},
+				{newService("s1", "555", api.ServiceTypeLoadBalancer), nodes},
+				{newService("s2", "666", api.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -194,8 +198,8 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				newService("s4", "123", api.ServiceTypeClusterIP),
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s1", "888", api.ServiceTypeLoadBalancer), hosts},
-				{newService("s3", "999", api.ServiceTypeLoadBalancer), hosts},
+				{newService("s1", "888", api.ServiceTypeLoadBalancer), nodes},
+				{newService("s3", "999", api.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 		{
@@ -205,7 +209,7 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				nil,
 			},
 			expectedUpdateCalls: []fakecloud.FakeUpdateBalancerCall{
-				{newService("s0", "234", api.ServiceTypeLoadBalancer), hosts},
+				{newService("s0", "234", api.ServiceTypeLoadBalancer), nodes},
 			},
 		},
 	}
@@ -222,65 +226,11 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 		for _, service := range item.services {
 			services = append(services, service)
 		}
-		if err := controller.updateLoadBalancerHosts(services, hosts); err != nil {
+		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
 		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
 			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
-		}
-	}
-}
-
-func TestHostsFromNodeList(t *testing.T) {
-	tests := []struct {
-		nodes         *api.NodeList
-		expectedHosts []string
-	}{
-		{
-			nodes:         &api.NodeList{},
-			expectedHosts: []string{},
-		},
-		{
-			nodes: &api.NodeList{
-				Items: []api.Node{
-					{
-						ObjectMeta: api.ObjectMeta{Name: "foo"},
-						Status:     api.NodeStatus{Phase: api.NodeRunning},
-					},
-					{
-						ObjectMeta: api.ObjectMeta{Name: "bar"},
-						Status:     api.NodeStatus{Phase: api.NodeRunning},
-					},
-				},
-			},
-			expectedHosts: []string{"foo", "bar"},
-		},
-		{
-			nodes: &api.NodeList{
-				Items: []api.Node{
-					{
-						ObjectMeta: api.ObjectMeta{Name: "foo"},
-						Status:     api.NodeStatus{Phase: api.NodeRunning},
-					},
-					{
-						ObjectMeta: api.ObjectMeta{Name: "bar"},
-						Status:     api.NodeStatus{Phase: api.NodeRunning},
-					},
-					{
-						ObjectMeta: api.ObjectMeta{Name: "unschedulable"},
-						Spec:       api.NodeSpec{Unschedulable: true},
-						Status:     api.NodeStatus{Phase: api.NodeRunning},
-					},
-				},
-			},
-			expectedHosts: []string{"foo", "bar"},
-		},
-	}
-
-	for _, test := range tests {
-		hosts := hostsFromNodeList(test.nodes)
-		if !reflect.DeepEqual(hosts, test.expectedHosts) {
-			t.Errorf("expected: %v, saw: %v", test.expectedHosts, hosts)
 		}
 	}
 }
