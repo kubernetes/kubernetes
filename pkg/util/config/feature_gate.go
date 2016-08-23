@@ -34,14 +34,14 @@ const (
 	// a featureSpec entry to knownFeatures.
 
 	// allAlphaGate is a global toggle for alpha features. Per-feature key
-	// values override the default set by allAlphaGate, if they come later in the
-	// specification of gates. Examples:
+	// values override the default set by allAlphaGate. Examples:
 	//   AllAlpha=false,NewFeature=true  will result in newFeature=true
 	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
 	allAlphaGate              = "AllAlpha"
 	externalTrafficLocalOnly  = "AllowExtTrafficLocalEndpoints"
 	dynamicKubeletConfig      = "DynamicKubeletConfig"
 	dynamicVolumeProvisioning = "DynamicVolumeProvisioning"
+	// TODO: Define gate/accessor for AppArmor
 )
 
 var (
@@ -99,7 +99,8 @@ type FeatureGate interface {
 	// alpha: v1.3
 	DynamicVolumeProvisioning() bool
 
-	// TODO: Define accessors for each non-API alpha feature.
+	// owner: mtaufen
+	// alpha: v1.4
 	DynamicKubeletConfig() bool
 }
 
