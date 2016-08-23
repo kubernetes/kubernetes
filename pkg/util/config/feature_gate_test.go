@@ -139,3 +139,21 @@ func TestFeatureGateFlag(t *testing.T) {
 		}
 	}
 }
+
+func TestFeatureGateFlagDefaults(t *testing.T) {
+	// gates for testing
+	const testAlphaGate = "TestAlpha"
+	const testBetaGate = "TestBeta"
+
+	// Don't parse the flag, assert defaults are used.
+	f := DefaultFeatureGate
+	f.known[testAlphaGate] = featureSpec{false, alpha}
+	f.known[testBetaGate] = featureSpec{true, beta}
+
+	if f.lookup(testAlphaGate) != false {
+		t.Errorf("Expected false")
+	}
+	if f.lookup(testBetaGate) != true {
+		t.Errorf("Expected true")
+	}
+}
