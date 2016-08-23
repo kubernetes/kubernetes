@@ -17,13 +17,16 @@ limitations under the License.
 package rollout
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/set"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -33,10 +36,13 @@ import (
 // ResumeConfig is the start of the data required to perform the operation.  As new fields are added, add them here instead of
 // referencing the cmd.Flags()
 type ResumeConfig struct {
-	ResumeObject func(object runtime.Object) (bool, error)
-	Mapper       meta.RESTMapper
-	Typer        runtime.ObjectTyper
-	Infos        []*resource.Info
+	ResumeFn func(object *resource.Info) (bool, error)
+	Mapper   meta.RESTMapper
+	Typer    runtime.ObjectTyper
+	Infos    []*resource.Info
+
+	Encoder     runtime.Encoder
+	ShortOutput bool
 
 	Out       io.Writer
 	Filenames []string
@@ -81,6 +87,7 @@ func NewCmdRolloutResume(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
 	kubectl.AddJsonFilenameFlag(cmd, &opts.Filenames, usage)
 	cmdutil.AddRecursiveFlag(cmd, &opts.Recursive)
+	cmdutil.AddPrinterFlags(cmd)
 	return cmd
 }
 
@@ -90,8 +97,10 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 	}
 
 	o.Mapper, o.Typer = f.Object(false)
-	o.ResumeObject = f.ResumeObject
+	o.ResumeFn = f.ResumeFn
 	o.Out = out
+	o.Encoder = f.JSONEncoder()
+	o.ShortOutput = cmdutil.GetFlagString(cmd, "output") == "name"
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -126,17 +135,27 @@ func (o *ResumeConfig) CompleteResume(f *cmdutil.Factory, cmd *cobra.Command, ou
 
 func (o ResumeConfig) RunResume() error {
 	allErrs := []error{}
-	for _, info := range o.Infos {
-		isAlreadyResumed, err := o.ResumeObject(info.Object)
+	for _, patch := range set.CalculatePatches(o.Infos, o.Encoder, o.ResumeFn) {
+		info := patch.Info
+
+		if patch.Err != nil {
+			allErrs = append(allErrs, fmt.Errorf("error: %s/%s %v\n", info.Mapping.Resource, info.Name, patch.Err))
+			continue
+		}
+
+		if string(patch.Patch) == "{}" || len(patch.Patch) == 0 {
+			continue
+		}
+
+		obj, err := resource.NewHelper(info.Client, info.Mapping).Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patch.Patch)
 		if err != nil {
-			allErrs = append(allErrs, cmdutil.AddSourceToErr("resuming", info.Source, err))
+			allErrs = append(allErrs, fmt.Errorf("failed to patch: %v\n", err))
 			continue
 		}
-		if isAlreadyResumed {
-			cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "already resumed")
-			continue
-		}
-		cmdutil.PrintSuccess(o.Mapper, false, o.Out, info.Mapping.Resource, info.Name, "resumed")
+
+		info.Refresh(obj, true)
+		cmdutil.PrintSuccess(o.Mapper, o.ShortOutput, o.Out, info.Mapping.Resource, info.Name, "resumed")
 	}
+
 	return utilerrors.NewAggregate(allErrs)
 }
