@@ -62,7 +62,7 @@ func NewREST(opts generic.RESTOptions) (*REST, *StatusREST, *ApprovalREST) {
 		ObjectNameFunc: func(obj runtime.Object) (string, error) {
 			return obj.(*certificates.CertificateSigningRequest).Name, nil
 		},
-		PredicateFunc: func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
+		PredicateFunc: func(label labels.Selector, field fields.Selector) storage.SelectionPredicate {
 			return csrregistry.Matcher(label, field)
 		},
 		QualifiedResource:       certificates.Resource("certificatesigningrequests"),

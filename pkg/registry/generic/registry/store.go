@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
-	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
@@ -89,7 +88,7 @@ type Store struct {
 	TTLFunc func(obj runtime.Object, existing uint64, update bool) (uint64, error)
 
 	// Returns a matcher corresponding to the provided labels and fields.
-	PredicateFunc func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate
+	PredicateFunc func(label labels.Selector, field fields.Selector) storage.SelectionPredicate
 
 	// Called to cleanup storage clients.
 	DestroyFunc func()
@@ -201,12 +200,11 @@ func (e *Store) List(ctx api.Context, options *api.ListOptions) (runtime.Object,
 }
 
 // ListPredicate returns a list of all the items matching m.
-func (e *Store) ListPredicate(ctx api.Context, m *generic.SelectionPredicate, options *api.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx api.Context, p storage.SelectionPredicate, options *api.ListOptions) (runtime.Object, error) {
 	list := e.NewListFunc()
-	filter := e.createFilter(m)
-	if name, ok := m.MatchesSingle(); ok {
+	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
-			err := e.Storage.GetToList(ctx, key, filter, list)
+			err := e.Storage.GetToList(ctx, key, p, list)
 			return list, storeerr.InterpretListError(err, e.QualifiedResource)
 		}
 		// if we cannot extract a key based on the current context, the optimization is skipped
@@ -215,7 +213,7 @@ func (e *Store) ListPredicate(ctx api.Context, m *generic.SelectionPredicate, op
 	if options == nil {
 		options = &api.ListOptions{ResourceVersion: "0"}
 	}
-	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, filter, list)
+	err := e.Storage.List(ctx, e.KeyRootFunc(ctx), options.ResourceVersion, p, list)
 	return list, storeerr.InterpretListError(err, e.QualifiedResource)
 }
 
@@ -853,7 +851,7 @@ func (e *Store) finalizeDelete(obj runtime.Object, runHooks bool) (runtime.Objec
 
 // Watch makes a matcher for the given label and field, and calls
 // WatchPredicate. If possible, you should customize PredicateFunc to produre a
-// matcher that matches by key. generic.SelectionPredicate does this for you
+// matcher that matches by key. SelectionPredicate does this for you
 // automatically.
 func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
@@ -872,15 +870,13 @@ func (e *Store) Watch(ctx api.Context, options *api.ListOptions) (watch.Interfac
 }
 
 // WatchPredicate starts a watch for the items that m matches.
-func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
-	filter := e.createFilter(m)
-
-	if name, ok := m.MatchesSingle(); ok {
+func (e *Store) WatchPredicate(ctx api.Context, p storage.SelectionPredicate, resourceVersion string) (watch.Interface, error) {
+	if name, ok := p.MatchesSingle(); ok {
 		if key, err := e.KeyFunc(ctx, name); err == nil {
 			if err != nil {
 				return nil, err
 			}
-			w, err := e.Storage.Watch(ctx, key, resourceVersion, filter)
+			w, err := e.Storage.Watch(ctx, key, resourceVersion, p)
 			if err != nil {
 				return nil, err
 			}
@@ -892,7 +888,7 @@ func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, r
 		// if we cannot extract a key based on the current context, the optimization is skipped
 	}
 
-	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, filter)
+	w, err := e.Storage.WatchList(ctx, e.KeyRootFunc(ctx), resourceVersion, p)
 	if err != nil {
 		return nil, err
 	}
@@ -900,18 +896,6 @@ func (e *Store) WatchPredicate(ctx api.Context, m *generic.SelectionPredicate, r
 		return newDecoratedWatcher(w, e.Decorator), nil
 	}
 	return w, nil
-}
-
-func (e *Store) createFilter(m *generic.SelectionPredicate) storage.Filter {
-	filterFunc := func(obj runtime.Object) bool {
-		matches, err := m.Matches(obj)
-		if err != nil {
-			glog.Errorf("unable to match watch: %v", err)
-			return false
-		}
-		return matches
-	}
-	return storage.NewSimpleFilter(filterFunc, m.MatcherIndex)
 }
 
 // calculateTTL is a helper for retrieving the updated TTL for an object or returning an error

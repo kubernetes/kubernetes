@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
 	"k8s.io/kubernetes/pkg/runtime"
+	apistorage "k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
 
@@ -77,8 +78,8 @@ func (storageClassStrategy) AllowUnconditionalUpdate() bool {
 }
 
 // MatchStorageClass returns a generic matcher for a given label and field selector.
-func MatchStorageClasses(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-	return &generic.SelectionPredicate{
+func MatchStorageClasses(label labels.Selector, field fields.Selector) apistorage.SelectionPredicate {
+	return apistorage.SelectionPredicate{
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
