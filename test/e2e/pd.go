@@ -362,12 +362,18 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 	It("should schedule a pod w/two RW PDs both mounted to one container, write to PD, verify contents, delete pod, recreate pod, verify contents, and repeat in rapid succession [Slow]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
 
-		By("creating PD1")
-		disk1Name, err := createPDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD1")
-		By("creating PD2")
-		disk2Name, err := createPDWithRetry()
-		framework.ExpectNoError(err, "Error creating PD2")
+		var diskNames []string
+
+		diskCount := 2
+
+		for i := 0; i < diskCount; i++ {
+			id := fmt.Sprintf("PD%d", i)
+			By("creating " + id)
+			diskName, err := createPDWithRetry()
+			framework.ExpectNoError(err, "Error creating "+id)
+			diskNames = append(diskNames, diskName)
+		}
+
 		var host0Pod *api.Pod
 
 		defer func() {
@@ -377,17 +383,26 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			if host0Pod != nil {
 				podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0))
 			}
-			detachAndDeletePDs(disk1Name, []string{host0Name})
-			detachAndDeletePDs(disk2Name, []string{host0Name})
+			for _, diskName := range diskNames {
+				detachAndDeletePDs(diskName, []string{host0Name, host1Name})
+			}
 		}()
 
 		containerName := "mycontainer"
 		fileAndContentToVerify := make(map[string]string)
-		for i := 0; i < 3; i++ {
+		targetHost := host0Name
+		for i := 0; i < 5; i++ {
 			framework.Logf("PD Read/Writer Iteration #%v", i)
+
+			// TODO: Better randomization?
+			targetHost = host0Name
+			if i % 2 == 1 {
+				targetHost = host1Name
+			}
+
 			By("submitting host0Pod to kubernetes")
-			host0Pod = testPDPod([]string{disk1Name, disk2Name}, host0Name, false /* readOnly */, 1 /* numContainers */)
-			_, err = podClient.Create(host0Pod)
+			host0Pod = testPDPod(diskNames, targetHost, false /* readOnly */, 1 /* numContainers */)
+			_, err := podClient.Create(host0Pod)
 			framework.ExpectNoError(err, fmt.Sprintf("Failed to create host0Pod: %v", err))
 
 			framework.ExpectNoError(f.WaitForPodRunningSlow(host0Pod.Name))
@@ -396,27 +411,33 @@ var _ = framework.KubeDescribe("Pod Disks", func() {
 			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			// Write a file to both PDs from container
-			testFilePD1 := fmt.Sprintf("/testpd1/tracker%v", i)
-			testFilePD2 := fmt.Sprintf("/testpd2/tracker%v", i)
-			testFilePD1Contents := fmt.Sprintf("%v", mathrand.Int())
-			testFilePD2Contents := fmt.Sprintf("%v", mathrand.Int())
-			fileAndContentToVerify[testFilePD1] = testFilePD1Contents
-			fileAndContentToVerify[testFilePD2] = testFilePD2Contents
-			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD1, testFilePD1Contents))
-			framework.Logf("Wrote value: \"%v\" to PD1 (%q) from pod %q container %q", testFilePD1Contents, disk1Name, host0Pod.Name, containerName)
-			framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFilePD2, testFilePD2Contents))
-			framework.Logf("Wrote value: \"%v\" to PD2 (%q) from pod %q container %q", testFilePD2Contents, disk2Name, host0Pod.Name, containerName)
+			for j, diskName := range diskNames {
+				testFile := fmt.Sprintf("/testpd%d/tracker%v", j + 1, i)
+				testFileContents := fmt.Sprintf("%v", mathrand.Int())
+
+				framework.ExpectNoError(f.WriteFileViaContainer(host0Pod.Name, containerName, testFile, testFileContents))
+				framework.Logf("Wrote value: \"%v\" to PD (%q) from pod %q container %q", testFileContents, diskName, host0Pod.Name, containerName)
+
+				fileAndContentToVerify[testFile] = testFileContents
+			}
 
 			// Read/verify pd contents for both disks from container
 			verifyPDContentsViaContainer(f, host0Pod.Name, containerName, fileAndContentToVerify)
 
 			By("deleting host0Pod")
 			framework.ExpectNoError(podClient.Delete(host0Pod.Name, api.NewDeleteOptions(0)), "Failed to delete host0Pod")
+
+			// TODO: Better randomization?
+			if i % 3 == 0 {
+				framework.Logf("sleeping to allow volumes to be detached")
+				time.Sleep(1 * time.Minute)
+			}
 		}
 
 		By("Test completed successfully, waiting for PD to safely detach")
-		waitForPDDetach(disk1Name, host0Name)
-		waitForPDDetach(disk2Name, host0Name)
+		for _, diskName := range diskNames {
+			waitForPDDetach(diskName, targetHost)
+		}
 	})
 })
 
@@ -686,7 +707,7 @@ func getGCECloud() (*gcecloud.GCECloud, error) {
 
 func detachAndDeletePDs(diskName string, hosts []string) {
 	for _, host := range hosts {
-		framework.Logf("Detaching GCE PD %q from node %q.", diskName, host)
+		framework.Logf("Detaching PD %q from node %q.", diskName, host)
 		detachPD(host, diskName)
 		By(fmt.Sprintf("Waiting for PD %q to detach from %q", diskName, host))
 		waitForPDDetach(diskName, host)
