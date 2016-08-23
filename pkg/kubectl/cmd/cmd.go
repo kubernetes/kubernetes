@@ -273,7 +273,7 @@ Find more information at https://github.com/kubernetes/kubernetes.`,
 		{
 			Message: "Troubleshooting and Debugging Commands:",
 			Commands: []*cobra.Command{
-				NewCmdDescribe(f, out),
+				NewCmdDescribe(f, out, err),
 				NewCmdLogs(f, out),
 				NewCmdAttach(f, in, out, err),
 				NewCmdExec(f, in, out, err),
