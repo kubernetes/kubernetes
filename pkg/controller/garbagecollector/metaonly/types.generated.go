@@ -710,7 +710,7 @@ func (x codecSelfer1234) decSliceMetadataOnlyObject(v *[]MetadataOnlyObject, d *
 
 			yyrg56 := len(yyv56) > 0
 			yyv256 := yyv56
-			yyrl56, yyrt56 = z.DecInferLen(yyl56, z.DecBasicHandle().MaxInitLen, 240)
+			yyrl56, yyrt56 = z.DecInferLen(yyl56, z.DecBasicHandle().MaxInitLen, 256)
 			if yyrt56 {
 				if yyrl56 <= cap(yyv56) {
 					yyv56 = yyv56[:yyrl56]
