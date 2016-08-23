@@ -724,6 +724,10 @@ start_kube_scheduler() {
     log_level="${SCHEDULER_TEST_LOG_LEVEL}"
   fi
   params="${log_level} ${SCHEDULER_TEST_ARGS:-}"
+  if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
+    params="${params} --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
+  fi
+  
   readonly kube_scheduler_docker_tag=$(cat "${kube_home}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values

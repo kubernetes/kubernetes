@@ -858,6 +858,9 @@ function start-kube-scheduler {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
     params+=" --feature-gates=${FEATURE_GATES}"
   fi
+  if [[ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}"  ]]; then
+    params+=" --algorithm-provider=${SCHEDULING_ALGORITHM_PROVIDER}"
+  fi
   local -r kube_scheduler_docker_tag=$(cat "${KUBE_HOME}/kube-docker-files/kube-scheduler.docker_tag")
 
   # Remove salt comments and replace variables with values.

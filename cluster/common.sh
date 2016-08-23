@@ -761,6 +761,11 @@ EOF
 DNS_ZONE_NAME: $(yaml-quote ${DNS_ZONE_NAME})
 EOF
   fi
+  if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
+    cat >>$file <<EOF
+SCHEDULING_ALGORITHM_PROVIDER: $(yaml-quote ${SCHEDULING_ALGORITHM_PROVIDER})
+EOF
+  fi
 }
 
 function sha1sum-file() {

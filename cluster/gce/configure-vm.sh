@@ -584,6 +584,11 @@ EOF
 federations_domain_map: ''
 EOF
     fi
+    if [ -n "${SCHEDULING_ALGORITHM_PROVIDER:-}" ]; then
+      cat <<EOF >>/srv/salt-overlay/pillar/cluster-params.sls
+scheduling_algorithm_provider: '$(echo "${SCHEDULING_ALGORITHM_PROVIDER}" | sed -e "s/'/''/g")'
+EOF
+    fi
 }
 
 # The job of this function is simple, but the basic regular expression syntax makes
