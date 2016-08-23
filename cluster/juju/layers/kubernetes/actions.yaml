@@ -13,9 +13,7 @@ microbot:
         description: If true removes the microbots
 pause:
     description: |
-      Cordon the unit, pausing all future workload scheduling on this unit,
-      and drains active workloads
+      Cordon the unit, draining all active workloads.
 resume:
     description: |
-      UnCordon the unit, enabling workload scheduling. Workloads
-      will automatically balance into the unit
+      UnCordon the unit, enabling workload scheduling.
