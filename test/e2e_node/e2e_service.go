@@ -87,7 +87,7 @@ func (e *E2EServices) Start() error {
 		"--manifest-path", framework.TestContext.ManifestPath,
 		"--eviction-hard", framework.TestContext.EvictionHard,
 	)
-	e.services = newServer("services", startCmd, nil, nil, getHealthCheckURLs(), servicesLogFile, false)
+	e.services = newServer("services", startCmd, nil, getHealthCheckURLs(), servicesLogFile)
 	return e.services.start()
 }
 
@@ -335,7 +335,7 @@ func (es *e2eService) startNamespaceController() error {
 }
 
 func (es *e2eService) startKubeletServer() (*server, error) {
-	var killCommand, restartCommand *exec.Cmd
+	var killCommand *exec.Cmd
 	cmdArgs := []string{}
 	if systemdRun, err := exec.LookPath("systemd-run"); err == nil {
 		// On systemd services, detection of a service / unit works reliably while
@@ -343,9 +343,8 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		// Since kubelet will typically be run as a service it also makes more
 		// sense to test it that way
 		unitName := fmt.Sprintf("kubelet-%d.service", rand.Int31())
-		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", getKubeletServerBin())
+		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, getKubeletServerBin())
 		killCommand = exec.Command("sudo", "systemctl", "kill", unitName)
-		restartCommand = exec.Command("sudo", "systemctl", "restart", unitName)
 		es.logFiles["kubelet.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
@@ -373,7 +372,6 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		"--pod-cidr=10.180.0.0/24", // Assign a fixed CIDR to the node because there is no node controller.
 		"--eviction-hard", framework.TestContext.EvictionHard,
 		"--eviction-pressure-transition-period", "30s",
-		"--feature-gates", "DynamicKubeletConfig=true", // TODO(mtaufen): Eventually replace with a value from the framework.TestContext
 	)
 	if framework.TestContext.CgroupsPerQOS {
 		// TODO: enable this when the flag is stable and available in kubelet.
@@ -396,10 +394,8 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		"kubelet",
 		cmd,
 		killCommand,
-		restartCommand,
 		[]string{kubeletHealthCheckURL},
-		"kubelet.log",
-		true)
+		"kubelet.log")
 	return server, server.start()
 }
 
@@ -412,32 +408,20 @@ type server struct {
 	// killCommand is the command used to stop the server. It is not required. If it
 	// is not specified, `sudo kill` will be used to stop the server.
 	killCommand *exec.Cmd
-	// restartCommand is the command used to restart the server. If provided, it will be used
-	// instead of startCommand when restarting the server.
-	restartCommand *exec.Cmd
 	// healthCheckUrls is the urls used to check whether the server is ready.
 	healthCheckUrls []string
 	// outFilename is the name of the log file. The stdout and stderr of the server
 	// will be redirected to this file.
 	outFilename string
-	// restartOnExit determines whether a restart loop is launched with the server
-	restartOnExit bool
-	// Writing to this channel, if it is not nil, stops the restart loop.
-	// When tearing down a server, you should check for this channel and write to it if it exists.
-	stopRestartingCh chan<- bool
-	// Read from this to confirm that the restart loop has stopped.
-	ackStopRestartingCh <-chan bool
 }
 
-func newServer(name string, start, kill, restart *exec.Cmd, urls []string, filename string, restartOnExit bool) *server {
+func newServer(name string, start, kill *exec.Cmd, urls []string, filename string) *server {
 	return &server{
 		name:            name,
 		startCommand:    start,
 		killCommand:     kill,
-		restartCommand:  restart,
 		healthCheckUrls: urls,
 		outFilename:     filename,
-		restartOnExit:   restartOnExit,
 	}
 }
 
@@ -450,8 +434,8 @@ func commandToString(c *exec.Cmd) string {
 }
 
 func (s *server) String() string {
-	return fmt.Sprintf("server %q start-command: `%s`, kill-command: `%s`, restart-command: `%s`, health-check: %v, output-file: %q", s.name,
-		commandToString(s.startCommand), commandToString(s.killCommand), commandToString(s.restartCommand), s.healthCheckUrls, s.outFilename)
+	return fmt.Sprintf("server %q start-command: `%s`, kill-command: `%s`, health-check: %v, output-file: %q", s.name,
+		commandToString(s.startCommand), commandToString(s.killCommand), s.healthCheckUrls, s.outFilename)
 }
 
 // readinessCheck checks whether services are ready via the health check urls. Once there is
@@ -497,23 +481,8 @@ func readinessCheck(urls []string, errCh <-chan error) error {
 	return fmt.Errorf("e2e service readiness check timeout %v", *serverStartTimeout)
 }
 
-// Note: restartOnExit == true requires len(s.healthCheckUrls) > 0 to work properly.
 func (s *server) start() error {
 	errCh := make(chan error)
-
-	var stopRestartingCh, ackStopRestartingCh chan bool
-	if s.restartOnExit {
-		if len(s.healthCheckUrls) == 0 {
-			return fmt.Errorf("Tried to start %s which has s.restartOnExit == true, but no health check urls provided.", s)
-		}
-
-		stopRestartingCh = make(chan bool)
-		ackStopRestartingCh = make(chan bool)
-
-		s.stopRestartingCh = stopRestartingCh
-		s.ackStopRestartingCh = ackStopRestartingCh
-	}
-
 	go func() {
 		defer close(errCh)
 
@@ -527,9 +496,10 @@ func (s *server) start() error {
 		defer outfile.Close()
 		defer outfile.Sync()
 
+		cmd := s.startCommand
 		// Set the command to write the output file
-		s.startCommand.Stdout = outfile
-		s.startCommand.Stderr = outfile
+		cmd.Stdout = outfile
+		cmd.Stderr = outfile
 
 		// Death of this test process should kill the server as well.
 		attrs := &syscall.SysProcAttr{}
@@ -541,95 +511,13 @@ func (s *server) start() error {
 			errCh <- fmt.Errorf("failed to set Pdeathsig field (non-linux build)")
 			return
 		}
-		s.startCommand.SysProcAttr = attrs
+		cmd.SysProcAttr = attrs
 
-		// Start the command
-		err = s.startCommand.Start()
+		// Run the command
+		err = cmd.Run()
 		if err != nil {
-			errCh <- fmt.Errorf("failed to run %s: %v", s, err)
+			errCh <- fmt.Errorf("failed to run server start command %q: %v", commandToString(cmd), err)
 			return
-		}
-		if !s.restartOnExit {
-			// If we aren't planning on restarting, ok to Wait() here to release resources.
-			// Otherwise, we Wait() in the restart loop.
-			err = s.startCommand.Wait()
-			if err != nil {
-				errCh <- fmt.Errorf("failed to run %s: %v", s, err)
-				return
-			}
-		} else {
-			// New stuff
-			usedStartCmd := true
-			for {
-				// Wait for an initial health check to pass, so that we are sure the server started.
-				err := readinessCheck(s.healthCheckUrls, nil)
-				if err != nil {
-					if usedStartCmd {
-						s.startCommand.Wait() // Release resources if necessary.
-					}
-					// This should not happen, immediately stop the e2eService process.
-					glog.Fatalf("restart loop readinessCheck failed for %s", s)
-				}
-
-				// Initial health check passed, wait until a health check fails again.
-			stillAlive:
-				for {
-					select {
-					case <-stopRestartingCh:
-						ackStopRestartingCh <- true
-						return
-					case <-time.After(time.Second):
-						for _, url := range s.healthCheckUrls {
-							resp, err := http.Get(url)
-							if err != nil || resp.StatusCode != http.StatusOK {
-								break stillAlive
-							}
-						}
-					}
-				}
-
-				if usedStartCmd {
-					s.startCommand.Wait() // Release resources from last cmd
-					usedStartCmd = false
-				}
-				if s.restartCommand != nil {
-					// Always make a fresh copy of restartCommand before running, we may have to restart multiple times
-					s.restartCommand = &exec.Cmd{
-						Path:        s.restartCommand.Path,
-						Args:        s.restartCommand.Args,
-						Env:         s.restartCommand.Env,
-						Dir:         s.restartCommand.Dir,
-						Stdin:       s.restartCommand.Stdin,
-						Stdout:      s.restartCommand.Stdout,
-						Stderr:      s.restartCommand.Stderr,
-						ExtraFiles:  s.restartCommand.ExtraFiles,
-						SysProcAttr: s.restartCommand.SysProcAttr,
-					}
-					err = s.restartCommand.Run() // Run and wait for exit. This command is assumed to have short duration, e.g. systemctl restart
-					if err != nil {
-						// This should not happen, immediately stop the e2eService process.
-						glog.Fatalf("restarting %s with restartCommand failed. Error: %v.", s, err)
-					}
-				} else {
-					s.startCommand = &exec.Cmd{
-						Path:        s.startCommand.Path,
-						Args:        s.startCommand.Args,
-						Env:         s.startCommand.Env,
-						Dir:         s.startCommand.Dir,
-						Stdin:       s.startCommand.Stdin,
-						Stdout:      s.startCommand.Stdout,
-						Stderr:      s.startCommand.Stderr,
-						ExtraFiles:  s.startCommand.ExtraFiles,
-						SysProcAttr: s.startCommand.SysProcAttr,
-					}
-					err = s.startCommand.Start()
-					usedStartCmd = true
-					if err != nil {
-						// This should not happen, immediately stop the e2eService process.
-						glog.Fatalf("restarting %s with startCommand failed. Error: %v.", s, err)
-					}
-				}
-			}
 		}
 	}()
 
@@ -639,12 +527,6 @@ func (s *server) start() error {
 func (s *server) kill() error {
 	name := s.name
 	cmd := s.startCommand
-
-	// If s has a restart loop, turn it off.
-	if s.restartOnExit {
-		s.stopRestartingCh <- true
-		<-s.ackStopRestartingCh
-	}
 
 	if s.killCommand != nil {
 		return s.killCommand.Run()
