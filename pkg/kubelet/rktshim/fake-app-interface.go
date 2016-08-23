@@ -181,7 +181,7 @@ func (r *FakeRuntime) ListContainers(*runtimeApi.ContainerFilter) ([]*runtimeApi
 	for _, c := range r.Containers {
 		list = append(list, &runtimeApi.Container{
 			Id:       c.Status.Id,
-			Name:     c.Config.Name,
+			Metadata: c.Config.Metadata,
 			Labels:   c.Config.Labels,
 			ImageRef: c.Status.ImageRef,
 			State:    &c.State,
