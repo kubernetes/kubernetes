@@ -191,7 +191,7 @@ func NodeNameTriggerFunc(obj runtime.Object) []storage.MatchValue {
 // PodToSelectableFields returns a field set that represents the object
 // TODO: fields are not labels, and the validation rules for them do not apply.
 func PodToSelectableFields(pod *api.Pod) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(pod.ObjectMeta, true)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&pod.ObjectMeta, true)
 	podSpecificFieldsSet := fields.Set{
 		"spec.nodeName":      pod.Spec.NodeName,
 		"spec.restartPolicy": string(pod.Spec.RestartPolicy),

@@ -111,7 +111,7 @@ func MatchPersistentVolumes(label labels.Selector, field fields.Selector) *gener
 
 // PersistentVolumeToSelectableFields returns a field set that represents the object
 func PersistentVolumeToSelectableFields(persistentvolume *api.PersistentVolume) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(persistentvolume.ObjectMeta, false)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&persistentvolume.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
 		// This is a bug, but we need to support it for backward compatibility.
 		"name": persistentvolume.Name,

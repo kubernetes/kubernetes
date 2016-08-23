@@ -98,7 +98,7 @@ func (petSetStrategy) AllowUnconditionalUpdate() bool {
 
 // PetSetToSelectableFields returns a field set that represents the object.
 func PetSetToSelectableFields(petSet *apps.PetSet) fields.Set {
-	return generic.ObjectMetaFieldsSet(petSet.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&petSet.ObjectMeta, true)
 }
 
 // MatchPetSet is the filter used by the generic etcd backend to watch events

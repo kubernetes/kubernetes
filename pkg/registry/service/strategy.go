@@ -115,7 +115,7 @@ func MatchServices(label labels.Selector, field fields.Selector) *generic.Select
 }
 
 func ServiceToSelectableFields(service *api.Service) fields.Set {
-	return generic.ObjectMetaFieldsSet(service.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&service.ObjectMeta, true)
 }
 
 type serviceStatusStrategy struct {
