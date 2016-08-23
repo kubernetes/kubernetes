@@ -489,7 +489,7 @@ func TestUpdateExistingNodeStatus(t *testing.T) {
 	}
 
 	if !api.Semantic.DeepEqual(expectedNode, updatedNode) {
-		t.Errorf("expected \n%v\n, got \n%v", expectedNode, updatedNode)
+		t.Errorf("unexpected objects: %s", diff.ObjectDiff(expectedNode, updatedNode))
 	}
 }
 
@@ -644,7 +644,8 @@ func TestUpdateExistingNodeOutOfDiskStatusWithTransitionFrequency(t *testing.T) 
 		}
 
 		if !reflect.DeepEqual(tc.expected, oodCondition) {
-			t.Errorf("%d.\nwant \n%v\n, got \n%v", tcIdx, tc.expected, oodCondition)
+			t.Errorf("%d.\nunexpected objects: %s", tcIdx, diff.ObjectDiff(tc.expected, oodCondition))
+
 		}
 	}
 }
