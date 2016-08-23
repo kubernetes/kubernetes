@@ -66,7 +66,8 @@ func Run(serverOptions *genericoptions.ServerRunOptions) error {
 	genericvalidation.VerifyEtcdServersList(serverOptions)
 	config := genericapiserver.NewConfig(serverOptions)
 	config.Serializer = api.Codecs
-	s, err := genericapiserver.New(config)
+	config.SetDefaults()
+	s, err := config.New()
 	if err != nil {
 		return fmt.Errorf("Error in bringing up the server: %v", err)
 	}

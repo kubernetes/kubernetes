@@ -191,7 +191,8 @@ func Run(s *options.ServerRunOptions) error {
 		cachesize.SetWatchCacheSizes(s.WatchCacheSizes)
 	}
 
-	m, err := genericapiserver.New(genericConfig)
+	genericConfig.SetDefaults()
+	m, err := genericConfig.New()
 	if err != nil {
 		return err
 	}
