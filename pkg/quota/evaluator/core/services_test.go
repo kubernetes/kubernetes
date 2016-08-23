@@ -53,6 +53,7 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				},
 			},
 			usage: api.ResourceList{
+				api.ResourceServicesNodePorts:     resource.MustParse("0"),
 				api.ResourceServicesLoadBalancers: resource.MustParse("1"),
 				api.ResourceServices:              resource.MustParse("1"),
 			},
@@ -64,7 +65,9 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				},
 			},
 			usage: api.ResourceList{
-				api.ResourceServices: resource.MustParse("1"),
+				api.ResourceServices:              resource.MustParse("1"),
+				api.ResourceServicesNodePorts:     resource.MustParse("0"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
 			},
 		},
 		"nodeports": {
@@ -79,8 +82,9 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				},
 			},
 			usage: api.ResourceList{
-				api.ResourceServices:          resource.MustParse("1"),
-				api.ResourceServicesNodePorts: resource.MustParse("1"),
+				api.ResourceServices:              resource.MustParse("1"),
+				api.ResourceServicesNodePorts:     resource.MustParse("1"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
 			},
 		},
 		"multi-nodeports": {
@@ -98,8 +102,9 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 				},
 			},
 			usage: api.ResourceList{
-				api.ResourceServices:          resource.MustParse("1"),
-				api.ResourceServicesNodePorts: resource.MustParse("2"),
+				api.ResourceServices:              resource.MustParse("1"),
+				api.ResourceServicesNodePorts:     resource.MustParse("2"),
+				api.ResourceServicesLoadBalancers: resource.MustParse("0"),
 			},
 		},
 	}
@@ -107,6 +112,69 @@ func TestServiceEvaluatorUsage(t *testing.T) {
 		actual := evaluator.Usage(testCase.service)
 		if !quota.Equals(testCase.usage, actual) {
 			t.Errorf("%s expected: %v, actual: %v", testName, testCase.usage, actual)
+		}
+	}
+}
+
+func TestServiceConstraintsFunc(t *testing.T) {
+	testCases := map[string]struct {
+		service  *api.Service
+		required []api.ResourceName
+		err      string
+	}{
+		"loadbalancer": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeLoadBalancer,
+				},
+			},
+			required: []api.ResourceName{api.ResourceServicesLoadBalancers},
+		},
+		"clusterip": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+				},
+			},
+			required: []api.ResourceName{api.ResourceServicesLoadBalancers, api.ResourceServices},
+		},
+		"nodeports": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+					},
+				},
+			},
+			required: []api.ResourceName{api.ResourceServicesNodePorts},
+		},
+		"multi-nodeports": {
+			service: &api.Service{
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Port: 27443,
+						},
+						{
+							Port: 27444,
+						},
+					},
+				},
+			},
+			required: []api.ResourceName{api.ResourceServicesNodePorts},
+		},
+	}
+	for testName, test := range testCases {
+		err := ServiceConstraintsFunc(test.required, test.service)
+		switch {
+		case err != nil && len(test.err) == 0,
+			err == nil && len(test.err) != 0,
+			err != nil && test.err != err.Error():
+			t.Errorf("%s unexpected error: %v", testName, err)
 		}
 	}
 }
