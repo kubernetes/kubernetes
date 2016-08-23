@@ -227,7 +227,7 @@ func (o *DrainOptions) RunDrain() error {
 	if err = o.deletePods(pods); err != nil {
 		return err
 	}
-	cmdutil.PrintSuccess(o.mapper, false, o.out, "node", o.nodeInfo.Name, "drained")
+	cmdutil.PrintSuccess(o.mapper, false, o.out, "node", o.nodeInfo.Name, false, "drained")
 	return nil
 }
 
@@ -391,7 +391,7 @@ func (o *DrainOptions) deletePods(pods []api.Pod) error {
 		if err != nil {
 			return err
 		}
-		cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, "deleted")
+		cmdutil.PrintSuccess(o.mapper, false, o.out, "pod", pod.Name, false, "deleted")
 	}
 
 	return nil
@@ -408,7 +408,7 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 	if o.nodeInfo.Mapping.GroupVersionKind.Kind == "Node" {
 		unsched := reflect.ValueOf(o.nodeInfo.Object).Elem().FieldByName("Spec").FieldByName("Unschedulable")
 		if unsched.Bool() == desired {
-			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, already(desired))
+			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, already(desired))
 		} else {
 			helper := resource.NewHelper(o.restClient, o.nodeInfo.Mapping)
 			unsched.SetBool(desired)
@@ -416,10 +416,10 @@ func (o *DrainOptions) RunCordonOrUncordon(desired bool) error {
 			if err != nil {
 				return err
 			}
-			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, changed(desired))
+			cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, changed(desired))
 		}
 	} else {
-		cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, "skipped")
+		cmdutil.PrintSuccess(o.mapper, false, o.out, o.nodeInfo.Mapping.Resource, o.nodeInfo.Name, false, "skipped")
 	}
 
 	return nil
