@@ -156,7 +156,7 @@ type ContentConfig struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 }
 
-// Returns Host and AlternateHosts as a single slice, if Host is already present
+// Hosts returns Host and AlternateHosts as a single slice, if Host is already present
 // in AlternateHosts it won't be repeated
 func (c *Config) Hosts() []string {
 	var hosts []string
