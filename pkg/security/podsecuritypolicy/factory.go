@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/user"
 	"k8s.io/kubernetes/pkg/util/errors"
@@ -55,6 +56,11 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		errs = append(errs, err)
 	}
 
+	seccompStrat, err := createSeccompStrategy(psp)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	fsGroupStrat, err := createFSGroupStrategy(&psp.Spec.FSGroup)
 	if err != nil {
 		errs = append(errs, err)
@@ -81,6 +87,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		FSGroupStrategy:           fsGroupStrat,
 		SupplementalGroupStrategy: supGroupStrat,
 		CapabilitiesStrategy:      capStrat,
+		SeccompStrategy:           seccompStrat,
 	}
 
 	return strategies, nil
@@ -115,6 +122,11 @@ func createSELinuxStrategy(opts *extensions.SELinuxStrategyOptions) (selinux.SEL
 // createAppArmorStrategy creates a new AppArmor strategy.
 func createAppArmorStrategy(psp *extensions.PodSecurityPolicy) (apparmor.Strategy, error) {
 	return apparmor.NewStrategy(psp.Annotations), nil
+}
+
+// createSeccompStrategy creates a new seccomp strategy.
+func createSeccompStrategy(psp *extensions.PodSecurityPolicy) (seccomp.Strategy, error) {
+	return seccomp.NewStrategy(psp.Annotations), nil
 }
 
 // createFSGroupStrategy creates a new fsgroup strategy

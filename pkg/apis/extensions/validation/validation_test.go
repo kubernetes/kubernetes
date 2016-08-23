@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -1596,6 +1597,15 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + ",not-good",
 	}
 
+	invalidSeccompDefault := validPSP()
+	invalidSeccompDefault.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey: "not-good",
+	}
+	invalidSeccompAllowed := validPSP()
+	invalidSeccompAllowed.Annotations = map[string]string{
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,not-good",
+	}
+
 	errorCases := map[string]struct {
 		psp         *extensions.PodSecurityPolicy
 		errorType   field.ErrorType
@@ -1686,6 +1696,16 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 			errorType:   field.ErrorTypeInvalid,
 			errorDetail: "invalid AppArmor profile name: \"not-good\"",
 		},
+		"invalid seccomp default profile": {
+			psp:         invalidSeccompDefault,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
+		"invalid seccomp allowed profile": {
+			psp:         invalidSeccompAllowed,
+			errorType:   field.ErrorTypeInvalid,
+			errorDetail: "must be a valid seccomp profile",
+		},
 	}
 
 	for k, v := range errorCases {
@@ -1728,6 +1748,12 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault + "," + apparmor.ProfileNamePrefix + "foo",
 	}
 
+	validSeccomp := validPSP()
+	validSeccomp.Annotations = map[string]string{
+		seccomp.DefaultProfileAnnotationKey:  "docker/default",
+		seccomp.AllowedProfilesAnnotationKey: "docker/default,unconfined,localhost/foo",
+	}
+
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy
 	}{
@@ -1748,6 +1774,9 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 		},
 		"valid AppArmor annotations": {
 			psp: validAppArmor,
+		},
+		"valid seccomp annotations": {
+			psp: validSeccomp,
 		},
 	}
 
