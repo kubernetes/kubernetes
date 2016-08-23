@@ -62,7 +62,7 @@ func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Co
 	config.APIPrefix = "/api"
 	config.APIGroupPrefix = "/apis"
 
-	s, err := New(&config)
+	s, err := config.New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -114,7 +114,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.APIGroupPrefix = "/apiGroupPrefix"
 	config.Serializer = api.Codecs
 
-	s, err := New(&config)
+	s, err := config.New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
