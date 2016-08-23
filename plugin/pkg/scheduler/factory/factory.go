@@ -509,7 +509,7 @@ func (factory *ConfigFactory) createReplicaSetLW() *cache.ListWatch {
 	return cache.NewListWatchFromClient(factory.Client.ExtensionsClient, "replicasets", api.NamespaceAll, fields.ParseSelectorOrDie(""))
 }
 
-func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.FIFO) func(pod *api.Pod, err error) {
+func (factory *ConfigFactory) makeDefaultErrorFunc(backoff *podBackoff, podQueue *cache.Priority) func(pod *api.Pod, err error) {
 	return func(pod *api.Pod, err error) {
 		if err == scheduler.ErrNoNodesAvailable {
 			glog.V(4).Infof("Unable to schedule %v %v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
