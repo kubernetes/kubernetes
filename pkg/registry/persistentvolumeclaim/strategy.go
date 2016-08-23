@@ -111,10 +111,9 @@ func MatchPersistentVolumeClaim(label labels.Selector, field fields.Selector) *g
 
 // PersistentVolumeClaimToSelectableFields returns a field set that represents the object
 func PersistentVolumeClaimToSelectableFields(persistentvolumeclaim *api.PersistentVolumeClaim) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(persistentvolumeclaim.ObjectMeta, true)
-	specificFieldsSet := fields.Set{
-		// This is a bug, but we need to support it for backward compatibility.
-		"name": persistentvolumeclaim.Name,
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+	fields := make(fields.Set, 3)
+	// This is a bug, but we need to support it for backward compatibility.
+	fields["name"] = persistentvolumeclaim.Name
+	generic.AddObjectMetaFields(&persistentvolumeclaim.ObjectMeta, true, &fields)
+	return fields
 }

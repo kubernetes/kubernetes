@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -71,31 +70,31 @@ func (eventStrategy) AllowUnconditionalUpdate() bool {
 }
 
 func MatchEvent(label labels.Selector, field fields.Selector) *generic.SelectionPredicate {
-	return &generic.SelectionPredicate{Label: label, Field: field, GetAttrs: getAttrs}
+	return &generic.SelectionPredicate{
+		Label: label,
+		Field: field,
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			event, ok := obj.(*api.Event)
+			if !ok {
+				return nil, nil, fmt.Errorf("not an event")
+			}
+			return labels.Set(event.Labels), SelectableFields(event), nil
+		},
+	}
 }
 
-func getAttrs(obj runtime.Object) (objLabels labels.Set, objFields fields.Set, err error) {
-	event, ok := obj.(*api.Event)
-	if !ok {
-		return nil, nil, errors.NewInternalError(fmt.Errorf("object is not of type event: %#v", obj))
-	}
-	l := event.Labels
-	if l == nil {
-		l = labels.Set{}
-	}
-
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(event.ObjectMeta, true)
-	specificFieldsSet := fields.Set{
-		"involvedObject.kind":            event.InvolvedObject.Kind,
-		"involvedObject.namespace":       event.InvolvedObject.Namespace,
-		"involvedObject.name":            event.InvolvedObject.Name,
-		"involvedObject.uid":             string(event.InvolvedObject.UID),
-		"involvedObject.apiVersion":      event.InvolvedObject.APIVersion,
-		"involvedObject.resourceVersion": event.InvolvedObject.ResourceVersion,
-		"involvedObject.fieldPath":       event.InvolvedObject.FieldPath,
-		"reason":                         event.Reason,
-		"source":                         event.Source.Component,
-		"type":                           event.Type,
-	}
-	return l, generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet), nil
+func SelectableFields(event *api.Event) fields.Set {
+	fields := make(fields.Set, 12)
+	fields["involvedObject.kind"] = event.InvolvedObject.Kind
+	fields["involvedObject.namespace"] = event.InvolvedObject.Namespace
+	fields["involvedObject.name"] = event.InvolvedObject.Name
+	fields["involvedObject.uid"] = string(event.InvolvedObject.UID)
+	fields["involvedObject.apiVersion"] = event.InvolvedObject.APIVersion
+	fields["involvedObject.resourceVersion"] = event.InvolvedObject.ResourceVersion
+	fields["involvedObject.fieldPath"] = event.InvolvedObject.FieldPath
+	fields["reason"] = event.Reason
+	fields["source"] = event.Source.Component
+	fields["type"] = event.Type
+	generic.AddObjectMetaFields(&event.ObjectMeta, true, &fields)
+	return fields
 }

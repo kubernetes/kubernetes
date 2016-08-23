@@ -103,11 +103,10 @@ func (rcStrategy) AllowUnconditionalUpdate() bool {
 
 // ControllerToSelectableFields returns a field set that represents the object.
 func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(controller.ObjectMeta, true)
-	controllerSpecificFieldsSet := fields.Set{
-		"status.replicas": strconv.Itoa(int(controller.Status.Replicas)),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, controllerSpecificFieldsSet)
+	fields := make(fields.Set, 3)
+	fields["status.replicas"] = strconv.Itoa(int(controller.Status.Replicas))
+	generic.AddObjectMetaFields(&controller.ObjectMeta, true, &fields)
+	return fields
 }
 
 // MatchController is the filter used by the generic etcd backend to route

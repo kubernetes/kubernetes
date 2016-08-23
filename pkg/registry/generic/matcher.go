@@ -27,25 +27,19 @@ import (
 // AttrFunc returns label and field sets for List or Watch to compare against, or an error.
 type AttrFunc func(obj runtime.Object) (label labels.Set, field fields.Set, err error)
 
-// ObjectMetaFieldsSet returns a fields set that represents the ObjectMeta.
-func ObjectMetaFieldsSet(objectMeta api.ObjectMeta, hasNamespaceField bool) fields.Set {
-	if !hasNamespaceField {
-		return fields.Set{
-			"metadata.name": objectMeta.Name,
-		}
-	}
-	return fields.Set{
-		"metadata.name":      objectMeta.Name,
-		"metadata.namespace": objectMeta.Namespace,
+// AddObjectMetaFields adds fields that represents the ObjectMeta to the given set.
+func AddObjectMetaFields(objectMeta *api.ObjectMeta, hasNamespaceField bool, set *fields.Set) {
+	(*set)["metadata.name"] = objectMeta.Name
+	if hasNamespaceField {
+		(*set)["metadata.namespace"] = objectMeta.Namespace
 	}
 }
 
-// MergeFieldsSets merges a fields'set from fragment into the source.
-func MergeFieldsSets(source fields.Set, fragment fields.Set) fields.Set {
-	for k, value := range fragment {
-		source[k] = value
-	}
-	return source
+// ObjectMetaFieldsSet returns a fields set that represents the ObjectMeta.
+func ObjectMetaFieldsSet(objectMeta api.ObjectMeta, hasNamespaceField bool) fields.Set {
+	result := make(fields.Set, 2)
+	AddObjectMetaFields(&objectMeta, hasNamespaceField, &result)
+	return result
 }
 
 // SelectionPredicate implements a generic predicate that can be passed to

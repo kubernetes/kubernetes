@@ -139,11 +139,10 @@ type ResourceGetter interface {
 
 // NodeToSelectableFields returns a field set that represents the object.
 func NodeToSelectableFields(node *api.Node) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(node.ObjectMeta, false)
-	specificFieldsSet := fields.Set{
-		"spec.unschedulable": fmt.Sprint(node.Spec.Unschedulable),
-	}
-	return generic.MergeFieldsSets(objectMetaFieldsSet, specificFieldsSet)
+	fields := make(fields.Set, 2)
+	fields["spec.unschedulable"] = fmt.Sprint(node.Spec.Unschedulable)
+	generic.AddObjectMetaFields(&node.ObjectMeta, false, &fields)
+	return fields
 }
 
 // MatchNode returns a generic matcher for a given label and field selector.
