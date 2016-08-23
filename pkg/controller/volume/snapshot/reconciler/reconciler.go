@@ -90,6 +90,5 @@ func (rc *reconciler) reconciliationLoopFunc() func() {
 					err)
 			}
 		}
-
 	}
 }

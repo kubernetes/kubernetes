@@ -150,6 +150,9 @@ type Disks interface {
 
 	// GetSnapshot gets the snapshot with the specified name
 	GetSnapshot(snapshotName string) (*compute.Snapshot, error)
+
+	// SnapshotExists checks if a snapshot with the specified name exists
+	SnapshotExists(snapshotName string) (bool, error)
 }
 
 func init() {
@@ -2559,6 +2562,17 @@ func (gce *GCECloud) GetSnapshot(snapshotName string) (*compute.Snapshot, error)
 	}
 
 	return snapshot, nil
+}
+
+func (gce *GCECloud) SnapshotExists(snapshotName string) (bool, error) {
+	snapshot, err := gce.GetSnapshot(snapshotName)
+	if snapshot != nil {
+		return true, nil
+	} else if isHTTPErrorCode(err, http.StatusNotFound) {
+		return false, nil
+	} else {
+		return false, err
+	}
 }
 
 // Returns a gceDisk for the disk, if it is found in the specified zone.
