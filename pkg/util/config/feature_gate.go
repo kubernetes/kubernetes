@@ -34,16 +34,20 @@ const (
 	// a featureSpec entry to knownFeatures.
 
 	// allAlphaGate is a global toggle for alpha features. Per-feature key
-	// values override the default set by allAlphaGate, if they come later in the
-	// specification of gates. Examples:
+	// values override the default set by allAlphaGate. Examples:
 	//   AllAlpha=false,NewFeature=true  will result in newFeature=true
-	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
-	allAlphaGate         = "AllAlpha"
-	dynamicKubeletConfig = "DynamicKubeletConfig"
+	//   NewFeature=false,AllAlpha=true will result in newFeature=false
+	allAlphaGate = "AllAlpha"
+
+	// DynamicKubeletConfig is a toggle for kubelet loading its
+	// config via a config map from the apiserver.
+	dynamicKubeletConfigGate = "DynamicKubeletConfig"
 
 	// dynamicVolumeProvisioningGate is a toggle for alpha dynamic volume
 	// provisioning support, which is controlled by annotations.
 	dynamicVolumeProvisioningGate = "DynamicVolumeProvisioning"
+
+	// TODO: Define gate/accessor for AppArmor
 )
 
 var (
@@ -51,7 +55,7 @@ var (
 	// represented here.
 	knownFeatures = map[string]featureSpec{
 		allAlphaGate:                  {false, alpha},
-		dynamicKubeletConfig:          {false, alpha},
+		dynamicKubeletConfigGate:      {false, alpha},
 		dynamicVolumeProvisioningGate: {true, alpha},
 	}
 
@@ -98,7 +102,10 @@ type FeatureGate interface {
 	// alpha: v1.3
 	DynamicVolumeProvisioning() bool
 
-	// TODO: Define accessors for each non-API alpha feature.
+	// DynamicKubeletConfig is a toggle for kubelet loading its
+	// config via a config map from the apiserver.
+	// owner: @mtaufen
+	// alpha: v1.4
 	DynamicKubeletConfig() bool
 }
 
@@ -169,7 +176,7 @@ func (f *featureGate) Type() string {
 }
 
 func (f *featureGate) DynamicKubeletConfig() bool {
-	return f.lookup(dynamicKubeletConfig)
+	return f.lookup(dynamicKubeletConfigGate)
 }
 
 func (f *featureGate) DynamicVolumeProvisioning() bool {
