@@ -30,7 +30,7 @@ import (
 )
 
 const (
-	podCgroupNamePrefix = "pod#"
+	podCgroupNamePrefix = "pod_"
 	minimumMemoryValue  = int64(1)
 )
 
@@ -112,6 +112,12 @@ func (m *podContainerManagerImpl) GetPodContainerName(pod *api.Pod) string {
 	podContainer := podCgroupNamePrefix + string(pod.UID)
 	// Get the absolute path of the cgroup
 	return path.Join(parentContainer, podContainer)
+}
+
+// GetPodContainerNameForDriver gets the name that aligns with the cgroup driver...
+// intended for integration with legacy runtimes that do not all accept the cgroupfs syntax
+func (m *podContainerManagerImpl) GetPodContainerNameForDriver(pod *api.Pod) string {
+	return m.cgroupManager.Adapt(m.GetPodContainerName(pod))
 }
 
 // Scans through all the subsystems pod cgroups directory.
@@ -234,6 +240,10 @@ func (m *podContainerManagerNoop) EnsureExists(_ *api.Pod) error {
 
 func (m *podContainerManagerNoop) GetPodContainerName(_ *api.Pod) string {
 	return m.cgroupRoot
+}
+
+func (m *podContainerManagerNoop) GetPodContainerNameForDriver(_ *api.Pod) string {
+	return ""
 }
 
 // Destroy destroys the pod container cgroup paths

@@ -35,6 +35,10 @@ func (m *podContainerManagerStub) GetPodContainerName(_ *api.Pod) string {
 	return ""
 }
 
+func (m *podContainerManagerStub) GetPodContainerNameForDriver(_ *api.Pod) string {
+	return ""
+}
+
 func (m *podContainerManagerStub) Destroy(_ string) error {
 	return nil
 }

@@ -699,6 +699,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	if len(opts.CgroupParent) > 0 {
+		glog.Infof("cgroup manager: launching container with cgroup parent: %v", opts.CgroupParent)
 		hc.CgroupParent = opts.CgroupParent
 	}
 

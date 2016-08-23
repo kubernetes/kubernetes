@@ -1423,7 +1423,9 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	pcm := kl.containerManager.NewPodContainerManager()
-	podContainerName := pcm.GetPodContainerName(pod)
+	// TODO: the pod container name needs to be formatted based on cgroup driver of runtime (in this case docker expects slice syntax)
+	// THIS IS CONFUSING IN THE CASE OF DOCKER THAT NEEDS FORMAT AS EXPECTED
+	podContainerName := pcm.GetPodContainerNameForDriver(pod)
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: podContainerName}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
@@ -2061,48 +2063,6 @@ func (kl *Kubelet) cleanupOrphanedPodCgroups(
 		go pcm.Destroy(val)
 	}
 	return nil
-}
-
-// cleanupOrphanedPodDirs removes the volumes of pods that should not be
-// running and that have no containers running.
-func (kl *Kubelet) cleanupOrphanedPodDirs(
-	pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
-	allPods := sets.NewString()
-	for _, pod := range pods {
-		allPods.Insert(string(pod.UID))
-	}
-	for _, pod := range runningPods {
-		allPods.Insert(string(pod.ID))
-	}
-
-	found, err := kl.listPodsFromDisk()
-	if err != nil {
-		return err
-	}
-	errlist := []error{}
-	for _, uid := range found {
-		if allPods.Has(string(uid)) {
-			continue
-		}
-		// If volumes have not been unmounted/detached, do not delete directory.
-		// Doing so may result in corruption of data.
-		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
-			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up; err: %v", uid, err)
-			continue
-		}
-		// Check whether volume is still mounted on disk. If so, do not delete directory
-		if volumeNames, err := kl.getPodVolumeNameListFromDisk(uid); err != nil || len(volumeNames) != 0 {
-			glog.V(3).Infof("Orphaned pod %q found, but volumes are still mounted; err: %v, volumes: %v ", uid, err, volumeNames)
-			continue
-		}
-
-		glog.V(3).Infof("Orphaned pod %q found, removing", uid)
-		if err := os.RemoveAll(kl.getPodDir(uid)); err != nil {
-			glog.Errorf("Failed to remove orphaned pod %q dir; err: %v", uid, err)
-			errlist = append(errlist, err)
-		}
-	}
-	return utilerrors.NewAggregate(errlist)
 }
 
 // Get pods which should be resynchronized. Currently, the following pod should be resynchronized:

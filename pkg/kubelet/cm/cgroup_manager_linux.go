@@ -19,11 +19,110 @@ package cm
 import (
 	"fmt"
 	"path"
+	"strings"
 
+	"github.com/golang/glog"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
+	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 )
+
+// libcontainerCgroupManagerType defines how to interface with libcontainer
+type libcontainerCgroupManagerType string
+
+const (
+	// libcontainerCgroupfs means use libcontainer with cgroupfs
+	libcontainerCgroupfs libcontainerCgroupManagerType = "cgroupfs"
+	// libcontainerSystemd means use libcontainer with systemd
+	libcontainerSystemd libcontainerCgroupManagerType = "systemd"
+)
+
+// libcontainerFacade provides a simplified interface to libcontainer based on libcontainer type.
+type libcontainerFacade struct {
+	// cgroupManagerType defines how to interface with libcontainer
+	cgroupManagerType libcontainerCgroupManagerType
+}
+
+// newLibcontainerFacade returns a configured libcontainerFacade for specified manager.
+// it does any initialization required by that manager to function.
+func newLibcontainerFacade(cgroupManagerType libcontainerCgroupManagerType) *libcontainerFacade {
+	if cgroupManagerType == libcontainerSystemd {
+		// this means you asked systemd to manage cgroups, but systemd was not on the host, so all you can do is panic...
+		if !cgroupsystemd.UseSystemd() {
+			panic(fmt.Errorf("systemd cgroup manager not available"))
+		}
+	}
+	return &libcontainerFacade{cgroupManagerType: cgroupManagerType}
+}
+
+func logCgroups(cgroups *libcontainerconfigs.Cgroup) {
+	glog.V(3).Infof("cgroup manager: name: %v, parent: %v, path: %v, scopePrefix: %v", cgroups.Name, cgroups.Parent, cgroups.Path, cgroups.ScopePrefix)
+}
+
+// newManager returns an implementation of cgroups.Manager
+func (l *libcontainerFacade) newManager(cgroups *libcontainerconfigs.Cgroup, paths map[string]string) (libcontainercgroups.Manager, error) {
+	logCgroups(cgroups)
+	switch l.cgroupManagerType {
+	case libcontainerCgroupfs:
+		return &cgroupfs.Manager{
+			Cgroups: cgroups,
+			Paths:   paths,
+		}, nil
+	case libcontainerSystemd:
+		return &cgroupsystemd.Manager{
+			Cgroups: cgroups,
+			Paths:   paths,
+		}, nil
+	}
+	return nil, fmt.Errorf("invalid cgroup manager configuration")
+}
+
+// adaptCgroupName modifies the cgroup name based on cgroupManagerType
+// for systemd, it modifies name to always have a .slice suffix
+func (l *libcontainerFacade) adaptCgroupName(name string) string {
+	if l.cgroupManagerType != libcontainerSystemd {
+		return name
+	}
+
+	// note: libcontainer w/ systemd driver defaults "" as system.slice, and we want -.slice
+	if name == "" || name == "/" {
+		return "-.slice"
+	}
+
+	// real hacky, but pod uids are of form 1234-12321-1321, so we cant confuse those as hierarchy steps in slice names
+	name = strings.Replace(name, "-", "", -1)
+
+	// hacky hack for now
+	result := ""
+	parts := strings.Split(name, "/")
+	for _, part := range parts {
+		// ignore leading stuff for now
+		if part == "" {
+			continue
+		}
+		if len(result) > 0 {
+			result = result + "-"
+		}
+		result = result + part
+	}
+	return result + ".slice"
+}
+
+// expandCgroupName expands systemd naming style to cgroupfs style
+func (l *libcontainerFacade) expandCgroupName(name string) string {
+	if l.cgroupManagerType != libcontainerSystemd {
+		return name
+	}
+
+	expandedName, err := cgroupsystemd.ExpandSlice(name)
+	if err != nil {
+		// THIS SHOULD NEVER HAPPEN, REFACTOR LATER IN CASE IT DOES
+		panic(fmt.Errorf("error expanding name: %v", err))
+	}
+
+	return expandedName
+}
 
 // CgroupSubsystems holds information about the mounted cgroup subsytems
 type CgroupSubsystems struct {
@@ -44,6 +143,8 @@ type cgroupManagerImpl struct {
 	// subsystems holds information about all the
 	// mounted cgroup subsytems on the node
 	subsystems *CgroupSubsystems
+	// facade simplifies interaction with libcontainer and its cgroup managers
+	facade *libcontainerFacade
 }
 
 // Make sure that cgroupManagerImpl implements the CgroupManager interface
@@ -53,35 +154,55 @@ var _ CgroupManager = &cgroupManagerImpl{}
 func NewCgroupManager(cs *CgroupSubsystems) CgroupManager {
 	return &cgroupManagerImpl{
 		subsystems: cs,
+		facade:     newLibcontainerFacade(libcontainerSystemd),
 	}
+}
+
+func (m *cgroupManagerImpl) Adapt(name string) string {
+	return m.facade.adaptCgroupName(name)
 }
 
 // Exists checks if all subsystem cgroups already exist
 func (m *cgroupManagerImpl) Exists(name string) bool {
+	glog.V(3).Infof("cgroup manager: start exists %v", name)
+
+	adaptedName := m.facade.adaptCgroupName(name)
+	expandedName := m.facade.expandCgroupName(adaptedName)
+
+	glog.V(3).Infof("cgroup manager: exists adapted name %v", adaptedName)
+	glog.V(3).Infof("cgroup manager: exists expanded name %v", expandedName)
+
 	// Get map of all cgroup paths on the system for the particular cgroup
 	cgroupPaths := make(map[string]string, len(m.subsystems.MountPoints))
 	for key, val := range m.subsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
+		cgroupPaths[key] = path.Join(val, expandedName)
 	}
 
 	// If even one cgroup doesn't exist we go on to create it
 	for _, path := range cgroupPaths {
+		glog.V(3).Infof("cgroup manager: exists path: %v", path)
 		if !libcontainercgroups.PathExists(path) {
 			return false
 		}
 	}
+	glog.V(3).Infof("cgroup manager: end exists %v", name)
 	return true
 }
 
 // Destroy destroys the specified cgroup
 func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
-	//cgroup name
-	name := cgroupConfig.Name
+	glog.V(3).Infof("cgroup manager: start destroy %v", cgroupConfig.Name)
+
+	// cgroup name
+	name := m.facade.adaptCgroupName(cgroupConfig.Name)
+	expandedName := m.facade.expandCgroupName(name)
+
+	glog.V(3).Infof("cgroup manager: exists adapted name %v", name)
 
 	// Get map of all cgroup paths on the system for the particular cgroup
 	cgroupPaths := make(map[string]string, len(m.subsystems.MountPoints))
 	for key, val := range m.subsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
+		cgroupPaths[key] = path.Join(val, expandedName)
 	}
 
 	// Initialize libcontainer's cgroup config
@@ -89,15 +210,18 @@ func (m *cgroupManagerImpl) Destroy(cgroupConfig *CgroupConfig) error {
 		Name:   path.Base(name),
 		Parent: path.Dir(name),
 	}
-	fsCgroupManager := cgroupfs.Manager{
-		Cgroups: libcontainerCgroupConfig,
-		Paths:   cgroupPaths,
+
+	manager, err := m.facade.newManager(libcontainerCgroupConfig, cgroupPaths)
+	if err != nil {
+		return err
 	}
 
 	// Delete cgroups using libcontainers Managers Destroy() method
-	if err := fsCgroupManager.Destroy(); err != nil {
+	if err = manager.Destroy(); err != nil {
 		return fmt.Errorf("Unable to destroy cgroup paths for cgroup %v : %v", name, err)
 	}
+
+	glog.V(3).Infof("cgroup manager: end destroy %v", cgroupConfig.Name)
 	return nil
 }
 
@@ -138,7 +262,8 @@ func setSupportedSubsytems(cgroupConfig *libcontainerconfigs.Cgroup) error {
 // Update updates the cgroup with the specified Cgroup Configuration
 func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	//cgroup name
-	name := cgroupConfig.Name
+	name := m.facade.adaptCgroupName(cgroupConfig.Name)
+	expandedName := m.facade.expandCgroupName(name)
 
 	// Extract the cgroup resource parameters
 	resourceConfig := cgroupConfig.ResourceParameters
@@ -156,7 +281,7 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 	// Get map of all cgroup paths on the system for the particular cgroup
 	cgroupPaths := make(map[string]string, len(m.subsystems.MountPoints))
 	for key, val := range m.subsystems.MountPoints {
-		cgroupPaths[key] = path.Join(val, name)
+		cgroupPaths[key] = path.Join(val, expandedName)
 	}
 
 	// Initialize libcontainer's cgroup config
@@ -175,28 +300,42 @@ func (m *cgroupManagerImpl) Update(cgroupConfig *CgroupConfig) error {
 
 // Create creates the specified cgroup
 func (m *cgroupManagerImpl) Create(cgroupConfig *CgroupConfig) error {
-	// get cgroup name
-	name := cgroupConfig.Name
+	glog.V(3).Infof("cgroup manager: begin create - %v", cgroupConfig.Name)
+
+	parent := path.Dir(cgroupConfig.Name)
+	name := path.Base(cgroupConfig.Name)
+
+	parent = m.facade.adaptCgroupName(parent)
+	name = m.facade.adaptCgroupName(name)
+	// systemd naming for slices needs to encode path...
+	name = m.facade.adaptCgroupName(cgroupConfig.Name)
+	glog.V(3).Infof("cgroup manager: create passing - %v", name)
 
 	// Initialize libcontainer's cgroup config
 	libcontainerCgroupConfig := &libcontainerconfigs.Cgroup{
-		Name:      path.Base(name),
-		Parent:    path.Dir(name),
+		Name:      name,
+		Parent:    parent,
 		Resources: &libcontainerconfigs.Resources{},
 	}
 
-	// get the fscgroup Manager with the specified cgroup configuration
-	fsCgroupManager := &cgroupfs.Manager{
-		Cgroups: libcontainerCgroupConfig,
+	// get the manager with the specified cgroup configuration
+	manager, err := m.facade.newManager(libcontainerCgroupConfig, nil)
+	if err != nil {
+		glog.V(3).Infof("cgroup manager: create error getting manager %v, %v", name, err)
+		return err
 	}
-	//Apply(0) is a hack to create the cgroup directories for each resource
+
+	// Apply(-1) is a hack to create the cgroup directories for each resource
 	// subsystem. The function [cgroups.Manager.apply()] applies cgroup
 	// configuration to the process with the specified pid.
 	// It creates cgroup files for each subsytems and writes the pid
 	// in the tasks file. We use the function to create all the required
 	// cgroup files but not attach any "real" pid to the cgroup.
-	if err := fsCgroupManager.Apply(-1); err != nil {
+	glog.V(3).Infof("cgroup manager: create - about to apply %v", name)
+	if err := manager.Apply(-1); err != nil {
+		glog.V(3).Infof("cgroup manager: create - did not apply %v", name)
 		return fmt.Errorf("Failed to apply cgroup config for %v: %v", name, err)
 	}
+	glog.V(3).Infof("cgroup manager: end create - %v", name)
 	return nil
 }

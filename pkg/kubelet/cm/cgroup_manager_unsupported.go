@@ -34,6 +34,10 @@ func NewCgroupManager(_ interface{}) CgroupManager {
 	return &unsupportedCgroupManager{}
 }
 
+func (m *unsupportedCgroupManager) Adapt(s string) bool {
+	return s
+}
+
 func (m *unsupportedCgroupManager) Exists(_ string) bool {
 	return false
 }
