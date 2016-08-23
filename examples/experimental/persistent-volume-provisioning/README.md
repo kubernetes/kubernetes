@@ -127,10 +127,10 @@ parameters:
   apiVersion: extensions/v1beta1                                                                                                                                                                                   
   kind: StorageClass                                                                                                                                                                                               
   metadata: 
-   name: fast
+   name: slow
 provisioner: kubernetes.io/rbd
 parameters:
-    monitors: 10.16.153.105:6789
+    monitors: 127.0.0.1:6789
     adminId: kube
     adminSecretName: ceph-secret
     adminSecretNamespace: kube-system
@@ -176,7 +176,7 @@ In the future, the storage class may remain in an annotation or become a field o
 }
 ```
 
-### Sample output
+### Usage Examples
 
 #### GCE
 
@@ -215,22 +215,38 @@ $ kubectl get pv
 
 #### Ceph RBD
 
-First create Ceph admin's Secret in the system namespace. Here the Secret is created in `kube-system`:
+For this to work you must have a functional Ceph cluster, and the `rbd` command line utility must be installed on any host/container that `kube-controller-manager` or `kubelet` are running on.
+
+First we must identify the Ceph client admin key. This is usually found in `/etc/ceph/ceph.client.admin.keyring` on your Ceph cluster nodes. The file will look something like this:
 
 ```
-$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-admin.yaml --namespace=kube-system
+[client.admin]
+  key = AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==
+  auid = 0
+  caps mds = "allow"
+  caps mon = "allow *"
+  caps osd = "allow *"
 ```
 
-Then create RBD Storage Class:
+From the key value, we will create a secret. We must create the Ceph admin Secret in the namespace defined in our `StorageClass`. In this example we set the namespace to `kube-system`.
+
+```
+$ kubectl create secret generic ceph-secret-admin --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system
+```
+
+Now modify `examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml` to reflect your environment, particularly the `monitors` field.  We are now ready to create our RBD Storage Class:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
 ```
 
-Before creating PVC in user's namespace (e.g. myns), make sure the Ceph user's Secret exists, if not, create the Secret:
+The kube-controller-manager is now able to provision storage, however we still need to be able to map it. Mapping should be done with a non-privileged key, if you have existing users you can get all keys by running `ceph auth list` on your Ceph cluster with the admin key. For this example we will create a new user and pool.
 
 ```
-$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-user.yaml --namespace=myns
+$ ceph osd pool create kube 512
+$ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rwx pool=kube'
+[client.kube]
+	key = AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==
 ```
 
 Now create a PVC in user's namespace (e.g. myns):
@@ -263,7 +279,7 @@ Capacity:	3Gi
 Message:	
 Source:
     Type:		RBD (a Rados Block Device mount on the host that shares a pod's lifetime)
-    CephMonitors:	[10.16.153.105:6789]
+    CephMonitors:	[127.0.0.1:6789]
     RBDImage:		kubernetes-dynamic-pvc-1cfb1862-664b-11e6-9a5d-90b11c09520d
     FSType:		
     RBDPool:		kube
@@ -274,12 +290,17 @@ Source:
 No events.
 ```
 
-Create a Pod to use the PVC:
+With our storage provisioned, we can now create a Pod to use the PVC:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/pod.yaml --namespace=myns
 ```
-
+Now our pod has an RBD mount!
+```
+$ export PODNAME=`kubectl get pod --selector='role=server' --namespace=myns --output=template --template="{{with index .items 0}}{{.metadata.name}}{{end}}"`
+$ kubectl exec -it $PODNAME --namespace=myns -- df -h | grep rbd
+/dev/rbd1       2.9G  4.5M  2.8G   1% /var/lib/www/html
+```
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()
