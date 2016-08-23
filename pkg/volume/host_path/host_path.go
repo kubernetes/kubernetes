@@ -116,7 +116,7 @@ func (plugin *hostPathPlugin) NewRecycler(pvName string, spec *volume.Spec) (vol
 	return plugin.newRecyclerFunc(pvName, spec, plugin.host, plugin.config)
 }
 
-func (plugin *hostPathPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *hostPathPlugin) NewDeleter(parameters map[string]string, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterFunc(spec, plugin.host)
 }
 
