@@ -483,7 +483,7 @@ func readinessCheck(urls []string, errCh <-chan error) error {
 		case <-time.After(time.Second):
 			ready := true
 			for _, url := range urls {
-				resp, err := http.Get(url)
+				resp, err := http.Head(url)
 				if err != nil || resp.StatusCode != http.StatusOK {
 					ready = false
 					break
@@ -580,7 +580,7 @@ func (s *server) start() error {
 						return
 					case <-time.After(time.Second):
 						for _, url := range s.healthCheckUrls {
-							resp, err := http.Get(url)
+							resp, err := http.Head(url)
 							if err != nil || resp.StatusCode != http.StatusOK {
 								break stillAlive
 							}
