@@ -41,6 +41,9 @@ build:
 	# Copy the content in this dir to the temp dir
 	cp ./* $(TEMP_DIR)
 
+	make -C ../../../ WHAT=cluster/images/etcd KUBE_STATIC_OVERRIDES="etcd";
+	cp "../../../_output/bin/etcd" $(TEMP_DIR)/attachlease
+
 ifeq ($(ARCH),amd64)
 
 	# Do not compile if we should make an image for amd64, use the official etcd binaries instead
