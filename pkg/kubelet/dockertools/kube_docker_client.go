@@ -152,7 +152,7 @@ func (d *kubeDockerClient) StartContainer(id string) error {
 
 // Stopping an already stopped container will not cause an error in engine-api.
 func (d *kubeDockerClient) StopContainer(id string, timeout int) error {
-	ctx, cancel := d.getTimeoutContext()
+	ctx, cancel := d.getCustomTimeoutContext(time.Duration(timeout) * time.Second)
 	defer cancel()
 	err := d.client.ContainerStop(ctx, id, timeout)
 	if ctxErr := contextError(ctx); ctxErr != nil {
@@ -532,6 +532,15 @@ func (d *kubeDockerClient) getCancelableContext() (context.Context, context.Canc
 // getTimeoutContext returns a new context with default request timeout
 func (d *kubeDockerClient) getTimeoutContext() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), d.timeout)
+}
+
+// getCustomTimeoutContext returns a new context with a specific request timeout
+func (d *kubeDockerClient) getCustomTimeoutContext(timeout time.Duration) (context.Context, context.CancelFunc) {
+	// Pick the larger of the two
+	if d.timeout > timeout {
+		timeout = d.timeout
+	}
+	return context.WithTimeout(context.Background(), timeout)
 }
 
 // ParseDockerTimestamp parses the timestamp returned by DockerInterface from string to time.Time
