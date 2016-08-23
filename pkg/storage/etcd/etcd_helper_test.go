@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/testapi"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/conversion"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/runtime/serializer"
 	"k8s.io/kubernetes/pkg/storage"
@@ -154,14 +156,17 @@ func TestListFiltered(t *testing.T) {
 	}
 
 	createPodList(t, helper, &list)
-	filterFunc := func(obj runtime.Object) bool {
-		pod := obj.(*api.Pod)
-		return pod.Name == "bar"
+	// List only "bar" pod
+	p := storage.SelectionPredicate{
+		Label: labels.Everything(),
+		Field: fields.SelectorFromSet(fields.Set{"metadata.name": "bar"}),
+		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+			pod := obj.(*api.Pod)
+			return labels.Set(pod.Labels), fields.Set{"metadata.name": pod.Name}, nil
+		},
 	}
-	filter := storage.NewSimpleFilter(filterFunc, storage.NoTriggerFunc)
-
 	var got api.PodList
-	err := helper.List(context.TODO(), key, "", filter, &got)
+	err := helper.List(context.TODO(), key, "", p, &got)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}

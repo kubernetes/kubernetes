@@ -30,6 +30,8 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/fields"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -54,45 +56,42 @@ func testWatch(t *testing.T, recursive bool) {
 
 	tests := []struct {
 		key        string
-		filter     func(runtime.Object) bool
-		trigger    func() []storage.MatchValue
+		pred       storage.SelectionPredicate
 		watchTests []*testWatchStruct
 	}{{ // create a key
 		key:        "/somekey-1",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}},
-		filter:     storage.EverythingFunc,
-		trigger:    storage.NoTriggerFunc,
-	}, { // create a key but obj gets filtered
-		key:        "/somekey-2",
-		watchTests: []*testWatchStruct{{podFoo, false, ""}},
-		filter:     func(runtime.Object) bool { return false },
-		trigger:    storage.NoTriggerFunc,
+		pred:       storage.Everything,
 	}, { // create a key but obj gets filtered. Then update it with unfiltered obj
 		key:        "/somekey-3",
 		watchTests: []*testWatchStruct{{podFoo, false, ""}, {podBar, true, watch.Added}},
-		filter: func(obj runtime.Object) bool {
-			pod := obj.(*api.Pod)
-			return pod.Name == "bar"
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name=bar"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*api.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
 		},
-		trigger: storage.NoTriggerFunc,
 	}, { // update
 		key:        "/somekey-4",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Modified}},
-		filter:     storage.EverythingFunc,
-		trigger:    storage.NoTriggerFunc,
+		pred:       storage.Everything,
 	}, { // delete because of being filtered
 		key:        "/somekey-5",
 		watchTests: []*testWatchStruct{{podFoo, true, watch.Added}, {podBar, true, watch.Deleted}},
-		filter: func(obj runtime.Object) bool {
-			pod := obj.(*api.Pod)
-			return pod.Name != "bar"
+		pred: storage.SelectionPredicate{
+			Label: labels.Everything(),
+			Field: fields.ParseSelectorOrDie("metadata.name!=bar"),
+			GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
+				pod := obj.(*api.Pod)
+				return nil, fields.Set{"metadata.name": pod.Name}, nil
+			},
 		},
-		trigger: storage.NoTriggerFunc,
 	}}
 	for i, tt := range tests {
 		ctx, store, cluster := testSetup(t)
-		filter := storage.NewSimpleFilter(tt.filter, tt.trigger)
-		w, err := store.watch(ctx, tt.key, "0", filter, recursive)
+		w, err := store.watch(ctx, tt.key, "0", storage.SimpleFilter(tt.pred), recursive)
 		if err != nil {
 			t.Fatalf("Watch failed: %v", err)
 		}
@@ -198,7 +197,7 @@ func TestWatchContextCancel(t *testing.T) {
 	cancel()
 	// When we watch with a canceled context, we should detect that it's context canceled.
 	// We won't take it as error and also close the watcher.
-	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.Everything)
+	w, err := store.watcher.Watch(canceledCtx, "/abc", 0, false, storage.SimpleFilter(storage.Everything))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +216,7 @@ func TestWatchErrResultNotBlockAfterCancel(t *testing.T) {
 	origCtx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	ctx, cancel := context.WithCancel(origCtx)
-	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, storage.Everything)
+	w := store.watcher.createWatchChan(ctx, "/abc", 0, false, storage.SimpleFilter(storage.Everything))
 	// make resutlChan and errChan blocking to ensure ordering.
 	w.resultChan = make(chan watch.Event)
 	w.errChan = make(chan error)
