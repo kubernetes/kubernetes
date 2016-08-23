@@ -708,6 +708,7 @@ func Convert_api_PodSecurityContext_To_v1_PodSecurityContext(in *api.PodSecurity
 	out.RunAsUser = in.RunAsUser
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.FSGroup = in.FSGroup
+	out.HostUser = in.HostUser
 	return nil
 }
 
@@ -724,6 +725,7 @@ func Convert_v1_PodSecurityContext_To_api_PodSecurityContext(in *PodSecurityCont
 	out.RunAsUser = in.RunAsUser
 	out.RunAsNonRoot = in.RunAsNonRoot
 	out.FSGroup = in.FSGroup
+	out.HostUser = in.HostUser
 	return nil
 }
 
