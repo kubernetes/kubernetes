@@ -33,6 +33,7 @@ import (
 	clientsetfake "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/fake"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	kpsp "k8s.io/kubernetes/pkg/security/podsecuritypolicy"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/pkg/util/diff"
 )
@@ -53,6 +54,115 @@ func useInitContainers(pod *kapi.Pod) *kapi.Pod {
 	pod.Spec.InitContainers = pod.Spec.Containers
 	pod.Spec.Containers = []kapi.Container{}
 	return pod
+}
+
+func TestAdmitSeccomp(t *testing.T) {
+	containerName := "container"
+	tests := map[string]struct {
+		pspAnnotations map[string]string
+		podAnnotations map[string]string
+		shouldAdmit    bool
+	}{
+		"no seccomp, no pod annotations": {
+			pspAnnotations: nil,
+			podAnnotations: nil,
+			shouldAdmit:    true,
+		},
+		"no seccomp, pod annotations": {
+			pspAnnotations: nil,
+			podAnnotations: map[string]string{
+				kapi.SeccompPodAnnotationKey: "foo",
+			},
+			shouldAdmit: false,
+		},
+		"no seccomp, container annotations": {
+			pspAnnotations: nil,
+			podAnnotations: map[string]string{
+				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "foo",
+			},
+			shouldAdmit: false,
+		},
+		"seccomp, allow any no pod annotation": {
+			pspAnnotations: map[string]string{
+				seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny,
+			},
+			podAnnotations: nil,
+			shouldAdmit:    true,
+		},
+		"seccomp, allow any pod annotation": {
+			pspAnnotations: map[string]string{
+				seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny,
+			},
+			podAnnotations: map[string]string{
+				kapi.SeccompPodAnnotationKey: "foo",
+			},
+			shouldAdmit: true,
+		},
+		"seccomp, allow any container annotation": {
+			pspAnnotations: map[string]string{
+				seccomp.AllowedProfilesAnnotationKey: seccomp.AllowAny,
+			},
+			podAnnotations: map[string]string{
+				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "foo",
+			},
+			shouldAdmit: true,
+		},
+		"seccomp, allow specific pod annotation failure": {
+			pspAnnotations: map[string]string{
+				seccomp.AllowedProfilesAnnotationKey: "foo",
+			},
+			podAnnotations: map[string]string{
+				kapi.SeccompPodAnnotationKey: "bar",
+			},
+			shouldAdmit: false,
+		},
+		"seccomp, allow specific container annotation failure": {
+			pspAnnotations: map[string]string{
+				// provide a default so we don't have to give the pod annotation
+				seccomp.DefaultProfileAnnotationKey:  "foo",
+				seccomp.AllowedProfilesAnnotationKey: "foo",
+			},
+			podAnnotations: map[string]string{
+				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "bar",
+			},
+			shouldAdmit: false,
+		},
+		"seccomp, allow specific pod annotation pass": {
+			pspAnnotations: map[string]string{
+				seccomp.AllowedProfilesAnnotationKey: "foo",
+			},
+			podAnnotations: map[string]string{
+				kapi.SeccompPodAnnotationKey: "foo",
+			},
+			shouldAdmit: true,
+		},
+		"seccomp, allow specific container annotation pass": {
+			pspAnnotations: map[string]string{
+				// provide a default so we don't have to give the pod annotation
+				seccomp.DefaultProfileAnnotationKey:  "foo",
+				seccomp.AllowedProfilesAnnotationKey: "foo,bar",
+			},
+			podAnnotations: map[string]string{
+				kapi.SeccompContainerAnnotationKeyPrefix + containerName: "bar",
+			},
+			shouldAdmit: true,
+		},
+	}
+	for k, v := range tests {
+		psp := restrictivePSP()
+		psp.Annotations = v.pspAnnotations
+		pod := &kapi.Pod{
+			ObjectMeta: kapi.ObjectMeta{
+				Annotations: v.podAnnotations,
+			},
+			Spec: kapi.PodSpec{
+				Containers: []kapi.Container{
+					{Name: containerName},
+				},
+			},
+		}
+		testPSPAdmit(k, []*extensions.PodSecurityPolicy{psp}, pod, v.shouldAdmit, psp.Name, t)
+	}
 }
 
 func TestAdmitPrivileged(t *testing.T) {

@@ -2119,7 +2119,7 @@ func ValidateTolerationsInPodAnnotations(annotations map[string]string, fldPath 
 	return allErrs
 }
 
-func validateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
+func ValidateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 	if p == "docker/default" {
 		return nil
 	}
@@ -2135,11 +2135,11 @@ func validateSeccompProfile(p string, fldPath *field.Path) field.ErrorList {
 func ValidateSeccompPodAnnotations(annotations map[string]string, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if p, exists := annotations[api.SeccompPodAnnotationKey]; exists {
-		allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
+		allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(api.SeccompPodAnnotationKey))...)
 	}
 	for k, p := range annotations {
 		if strings.HasPrefix(k, api.SeccompContainerAnnotationKeyPrefix) {
-			allErrs = append(allErrs, validateSeccompProfile(p, fldPath.Child(k))...)
+			allErrs = append(allErrs, ValidateSeccompProfile(p, fldPath.Child(k))...)
 		}
 	}
 
