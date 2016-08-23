@@ -483,6 +483,9 @@ var _ = framework.KubeDescribe("DNS", func() {
 		_, err = updateService(f.Client, f.Namespace.Name, serviceName, func(s *api.Service) {
 			s.Spec.Type = api.ServiceTypeClusterIP
 			s.Spec.ClusterIP = "127.1.2.3"
+			s.Spec.Ports = []api.ServicePort{
+				{Port: 80, Name: "http", Protocol: "TCP"},
+			}
 		})
 		Expect(err).NotTo(HaveOccurred())
 		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "A", "wheezy")
