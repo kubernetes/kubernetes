@@ -37,11 +37,23 @@ array_contains () {
     return $in
 }
 
+# Check that the file is in alphabetical order
+linted_file="${KUBE_ROOT}/hack/.linted_packages"
+if ! diff -u "${linted_file}" <(LANG=C sort "${linted_file}"); then
+	{
+		echo
+		echo "hack/.linted_packages is not in alphabetical order. Please sort it:"
+		echo
+		echo "  sort -o hack/.linted_packages hack/.linted_packages"
+		echo
+	} >&2
+	false
+fi
+
 export IFS=$'\n'
 all_packages=(
 	$(go list -e ./... | egrep -v "/(third_party|vendor|staging|generated|clientset_generated)" | sed 's/k8s.io\/kubernetes\///g')
 )
-linted_file="${KUBE_ROOT}/hack/.linted_packages"
 linted_packages=(
 	$(cat $linted_file)
 )
@@ -78,16 +90,20 @@ else
 fi
 
 # check to make sure all packages that pass lint are in the linted file.
+echo
 if [ ${#linted[@]} -eq 0 ]; then
 	echo 'Success! All packages that should pass lint are listed in the linted file.'
 else
 	{
-		echo "The following packages passed golint but are not listed in $linted_file:"
-		for p in "${linted[@]}"; do
-			echo "echo $p >> hack/.linted_packages"
-		done
+		echo "Some packages passed golint but are not listed in hack/.linted_packages."
+		echo "Please add them in alphabetical order:"
 		echo
-		echo 'Please add the following packages to the linted file. You can test via this script and commit the result.'
+		for p in "${linted[@]}"; do
+			echo "  echo $p >> hack/.linted_packages"
+		done
+		echo "  LANG=C sort -o hack/.linted_packages hack/.linted_packages"
+		echo
+		echo 'You can test via this script and commit the result.'
 		echo
 	} >&2
 	false
