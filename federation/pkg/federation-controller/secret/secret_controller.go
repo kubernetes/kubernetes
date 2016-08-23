@@ -118,7 +118,7 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconcilation whenever something in federated cluster is changed. In most cases it
 				// would be just confirmation that some secret opration suceeded.
-				util.NewTriggerOnChanges(
+				util.NewTriggerOnAllChanges(
 					func(obj pkg_runtime.Object) {
 						secretcontroller.deliverSecretObj(obj, secretcontroller.secretReviewDelay, false)
 					},
