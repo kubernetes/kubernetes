@@ -84,7 +84,43 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			framework.Logf("Verified that zero clusters remain")
 		})
 	})
+	Describe("Admission control", func() {
+		AfterEach(func() {
+			framework.SkipUnlessFederated(f.Client)
+		})
+
+		It("should not be able to create resources if namespace does not exist", func() {
+			framework.SkipUnlessFederated(f.Client)
+
+			// Creating a service in a non-existing namespace should fail.
+			svcNamespace := "federation-admission-test-ns"
+			svcName := "myns"
+			clientset := f.FederationClientset_1_4
+			framework.Logf("Trying to create service %s in namespace %s, expect to get error", svcName, svcNamespace)
+			if _, err := clientset.Core().Services(svcNamespace).Create(newService(svcName, svcNamespace)); err == nil {
+				framework.Failf("Expected to get an error while creating a service in a non-existing namespace")
+			}
+
+			// Note: We have other tests that verify that we can create resources in existing namespaces, so we dont test it again here.
+		})
+	})
 })
+
+func newService(name, namespace string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: v1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Spec: v1.ServiceSpec{
+			Ports: []v1.ServicePort{
+				{
+					Port: 80,
+				},
+			},
+		},
+	}
+}
 
 // Verify that the cluster is marked ready.
 func isReady(clusterName string, clientset *federation_release_1_4.Clientset) error {

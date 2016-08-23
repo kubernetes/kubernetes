@@ -42,23 +42,26 @@ var _ = framework.KubeDescribe("Federation ingresses [Feature:Federation]", func
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
 
+			nsName := f.FederationNamespace.Name
 			// Delete registered ingresses.
-			ingressList, err := f.FederationClientset_1_4.Extensions().Ingresses(f.Namespace.Name).List(api.ListOptions{})
+			ingressList, err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, ingress := range ingressList.Items {
-				err := f.FederationClientset_1_4.Extensions().Ingresses(f.Namespace.Name).Delete(ingress.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &api.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.Client)
-			ingress := createIngressOrFail(f.FederationClientset_1_4, f.Namespace.Name)
-			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, f.Namespace.Name))
+
+			nsName := f.FederationNamespace.Name
+			ingress := createIngressOrFail(f.FederationClientset_1_4, nsName)
+			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Extensions().Ingresses(f.Namespace.Name).Delete(ingress.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &api.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting ingress %q in namespace %q", ingress.Name, ingress.Namespace)
-			By(fmt.Sprintf("Deletion of ingress %q in namespace %q succeeded.", ingress.Name, f.Namespace.Name))
+			By(fmt.Sprintf("Deletion of ingress %q in namespace %q succeeded.", ingress.Name, nsName))
 		})
 
 	})
