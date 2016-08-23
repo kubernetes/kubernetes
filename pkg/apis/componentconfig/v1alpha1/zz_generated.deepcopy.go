@@ -401,6 +401,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		} else {
 			out.IPTablesDropBit = nil
 		}
+		out.ExperimentalHostUserNamespaceDefaulting = in.ExperimentalHostUserNamespaceDefaulting
 		return nil
 	}
 }
