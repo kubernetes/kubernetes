@@ -24,7 +24,6 @@ import (
 	"os"
 	"path"
 
-	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 	"k8s.io/kubernetes/pkg/kubeadm/tlsutil"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -119,8 +118,7 @@ func newServiceAccountKey() (*rsa.PrivateKey, error) {
 	return key, err
 }
 
-// TODO this probably shouldn't call `createClientCertsAndConfigs()`, and should just return `caKey` and `caCert`
-func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (map[string]*clientcmdapi.Config, error) {
+func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509.Certificate, error) {
 	var (
 		err      error
 		altNames tlsutil.AltNames // TODO actual SANs
@@ -136,39 +134,35 @@ func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (map[string]*clientcmda
 
 	pkiPath := path.Join(params.EnvParams["host_pki_path"])
 	if err := os.MkdirAll(pkiPath, 0700); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	caKey, caCert, err := newCertificateAuthority()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := writeKeysAndCert(pkiPath, "ca", caKey, caCert); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	apiKey, apiCert, err := newServerKeyAndCert(caCert, caKey, altNames)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := writeKeysAndCert(pkiPath, "apiserver", apiKey, apiCert); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	saKey, err := newServiceAccountKey()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if err := writeKeysAndCert(pkiPath, "sa", saKey, nil); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	configs, err := createClientCertsAndConfigs(params, []string{"kubelet", "admin"}, caCert, caKey)
-	if err != nil {
-		return nil, err
-	}
-	return configs, nil
+	return caKey, caCert, nil
 }

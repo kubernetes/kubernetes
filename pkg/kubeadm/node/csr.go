@@ -34,17 +34,19 @@ func getNodeName() string {
 	return "TODO"
 }
 
-// runs on nodes
-func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Config, error) {
-	// Create a restful client for doing the certificate signing request.
-	pemData, err := ioutil.ReadFile(params.Discovery.CaCertFile)
+func PerformTLSBootstrapFromParams(params *kubeadmapi.BootstrapParams) (*clientcmdapi.Config, error) {
+	caCert, err := ioutil.ReadFile(params.Discovery.CaCertFile)
 	if err != nil {
 		return nil, err
 	}
+
+	return PerformTLSBootstrap(params, strings.Split(params.Discovery.ApiServerURLs, ",")[0], caCert)
+}
+
+// Create a restful client for doing the certificate signing request.
+func PerformTLSBootstrap(params *kubeadmapi.BootstrapParams, apiEndpoint string, caCert []byte) (*clientcmdapi.Config, error) {
 	// TODO try all the api servers until we find one that works
-	bareClientConfig := kubeadmutil.CreateBasicClientConfig(
-		"kubernetes", strings.Split(params.Discovery.ApiServerURLs, ",")[0], pemData,
-	)
+	bareClientConfig := kubeadmutil.CreateBasicClientConfig("kubernetes", apiEndpoint, caCert)
 
 	nodeName := getNodeName()
 
