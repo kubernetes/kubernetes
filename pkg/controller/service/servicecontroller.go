@@ -77,7 +77,7 @@ type serviceCache struct {
 
 type ServiceController struct {
 	cloud            cloudprovider.Interface
-	knownHosts       []string
+	knownHosts       []*v1.Node
 	servicesToUpdate []*v1.Service
 	kubeClient       clientset.Interface
 	clusterName      string
@@ -108,7 +108,7 @@ func New(cloud cloudprovider.Interface, kubeClient clientset.Interface, clusterN
 
 	s := &ServiceController{
 		cloud:            cloud,
-		knownHosts:       []string{},
+		knownHosts:       []*v1.Node{},
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
 		cache:            &serviceCache{serviceMap: make(map[string]*cachedService)},
@@ -344,10 +344,17 @@ func (s *ServiceController) createLoadBalancer(service *v1.Service) error {
 		return err
 	}
 
+	lbNodes := []*v1.Node{}
+	for ix := range nodes.Items {
+		if includeNodeFromNodeList(&nodes.Items[ix]) {
+			lbNodes = append(lbNodes, &nodes.Items[ix])
+		}
+	}
+
 	// - Only one protocol supported per service
 	// - Not all cloud providers support all protocols and the next step is expected to return
 	//   an error for unsupported protocols
-	status, err := s.balancer.EnsureLoadBalancer(s.clusterName, service, hostsFromNodeList(&nodes))
+	status, err := s.balancer.EnsureLoadBalancer(s.clusterName, service, lbNodes)
 	if err != nil {
 		return err
 	} else {
@@ -533,6 +540,21 @@ func portEqualForLB(x, y *v1.ServicePort) bool {
 	return true
 }
 
+func nodeNames(nodes []*v1.Node) []string {
+	ret := make([]string, len(nodes))
+	for i, node := range nodes {
+		ret[i] = node.Name
+	}
+	return ret
+}
+
+func nodeSlicesEqualForLB(x, y []*v1.Node) bool {
+	if len(x) != len(y) {
+		return false
+	}
+	return stringSlicesEqual(nodeNames(x), nodeNames(y))
+}
+
 func intSlicesEqual(x, y []int) bool {
 	if len(x) != len(y) {
 		return false
@@ -573,26 +595,6 @@ func includeNodeFromNodeList(node *v1.Node) bool {
 	return !node.Spec.Unschedulable
 }
 
-func hostsFromNodeList(list *v1.NodeList) []string {
-	result := []string{}
-	for ix := range list.Items {
-		if includeNodeFromNodeList(&list.Items[ix]) {
-			result = append(result, list.Items[ix].Name)
-		}
-	}
-	return result
-}
-
-func hostsFromNodeSlice(nodes []*v1.Node) []string {
-	result := []string{}
-	for _, node := range nodes {
-		if includeNodeFromNodeList(node) {
-			result = append(result, node.Name)
-		}
-	}
-	return result
-}
-
 func getNodeConditionPredicate() cache.NodeConditionPredicate {
 	return func(node *v1.Node) bool {
 		// We add the master to the node list, but its unschedulable.  So we use this to filter
@@ -620,19 +622,20 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 // nodeSyncLoop handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
 func (s *ServiceController) nodeSyncLoop() {
-	nodes, err := s.nodeLister.NodeCondition(getNodeConditionPredicate()).List()
+	newHosts, err := s.nodeLister.NodeCondition(getNodeConditionPredicate()).List()
 	if err != nil {
 		glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
 		return
 	}
-	newHosts := hostsFromNodeSlice(nodes)
-	if stringSlicesEqual(newHosts, s.knownHosts) {
+	if nodeSlicesEqualForLB(newHosts, s.knownHosts) {
 		// The set of nodes in the cluster hasn't changed, but we can retry
 		// updating any services that we failed to update last time around.
 		s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, newHosts)
 		return
 	}
-	glog.Infof("Detected change in list of current cluster nodes. New node set: %v", newHosts)
+
+	glog.Infof("Detected change in list of current cluster nodes. New node set: %v",
+		nodeNames(newHosts))
 
 	// Try updating all services, and save the ones that fail to try again next
 	// round.
@@ -648,7 +651,7 @@ func (s *ServiceController) nodeSyncLoop() {
 // updateLoadBalancerHosts updates all existing load balancers so that
 // they will match the list of hosts provided.
 // Returns the list of services that couldn't be updated.
-func (s *ServiceController) updateLoadBalancerHosts(services []*v1.Service, hosts []string) (servicesToRetry []*v1.Service) {
+func (s *ServiceController) updateLoadBalancerHosts(services []*v1.Service, hosts []*v1.Node) (servicesToRetry []*v1.Service) {
 	for _, service := range services {
 		func() {
 			if service == nil {
@@ -665,7 +668,7 @@ func (s *ServiceController) updateLoadBalancerHosts(services []*v1.Service, host
 
 // Updates the load balancer of a service, assuming we hold the mutex
 // associated with the service.
-func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []string) error {
+func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []*v1.Node) error {
 	if !wantsLoadBalancer(service) {
 		return nil
 	}
@@ -684,7 +687,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, h
 		return nil
 	}
 
-	s.eventRecorder.Eventf(service, v1.EventTypeWarning, "LoadBalancerUpdateFailed", "Error updating load balancer with new hosts %v: %v", hosts, err)
+	s.eventRecorder.Eventf(service, v1.EventTypeWarning, "LoadBalancerUpdateFailed", "Error updating load balancer with new hosts %v: %v", nodeNames(hosts), err)
 	return err
 }
 
