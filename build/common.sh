@@ -152,6 +152,11 @@ function kube::build::verify_prereqs() {
   fi
   kube::build::ensure_docker_daemon_connectivity || return 1
 
+  if (( $KUBE_VERBOSE > 6 )); then
+    kube::log::status "Docker Version:"
+    "${DOCKER[@]}" version | kube::log::info_from_stdin
+  fi
+
   KUBE_ROOT_HASH=$(kube::build::short_hash "${HOSTNAME:-}:${KUBE_ROOT}")
   KUBE_BUILD_IMAGE_TAG_BASE="build-${KUBE_ROOT_HASH}"
   KUBE_BUILD_IMAGE_TAG="${KUBE_BUILD_IMAGE_TAG_BASE}-${KUBE_IMAGE_VERSION}"
@@ -312,7 +317,9 @@ function kube::build::docker_image_exists() {
 # $2: The tag base. We consider any image that matches $2*
 # $3: The current image not to delete if provided
 function kube::build::docker_delete_old_images() {
-  for tag in $(docker images $1 --format "{{.Tag}}") ; do
+  # In Docker 1.12, we can replace this with
+  #    docker images "$1" --format "{{.Tag}}"
+  for tag in $(docker images kube-build | tail -n +2 | awk '{print $2}') ; do
     if [[ "$tag" != "$2"* ]] ; then
       V=6 kube::log::status "Keeping image $1:$tag"
       continue
@@ -332,7 +339,9 @@ function kube::build::docker_delete_old_images() {
 # $1: The base container prefix
 # $2: The current container to keep, if provided
 function kube::build::docker_delete_old_containers() {
-  for container in $(docker ps -a --format="{{.Names}}") ; do
+  # In Docker 1.12 we can replace this line with
+  #   docker ps -a --format="{{.Names}}"
+  for container in $(docker ps -a | tail -n +2 | awk '{print $NF}') ; do
     if [[ "$container" != "$1"* ]] ; then
       V=6 kube::log::status "Keeping container $container"
       continue
