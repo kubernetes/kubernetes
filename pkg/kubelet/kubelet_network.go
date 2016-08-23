@@ -297,11 +297,13 @@ func (kl *Kubelet) syncNetworkStatus() {
 // updatePodCIDR updates the pod CIDR in the runtime state if it is different
 // from the current CIDR.
 func (kl *Kubelet) updatePodCIDR(cidr string) {
-	if kl.runtimeState.podCIDR() == cidr {
+	podCIDR := kl.runtimeState.podCIDR()
+
+	if podCIDR == cidr {
 		return
 	}
 
-	glog.Infof("Setting Pod CIDR: %v -> %v", kl.runtimeState.podCIDR(), cidr)
+	glog.Infof("Setting Pod CIDR: %v -> %v", podCIDR, cidr)
 	kl.runtimeState.setPodCIDR(cidr)
 
 	if kl.networkPlugin != nil {
