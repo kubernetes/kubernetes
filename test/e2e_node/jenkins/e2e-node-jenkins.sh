@@ -38,6 +38,7 @@ go build test/e2e_node/environment/conformance.go
 PARALLELISM=${PARALLELISM:-8}
 WORKSPACE=${WORKSPACE:-"/tmp/"}
 ARTIFACTS=${WORKSPACE}/_artifacts
+TIMEOUT=${TIMEOUT:-"45m"}
 
 mkdir -p ${ARTIFACTS}
 
@@ -46,4 +47,5 @@ go run test/e2e_node/runner/run_e2e.go  --logtostderr --vmodule=*=4 --ssh-env="g
   --images="$GCE_IMAGES" --image-project="$GCE_IMAGE_PROJECT" \
   --image-config-file="$GCE_IMAGE_CONFIG_PATH" --cleanup="$CLEANUP" \
   --results-dir="$ARTIFACTS" --ginkgo-flags="--nodes=$PARALLELISM $GINKGO_FLAGS" \
-  --setup-node="$SETUP_NODE" --test_args="$TEST_ARGS" --instance-metadata="$GCE_INSTANCE_METADATA"
+  --test-timeout="$TIMEOUT" --setup-node="$SETUP_NODE" --test_args="$TEST_ARGS" \
+  --instance-metadata="$GCE_INSTANCE_METADATA"
