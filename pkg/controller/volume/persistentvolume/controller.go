@@ -1064,7 +1064,19 @@ func (ctrl *PersistentVolumeController) deleteVolumeOperation(arg interface{}) {
 		return
 	}
 
-	if err = ctrl.doDeleteVolume(volume); err != nil {
+	// Find StorageClass.Parameters of the PV's storage class - it may contain
+	// configuration of the deleter
+	parameters, err := ctrl.findDeleterParameters(newVolume)
+	if err != nil {
+		msg := fmt.Sprintf("error getting StorageClasss parameters for deletion: %v", err)
+		glog.Error(msg)
+		ctrl.eventRecorder.Event(volume, api.EventTypeWarning, "VolumeDeleteClassError", msg)
+		// Despite the error, try to delete the volume. There is high
+		// probability that the deleter does not need the storage class
+		// parameters.
+	}
+
+	if err = ctrl.doDeleteVolume(volume, parameters); err != nil {
 		// Delete failed, update the volume and emit an event.
 		glog.V(3).Infof("deletion of volume %q failed: %v", volume.Name, err)
 		if _, err = ctrl.updateVolumePhaseWithEvent(volume, api.VolumeFailed, api.EventTypeWarning, "VolumeFailedDelete", err.Error()); err != nil {
@@ -1134,7 +1146,8 @@ func (ctrl *PersistentVolumeController) isVolumeReleased(volume *api.PersistentV
 
 // doDeleteVolume finds appropriate delete plugin and deletes given volume
 // (it will be re-used in future provisioner error cases).
-func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVolume) error {
+// Parameters is value of StorageClass.Parameters of corresponding class.
+func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVolume, parameters map[string]string) error {
 	glog.V(4).Infof("doDeleteVolume [%s]", volume.Name)
 	var err error
 
@@ -1164,7 +1177,7 @@ func (ctrl *PersistentVolumeController) doDeleteVolume(volume *api.PersistentVol
 	glog.V(5).Infof("found a deleter plugin %q for volume %q", plugin.GetPluginName(), volume.Name)
 
 	// Plugin found
-	deleter, err := plugin.NewDeleter(spec)
+	deleter, err := plugin.NewDeleter(parameters, spec)
 	if err != nil {
 		// Cannot create deleter
 		return fmt.Errorf("Failed to create deleter for volume %q: %v", volume.Name, err)
@@ -1318,7 +1331,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperation(claimObj interfa
 		ctrl.eventRecorder.Event(claim, api.EventTypeWarning, "ProvisioningFailed", strerr)
 
 		for i := 0; i < ctrl.createProvisionedPVRetryCount; i++ {
-			if err = ctrl.doDeleteVolume(volume); err == nil {
+			if err = ctrl.doDeleteVolume(volume, storageClass.Parameters); err == nil {
 				// Delete succeeded
 				glog.V(4).Infof("provisionClaimOperation [%s]: cleaning volume %s succeeded", claimToClaimKey(claim), volume.Name)
 				break

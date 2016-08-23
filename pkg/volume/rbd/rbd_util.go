@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/node"
@@ -306,4 +307,71 @@ func (util *RBDUtil) DetachDisk(c rbdUnmounter, mntPath string) error {
 		glog.Infof("rbd: successfully unmap device %s", device)
 	}
 	return nil
+}
+
+func (util *RBDUtil) CreateImage(p *rbdVolumeProvisioner) (r *api.RBDVolumeSource, size int, err error) {
+	volSizeBytes := p.options.Capacity.Value()
+	// convert to MB that rbd defaults on
+	const mb = 1024 * 1024
+	sz := int((volSizeBytes + mb - 1) / mb)
+	volSz := fmt.Sprintf("%d", sz)
+	// rbd create
+	l := len(p.rbdMounter.Mon)
+	// pick a mon randomly
+	start := rand.Int() % l
+	// iterate all monitors until create succeeds.
+	for i := start; i < start+l; i++ {
+		mon := p.Mon[i%l]
+		glog.V(4).Infof("rbd: create %s size %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, volSz, mon, p.rbdMounter.Pool, p.rbdMounter.Id, p.rbdMounter.Secret)
+		var output []byte
+		output, err = p.rbdMounter.plugin.execCommand("rbd",
+			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.Id, "-m", mon, "--key=" + p.rbdMounter.Secret})
+		if err == nil {
+			break
+		} else {
+			glog.V(4).Infof("failed to create rbd image, output %v", string(output))
+		}
+		// if failed, fall back to image format 1
+		output, err = p.rbdMounter.plugin.execCommand("rbd",
+			[]string{"create", p.rbdMounter.Image, "--size", volSz, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.Id, "-m", mon, "--key=" + p.rbdMounter.Secret, "--image-format", "1"})
+		if err == nil {
+			break
+		} else {
+			glog.V(4).Infof("failed to create rbd image, output %v", string(output))
+		}
+
+	}
+
+	if err != nil {
+		glog.Errorf("rbd: Error creating rbd image: %v", err)
+		return nil, 0, err
+	}
+
+	return &api.RBDVolumeSource{
+		CephMonitors: p.rbdMounter.Mon,
+		RBDImage:     p.rbdMounter.Image,
+		RBDPool:      p.rbdMounter.Pool,
+	}, sz, nil
+}
+
+func (util *RBDUtil) DeleteImage(p *rbdVolumeDeleter) error {
+	var err error
+	var output []byte
+	// rbd rm
+	l := len(p.rbdMounter.Mon)
+	// pick a mon randomly
+	start := rand.Int() % l
+	// iterate all monitors until rm succeeds.
+	for i := start; i < start+l; i++ {
+		mon := p.rbdMounter.Mon[i%l]
+		glog.V(4).Infof("rbd: rm %s using mon %s, pool %s id %s key %s", p.rbdMounter.Image, mon, p.rbdMounter.Pool, p.rbdMounter.Id, p.rbdMounter.Secret)
+		output, err = p.plugin.execCommand("rbd",
+			[]string{"rm", p.rbdMounter.Image, "--pool", p.rbdMounter.Pool, "--id", p.rbdMounter.Id, "-m", mon, "--key=" + p.rbdMounter.Secret})
+		if err == nil {
+			return nil
+		} else {
+			glog.Errorf("failed to delete rbd image, error %v ouput %v", err, string(output))
+		}
+	}
+	return err
 }

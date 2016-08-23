@@ -277,7 +277,7 @@ func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec) (Recycler
 	return &fakeRecycler{"/attributesTransferredFromSpec", MetricsNil{}}, nil
 }
 
-func (plugin *FakeVolumePlugin) NewDeleter(spec *Spec) (Deleter, error) {
+func (plugin *FakeVolumePlugin) NewDeleter(parameters map[string]string, spec *Spec) (Deleter, error) {
 	return &FakeDeleter{"/attributesTransferredFromSpec", MetricsNil{}}, nil
 }
 

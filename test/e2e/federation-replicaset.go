@@ -42,25 +42,22 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			framework.SkipUnlessFederated(f.Client)
 
 			// Delete registered replicasets.
-			nsName := f.FederationNamespace.Name
-			replicasetList, err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).List(api.ListOptions{})
+			replicasetList, err := f.FederationClientset_1_4.Extensions().ReplicaSets(f.Namespace.Name).List(api.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, replicaset := range replicasetList.Items {
-				err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Extensions().ReplicaSets(f.Namespace.Name).Delete(replicaset.Name, &api.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
 
 		It("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.Client)
-
-			nsName := f.FederationNamespace.Name
-			replicaset := createReplicaSetOrFail(f.FederationClientset_1_4, nsName)
-			By(fmt.Sprintf("Creation of replicaset %q in namespace %q succeeded.  Deleting replicaset.", replicaset.Name, nsName))
+			replicaset := createReplicaSetOrFail(f.FederationClientset_1_4, f.Namespace.Name)
+			By(fmt.Sprintf("Creation of replicaset %q in namespace %q succeeded.  Deleting replicaset.", replicaset.Name, f.Namespace.Name))
 			// Cleanup
-			err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_4.Extensions().ReplicaSets(f.Namespace.Name).Delete(replicaset.Name, &api.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting replicaset %q in namespace %q", replicaset.Name, replicaset.Namespace)
-			By(fmt.Sprintf("Deletion of replicaset %q in namespace %q succeeded.", replicaset.Name, nsName))
+			By(fmt.Sprintf("Deletion of replicaset %q in namespace %q succeeded.", replicaset.Name, f.Namespace.Name))
 		})
 
 	})
@@ -75,8 +72,7 @@ func createReplicaSetOrFail(clientset *federation_release_1_4.Clientset, namespa
 	replicas := int32(5)
 	replicaset := &v1beta1.ReplicaSet{
 		ObjectMeta: v1.ObjectMeta{
-			Name:      FederationReplicaSetName,
-			Namespace: namespace,
+			Name: FederationReplicaSetName,
 		},
 		Spec: v1beta1.ReplicaSetSpec{
 			Replicas: &replicas,

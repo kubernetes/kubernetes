@@ -50,7 +50,6 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&PodDisruptionBudget{},
 		&PodDisruptionBudgetList{},
 		&api.ListOptions{},
-		&Eviction{},
 	)
 	return nil
 }

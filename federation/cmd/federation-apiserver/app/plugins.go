@@ -26,5 +26,4 @@ import (
 	// Admission policies
 	_ "k8s.io/kubernetes/plugin/pkg/admission/admit"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/deny"
-	_ "k8s.io/kubernetes/plugin/pkg/admission/namespace/lifecycle"
 )

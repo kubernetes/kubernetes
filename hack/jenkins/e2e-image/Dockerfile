@@ -15,7 +15,7 @@
 # This file creates a build environment for building and running kubernetes
 # unit and integration tests
 
-FROM gcr.io/google-containers/kubekins-test:v20160822
+FROM gcr.io/google-containers/kubekins-test:v20160810
 MAINTAINER  Erick Fejta <fejta@google.com>
 
 # Defaults of all e2e runs

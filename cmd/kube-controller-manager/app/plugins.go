@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/glusterfs"
 	"k8s.io/kubernetes/pkg/volume/host_path"
 	"k8s.io/kubernetes/pkg/volume/nfs"
+	"k8s.io/kubernetes/pkg/volume/rbd"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 )
 
@@ -59,7 +60,6 @@ func ProbeAttachableVolumePlugins(config componentconfig.VolumeConfiguration) []
 	allPlugins = append(allPlugins, gce_pd.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, cinder.ProbeVolumePlugins()...)
 	allPlugins = append(allPlugins, flexvolume.ProbeVolumePlugins(config.FlexVolumePluginDir)...)
-	allPlugins = append(allPlugins, vsphere_volume.ProbeVolumePlugins()...)
 	return allPlugins
 }
 
@@ -99,7 +99,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 	}
 	allPlugins = append(allPlugins, nfs.ProbeVolumePlugins(nfsConfig)...)
 	allPlugins = append(allPlugins, glusterfs.ProbeVolumePlugins()...)
-
+	// add rbd provisioner
+	allPlugins = append(allPlugins, rbd.ProbeVolumePlugins()...)
 	if cloud != nil {
 		switch {
 		case aws.ProviderName == cloud.ProviderName():

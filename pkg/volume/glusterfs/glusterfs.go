@@ -359,7 +359,7 @@ type glusterfsVolumeProvisioner struct {
 	options volume.VolumeOptions
 }
 
-func (plugin *glusterfsPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+func (plugin *glusterfsPlugin) NewDeleter(param map[string]string, spec *volume.Spec) (volume.Deleter, error) {
 	return plugin.newDeleterInternal(spec)
 }
 

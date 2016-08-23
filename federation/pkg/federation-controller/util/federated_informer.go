@@ -38,7 +38,7 @@ import (
 
 const (
 	clusterSyncPeriod = 10 * time.Minute
-	userAgentName     = "federation-controller"
+	userAgentName     = "federation-service-controller"
 )
 
 // An object with an origin information.

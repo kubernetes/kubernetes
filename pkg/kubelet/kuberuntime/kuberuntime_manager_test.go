@@ -69,21 +69,22 @@ func makeAndSetFakePod(m *kubeGenericRuntimeManager, fakeRuntime *apitest.FakeRu
 }
 
 func makeFakePodSandbox(m *kubeGenericRuntimeManager, pod *api.Pod) (*apitest.FakePodSandbox, error) {
-	config, err := m.generatePodSandboxConfig(pod, "", 0)
+	config, err := m.generatePodSandboxConfig(pod, "")
 	if err != nil {
 		return nil, err
 	}
 
-	podSandboxID := apitest.BuildSandboxName(config.Metadata)
+	podSandboxID := config.GetName()
 	readyState := runtimeApi.PodSandBoxState_READY
 	return &apitest.FakePodSandbox{
-		PodSandboxStatus: runtimeApi.PodSandboxStatus{
+		PodSandbox: runtimeApi.PodSandbox{
 			Id:        &podSandboxID,
-			Metadata:  config.Metadata,
+			Name:      config.Name,
 			State:     &readyState,
 			CreatedAt: &fakeCreatedAt,
 			Labels:    config.Labels,
 		},
+		Annotations: config.Annotations,
 	}, nil
 }
 
@@ -93,14 +94,13 @@ func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api
 		return nil, err
 	}
 
-	containerID := apitest.BuildContainerName(containerConfig.Metadata)
-	podSandboxID := apitest.BuildSandboxName(sandboxConfig.Metadata)
+	containerID := containerConfig.GetName()
 	runningState := runtimeApi.ContainerState_RUNNING
 	imageRef := containerConfig.Image.GetImage()
 	return &apitest.FakeContainer{
 		ContainerStatus: runtimeApi.ContainerStatus{
 			Id:          &containerID,
-			Metadata:    containerConfig.Metadata,
+			Name:        containerConfig.Name,
 			Image:       containerConfig.Image,
 			ImageRef:    &imageRef,
 			CreatedAt:   &fakeCreatedAt,
@@ -108,12 +108,12 @@ func makeFakeContainer(m *kubeGenericRuntimeManager, pod *api.Pod, container api
 			Labels:      containerConfig.Labels,
 			Annotations: containerConfig.Annotations,
 		},
-		SandboxID: podSandboxID,
+		SandboxID: sandboxConfig.GetName(),
 	}, nil
 }
 
 func makeFakeContainers(m *kubeGenericRuntimeManager, pod *api.Pod, containers []api.Container) ([]*apitest.FakeContainer, error) {
-	sandboxConfig, err := m.generatePodSandboxConfig(pod, "", 0)
+	sandboxConfig, err := m.generatePodSandboxConfig(pod, "")
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func TestGetPods(t *testing.T) {
 		fakeContainer := fakeContainers[i]
 		c, err := m.toKubeContainer(&runtimeApi.Container{
 			Id:       fakeContainer.Id,
-			Metadata: fakeContainer.Metadata,
+			Name:     fakeContainer.Name,
 			State:    fakeContainer.State,
 			Image:    fakeContainer.Image,
 			ImageRef: fakeContainer.ImageRef,

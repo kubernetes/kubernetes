@@ -1947,7 +1947,6 @@ func DeepCopy_api_ObjectMeta(in interface{}, out interface{}, c *conversion.Clon
 		} else {
 			out.Finalizers = nil
 		}
-		out.ClusterName = in.ClusterName
 		return nil
 	}
 }

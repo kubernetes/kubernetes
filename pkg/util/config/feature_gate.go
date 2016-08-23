@@ -31,78 +31,48 @@ const (
 
 	// All known feature keys
 	// To add a new feature, define a key for it below and add
-	// a featureSpec entry to knownFeatures.
+	// a featureInfo entry to knownFeatures.
 
-	// allAlphaGate is a global toggle for alpha features. Per-feature key
-	// values override the default set by allAlphaGate, if they come later in the
-	// specification of gates. Examples:
-	//   AllAlpha=false,NewFeature=true  will result in newFeature=true
-	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
-	allAlphaGate = "AllAlpha"
+	// allAlpha is a global toggle for alpha features. Per feature key
+	// values override the default set by allAlpha.
+	// e.g. allAlpha=false,newFeature=true will result in newFeature=true
+	allAlpha = "allAlpha"
 )
 
 var (
-	// Default values for recorded features.  Every new feature gate should be
-	// represented here.
-	knownFeatures = map[string]featureSpec{
-		allAlphaGate: {false, alpha},
-	}
-
-	// Special handling for a few gates.
-	specialFeatures = map[string]func(f *featureGate, val bool){
-		allAlphaGate: setUnsetAlphaGates,
-	}
-
 	// DefaultFeatureGate is a shared global FeatureGate.
-	DefaultFeatureGate = &featureGate{
-		known:   knownFeatures,
-		special: specialFeatures,
+	DefaultFeatureGate = &featureGate{}
+
+	// Default values for recorded features.
+	knownFeatures = map[string]featureInfo{
+		allAlpha: {false, alpha},
 	}
-)
 
-type featureSpec struct {
-	enabled    bool
-	prerelease prerelease
-}
-
-type prerelease string
-
-const (
-	// Values for prerelease.
 	alpha = prerelease("ALPHA")
 	beta  = prerelease("BETA")
 	ga    = prerelease("")
 )
 
+type prerelease string
+
+type featureInfo struct {
+	enabled    bool
+	prerelease prerelease
+}
+
 // FeatureGate parses and stores flag gates for known features from
 // a string like feature1=true,feature2=false,...
 type FeatureGate interface {
 	AddFlag(fs *pflag.FlagSet)
-
-	// Every feature gate should add method here following this template:
-	//
-	// // owner: @username
-	// // alpha: v1.4
-	// MyFeature() bool
-
+	// owner: @jlowdermilk
+	// alpha: v1.4
+	AllAlpha() bool
 	// TODO: Define accessors for each non-API alpha feature.
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
 type featureGate struct {
-	known   map[string]featureSpec
-	special map[string]func(*featureGate, bool)
-	enabled map[string]bool
-}
-
-func setUnsetAlphaGates(f *featureGate, val bool) {
-	for k, v := range f.known {
-		if v.prerelease == alpha {
-			if _, found := f.enabled[k]; !found {
-				f.enabled[k] = val
-			}
-		}
-	}
+	features map[string]bool
 }
 
 // Set, String, and Type implement pflag.Value
@@ -110,14 +80,14 @@ func setUnsetAlphaGates(f *featureGate, val bool) {
 // Set Parses a string of the form // "key1=value1,key2=value2,..." into a
 // map[string]bool of known keys or returns an error.
 func (f *featureGate) Set(value string) error {
-	f.enabled = make(map[string]bool)
+	f.features = make(map[string]bool)
 	for _, s := range strings.Split(value, ",") {
 		if len(s) == 0 {
 			continue
 		}
 		arr := strings.SplitN(s, "=", 2)
 		k := strings.TrimSpace(arr[0])
-		_, ok := f.known[k]
+		_, ok := knownFeatures[k]
 		if !ok {
 			return fmt.Errorf("unrecognized key: %s", k)
 		}
@@ -129,21 +99,15 @@ func (f *featureGate) Set(value string) error {
 		if err != nil {
 			return fmt.Errorf("invalid value of %s: %s, err: %v", k, v, err)
 		}
-		f.enabled[k] = boolValue
-
-		// Handle "special" features like "all alpha gates"
-		if fn, found := f.special[k]; found {
-			fn(f, boolValue)
-		}
+		f.features[k] = boolValue
 	}
-
-	glog.Infof("feature gates: %v", f.enabled)
+	glog.Infof("feature gates: %v", f.features)
 	return nil
 }
 
 func (f *featureGate) String() string {
 	pairs := []string{}
-	for k, v := range f.enabled {
+	for k, v := range f.features {
 		pairs = append(pairs, fmt.Sprintf("%s=%t", k, v))
 	}
 	sort.Strings(pairs)
@@ -154,12 +118,18 @@ func (f *featureGate) Type() string {
 	return "mapStringBool"
 }
 
+// AllAlpha returns value for allAlpha.
+func (f *featureGate) AllAlpha() bool {
+	return f.lookup(allAlpha)
+}
+
 func (f *featureGate) lookup(key string) bool {
-	defaultValue := f.known[key].enabled
-	if f.enabled != nil {
-		if v, ok := f.enabled[key]; ok {
-			return v
-		}
+	defaultValue := knownFeatures[key].enabled
+	if f.features == nil {
+		panic(fmt.Sprintf("--%s has not been parsed", flagName))
+	}
+	if v, ok := f.features[key]; ok {
+		return v
 	}
 	return defaultValue
 
@@ -168,7 +138,7 @@ func (f *featureGate) lookup(key string) bool {
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 	var known []string
-	for k, v := range f.known {
+	for k, v := range knownFeatures {
 		pre := ""
 		if v.prerelease != ga {
 			pre = fmt.Sprintf("%s - ", v.prerelease)

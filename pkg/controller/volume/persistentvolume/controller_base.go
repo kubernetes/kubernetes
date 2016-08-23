@@ -488,6 +488,29 @@ func (ctrl *PersistentVolumeController) upgradeVolumeFrom1_2(volume *api.Persist
 	return true
 }
 
+// findDeleterParameters finds StorageClass.Parameters of storage class where
+// given volume belongs
+func (ctrl *PersistentVolumeController) findDeleterParameters(volume *api.PersistentVolume) (map[string]string, error) {
+	className := getVolumeClass(volume)
+	if className == "" {
+		return nil, nil
+	}
+
+	obj, found, err := ctrl.classes.GetByKey(className)
+	if err != nil {
+		return nil, fmt.Errorf("error getting storage class %q: %v", className, err)
+	}
+	if !found {
+		return nil, fmt.Errorf("cannot find storage class %q", className)
+	}
+
+	class, ok := obj.(*extensions.StorageClass)
+	if !ok {
+		return nil, fmt.Errorf("expected StorageClass in class reflector, got %+v", obj)
+	}
+	return class.Parameters, nil
+}
+
 // Stateless functions
 
 func hasAnnotation(obj api.ObjectMeta, ann string) bool {

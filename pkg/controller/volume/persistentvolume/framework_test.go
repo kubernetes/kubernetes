@@ -1173,7 +1173,7 @@ func (plugin *mockVolumePlugin) Provision() (*api.PersistentVolume, error) {
 
 // Deleter interfaces
 
-func (plugin *mockVolumePlugin) NewDeleter(spec *vol.Spec) (vol.Deleter, error) {
+func (plugin *mockVolumePlugin) NewDeleter(parameters map[string]string, spec *vol.Spec) (vol.Deleter, error) {
 	if len(plugin.deleteCalls) > 0 {
 		// mockVolumePlugin directly implements Deleter interface
 		glog.V(4).Infof("mock plugin NewDeleter called, returning mock deleter")

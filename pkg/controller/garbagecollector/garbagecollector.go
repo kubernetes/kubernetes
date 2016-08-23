@@ -45,7 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
-const ResourceResyncTime time.Duration = 0
+const ResourceResyncTime = 60 * time.Second
 
 type monitor struct {
 	store      cache.Store

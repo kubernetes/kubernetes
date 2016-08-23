@@ -121,6 +121,32 @@ parameters:
 * `type`: [VolumeType](http://docs.openstack.org/admin-guide/dashboard-manage-volumes.html) created in Cinder. Default is empty.
 * `availability`: Availability Zone. Default is empty.
 
+#### Ceph RBD
+
+```yaml                                                                                                                                                                                                          
+  apiVersion: extensions/v1beta1                                                                                                                                                                                   
+  kind: StorageClass                                                                                                                                                                                               
+  metadata: 
+   name: fast
+provisioner: kubernetes.io/rbd
+parameters:
+    monitors: 10.16.153.105:6789
+    adminID: kube
+    adminSecretName: ceph-secret
+    adminSecretNamespace: kube-system
+    pool: kube
+    userId: kube
+    secretName: ceph-secret-user
+```
+
+* `monitors`: Ceph monitors, comma delimited
+* `adminID`: Ceph client ID that is capable of creating images in the pool. Default is "admin"
+* `adminSecret`: Secret Name for `adminID`
+* `adminSecretNamespace`: The namespace for `adminSecret`. Default is "default"
+* `pool`: Ceph RBD pool. Default is "rbd"
+* `userId`: Ceph client ID that is used to map the RBD image. Default is the same as `adminID`
+* `secretName`: The name of Ceph Secret. It must exist in the same namespace as PVCs.
+
 ### User provisioning requests
 
 Users request dynamically provisioned storage by including a storage class in their `PersistentVolumeClaim`.
@@ -152,6 +178,7 @@ In the future, the storage class may remain in an annotation or become a field o
 
 ### Sample output
 
+#### GCE
 This example uses GCE but any provisioner would follow the same flow.
 
 First we note there are no Persistent Volumes in the cluster.  After creating a storage class and a claim including that storage class, we see a new PV is created
@@ -183,6 +210,73 @@ persistentvolumeclaim "claim1" deleted
 $ kubectl get pv
 
 ```
+
+
+#### Ceph RBD
+
+First create Ceph admin's Secret in the system namespace. Here the Secret is created in `kube-system`:
+
+```
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-admin.yaml --namespace=kube-system
+```
+
+Then create RBD Storage Class:
+
+```
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
+```
+
+Before creating PVC in user's namespace (e.g. myns), make sure the Ceph user's Secret exists, if not, create the Secret:
+
+```
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-user.yaml --namespace=myns
+```
+Now create a PVC in user's namespace (e.g. myns):
+
+```
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json --namespace=myns
+```
+
+Check the PV and PVC are created:
+```
+$ kubectl describe pvc --namespace=myns
+Name:		claim1
+Namespace:	myns
+Status:		Bound
+Volume:		pvc-1cfa23b3-664b-11e6-9eb9-90b11c09520d
+Labels:		<none>
+Capacity:	3Gi
+Access Modes:	RWO
+No events.
+
+$ kubectl describe pv
+Name:		pvc-1cfa23b3-664b-11e6-9eb9-90b11c09520d
+Labels:		<none>
+Status:		Bound
+Claim:		myns/claim1
+Reclaim Policy:	Delete
+Access Modes:	RWO
+Capacity:	3Gi
+Message:	
+Source:
+    Type:		RBD (a Rados Block Device mount on the host that shares a pod's lifetime)
+    CephMonitors:	[10.16.153.105:6789]
+    RBDImage:		kubernetes-dynamic-pvc-1cfb1862-664b-11e6-9a5d-90b11c09520d
+    FSType:		
+    RBDPool:		kube
+    RadosUser:		kube
+    Keyring:		/etc/ceph/keyring
+    SecretRef:		&{ceph-secret-user}
+    ReadOnly:		false
+No events.
+```
+
+Create a Pod to use the PVC:
+
+```
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/pod.yaml --namespace=myns
+```
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()

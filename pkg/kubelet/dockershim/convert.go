@@ -51,13 +51,9 @@ func toRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error) {
 
 func toRuntimeAPIContainer(c *dockertypes.Container) *runtimeApi.Container {
 	state := toRuntimeAPIContainerState(c.Status)
-	_, _, _, containerName, attempt, _ := parseContainerName(c.Names[0])
 	return &runtimeApi.Container{
-		Id: &c.ID,
-		Metadata: &runtimeApi.ContainerMetadata{
-			Name:    &containerName,
-			Attempt: &attempt,
-		},
+		Id:       &c.ID,
+		Name:     &c.Names[0],
 		Image:    &runtimeApi.ImageSpec{Image: &c.Image},
 		ImageRef: &c.ImageID,
 		State:    &state,
@@ -108,15 +104,9 @@ func toRuntimeAPISandboxState(state string) runtimeApi.PodSandBoxState {
 
 func toRuntimeAPISandbox(c *dockertypes.Container) *runtimeApi.PodSandbox {
 	state := toRuntimeAPISandboxState(c.Status)
-	podName, podNamespace, podUID, attempt, _ := parseSandboxName(c.Names[0])
 	return &runtimeApi.PodSandbox{
-		Id: &c.ID,
-		Metadata: &runtimeApi.PodSandboxMetadata{
-			Name:      &podName,
-			Namespace: &podNamespace,
-			Uid:       &podUID,
-			Attempt:   &attempt,
-		},
+		Id:        &c.ID,
+		Name:      &c.Names[0],
 		State:     &state,
 		CreatedAt: &c.Created, // TODO: Why do we need CreateAt timestamp for sandboxes?
 		Labels:    c.Labels,   // TODO: Need to disthinguish annotaions and labels.

@@ -137,7 +137,13 @@ type DeletableVolumePlugin interface {
 	// NewDeleter creates a new volume.Deleter which knows how to delete this
 	// resource in accordance with the underlying storage provider after the
 	// volume's release from a claim
-	NewDeleter(spec *Spec) (Deleter, error)
+	// parameters is value of StorageClass.Parameters referenced by
+	// PersistentVolume.Spec.Class (or the beta annotation) of the volume that
+	// is being deleted.
+	// The parameters can be nil in case the StorageClass instance was deleted.
+	// In this case, the deleter should do its best to delete the volume without
+	// it and throw an error when StorageClass.Parameters are really needed.
+	NewDeleter(parameters map[string]string, spec *Spec) (Deleter, error)
 }
 
 const (
