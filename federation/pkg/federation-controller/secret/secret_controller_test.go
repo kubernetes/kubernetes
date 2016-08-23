@@ -108,6 +108,17 @@ func TestSecretController(t *testing.T) {
 	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
 	assert.True(t, reflect.DeepEqual(&secret1, updatedSecret))
 
+	// Test update federated secret.
+	secret1.Data = map[string][]byte{
+		"config": []byte("myconfigurationfile"),
+	}
+	secretWatch.Modify(&secret1)
+	updatedSecret2 := GetSecretFromChan(cluster1UpdateChan)
+	assert.NotNil(t, updatedSecret)
+	assert.Equal(t, secret1.Name, updatedSecret.Name)
+	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
+	assert.True(t, reflect.DeepEqual(&secret1, updatedSecret2))
+
 	// Test add cluster
 	clusterWatch.Add(cluster2)
 	createdSecret2 := GetSecretFromChan(cluster2CreateChan)
