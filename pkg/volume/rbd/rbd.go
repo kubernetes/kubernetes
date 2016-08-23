@@ -23,12 +23,14 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/exec"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/volume"
+	volutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // This is the primary entrypoint for volume plugins.
@@ -51,6 +53,7 @@ const (
 	annCephAdminID              = "rbd.kubernetes.io/admin"
 	annCephAdminSecretName      = "rbd.kubernetes.io/adminsecretname"
 	annCephAdminSecretNameSpace = "rbd.kubernetes.io/adminsecretnamespace"
+	secretKeyName               = "key" // key name used in secret
 )
 
 func (plugin *rbdPlugin) Init(host volume.VolumeHost) error {
@@ -99,33 +102,14 @@ func (plugin *rbdPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.Vo
 	source, _ := plugin.getRBDVolumeSource(spec)
 
 	if source.SecretRef != nil {
-		if secret, err = plugin.getSecret(pod.Namespace, source.SecretRef.Name); err != nil {
-			glog.Errorf("Couldn't get secret %v/%v", pod.Namespace, source.SecretRef)
+		if secret, err = parseSecret(pod.Namespace, source.SecretRef.Name, plugin.host.GetKubeClient()); err != nil {
+			glog.Errorf("Couldn't get secret from %v/%v", pod.Namespace, source.SecretRef)
 			return nil, err
 		}
 	}
 
 	// Inject real implementations here, test through the internal function.
 	return plugin.newMounterInternal(spec, pod.UID, &RBDUtil{}, plugin.host.GetMounter(), secret)
-}
-
-func (plugin *rbdPlugin) getSecret(namespace, secretName string) (string, error) {
-	secret := ""
-	kubeClient := plugin.host.GetKubeClient()
-	if kubeClient == nil {
-		return "", fmt.Errorf("Cannot get kube client")
-	}
-
-	secrets, err := kubeClient.Core().Secrets(namespace).Get(secretName)
-	if err != nil {
-		return "", err
-	}
-	for name, data := range secrets.Data {
-		secret = string(data)
-		glog.V(4).Infof("ceph secret [%q/%q] info: %s/%s", namespace, secretName, name, secret)
-	}
-	return secret, nil
-
 }
 
 func (plugin *rbdPlugin) getRBDVolumeSource(spec *volume.Spec) (*api.RBDVolumeSource, bool) {
@@ -199,14 +183,15 @@ func (plugin *rbdPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
 	if spec.PersistentVolume != nil && spec.PersistentVolume.Spec.RBD == nil {
 		return nil, fmt.Errorf("spec.PersistentVolumeSource.Spec.RBD is nil")
 	}
-	admin, adminSecretName, adminSecretNamespace, err := selectorToParam(spec.PersistentVolume)
+	admin, adminSecretName, adminSecretNamespace, err := annotationsToParam(spec.PersistentVolume)
 	if err != nil {
-		return nil, fmt.Errorf("cannot find Ceph credentials to delete rbd PV")
+		return nil, fmt.Errorf("cannot find Ceph credentials to delete rbd PV: %v", err)
 	}
-	secret := ""
-	if secret, err = plugin.getSecret(adminSecretNamespace, adminSecretName); err != nil {
+
+	secret, err := parseSecret(adminSecretNamespace, adminSecretName, plugin.host.GetKubeClient())
+	if err != nil {
 		// log error but don't return yet
-		glog.Errorf("failed to get admin secret from [%q/%q]", adminSecretNamespace, adminSecretName)
+		glog.Errorf("failed to get admin secret from [%q/%q]: %v", adminSecretNamespace, adminSecretName, err)
 	}
 	return plugin.newDeleterInternal(spec, admin, secret, &RBDUtil{})
 }
@@ -221,9 +206,9 @@ func (plugin *rbdPlugin) newDeleterInternal(spec *volume.Spec, admin, secret str
 				manager: manager,
 				plugin:  plugin,
 			},
-			Mon:    spec.PersistentVolume.Spec.RBD.CephMonitors,
-			Id:     admin,
-			Secret: secret,
+			Mon:         spec.PersistentVolume.Spec.RBD.CephMonitors,
+			adminId:     admin,
+			adminSecret: secret,
 		}}, nil
 }
 
@@ -259,7 +244,6 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	adminSecretName := ""
 	adminSecretNamespace := "default"
 	secretName := ""
-	userId := ""
 	secret := ""
 
 	for k, v := range r.options.Parameters {
@@ -270,16 +254,16 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 				r.Mon = append(r.Mon, m)
 			}
 		case "adminid":
-			r.Id = v
+			r.adminId = v
 		case "adminsecretname":
 			adminSecretName = v
 		case "adminsecretnamespace":
 			adminSecretNamespace = v
 		case "userid":
-			userId = v
+			r.Id = v
 		case "pool":
 			r.Pool = v
-		case "secretname":
+		case "usersecretname":
 			secretName = v
 		default:
 			return nil, fmt.Errorf("invalid option %q for volume plugin %s", k, r.plugin.GetPluginName())
@@ -289,25 +273,25 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 	if adminSecretName == "" {
 		return nil, fmt.Errorf("missing Ceph admin secret name")
 	}
-	if secret, err = r.plugin.getSecret(adminSecretNamespace, adminSecretName); err != nil {
+	if secret, err = parseSecret(adminSecretNamespace, adminSecretName, r.plugin.host.GetKubeClient()); err != nil {
 		// log error but don't return yet
 		glog.Errorf("failed to get admin secret from [%q/%q]", adminSecretNamespace, adminSecretName)
 	}
-	r.Secret = secret
+	r.adminSecret = secret
 	if len(r.Mon) < 1 {
 		return nil, fmt.Errorf("missing Ceph monitors")
 	}
 	if secretName == "" {
-		return nil, fmt.Errorf("missing secret name")
+		return nil, fmt.Errorf("missing user secret name")
 	}
-	if r.Id == "" {
-		r.Id = "admin"
+	if r.adminId == "" {
+		r.adminId = "admin"
 	}
 	if r.Pool == "" {
 		r.Pool = "rbd"
 	}
-	if userId == "" {
-		userId = r.Id
+	if r.Id == "" {
+		r.Id = r.adminId
 	}
 
 	// create random image name
@@ -318,10 +302,11 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		glog.Errorf("rbd: create volume failed, err: %v", err)
 		return nil, fmt.Errorf("rbd: create volume failed, err: %v", err)
 	}
+	glog.Infof("successfully created rbd image %q", image)
 	pv := new(api.PersistentVolume)
 	rbd.SecretRef = new(api.LocalObjectReference)
 	rbd.SecretRef.Name = secretName
-	rbd.RadosUser = userId
+	rbd.RadosUser = r.Id
 	pv.Spec.PersistentVolumeSource.RBD = rbd
 	pv.Spec.PersistentVolumeReclaimPolicy = r.options.PersistentVolumeReclaimPolicy
 	pv.Spec.AccessModes = r.options.AccessModes
@@ -329,7 +314,7 @@ func (r *rbdVolumeProvisioner) Provision() (*api.PersistentVolume, error) {
 		api.ResourceName(api.ResourceStorage): resource.MustParse(fmt.Sprintf("%dMi", sizeMB)),
 	}
 	// place parameters in pv selector
-	paramToSelector(r.Id, adminSecretNamespace, adminSecretName, pv)
+	paramToAnnotations(r.adminId, adminSecretNamespace, adminSecretName, pv)
 	return pv, nil
 }
 
@@ -346,7 +331,7 @@ func (r *rbdVolumeDeleter) Delete() error {
 	return r.manager.DeleteImage(r)
 }
 
-func paramToSelector(admin, adminSecretNamespace, adminSecretName string, pv *api.PersistentVolume) {
+func paramToAnnotations(admin, adminSecretNamespace, adminSecretName string, pv *api.PersistentVolume) {
 	if pv.Annotations == nil {
 		pv.Annotations = make(map[string]string)
 	}
@@ -355,9 +340,9 @@ func paramToSelector(admin, adminSecretNamespace, adminSecretName string, pv *ap
 	pv.Annotations[annCephAdminSecretNameSpace] = adminSecretNamespace
 }
 
-func selectorToParam(pv *api.PersistentVolume) (string, string, string, error) {
+func annotationsToParam(pv *api.PersistentVolume) (string, string, string, error) {
 	if pv.Annotations == nil {
-		return "", "", "", fmt.Errorf("PV has no annotation, cannot get Ceph admin cedentials")
+		return "", "", "", fmt.Errorf("PV has no annotation, cannot get Ceph admin credentials")
 	}
 	var admin, adminSecretName, adminSecretNamespace string
 	found := false
@@ -398,11 +383,13 @@ func (rbd *rbd) GetPath() string {
 type rbdMounter struct {
 	*rbd
 	// capitalized so they can be exported in persistRBD()
-	Mon     []string
-	Id      string
-	Keyring string
-	Secret  string
-	fsType  string
+	Mon         []string
+	Id          string
+	Keyring     string
+	Secret      string
+	fsType      string
+	adminSecret string
+	adminId     string
 }
 
 var _ volume.Mounter = &rbdMounter{}
@@ -460,4 +447,25 @@ func getVolumeSource(
 	}
 
 	return nil, false, fmt.Errorf("Spec does not reference a RBD volume type")
+}
+
+// parseSecretMap locates the secret by key name.
+func parseSecret(namespace, secretName string, kubeClient clientset.Interface) (string, error) {
+	secretMap, err := volutil.GetSecret(namespace, secretName, kubeClient)
+	if err != nil {
+		glog.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
+		return "", fmt.Errorf("failed to get secret from [%q/%q]", namespace, secretName)
+	}
+	if len(secretMap) == 0 {
+		return "", fmt.Errorf("empty secret map")
+	}
+	secret := ""
+	for k, v := range secretMap {
+		if k == secretKeyName {
+			return v, nil
+		}
+		secret = v
+	}
+	// If not found, the last secret in the map wins as done before
+	return secret, nil
 }
