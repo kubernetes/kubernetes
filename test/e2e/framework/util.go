@@ -2974,11 +2974,14 @@ func ScaleRC(c *client.Client, ns, name string, size uint, wait bool) error {
 	return WaitForRCPodsRunning(c, ns, name)
 }
 
-// Wait up to 10 minutes for pods to become Running. Assume that the pods of the
-// rc are labels with {"name":rcName}.
+// Wait up to 10 minutes for pods to become Running.
 func WaitForRCPodsRunning(c *client.Client, ns, rcName string) error {
-	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
-	err := WaitForPodsWithLabelRunning(c, ns, selector)
+	rc, err := c.ReplicationControllers(ns).Get(rcName)
+	if err != nil {
+		return err
+	}
+	selector := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
+	err = WaitForPodsWithLabelRunning(c, ns, selector)
 	if err != nil {
 		return fmt.Errorf("Error while waiting for replication controller %s pods to be running: %v", rcName, err)
 	}
