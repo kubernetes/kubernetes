@@ -32,6 +32,7 @@ func TestFeatureGateFlag(t *testing.T) {
 	}{
 		{fmt.Sprintf("--%s=fooBarBaz=maybeidk", flagName), false, fmt.Errorf("unrecognized key: fooBarBaz")},
 		{fmt.Sprintf("--%s=", flagName), false, nil},
+		{"", false, nil},
 		{fmt.Sprintf("--%s=allAlpha=false", flagName), false, nil},
 		{fmt.Sprintf("--%s=allAlpha=true", flagName), true, nil},
 		{fmt.Sprintf("--%s=allAlpha=banana", flagName), false, fmt.Errorf("invalid value of allAlpha")},
