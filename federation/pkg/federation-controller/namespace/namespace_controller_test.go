@@ -23,40 +23,38 @@ import (
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	fake_federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNamespaceController(t *testing.T) {
-	cluster1 := mkCluster("cluster1", api_v1.ConditionTrue)
-	cluster2 := mkCluster("cluster2", api_v1.ConditionTrue)
+	cluster1 := NewCluster("cluster1", api_v1.ConditionTrue)
+	cluster2 := NewCluster("cluster2", api_v1.ConditionTrue)
 
 	fakeClient := &fake_federation_release_1_4.Clientset{}
-	RegisterList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
-	RegisterList("namespaces", &fakeClient.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
-	namespaceWatch := RegisterWatch("namespaces", &fakeClient.Fake)
-	clusterWatch := RegisterWatch("clusters", &fakeClient.Fake)
+	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
+	RegisterFakeList("namespaces", &fakeClient.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
+	namespaceWatch := RegisterFakeWatch("namespaces", &fakeClient.Fake)
+	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
 	cluster1Client := &fake_kube_release_1_4.Clientset{}
-	cluster1Watch := RegisterWatch("namespaces", &cluster1Client.Fake)
-	RegisterList("namespaces", &cluster1Client.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
-	cluster1CreateChan := RegisterCopyOnCreate("namespaces", &cluster1Client.Fake, cluster1Watch)
-	cluster1UpdateChan := RegisterCopyOnUpdate("namespaces", &cluster1Client.Fake, cluster1Watch)
+	cluster1Watch := RegisterFakeWatch("namespaces", &cluster1Client.Fake)
+	RegisterFakeList("namespaces", &cluster1Client.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
+	cluster1CreateChan := RegisterFakeCopyOnCreate("namespaces", &cluster1Client.Fake, cluster1Watch)
+	cluster1UpdateChan := RegisterFakeCopyOnUpdate("namespaces", &cluster1Client.Fake, cluster1Watch)
 
 	cluster2Client := &fake_kube_release_1_4.Clientset{}
-	cluster2Watch := RegisterWatch("namespaces", &cluster2Client.Fake)
-	RegisterList("namespaces", &cluster2Client.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
-	cluster2CreateChan := RegisterCopyOnCreate("namespaces", &cluster2Client.Fake, cluster2Watch)
+	cluster2Watch := RegisterFakeWatch("namespaces", &cluster2Client.Fake)
+	RegisterFakeList("namespaces", &cluster2Client.Fake, &api_v1.NamespaceList{Items: []api_v1.Namespace{}})
+	cluster2CreateChan := RegisterFakeCopyOnCreate("namespaces", &cluster2Client.Fake, cluster2Watch)
 
 	namespaceController := NewNamespaceController(fakeClient)
-	informer := toFederatedInformerForTestOnly(namespaceController.namespaceFederatedInformer)
+	informer := ToFederatedInformerForTestOnly(namespaceController.namespaceFederatedInformer)
 	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kube_release_1_4.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
@@ -107,70 +105,8 @@ func TestNamespaceController(t *testing.T) {
 	close(stop)
 }
 
-func toFederatedInformerForTestOnly(informer util.FederatedInformer) util.FederatedInformerForTestOnly {
-	inter := informer.(interface{})
-	return inter.(util.FederatedInformerForTestOnly)
-}
-
-func mkCluster(name string, readyStatus api_v1.ConditionStatus) *federation_api.Cluster {
-	return &federation_api.Cluster{
-		ObjectMeta: api_v1.ObjectMeta{
-			Name: name,
-		},
-		Status: federation_api.ClusterStatus{
-			Conditions: []federation_api.ClusterCondition{
-				{Type: federation_api.ClusterReady, Status: readyStatus},
-			},
-		},
-	}
-}
-
-func RegisterWatch(resource string, client *core.Fake) *watch.FakeWatcher {
-	watcher := watch.NewFake()
-	client.AddWatchReactor(resource, func(action core.Action) (bool, watch.Interface, error) { return true, watcher, nil })
-	return watcher
-}
-
-func RegisterList(resource string, client *core.Fake, obj runtime.Object) {
-	client.AddReactor("list", resource, func(action core.Action) (bool, runtime.Object, error) {
-		return true, obj, nil
-	})
-}
-
-func RegisterCopyOnCreate(resource string, client *core.Fake, watcher *watch.FakeWatcher) chan runtime.Object {
-	objChan := make(chan runtime.Object, 100)
-	client.AddReactor("create", resource, func(action core.Action) (bool, runtime.Object, error) {
-		createAction := action.(core.CreateAction)
-		obj := createAction.GetObject()
-		go func() {
-			watcher.Add(obj)
-			objChan <- obj
-		}()
-		return true, obj, nil
-	})
-	return objChan
-}
-
-func RegisterCopyOnUpdate(resource string, client *core.Fake, watcher *watch.FakeWatcher) chan runtime.Object {
-	objChan := make(chan runtime.Object, 100)
-	client.AddReactor("update", resource, func(action core.Action) (bool, runtime.Object, error) {
-		updateAction := action.(core.UpdateAction)
-		obj := updateAction.GetObject()
-		go func() {
-			watcher.Modify(obj)
-			objChan <- obj
-		}()
-		return true, obj, nil
-	})
-	return objChan
-}
-
 func GetNamespaceFromChan(c chan runtime.Object) *api_v1.Namespace {
-	select {
-	case obj := <-c:
-		namespace := obj.(*api_v1.Namespace)
-		return namespace
-	case <-time.After(time.Minute):
-		return nil
-	}
+	namespace := GetObjectFromChan(c).(*api_v1.Namespace)
+	return namespace
+
 }

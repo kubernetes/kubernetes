@@ -23,43 +23,40 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	// federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	fake_federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4/fake"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	. "k8s.io/kubernetes/federation/pkg/federation-controller/util/test"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	extensions_v1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	fake_kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/fake"
-	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/runtime"
-	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIngressController(t *testing.T) {
-	cluster1 := mkCluster("cluster1", api_v1.ConditionTrue)
-	cluster2 := mkCluster("cluster2", api_v1.ConditionTrue)
+	cluster1 := NewCluster("cluster1", api_v1.ConditionTrue)
+	cluster2 := NewCluster("cluster2", api_v1.ConditionTrue)
 
 	fakeClient := &fake_federation_release_1_4.Clientset{}
-	RegisterList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
-	RegisterList("ingresses", &fakeClient.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
-	ingressWatch := RegisterWatch("ingresses", &fakeClient.Fake)
-	clusterWatch := RegisterWatch("clusters", &fakeClient.Fake)
+	RegisterFakeList("clusters", &fakeClient.Fake, &federation_api.ClusterList{Items: []federation_api.Cluster{*cluster1}})
+	RegisterFakeList("ingresses", &fakeClient.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
+	ingressWatch := RegisterFakeWatch("ingresses", &fakeClient.Fake)
+	clusterWatch := RegisterFakeWatch("clusters", &fakeClient.Fake)
 
 	cluster1Client := &fake_kube_release_1_4.Clientset{}
-	cluster1Watch := RegisterWatch("ingresses", &cluster1Client.Fake)
-	RegisterList("ingresses", &cluster1Client.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
-	cluster1CreateChan := RegisterCopyOnCreate("ingresses", &cluster1Client.Fake, cluster1Watch)
-	cluster1UpdateChan := RegisterCopyOnUpdate("ingresses", &cluster1Client.Fake, cluster1Watch)
+	cluster1Watch := RegisterFakeWatch("ingresses", &cluster1Client.Fake)
+	RegisterFakeList("ingresses", &cluster1Client.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
+	cluster1CreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster1Client.Fake, cluster1Watch)
+	cluster1UpdateChan := RegisterFakeCopyOnUpdate("ingresses", &cluster1Client.Fake, cluster1Watch)
 
 	cluster2Client := &fake_kube_release_1_4.Clientset{}
-	cluster2Watch := RegisterWatch("ingresses", &cluster2Client.Fake)
-	RegisterList("ingresses", &cluster2Client.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
-	cluster2CreateChan := RegisterCopyOnCreate("ingresses", &cluster2Client.Fake, cluster2Watch)
+	cluster2Watch := RegisterFakeWatch("ingresses", &cluster2Client.Fake)
+	RegisterFakeList("ingresses", &cluster2Client.Fake, &extensions_v1beta1.IngressList{Items: []extensions_v1beta1.Ingress{}})
+	cluster2CreateChan := RegisterFakeCopyOnCreate("ingresses", &cluster2Client.Fake, cluster2Watch)
 
 	ingressController := NewIngressController(fakeClient)
-	informer := toFederatedInformerForTestOnly(ingressController.ingressFederatedInformer)
+	informer := ToFederatedInformerForTestOnly(ingressController.ingressFederatedInformer)
 	informer.SetClientFactory(func(cluster *federation_api.Cluster) (kube_release_1_4.Interface, error) {
 		switch cluster.Name {
 		case cluster1.Name:
@@ -111,70 +108,7 @@ func TestIngressController(t *testing.T) {
 	close(stop)
 }
 
-func toFederatedInformerForTestOnly(informer util.FederatedInformer) util.FederatedInformerForTestOnly {
-	inter := informer.(interface{})
-	return inter.(util.FederatedInformerForTestOnly)
-}
-
-func mkCluster(name string, readyStatus api_v1.ConditionStatus) *federation_api.Cluster {
-	return &federation_api.Cluster{
-		ObjectMeta: api_v1.ObjectMeta{
-			Name: name,
-		},
-		Status: federation_api.ClusterStatus{
-			Conditions: []federation_api.ClusterCondition{
-				{Type: federation_api.ClusterReady, Status: readyStatus},
-			},
-		},
-	}
-}
-
-func RegisterWatch(resource string, client *core.Fake) *watch.FakeWatcher {
-	watcher := watch.NewFake()
-	client.AddWatchReactor(resource, func(action core.Action) (bool, watch.Interface, error) { return true, watcher, nil })
-	return watcher
-}
-
-func RegisterList(resource string, client *core.Fake, obj runtime.Object) {
-	client.AddReactor("list", resource, func(action core.Action) (bool, runtime.Object, error) {
-		return true, obj, nil
-	})
-}
-
-func RegisterCopyOnCreate(resource string, client *core.Fake, watcher *watch.FakeWatcher) chan runtime.Object {
-	objChan := make(chan runtime.Object, 100)
-	client.AddReactor("create", resource, func(action core.Action) (bool, runtime.Object, error) {
-		createAction := action.(core.CreateAction)
-		obj := createAction.GetObject()
-		go func() {
-			watcher.Add(obj)
-			objChan <- obj
-		}()
-		return true, obj, nil
-	})
-	return objChan
-}
-
-func RegisterCopyOnUpdate(resource string, client *core.Fake, watcher *watch.FakeWatcher) chan runtime.Object {
-	objChan := make(chan runtime.Object, 100)
-	client.AddReactor("update", resource, func(action core.Action) (bool, runtime.Object, error) {
-		updateAction := action.(core.UpdateAction)
-		obj := updateAction.GetObject()
-		go func() {
-			watcher.Modify(obj)
-			objChan <- obj
-		}()
-		return true, obj, nil
-	})
-	return objChan
-}
-
 func GetIngressFromChan(c chan runtime.Object) *extensions_v1beta1.Ingress {
-	select {
-	case obj := <-c:
-		ingress := obj.(*extensions_v1beta1.Ingress)
-		return ingress
-	case <-time.After(time.Minute):
-		return nil
-	}
+	ingress := GetObjectFromChan(c).(*extensions_v1beta1.Ingress)
+	return ingress
 }
