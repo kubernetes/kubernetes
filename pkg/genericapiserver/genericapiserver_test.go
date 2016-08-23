@@ -44,7 +44,7 @@ import (
 
 // setUp is a convience function for setting up for (most) tests.
 func setUp(t *testing.T) (GenericAPIServer, *etcdtesting.EtcdTestServer, Config, *assert.Assertions) {
-	etcdServer := etcdtesting.NewEtcdTestClientServer(t)
+	etcdServer, _ := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 
 	genericapiserver := GenericAPIServer{}
 	config := Config{}
