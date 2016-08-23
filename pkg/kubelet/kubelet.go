@@ -1633,7 +1633,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Latency measurements for the main workflow are relative to the
-	// (first time the pod was seen by the API server.
+	// first time the pod was seen by the API server.
 	var firstSeenTime time.Time
 	if firstSeenTimeStr, ok := pod.Annotations[kubetypes.ConfigFirstSeenAnnotationKey]; ok {
 		firstSeenTime = kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
@@ -1686,7 +1686,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			if mirrorPod.DeletionTimestamp != nil || !kl.podManager.IsMirrorPodOf(mirrorPod, pod) {
 				// The mirror pod is semantically different from the static pod. Remove
 				// it. The mirror pod will get recreated later.
-				glog.Errorf("Deleting mirror pod %q because it is outdated", format.Pod(mirrorPod))
+				glog.Warningf("Deleting mirror pod %q because it is outdated", format.Pod(mirrorPod))
 				if err := kl.podManager.DeleteMirrorPod(podFullName); err != nil {
 					glog.Errorf("Failed deleting mirror pod %q: %v", format.Pod(mirrorPod), err)
 				} else {
