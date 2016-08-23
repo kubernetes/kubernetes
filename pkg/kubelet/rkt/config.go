@@ -88,20 +88,20 @@ func (r *Runtime) getConfig(cfg *Config) (*Config, error) {
 
 	flags := resp.Info.GlobalFlags
 
-	if cfg.Dir == "" {
+	if flags.Dir != "" {
 		cfg.Dir = flags.Dir
 	}
-	if cfg.InsecureOptions == "" {
-		cfg.InsecureOptions = flags.InsecureFlags
-	}
-	if cfg.LocalConfigDir == "" {
+	if flags.LocalConfigDir != "" {
 		cfg.LocalConfigDir = flags.LocalConfigDir
 	}
-	if cfg.UserConfigDir == "" {
+	if flags.UserConfigDir != "" {
 		cfg.UserConfigDir = flags.UserConfigDir
 	}
-	if cfg.SystemConfigDir == "" {
+	if flags.SystemConfigDir != "" {
 		cfg.SystemConfigDir = flags.SystemConfigDir
+	}
+	if flags.InsecureFlags != "" {
+		cfg.InsecureOptions = fmt.Sprintf("%s,%s", cfg.InsecureOptions, flags.InsecureFlags)
 	}
 
 	return cfg, nil
