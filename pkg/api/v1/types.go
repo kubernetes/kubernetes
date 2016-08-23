@@ -186,6 +186,11 @@ type ObjectMeta struct {
 	// from the list. If the deletionTimestamp of the object is non-nil, entries
 	// in this list can only be removed.
 	Finalizers []string `json:"finalizers,omitempty" patchStrategy:"merge" protobuf:"bytes,14,rep,name=finalizers"`
+
+	// The name of the cluster which the object belongs to.
+	// This is used to distinguish resources with same name and namespace in different clusters.
+	// This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request.
+	ClusterName string `json:"clusterName,omitempty" protobuf:"bytes,15,opt,name=clusterName"`
 }
 
 const (

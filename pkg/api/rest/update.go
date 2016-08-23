@@ -95,6 +95,9 @@ func BeforeUpdate(strategy RESTUpdateStrategy, ctx api.Context, obj, old runtime
 
 	strategy.PrepareForUpdate(ctx, obj, old)
 
+	// ClusterName is ignored and should not be saved
+	objectMeta.ClusterName = ""
+
 	// Ensure some common fields, like UID, are validated for all resources.
 	errs, err := validateCommonFields(obj, old)
 	if err != nil {

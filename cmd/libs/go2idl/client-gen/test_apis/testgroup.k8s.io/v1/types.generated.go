@@ -914,7 +914,7 @@ func (x codecSelfer1234) decSliceTestType(v *[]TestType, d *codec1978.Decoder) {
 
 			yyrg72 := len(yyv72) > 0
 			yyv272 := yyv72
-			yyrl72, yyrt72 = z.DecInferLen(yyl72, z.DecBasicHandle().MaxInitLen, 256)
+			yyrl72, yyrt72 = z.DecInferLen(yyl72, z.DecBasicHandle().MaxInitLen, 272)
 			if yyrt72 {
 				if yyrl72 <= cap(yyv72) {
 					yyv72 = yyv72[:yyrl72]
