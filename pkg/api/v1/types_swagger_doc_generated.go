@@ -505,7 +505,7 @@ func (ExportOptions) SwaggerDoc() map[string]string {
 
 var map_FCVolumeSource = map[string]string{
 	"":           "Represents a Fibre Channel volume. Fibre Channel volumes can only be mounted as read/write once. Fibre Channel volumes support ownership management and SELinux relabeling.",
-	"targetWWNs": "Required: FC target world wide names (WWNs)",
+	"targetWWNs": "Required: FC target worldwide names (WWNs)",
 	"lun":        "Required: FC target lun number",
 	"fsType":     "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
 	"readOnly":   "Optional: Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
@@ -516,7 +516,7 @@ func (FCVolumeSource) SwaggerDoc() map[string]string {
 }
 
 var map_FlexVolumeSource = map[string]string{
-	"":          "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+	"":          "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
 	"driver":    "Driver is the name of the driver to use for this volume.",
 	"fsType":    "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". The default filesystem depends on FlexVolume script.",
 	"secretRef": "Optional: SecretRef is reference to the secret object containing sensitive information to pass to the plugin scripts. This may be empty if no secret object is specified. If the secret object contains more than one secret, all secrets are passed to the plugin scripts.",
@@ -825,7 +825,7 @@ func (NodeAffinity) SwaggerDoc() map[string]string {
 }
 
 var map_NodeCondition = map[string]string{
-	"":                   "NodeCondition contains condition infromation for a node.",
+	"":                   "NodeCondition contains condition information for a node.",
 	"type":               "Type of node condition.",
 	"status":             "Status of the condition, one of True, False, Unknown.",
 	"lastHeartbeatTime":  "Last time we got an update on a given condition.",
@@ -1092,7 +1092,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"cephfs":               "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 	"fc":                   "FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.",
 	"flocker":              "Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running",
-	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+	"flexVolume":           "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
 	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
@@ -1108,7 +1108,7 @@ var map_PersistentVolumeSpec = map[string]string{
 	"capacity":                      "A description of the persistent volume's resources and capacity. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#capacity",
 	"accessModes":                   "AccessModes contains all ways the volume can be mounted. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#access-modes",
 	"claimRef":                      "ClaimRef is part of a bi-directional binding between PersistentVolume and PersistentVolumeClaim. Expected to be non-nil when bound. claim.VolumeName is the authoritative bind between PV and PVC. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#binding",
-	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recyling must be supported by the volume plugin underlying this persistent volume. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#recycling-policy",
+	"persistentVolumeReclaimPolicy": "What happens to a persistent volume when released from its claim. Valid options are Retain (default) and Recycle. Recycling must be supported by the volume plugin underlying this persistent volume. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#recycling-policy",
 }
 
 func (PersistentVolumeSpec) SwaggerDoc() map[string]string {
@@ -1771,7 +1771,7 @@ var map_VolumeSource = map[string]string{
 	"glusterfs":             "Glusterfs represents a Glusterfs mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md",
 	"persistentVolumeClaim": "PersistentVolumeClaimVolumeSource represents a reference to a PersistentVolumeClaim in the same namespace. More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#persistentvolumeclaims",
 	"rbd":           "RBD represents a Rados Block Device mount on the host that shares a pod's lifetime. More info: http://releases.k8s.io/HEAD/examples/volumes/rbd/README.md",
-	"flexVolume":    "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+	"flexVolume":    "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
 	"cinder":        "Cinder represents a cinder volume attached and mounted on kubelets host machine More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md",
 	"cephfs":        "CephFS represents a Ceph FS mount on the host that shares a pod's lifetime",
 	"flocker":       "Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running",
