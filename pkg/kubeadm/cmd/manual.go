@@ -93,7 +93,7 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 			}
 
 			out.Write([]byte(fmt.Sprintf(dedent.Dedent(`
-			    Master initialization complete:
+				Master initialization complete:
 
 				* Static pods written and kubelet's kubeconfig written.
 				* Kubelet should start soon.  Try 'systemctl restart kubelet'
@@ -160,9 +160,9 @@ func NewCmdManualBootstrapJoinNode(out io.Writer, params *kubeadmapi.BootstrapPa
 				Node join complete:
 				* Certificate signing request sent to master and response
 				  received.
-			    * Kubelet informed of new secure connection details.
+				* Kubelet informed of new secure connection details.
 
-			    Run 'kubectl get nodes' on the master to see this node join.
+				Run 'kubectl get nodes' on the master to see this node join.
 
 			`)))
 		},
