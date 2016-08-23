@@ -29,7 +29,6 @@ import (
 	planner "k8s.io/kubernetes/federation/pkg/federation-controller/replicaset/planner"
 	fedutil "k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/meta"
 	apiv1 "k8s.io/kubernetes/pkg/api/v1"
 	extensionsv1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/pkg/client/cache"
@@ -44,7 +43,7 @@ import (
 )
 
 const (
-	FedReplicaSetPreferencesAnnotation = ""
+	FedReplicaSetPreferencesAnnotation = "federation.kubernetes.io/replica-set-preferences"
 	allClustersKey                     = "THE_ALL_CLUSTER_KEY"
 	UserAgentName                      = "Federation-replicaset-Controller"
 )
@@ -57,15 +56,10 @@ var (
 )
 
 func parseFederationReplicaSetReference(frs *extensionsv1.ReplicaSet) (*fed.FederatedReplicaSetPreferences, error) {
-	accessor, err := meta.Accessor(frs)
-	if err != nil {
-		return nil, err
-	}
-	anno := accessor.GetAnnotations()
-	if anno == nil {
+	if frs.Annotations == nil {
 		return nil, nil
 	}
-	frsPrefString, found := anno[FedReplicaSetPreferencesAnnotation]
+	frsPrefString, found := frs.Annotations[FedReplicaSetPreferencesAnnotation]
 	if !found {
 		return nil, nil
 	}
