@@ -399,7 +399,9 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		restartCommand,
 		[]string{kubeletHealthCheckURL},
 		"kubelet.log",
-		true)
+		// TODO(random-liu): The test is failing because kubelet got restarted during the test,
+		// disable it for now.
+		false)
 	return server, server.start()
 }
 
