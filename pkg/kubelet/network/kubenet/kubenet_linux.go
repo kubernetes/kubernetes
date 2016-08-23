@@ -210,7 +210,7 @@ const NET_CONFIG_TEMPLATE = `{
   "addIf": "%s",
   "isGateway": true,
   "ipMasq": false,
-  "hairpin": "%t",
+  "hairpinMode": %t,
   "ipam": {
     "type": "host-local",
     "subnet": "%s",
