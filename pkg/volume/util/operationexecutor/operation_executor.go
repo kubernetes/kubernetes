@@ -1039,31 +1039,53 @@ func (oe *operationExecutor) generateCreateSnapshotFunc(
 	}
 
 	return func() error {
-		// Execute create snapshot
-		snapshotTimestamp, snapshotErr := snapshottableVolumePlugin.CreateSnapshot(
-			volumeToSnapshot.VolumeSpec, snapshotName)
-
-		if snapshotErr != nil {
+		// Check if a snapshot of this name already exists
+		exists, existsErr := snapshottableVolumePlugin.SnapshotExists(snapshotName)
+		if existsErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return fmt.Errorf(
-				"CreateSnapshot.CreateSnapshot failed for volume %q (spec.Name: %q) with: %v",
+				"CreateSnapshot.SnapshotExists failed for volume %q (spec.Name: %q) with: %v",
 				volumeToSnapshot.VolumeName,
 				volumeToSnapshot.VolumeSpec.Name(),
-				snapshotErr)
+				existsErr)
 		}
 
-		glog.Infof(
-			"CreateSnapshot.CreateSnapshot succeeded for volume %q (spec.Name: %q).",
-			volumeToSnapshot.VolumeName,
-			volumeToSnapshot.VolumeSpec.Name())
+		if exists {
+			// Post event to API server that snapshot already exists
+			eventErr := volumehelper.PostEventToPersistentVolumeClaim(
+				oe.kubeClient,
+				volumeToSnapshot.PersistentVolumeClaim,
+				"SnapshotSkipped",
+				fmt.Sprintf("Snapshot %q skipped: snapshot with name already exists.", snapshotName),
+				api.EventTypeNormal)
+			if eventErr != nil {
+				glog.Infof("CreateSnapshot failed with: %v", eventErr)
+			}
+		} else {
+			// Execute create snapshot
+			snapshotTimestamp, snapshotErr := snapshottableVolumePlugin.CreateSnapshot(
+				volumeToSnapshot.VolumeSpec, snapshotName)
+
+			if snapshotErr != nil {
+				// On failure, return error. Caller will log and retry.
+				return fmt.Errorf(
+					"CreateSnapshot.CreateSnapshot failed for volume %q (spec.Name: %q) with: %v",
+					volumeToSnapshot.VolumeName,
+					volumeToSnapshot.VolumeSpec.Name(),
+					snapshotErr)
+			}
+
+			glog.Infof(
+				"CreateSnapshot.CreateSnapshot succeeded for volume %q (spec.Name: %q).",
+				volumeToSnapshot.VolumeName,
+				volumeToSnapshot.VolumeSpec.Name())
+
+			volumeToSnapshot.PersistentVolumeClaim.Annotations[snapshotName] = snapshotTimestamp
+		}
 
 		// Update PVC object
 		delete(volumeToSnapshot.PersistentVolumeClaim.Annotations, api.AnnSnapshotCreate)
-		volumeToSnapshot.PersistentVolumeClaim.Annotations[snapshotName] = snapshotTimestamp
 
-		glog.Infof(
-			"xcxc Posting pvc to the api server: %v",
-			volumeToSnapshot.PersistentVolumeClaim.Annotations)
 		namespace := volumeToSnapshot.PersistentVolumeClaim.Namespace
 		_, updateErr := oe.kubeClient.Core().PersistentVolumeClaims(namespace).Update(volumeToSnapshot.PersistentVolumeClaim)
 		if updateErr != nil {

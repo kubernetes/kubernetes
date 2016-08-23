@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
+	"k8s.io/kubernetes/pkg/volume/util/volumehelper"
 )
 
 const (
@@ -150,7 +151,19 @@ func (sc *snapshotController) pvcAdd(obj interface{}) {
 			pvc.Namespace,
 			pvc.Name,
 			err)
-		//post event to API
+		eventErr := volumehelper.PostEventToPersistentVolumeClaim(
+			sc.kubeClient,
+			pvc,
+			"SnapshotControllerError",
+			fmt.Sprintf("Snapshot %q failed due to a controller error.", snapshotName),
+			api.EventTypeWarning)
+		if eventErr != nil {
+			glog.V(5).Infof("Failed posting event to API server err=%v", eventErr)
+		}
+		removeErr := sc.removeCreateSnapshotAnnotation(pvc)
+		if removeErr != nil {
+			glog.V(5).Infof("Failed removing snapshot annotation err=%v", removeErr)
+		}
 		return
 	}
 
@@ -162,7 +175,19 @@ func (sc *snapshotController) pvcAdd(obj interface{}) {
 			pvc.Namespace,
 			pvc.Name,
 			err)
-		//post event to API
+		eventErr := volumehelper.PostEventToPersistentVolumeClaim(
+			sc.kubeClient,
+			pvc,
+			"SnapshotSkipped",
+			fmt.Sprintf("Snapshot %q skipped: underlying persistent volume does not support snapshotting.", snapshotName),
+			api.EventTypeNormal)
+		if eventErr != nil {
+			glog.V(5).Infof("Failed posting event to API server err=%v", eventErr)
+		}
+		removeErr := sc.removeCreateSnapshotAnnotation(pvc)
+		if removeErr != nil {
+			glog.V(5).Infof("Failed removing snapshot annotation err=%v", removeErr)
+		}
 		return
 	}
 
@@ -174,7 +199,19 @@ func (sc *snapshotController) pvcAdd(obj interface{}) {
 			pvc.Name,
 			volumeSpec.Name(),
 			err)
-		//post event to API
+		eventErr := volumehelper.PostEventToPersistentVolumeClaim(
+			sc.kubeClient,
+			pvc,
+			"SnapshotControllerError",
+			fmt.Sprintf("Snapshot %q failed due to a controller error.", snapshotName),
+			api.EventTypeWarning)
+		if eventErr != nil {
+			glog.V(5).Infof("Failed posting event to API server err=%v", eventErr)
+		}
+		removeErr := sc.removeCreateSnapshotAnnotation(pvc)
+		if removeErr != nil {
+			glog.V(5).Infof("Failed removing snapshot annotation err=%v", removeErr)
+		}
 		return
 	}
 
@@ -326,6 +363,19 @@ func (sc *snapshotController) getPVSpecFromCache(
 	}
 
 	return volume.NewSpecFromPersistentVolume(&clonedPV, pvcReadOnly), nil
+}
+
+func (sc *snapshotController) removeCreateSnapshotAnnotation(
+	pvc *api.PersistentVolumeClaim) error {
+	delete(pvc.Annotations, api.AnnSnapshotCreate)
+	_, err := sc.kubeClient.Core().PersistentVolumeClaims(pvc.Namespace).Update(pvc)
+	if err != nil {
+		return fmt.Errorf(
+			"Snapshot controller failed removing create-snapshot annotation from PVC %q with: %v",
+			pvc.Name,
+			err)
+	}
+	return nil
 }
 
 // VolumeHost implementation

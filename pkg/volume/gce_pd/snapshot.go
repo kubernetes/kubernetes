@@ -54,3 +54,16 @@ func (plugin *gcePersistentDiskPlugin) CreateSnapshot(spec *volume.Spec, snapsho
 
 	return snapshot.CreationTimestamp, nil
 }
+
+// SnapshotExists issues a command to the GCE cloud provide to get the snapshot
+// with the specified name and returns true if it exists.
+// Callers are responsible for retrying on failure.
+// Callers are responsible for thread safety between concurrent snapshot operations.
+func (plugin *gcePersistentDiskPlugin) SnapshotExists(snapshotName string) (bool, error) {
+	gceCloud, err := getCloudProvider(plugin.host.GetCloudProvider())
+	if err != nil {
+		return false, err
+	}
+
+	return gceCloud.SnapshotExists(snapshotName)
+}

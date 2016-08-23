@@ -173,6 +173,10 @@ type SnapshottableVolumePlugin interface {
 	// CreateSnapshot contains the plugin-specific logic to trigger a snapshot.
 	// In alpha, only implemented for GCE PD.
 	CreateSnapshot(spec *Spec, snapshotName string) (string, error)
+	// SnapshotExists returns whether or not a snapshot with the specified name
+	// exists.
+	// In alpha, only implemented for GCE PD.
+	SnapshotExists(snapshotName string) (bool, error)
 }
 
 // VolumeHost is an interface that plugins can use to access the kubelet.
