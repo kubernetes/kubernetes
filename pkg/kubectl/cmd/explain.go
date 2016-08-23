@@ -17,6 +17,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
@@ -43,14 +44,14 @@ var (
 )
 
 // NewCmdExplain returns a cobra command for swagger docs
-func NewCmdExplain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdExplain(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "explain RESOURCE",
 		Short:   "Documentation of resources",
 		Long:    explainLong,
 		Example: explainExamples,
 		Run: func(cmd *cobra.Command, args []string) {
-			err := RunExplain(f, out, cmd, args)
+			err := RunExplain(f, out, cmdErr, cmd, args)
 			cmdutil.CheckErr(err)
 		},
 	}
@@ -60,8 +61,12 @@ func NewCmdExplain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // RunExplain executes the appropriate steps to print a model's documentation
-func RunExplain(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
+func RunExplain(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		fmt.Fprint(cmdErr, "You must specify the type of resource to explain. ", valid_resources)
+		return cmdutil.UsageError(cmd, "Required resource not specified.")
+	}
+	if len(args) > 1 {
 		return cmdutil.UsageError(cmd, "We accept only this format: explain RESOURCE")
 	}
 
