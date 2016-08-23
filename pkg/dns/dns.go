@@ -275,7 +275,14 @@ func (kd *KubeDNS) removeService(obj interface{}) {
 }
 
 func (kd *KubeDNS) updateService(oldObj, newObj interface{}) {
-	kd.newService(newObj)
+	if new, ok := assertIsService(newObj); ok {
+		if old, ok := assertIsService(oldObj); ok {
+			if (new.Spec.Type == kapi.ServiceTypeExternalName) != (old.Spec.Type == kapi.ServiceTypeExternalName) {
+				kd.removeService(oldObj)
+			}
+			kd.newService(newObj)
+		}
+	}
 }
 
 func (kd *KubeDNS) handleEndpointAdd(obj interface{}) {
