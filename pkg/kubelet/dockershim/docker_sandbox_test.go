@@ -27,17 +27,18 @@ import (
 func TestCreateSandbox(t *testing.T) {
 	ds, fakeDocker := newTestDockerSevice()
 	name := "FOO"
-	// We don't really want to test k8s name format and parsing,
-	// but FakeDockerClient parses the name internally during AssertCreated().
-	// TODO: fix this.
-	fullName := "k8s_" + name + ".abcde_foo_new_12345678_0"
-	config := &runtimeApi.PodSandboxConfig{Name: &fullName}
+	namespace := "BAR"
+	uid := "1"
+	config := &runtimeApi.PodSandboxConfig{
+		Metadata: &runtimeApi.PodSandboxMetadata{
+			Name:      &name,
+			Namespace: &namespace,
+			Uid:       &uid,
+		},
+	}
 	id, err := ds.CreatePodSandbox(config)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
-	}
-	if err := fakeDocker.AssertCreated([]string{name}); err != nil {
-		t.Errorf("%v", err)
 	}
 	if err := fakeDocker.AssertStarted([]string{id}); err != nil {
 		t.Errorf("%v", err)

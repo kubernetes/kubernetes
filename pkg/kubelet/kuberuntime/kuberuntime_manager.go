@@ -229,12 +229,11 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 		return nil, err
 	}
 	for _, s := range sandboxes {
-		name, namespace, uid, _ := parseSandboxName(s.GetName())
-		podUID := kubetypes.UID(uid)
+		podUID := kubetypes.UID(s.Metadata.GetUid())
 		pods[podUID] = &kubecontainer.Pod{
 			ID:        podUID,
-			Name:      name,
-			Namespace: namespace,
+			Name:      s.Metadata.GetName(),
+			Namespace: s.Metadata.GetNamespace(),
 		}
 	}
 
