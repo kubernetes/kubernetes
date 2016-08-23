@@ -491,7 +491,7 @@ var withNamespacePrefixColumns = []string{"NAMESPACE"} // TODO(erictune): print 
 var deploymentColumns = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "AVAILABLE", "AGE"}
 var configMapColumns = []string{"NAME", "DATA", "AGE"}
 var podSecurityPolicyColumns = []string{"NAME", "PRIV", "CAPS", "VOLUMEPLUGINS", "SELINUX", "RUNASUSER"}
-var clusterColumns = []string{"NAME", "STATUS", "VERSION", "AGE"}
+var clusterColumns = []string{"NAME", "STATUS", "AGE"}
 var networkPolicyColumns = []string{"NAME", "POD-SELECTOR", "AGE"}
 var certificateSigningRequestColumns = []string{"NAME", "AGE", "REQUESTOR", "CONDITION"}
 
