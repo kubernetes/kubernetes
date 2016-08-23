@@ -161,21 +161,31 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		if err := scaler.Scale(info.Namespace, info.Name, uint(count), precondition, retry, waitForReplicas); err != nil {
 			return err
 		}
+
+		var patchBytes []byte
+		createdPatch := false
 		if cmdutil.ShouldRecord(cmd, info) {
-			patchBytes, err := cmdutil.ChangeResourcePatch(info, f.Command())
+			patchBytes, err = cmdutil.ChangeResourcePatch(info, f.Command())
 			if err != nil {
 				return err
 			}
-			mapping := info.ResourceMapping()
-			client, err := f.ClientForMapping(mapping)
-			if err != nil {
-				return err
-			}
-			helper := resource.NewHelper(client, mapping)
+			createdPatch = true
+		}
+
+		mapping = info.ResourceMapping()
+		client, err := f.ClientForMapping(mapping)
+		if err != nil {
+			return err
+		}
+		helper := resource.NewHelper(client, mapping)
+
+		if createdPatch {
 			_, err = helper.Patch(info.Namespace, info.Name, api.StrategicMergePatchType, patchBytes)
-			if err != nil {
-				return err
-			}
+		} else {
+			_, err = helper.Replace(info.Namespace, info.Name, false, info.Object)
+		}
+		if err != nil {
+			return err
 		}
 		counter++
 		cmdutil.PrintSuccess(mapper, shortOutput, out, info.Mapping.Resource, info.Name, "scaled")
