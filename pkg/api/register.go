@@ -45,12 +45,12 @@ var Unversioned = unversioned.GroupVersion{Group: "", Version: "v1"}
 // ParameterCodec handles versioning of objects that are converted to query parameters.
 var ParameterCodec = runtime.NewParameterCodec(Scheme)
 
-// Kind takes an unqualified kind and returns back a Group qualified GroupKind
+// Kind takes an unqualified kind and returns a Group qualified GroupKind
 func Kind(kind string) unversioned.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
-// Resource takes an unqualified resource and returns back a Group qualified GroupResource
+// Resource takes an unqualified resource and returns a Group qualified GroupResource
 func Resource(resource string) unversioned.GroupResource {
 	return SchemeGroupVersion.WithResource(resource).GroupResource()
 }
@@ -62,7 +62,7 @@ var (
 
 func init() {
 	// TODO(lavalamp): move this call to scheme builder above.  Can't
-	// remove it from here because lots of people inapropriately rely on it
+	// remove it from here because lots of people inappropriately rely on it
 	// (specifically the unversioned time conversion). Can't have it in
 	// both places because then it gets double registered.  Consequence of
 	// current state is that it only ever gets registered in the main
