@@ -38,8 +38,12 @@ ifeq ($(ARCH),ppc64le)
 endif
 
 build:
-	# Copy the content in this dir to the temp dir
-	cp ./* $(TEMP_DIR)
+	# Copy the content in this dir to the temp dir,
+	# without copying the subdirectories.
+	find ./ -maxdepth 1 -type f | xargs cp -t $(TEMP_DIR)
+
+	make -C ../../../ WHAT=cluster/images/etcd/attachlease KUBE_STATIC_OVERRIDES="etcd";
+	cp "../../../_output/bin/attachlease" $(TEMP_DIR)
 
 ifeq ($(ARCH),amd64)
 

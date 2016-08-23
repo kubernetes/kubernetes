@@ -1,4 +1,5 @@
 cluster/addons/fluentd-elasticsearch/es-image
+cluster/images/etcd/attachlease
 cmd/gendocs
 cmd/genkubedocs
 cmd/genman

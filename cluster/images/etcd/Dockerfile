@@ -16,4 +16,4 @@ FROM BASEIMAGE
 MAINTAINER Dawn Chen <dawnchen@google.com>
 
 EXPOSE 2379 2380 4001 7001
-COPY etcd etcdctl migrate-if-needed.sh /usr/local/bin/
+COPY etcd etcdctl migrate-if-needed.sh attachlease /usr/local/bin/
