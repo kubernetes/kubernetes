@@ -41,7 +41,7 @@ type Scaler interface {
 	Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, wait *RetryParams) error
 	// ScaleSimple does a simple one-shot attempt at scaling - not useful on its own, but
 	// a necessary building block for Scale
-	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, updatedResourceVersion *string) error
+	ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error)
 }
 
 func ScalerFor(kind unversioned.GroupKind, c client.Interface) (Scaler, error) {
@@ -115,7 +115,10 @@ func NewRetryParams(interval, timeout time.Duration) *RetryParams {
 // ScaleCondition is a closure around Scale that facilitates retries via util.wait
 func ScaleCondition(r Scaler, precondition *ScalePrecondition, namespace, name string, count uint, updatedResourceVersion *string) wait.ConditionFunc {
 	return func() (bool, error) {
-		err := r.ScaleSimple(namespace, name, precondition, count, updatedResourceVersion)
+		rv, err := r.ScaleSimple(namespace, name, precondition, count)
+		if updatedResourceVersion != nil {
+			*updatedResourceVersion = rv
+		}
 		switch e, _ := err.(ScaleError); err.(type) {
 		case nil:
 			return true, nil
@@ -155,28 +158,25 @@ type ReplicationControllerScaler struct {
 	c client.Interface
 }
 
-func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, updatedResourceVersion *string) error {
+func (scaler *ReplicationControllerScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
 	controller, err := scaler.c.ReplicationControllers(namespace).Get(name)
 	if err != nil {
-		return ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateReplicationController(controller); err != nil {
-			return err
+			return "", err
 		}
 	}
 	controller.Spec.Replicas = int32(newSize)
 	updatedRC, err := scaler.c.ReplicationControllers(namespace).Update(controller)
 	if err != nil {
 		if errors.IsConflict(err) {
-			return ScaleError{ScaleUpdateConflictFailure, controller.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, controller.ResourceVersion, err}
 		}
-		return ScaleError{ScaleUpdateFailure, controller.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, controller.ResourceVersion, err}
 	}
-	if updatedResourceVersion != nil {
-		*updatedResourceVersion = updatedRC.ObjectMeta.ResourceVersion
-	}
-	return nil
+	return updatedRC.ObjectMeta.ResourceVersion, nil
 }
 
 // Scale updates a ReplicationController to a new size, with optional precondition check (if preconditions is not nil),
@@ -236,28 +236,25 @@ type ReplicaSetScaler struct {
 	c client.ExtensionsInterface
 }
 
-func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, updatedResourceVersion *string) error {
+func (scaler *ReplicaSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
 	rs, err := scaler.c.ReplicaSets(namespace).Get(name)
 	if err != nil {
-		return ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateReplicaSet(rs); err != nil {
-			return err
+			return "", err
 		}
 	}
 	rs.Spec.Replicas = int32(newSize)
 	updatedRS, err := scaler.c.ReplicaSets(namespace).Update(rs)
 	if err != nil {
 		if errors.IsConflict(err) {
-			return ScaleError{ScaleUpdateConflictFailure, rs.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, rs.ResourceVersion, err}
 		}
-		return ScaleError{ScaleUpdateFailure, rs.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, rs.ResourceVersion, err}
 	}
-	if updatedResourceVersion != nil {
-		*updatedResourceVersion = updatedRS.ObjectMeta.ResourceVersion
-	}
-	return nil
+	return updatedRS.ObjectMeta.ResourceVersion, nil
 }
 
 // Scale updates a ReplicaSet to a new size, with optional precondition check (if preconditions is
@@ -308,24 +305,25 @@ type PetSetScaler struct {
 	c client.AppsInterface
 }
 
-func (scaler *PetSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) error {
+func (scaler *PetSetScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
 	ps, err := scaler.c.PetSets(namespace).Get(name)
 	if err != nil {
-		return ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidatePetSet(ps); err != nil {
-			return err
+			return "", err
 		}
 	}
 	ps.Spec.Replicas = int(newSize)
-	if _, err := scaler.c.PetSets(namespace).Update(ps); err != nil {
+	updatedPetSet, err := scaler.c.PetSets(namespace).Update(ps)
+	if err != nil {
 		if errors.IsConflict(err) {
-			return ScaleError{ScaleUpdateConflictFailure, ps.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, ps.ResourceVersion, err}
 		}
-		return ScaleError{ScaleUpdateFailure, ps.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, ps.ResourceVersion, err}
 	}
-	return nil
+	return updatedPetSet.ResourceVersion, nil
 }
 
 func (scaler *PetSetScaler) Scale(namespace, name string, newSize uint, preconditions *ScalePrecondition, retry, waitForReplicas *RetryParams) error {
@@ -359,14 +357,14 @@ type JobScaler struct {
 }
 
 // ScaleSimple is responsible for updating job's parallelism.
-func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, updatedResourceVersion *string) error {
+func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
 	job, err := scaler.c.Jobs(namespace).Get(name)
 	if err != nil {
-		return ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateJob(job); err != nil {
-			return err
+			return "", err
 		}
 	}
 	parallelism := int32(newSize)
@@ -374,14 +372,11 @@ func (scaler *JobScaler) ScaleSimple(namespace, name string, preconditions *Scal
 	udpatedJob, err := scaler.c.Jobs(namespace).Update(job)
 	if err != nil {
 		if errors.IsConflict(err) {
-			return ScaleError{ScaleUpdateConflictFailure, job.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, job.ResourceVersion, err}
 		}
-		return ScaleError{ScaleUpdateFailure, job.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, job.ResourceVersion, err}
 	}
-	if updatedResourceVersion != nil {
-		*updatedResourceVersion = udpatedJob.ObjectMeta.ResourceVersion
-	}
-	return nil
+	return udpatedJob.ObjectMeta.ResourceVersion, nil
 }
 
 // Scale updates a Job to a new size, with optional precondition check (if preconditions is not nil),
@@ -429,14 +424,14 @@ type DeploymentScaler struct {
 }
 
 // ScaleSimple is responsible for updating a deployment's desired replicas count.
-func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint, updatedResourceVersion *string) error {
+func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, preconditions *ScalePrecondition, newSize uint) (updatedResourceVersion string, err error) {
 	deployment, err := scaler.c.Deployments(namespace).Get(name)
 	if err != nil {
-		return ScaleError{ScaleGetFailure, "Unknown", err}
+		return "", ScaleError{ScaleGetFailure, "Unknown", err}
 	}
 	if preconditions != nil {
 		if err := preconditions.ValidateDeployment(deployment); err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -446,14 +441,11 @@ func (scaler *DeploymentScaler) ScaleSimple(namespace, name string, precondition
 	updatedDeployment, err := scaler.c.Deployments(namespace).Update(deployment)
 	if err != nil {
 		if errors.IsConflict(err) {
-			return ScaleError{ScaleUpdateConflictFailure, deployment.ResourceVersion, err}
+			return "", ScaleError{ScaleUpdateConflictFailure, deployment.ResourceVersion, err}
 		}
-		return ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
+		return "", ScaleError{ScaleUpdateFailure, deployment.ResourceVersion, err}
 	}
-	if updatedResourceVersion != nil {
-		*updatedResourceVersion = updatedDeployment.ObjectMeta.ResourceVersion
-	}
-	return nil
+	return updatedDeployment.ObjectMeta.ResourceVersion, nil
 }
 
 // Scale updates a deployment to a new size, with optional precondition check (if preconditions is not nil),
@@ -466,7 +458,7 @@ func (scaler *DeploymentScaler) Scale(namespace, name string, newSize uint, prec
 		// Make it try only once, immediately
 		retry = &RetryParams{Interval: time.Millisecond, Timeout: time.Millisecond}
 	}
-	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize)
+	cond := ScaleCondition(scaler, preconditions, namespace, name, newSize, nil)
 	if err := wait.Poll(retry.Interval, retry.Timeout, cond); err != nil {
 		return err
 	}
