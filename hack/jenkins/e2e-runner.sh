@@ -339,7 +339,7 @@ if [[ -n "${JENKINS_PUBLISHED_SKEW_VERSION:-}" ]]; then
     #       master.
     #         # - for client skew tests, we want to use the skewed kubectl
     #         (that's what we're testing).
-    GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-} --kubectl-path=$(pwd)/../kubernetes_skew/cluster/kubectl.sh"
+    GINKGO_TEST_ARGS="${GINKGO_TEST_ARGS:-} --kubectl-path=$(pwd)/kubernetes_skew/cluster/kubectl.sh"
   fi
 fi
 
