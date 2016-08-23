@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"strconv"
 	"testing"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apiserver"
+	ipallocator "k8s.io/kubernetes/pkg/registry/service/ipallocator"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
@@ -49,7 +51,7 @@ func setUp(t *testing.T) (GenericAPIServer, *etcdtesting.EtcdTestServer, Config,
 	genericapiserver := GenericAPIServer{}
 	config := Config{}
 	config.PublicAddress = net.ParseIP("192.168.10.4")
-
+	config.RequestContextMapper = api.NewRequestContextMapper()
 	return genericapiserver, etcdServer, config, assert.New(t)
 }
 
@@ -62,7 +64,7 @@ func newMaster(t *testing.T) (*GenericAPIServer, *etcdtesting.EtcdTestServer, Co
 	config.APIPrefix = "/api"
 	config.APIGroupPrefix = "/apis"
 
-	s, err := New(&config)
+	s, err := config.New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
@@ -88,11 +90,15 @@ func TestNew(t *testing.T) {
 	assert.Equal(s.authorizer, config.Authorizer)
 	assert.Equal(s.AdmissionControl, config.AdmissionControl)
 	assert.Equal(s.RequestContextMapper, config.RequestContextMapper)
-	assert.Equal(s.cacheTimeout, config.CacheTimeout)
-	assert.Equal(s.ExternalAddress, config.ExternalHost)
 	assert.Equal(s.ClusterIP, config.PublicAddress)
-	assert.Equal(s.PublicReadWritePort, config.ReadWritePort)
-	assert.Equal(s.ServiceReadWriteIP, config.ServiceReadWriteIP)
+
+	// these values get defaulted
+	_, serviceClusterIPRange, _ := net.ParseCIDR("10.0.0.0/24")
+	serviceReadWriteIP, _ := ipallocator.GetIndexedIP(serviceClusterIPRange, 1)
+	assert.Equal(s.ServiceReadWriteIP, serviceReadWriteIP)
+	assert.Equal(s.cacheTimeout, 5*time.Second)
+	assert.Equal(s.ExternalAddress, net.JoinHostPort(config.PublicAddress.String(), "6443"))
+	assert.Equal(s.PublicReadWritePort, 6443)
 
 	// These functions should point to the same memory location
 	serverDialer, _ := utilnet.Dialer(s.ProxyTransport)
@@ -114,7 +120,7 @@ func TestInstallAPIGroups(t *testing.T) {
 	config.APIGroupPrefix = "/apiGroupPrefix"
 	config.Serializer = api.Codecs
 
-	s, err := New(&config)
+	s, err := config.New()
 	if err != nil {
 		t.Fatalf("Error in bringing up the server: %v", err)
 	}
