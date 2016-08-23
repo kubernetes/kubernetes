@@ -17,7 +17,7 @@ limitations under the License.
 package kubeadm
 
 import (
-	"fmt"
+	//"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
