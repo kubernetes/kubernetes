@@ -8557,7 +8557,7 @@
      },
      "flexVolume": {
       "$ref": "v1.FlexVolumeSource",
-      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future."
+      "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future."
      },
      "cinder": {
       "$ref": "v1.CinderVolumeSource",
@@ -8896,7 +8896,7 @@
    },
    "v1.FlexVolumeSource": {
     "id": "v1.FlexVolumeSource",
-    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.",
+    "description": "FlexVolume represents a generic volume resource that is provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.",
     "required": [
      "driver"
     ],
@@ -9088,7 +9088,7 @@
       "items": {
        "type": "string"
       },
-      "description": "Required: FC target world wide names (WWNs)"
+      "description": "Required: FC target worldwide names (WWNs)"
      },
      "lun": {
       "type": "integer",
