@@ -103,7 +103,7 @@ func NewConfigFactory(client *client.Client, schedulerName string, hardPodAffini
 
 	c := &ConfigFactory{
 		Client:             client,
-		PodQueue:           cache.NewFIFO(cache.MetaNamespaceKeyFunc),
+		PodQueue:           cache.NewPriority(cache.MetaNamespaceKeyFunc),
 		ScheduledPodLister: &cache.StoreToPodLister{},
 		// Only nodes in the "Ready" condition with status == "True" are schedulable
 		NodeLister:                     &cache.StoreToNodeLister{},
