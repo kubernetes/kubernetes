@@ -234,7 +234,11 @@ func RunCreateSubcommand(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, 
 	}
 
 	if useShortOutput := options.OutputFormat == "name"; useShortOutput || len(options.OutputFormat) == 0 {
-		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, options.Name, "created")
+		successMsg := "created"
+		if options.DryRun {
+			successMsg = fmt.Sprintf("%s %s", successMsg, "(DRY RUN)")
+		}
+		cmdutil.PrintSuccess(mapper, useShortOutput, out, mapping.Resource, options.Name, successMsg)
 		return nil
 	}
 
