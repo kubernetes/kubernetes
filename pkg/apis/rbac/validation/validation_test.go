@@ -56,7 +56,7 @@ func TestValidateClusterRoleBinding(t *testing.T) {
 		"bad kind": {
 			A: rbac.ClusterRoleBinding{
 				ObjectMeta: api.ObjectMeta{Name: "default"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Type", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Type", Namespace: api.NamespaceDefault, Name: "valid"},
 			},
 			T: field.ErrorTypeNotSupported,
 			F: "roleRef.kind",
@@ -64,7 +64,7 @@ func TestValidateClusterRoleBinding(t *testing.T) {
 		"reference role": {
 			A: rbac.ClusterRoleBinding{
 				ObjectMeta: api.ObjectMeta{Name: "default"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: api.NamespaceDefault, Name: "valid"},
 			},
 			T: field.ErrorTypeNotSupported,
 			F: "roleRef.kind",
@@ -143,7 +143,7 @@ func TestValidateRoleBinding(t *testing.T) {
 	errs := ValidateRoleBinding(
 		&rbac.RoleBinding{
 			ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master"},
-			RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+			RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: api.NamespaceDefault, Name: "valid"},
 			Subjects: []rbac.Subject{
 				{Name: "validsaname", Kind: rbac.ServiceAccountKind},
 				{Name: "valid@username", Kind: rbac.UserKind},
@@ -171,7 +171,7 @@ func TestValidateRoleBinding(t *testing.T) {
 		"bad kind": {
 			A: rbac.RoleBinding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "default"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Type", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Type", Name: "valid"},
 			},
 			T: field.ErrorTypeNotSupported,
 			F: "roleRef.kind",
@@ -179,7 +179,7 @@ func TestValidateRoleBinding(t *testing.T) {
 		"namespace for cluster role": {
 			A: rbac.RoleBinding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "default"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "ClusterRole", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "ClusterRole", Namespace: api.NamespaceDefault, Name: "valid"},
 			},
 			T: field.ErrorTypeInvalid,
 			F: "roleRef.namespace",
@@ -187,7 +187,7 @@ func TestValidateRoleBinding(t *testing.T) {
 		"zero-length namespace": {
 			A: rbac.RoleBinding{
 				ObjectMeta: api.ObjectMeta{Name: "default"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
 			},
 			T: field.ErrorTypeRequired,
 			F: "metadata.namespace",
@@ -195,7 +195,7 @@ func TestValidateRoleBinding(t *testing.T) {
 		"zero-length name": {
 			A: rbac.RoleBinding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
 			},
 			T: field.ErrorTypeRequired,
 			F: "metadata.name",
@@ -216,10 +216,18 @@ func TestValidateRoleBinding(t *testing.T) {
 			T: field.ErrorTypeRequired,
 			F: "roleRef.name",
 		},
+		"roleref namespace mismatch": {
+			A: rbac.RoleBinding{
+				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "default"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "different", Name: "foo"},
+			},
+			T: field.ErrorTypeInvalid,
+			F: "roleRef.namespace",
+		},
 		"bad subject kind": {
 			A: rbac.RoleBinding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
 				Subjects:   []rbac.Subject{{Name: "subject"}},
 			},
 			T: field.ErrorTypeNotSupported,
@@ -228,7 +236,7 @@ func TestValidateRoleBinding(t *testing.T) {
 		"bad subject name": {
 			A: rbac.RoleBinding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
 				Subjects:   []rbac.Subject{{Name: "subject:bad", Kind: rbac.ServiceAccountKind}},
 			},
 			T: field.ErrorTypeInvalid,
@@ -237,7 +245,7 @@ func TestValidateRoleBinding(t *testing.T) {
 		"missing subject name": {
 			A: rbac.RoleBinding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
 				Subjects:   []rbac.Subject{{Kind: rbac.ServiceAccountKind}},
 			},
 			T: field.ErrorTypeRequired,
@@ -264,13 +272,13 @@ func TestValidateRoleBinding(t *testing.T) {
 func TestValidateRoleBindingUpdate(t *testing.T) {
 	old := &rbac.RoleBinding{
 		ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master", ResourceVersion: "1"},
-		RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+		RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
 	}
 
 	errs := ValidateRoleBindingUpdate(
 		&rbac.RoleBinding{
 			ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master", ResourceVersion: "1"},
-			RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "valid"},
+			RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
 		},
 		old,
 	)
@@ -286,7 +294,7 @@ func TestValidateRoleBindingUpdate(t *testing.T) {
 		"changedRef": {
 			A: rbac.RoleBinding{
 				ObjectMeta: api.ObjectMeta{Namespace: api.NamespaceDefault, Name: "master", ResourceVersion: "1"},
-				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Namespace: "master", Name: "changed"},
+				RoleRef:    api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "changed"},
 			},
 			T: field.ErrorTypeInvalid,
 			F: "roleRef",

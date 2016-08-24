@@ -104,26 +104,19 @@ type ClusterRoleBindingLister interface {
 func (r *DefaultRuleResolver) GetRoleReferenceRules(ctx api.Context, roleRef api.ObjectReference, bindingNamespace string) ([]rbac.PolicyRule, error) {
 	switch roleRef.Kind {
 	case "Role":
-		// Roles can only be referenced by RoleBindings within the same namespace.
-		if len(bindingNamespace) == 0 {
-			return nil, fmt.Errorf("cluster role binding references role %q in namespace %q", roleRef.Name, roleRef.Namespace)
-		} else {
-			if bindingNamespace != roleRef.Namespace {
-				return nil, fmt.Errorf("role binding in namespace %q references role %q in namespace %q", bindingNamespace, roleRef.Name, roleRef.Namespace)
-			}
-		}
-
-		role, err := r.roleGetter.GetRole(api.WithNamespace(ctx, roleRef.Namespace), roleRef.Name)
+		role, err := r.roleGetter.GetRole(api.WithNamespace(ctx, bindingNamespace), roleRef.Name)
 		if err != nil {
 			return nil, err
 		}
 		return role.Rules, nil
+
 	case "ClusterRole":
 		clusterRole, err := r.clusterRoleGetter.GetClusterRole(api.WithNamespace(ctx, ""), roleRef.Name)
 		if err != nil {
 			return nil, err
 		}
 		return clusterRole.Rules, nil
+
 	default:
 		return nil, fmt.Errorf("unsupported role reference kind: %q", roleRef.Kind)
 	}

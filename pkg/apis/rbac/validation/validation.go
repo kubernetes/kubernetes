@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"fmt"
+
 	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -109,10 +111,8 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	switch roleBinding.RoleRef.Kind {
 	case "Role":
 		// role namespace can be empty if referencing a local role
-		if len(roleBinding.RoleRef.Namespace) > 0 {
-			for _, msg := range validation.ValidateNamespaceName(roleBinding.RoleRef.Namespace, false) {
-				allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, msg))
-			}
+		if len(roleBinding.RoleRef.Namespace) > 0 && roleBinding.RoleRef.Namespace != roleBinding.Namespace {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, fmt.Sprintf("must be empty or match the current namespace: %q", roleBinding.Namespace)))
 		}
 	case "ClusterRole":
 		if len(roleBinding.RoleRef.Namespace) != 0 {
