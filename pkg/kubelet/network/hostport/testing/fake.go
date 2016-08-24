@@ -19,6 +19,7 @@ package testing
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/api"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 )
@@ -29,12 +30,12 @@ func NewFakeHostportHandler() hostport.HostportHandler {
 	return &fakeHandler{}
 }
 
-func (h *fakeHandler) OpenPodHostportsAndSync(newPod *hostport.RunningPod, natInterfaceName string, runningPods []*hostport.RunningPod) error {
-	return h.SyncHostports(natInterfaceName, append(runningPods, newPod))
+func (h *fakeHandler) OpenPodHostportsAndSync(newPod *api.Pod, natInterfaceName string, activePods []*hostport.ActivePod) error {
+	return h.SyncHostports(natInterfaceName, activePods)
 }
 
-func (h *fakeHandler) SyncHostports(natInterfaceName string, runningPods []*hostport.RunningPod) error {
-	for _, r := range runningPods {
+func (h *fakeHandler) SyncHostports(natInterfaceName string, activePods []*hostport.ActivePod) error {
+	for _, r := range activePods {
 		if r.IP.To4() == nil {
 			return fmt.Errorf("Invalid or missing pod %s IP", kubecontainer.GetPodFullName(r.Pod))
 		}
