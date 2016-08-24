@@ -55,11 +55,19 @@ var (
 	ErrVersionNotSupported = errors.New("Runtime api version is not supported")
 )
 
+// A subset of the pod.Manager interface extracted for garbage collection purposes.
+type podGetter interface {
+	GetPodByUID(kubetypes.UID) (*api.Pod, bool)
+}
+
 type kubeGenericRuntimeManager struct {
 	runtimeName         string
 	recorder            record.EventRecorder
 	osInterface         kubecontainer.OSInterface
 	containerRefManager *kubecontainer.RefManager
+
+	// Container GC manager
+	containerGC *containerGC
 
 	// Keyring for pulling images
 	keyring credentialprovider.DockerKeyring
@@ -92,6 +100,7 @@ func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
 	containerRefManager *kubecontainer.RefManager,
+	podGetter podGetter,
 	osInterface kubecontainer.OSInterface,
 	networkPlugin network.NetworkPlugin,
 	runtimeHelper kubecontainer.RuntimeHelper,
@@ -151,6 +160,7 @@ func NewKubeGenericRuntimeManager(
 		imageBackOff,
 		serializeImagePulls)
 	kubeRuntimeManager.runner = lifecycle.NewHandlerRunner(httpClient, kubeRuntimeManager, kubeRuntimeManager)
+	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, podGetter, kubeRuntimeManager)
 
 	return kubeRuntimeManager, nil
 }
@@ -475,6 +485,11 @@ func (m *kubeGenericRuntimeManager) GetNetNS(sandboxID kubecontainer.ContainerID
 	return "", fmt.Errorf("not supported")
 }
 
+// GarbageCollect removes dead containers using the specified container gc policy.
+func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
+	return m.containerGC.GarbageCollect(gcPolicy, allSourcesReady)
+}
+
 // GetPodContainerID gets pod sandbox ID
 func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
 	podFullName := kubecontainer.BuildPodFullName(pod.Name, pod.Namespace)
@@ -489,10 +504,5 @@ func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (k
 
 // Forward the specified port from the specified pod to the stream.
 func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
-	return fmt.Errorf("not implemented")
-}
-
-// GarbageCollect removes dead containers using the specified container gc policy
-func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
 	return fmt.Errorf("not implemented")
 }
