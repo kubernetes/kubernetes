@@ -62,7 +62,7 @@ func (az *Cloud) GetLoadBalancer(clusterName string, service *v1.Service) (statu
 }
 
 // EnsureLoadBalancer creates a new load balancer 'name', or updates the existing one. Returns the status of the balancer
-func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) (*v1.LoadBalancerStatus, error) {
+func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	lbName := getLoadBalancerName(clusterName)
 	pipName := getPublicIPName(clusterName, service)
 	serviceName := getServiceName(service)
@@ -101,7 +101,7 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 		}
 	}
 
-	lb, lbNeedsUpdate, err := az.reconcileLoadBalancer(lb, pip, clusterName, service, nodeNames)
+	lb, lbNeedsUpdate, err := az.reconcileLoadBalancer(lb, pip, clusterName, service, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -116,9 +116,9 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 	// Add the machines to the backend pool if they're not already
 	lbBackendName := getBackendPoolName(clusterName)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendName)
-	hostUpdates := make([]func() error, len(nodeNames))
-	for i, nodeName := range nodeNames {
-		localNodeName := nodeName
+	hostUpdates := make([]func() error, len(nodes))
+	for i, node := range nodes {
+		localNodeName := node.Name
 		f := func() error {
 			err := az.ensureHostInPool(serviceName, types.NodeName(localNodeName), lbBackendPoolID)
 			if err != nil {
@@ -141,8 +141,8 @@ func (az *Cloud) EnsureLoadBalancer(clusterName string, service *v1.Service, nod
 }
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
-func (az *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodeNames []string) error {
-	_, err := az.EnsureLoadBalancer(clusterName, service, nodeNames)
+func (az *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	_, err := az.EnsureLoadBalancer(clusterName, service, nodes)
 	return err
 }
 
@@ -167,7 +167,7 @@ func (az *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servi
 		return err
 	}
 	if existsLb {
-		lb, lbNeedsUpdate, reconcileErr := az.reconcileLoadBalancer(lb, nil, clusterName, service, []string{})
+		lb, lbNeedsUpdate, reconcileErr := az.reconcileLoadBalancer(lb, nil, clusterName, service, []*v1.Node{})
 		if reconcileErr != nil {
 			return reconcileErr
 		}
@@ -259,7 +259,7 @@ func (az *Cloud) ensurePublicIPDeleted(serviceName, pipName string) error {
 // This ensures load balancer exists and the frontend ip config is setup.
 // This also reconciles the Service's Ports  with the LoadBalancer config.
 // This entails adding rules/probes for expected Ports and removing stale rules/ports.
-func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.PublicIPAddress, clusterName string, service *v1.Service, nodeNames []string) (network.LoadBalancer, bool, error) {
+func (az *Cloud) reconcileLoadBalancer(lb network.LoadBalancer, pip *network.PublicIPAddress, clusterName string, service *v1.Service, nodes []*v1.Node) (network.LoadBalancer, bool, error) {
 	lbName := getLoadBalancerName(clusterName)
 	serviceName := getServiceName(service)
 	lbFrontendIPConfigName := getFrontendIPConfigName(service)
