@@ -77,6 +77,21 @@ func toKubeContainerState(state runtimeApi.ContainerState) kubecontainer.Contain
 	return kubecontainer.ContainerStateUnknown
 }
 
+// sandboxToKubeContainerState converts runtimeApi.PodSandboxState to
+// kubecontainer.ContainerState.
+// This is only needed because we need to return sandboxes as if they were
+// kubecontainer.Containers to avoid substantial changes to PLEG.
+// TODO: Remove this once it becomes obsolete.
+func sandboxToKubeContainerState(state runtimeApi.PodSandBoxState) kubecontainer.ContainerState {
+	switch state {
+	case runtimeApi.PodSandBoxState_READY:
+		return kubecontainer.ContainerStateRunning
+	case runtimeApi.PodSandBoxState_NOTREADY:
+		return kubecontainer.ContainerStateExited
+	}
+	return kubecontainer.ContainerStateUnknown
+}
+
 // toRuntimeProtocol converts api.Protocol to runtimeApi.Protocol.
 func toRuntimeProtocol(protocol api.Protocol) runtimeApi.Protocol {
 	switch protocol {
@@ -104,6 +119,21 @@ func (m *kubeGenericRuntimeManager) toKubeContainer(c *runtimeApi.Container) (*k
 		Image: c.Image.GetImage(),
 		Hash:  annotatedInfo.Hash,
 		State: toKubeContainerState(c.GetState()),
+	}, nil
+}
+
+// sandboxToKubeContainer converts runtimeApi.PodSandbox to kubecontainer.Container.
+// This is only needed because we need to return sandboxes as if they were
+// kubecontainer.Containers to avoid substantial changes to PLEG.
+// TODO: Remove this once it becomes obsolete.
+func (m *kubeGenericRuntimeManager) sandboxToKubeContainer(s *runtimeApi.PodSandbox) (*kubecontainer.Container, error) {
+	if s == nil || s.Id == nil || s.State == nil {
+		return nil, fmt.Errorf("unable to convert a nil pointer to a runtime container")
+	}
+
+	return &kubecontainer.Container{
+		ID:    kubecontainer.ContainerID{Type: m.runtimeName, ID: s.GetId()},
+		State: sandboxToKubeContainerState(s.GetState()),
 	}, nil
 }
 
