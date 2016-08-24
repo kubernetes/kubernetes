@@ -1199,7 +1199,7 @@ func TestDescribeLoadBalancerOnUpdate(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.UpdateLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+	c.UpdateLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []*api.Node{})
 }
 
 func TestDescribeLoadBalancerOnGet(t *testing.T) {
@@ -1215,7 +1215,7 @@ func TestDescribeLoadBalancerOnEnsure(t *testing.T) {
 	c, _ := newAWSCloud(strings.NewReader("[global]"), awsServices)
 	awsServices.elb.expectDescribeLoadBalancers("aid")
 
-	c.EnsureLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []string{})
+	c.EnsureLoadBalancer(TestClusterName, &api.Service{ObjectMeta: api.ObjectMeta{Name: "myservice", UID: "id"}}, []*api.Node{})
 }
 
 func TestBuildListener(t *testing.T) {
