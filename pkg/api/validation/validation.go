@@ -145,7 +145,7 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.Pod
 	if err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey), unsafeSysctlAnn, err.Error()))
 	} else {
-		allErrs = append(allErrs, validateSysctls(sysctls, fldPath.Key(api.UnsafeSysctlsPodAnnotationKey))...)
+		allErrs = append(allErrs, validateSysctls(unsafeSysctls, fldPath.Key(api.UnsafeSysctlsPodAnnotationKey))...)
 	}
 	inBoth := sysctlIntersection(sysctls, unsafeSysctls)
 	for i := range inBoth {
