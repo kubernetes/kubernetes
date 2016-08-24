@@ -17,14 +17,17 @@ limitations under the License.
 package master
 
 import (
+	"sync"
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	extensionsapiv1beta1 "k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	daemonetcd "k8s.io/kubernetes/pkg/registry/daemonset/etcd"
 	deploymentetcd "k8s.io/kubernetes/pkg/registry/deployment/etcd"
@@ -46,6 +49,7 @@ type ExtensionsRESTStorageProvider struct {
 }
 
 var _ RESTStorageProvider = &ExtensionsRESTStorageProvider{}
+var instrumentationInitializer sync.Once
 
 func (p ExtensionsRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(extensions.GroupName)
@@ -99,6 +103,9 @@ func (p ExtensionsRESTStorageProvider) v1beta1Storage(apiResourceConfigSource ge
 		storage["deployments/status"] = deploymentStorage.Status
 		storage["deployments/rollback"] = deploymentStorage.Rollback
 		storage["deployments/scale"] = deploymentStorage.Scale
+		instrumentationInitializer.Do(func() {
+			prometheus.MustRegister(metrics.NewDeploymentsCollector(deploymentStorage.Deployment))
+		})
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("jobs")) {
 		jobsStorage, jobsStatusStorage := jobetcd.NewREST(restOptionsGetter(extensions.Resource("jobs")))
