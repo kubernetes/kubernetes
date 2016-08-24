@@ -34,10 +34,15 @@ A proposal for improving Kubelet config by versioning it and making it manageabl
 ## Motivation
 
 The Kubelet is currently configured via command-line flags. This is painful for a number of reasons:
-- It makes it difficult to change the way Kubelets are configured in a running cluster, because it is often tedious to change the Kubelet startup configuration.
+- It makes it difficult to change the way Kubelets are configured in a running cluster, because it is often tedious to change the Kubelet startup configuration (without adding your own configuration management system e.g. Ansible, Salt, Puppet).
 - It makes it difficult to manage different Kubelet configurations for different nodes, e.g. if you want to canary a new config.
 - The current lack of versioned Kubelet configuration means that any time we change Kubelet flags, we risk breaking someone's setup.
 - Having the ability to pass config in the same format on-disk as via the API server will make it easier to bootstrap master nodes before the API server is available.
+
+## Example Use Cases
+- Configuring heterogeneous machines in a cluster, where machines need different node-allocatable settings, different eviction settings, etc.
+- Configuring nodes with different container runtimes in the same cluster.
+- Staged rollout of new Kubelet features. This feature will allow you to configure a few nodes at a time with new feature enabled, before rolling out that configuration to the entire fleet.
 
 
 ## Goals of this design:
