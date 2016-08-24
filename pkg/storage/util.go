@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -107,7 +107,7 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", err
 	}
 	name := meta.GetName()
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
 	return prefix + "/" + meta.GetNamespace() + "/" + name, nil
@@ -119,7 +119,7 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 		return "", err
 	}
 	name := meta.GetName()
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
+	if msgs := path.IsValidPathSegmentName(name); len(msgs) != 0 {
 		return "", fmt.Errorf("invalid name: %v", msgs)
 	}
 	return prefix + "/" + name, nil
