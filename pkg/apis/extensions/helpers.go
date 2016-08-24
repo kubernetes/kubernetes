@@ -24,7 +24,7 @@ import (
 // SysctlsSecurityPolocyAnnotationKey into a slice of sysctls. An empty slice
 // is returned if annotation is the empty string.
 func SysctlsFromPodSecurityPolicyAnnotation(annotation string) ([]string, error) {
-	if annotation == "" {
+	if len(annotation) == 0 {
 		return []string{}, nil
 	}
 

@@ -36,10 +36,10 @@ import (
 )
 
 const (
-	// SysctlsPodSecurityPolicyAnnotationKey represents the key of a whitelist of
-	// allowed sysctls in a pod spec. It's a comma-separated list of plain sysctl
+	// UnsafeSysctlsPodSecurityPolicyAnnotationKey represents the key of a whitelist of
+	// allowed unsafe sysctls in a pod spec. It's a comma-separated list of plain sysctl
 	// names or sysctl patterns (which end in *). The string "*" matches all sysctls.
-	SysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
+	UnsafeSysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
 )
 
 // describes the attributes of a scale subresource
