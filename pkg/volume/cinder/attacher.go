@@ -262,6 +262,6 @@ func (detacher *cinderDiskDetacher) WaitForDetach(devicePath string, timeout tim
 	}
 }
 
-func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) error {
+func (detacher *cinderDiskDetacher) UnmountDevice(deviceMountPath string) (string, error) {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }

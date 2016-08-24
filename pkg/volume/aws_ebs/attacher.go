@@ -230,6 +230,6 @@ func (detacher *awsElasticBlockStoreDetacher) WaitForDetach(devicePath string, t
 	}
 }
 
-func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) error {
+func (detacher *awsElasticBlockStoreDetacher) UnmountDevice(deviceMountPath string) (string, error) {
 	return volumeutil.UnmountPath(deviceMountPath, detacher.mounter)
 }

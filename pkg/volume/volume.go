@@ -168,7 +168,7 @@ type Detacher interface {
 	// UnmountDevice unmounts the global mount of the disk. This
 	// should only be called once all bind mounts have been
 	// unmounted.
-	UnmountDevice(deviceMountPath string) error
+	UnmountDevice(deviceMountPath string) (string, error)
 }
 
 func RenameDirectory(oldPath, newName string) (string, error) {
