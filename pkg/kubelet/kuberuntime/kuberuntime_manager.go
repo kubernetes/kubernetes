@@ -391,8 +391,3 @@ func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (k
 func (m *kubeGenericRuntimeManager) PortForward(pod *kubecontainer.Pod, port uint16, stream io.ReadWriteCloser) error {
 	return fmt.Errorf("not implemented")
 }
-
-// GarbageCollect removes dead containers using the specified container gc policy
-func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
-	return fmt.Errorf("not implemented")
-}
