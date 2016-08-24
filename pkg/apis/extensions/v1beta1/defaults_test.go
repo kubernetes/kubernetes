@@ -31,6 +31,7 @@ import (
 )
 
 func TestSetDefaultDaemonSet(t *testing.T) {
+	defaultIntOrString := intstr.FromInt(1)
 	defaultLabels := map[string]string{"foo": "bar"}
 	period := int64(v1.DefaultTerminationGracePeriodSeconds)
 	defaultTemplate := v1.PodTemplateSpec{
@@ -71,6 +72,12 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
 				},
 			},
 		},
@@ -83,6 +90,12 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 				},
 				Spec: DaemonSetSpec{
 					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
 				},
 			},
 			expected: &DaemonSet{
@@ -96,6 +109,12 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 						MatchLabels: defaultLabels,
 					},
 					Template: defaultTemplate,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
 				},
 			},
 		},
@@ -104,26 +123,74 @@ func TestSetDefaultDaemonSet(t *testing.T) {
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
 				},
 			},
 		},
 		{ // Update strategy.
 			original: &DaemonSet{
-				Spec: DaemonSetSpec{},
+				Spec: DaemonSetSpec{
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						RollingUpdate: &RollingUpdateDaemonSet{},
+					},
+				},
 			},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
 				},
 			},
 		},
-		{ // Custom unique label key.
+		{ // Paused
 			original: &DaemonSet{
-				Spec: DaemonSetSpec{},
+				Spec: DaemonSetSpec{
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						RollingUpdate: &RollingUpdateDaemonSet{},
+					},
+				},
 			},
 			expected: &DaemonSet{
 				Spec: DaemonSetSpec{
+					Paused:   false,
 					Template: templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
+				},
+			},
+		},
+		{ // AutoUpdate
+			original: &DaemonSet{
+				Spec: DaemonSetSpec{
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						RollingUpdate: &RollingUpdateDaemonSet{},
+					},
+				},
+			},
+			expected: &DaemonSet{
+				Spec: DaemonSetSpec{
+					AutoUpdate: false,
+					Template:   templateNoLabel,
+					UpdateStrategy: DaemonSetUpdateStrategy{
+						Type: RollingUpdateDaemonSetStrategyType,
+						RollingUpdate: &RollingUpdateDaemonSet{
+							MaxUnavailable: &defaultIntOrString,
+						},
+					},
 				},
 			},
 		},

@@ -467,7 +467,7 @@ var ingressColumns = []string{"NAME", "HOSTS", "ADDRESS", "PORTS", "AGE"}
 var petSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
 var endpointColumns = []string{"NAME", "ENDPOINTS", "AGE"}
 var nodeColumns = []string{"NAME", "STATUS", "AGE"}
-var daemonSetColumns = []string{"NAME", "DESIRED", "CURRENT", "NODE-SELECTOR", "AGE"}
+var daemonSetColumns = []string{"NAME", "DESIRED", "CURRENT", "UP-TO-DATE", "NODE-SELECTOR", "AGE"}
 var eventColumns = []string{"LASTSEEN", "FIRSTSEEN", "COUNT", "NAME", "KIND", "SUBOBJECT", "TYPE", "REASON", "SOURCE", "MESSAGE"}
 var limitRangeColumns = []string{"NAME", "AGE"}
 var resourceQuotaColumns = []string{"NAME", "AGE"}
@@ -1280,9 +1280,7 @@ func printPetSetList(petSetList *apps.PetSetList, w io.Writer, options PrintOpti
 
 func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options PrintOptions) error {
 	name := formatResourceName(options.Kind, ds.Name, options.WithKind)
-
 	namespace := ds.Namespace
-
 	containers := ds.Spec.Template.Spec.Containers
 
 	if options.WithNamespace {
@@ -1293,15 +1291,17 @@ func printDaemonSet(ds *extensions.DaemonSet, w io.Writer, options PrintOptions)
 
 	desiredScheduled := ds.Status.DesiredNumberScheduled
 	currentScheduled := ds.Status.CurrentNumberScheduled
+	updatedScheduled := ds.Status.UpdatedNumberScheduled
 	selector, err := unversioned.LabelSelectorAsSelector(ds.Spec.Selector)
 	if err != nil {
 		// this shouldn't happen if LabelSelector passed validation
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s\t%s",
 		name,
 		desiredScheduled,
 		currentScheduled,
+		updatedScheduled,
 		labels.FormatLabels(ds.Spec.Template.Spec.NodeSelector),
 		translateTimestamp(ds.CreationTimestamp),
 	); err != nil {
