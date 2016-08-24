@@ -160,6 +160,8 @@ type ActualStateOfWorldAttacherUpdater interface {
 	MarkVolumeAsDetached(volumeName api.UniqueVolumeName, nodeName string)
 }
 
+// ActualStateOfWorldSnapshotUpdater defines a set of operations updating the
+// actual state of the world cache after successful snapshot operations.
 type ActualStateOfWorldSnapshotUpdater interface {
 	MarkVolumeAsSnapshotted(volumeName api.UniqueVolumeName)
 }

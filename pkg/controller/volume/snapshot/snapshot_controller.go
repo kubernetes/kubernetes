@@ -25,6 +25,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	"k8s.io/kubernetes/pkg/controller/volume/snapshot/cache"
@@ -52,6 +53,7 @@ type SnapshotController interface {
 // NewSnapshotController returns a new instance of SnapshotController.
 func NewSnapshotController(
 	kubeClient internalclientset.Interface,
+	recorder record.EventRecorder,
 	pvcInformer framework.SharedInformer,
 	pvInformer framework.SharedInformer,
 	cloud cloudprovider.Interface,
@@ -77,7 +79,8 @@ func NewSnapshotController(
 	sc.snapshotOperationExecutor =
 		operationexecutor.NewOperationExecutor(
 			kubeClient,
-			&sc.volumePluginMgr)
+			&sc.volumePluginMgr,
+			recorder)
 	sc.reconciler = reconciler.NewReconciler(
 		reconcilerLoopPeriod,
 		sc.actualStateOfWorld,
