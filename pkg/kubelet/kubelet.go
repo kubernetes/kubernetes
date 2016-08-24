@@ -757,10 +757,6 @@ type nodeLister interface {
 	List() (machines api.NodeList, err error)
 }
 
-type FlannelHelper interface {
-	Handshake() (podCIDR string, err error)
-}
-
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
 	kubeletConfiguration *componentconfig.KubeletConfiguration
@@ -983,7 +979,7 @@ type Kubelet struct {
 	// TODO: Flannelhelper doesn't store any state, we can instantiate it
 	// on the fly if we're confident the dbus connetions it opens doesn't
 	// put the system under duress.
-	flannelHelper FlannelHelper
+	flannelHelper *FlannelHelper
 
 	// If non-nil, use this IP address for the node
 	nodeIP net.IP
