@@ -10,7 +10,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: /tmp/pv-1
+    path: /tmp/data/pv-1
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -24,4 +24,4 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: /tmp/pv-2
+    path: /tmp/data/pv-2
