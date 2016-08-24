@@ -40,6 +40,7 @@ const (
 	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
 	allAlphaGate             = "AllAlpha"
 	externalTrafficLocalOnly = "AllowExtTrafficLocalEndpoints"
+	dynamicKubeletConfig     = "DynamicKubeletConfig"
 )
 
 var (
@@ -48,6 +49,7 @@ var (
 	knownFeatures = map[string]featureSpec{
 		allAlphaGate:             {false, alpha},
 		externalTrafficLocalOnly: {false, alpha},
+		dynamicKubeletConfig:     {false, alpha},
 	}
 
 	// Special handling for a few gates.
@@ -92,6 +94,7 @@ type FeatureGate interface {
 	ExternalTrafficLocalOnly() bool
 
 	// TODO: Define accessors for each non-API alpha feature.
+	DynamicKubeletConfig() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -163,6 +166,11 @@ func (f *featureGate) Type() string {
 // ExternalTrafficLocalOnly returns value for AllowExtTrafficLocalEndpoints
 func (f *featureGate) ExternalTrafficLocalOnly() bool {
 	return f.lookup(externalTrafficLocalOnly)
+}
+
+// DynamicKubeletConfig returns value for dynamicKubeletConfig
+func (f *featureGate) DynamicKubeletConfig() bool {
+	return f.lookup(dynamicKubeletConfig)
 }
 
 func (f *featureGate) lookup(key string) bool {
