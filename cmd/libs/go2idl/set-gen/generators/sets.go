@@ -337,6 +337,15 @@ func (s $.type|public$) List() []$.type|raw$ {
 	return []$.type|raw$(res)
 }
 
+// UnsortedList returns the slice with contents in random order.
+func (s $.type|public$) UnsortedList() []$.type|raw$ {
+	res :=make([]$.type|raw$, 0, len(s))
+	for key := range s {
+		res = append(res, key)
+	}
+	return res
+}
+
 // Returns a single element from the set.
 func (s $.type|public$) PopAny() ($.type|raw$, bool) {
 	for key := range s {

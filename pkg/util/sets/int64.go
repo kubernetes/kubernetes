@@ -174,6 +174,15 @@ func (s Int64) List() []int64 {
 	return []int64(res)
 }
 
+// UnsortedList returns the slice with contents in random order.
+func (s Int64) UnsortedList() []int64 {
+	res := make([]int64, 0, len(s))
+	for key := range s {
+		res = append(res, key)
+	}
+	return res
+}
+
 // Returns a single element from the set.
 func (s Int64) PopAny() (int64, bool) {
 	for key := range s {
