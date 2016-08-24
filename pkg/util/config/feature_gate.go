@@ -38,14 +38,16 @@ const (
 	// specification of gates. Examples:
 	//   AllAlpha=false,NewFeature=true  will result in newFeature=true
 	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
-	allAlphaGate = "AllAlpha"
+	allAlphaGate             = "AllAlpha"
+	externalTrafficLocalOnly = "AllowExtTrafficLocalEndpoints"
 )
 
 var (
 	// Default values for recorded features.  Every new feature gate should be
 	// represented here.
 	knownFeatures = map[string]featureSpec{
-		allAlphaGate: {false, alpha},
+		allAlphaGate:             {false, alpha},
+		externalTrafficLocalOnly: {false, alpha},
 	}
 
 	// Special handling for a few gates.
@@ -84,6 +86,10 @@ type FeatureGate interface {
 	// // owner: @username
 	// // alpha: v1.4
 	// MyFeature() bool
+
+	// owner: @girishkalele
+	// alpha: v1.4
+	ExternalTrafficLocalOnly() bool
 
 	// TODO: Define accessors for each non-API alpha feature.
 }
@@ -152,6 +158,11 @@ func (f *featureGate) String() string {
 
 func (f *featureGate) Type() string {
 	return "mapStringBool"
+}
+
+// ExternalTrafficLocalOnly returns value for AllowExtTrafficLocalEndpoints
+func (f *featureGate) ExternalTrafficLocalOnly() bool {
+	return f.lookup(externalTrafficLocalOnly)
 }
 
 func (f *featureGate) lookup(key string) bool {
