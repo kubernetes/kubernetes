@@ -77,6 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
 	"k8s.io/kubernetes/pkg/util/clock"
@@ -1736,9 +1737,9 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		firstSeenTime = kubetypes.ConvertToTimestamp(firstSeenTimeStr).Get()
 	}
 
-	// Record pod worker start latency if being created
-	// TODO: make pod workers record their own latencies
 	if updateType == kubetypes.SyncPodCreate {
+		// Record pod worker start latency if being created
+		// TODO: make pod workers record their own latencies
 		if !firstSeenTime.IsZero() {
 			// This is the first time we are syncing the pod. Record the latency
 			// since kubelet first saw the pod if firstSeenTime is set.
@@ -1762,8 +1763,14 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		metrics.PodStartLatency.Observe(metrics.SinceInMicroseconds(firstSeenTime))
 	}
 
+	var statusAnnotations map[string]string
+	if apparmor.PodUsesAppArmor(pod) && apiPodStatus.Phase != api.PodFailed {
+		// If the pod has AppArmor annotations & wasn't rejected, then AppArmor is enabled.
+		statusAnnotations = map[string]string{apparmor.StatusAnnotationKey: apparmor.StatusEnabled}
+	}
+
 	// Update status in the status manager
-	kl.statusManager.SetPodStatus(pod, apiPodStatus)
+	kl.statusManager.SetPodStatusWithAnnotations(pod, apiPodStatus, statusAnnotations)
 
 	// Kill pod if it should not be running
 	if errOuter := canRunPod(pod); errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {

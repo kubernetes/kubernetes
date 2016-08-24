@@ -59,7 +59,7 @@ type validator struct {
 }
 
 func (v *validator) Validate(pod *api.Pod) error {
-	if !isRequired(pod) {
+	if !PodUsesAppArmor(pod) {
 		return nil
 	}
 
