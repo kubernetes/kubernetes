@@ -2551,7 +2551,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, 
 
 	// Add sharedSecurityGroupID into instances' rules only.
 	if c.cfg.Global.EnableSharedSecurityGroupIngress {
-		err = s.updateInstanceSharedSecurityGroups(sharedSecurityGroupID, instances)
+		err = c.updateInstanceSharedSecurityGroups(sharedSecurityGroupID, instances)
 		if err != nil {
 			glog.Warningf("Error opening ingress rules for the shared security group to the instances: %v", err)
 			return nil, err
