@@ -90,16 +90,28 @@ func Run(s *options.CMServer) error {
 	} else {
 		glog.Errorf("unable to register configz: %s", err)
 	}
+
+	// If s.Kubeconfig flag is empty, try with the deprecated name in 1.4.
+	// TODO(madhusudancs): Remove this in 1.5.
+	var restClientCfg *restclient.Config
+	var err error
+	if len(s.Kubeconfig) <= 0 {
+		restClientCfg, err = restClientConfigFromSecret(s.Master)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Create the config to talk to federation-apiserver.
-	restClientCfg, err := clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
+	restClientCfg, err = clientcmd.BuildConfigFromFlags(s.Master, s.Kubeconfig)
 	if err != nil || restClientCfg == nil {
 		// Retry with the deprecated name in 1.4.
 		// TODO(madhusudancs): Remove this in 1.5.
-		var depErr error
-		kubeconfigGetter := util.KubeconfigGetterForSecret(DeprecatedKubeconfigSecretName)
-		restClientCfg, depErr = clientcmd.BuildConfigFromKubeconfigGetter(s.Master, kubeconfigGetter)
-		if depErr != nil {
-			return fmt.Errorf("failed to find the secret containing Federation API server kubeconfig, tried the secret name %s and the deprecated name %s: %v, %v", KubeconfigSecretName, DeprecatedKubeconfigSecretName, err, depErr)
+		glog.V(2).Infof("Couldn't build the rest client config from flags: %v", err)
+		glog.V(2).Infof("Trying with deprecated secret: %s", DeprecatedKubeconfigSecretName)
+		restClientCfg, err = restClientConfigFromSecret(s.Master)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -181,4 +193,15 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	}
 
 	select {}
+}
+
+// TODO(madhusudancs): Remove this in 1.5. This is only temporary to give an
+// upgrade path in 1.4.
+func restClientConfigFromSecret(master string) (*restclient.Config, error) {
+	kubeconfigGetter := util.KubeconfigGetterForSecret(DeprecatedKubeconfigSecretName)
+	restClientCfg, err := clientcmd.BuildConfigFromKubeconfigGetter(master, kubeconfigGetter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find the Federation API server kubeconfig, tried the flags and the deprecated secret %s: %v", DeprecatedKubeconfigSecretName, err)
+	}
+	return restClientCfg, nil
 }
