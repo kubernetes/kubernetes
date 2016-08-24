@@ -631,6 +631,11 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 			allErrs = append(allErrs, validateVsphereVolumeSource(source.VsphereVolume, fldPath.Child("vsphereVolume"))...)
 		}
 	}
+	if source.AzureDisk != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
+	}
+
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
 	}
@@ -941,6 +946,22 @@ func validateAzureFile(azure *api.AzureFileVolumeSource, fldPath *field.Path) fi
 	return allErrs
 }
 
+var supportedCachingModes = sets.NewString(string(api.AzureDataDiskCachingNone), string(api.AzureDataDiskCachingReadOnly), string(api.AzureDataDiskCachingReadWrite))
+
+func validateAzureDisk(azure *api.AzureDiskVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	if azure.DiskName == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("diskName"), ""))
+	}
+	if azure.DataDiskURI == "" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("diskURI"), ""))
+	}
+	if azure.CachingMode != nil && !supportedCachingModes.Has(string(*azure.CachingMode)) {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("cachingMode"), *azure.CachingMode, supportedCachingModes.List()))
+	}
+	return allErrs
+}
+
 func validateVsphereVolumeSource(cd *api.VsphereVirtualDiskVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cd.VolumePath) == 0 {
@@ -1093,6 +1114,11 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 			allErrs = append(allErrs, validateVsphereVolumeSource(pv.Spec.VsphereVolume, specPath.Child("vsphereVolume"))...)
 		}
 	}
+	if pv.Spec.AzureDisk != nil {
+		numVolumes++
+		allErrs = append(allErrs, validateAzureDisk(pv.Spec.AzureDisk, specPath.Child("azureDisk"))...)
+	}
+
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(specPath, "must specify a volume type"))
 	}

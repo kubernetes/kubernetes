@@ -69,6 +69,19 @@ func (AvoidPods) SwaggerDoc() map[string]string {
 	return map_AvoidPods
 }
 
+var map_AzureDiskVolumeSource = map[string]string{
+	"":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
+	"diskName":    "The Name of the data disk in the blob storage",
+	"diskURI":     "The URI the data disk in the blob storage",
+	"cachingMode": "Host Caching mode: None, Read Only, Read Write.",
+	"fsType":      "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified.",
+	"readOnly":    "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts.",
+}
+
+func (AzureDiskVolumeSource) SwaggerDoc() map[string]string {
+	return map_AzureDiskVolumeSource
+}
+
 var map_AzureFileVolumeSource = map[string]string{
 	"":           "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"secretName": "the name of secret that contains Azure Storage Account Name and Key",
@@ -1083,6 +1096,7 @@ var map_PersistentVolumeSource = map[string]string{
 	"azureFile":            "AzureFile represents an Azure File Service mount on the host and bind mount to the pod.",
 	"vsphereVolume":        "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
 	"quobyte":              "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
+	"azureDisk":            "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 }
 
 func (PersistentVolumeSource) SwaggerDoc() map[string]string {
@@ -1767,6 +1781,7 @@ var map_VolumeSource = map[string]string{
 	"configMap":     "ConfigMap represents a configMap that should populate this volume",
 	"vsphereVolume": "VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine",
 	"quobyte":       "Quobyte represents a Quobyte mount on the host that shares a pod's lifetime",
+	"azureDisk":     "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.",
 }
 
 func (VolumeSource) SwaggerDoc() map[string]string {

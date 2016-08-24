@@ -2063,6 +2063,47 @@ func TestValidateVolumes(t *testing.T) {
 			errtype:  field.ErrorTypeRequired,
 			errfield: "quobyte.volume",
 		},
+		// AzureDisk
+		{
+			name: "valid AzureDisk",
+			vol: api.Volume{
+				Name: "azure-disk",
+				VolumeSource: api.VolumeSource{
+					AzureDisk: &api.AzureDiskVolumeSource{
+						DiskName:    "foo",
+						DataDiskURI: "https://blob/vhds/bar.vhd",
+					},
+				},
+			},
+		},
+		{
+			name: "AzureDisk empty disk name",
+			vol: api.Volume{
+				Name: "azure-disk",
+				VolumeSource: api.VolumeSource{
+					AzureDisk: &api.AzureDiskVolumeSource{
+						DiskName:    "",
+						DataDiskURI: "https://blob/vhds/bar.vhd",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "azureDisk.diskName",
+		},
+		{
+			name: "AzureDisk empty disk uri",
+			vol: api.Volume{
+				Name: "azure-disk",
+				VolumeSource: api.VolumeSource{
+					AzureDisk: &api.AzureDiskVolumeSource{
+						DiskName:    "foo",
+						DataDiskURI: "",
+					},
+				},
+			},
+			errtype:  field.ErrorTypeRequired,
+			errfield: "azureDisk.diskURI",
+		},
 	}
 
 	for i, tc := range testCases {
