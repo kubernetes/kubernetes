@@ -26,6 +26,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -76,7 +77,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	"k8s.io/kubernetes/pkg/runtime"
+	kruntime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -377,7 +378,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		// TODO: cache.NewListWatchFromClient is limited as it takes a client implementation rather
 		// than an interface. There is no way to construct a list+watcher using resource name.
 		listWatch := &cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (kruntime.Object, error) {
 				return kubeClient.Core().Services(api.NamespaceAll).List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
@@ -394,7 +395,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		// than an interface. There is no way to construct a list+watcher using resource name.
 		fieldSelector := fields.Set{api.ObjectNameField: nodeName}.AsSelector()
 		listWatch := &cache.ListWatch{
-			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
+			ListFunc: func(options api.ListOptions) (kruntime.Object, error) {
 				options.FieldSelector = fieldSelector
 				return kubeClient.Core().Nodes().List(options)
 			},
@@ -577,39 +578,6 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 			klet.hairpinMode == componentconfig.HairpinVeth && kubeCfg.NetworkPluginName != "kubenet",
 			kubeCfg.SeccompProfileRoot,
 			kubeDeps.ContainerRuntimeOptions...,
-		)
-	case "windows-docker":
-		klet.containerRuntime = dockertools.NewWindowsDockerManager(
-			dockerClient,
-			kubecontainer.FilterEventRecorder(recorder),
-			klet.livenessManager,
-			containerRefManager,
-			klet.podManager,
-			machineInfo,
-			podInfraContainerImage,
-			pullQPS,
-			pullBurst,
-			containerLogsDir,
-			osInterface,
-			klet.networkPlugin,
-			klet,
-			klet.httpClient,
-			dockerExecHandler,
-			oomAdjuster,
-			procFs,
-			klet.cpuCFSQuota,
-			imageBackOff,
-			serializeImagePulls,
-			enableCustomMetrics,
-			// If using "kubenet", the Kubernetes network plugin that wraps
-			// CNI's bridge plugin, it knows how to set the hairpin veth flag
-			// so we tell the container runtime to back away from setting it.
-			// If the kubelet is started with any other plugin we can't be
-			// sure it handles the hairpin case so we instruct the docker
-			// runtime to set the flag instead.
-			klet.hairpinMode == componentconfig.HairpinVeth && networkPluginName != "kubenet",
-			seccompProfileRoot,
-			containerRuntimeOptions...,
 		)
 	case "rkt":
 		// TODO: Include hairpin mode settings in rkt?
@@ -1405,8 +1373,7 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
 	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
-	// hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
-	hostname, _, err := kl.GeneratePodHostNameAndDomain(pod)
+	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, err
 	}
@@ -1425,23 +1392,25 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		}
 	}
 
-	// opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
-	// if err != nil {
-	// 	return nil, err
-	// }
+	if runtime.GOOS != "windows" {
+		opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
+		if err != nil {
+			return nil, err
+		}
+	}
 	opts.Envs, err = kl.makeEnvironmentVariables(pod, container, podIP)
 	if err != nil {
 		return nil, err
 	}
 
-	// if len(container.TerminationMessagePath) != 0 {
-	// 	p := kl.getPodContainerDir(pod.UID, container.Name)
-	// 	if err := os.MkdirAll(p, 0750); err != nil {
-	// 		glog.Errorf("Error on creating %q: %v", p, err)
-	// 	} else {
-	// 		opts.PodContainerDir = p
-	// 	}
-	// }
+	if len(container.TerminationMessagePath) != 0 && runtime.GOOS != "windows" {
+		p := kl.getPodContainerDir(pod.UID, container.Name)
+		if err := os.MkdirAll(p, 0750); err != nil {
+			glog.Errorf("Error on creating %q: %v", p, err)
+		} else {
+			opts.PodContainerDir = p
+		}
+	}
 
 	opts.DNS, opts.DNSSearch, err = kl.GetClusterDNS(pod)
 	if err != nil {
