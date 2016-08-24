@@ -99,22 +99,46 @@ func TestErrorUsefulMessage(t *testing.T) {
 }
 
 func TestToAggregate(t *testing.T) {
-	testCases := []ErrorList{
-		nil,
-		{},
-		{Invalid(NewPath("f"), "v", "d")},
-		{Invalid(NewPath("f"), "v", "d"), InternalError(NewPath(""), fmt.Errorf("e"))},
+	testCases := struct {
+		ErrList         []ErrorList
+		NumExpectedErrs []int
+	}{
+		[]ErrorList{
+			nil,
+			{},
+			{Invalid(NewPath("f"), "v", "d")},
+			{Invalid(NewPath("f"), "v", "d"), Invalid(NewPath("f"), "v", "d")},
+			{Invalid(NewPath("f"), "v", "d"), InternalError(NewPath(""), fmt.Errorf("e"))},
+		},
+		[]int{
+			0,
+			0,
+			1,
+			1,
+			2,
+		},
 	}
-	for i, tc := range testCases {
+
+	if len(testCases.ErrList) != len(testCases.NumExpectedErrs) {
+		t.Errorf("Mismatch: length of NumExpectedErrs does not match length of ErrList")
+	}
+	for i, tc := range testCases.ErrList {
 		agg := tc.ToAggregate()
+		numErrs := 0
+
+		if agg != nil {
+			numErrs = len(agg.Errors())
+		}
+		if numErrs != testCases.NumExpectedErrs[i] {
+			t.Errorf("[%d] Expected %d, got %d", i, testCases.NumExpectedErrs[i], numErrs)
+		}
+
 		if len(tc) == 0 {
 			if agg != nil {
 				t.Errorf("[%d] Expected nil, got %#v", i, agg)
 			}
 		} else if agg == nil {
 			t.Errorf("[%d] Expected non-nil", i)
-		} else if len(tc) != len(agg.Errors()) {
-			t.Errorf("[%d] Expected %d, got %d", i, len(tc), len(agg.Errors()))
 		}
 	}
 }
