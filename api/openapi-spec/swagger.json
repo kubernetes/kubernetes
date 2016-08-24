@@ -26623,6 +26623,62 @@
      }
     ]
    },
+   "/apis/rbac.authorization.k8s.io/v1alpha1/namespaces/{namespace}/addrolerequests": {
+    "post": {
+     "description": "create a AddRoleRequest",
+     "consumes": [
+      "*/*"
+     ],
+     "produces": [
+      "application/json",
+      "application/yaml",
+      "application/vnd.kubernetes.protobuf"
+     ],
+     "schemes": [
+      "https"
+     ],
+     "tags": [
+      "rbacAuthorization_v1alpha1"
+     ],
+     "operationId": "createRbacAuthorizationV1alpha1NamespacedAddRoleRequest",
+     "responses": {
+      "200": {
+       "description": "OK",
+       "schema": {
+        "$ref": "#/definitions/v1alpha1.AddRoleRequest"
+       }
+      },
+      "401": {
+       "description": "Unauthorized"
+      }
+     }
+    },
+    "parameters": [
+     {
+      "name": "body",
+      "in": "body",
+      "required": true,
+      "schema": {
+       "$ref": "#/definitions/v1alpha1.AddRoleRequest"
+      }
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "object name and auth scope, such as for teams and projects",
+      "name": "namespace",
+      "in": "path",
+      "required": true
+     },
+     {
+      "uniqueItems": true,
+      "type": "string",
+      "description": "If 'true', then the output is pretty printed.",
+      "name": "pretty",
+      "in": "query"
+     }
+    ]
+   },
    "/apis/rbac.authorization.k8s.io/v1alpha1/namespaces/{namespace}/rolebindings": {
     "get": {
      "description": "list or watch objects of kind RoleBinding",
@@ -32015,6 +32071,58 @@
      "subPath": {
       "description": "Path within the volume from which the container's volume should be mounted. Defaults to \"\" (volume's root).",
       "type": "string"
+     }
+    }
+   },
+   "v1alpha1.AddRoleRequest": {
+    "description": "AddRoleRequest is a namespaced request to bind a Role or ClusterRole to a list of subjects",
+    "required": [
+     "metadata",
+     "spec",
+     "status"
+    ],
+    "properties": {
+     "metadata": {
+      "description": "Standard object's metadata.",
+      "$ref": "#/definitions/v1.ObjectMeta"
+     },
+     "spec": {
+      "$ref": "#/definitions/v1alpha1.AddRoleRequestSpec"
+     },
+     "status": {
+      "$ref": "#/definitions/v1alpha1.AddRoleRequestStatus"
+     }
+    }
+   },
+   "v1alpha1.AddRoleRequestSpec": {
+    "description": "AddRoleRequestSpec indicates what the caller would like to bind",
+    "required": [
+     "roleRef",
+     "subjects"
+    ],
+    "properties": {
+     "roleRef": {
+      "description": "RoleRef is a reference to the Role or ClusterRole that you'd like to bind",
+      "$ref": "#/definitions/v1alpha1.RoleRef"
+     },
+     "subjects": {
+      "description": "Subjects are the subjects that you want to bind to the role",
+      "type": "array",
+      "items": {
+       "$ref": "#/definitions/v1alpha1.Subject"
+      }
+     }
+    }
+   },
+   "v1alpha1.AddRoleRequestStatus": {
+    "description": "AddRoleRequestStatus indicates how the request was handled",
+    "required": [
+     "roleBindingRef"
+    ],
+    "properties": {
+     "roleBindingRef": {
+      "description": "RoleBindingRef is a reference to the RoleBinding that was used to satisfy the request",
+      "$ref": "#/definitions/v1alpha1.RoleRef"
      }
     }
    },

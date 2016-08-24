@@ -35,6 +35,9 @@ func init() {
 // to allow building arbitrary schemes.
 func RegisterDeepCopies(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedDeepCopyFuncs(
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_AddRoleRequest, InType: reflect.TypeOf(&AddRoleRequest{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_AddRoleRequestSpec, InType: reflect.TypeOf(&AddRoleRequestSpec{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_AddRoleRequestStatus, InType: reflect.TypeOf(&AddRoleRequestStatus{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRole, InType: reflect.TypeOf(&ClusterRole{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRoleBinding, InType: reflect.TypeOf(&ClusterRoleBinding{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_ClusterRoleBindingList, InType: reflect.TypeOf(&ClusterRoleBindingList{})},
@@ -47,6 +50,49 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleRef, InType: reflect.TypeOf(&RoleRef{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_Subject, InType: reflect.TypeOf(&Subject{})},
 	)
+}
+
+func DeepCopy_v1alpha1_AddRoleRequest(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AddRoleRequest)
+		out := out.(*AddRoleRequest)
+		out.TypeMeta = in.TypeMeta
+		if err := v1.DeepCopy_v1_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, c); err != nil {
+			return err
+		}
+		if err := DeepCopy_v1alpha1_AddRoleRequestSpec(&in.Spec, &out.Spec, c); err != nil {
+			return err
+		}
+		out.Status = in.Status
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_AddRoleRequestSpec(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AddRoleRequestSpec)
+		out := out.(*AddRoleRequestSpec)
+		out.RoleRef = in.RoleRef
+		if in.Subjects != nil {
+			in, out := &in.Subjects, &out.Subjects
+			*out = make([]Subject, len(*in))
+			for i := range *in {
+				(*out)[i] = (*in)[i]
+			}
+		} else {
+			out.Subjects = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_AddRoleRequestStatus(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AddRoleRequestStatus)
+		out := out.(*AddRoleRequestStatus)
+		out.RoleBindingRef = in.RoleBindingRef
+		return nil
+	}
 }
 
 func DeepCopy_v1alpha1_ClusterRole(in interface{}, out interface{}, c *conversion.Cloner) error {

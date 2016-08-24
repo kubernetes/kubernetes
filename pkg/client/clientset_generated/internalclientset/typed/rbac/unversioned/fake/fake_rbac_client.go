@@ -26,6 +26,10 @@ type FakeRbac struct {
 	*core.Fake
 }
 
+func (c *FakeRbac) AddRoleRequests(namespace string) unversioned.AddRoleRequestInterface {
+	return &FakeAddRoleRequests{c, namespace}
+}
+
 func (c *FakeRbac) ClusterRoles() unversioned.ClusterRoleInterface {
 	return &FakeClusterRoles{c}
 }

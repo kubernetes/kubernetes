@@ -34,6 +34,12 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v1alpha1_AddRoleRequest_To_rbac_AddRoleRequest,
+		Convert_rbac_AddRoleRequest_To_v1alpha1_AddRoleRequest,
+		Convert_v1alpha1_AddRoleRequestSpec_To_rbac_AddRoleRequestSpec,
+		Convert_rbac_AddRoleRequestSpec_To_v1alpha1_AddRoleRequestSpec,
+		Convert_v1alpha1_AddRoleRequestStatus_To_rbac_AddRoleRequestStatus,
+		Convert_rbac_AddRoleRequestStatus_To_v1alpha1_AddRoleRequestStatus,
 		Convert_v1alpha1_ClusterRole_To_rbac_ClusterRole,
 		Convert_rbac_ClusterRole_To_v1alpha1_ClusterRole,
 		Convert_v1alpha1_ClusterRoleBinding_To_rbac_ClusterRoleBinding,
@@ -57,6 +63,108 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_v1alpha1_Subject_To_rbac_Subject,
 		Convert_rbac_Subject_To_v1alpha1_Subject,
 	)
+}
+
+func autoConvert_v1alpha1_AddRoleRequest_To_rbac_AddRoleRequest(in *AddRoleRequest, out *rbac.AddRoleRequest, s conversion.Scope) error {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_AddRoleRequestSpec_To_rbac_AddRoleRequestSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_v1alpha1_AddRoleRequestStatus_To_rbac_AddRoleRequestStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1alpha1_AddRoleRequest_To_rbac_AddRoleRequest(in *AddRoleRequest, out *rbac.AddRoleRequest, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddRoleRequest_To_rbac_AddRoleRequest(in, out, s)
+}
+
+func autoConvert_rbac_AddRoleRequest_To_v1alpha1_AddRoleRequest(in *rbac.AddRoleRequest, out *AddRoleRequest, s conversion.Scope) error {
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if err := Convert_rbac_AddRoleRequestSpec_To_v1alpha1_AddRoleRequestSpec(&in.Spec, &out.Spec, s); err != nil {
+		return err
+	}
+	if err := Convert_rbac_AddRoleRequestStatus_To_v1alpha1_AddRoleRequestStatus(&in.Status, &out.Status, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_rbac_AddRoleRequest_To_v1alpha1_AddRoleRequest(in *rbac.AddRoleRequest, out *AddRoleRequest, s conversion.Scope) error {
+	return autoConvert_rbac_AddRoleRequest_To_v1alpha1_AddRoleRequest(in, out, s)
+}
+
+func autoConvert_v1alpha1_AddRoleRequestSpec_To_rbac_AddRoleRequestSpec(in *AddRoleRequestSpec, out *rbac.AddRoleRequestSpec, s conversion.Scope) error {
+	if err := Convert_v1alpha1_RoleRef_To_rbac_RoleRef(&in.RoleRef, &out.RoleRef, s); err != nil {
+		return err
+	}
+	if in.Subjects != nil {
+		in, out := &in.Subjects, &out.Subjects
+		*out = make([]rbac.Subject, len(*in))
+		for i := range *in {
+			if err := Convert_v1alpha1_Subject_To_rbac_Subject(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Subjects = nil
+	}
+	return nil
+}
+
+func Convert_v1alpha1_AddRoleRequestSpec_To_rbac_AddRoleRequestSpec(in *AddRoleRequestSpec, out *rbac.AddRoleRequestSpec, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddRoleRequestSpec_To_rbac_AddRoleRequestSpec(in, out, s)
+}
+
+func autoConvert_rbac_AddRoleRequestSpec_To_v1alpha1_AddRoleRequestSpec(in *rbac.AddRoleRequestSpec, out *AddRoleRequestSpec, s conversion.Scope) error {
+	if err := Convert_rbac_RoleRef_To_v1alpha1_RoleRef(&in.RoleRef, &out.RoleRef, s); err != nil {
+		return err
+	}
+	if in.Subjects != nil {
+		in, out := &in.Subjects, &out.Subjects
+		*out = make([]Subject, len(*in))
+		for i := range *in {
+			if err := Convert_rbac_Subject_To_v1alpha1_Subject(&(*in)[i], &(*out)[i], s); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.Subjects = nil
+	}
+	return nil
+}
+
+func Convert_rbac_AddRoleRequestSpec_To_v1alpha1_AddRoleRequestSpec(in *rbac.AddRoleRequestSpec, out *AddRoleRequestSpec, s conversion.Scope) error {
+	return autoConvert_rbac_AddRoleRequestSpec_To_v1alpha1_AddRoleRequestSpec(in, out, s)
+}
+
+func autoConvert_v1alpha1_AddRoleRequestStatus_To_rbac_AddRoleRequestStatus(in *AddRoleRequestStatus, out *rbac.AddRoleRequestStatus, s conversion.Scope) error {
+	if err := Convert_v1alpha1_RoleRef_To_rbac_RoleRef(&in.RoleBindingRef, &out.RoleBindingRef, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_v1alpha1_AddRoleRequestStatus_To_rbac_AddRoleRequestStatus(in *AddRoleRequestStatus, out *rbac.AddRoleRequestStatus, s conversion.Scope) error {
+	return autoConvert_v1alpha1_AddRoleRequestStatus_To_rbac_AddRoleRequestStatus(in, out, s)
+}
+
+func autoConvert_rbac_AddRoleRequestStatus_To_v1alpha1_AddRoleRequestStatus(in *rbac.AddRoleRequestStatus, out *AddRoleRequestStatus, s conversion.Scope) error {
+	if err := Convert_rbac_RoleRef_To_v1alpha1_RoleRef(&in.RoleBindingRef, &out.RoleBindingRef, s); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Convert_rbac_AddRoleRequestStatus_To_v1alpha1_AddRoleRequestStatus(in *rbac.AddRoleRequestStatus, out *AddRoleRequestStatus, s conversion.Scope) error {
+	return autoConvert_rbac_AddRoleRequestStatus_To_v1alpha1_AddRoleRequestStatus(in, out, s)
 }
 
 func autoConvert_v1alpha1_ClusterRole_To_rbac_ClusterRole(in *ClusterRole, out *rbac.ClusterRole, s conversion.Scope) error {

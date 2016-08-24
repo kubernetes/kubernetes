@@ -9,6 +9,59 @@
   },
   "apis": [
    {
+    "path": "/apis/rbac.authorization.k8s.io/v1alpha1/namespaces/{namespace}/addrolerequests",
+    "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
+    "operations": [
+     {
+      "type": "v1alpha1.AddRoleRequest",
+      "method": "POST",
+      "summary": "create a AddRoleRequest",
+      "nickname": "createNamespacedAddRoleRequest",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1alpha1.AddRoleRequest",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       },
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "namespace",
+        "description": "object name and auth scope, such as for teams and projects",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1alpha1.AddRoleRequest"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     }
+    ]
+   },
+   {
     "path": "/apis/rbac.authorization.k8s.io/v1alpha1/clusterrolebindings",
     "description": "API at /apis/rbac.authorization.k8s.io/v1alpha1",
     "operations": [
@@ -2643,55 +2696,9 @@
    }
   ],
   "models": {
-   "v1alpha1.ClusterRoleBindingList": {
-    "id": "v1alpha1.ClusterRoleBindingList",
-    "description": "ClusterRoleBindingList is a collection of ClusterRoleBindings",
-    "required": [
-     "items"
-    ],
-    "properties": {
-     "kind": {
-      "type": "string",
-      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
-     },
-     "metadata": {
-      "$ref": "unversioned.ListMeta",
-      "description": "Standard object's metadata."
-     },
-     "items": {
-      "type": "array",
-      "items": {
-       "$ref": "v1alpha1.ClusterRoleBinding"
-      },
-      "description": "Items is a list of ClusterRoleBindings"
-     }
-    }
-   },
-   "unversioned.ListMeta": {
-    "id": "unversioned.ListMeta",
-    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
-    "properties": {
-     "selfLink": {
-      "type": "string",
-      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
-     }
-    }
-   },
-   "v1alpha1.ClusterRoleBinding": {
-    "id": "v1alpha1.ClusterRoleBinding",
-    "description": "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
-    "required": [
-     "subjects",
-     "roleRef"
-    ],
+   "v1alpha1.AddRoleRequest": {
+    "id": "v1alpha1.AddRoleRequest",
+    "description": "AddRoleRequest is a namespaced request to bind a Role or ClusterRole to a list of subjects",
     "properties": {
      "kind": {
       "type": "string",
@@ -2705,16 +2712,11 @@
       "$ref": "v1.ObjectMeta",
       "description": "Standard object's metadata."
      },
-     "subjects": {
-      "type": "array",
-      "items": {
-       "$ref": "v1alpha1.Subject"
-      },
-      "description": "Subjects holds references to the objects the role applies to."
+     "spec": {
+      "$ref": "v1alpha1.AddRoleRequestSpec"
      },
-     "roleRef": {
-      "$ref": "v1alpha1.RoleRef",
-      "description": "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
+     "status": {
+      "$ref": "v1alpha1.AddRoleRequestStatus"
      }
     }
    },
@@ -2826,6 +2828,50 @@
      }
     }
    },
+   "v1alpha1.AddRoleRequestSpec": {
+    "id": "v1alpha1.AddRoleRequestSpec",
+    "description": "AddRoleRequestSpec indicates what the caller would like to bind",
+    "required": [
+     "roleRef",
+     "subjects"
+    ],
+    "properties": {
+     "roleRef": {
+      "$ref": "v1alpha1.RoleRef",
+      "description": "RoleRef is a reference to the Role or ClusterRole that you'd like to bind"
+     },
+     "subjects": {
+      "type": "array",
+      "items": {
+       "$ref": "v1alpha1.Subject"
+      },
+      "description": "Subjects are the subjects that you want to bind to the role"
+     }
+    }
+   },
+   "v1alpha1.RoleRef": {
+    "id": "v1alpha1.RoleRef",
+    "description": "RoleRef contains information that points to the role being used",
+    "required": [
+     "apiGroup",
+     "kind",
+     "name"
+    ],
+    "properties": {
+     "apiGroup": {
+      "type": "string",
+      "description": "APIGroup is the group for the resource being referenced"
+     },
+     "kind": {
+      "type": "string",
+      "description": "Kind is the type of resource being referenced"
+     },
+     "name": {
+      "type": "string",
+      "description": "Name is the name of resource being referenced"
+     }
+    }
+   },
    "v1alpha1.Subject": {
     "id": "v1alpha1.Subject",
     "description": "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
@@ -2852,26 +2898,91 @@
      }
     }
    },
-   "v1alpha1.RoleRef": {
-    "id": "v1alpha1.RoleRef",
-    "description": "RoleRef contains information that points to the role being used",
+   "v1alpha1.AddRoleRequestStatus": {
+    "id": "v1alpha1.AddRoleRequestStatus",
+    "description": "AddRoleRequestStatus indicates how the request was handled",
     "required": [
-     "apiGroup",
-     "kind",
-     "name"
+     "roleBindingRef"
     ],
     "properties": {
-     "apiGroup": {
-      "type": "string",
-      "description": "APIGroup is the group for the resource being referenced"
-     },
+     "roleBindingRef": {
+      "$ref": "v1alpha1.RoleRef",
+      "description": "RoleBindingRef is a reference to the RoleBinding that was used to satisfy the request"
+     }
+    }
+   },
+   "v1alpha1.ClusterRoleBindingList": {
+    "id": "v1alpha1.ClusterRoleBindingList",
+    "description": "ClusterRoleBindingList is a collection of ClusterRoleBindings",
+    "required": [
+     "items"
+    ],
+    "properties": {
      "kind": {
       "type": "string",
-      "description": "Kind is the type of resource being referenced"
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
-     "name": {
+     "apiVersion": {
       "type": "string",
-      "description": "Name is the name of resource being referenced"
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "unversioned.ListMeta",
+      "description": "Standard object's metadata."
+     },
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1alpha1.ClusterRoleBinding"
+      },
+      "description": "Items is a list of ClusterRoleBindings"
+     }
+    }
+   },
+   "unversioned.ListMeta": {
+    "id": "unversioned.ListMeta",
+    "description": "ListMeta describes metadata that synthetic resources must have, including lists and various status objects. A resource may have only one of {ObjectMeta, ListMeta}.",
+    "properties": {
+     "selfLink": {
+      "type": "string",
+      "description": "SelfLink is a URL representing this object. Populated by the system. Read-only."
+     },
+     "resourceVersion": {
+      "type": "string",
+      "description": "String that identifies the server's internal version of this object that can be used by clients to determine when objects have changed. Value must be treated as opaque by clients and passed unmodified back to the server. Populated by the system. Read-only. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
+     }
+    }
+   },
+   "v1alpha1.ClusterRoleBinding": {
+    "id": "v1alpha1.ClusterRoleBinding",
+    "description": "ClusterRoleBinding references a ClusterRole, but not contain it.  It can reference a ClusterRole in the global namespace, and adds who information via Subject.",
+    "required": [
+     "subjects",
+     "roleRef"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "description": "Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
+     },
+     "apiVersion": {
+      "type": "string",
+      "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
+     },
+     "metadata": {
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata."
+     },
+     "subjects": {
+      "type": "array",
+      "items": {
+       "$ref": "v1alpha1.Subject"
+      },
+      "description": "Subjects holds references to the objects the role applies to."
+     },
+     "roleRef": {
+      "$ref": "v1alpha1.RoleRef",
+      "description": "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
      }
     }
    },

@@ -5220,6 +5220,88 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{},
 	},
+	"rbac.AddRoleRequest": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AddRoleRequest is a namespaced request to bind a Role or ClusterRole to a list of subjects",
+				Properties: map[string]spec.Schema{
+					"TypeMeta": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/unversioned.TypeMeta"),
+						},
+					},
+					"ObjectMeta": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/api.ObjectMeta"),
+						},
+					},
+					"Spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/rbac.AddRoleRequestSpec"),
+						},
+					},
+					"Status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/rbac.AddRoleRequestStatus"),
+						},
+					},
+				},
+				Required: []string{"TypeMeta", "ObjectMeta", "Spec", "Status"},
+			},
+		},
+		Dependencies: []string{
+			"api.ObjectMeta", "rbac.AddRoleRequestSpec", "rbac.AddRoleRequestStatus", "unversioned.TypeMeta"},
+	},
+	"rbac.AddRoleRequestSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AddRoleRequestSpec indicates what the caller would like to bind",
+				Properties: map[string]spec.Schema{
+					"RoleRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RoleRef is a reference to the Role or ClusterRole that you'd like to bind",
+							Ref:         spec.MustCreateRef("#/definitions/rbac.RoleRef"),
+						},
+					},
+					"Subjects": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Subjects are the subjects that you want to bind to the role",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/rbac.Subject"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"RoleRef", "Subjects"},
+			},
+		},
+		Dependencies: []string{
+			"rbac.RoleRef", "rbac.Subject"},
+	},
+	"rbac.AddRoleRequestStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AddRoleRequestStatus indicates how the request was handled",
+				Properties: map[string]spec.Schema{
+					"RoleBindingRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RoleBindingRef is a reference to the RoleBinding that was used to satisfy the request",
+							Ref:         spec.MustCreateRef("#/definitions/rbac.RoleRef"),
+						},
+					},
+				},
+				Required: []string{"RoleBindingRef"},
+			},
+		},
+		Dependencies: []string{
+			"rbac.RoleRef"},
+	},
 	"rbac.ClusterRole": {
 		Schema: spec.Schema{
 			SchemaProps: spec.SchemaProps{
@@ -13160,6 +13242,83 @@ var OpenAPIDefinitions *common.OpenAPIDefinitions = &common.OpenAPIDefinitions{
 		},
 		Dependencies: []string{
 			"v1.PodAffinityTerm"},
+	},
+	"v1alpha1.AddRoleRequest": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AddRoleRequest is a namespaced request to bind a Role or ClusterRole to a list of subjects",
+				Properties: map[string]spec.Schema{
+					"metadata": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Standard object's metadata.",
+							Ref:         spec.MustCreateRef("#/definitions/v1.ObjectMeta"),
+						},
+					},
+					"spec": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1alpha1.AddRoleRequestSpec"),
+						},
+					},
+					"status": {
+						SchemaProps: spec.SchemaProps{
+							Ref: spec.MustCreateRef("#/definitions/v1alpha1.AddRoleRequestStatus"),
+						},
+					},
+				},
+				Required: []string{"metadata", "spec", "status"},
+			},
+		},
+		Dependencies: []string{
+			"v1.ObjectMeta", "v1alpha1.AddRoleRequestSpec", "v1alpha1.AddRoleRequestStatus"},
+	},
+	"v1alpha1.AddRoleRequestSpec": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AddRoleRequestSpec indicates what the caller would like to bind",
+				Properties: map[string]spec.Schema{
+					"roleRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RoleRef is a reference to the Role or ClusterRole that you'd like to bind",
+							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.RoleRef"),
+						},
+					},
+					"subjects": {
+						SchemaProps: spec.SchemaProps{
+							Description: "Subjects are the subjects that you want to bind to the role",
+							Type:        []string{"array"},
+							Items: &spec.SchemaOrArray{
+								Schema: &spec.Schema{
+									SchemaProps: spec.SchemaProps{
+										Ref: spec.MustCreateRef("#/definitions/v1alpha1.Subject"),
+									},
+								},
+							},
+						},
+					},
+				},
+				Required: []string{"roleRef", "subjects"},
+			},
+		},
+		Dependencies: []string{
+			"v1alpha1.RoleRef", "v1alpha1.Subject"},
+	},
+	"v1alpha1.AddRoleRequestStatus": {
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Description: "AddRoleRequestStatus indicates how the request was handled",
+				Properties: map[string]spec.Schema{
+					"roleBindingRef": {
+						SchemaProps: spec.SchemaProps{
+							Description: "RoleBindingRef is a reference to the RoleBinding that was used to satisfy the request",
+							Ref:         spec.MustCreateRef("#/definitions/v1alpha1.RoleRef"),
+						},
+					},
+				},
+				Required: []string{"roleBindingRef"},
+			},
+		},
+		Dependencies: []string{
+			"v1alpha1.RoleRef"},
 	},
 	"v1alpha1.CertificateSigningRequest": {
 		Schema: spec.Schema{

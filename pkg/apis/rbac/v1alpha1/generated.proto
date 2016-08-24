@@ -30,6 +30,31 @@ import "k8s.io/kubernetes/pkg/util/intstr/generated.proto";
 // Package-wide variables from generator "generated".
 option go_package = "v1alpha1";
 
+// AddRoleRequest is a namespaced request to bind a Role or ClusterRole to a list of subjects
+message AddRoleRequest {
+  // Standard object's metadata.
+  optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
+
+  optional AddRoleRequestSpec spec = 2;
+
+  optional AddRoleRequestStatus status = 3;
+}
+
+// AddRoleRequestSpec indicates what the caller would like to bind
+message AddRoleRequestSpec {
+  // RoleRef is a reference to the Role or ClusterRole that you'd like to bind
+  optional RoleRef roleRef = 1;
+
+  // Subjects are the subjects that you want to bind to the role
+  repeated Subject subjects = 2;
+}
+
+// AddRoleRequestStatus indicates how the request was handled
+message AddRoleRequestStatus {
+  // RoleBindingRef is a reference to the RoleBinding that was used to satisfy the request
+  optional RoleRef roleBindingRef = 1;
+}
+
 // ClusterRole is a cluster level, logical grouping of PolicyRules that can be referenced as a unit by a RoleBinding or ClusterRoleBinding.
 message ClusterRole {
   // Standard object's metadata.

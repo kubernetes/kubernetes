@@ -25,6 +25,7 @@ import (
 
 type RbacInterface interface {
 	RESTClient() restclient.Interface
+	AddRoleRequestsGetter
 	ClusterRolesGetter
 	ClusterRoleBindingsGetter
 	RolesGetter
@@ -34,6 +35,10 @@ type RbacInterface interface {
 // RbacClient is used to interact with features provided by the Rbac group.
 type RbacClient struct {
 	restClient restclient.Interface
+}
+
+func (c *RbacClient) AddRoleRequests(namespace string) AddRoleRequestInterface {
+	return newAddRoleRequests(c, namespace)
 }
 
 func (c *RbacClient) ClusterRoles() ClusterRoleInterface {
