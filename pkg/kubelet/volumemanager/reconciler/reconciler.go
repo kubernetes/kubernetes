@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager/cache"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/goroutinemap/exponentialbackoff"
+	"k8s.io/kubernetes/pkg/util/io"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/util/strings"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -522,7 +523,8 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 		podName := podsDirInfo[i].Name()
 		podDir := path.Join(podDir, podName)
 		volumesDir := path.Join(podDir, options.DefaultKubeletVolumesDirName)
-		volumesDirInfo, err := ioutil.ReadDir(volumesDir)
+		glog.V(5).Infof("Reading pod volumes directory %v to determine volumes", volumesDir)
+		volumesDirInfo, err := io.ReadDir(volumesDir)
 		if err != nil {
 			glog.Errorf("Could not read volume directory %q: %v", volumesDir, err)
 			continue
@@ -531,7 +533,7 @@ func getVolumesFromPodDir(podDir string) ([]podVolume, error) {
 			pluginName := volumeDir.Name()
 			volumePluginPath := path.Join(volumesDir, pluginName)
 
-			volumePluginDirs, err := ioutil.ReadDir(volumePluginPath)
+			volumePluginDirs, err := io.ReadDir(volumePluginPath)
 			if err != nil {
 				glog.Errorf("Could not read volume plugin directory %q: %v", volumePluginPath, err)
 				continue

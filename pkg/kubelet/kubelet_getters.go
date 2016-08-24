@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/types"
-	"k8s.io/kubernetes/pkg/util"
+	"k8s.io/kubernetes/pkg/util/io"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
 
@@ -251,7 +251,7 @@ func (kl *Kubelet) getPodVolumeNameListFromDisk(podUID types.UID) ([]string, err
 	for _, volumePluginDir := range volumePluginDirs {
 		volumePluginName := volumePluginDir.Name()
 		volumePluginPath := path.Join(podVolDir, volumePluginName)
-		volumeDirs, volumeDirsStatErrs, err := util.ReadDirNoExit(volumePluginPath)
+		volumeDirs, volumeDirsStatErrs, err := io.ReadDirNoExit(volumePluginPath)
 		if err != nil {
 			return volumes, fmt.Errorf("Could not read directory %s: %v", volumePluginPath, err)
 		}
