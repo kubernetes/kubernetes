@@ -146,7 +146,9 @@ func loadTestProfiles() error {
 
 func runAppArmorTest(f *framework.Framework, profile string) api.PodStatus {
 	pod := createPodWithAppArmor(f, profile)
-	framework.ExpectNoError(f.WaitForPodNoLongerRunning(pod.Name))
+	// The pod needs to start before it stops, so wait for the longer start timeout.
+	framework.ExpectNoError(framework.WaitTimeoutForPodNoLongerRunningInNamespace(
+		f.Client, pod.Name, f.Namespace.Name, "", framework.PodStartTimeout))
 	p, err := f.PodClient().Get(pod.Name)
 	framework.ExpectNoError(err)
 	return p.Status
