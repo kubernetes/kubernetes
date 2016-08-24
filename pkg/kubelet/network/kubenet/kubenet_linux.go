@@ -45,8 +45,9 @@ import (
 	utilsets "k8s.io/kubernetes/pkg/util/sets"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 
-	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 	"strconv"
+
+	"k8s.io/kubernetes/pkg/kubelet/network/hostport"
 )
 
 const (
@@ -394,13 +395,13 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 	plugin.podIPs[id] = ip4.String()
 
 	// Open any hostports the pod's containers want
-	runningPods, err := plugin.getRunningPods()
+	activePods, err := plugin.getActivePods()
 	if err != nil {
 		return err
 	}
 
-	newPod := &hostport.RunningPod{Pod: pod, IP: ip4}
-	if err := plugin.hostportHandler.OpenPodHostportsAndSync(newPod, BridgeName, runningPods); err != nil {
+	newPod := &hostport.ActivePod{Pod: pod, IP: ip4}
+	if err := plugin.hostportHandler.OpenPodHostportsAndSync(newPod, BridgeName, activePods); err != nil {
 		return err
 	}
 
@@ -468,9 +469,9 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 		}
 	}
 
-	runningPods, err := plugin.getRunningPods()
+	activePods, err := plugin.getActivePods()
 	if err == nil {
-		err = plugin.hostportHandler.SyncHostports(BridgeName, runningPods)
+		err = plugin.hostportHandler.SyncHostports(BridgeName, activePods)
 	}
 	if err != nil {
 		errList = append(errList, err)
@@ -571,16 +572,20 @@ func (plugin *kubenetNetworkPlugin) checkCNIPluginInDir(dir string) bool {
 	return true
 }
 
-// Returns a list of pods running on this node and each pod's IP address.  Assumes
-// PodSpecs retrieved from the runtime include the name and ID of containers in
+// Returns a list of pods running or ready to run on this node and each pod's IP address.
+// Assumes PodSpecs retrieved from the runtime include the name and ID of containers in
 // each pod.
-func (plugin *kubenetNetworkPlugin) getRunningPods() ([]*hostport.RunningPod, error) {
-	pods, err := plugin.host.GetRuntime().GetPods(false)
+func (plugin *kubenetNetworkPlugin) getActivePods() ([]*hostport.ActivePod, error) {
+	pods, err := plugin.host.GetRuntime().GetPods(true)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve pods from runtime: %v", err)
 	}
-	runningPods := make([]*hostport.RunningPod, 0)
+	activePods := make([]*hostport.ActivePod, 0)
 	for _, p := range pods {
+		if podIsExited(p) {
+			continue
+		}
+
 		containerID, err := plugin.host.GetRuntime().GetPodContainerID(p)
 		if err != nil {
 			continue
@@ -594,13 +599,28 @@ func (plugin *kubenetNetworkPlugin) getRunningPods() ([]*hostport.RunningPod, er
 			continue
 		}
 		if pod, ok := plugin.host.GetPodByName(p.Namespace, p.Name); ok {
-			runningPods = append(runningPods, &hostport.RunningPod{
+			activePods = append(activePods, &hostport.ActivePod{
 				Pod: pod,
 				IP:  podIP,
 			})
 		}
 	}
-	return runningPods, nil
+	return activePods, nil
+}
+
+// podIsExited returns true if the pod is exited (all containers inside are exited).
+func podIsExited(p *kubecontainer.Pod) bool {
+	for _, c := range p.Containers {
+		if c.State != kubecontainer.ContainerStateExited {
+			return false
+		}
+	}
+	for _, c := range p.Sandboxes {
+		if c.State != kubecontainer.ContainerStateExited {
+			return false
+		}
+	}
+	return true
 }
 
 func (plugin *kubenetNetworkPlugin) buildCNIRuntimeConf(ifName string, id kubecontainer.ContainerID) (*libcni.RuntimeConf, error) {
