@@ -46,10 +46,12 @@ func (endpointsStrategy) NamespaceScoped() bool {
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
 func (endpointsStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
+	validation.ClearReadOnlyEndpointFieldsOnCreate(obj.(*api.Endpoints))
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (endpointsStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
+	validation.EnforceReadOnlyEndpointFieldsOnUpdate(old.(*api.Endpoints), obj.(*api.Endpoints))
 }
 
 // Validate validates a new endpoints.

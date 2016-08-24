@@ -57,6 +57,8 @@ var volumeModeErrorMsg string = "must be a number between 0 and 0777 (octal), bo
 
 const totalAnnotationSizeLimitB int = 256 * (1 << 10) // 256 kB
 
+const isExistingEndpointWithNilNodeName = ""
+
 // BannedOwners is a black list of object that are not allowed to be owners.
 var BannedOwners = map[unversioned.GroupVersionKind]struct{}{
 	v1.SchemeGroupVersion.WithKind("Event"): {},
@@ -3288,6 +3290,80 @@ func ValidateNamespaceFinalizeUpdate(newNamespace, oldNamespace *api.Namespace) 
 	return allErrs
 }
 
+// Set all NodeNames in the subset EndpointAddress slices to nil
+func clearNodeNamesinSubset(subset *api.EndpointSubset) {
+	for n := range subset.Addresses {
+		subset.Addresses[n].NodeName = nil
+	}
+	for n := range subset.NotReadyAddresses {
+		subset.Addresses[n].NodeName = nil
+	}
+}
+
+// ClearReadOnlyEndpointFieldsOnCreate Clears fields that are non user configurable upon create
+func ClearReadOnlyEndpointFieldsOnCreate(endpoints *api.Endpoints) {
+	for i := range endpoints.Subsets {
+		clearNodeNamesinSubset(&endpoints.Subsets[i])
+	}
+}
+
+func buildEndpointAddressToNodeNameMap(ipToNodeName map[string]string, addresses []api.EndpointAddress) {
+	// Construct lookup map of old subset IPs to NodeNames.
+	for n := range addresses {
+		_, ok := ipToNodeName[addresses[n].IP]
+		if !ok {
+			// New/unknown EndPointAddresses cannot have NodeName set but we only allow transition
+			// from nil to NodeName for pre-existing EndpointAddresses. Use empty string values to
+			// indicate IP exists but is currently set to NodeName = nil.
+			value := isExistingEndpointWithNilNodeName
+			if addresses[n].NodeName != nil {
+				value = *addresses[n].NodeName
+			}
+			ipToNodeName[addresses[n].IP] = value
+		}
+	}
+}
+
+func enforceNodeNameUnchangedEndpointAddresses(newAddresses []api.EndpointAddress, ipToNodeName map[string]string) {
+	for n := range newAddresses {
+		existingNodeName, ok := ipToNodeName[newAddresses[n].IP]
+		if !ok {
+			// New EndpointAddress not found in old - treat like Create and force it to nil
+			newAddresses[n].NodeName = nil
+			continue
+		}
+		// NodeName entry found for this endpoint IP, but user attempting to set nodename to nil
+		if newAddresses[n].NodeName == nil {
+			// Put the old NodeName back
+			newAddresses[n].NodeName = &existingNodeName
+			continue
+		}
+		// NodeName entry found for this endpoint IP, but user is attempting to change NodeName
+		if *newAddresses[n].NodeName != existingNodeName {
+			// Only permitted to change nodeName from empty to something once
+			if existingNodeName != isExistingEndpointWithNilNodeName {
+				// Reverse attempts to change NodeName once it has already been set.
+				newAddresses[n].NodeName = &existingNodeName
+			}
+		}
+	}
+}
+
+// EnforceReadOnlyEndpointFieldsOnUpdate Copies old value of EndpointAddress.NodeName into new object if modified upon update
+func EnforceReadOnlyEndpointFieldsOnUpdate(oldEndpoints *api.Endpoints, newEndpoints *api.Endpoints) {
+	ipToNodeName := make(map[string]string)
+	// Build a map across all subsets of IP -> NodeName
+	for i := range oldEndpoints.Subsets {
+		buildEndpointAddressToNodeNameMap(ipToNodeName, oldEndpoints.Subsets[i].Addresses)
+		buildEndpointAddressToNodeNameMap(ipToNodeName, oldEndpoints.Subsets[i].NotReadyAddresses)
+	}
+	// Use the exploded map of endpoints to validate if newEndpoints has any invalid NodeName changes
+	for i := range newEndpoints.Subsets {
+		enforceNodeNameUnchangedEndpointAddresses(newEndpoints.Subsets[i].Addresses, ipToNodeName)
+		enforceNodeNameUnchangedEndpointAddresses(newEndpoints.Subsets[i].NotReadyAddresses, ipToNodeName)
+	}
+}
+
 // ValidateEndpoints tests if required fields are set.
 func ValidateEndpoints(endpoints *api.Endpoints) field.ErrorList {
 	allErrs := ValidateObjectMeta(&endpoints.ObjectMeta, true, ValidateEndpointsName, field.NewPath("metadata"))
@@ -3331,6 +3407,9 @@ func validateEndpointAddress(address *api.EndpointAddress, fldPath *field.Path) 
 	}
 	if len(address.Hostname) > 0 {
 		allErrs = append(allErrs, ValidateDNS1123Label(address.Hostname, fldPath.Child("hostname"))...)
+	}
+	if address.NodeName != nil && len(*address.NodeName) > 0 {
+		allErrs = append(allErrs, ValidateDNS1123Label(*address.NodeName, fldPath.Child("nodeName"))...)
 	}
 	if len(allErrs) > 0 {
 		return allErrs
