@@ -34,7 +34,7 @@ import (
 )
 
 // This test is marked [Disruptive] because the Kubelet temporarily goes down as part of of this test.
-var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:dynamicKubeletConfig] [Serial] [Disruptive]", func() {
+var _ = framework.KubeDescribe("DynamicKubeletConfiguration [Feature:DynamicKubeletConfig] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("dynamic-kubelet-configuration-test")
 
 	Context("When a configmap called `kubelet-<node-name>` is added to the `kube-system` namespace", func() {
