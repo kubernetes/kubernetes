@@ -260,6 +260,7 @@ kube::util::gen-analytics() {
   mdfiles=($( find "${dir}" -name "*.md" -type f \
               -not -path '*/\.*' \
               -not -path "${path}/vendor/*" \
+              -not -path "${path}/staging/*" \
               -not -path "${path}/third_party/*" \
               -not -path "${path}/_gopath/*" \
               -not -path "${path}/_output/*" \
