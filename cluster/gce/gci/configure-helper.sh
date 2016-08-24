@@ -436,13 +436,26 @@ function load-docker-images {
   fi
 }
 
-# A kubelet systemd service is built in GCI image, but by default it is not started
-# when an instance is up. To start kubelet, the command line flags should be written
-# to /etc/default/kubelet in the format "KUBELET_OPTS=<flags>", and then start kubelet
-# using systemctl. This function assembles the command line and start the kubelet
-# systemd service.
+# This function assembles the kubelet systemd service file and starts it
+# using systemctl.
 function start-kubelet {
   echo "Start kubelet"
+  local kubelet_bin="${KUBE_HOME}/bin/kubelet"
+  local -r version="$("${kubelet_bin}" --version=true | cut -f2 -d " ")"
+  local -r builtin_kubelet="/usr/bin/kubelet"
+  if [[ "${TEST_CLUSTER:-}" == "true" ]]; then
+    # Determine which binary to use on test clusters. We use the built-in
+    # version only if the downloaded version is the same as the built-in
+    # version. This allows GCI to run some of the e2e tests to qualify the
+    # built-in kubelet.
+    if [[ -x "${builtin_kubelet}" ]]; then
+      local -r builtin_version="$("${builtin_kubelet}"  --version=true | cut -f2 -d " ")"
+      if [[ "${builtin_version}" == "${version}" ]]; then
+        kubelet_bin="${builtin_kubelet}"
+      fi
+    fi
+  fi
+  echo "Using kubelet binary at ${kubelet_bin}"
   local flags="${KUBELET_TEST_LOG_LEVEL:-"--v=2"} ${KUBELET_TEST_ARGS:-}"
   flags+=" --allow-privileged=true"
   flags+=" --babysit-daemons=true"
@@ -506,7 +519,26 @@ function start-kubelet {
   if [[ -n "${FEATURE_GATES:-}" ]]; then
      flags+=" --feature-gates=${FEATURE_GATES}"
   fi
-  echo "KUBELET_OPTS=\"${flags}\"" > /etc/default/kubelet
+
+  local -r kubelet_env_file="/etc/default/kubelet"
+  echo "KUBELET_OPTS=\"${flags}\"" > "${kubelet_env_file}"
+
+  # Write the systemd service file for kubelet.
+  cat <<EOF >/etc/systemd/system/kubelet.service
+[Unit]
+Description=Kubernetes kubelet
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Restart=always
+RestartSec=10
+EnvironmentFile=${kubelet_env_file}
+ExecStart=${kubelet_bin} \$KUBELET_OPTS
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
   # Delete docker0 to avoid interference
   iptables -t nat -F || true
@@ -1070,7 +1102,7 @@ function start-rescheduler {
 
 function reset-motd {
   # kubelet is installed both on the master and nodes, and the version is easy to parse (unlike kubectl)
-  local -r version="$(/usr/bin/kubelet --version=true | cut -f2 -d " ")"
+  local -r version="$("${KUBE_HOME}"/bin/kubelet --version=true | cut -f2 -d " ")"
   # This logic grabs either a release tag (v1.2.1 or v1.2.1-alpha.1),
   # or the git hash that's in the build info.
   local gitref="$(echo "${version}" | sed -r "s/(v[0-9]+\.[0-9]+\.[0-9]+)(-[a-z]+\.[0-9]+)?.*/\1\2/g")"
