@@ -49,7 +49,7 @@ write_files:
       dns_domain: cluster.local
       federations_domain_map: ''
       instance_prefix: kubernetes
-      admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      admission_control: NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,DefaultStorageClass,ResourceQuota
       enable_cpu_cfs_quota: "true"
       network_provider: none
       opencontrail_tag: R2.20

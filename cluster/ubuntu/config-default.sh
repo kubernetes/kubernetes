@@ -68,7 +68,7 @@ FLANNEL_OTHER_NET_CONFIG=''
 
 # Admission Controllers to invoke prior to persisting objects in cluster
 # If we included ResourceQuota, we should keep it at the end of the list to prevent incremeting quota usage prematurely.
-export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,SecurityContextDeny,ResourceQuota
+export ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,SecurityContextDeny,DefaultStorageClass,ResourceQuota
 
 # Path to the config file or directory of files of kubelet
 export KUBELET_CONFIG=${KUBELET_CONFIG:-""}

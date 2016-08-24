@@ -40,4 +40,5 @@ import (
 	_ "k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
 	_ "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount"
+	_ "k8s.io/kubernetes/plugin/pkg/admission/storageclass/default"
 )
