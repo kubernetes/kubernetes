@@ -41,9 +41,9 @@ import (
 var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", func() {
 	f := framework.NewDefaultFramework("eviction-test")
 
-	Context("When there is memory pressure", func() {
-		It("It should evict pods in the correct order (besteffort first, then burstable, then guaranteed)", func() {
-			By("Creating a guaranteed pod, a burstable pod, and a besteffort pod.")
+	Context("when there is memory pressure", func() {
+		It("should evict pods in the correct order (besteffort first, then burstable, then guaranteed)", func() {
+			By("creating a guaranteed pod, a burstable pod, and a besteffort pod.")
 
 			// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
 			guaranteed := createMemhogPod(f, "guaranteed-", "guaranteed", api.ResourceRequirements{
@@ -69,8 +69,8 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 			// We poll until timeout or all pods are killed.
 			// Inside the func, we check that all pods are in a valid phase with
 			// respect to the eviction order of best effort, then burstable, then guaranteed.
-			By("Polling the Status.Phase of each pod and checking for violations of the eviction order.")
-			Eventually(func() bool {
+			By("polling the Status.Phase of each pod and checking for violations of the eviction order.")
+			Eventually(func() error {
 
 				gteed, gtErr := f.Client.Pods(f.Namespace.Name).Get(guaranteed.Name)
 				framework.ExpectNoError(gtErr, fmt.Sprintf("getting pod %s", guaranteed.Name))
@@ -84,60 +84,73 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				framework.ExpectNoError(beErr, fmt.Sprintf("getting pod %s", besteffort.Name))
 				bestPh := best.Status.Phase
 
-				glog.Infof("Pod phase: guaranteed: %v, burstable: %v, besteffort: %v", gteedPh, burstPh, bestPh)
+				glog.Infof("pod phase: guaranteed: %v, burstable: %v, besteffort: %v", gteedPh, burstPh, bestPh)
 
 				if bestPh == api.PodRunning {
-					Expect(burstPh).NotTo(Equal(api.PodFailed), "Burstable pod failed before best effort pod")
-					Expect(gteedPh).NotTo(Equal(api.PodFailed), "Guaranteed pod failed before best effort pod")
+					Expect(burstPh).NotTo(Equal(api.PodFailed), "burstable pod failed before best effort pod")
+					Expect(gteedPh).NotTo(Equal(api.PodFailed), "guaranteed pod failed before best effort pod")
 				} else if burstPh == api.PodRunning {
-					Expect(gteedPh).NotTo(Equal(api.PodFailed), "Guaranteed pod failed before burstable pod")
+					Expect(gteedPh).NotTo(Equal(api.PodFailed), "guaranteed pod failed before burstable pod")
 				}
 
-				// When both besteffort and burstable have been evicted, return true, else false
+				// When both besteffort and burstable have been evicted, the test has completed.
 				if bestPh == api.PodFailed && burstPh == api.PodFailed {
-					return true
+					return nil
 				}
-				return false
+				return fmt.Errorf("besteffort and burstable have not yet both been evicted.")
 
-			}, 60*time.Minute, 5*time.Second).Should(Equal(true))
+			}, 60*time.Minute, 5*time.Second).Should(BeNil())
 
+			// Wait for the memory pressure condition to disappear from the node status before continuing.
+			Eventually(func() error {
+				nodeList, err := f.Client.Nodes().List(api.ListOptions{})
+				if err != nil {
+					return fmt.Errorf("tried to get node list but got error: %v", err)
+				}
+				// Assuming that there is only one node, because this is a node e2e test.
+				if len(nodeList.Items) != 1 {
+					return fmt.Errorf("expected 1 node, but see %d.", len(nodeList.Items))
+				}
+				node := nodeList.Items[0]
+				_, pressure := api.GetNodeCondition(&node.Status, api.NodeMemoryPressure)
+				if pressure != nil && pressure.Status == "True" {
+					return fmt.Errorf("node is still reporting memory pressure condition: %s", pressure)
+				}
+				return nil
+			}, 5*time.Minute, 15*time.Second).Should(BeNil())
+
+			// Check available memory after condition disappears, just in case:
 			// Wait for available memory to decrease to a reasonable level before ending the test.
-			// This prevents interference with tests that start immediately after this one.
-			Eventually(func() bool {
-				glog.Infof("Waiting for available memory to decrease to a reasonable level before ending the test.")
-
+			// This helps prevent interference with tests that start immediately after this one.
+			By("waiting for available memory to decrease to a reasonable level before ending the test.")
+			Eventually(func() error {
 				summary := stats.Summary{}
 				client := &http.Client{}
 				req, err := http.NewRequest("GET", "http://localhost:10255/stats/summary", nil)
 				if err != nil {
-					glog.Warningf("Failed to build http request: %v", err)
-					return false
+					return fmt.Errorf("failed to build http request: %v", err)
 				}
 				req.Header.Add("Accept", "application/json")
 				resp, err := client.Do(req)
 				if err != nil {
-					glog.Warningf("Failed to get /stats/summary: %v", err)
-					return false
+					return fmt.Errorf("failed to get /stats/summary: %v", err)
 				}
 				contentsBytes, err := ioutil.ReadAll(resp.Body)
+				resp.Body.Close()
 				if err != nil {
-					glog.Warningf("Failed to read /stats/summary: %+v", resp)
-					return false
+					return fmt.Errorf("failed to read /stats/summary: %+v", resp)
 				}
 				contents := string(contentsBytes)
 				decoder := json.NewDecoder(strings.NewReader(contents))
 				err = decoder.Decode(&summary)
 				if err != nil {
-					glog.Warningf("Failed to parse /stats/summary to go struct: %+v", resp)
-					return false
+					return fmt.Errorf("failed to parse /stats/summary to go struct: %+v", resp)
 				}
 				if summary.Node.Memory.AvailableBytes == nil {
-					glog.Warningf("summary.Node.Memory.AvailableBytes was nil, cannot get memory stats.")
-					return false
+					return fmt.Errorf("summary.Node.Memory.AvailableBytes was nil, cannot get memory stats.")
 				}
 				if summary.Node.Memory.WorkingSetBytes == nil {
-					glog.Warningf("summary.Node.Memory.WorkingSetBytes was nil, cannot get memory stats.")
-					return false
+					return fmt.Errorf("summary.Node.Memory.WorkingSetBytes was nil, cannot get memory stats.")
 				}
 				avail := *summary.Node.Memory.AvailableBytes
 				wset := *summary.Node.Memory.WorkingSetBytes
@@ -147,14 +160,39 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				halflimit := limit / 2
 
 				// Wait for at least half of memory limit to be available
-				glog.Infof("Current available memory is: %d bytes. Waiting for at least %d bytes available.", avail, halflimit)
 				if avail >= halflimit {
-					return true
+					return nil
 				}
+				return fmt.Errorf("current available memory is: %d bytes. Expected at least %d bytes available.", avail, halflimit)
+			}, 5*time.Minute, 15*time.Second).Should(BeNil())
 
-				return false
-			}, 5*time.Minute, 5*time.Second).Should(Equal(true))
-
+			// Finally, try starting a new pod and wait for it to be scheduled and running.
+			// This is the final check to try to prevent interference with subsequent tests.
+			podName := "admitBestEffortPod"
+			f.PodClient().Create(&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: podName,
+				},
+				Spec: api.PodSpec{
+					RestartPolicy: api.RestartPolicyNever,
+					Containers: []api.Container{
+						{
+							Image: ImageRegistry[pauseImage],
+							Name:  podName,
+						},
+					},
+				},
+			})
+			Eventually(func() error {
+				pod, err := f.PodClient().Get(podName)
+				if err != nil {
+					return err
+				}
+				if pod.Status.Phase != api.PodRunning {
+					return fmt.Errorf("waiting for the new pod to be running")
+				}
+				return nil
+			}, 5*time.Minute, 15*time.Second)
 		})
 	})
 
