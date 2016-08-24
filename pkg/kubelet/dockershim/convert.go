@@ -52,8 +52,10 @@ func toRuntimeAPIImage(image *dockertypes.Image) (*runtimeApi.Image, error) {
 func toRuntimeAPIContainer(c *dockertypes.Container) *runtimeApi.Container {
 	state := toRuntimeAPIContainerState(c.Status)
 	_, _, _, containerName, attempt, _ := parseContainerName(c.Names[0])
+	// TODO: set PodSandboxId for runtimeApi.Container
 	return &runtimeApi.Container{
-		Id: &c.ID,
+		Id:        &c.ID,
+		CreatedAt: &c.Created,
 		Metadata: &runtimeApi.ContainerMetadata{
 			Name:    &containerName,
 			Attempt: &attempt,

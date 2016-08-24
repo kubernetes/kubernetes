@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
+	"k8s.io/kubernetes/pkg/types"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
@@ -76,6 +77,19 @@ func (f *fakeRuntimeHelper) GetExtraSupplementalGroupsForPod(pod *api.Pod) []int
 	return nil
 }
 
+type fakePodGetter struct {
+	pods map[types.UID]*api.Pod
+}
+
+func newFakePodGetter() *fakePodGetter {
+	return &fakePodGetter{make(map[types.UID]*api.Pod)}
+}
+
+func (f *fakePodGetter) GetPodByUID(uid types.UID) (*api.Pod, bool) {
+	pod, found := f.pods[uid]
+	return pod, found
+}
+
 func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageService internalApi.ImageManagerService, networkPlugin network.NetworkPlugin, osInterface kubecontainer.OSInterface) (*kubeGenericRuntimeManager, error) {
 	recorder := &record.FakeRecorder{}
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
@@ -96,6 +110,7 @@ func NewFakeKubeRuntimeManager(runtimeService internalApi.RuntimeService, imageS
 		return nil, err
 	}
 
+	kubeRuntimeManager.containerGC = NewContainerGC(runtimeService, newFakePodGetter(), kubeRuntimeManager)
 	kubeRuntimeManager.runtimeName = typedVersion.GetRuntimeName()
 	kubeRuntimeManager.imagePuller = images.NewImageManager(
 		kubecontainer.FilterEventRecorder(recorder),
