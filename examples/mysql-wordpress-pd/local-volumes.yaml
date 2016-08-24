@@ -1,3 +1,9 @@
+# When using hostPath and selinux the mysql container will not be able to `chown /var/lib/mysql`
+# due to a permissions error. To remedy this without setting selinux to permissive:
+#   1) the hostPath PVs are located in /tmp/data rather than /tmp:
+#        on host: `mkdir -p /tmp/data & chmod a+rwt /tmp/data`,
+#   2) set the selinux label type to "svirt_sandbox_file_t" on /tmp/data:
+#        on host: `chcon -Rt svirt_sandbox_file_t /tmp/data`
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -10,7 +16,7 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: /tmp/pv-1
+    path: /tmp/data/pv-1
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -24,4 +30,4 @@ spec:
   accessModes:
     - ReadWriteOnce
   hostPath:
-    path: /tmp/pv-2
+    path: /tmp/data/pv-2
