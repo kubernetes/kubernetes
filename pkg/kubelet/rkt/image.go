@@ -76,7 +76,7 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 		return err
 	}
 
-	if _, err := r.cli.RunCommand(&config, "fetch", dockerPrefix+img); err != nil {
+	if _, err := r.cli.RunCommand(&config, "fetch", "--no-store", dockerPrefix+img); err != nil {
 		glog.Errorf("Failed to fetch: %v", err)
 		return err
 	}
