@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,12 +26,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"gopkg.in/gcfg.v1"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/service"
+	apiservice "k8s.io/kubernetes/pkg/api/service"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/types"
@@ -46,6 +47,7 @@ import (
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
+	dns "google.golang.org/api/dns/v1"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/cloud/compute/metadata"
 )
@@ -62,6 +64,12 @@ const (
 	// AffinityTypeClientIPProto - affinity based on Client IP and port.
 	gceAffinityTypeClientIPProto = "CLIENT_IP_PROTO"
 
+	// Attach this annotation to a LoadBalancer type service to indicate a DNS name is wanted.
+	// DNS name would be created in following format: serviceName-nameSpace-clusterName.domainName
+	// DNS zone name would be in this fomat: clusterName-domainName (escape "." to "-" and convert it to lower case)
+	// Domain name should be given with annotation.
+	serviceAnnotationLoadBalancerDns = "service.beta.kubernetes.io/gce-lb-dns"
+
 	operationPollInterval        = 3 * time.Second
 	operationPollTimeoutDuration = 30 * time.Minute
 
@@ -72,12 +80,16 @@ const (
 
 	// Target Pool creation is limited to 200 instances.
 	maxTargetPoolCreateInstances = 200
+
+	// minDnsTtl is the minimum safe DNS TTL value to use (in seconds). We use this as the TTL for all DNS records.
+	minDnsTtl = 180
 )
 
 // GCECloud is an implementation of Interface, LoadBalancer and Instances for Google Compute Engine.
 type GCECloud struct {
 	service                  *compute.Service
 	containerService         *container.Service
+	dnsService               *dns.Service
 	projectID                string
 	region                   string
 	localZone                string   // The zone in which we are running
@@ -87,6 +99,7 @@ type GCECloud struct {
 	nodeInstancePrefix       string   // If non-"", an advisory prefix for all nodes in the cluster
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
+	cache                    *dnsCache // cache for dns
 }
 
 type Config struct {
@@ -99,6 +112,18 @@ type Config struct {
 		NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
 		Multizone          bool     `gcfg:"multizone"`
 	}
+}
+
+// dnsCache is only in used for the beta DNS feature
+// cache is needed when annotation is deleted ahead
+type dnsCache struct {
+	mu     sync.Mutex // protects dnsMap
+	dnsMap map[string]*dnsCacheContent
+}
+
+type dnsCacheContent struct {
+	domainName string
+	ipAddress  string
 }
 
 type DiskType string
@@ -329,6 +354,14 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		return nil, err
 	}
 
+	dnsSvc, err := dns.New(client)
+	if err != nil {
+		glog.Infof("failed to retrieved DNS service, disabled DNS feature.")
+		dnsSvc = nil
+	} else {
+		glog.Infof("Successfully got DNS service: %v", dnsSvc)
+	}
+
 	if networkURL == "" {
 		networkName, err := getNetworkNameViaAPICall(svc, projectID)
 		if err != nil {
@@ -349,9 +382,12 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 
 	operationPollRateLimiter := flowcontrol.NewTokenBucketRateLimiter(10, 100) // 10 qps, 100 bucket size.
 
+	cache := &dnsCache{dnsMap: make(map[string]*dnsCacheContent)}
+
 	return &GCECloud{
 		service:                  svc,
 		containerService:         containerSvc,
+		dnsService:               dnsSvc,
 		projectID:                projectID,
 		region:                   region,
 		localZone:                zone,
@@ -361,6 +397,7 @@ func CreateGCECloud(projectID, region, zone string, managedZones []string, netwo
 		nodeInstancePrefix:       nodeInstancePrefix,
 		useMetadataServer:        useMetadataServer,
 		operationPollRateLimiter: operationPollRateLimiter,
+		cache: cache,
 	}, nil
 }
 
@@ -665,7 +702,7 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Serv
 	// is because the forwarding rule is used as the indicator that the load
 	// balancer is fully created - it's what getLoadBalancer checks for.
 	// Check if user specified the allow source range
-	sourceRanges, err := service.GetLoadBalancerSourceRanges(apiService)
+	sourceRanges, err := apiservice.GetLoadBalancerSourceRanges(apiService)
 	if err != nil {
 		return nil, err
 	}
@@ -763,6 +800,40 @@ func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Serv
 		// preventing it from actually being released.
 		isSafeToReleaseIP = true
 		glog.Infof("EnsureLoadBalancer(%v(%v)): created forwarding rule, IP %s", loadBalancerName, serviceName, ipAddress)
+	}
+
+	// If requested, create DNS record with the static external ip address.
+	// If annotation removed, make sure the previous dns name is deleted.
+	// Try create//delete/update the dns name at anytime the service(LoadBalancer type) changes.
+	if gce.dnsService != nil {
+		if serviceNeedDns(apiService) {
+			glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): service needs DNS.", loadBalancerName, serviceName)
+			domainName := apiService.Annotations[serviceAnnotationLoadBalancerDns]
+			// Handle dns annotation exists case.
+			// Make sure the dns zone exist first, create one if not present.
+			if !gce.haveDnsZone(clusterName, domainName) {
+				if err := gce.createDnsZone(apiService, clusterName, domainName); err != nil {
+					return nil, err
+				}
+			}
+
+			if err := gce.updateDnsRecord(apiService, ipAddress, clusterName, domainName); err != nil {
+				return nil, err
+			}
+		} else {
+			// Handle dns annotation not exist case.
+			cacheContent, ok := gce.serviceHadDns(apiService, clusterName)
+			if ok {
+				// if service had dns name before, remove the dns record
+				existedDomainName := cacheContent.domainName
+				existedIpAddress := cacheContent.ipAddress
+				glog.V(4).Infof("EnsureLoadBalancer(%v(%v)): found DNS content in cache: %v, %v", loadBalancerName, serviceName, existedDomainName, existedIpAddress)
+				glog.V(2).Infof("EnsureLoadBalancer(%v(%v)): service removed annotation, deleting DNS name", loadBalancerName, serviceName)
+				if err := gce.deleteDnsRecord(apiService, existedIpAddress, clusterName, existedDomainName); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	status := &api.LoadBalancerStatus{}
@@ -1296,6 +1367,10 @@ func (gce *GCECloud) EnsureLoadBalancerDeleted(clusterName string, service *api.
 			}
 			return nil
 		},
+		func() error {
+			// Remove the dns record if service is deleted with dns annotation attached.
+			return gce.deleteDns(loadBalancerName, service, clusterName)
+		},
 	)
 	if errs != nil {
 		return utilerrors.Flatten(errs)
@@ -1464,6 +1539,173 @@ func (gce *GCECloud) DeleteGlobalStaticIP(name string) error {
 // GetGlobalStaticIP returns the global static IP by name.
 func (gce *GCECloud) GetGlobalStaticIP(name string) (address *compute.Address, err error) {
 	return gce.service.GlobalAddresses.Get(gce.projectID, name).Do()
+}
+
+// DNS record management
+
+func (cache *dnsCache) get(dnsPrefix string) (*dnsCacheContent, bool) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	dnsContent, ok := cache.dnsMap[dnsPrefix]
+	return dnsContent, ok
+}
+
+func (cache *dnsCache) set(dnsPrefix, domain, ipAddr string) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	cache.dnsMap[dnsPrefix] = &dnsCacheContent{domainName: domain, ipAddress: ipAddr}
+}
+
+func (cache *dnsCache) delete(dnsPrefix string) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+	delete(cache.dnsMap, dnsPrefix)
+}
+
+// serviceNeedDns checkes whehter the service requests DNS name or not.
+func serviceNeedDns(service *api.Service) bool {
+	if _, ok := service.Annotations[serviceAnnotationLoadBalancerDns]; !ok {
+		return false
+	}
+	return true
+}
+
+// serviceHadDns returns the domain name if the service had DNS name before.
+func (gce *GCECloud) serviceHadDns(service *api.Service, clusterName string) (*dnsCacheContent, bool) {
+	cacheContent, ok := gce.cache.get(getDnsPrefix(service.Name, service.Namespace, clusterName))
+	if !ok {
+		return &dnsCacheContent{}, false
+	}
+	return cacheContent, true
+}
+
+// haveDnsZone validates the existence of the DNS zone.
+func (gce *GCECloud) haveDnsZone(clusterName, domainName string) bool {
+	zoneName := getDnsZoneName(clusterName, domainName)
+	_, err := gce.dnsService.ManagedZones.Get(gce.projectID, zoneName).Do()
+	if err != nil {
+		glog.Errorf("failed to retrieve DNS zone (%s)\n", err)
+		return false
+	}
+	return true
+}
+
+// createDnsZone creates the DNS zone using the given zone name.
+func (gce *GCECloud) createDnsZone(service *api.Service, clusterName, domainName string) error {
+	zoneName := getDnsZoneName(clusterName, domainName)
+	_, err := gce.dnsService.ManagedZones.Create(gce.projectID, &dns.ManagedZone{
+		Description: "service.beta.kubernetes.io",
+		DnsName:     domainName + ".",
+		Name:        zoneName,
+	}).Do()
+	if err != nil {
+		glog.Errorf("failed to create DNS zone (%s)", err)
+	} else {
+		glog.V(2).Infof("Created DNS zone %s\n", zoneName)
+	}
+	return err
+}
+
+// getDnsZoneName returns the desired DNS zone name according to service cluster and domain name.
+func getDnsZoneName(clusterName, domainName string) string {
+	return strings.ToLower(strings.Replace(fmt.Sprintf("%v-%v", clusterName, domainName), ".", "-", -1))
+}
+
+// getDnsPrefix returns the desired DNS prefix according to service name, namespace, cluster name.
+func getDnsPrefix(serviceName, namespace, clusterName string) string {
+	return fmt.Sprintf("%v-%v-%v", serviceName, namespace, clusterName)
+}
+
+// getLoadBalancerDnsName returns the desired DNS name according to service name, namespace, cluster name and hosted domain name.
+func getLoadBalancerDnsName(serviceName, namespace, clusterName, domainName string) string {
+	return fmt.Sprintf("%v.%v.", getDnsPrefix(serviceName, namespace, clusterName), domainName)
+}
+
+// updateDnsRecord updates a record set in the managed DNS zone.
+func (gce *GCECloud) updateDnsRecord(service *api.Service, newIpAddress, clusterName, newDomainName string) error {
+	cacheContent, yes := gce.serviceHadDns(service, clusterName)
+	if yes {
+		// if found record in cache, may need to update
+		oldDomainName := cacheContent.domainName
+		oldIpAddress := cacheContent.ipAddress
+		if oldDomainName == newDomainName && oldIpAddress == newIpAddress {
+			// Do nothing if both ip address and domain name stay the same.
+			glog.V(4).Infof("DNS name for LoadBalancer doesn't need update")
+			return nil
+		}
+		// If ip/domain changes, delete the record first.
+		glog.V(2).Infof("DNS name for LoadBalancer needs update")
+		err := gce.deleteDnsRecord(service, oldIpAddress, clusterName, oldDomainName)
+		if err != nil {
+			return err
+		}
+	}
+	// Insert new DNS record.
+	return gce.addDnsRecord(service, newIpAddress, clusterName, newDomainName)
+}
+
+// addDnsRecord creates a record set in the managed DNS zone.
+func (gce *GCECloud) addDnsRecord(service *api.Service, ipAddress, clusterName, domainName string) error {
+	zoneName := getDnsZoneName(clusterName, domainName)
+	dnsName := getLoadBalancerDnsName(service.Name, service.Namespace, clusterName, domainName)
+	_, err := gce.dnsService.Changes.Create(gce.projectID, zoneName, &dns.Change{
+		Additions: []*dns.ResourceRecordSet{
+			{
+				Name: dnsName,
+				Rrdatas: []string{
+					ipAddress,
+				},
+				Ttl:  minDnsTtl,
+				Type: "A",
+			},
+		},
+	}).Do()
+	if err == nil {
+		glog.V(2).Infof("Serivce (%v/%v) has DNS name %q", service.Namespace, service.Name, dnsName)
+		gce.cache.set(getDnsPrefix(service.Name, service.Namespace, clusterName), domainName, ipAddress)
+		glog.V(4).Infof("Stored DNS in cache for (%v): %v, %v", service.Name, domainName, ipAddress)
+	}
+	return err
+}
+
+// deleteDnsRecord deletes a record set in the managed DNS zone.
+func (gce *GCECloud) deleteDnsRecord(service *api.Service, ipAddress, clusterName, domainName string) error {
+	zoneName := getDnsZoneName(clusterName, domainName)
+	dnsName := getLoadBalancerDnsName(service.Name, service.Namespace, clusterName, domainName)
+	_, err := gce.dnsService.Changes.Create(gce.projectID, zoneName, &dns.Change{
+		Deletions: []*dns.ResourceRecordSet{
+			{
+				Name: dnsName,
+				Rrdatas: []string{
+					ipAddress,
+				},
+				Ttl:  minDnsTtl,
+				Type: "A",
+			},
+		},
+	}).Do()
+	if err == nil {
+		glog.V(2).Infof("DNS name for service (%v/%v) is deleted", service.Namespace, service.Name)
+		gce.cache.delete(getDnsPrefix(service.Name, service.Namespace, clusterName))
+		glog.V(4).Infof("Removed DNS name in cache for (%v)", service.Name)
+	}
+	return err
+}
+
+// deleteDns checkes and removes corresponding DNS record for service
+func (gce *GCECloud) deleteDns(loadBalancerName string, service *api.Service, clusterName string) error {
+	if gce.dnsService != nil && serviceNeedDns(service) {
+		// Get the loadbalancer ip address.
+		// We need this because Google Cloud Dns requires exact data in the record set in order to delete it.
+		cacheContent, ok := gce.cache.get(getDnsPrefix(service.Name, service.Namespace, clusterName))
+		if !ok {
+			return fmt.Errorf("failed to delete DNS (%v(%v)), content not found in cache", loadBalancerName, service.Name)
+		}
+		existedIpAddr := cacheContent.ipAddress
+		existedDomainName := cacheContent.domainName
+		return gce.deleteDnsRecord(service, existedIpAddr, clusterName, existedDomainName)
+	}
+	return nil
 }
 
 // UrlMap management

@@ -70,7 +70,7 @@ function create-master-instance-internal() {
     --image "${MASTER_IMAGE}" \
     --tags "${MASTER_TAG}" \
     --network "${NETWORK}" \
-    --scopes "storage-ro,compute-rw,monitoring,logging-write" \
+    --scopes "storage-ro,compute-rw,monitoring,logging-write,https://www.googleapis.com/auth/ndev.clouddns.readwrite" \
     --can-ip-forward \
     --metadata-from-file \
       "kube-env=${KUBE_TEMP}/master-kube-env.yaml,user-data=${KUBE_ROOT}/cluster/gce/gci/master.yaml,configure-sh=${KUBE_ROOT}/cluster/gce/gci/configure.sh,cluster-name=${KUBE_TEMP}/cluster-name.txt,gci-update-strategy=${KUBE_TEMP}/gci-update.txt,gci-ensure-gke-docker=${KUBE_TEMP}/gci-ensure-gke-docker.txt,gci-docker-version=${KUBE_TEMP}/gci-docker-version.txt" \
