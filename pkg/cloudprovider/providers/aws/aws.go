@@ -1567,18 +1567,16 @@ func (c *Cloud) CreateDisk(volumeOptions *VolumeOptions) (string, error) {
 
 	// TODO: Should we tag this with the cluster id (so it gets deleted when the cluster does?)
 	request := &ec2.CreateVolumeInput{}
-	request.AvailabilityZone = &createAZ
-	volSize := int64(volumeOptions.CapacityGB)
-	request.Size = &volSize
-	request.VolumeType = &createType
-	request.Encrypted = &volumeOptions.Encrypted
-	request.KmsKeyId = &volumeOptions.KmsKeyId
-	if len(*request.KmsKeyId) > 0 {
-		b := true
-		request.Encrypted = &b
+	request.AvailabilityZone = aws.String(createAZ)
+	request.Size = aws.Int64(int64(volumeOptions.CapacityGB))
+	request.VolumeType = aws.String(createType)
+	request.Encrypted = aws.Bool(volumeOptions.Encrypted)
+	if len(volumeOptions.KmsKeyId) > 0 {
+		request.KmsKeyId = aws.String(volumeOptions.KmsKeyId)
+		request.Encrypted = aws.Bool(true)
 	}
 	if iops > 0 {
-		request.Iops = &iops
+		request.Iops = aws.Int64(iops)
 	}
 	response, err := c.ec2.CreateVolume(request)
 	if err != nil {
