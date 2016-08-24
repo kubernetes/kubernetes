@@ -755,7 +755,7 @@ function start-kube-apiserver {
   if [[ -n "${KUBE_USER:-}" ]]; then
     local -r abac_policy_json="${src_dir}/abac-authz-policy.jsonl"
     remove-salt-config-comments "${abac_policy_json}"
-    sed -i -e "s@{{kube_user}}@${KUBE_USER}@g" "${abac_policy_json}"
+    sed -i -e "s/{{kube_user}}/${KUBE_USER}/g" "${abac_policy_json}"
     cp "${abac_policy_json}" /etc/srv/kubernetes/
   fi
 
@@ -1115,6 +1115,14 @@ if [[ ! -e "${KUBE_HOME}/kube-env" ]]; then
 fi
 
 source "${KUBE_HOME}/kube-env"
+
+if [[ -n "${KUBE_USER:-}" ]]; then
+  if ! [[ "${KUBE_USER}" =~ ^[-._@a-zA-Z0-9]+$ ]]; then
+    echo "Bad KUBE_USER format."
+    exit 1
+  fi
+fi
+
 config-ip-firewall
 create-dirs
 ensure-local-ssds
