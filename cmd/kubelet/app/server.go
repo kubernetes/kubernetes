@@ -304,6 +304,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		MakeIPTablesUtilChains: s.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:  int(s.IPTablesMasqueradeBit),
 		iptablesDropBit:        int(s.IPTablesDropBit),
+		EnableTracing:          s.EnableTracing,
 	}, nil
 }
 
@@ -966,6 +967,7 @@ type KubeletConfig struct {
 	MakeIPTablesUtilChains     bool
 	iptablesMasqueradeBit      int
 	iptablesDropBit            int
+	EnableTracing              bool
 }
 
 func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.PodConfig, err error) {
@@ -1069,6 +1071,7 @@ func CreateAndInitKubelet(kc *KubeletConfig) (k KubeletBootstrap, pc *config.Pod
 		kc.MakeIPTablesUtilChains,
 		kc.iptablesMasqueradeBit,
 		kc.iptablesDropBit,
+		kc.EnableTracing,
 	)
 
 	if err != nil {

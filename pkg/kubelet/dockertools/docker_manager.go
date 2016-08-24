@@ -49,6 +49,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
+	tracing "k8s.io/kubernetes/pkg/kubelet/metrics/tracing"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/hairpin"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -2225,6 +2226,9 @@ func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Po
 	if containerStatus != nil {
 		restartCount = containerStatus.RestartCount + 1
 	}
+
+	// Tracing probe
+	tracing.SetProbe(pod.UID, "container_syncPod")
 
 	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, podIP, restartCount)
 	if err != nil {

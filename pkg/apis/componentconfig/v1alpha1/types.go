@@ -474,4 +474,6 @@ type KubeletConfiguration struct {
 	// iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
 	// Values must be within the range [0, 31]. Must be different from other mark bits.
 	IPTablesDropBit *int32 `json:"iptablesDropBit"`
+	// enableTracing enables tracing of kubelet operations. It activates lightweight tracing probes inside kubelet.
+	EnableTracing bool `json:"enableTracing"`
 }
