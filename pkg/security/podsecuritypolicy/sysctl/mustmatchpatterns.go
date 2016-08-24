@@ -35,7 +35,7 @@ var (
 	defaultSysctlsPatterns = []string{"*"}
 )
 
-// NewMustMatchPattrens creates a new mustMatchPattern strategy that will provide validation.
+// NewMustMatchPatterns creates a new mustMatchPattern strategy that will provide validation.
 // Passing nil means the default pattern, passing an empty list means to disallow all sysctls.
 func NewMustMatchPatterns(patterns []string) (SysctlsStrategy, error) {
 	if patterns == nil {
@@ -50,18 +50,19 @@ func NewMustMatchPatterns(patterns []string) (SysctlsStrategy, error) {
 func (s *mustMatchPatterns) Validate(pod *api.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
 
-	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(api.SysctlsPodAnnotationKey)
+	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(api.UnsafeSysctlsPodAnnotationKey)
 
-	sysctls, err := api.SysctlsFromPodAnnotation(pod.Annotations[api.SysctlsPodAnnotationKey])
+	sysctlAnn := pod.Annotations[api.UnsafeSysctlsPodAnnotationKey]
+	unsafeSysctls, err := api.SysctlsFromPodAnnotation(sysctlAnn)
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fieldPath, pod.Annotations[api.SysctlsPodAnnotationKey], err.Error()))
+		allErrs = append(allErrs, field.Invalid(fieldPath, sysctlAnn, err.Error()))
 	}
 
-	if len(sysctls) > 0 {
-		if s.patterns == nil {
-			allErrs = append(allErrs, field.Invalid(fieldPath, pod.Annotations[api.SysctlsPodAnnotationKey], "Sysctls are not allowed to be used"))
+	if len(unsafeSysctls) > 0 {
+		if len(s.patterns) == 0 {
+			allErrs = append(allErrs, field.Invalid(fieldPath, sysctlAnn, "unsafe sysctls are not allowed"))
 		} else {
-			for i, sysctl := range sysctls {
+			for i, sysctl := range unsafeSysctls {
 				allErrs = append(allErrs, s.ValidateSysctl(sysctl.Name, fieldPath.Index(i))...)
 			}
 		}
@@ -81,5 +82,5 @@ func (s *mustMatchPatterns) ValidateSysctl(sysctlName string, fldPath *field.Pat
 			return nil
 		}
 	}
-	return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf("Sysctl %q is not allowed", sysctlName))}
+	return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf("unsafe sysctl %q is not allowed", sysctlName))}
 }

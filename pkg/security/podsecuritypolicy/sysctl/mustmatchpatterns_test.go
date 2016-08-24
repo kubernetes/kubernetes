@@ -77,14 +77,14 @@ func TestValidate(t *testing.T) {
 				Value: "dummy",
 			})
 		}
-		pod.Annotations = map[string]string{api.SysctlsPodAnnotationKey: api.PodAnnotationsFromSysctls(sysctls)}
+		pod.Annotations = map[string]string{api.UnsafeSysctlsPodAnnotationKey: api.PodAnnotationsFromSysctls(sysctls)}
 		errs = strategy.Validate(pod)
 		if len(errs) != 0 {
 			t.Errorf("%s: unexpected validaton errors: %v", k, errs)
 		}
 
 		for _, s := range v.disallowed {
-			pod.Annotations = map[string]string{api.SysctlsPodAnnotationKey: api.PodAnnotationsFromSysctls([]api.Sysctl{{s, "dummy"}})}
+			pod.Annotations = map[string]string{api.UnsafeSysctlsPodAnnotationKey: api.PodAnnotationsFromSysctls([]api.Sysctl{{s, "dummy"}})}
 			errs = strategy.Validate(pod)
 			if len(errs) == 0 {
 				t.Errorf("%s: expected error for sysctl %q", k, s)

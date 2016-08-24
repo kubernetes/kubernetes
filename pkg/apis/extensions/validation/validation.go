@@ -588,13 +588,13 @@ func ValidatePodSecurityPolicySpecificAnnotations(annotations map[string]string,
 		}
 	}
 
-	sysctlAnn := annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey]
-	sysctlFldPath := fldPath.Key(extensions.SysctlsPodSecurityPolicyAnnotationKey)
-	sysctls, err := extensions.SysctlsFromPodSecurityPolicyAnnotation(sysctlAnn)
+	unsafeSysctlAnn := annotations[extensions.UnsafeSysctlsPodSecurityPolicyAnnotationKey]
+	unsafeSysctlFldPath := fldPath.Key(extensions.UnsafeSysctlsPodSecurityPolicyAnnotationKey)
+	unsafeSysctls, err := extensions.SysctlsFromPodSecurityPolicyAnnotation(unsafeSysctlAnn)
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(sysctlFldPath, sysctlAnn, err.Error()))
+		allErrs = append(allErrs, field.Invalid(unsafeSysctlFldPath, unsafeSysctlAnn, err.Error()))
 	} else {
-		allErrs = append(allErrs, validatePodSecurityPolicySysctls(sysctlFldPath, sysctls)...)
+		allErrs = append(allErrs, validatePodSecurityPolicyUnsafeSysctls(unsafeSysctlFldPath, unsafeSysctls)...)
 	}
 
 	return allErrs
@@ -698,7 +698,7 @@ func IsValidSysctlPattern(name string) bool {
 }
 
 // validatePodSecurityPolicySysctls validates the sysctls fields of PodSecurityPolicy.
-func validatePodSecurityPolicySysctls(fldPath *field.Path, sysctls []string) field.ErrorList {
+func validatePodSecurityPolicyUnsafeSysctls(fldPath *field.Path, sysctls []string) field.ErrorList {
 	allErrs := field.ErrorList{}
 	for i, s := range sysctls {
 		if !IsValidSysctlPattern(string(s)) {
