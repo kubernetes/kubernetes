@@ -128,32 +128,19 @@ function install-kube-binary-config {
     cp -r "${KUBE_HOME}/kubernetes/addons" "${dst_dir}"
   fi
   local -r kube_bin="${KUBE_HOME}/bin"
-  # If the built-in binary version is different from the expected version, we use
-  # the downloaded binary. The simplest implementation is to always use the downloaded
-  # binary without checking the version. But we have another version guardian in GKE.
-  # So, we compare the versions to ensure this run-time binary replacement is only
-  # applied for OSS kubernetes.
-  cp "${src_dir}/kubelet" "${kube_bin}"
-  local -r builtin_version="$(/usr/bin/kubelet --version=true | cut -f2 -d " ")"
-  local -r required_version="$(/home/kubernetes/bin/kubelet --version=true | cut -f2 -d " ")"
-  if [[ "${TEST_CLUSTER:-}" == "true" ]] || \
-     [[ "${builtin_version}" != "${required_version}" ]]; then
-    cp "${src_dir}/kubectl" "${kube_bin}"
-    chmod 755 "${kube_bin}/kubelet"
-    chmod 755 "${kube_bin}/kubectl"
-    mount --bind "${kube_bin}/kubelet" /usr/bin/kubelet
-    mount --bind "${kube_bin}/kubectl" /usr/bin/kubectl
-  else
-    rm -f "${kube_bin}/kubelet"
-  fi
+  mv "${src_dir}/kubelet" "${kube_bin}"
+  mv "${src_dir}/kubectl" "${kube_bin}"
+
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
     local -r cni_tar="cni-26b61728ac940c3faf827927782326e921be17b0.tar.gz"
     download-or-bust "" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
-    tar xzf "${KUBE_HOME}/${cni_tar}" -C "${kube_bin}" --overwrite
-    mv "${kube_bin}/bin"/* "${kube_bin}"
-    rmdir "${kube_bin}/bin"
+    local -r cni_dir="${KUBE_HOME}/cni"
+    mkdir -p "${cni_dir}"
+    tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}" --overwrite
+    mv "${cni_dir}/bin"/* "${kube_bin}"
+    rmdir "${cni_dir}/bin"
     rm -f "${KUBE_HOME}/${cni_tar}"
   fi
 
@@ -186,8 +173,7 @@ function install-kube-binary-config {
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_HOME}/bin/configure-helper.sh"
   cp "${dst_dir}/kubernetes/gci-trusty/health-monitor.sh" "${KUBE_HOME}/bin/health-monitor.sh"
-  chmod 544 "${KUBE_HOME}/bin/configure-helper.sh"
-  chmod 544 "${KUBE_HOME}/bin/health-monitor.sh"
+  chmod -R 755 "${kube_bin}"
 
   # Clean up.
   rm -rf "${KUBE_HOME}/kubernetes"
