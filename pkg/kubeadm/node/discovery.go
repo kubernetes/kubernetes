@@ -20,7 +20,7 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 		return nil, err
 	}
 
-	host, port := apiServerURL.Host, 8081
+	host, port := strings.Split(apiServerURL.Host, ":")[0], 8081
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/api/v1alpha1/testclusterinfo", host, port), nil)
 	if err != nil {
