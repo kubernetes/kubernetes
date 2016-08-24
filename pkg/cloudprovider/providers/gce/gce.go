@@ -547,6 +547,14 @@ func isHTTPErrorCode(err error, code int) bool {
 	return ok && apiErr.Code == code
 }
 
+func nodeNames(nodes []*api.Node) []string {
+	ret := make([]string, len(nodes))
+	for i, node := range nodes {
+		ret[i] = node.Name
+	}
+	return ret
+}
+
 // EnsureLoadBalancer is an implementation of LoadBalancer.EnsureLoadBalancer.
 // Our load balancers in GCE consist of four separate GCE resources - a static
 // IP address, a firewall rule, a target pool, and a forwarding rule. This
@@ -554,11 +562,12 @@ func isHTTPErrorCode(err error, code int) bool {
 // Due to an interesting series of design decisions, this handles both creating
 // new load balancers and updating existing load balancers, recognizing when
 // each is needed.
-func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, hostNames []string) (*api.LoadBalancerStatus, error) {
-	if len(hostNames) == 0 {
+func (gce *GCECloud) EnsureLoadBalancer(clusterName string, apiService *api.Service, nodes []*api.Node) (*api.LoadBalancerStatus, error) {
+	if len(nodes) == 0 {
 		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
 	}
 
+	hostNames := nodeNames(nodes)
 	hosts, err := gce.getInstancesByNames(hostNames)
 	if err != nil {
 		return nil, err
@@ -1324,8 +1333,8 @@ func (gce *GCECloud) ensureStaticIP(name, serviceName, region, existingIP string
 }
 
 // UpdateLoadBalancer is an implementation of LoadBalancer.UpdateLoadBalancer.
-func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *api.Service, hostNames []string) error {
-	hosts, err := gce.getInstancesByNames(hostNames)
+func (gce *GCECloud) UpdateLoadBalancer(clusterName string, service *api.Service, nodes []*api.Node) error {
+	hosts, err := gce.getInstancesByNames(nodeNames(nodes))
 	if err != nil {
 		return err
 	}
