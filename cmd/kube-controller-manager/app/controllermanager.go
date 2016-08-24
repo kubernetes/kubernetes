@@ -459,6 +459,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 	snapshotController, snapshotControllerErr :=
 		snapshot.NewSnapshotController(
 			clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "snapshot-controller")),
+			recorder,
 			sharedInformers.PersistentVolumeClaims().Informer(),
 			sharedInformers.PersistentVolumes().Informer(),
 			cloud,
