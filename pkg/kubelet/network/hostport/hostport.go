@@ -42,11 +42,11 @@ const (
 )
 
 type HostportHandler interface {
-	OpenPodHostportsAndSync(newPod *RunningPod, natInterfaceName string, runningPods []*RunningPod) error
-	SyncHostports(natInterfaceName string, runningPods []*RunningPod) error
+	OpenPodHostportsAndSync(newPod *ActivePod, natInterfaceName string, activePods []*ActivePod) error
+	SyncHostports(natInterfaceName string, activePods []*ActivePod) error
 }
 
-type RunningPod struct {
+type ActivePod struct {
 	Pod *api.Pod
 	IP  net.IP
 }
@@ -131,9 +131,9 @@ func (h *handler) openHostports(pod *api.Pod) error {
 // gatherAllHostports returns all hostports that should be presented on node,
 // given the list of pods running on that node and ignoring host network
 // pods (which don't need hostport <-> container port mapping).
-func gatherAllHostports(runningPods []*RunningPod) (map[api.ContainerPort]targetPod, error) {
+func gatherAllHostports(activePods []*ActivePod) (map[api.ContainerPort]targetPod, error) {
 	podHostportMap := make(map[api.ContainerPort]targetPod)
-	for _, r := range runningPods {
+	for _, r := range activePods {
 		if r.IP.To4() == nil {
 			return nil, fmt.Errorf("Invalid or missing pod %s IP", kubecontainer.GetPodFullName(r.Pod))
 		}
@@ -171,36 +171,37 @@ func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Ch
 }
 
 // OpenPodHostportsAndSync opens hostports for a new pod, gathers all hostports on
-// node, sets up iptables rules enable them. And finally clean up stale hostports
-func (h *handler) OpenPodHostportsAndSync(newPod *RunningPod, natInterfaceName string, runningPods []*RunningPod) error {
+// node, sets up iptables rules enable them. And finally clean up stale hostports.
+// 'newPod' must also be present in 'activePods'.
+func (h *handler) OpenPodHostportsAndSync(newPod *ActivePod, natInterfaceName string, activePods []*ActivePod) error {
 	// try to open pod host port if specified
 	if err := h.openHostports(newPod.Pod); err != nil {
 		return err
 	}
 
-	// Add the new pod to running pods if it's not running already (e.g. in rkt's case).
+	// Add the new pod to active pods if it's not present.
 	var found bool
-	for _, p := range runningPods {
+	for _, p := range activePods {
 		if p.Pod.UID == newPod.Pod.UID {
 			found = true
 			break
 		}
 	}
 	if !found {
-		runningPods = append(runningPods, newPod)
+		activePods = append(activePods, newPod)
 	}
 
-	return h.SyncHostports(natInterfaceName, runningPods)
+	return h.SyncHostports(natInterfaceName, activePods)
 }
 
 // SyncHostports gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
-func (h *handler) SyncHostports(natInterfaceName string, runningPods []*RunningPod) error {
+func (h *handler) SyncHostports(natInterfaceName string, activePods []*ActivePod) error {
 	start := time.Now()
 	defer func() {
 		glog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
 	}()
 
-	containerPortMap, err := gatherAllHostports(runningPods)
+	containerPortMap, err := gatherAllHostports(activePods)
 	if err != nil {
 		return err
 	}
