@@ -92,23 +92,6 @@ func CreateTestArchive() (string, error) {
 		return "", fmt.Errorf("failed to locate kubernetes build output directory %v", err)
 	}
 
-	ginkgoTest := filepath.Join(buildOutputDir, "e2e_node.test")
-	if _, err := os.Stat(ginkgoTest); err != nil {
-		return "", fmt.Errorf("failed to locate test binary %s", ginkgoTest)
-	}
-	kubelet := filepath.Join(buildOutputDir, "kubelet")
-	if _, err := os.Stat(kubelet); err != nil {
-		return "", fmt.Errorf("failed to locate binary %s", kubelet)
-	}
-	apiserver := filepath.Join(buildOutputDir, "kube-apiserver")
-	if _, err := os.Stat(apiserver); err != nil {
-		return "", fmt.Errorf("failed to locate binary %s", apiserver)
-	}
-	ginkgo := filepath.Join(buildOutputDir, "ginkgo")
-	if _, err := os.Stat(apiserver); err != nil {
-		return "", fmt.Errorf("failed to locate binary %s", ginkgo)
-	}
-
 	glog.Infof("Building archive...")
 	tardir, err := ioutil.TempDir("", "node-e2e-archive")
 	if err != nil {
@@ -117,25 +100,20 @@ func CreateTestArchive() (string, error) {
 	defer os.RemoveAll(tardir)
 
 	// Copy binaries
-	out, err := exec.Command("cp", ginkgoTest, filepath.Join(tardir, "e2e_node.test")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy e2e_node.test %v.", err)
-	}
-	out, err = exec.Command("cp", kubelet, filepath.Join(tardir, "kubelet")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy kubelet %v.", err)
-	}
-	out, err = exec.Command("cp", apiserver, filepath.Join(tardir, "kube-apiserver")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy kube-apiserver %v.", err)
-	}
-	out, err = exec.Command("cp", ginkgo, filepath.Join(tardir, "ginkgo")).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("failed to copy ginkgo %v.", err)
+	requiredBins := []string{"kubelet", "e2e_node.test", "ginkgo"}
+	for _, bin := range requiredBins {
+		source := filepath.Join(buildOutputDir, bin)
+		if _, err := os.Stat(source); err != nil {
+			return "", fmt.Errorf("failed to locate test binary %s: %v", bin, err)
+		}
+		out, err := exec.Command("cp", source, filepath.Join(tardir, bin)).CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("failed to copy %q: %v Output: %q", bin, err, out)
+		}
 	}
 
 	// Build the tar
-	out, err = exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
+	out, err := exec.Command("tar", "-zcvf", archiveName, "-C", tardir, ".").CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("failed to build tar %v.  Output:\n%s", err, out)
 	}
