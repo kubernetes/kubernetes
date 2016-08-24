@@ -157,6 +157,7 @@ type FakeVolumePlugin struct {
 	NewAttacherCallCount    int
 	NewDetacherCallCount    int
 	CreateSnapshotCallCount int
+	SnapshotNames           map[string]bool
 
 	Mounters   []*FakeVolume
 	Unmounters []*FakeVolume
@@ -278,6 +279,7 @@ func (plugin *FakeVolumePlugin) CreateSnapshot(spec *Spec, snapshotName string) 
 	plugin.Lock()
 	defer plugin.Unlock()
 	plugin.CreateSnapshotCallCount = plugin.CreateSnapshotCallCount + 1
+	plugin.SnapshotNames[snapshotName] = true
 	return "snapshot-timestamp", nil
 }
 
@@ -285,6 +287,13 @@ func (plugin *FakeVolumePlugin) GetCreateSnapshotCallCount() int {
 	plugin.RLock()
 	defer plugin.RUnlock()
 	return plugin.CreateSnapshotCallCount
+}
+
+func (plugin *FakeVolumePlugin) SnapshotExists(snapshotName string) (bool, error) {
+	plugin.RLock()
+	defer plugin.RUnlock()
+	_, exists := plugin.SnapshotNames[snapshotName]
+	return exists, nil
 }
 
 func (plugin *FakeVolumePlugin) NewRecycler(pvName string, spec *Spec) (Recycler, error) {
