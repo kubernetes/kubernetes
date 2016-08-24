@@ -36,3 +36,43 @@ func TestSelectableFieldLabelConversions(t *testing.T) {
 		nil,
 	)
 }
+
+func newEndpoint(nodeName string) *api.Endpoints {
+	ep := &api.Endpoints{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			Namespace:       api.NamespaceDefault,
+			ResourceVersion: "1",
+		},
+		Subsets: []api.EndpointSubset{
+			{
+				NotReadyAddresses: []api.EndpointAddress{},
+				Ports:             []api.EndpointPort{{Name: "https", Port: 443, Protocol: "TCP"}},
+				Addresses: []api.EndpointAddress{
+					{
+						IP:       "8.8.8.8",
+						Hostname: "zookeeper1",
+						NodeName: &nodeName}}}}}
+	return ep
+}
+
+func TestEndpointAddressNodeNameUpdateRestrictions(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	oldEndpoint := newEndpoint("kubernetes-minion-setup-by-backend")
+	updatedEndpoint := newEndpoint("kubernetes-changed-nodename")
+	// Check that NodeName cannot be changed during update (if already set)
+	errList := Strategy.ValidateUpdate(ctx, updatedEndpoint, oldEndpoint)
+	if len(errList) == 0 {
+		t.Error("Endpoint should not allow changing of Subset.Addresses.NodeName on update")
+	}
+}
+
+func TestEndpointAddressNodeNameInvalidDNS1123(t *testing.T) {
+	ctx := api.NewDefaultContext()
+	// Check NodeName DNS validation
+	endpoint := newEndpoint("illegal.nodename")
+	errList := Strategy.Validate(ctx, endpoint)
+	if len(errList) == 0 {
+		t.Error("Endpoint should reject invalid NodeName")
+	}
+}
