@@ -48,6 +48,10 @@ STAGE_KUBEMARK="KUBEMARK"
 : ${KUBE_GCS_RELEASE_BUCKET:="kubernetes-release"}
 : ${KUBE_GCS_DEV_RELEASE_BUCKET:="kubernetes-release-dev"}
 
+# Explicitly set config path so staging gcloud (if installed_ uses the same path
+# as release
+export CLOUDSDK_CONFIG="${WORKSPACE}/.config/gcloud"
+
 # record_command runs the command and records its output/error messages in junit format
 # it expects the first argument to be the class and the second to be the name of the command
 # Example:
@@ -228,8 +232,6 @@ if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
     mv ~/$(basename "${CLOUDSDK_BUCKET}") ~/repo
     export CLOUDSDK_COMPONENT_MANAGER_SNAPSHOT_URL=file://${HOME}/repo/components-2.json
     install_google_cloud_sdk_tarball ~/repo/google-cloud-sdk.tar.gz ~/cloudsdk
-    # TODO: is this necessary? this won't work inside Docker currently.
-    export CLOUDSDK_CONFIG=/var/lib/jenkins/.config/gcloud
 fi
 
 # GCI specific settings.
