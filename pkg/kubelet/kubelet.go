@@ -604,7 +604,10 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, err
 	}
-	unsafeWhitelist, err := sysctl.NewWhitelist(allowedUnsafeSysctls, api.UnsafeSysctlsPodAnnotationKey)
+	// Safe, whitelisted sysctls can always be used as unsafe sysctls in the spec
+	// Hence, we concatenate those two lists.
+	safeAndUnsafeSysctls := append(sysctl.SafeSysctlWhitelist(), allowedUnsafeSysctls...)
+	unsafeWhitelist, err := sysctl.NewWhitelist(safeAndUnsafeSysctls, api.UnsafeSysctlsPodAnnotationKey)
 	if err != nil {
 		return nil, err
 	}
