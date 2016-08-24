@@ -125,10 +125,10 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 
 			By("waiting for Ingress to come up with ip: " + ip)
 			httpClient := buildInsecureClient(reqTimeout)
-			ExpectNoError(jig.pollURL(fmt.Sprintf("https://%v/", ip), "", lbPollTimeout, httpClient, false))
+			ExpectNoError(pollURL(fmt.Sprintf("https://%v/", ip), "", lbPollTimeout, httpClient, false))
 
 			By("should reject HTTP traffic")
-			ExpectNoError(jig.pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, httpClient, true))
+			ExpectNoError(pollURL(fmt.Sprintf("http://%v/", ip), "", lbPollTimeout, httpClient, true))
 
 			// TODO: uncomment the restart test once we have a way to synchronize
 			// and know that the controller has resumed watching. If we delete
