@@ -61,6 +61,9 @@ func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Comman
 				}
 			}
 
+			if err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"]); err != nil {
+				return err
+			}
 			// TODO: move Jose server into a separate command or static pod or whatever
 			kubemaster.NewDiscoveryEndpoint(params, string(tlsutil.EncodeCertificatePEM(caCert)))
 
