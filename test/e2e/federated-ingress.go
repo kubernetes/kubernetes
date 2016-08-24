@@ -18,11 +18,11 @@ package e2e
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"reflect"
 	"strconv"
 	"time"
-	"net/http"
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
@@ -82,7 +82,7 @@ var _ = framework.KubeDescribe("Federation ingresses [Feature:Federation]", func
 		var (
 			clusters                               map[string]*cluster // All clusters, keyed by cluster name
 			primaryClusterName, federationName, ns string
-			jig              *federationTestJig
+			jig                                    *federationTestJig
 		)
 
 		// register clusters in federation apiserver
@@ -357,7 +357,7 @@ type federationTestJig struct {
 	rootCAs map[string][]byte
 	address string
 	ing     *v1beta1.Ingress
-	client *federation_release_1_4.Clientset
+	client  *federation_release_1_4.Clientset
 }
 
 func newFederationTestJig(c *federation_release_1_4.Clientset) *federationTestJig {
