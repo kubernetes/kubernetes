@@ -257,6 +257,16 @@ function load-or-gen-kube-basicauth() {
   if [[ -z "${KUBE_USER:-}" || -z "${KUBE_PASSWORD:-}" ]]; then
     gen-kube-basicauth
   fi
+
+  # Make sure they don't contain any funny characters.
+  if ! [[ "${KUBE_USER}" =~ ^[-._@a-zA-Z0-9]+$ ]]; then
+    echo "Bad KUBE_USER string."
+    exit 1
+  fi
+  if ! [[ "${KUBE_PASSWORD}" =~ ^[-._@#%/a-zA-Z0-9]+$ ]]; then
+    echo "Bad KUBE_PASSWORD string."
+    exit 1
+  fi
 }
 
 function load-or-gen-kube-bearertoken() {
