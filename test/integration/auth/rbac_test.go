@@ -303,7 +303,7 @@ func TestRBAC(t *testing.T) {
 						Subjects: []v1alpha1.Subject{
 							{Kind: "User", Name: "pod-reader"},
 						},
-						RoleRef: v1.ObjectReference{Kind: "ClusterRole", Name: "read-pods"},
+						RoleRef: v1alpha1.RoleRef{Kind: "ClusterRole", Name: "read-pods"},
 					},
 				},
 			},
@@ -335,14 +335,14 @@ func TestRBAC(t *testing.T) {
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "write-jobs"},
 						Subjects:   []v1alpha1.Subject{{Kind: "User", Name: "job-writer"}},
-						RoleRef:    v1.ObjectReference{Kind: "ClusterRole", Name: "write-jobs"},
+						RoleRef:    v1alpha1.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 				},
 				roleBindings: []v1alpha1.RoleBinding{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "write-jobs", Namespace: "job-namespace"},
 						Subjects:   []v1alpha1.Subject{{Kind: "User", Name: "job-writer-namespace"}},
-						RoleRef:    v1.ObjectReference{Kind: "ClusterRole", Name: "write-jobs"},
+						RoleRef:    v1alpha1.RoleRef{Kind: "ClusterRole", Name: "write-jobs"},
 					},
 				},
 			},

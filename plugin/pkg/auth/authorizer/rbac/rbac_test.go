@@ -53,9 +53,10 @@ const (
 func newClusterRoleBinding(roleName string, subjects ...string) rbac.ClusterRoleBinding {
 	r := rbac.ClusterRoleBinding{
 		ObjectMeta: api.ObjectMeta{},
-		RoleRef: api.ObjectReference{
-			Kind: "ClusterRole", // ClusterRoleBindings can only refer to ClusterRole
-			Name: roleName,
+		RoleRef: rbac.RoleRef{
+			APIGroup: rbac.GroupName,
+			Kind:     "ClusterRole", // ClusterRoleBindings can only refer to ClusterRole
+			Name:     roleName,
 		},
 	}
 
@@ -72,9 +73,9 @@ func newRoleBinding(namespace, roleName string, bindType uint16, subjects ...str
 
 	switch bindType {
 	case bindToRole:
-		r.RoleRef = api.ObjectReference{Kind: "Role", Namespace: namespace, Name: roleName}
+		r.RoleRef = rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: roleName}
 	case bindToClusterRole:
-		r.RoleRef = api.ObjectReference{Kind: "ClusterRole", Name: roleName}
+		r.RoleRef = rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: roleName}
 	}
 
 	r.Subjects = make([]rbac.Subject, len(subjects))

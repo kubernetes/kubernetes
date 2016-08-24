@@ -32,7 +32,7 @@ import (
 type AuthorizationRuleResolver interface {
 	// GetRoleReferenceRules attempts to resolve the role reference of a RoleBinding or ClusterRoleBinding.  The passed namespace should be the namepsace
 	// of the role binding, the empty string if a cluster role binding.
-	GetRoleReferenceRules(ctx api.Context, roleRef api.ObjectReference, namespace string) ([]rbac.PolicyRule, error)
+	GetRoleReferenceRules(ctx api.Context, roleRef rbac.RoleRef, namespace string) ([]rbac.PolicyRule, error)
 
 	// GetEffectivePolicyRules returns the list of rules that apply to a given user in a given namespace and error.  If an error is returned, the slice of
 	// PolicyRules may not be complete, but it contains all retrievable rules.  This is done because policy rules are purely additive and policy determinations
@@ -101,31 +101,24 @@ type ClusterRoleBindingLister interface {
 }
 
 // GetRoleReferenceRules attempts resolve the RoleBinding or ClusterRoleBinding.
-func (r *DefaultRuleResolver) GetRoleReferenceRules(ctx api.Context, roleRef api.ObjectReference, bindingNamespace string) ([]rbac.PolicyRule, error) {
-	switch roleRef.Kind {
-	case "Role":
-		// Roles can only be referenced by RoleBindings within the same namespace.
-		if len(bindingNamespace) == 0 {
-			return nil, fmt.Errorf("cluster role binding references role %q in namespace %q", roleRef.Name, roleRef.Namespace)
-		} else {
-			if bindingNamespace != roleRef.Namespace {
-				return nil, fmt.Errorf("role binding in namespace %q references role %q in namespace %q", bindingNamespace, roleRef.Name, roleRef.Namespace)
-			}
-		}
-
-		role, err := r.roleGetter.GetRole(api.WithNamespace(ctx, roleRef.Namespace), roleRef.Name)
+func (r *DefaultRuleResolver) GetRoleReferenceRules(ctx api.Context, roleRef rbac.RoleRef, bindingNamespace string) ([]rbac.PolicyRule, error) {
+	switch kind := rbac.RoleRefGroupKind(roleRef); kind {
+	case rbac.Kind("Role"):
+		role, err := r.roleGetter.GetRole(api.WithNamespace(ctx, bindingNamespace), roleRef.Name)
 		if err != nil {
 			return nil, err
 		}
 		return role.Rules, nil
-	case "ClusterRole":
+
+	case rbac.Kind("ClusterRole"):
 		clusterRole, err := r.clusterRoleGetter.GetClusterRole(api.WithNamespace(ctx, ""), roleRef.Name)
 		if err != nil {
 			return nil, err
 		}
 		return clusterRole.Rules, nil
+
 	default:
-		return nil, fmt.Errorf("unsupported role reference kind: %q", roleRef.Kind)
+		return nil, fmt.Errorf("unsupported role reference kind: %q", kind)
 	}
 }
 
