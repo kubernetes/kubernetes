@@ -558,3 +558,94 @@ func TestValidateRoleNoResources(t *testing.T) {
 		field:   "rules[0].resources",
 	}.test(t)
 }
+
+func TestValidateAddRoleRequest(t *testing.T) {
+	errs := ValidateAddRoleRequest(
+		&rbac.AddRoleRequest{
+			Spec: rbac.AddRoleRequestSpec{
+				RoleRef: api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
+				Subjects: []rbac.Subject{
+					{Name: "validsaname", Kind: rbac.ServiceAccountKind},
+					{Name: "valid@username", Kind: rbac.UserKind},
+					{Name: "valid@groupname", Kind: rbac.GroupKind},
+				},
+			},
+		},
+	)
+	if len(errs) != 0 {
+		t.Errorf("expected success: %v", errs)
+	}
+
+	errorCases := map[string]struct {
+		A rbac.AddRoleRequest
+		T field.ErrorType
+		F string
+	}{
+		"bad role ref": {
+			A: rbac.AddRoleRequest{
+				Spec: rbac.AddRoleRequestSpec{
+					RoleRef: api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Roleasdf", Name: "valid"},
+					Subjects: []rbac.Subject{
+						{Name: "validsaname", Kind: rbac.ServiceAccountKind},
+						{Name: "valid@username", Kind: rbac.UserKind},
+						{Name: "valid@groupname", Kind: rbac.GroupKind},
+					},
+				},
+			},
+			T: field.ErrorTypeNotSupported,
+			F: "spec.roleRef.kind",
+		},
+		"bad role ref 2": {
+			A: rbac.AddRoleRequest{
+				Spec: rbac.AddRoleRequestSpec{
+					RoleRef: api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid", FieldPath: "asdf"},
+					Subjects: []rbac.Subject{
+						{Name: "validsaname", Kind: rbac.ServiceAccountKind},
+						{Name: "valid@username", Kind: rbac.UserKind},
+						{Name: "valid@groupname", Kind: rbac.GroupKind},
+					},
+				},
+			},
+			T: field.ErrorTypeInvalid,
+			F: "spec.roleRef",
+		},
+		"missing subjects": {
+			A: rbac.AddRoleRequest{
+				Spec: rbac.AddRoleRequestSpec{
+					RoleRef: api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
+				},
+			},
+			T: field.ErrorTypeRequired,
+			F: "spec.subjects",
+		},
+		"bad subject": {
+			A: rbac.AddRoleRequest{
+				Spec: rbac.AddRoleRequestSpec{
+					RoleRef: api.ObjectReference{APIVersion: rbac.GroupName + "/", Kind: "Role", Name: "valid"},
+					Subjects: []rbac.Subject{
+						{Name: "validsaname", Kind: "other"},
+						{Name: "valid@username", Kind: rbac.UserKind},
+						{Name: "valid@groupname", Kind: rbac.GroupKind},
+					},
+				},
+			},
+			T: field.ErrorTypeNotSupported,
+			F: "spec.subjects[0].kind",
+		},
+	}
+	for k, v := range errorCases {
+		errs := ValidateAddRoleRequest(&v.A)
+		if len(errs) == 0 {
+			t.Errorf("expected failure %s for %v", k, v.A)
+			continue
+		}
+		for i := range errs {
+			if errs[i].Type != v.T {
+				t.Errorf("%s: expected errors to have type %s: %v", k, v.T, errs[i])
+			}
+			if errs[i].Field != v.F {
+				t.Errorf("%s: expected errors to have field %s: %v", k, v.F, errs[i])
+			}
+		}
+	}
+}

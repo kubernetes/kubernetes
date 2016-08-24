@@ -189,3 +189,31 @@ type ClusterRoleList struct {
 	// Items is a list of ClusterRoles
 	Items []ClusterRole
 }
+
+// +genclient=true
+// +noMethods=true
+
+// AddRoleRequest is a namespaced request to bind a Role or ClusterRole to a list of subjects
+type AddRoleRequest struct {
+	unversioned.TypeMeta
+	// Standard object's metadata.
+	api.ObjectMeta
+
+	Spec   AddRoleRequestSpec
+	Status AddRoleRequestStatus
+}
+
+// AddRoleRequestSpec indicates what the caller would like to bind
+type AddRoleRequestSpec struct {
+	// RoleRef is a reference to the Role or ClusterRole that you'd like to bind
+	RoleRef RoleRef
+
+	// Subjects are the subjects that you want to bind to the role
+	Subjects []Subject
+}
+
+// AddRoleRequestStatus indicates how the request was handled
+type AddRoleRequestStatus struct {
+	// RoleBindingRef is a reference to the RoleBinding that was used to satisfy the request
+	RoleBindingRef RoleRef
+}
