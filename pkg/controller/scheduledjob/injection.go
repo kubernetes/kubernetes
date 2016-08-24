@@ -40,7 +40,7 @@ type realSJControl struct {
 var _ sjControlInterface = &realSJControl{}
 
 func (c *realSJControl) UpdateStatus(sj *batch.ScheduledJob) error {
-	_, err := c.KubeClient.Batch().ScheduledJobs(sj.Namespace).UpdateStatus(sj)
+	sj, err := c.KubeClient.Batch().ScheduledJobs(sj.Namespace).UpdateStatus(sj)
 	return err
 }
 
