@@ -420,7 +420,8 @@ func Example_printReplicationControllerWithNamespace() {
 			},
 		},
 		Status: api.ReplicationControllerStatus{
-			Replicas: 1,
+			Replicas:      1,
+			ReadyReplicas: 1,
 		},
 	}
 	mapper, _ := f.Object(false)
@@ -429,8 +430,8 @@ func Example_printReplicationControllerWithNamespace() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAMESPACE   NAME      DESIRED   CURRENT   AGE
-	// beep        foo       1         1         10y
+	// NAMESPACE   NAME      DESIRED   CURRENT   READY     AGE
+	// beep        foo       1         1         1         10y
 }
 
 func Example_printMultiContainersReplicationControllerWithWide() {
@@ -481,8 +482,8 @@ func Example_printMultiContainersReplicationControllerWithWide() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      DESIRED   CURRENT   AGE       CONTAINER(S)   IMAGE(S)               SELECTOR
-	// foo       1         1         10y       foo,foo2       someimage,someimage2   foo=bar
+	// NAME      DESIRED   CURRENT   READY     AGE       CONTAINER(S)   IMAGE(S)               SELECTOR
+	// foo       1         1         0         10y       foo,foo2       someimage,someimage2   foo=bar
 }
 
 func Example_printReplicationController() {
@@ -532,8 +533,8 @@ func Example_printReplicationController() {
 		fmt.Printf("Unexpected error: %v", err)
 	}
 	// Output:
-	// NAME      DESIRED   CURRENT   AGE
-	// foo       1         1         10y
+	// NAME      DESIRED   CURRENT   READY     AGE
+	// foo       1         1         0         10y
 }
 
 func Example_printPodWithWideFormat() {

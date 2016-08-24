@@ -458,8 +458,8 @@ func (h *HumanReadablePrinter) FinishPrint(output io.Writer, res string) error {
 // pkg/kubectl/cmd/get.go to reflect the new resource type.
 var podColumns = []string{"NAME", "READY", "STATUS", "RESTARTS", "AGE"}
 var podTemplateColumns = []string{"TEMPLATE", "CONTAINER(S)", "IMAGE(S)", "PODLABELS"}
-var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
-var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "AGE"}
+var replicationControllerColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
+var replicaSetColumns = []string{"NAME", "DESIRED", "CURRENT", "READY", "AGE"}
 var jobColumns = []string{"NAME", "DESIRED", "SUCCESSFUL", "AGE"}
 var scheduledJobColumns = []string{"NAME", "SCHEDULE", "SUSPEND", "ACTIVE", "LAST-SCHEDULE"}
 var serviceColumns = []string{"NAME", "CLUSTER-IP", "EXTERNAL-IP", "PORT(S)", "AGE"}
@@ -834,10 +834,12 @@ func printReplicationController(controller *api.ReplicationController, w io.Writ
 
 	desiredReplicas := controller.Spec.Replicas
 	currentReplicas := controller.Status.Replicas
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
+	readyReplicas := controller.Status.ReadyReplicas
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s",
 		name,
 		desiredReplicas,
 		currentReplicas,
+		readyReplicas,
 		translateTimestamp(controller.CreationTimestamp),
 	); err != nil {
 		return err
@@ -884,10 +886,12 @@ func printReplicaSet(rs *extensions.ReplicaSet, w io.Writer, options PrintOption
 
 	desiredReplicas := rs.Spec.Replicas
 	currentReplicas := rs.Status.Replicas
-	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%s",
+	readyReplicas := rs.Status.ReadyReplicas
+	if _, err := fmt.Fprintf(w, "%s\t%d\t%d\t%d\t%s",
 		name,
 		desiredReplicas,
 		currentReplicas,
+		readyReplicas,
 		translateTimestamp(rs.CreationTimestamp),
 	); err != nil {
 		return err
