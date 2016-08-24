@@ -274,3 +274,33 @@ func TestGetPods(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
 }
+
+func TestGetPodContainerID(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{},
+		},
+	}
+	expectedPod := &kubecontainer.Pod{
+		ID:         kubetypes.UID("12345678"),
+		Name:       "foo",
+		Namespace:  "new",
+		Containers: []*kubecontainer.Container{},
+	}
+
+	// Set fake sandbox and fake containers to fakeRuntime.
+	sandbox, _, err := makeAndSetFakePod(m, fakeRuntime, pod)
+	assert.NoError(t, err)
+
+	actual, err := m.GetPodContainerID(expectedPod)
+	assert.NoError(t, err)
+	assert.Equal(t, sandbox.GetId(), actual.ID)
+}
