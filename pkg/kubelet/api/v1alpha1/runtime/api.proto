@@ -515,20 +515,24 @@ message Container {
     // The ID of the container, used by the container runtime to identify
     // a container.
     optional string id = 1;
+    // The id of the sandbox which this container belongs to.
+    optional string pod_sandbox_id = 2;
     // The metadata of the container.
-    optional ContainerMetadata metadata = 2;
+    optional ContainerMetadata metadata = 3;
      // The spec of the image
-    optional ImageSpec image = 3;
+    optional ImageSpec image = 4;
     // Reference to the image in use. For most runtimes, this should be an
     // image ID.
-    optional string image_ref = 4;
+    optional string image_ref = 5;
     // State is the state of the container.
-    optional ContainerState state = 5;
+    optional ContainerState state = 6;
+    // Creation time of the container.
+    optional int64 created_at = 7;
     // Labels are key value pairs that may be used to scope and select individual resources.
-    map<string, string> labels = 6;
+    map<string, string> labels = 8;
     // Annotations is an unstructured key value map that may be set by external
     // tools to store and retrieve arbitrary metadata.
-    map<string, string> annotations = 7;
+    map<string, string> annotations = 9;
 }
 
 message ListContainersResponse {
