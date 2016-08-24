@@ -17,18 +17,13 @@ limitations under the License.
 package e2e_node
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
-	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/test/e2e/framework"
 
 	. "github.com/onsi/ginkgo"
@@ -106,29 +101,8 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 			Eventually(func() bool {
 				glog.Infof("Waiting for available memory to decrease to a reasonable level before ending the test.")
 
-				summary := stats.Summary{}
-				client := &http.Client{}
-				req, err := http.NewRequest("GET", "http://localhost:10255/stats/summary", nil)
+				summary, err := getNodeSummary()
 				if err != nil {
-					glog.Warningf("Failed to build http request: %v", err)
-					return false
-				}
-				req.Header.Add("Accept", "application/json")
-				resp, err := client.Do(req)
-				if err != nil {
-					glog.Warningf("Failed to get /stats/summary: %v", err)
-					return false
-				}
-				contentsBytes, err := ioutil.ReadAll(resp.Body)
-				if err != nil {
-					glog.Warningf("Failed to read /stats/summary: %+v", resp)
-					return false
-				}
-				contents := string(contentsBytes)
-				decoder := json.NewDecoder(strings.NewReader(contents))
-				err = decoder.Decode(&summary)
-				if err != nil {
-					glog.Warningf("Failed to parse /stats/summary to go struct: %+v", resp)
 					return false
 				}
 				if summary.Node.Memory.AvailableBytes == nil {
