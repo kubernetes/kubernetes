@@ -200,6 +200,7 @@ func NewMainKubelet(
 	volumePlugins []volume.VolumePlugin,
 	networkPlugins []network.NetworkPlugin,
 	networkPluginName string,
+	networkPluginMTU int,
 	streamingConnectionIdleTimeout time.Duration,
 	recorder record.EventRecorder,
 	cadvisorInterface cadvisor.Interface,
@@ -399,7 +400,7 @@ func NewMainKubelet(
 	}
 	glog.Infof("Hairpin mode set to %q", klet.hairpinMode)
 
-	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR); err != nil {
+	if plug, err := network.InitNetworkPlugin(networkPlugins, networkPluginName, &networkHost{klet}, klet.hairpinMode, klet.nonMasqueradeCIDR, networkPluginMTU); err != nil {
 		return nil, err
 	} else {
 		klet.networkPlugin = plug
