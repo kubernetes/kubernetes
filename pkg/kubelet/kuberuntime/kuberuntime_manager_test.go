@@ -200,7 +200,7 @@ func TestGetPods(t *testing.T) {
 	}
 
 	// Set fake sandbox and fake containers to fakeRuntime.
-	_, fakeContainers, err := makeAndSetFakePod(m, fakeRuntime, pod)
+	fakeSandbox, fakeContainers, err := makeAndSetFakePod(m, fakeRuntime, pod)
 	assert.NoError(t, err)
 
 	// Convert the fakeContainers to kubecontainer.Container
@@ -220,12 +220,25 @@ func TestGetPods(t *testing.T) {
 		}
 		containers[i] = c
 	}
+	// Convert fakeSandbox to kubecontainer.Container
+	sandbox, err := m.sandboxToKubeContainer(&runtimeApi.PodSandbox{
+		Id:        fakeSandbox.Id,
+		Metadata:  fakeSandbox.Metadata,
+		State:     fakeSandbox.State,
+		CreatedAt: fakeSandbox.CreatedAt,
+		Labels:    fakeSandbox.Labels,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
 	expected := []*kubecontainer.Pod{
 		{
 			ID:         kubetypes.UID("12345678"),
 			Name:       "foo",
 			Namespace:  "new",
 			Containers: []*kubecontainer.Container{containers[0], containers[1]},
+			Sandboxes:  []*kubecontainer.Container{sandbox},
 		},
 	}
 
