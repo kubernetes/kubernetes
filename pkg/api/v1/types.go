@@ -280,6 +280,8 @@ type VolumeSource struct {
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
 	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,21,opt,name=quobyte"`
+	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -344,6 +346,8 @@ type PersistentVolumeSource struct {
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,14,opt,name=vsphereVolume"`
 	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,15,opt,name=quobyte"`
+	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
 }
 
 // +genclient=true
@@ -890,6 +894,30 @@ type VsphereVirtualDiskVolumeSource struct {
 	// Must be a filesystem type supported by the host operating system.
 	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
 	FSType string `json:"fsType,omitempty" protobuf:"bytes,2,opt,name=fsType"`
+}
+type AzureDataDiskCachingMode string
+
+const (
+	AzureDataDiskCachingNone      AzureDataDiskCachingMode = "None"
+	AzureDataDiskCachingReadOnly  AzureDataDiskCachingMode = "ReadOnly"
+	AzureDataDiskCachingReadWrite AzureDataDiskCachingMode = "ReadWrite"
+)
+
+// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
+type AzureDiskVolumeSource struct {
+	// The Name of the data disk in the blob storage
+	DiskName string `json:"diskName" protobuf:"bytes,1,opt,name=diskName"`
+	// The URI the data disk in the blob storage
+	DataDiskURI string `json:"diskURI" protobuf:"bytes,2,opt,name=diskURI"`
+	// Host Caching mode: None, Read Only, Read Write.
+	CachingMode *AzureDataDiskCachingMode `json:"cachingMode,omitempty" protobuf:"bytes,3,opt,name=cachingMode,casttype=AzureDataDiskCachingMode"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType *string `json:"fsType,omitempty" protobuf:"bytes,4,opt,name=fsType"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.
