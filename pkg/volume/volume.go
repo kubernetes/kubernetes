@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"runtime"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
@@ -214,15 +215,22 @@ func RenameDirectory(oldPath, newName string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	// os.Rename call fails on windows (https://github.com/golang/go/issues/14527)
 	// Replacing with copyFolder to the newPath and deleting the oldPath directory
-	// err = os.Rename(oldPath, newPath)
-	err = copyFolder(oldPath, newPath)
+	if runtime.GOOS == "windows" {
+		err = copyFolder(oldPath, newPath)
+		if err != nil {
+			return "", err
+		}
+		os.RemoveAll(oldPath)
+		return newPath, nil
+	}
 
+	err = os.Rename(oldPath, newPath)
 	if err != nil {
 		return "", err
 	}
-	os.RemoveAll(oldPath)
 	return newPath, nil
 }
 

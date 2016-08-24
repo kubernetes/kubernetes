@@ -25,6 +25,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -261,16 +262,18 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 		}
 	}
 
-	opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
-	if err != nil {
-		return nil, err
+	if runtime.GOOS != "windows" {
+		opts.Mounts, err = makeMounts(pod, kl.getPodDir(pod.UID), container, hostname, hostDomainName, podIP, volumes)
+		if err != nil {
+			return nil, err
+		}
 	}
 	opts.Envs, err = kl.makeEnvironmentVariables(pod, container, podIP)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(container.TerminationMessagePath) != 0 {
+	if len(container.TerminationMessagePath) != 0 && runtime.GOOS != "windows" {
 		p := kl.getPodContainerDir(pod.UID, container.Name)
 		if err := os.MkdirAll(p, 0750); err != nil {
 			glog.Errorf("Error on creating %q: %v", p, err)
