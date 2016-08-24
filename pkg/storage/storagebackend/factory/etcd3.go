@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func newETCD3Storage(c storagebackend.Config) (storage.Interface, error) {
+func newETCD3Storage(c storagebackend.Config) (storage.Interface, func(), error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile: c.CertFile,
 		KeyFile:  c.KeyFile,
@@ -34,7 +34,7 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, error) {
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	cfg := clientv3.Config{
@@ -43,8 +43,13 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, error) {
 	}
 	client, err := clientv3.New(cfg)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	etcd3.StartCompactor(context.Background(), client)
-	return etcd3.New(client, c.Codec, c.Prefix), nil
+	ctx, cancel := context.WithCancel(context.Background())
+	etcd3.StartCompactor(ctx, client)
+	destroyFunc := func() {
+		cancel()
+		client.Close()
+	}
+	return etcd3.New(client, c.Codec, c.Prefix), destroyFunc, nil
 }
