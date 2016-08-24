@@ -90,9 +90,18 @@ func (r *ItemExponentialFailureRateLimiter) When(item interface{}) time.Duration
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
+	exp := r.failures[item]
+
+	// The maximum exponent maxExp is chosen such that the 'calculated' value never
+	// exceeds MaxInt64.
+	maxExp := int(math.Log10(float64(math.MaxInt64)/float64(r.baseDelay.Nanoseconds())) - 1)
+	if exp > maxExp {
+		exp = maxExp
+	}
+
+	calculated := r.baseDelay * time.Duration(math.Pow10(exp))
 	r.failures[item] = r.failures[item] + 1
 
-	calculated := r.baseDelay * time.Duration(math.Pow10(r.failures[item]-1))
 	if calculated > r.maxDelay {
 		return r.maxDelay
 	}
