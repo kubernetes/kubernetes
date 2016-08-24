@@ -38,7 +38,7 @@ var readOnlySysFSError = errors.New("ReadOnlySysFS")
 
 func (realConntracker) SetMax(max int) error {
 	glog.Infof("Setting nf_conntrack_max to %d", max)
-	if err := sysctl.SetSysctl("net/netfilter/nf_conntrack_max", max); err != nil {
+	if err := sysctl.New().SetSysctl("net/netfilter/nf_conntrack_max", max); err != nil {
 		return err
 	}
 	// sysfs is expected to be mounted as 'rw'. However, it may be unexpectedly mounted as
@@ -60,7 +60,7 @@ func (realConntracker) SetMax(max int) error {
 
 func (realConntracker) SetTCPEstablishedTimeout(seconds int) error {
 	glog.Infof("Setting nf_conntrack_tcp_timeout_established to %d", seconds)
-	return sysctl.SetSysctl("net/netfilter/nf_conntrack_tcp_timeout_established", seconds)
+	return sysctl.New().SetSysctl("net/netfilter/nf_conntrack_tcp_timeout_established", seconds)
 }
 
 // isSysFSWritable checks /proc/mounts to see whether sysfs is 'rw' or not.

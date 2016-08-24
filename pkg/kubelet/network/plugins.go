@@ -52,7 +52,7 @@ const (
 type NetworkPlugin interface {
 	// Init initializes the plugin.  This will be called exactly once
 	// before any other methods are called.
-	Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error
+	Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error
 
 	// Called on various events like:
 	// NET_PLUGIN_EVENT_POD_CIDR_CHANGE
@@ -105,11 +105,11 @@ type Host interface {
 }
 
 // InitNetworkPlugin inits the plugin that matches networkPluginName. Plugins must have unique names.
-func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) (NetworkPlugin, error) {
+func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) (NetworkPlugin, error) {
 	if networkPluginName == "" {
 		// default to the no_op plugin
 		plug := &NoopNetworkPlugin{}
-		if err := plug.Init(host, hairpinMode, nonMasqueradeCIDR); err != nil {
+		if err := plug.Init(host, hairpinMode, nonMasqueradeCIDR, mtu); err != nil {
 			return nil, err
 		}
 		return plug, nil
@@ -134,7 +134,7 @@ func InitNetworkPlugin(plugins []NetworkPlugin, networkPluginName string, host H
 
 	chosenPlugin := pluginMap[networkPluginName]
 	if chosenPlugin != nil {
-		err := chosenPlugin.Init(host, hairpinMode, nonMasqueradeCIDR)
+		err := chosenPlugin.Init(host, hairpinMode, nonMasqueradeCIDR, mtu)
 		if err != nil {
 			allErrs = append(allErrs, fmt.Errorf("Network plugin %q failed init: %v", networkPluginName, err))
 		} else {
@@ -156,7 +156,7 @@ type NoopNetworkPlugin struct {
 
 const sysctlBridgeCallIptables = "net/bridge/bridge-nf-call-iptables"
 
-func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string) error {
+func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	// Set bridge-nf-call-iptables=1 to maintain compatibility with older
 	// kubernetes versions to ensure the iptables-based kube proxy functions
 	// correctly.  Other plugins are responsible for setting this correctly
@@ -166,7 +166,7 @@ func (plugin *NoopNetworkPlugin) Init(host Host, hairpinMode componentconfig.Hai
 	// Ensure the netfilter module is loaded on kernel >= 3.18; previously
 	// it was built-in.
 	utilexec.New().Command("modprobe", "br-netfilter").CombinedOutput()
-	if err := utilsysctl.SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
+	if err := utilsysctl.New().SetSysctl(sysctlBridgeCallIptables, 1); err != nil {
 		glog.Warningf("can't set sysctl %s: %v", sysctlBridgeCallIptables, err)
 	}
 

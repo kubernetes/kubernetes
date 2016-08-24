@@ -122,7 +122,7 @@ func (lkct LinuxKernelCompatTester) IsCompatible() error {
 	// Check for the required sysctls.  We don't care about the value, just
 	// that it exists.  If this Proxier is chosen, we'll initialize it as we
 	// need.
-	_, err := utilsysctl.GetSysctl(sysctlRouteLocalnet)
+	_, err := utilsysctl.New().GetSysctl(sysctlRouteLocalnet)
 	return err
 }
 
@@ -202,16 +202,16 @@ var _ proxy.ProxyProvider = &Proxier{}
 // An error will be returned if iptables fails to update or acquire the initial lock.
 // Once a proxier is created, it will keep iptables up to date in the background and
 // will not terminate if a particular iptables call fails.
-func NewProxier(ipt utiliptables.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string, nodeIP net.IP) (*Proxier, error) {
+func NewProxier(ipt utiliptables.Interface, sysctl utilsysctl.Interface, exec utilexec.Interface, syncPeriod time.Duration, masqueradeAll bool, masqueradeBit int, clusterCIDR string, hostname string, nodeIP net.IP) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
-	if err := utilsysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
+	if err := sysctl.SetSysctl(sysctlRouteLocalnet, 1); err != nil {
 		return nil, fmt.Errorf("can't set sysctl %s: %v", sysctlRouteLocalnet, err)
 	}
 
 	// Proxy needs br_netfilter and bridge-nf-call-iptables=1 when containers
 	// are connected to a Linux bridge (but not SDN bridges).  Until most
 	// plugins handle this, log when config is missing
-	if val, err := utilsysctl.GetSysctl(sysctlBridgeCallIptables); err == nil && val != 1 {
+	if val, err := sysctl.GetSysctl(sysctlBridgeCallIptables); err == nil && val != 1 {
 		glog.Infof("missing br-netfilter module or unset sysctl br-nf-call-iptables; proxy may not work as intended")
 	}
 
