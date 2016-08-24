@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	internalApi "k8s.io/kubernetes/pkg/kubelet/api"
+	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -296,11 +297,37 @@ func (m *kubeGenericRuntimeManager) GetPodStatus(uid kubetypes.UID, name, namesp
 
 // Returns the filesystem path of the pod's network namespace; if the
 // runtime does not handle namespace creation itself, or cannot return
-// the network namespace path, it should return an error.
-// TODO: Change ContainerID to a Pod ID since the namespace is shared
-// by all containers in the pod.
-func (m *kubeGenericRuntimeManager) GetNetNS(containerID kubecontainer.ContainerID) (string, error) {
-	return "", fmt.Errorf("not implemented")
+// the network namespace path, it returns an 'not supported' error.
+// TODO: Rename param name to sandboxID in kubecontainer.Runtime.GetNetNS().
+// TODO: Remove GetNetNS after networking is delegated to the container runtime.
+func (m *kubeGenericRuntimeManager) GetNetNS(sandboxID kubecontainer.ContainerID) (string, error) {
+	readyState := runtimeApi.PodSandBoxState_READY
+	filter := &runtimeApi.PodSandboxFilter{
+		State:         &readyState,
+		Id:            &sandboxID.ID,
+		LabelSelector: map[string]string{kubernetesManagedLabel: "true"},
+	}
+	sandboxes, err := m.runtimeService.ListPodSandbox(filter)
+	if err != nil {
+		glog.Errorf("ListPodSandbox with filter %q failed: %v", filter, err)
+		return "", err
+	}
+	if len(sandboxes) == 0 {
+		glog.Errorf("No sandbox is found with filter %q", filter)
+		return "", fmt.Errorf("Sandbox %q is not found", sandboxID)
+	}
+
+	sandboxStatus, err := m.runtimeService.PodSandboxStatus(sandboxes[0].GetId())
+	if err != nil {
+		glog.Errorf("PodSandboxStatus with id %q failed: %v", sandboxes[0].GetId(), err)
+		return "", err
+	}
+
+	if sandboxStatus.Linux != nil && sandboxStatus.Linux.Namespaces != nil {
+		return sandboxStatus.Linux.Namespaces.GetNetwork(), nil
+	}
+
+	return "", fmt.Errorf("not supported")
 }
 
 // GetPodContainerID gets pod sandbox ID

@@ -236,3 +236,36 @@ func TestGetPods(t *testing.T) {
 		t.Errorf("expected %#v, got %#v", expected, actual)
 	}
 }
+
+func TestGetNetNS(t *testing.T) {
+	fakeRuntime, _, m, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{
+					Name:  "foo1",
+					Image: "busybox",
+				},
+				{
+					Name:  "foo2",
+					Image: "busybox",
+				},
+			},
+		},
+	}
+
+	// Set fake sandbox and fake containers to fakeRuntime.
+	sandbox, _, err := makeAndSetFakePod(m, fakeRuntime, pod)
+	assert.NoError(t, err)
+
+	actual, err := m.GetNetNS(kubecontainer.ContainerID{ID: sandbox.GetId()})
+	assert.Equal(t, "", actual)
+	assert.Equal(t, "not supported", err.Error())
+}
