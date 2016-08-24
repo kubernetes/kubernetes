@@ -231,11 +231,20 @@ func (m *kubeGenericRuntimeManager) GetPods(all bool) ([]*kubecontainer.Pod, err
 	}
 	for _, s := range sandboxes {
 		podUID := kubetypes.UID(s.Metadata.GetUid())
-		pods[podUID] = &kubecontainer.Pod{
-			ID:        podUID,
-			Name:      s.Metadata.GetName(),
-			Namespace: s.Metadata.GetNamespace(),
+		if _, ok := pods[podUID]; !ok {
+			pods[podUID] = &kubecontainer.Pod{
+				ID:        podUID,
+				Name:      s.Metadata.GetName(),
+				Namespace: s.Metadata.GetNamespace(),
+			}
 		}
+		p := pods[podUID]
+		converted, err := m.sandboxToKubeContainer(s)
+		if err != nil {
+			glog.Warningf("Convert %q sandbox %v of pod %q failed: %v", m.runtimeName, s, podUID, err)
+			continue
+		}
+		p.Sandboxes = append(p.Sandboxes, converted)
 	}
 
 	containers, err := m.getKubeletContainers(all)
