@@ -11,7 +11,7 @@
     "containers": [
       {
         "name": "kube-addon-manager",
-        "image": "gcr.io/google-containers/kube-addon-manager-ARCH:v5.1",
+        "image": "REGISTRY/kube-addon-manager-ARCH:v5.1",
         "resources": {
           "requests": {
             "cpu": "5m",
@@ -21,7 +21,7 @@
         "volumeMounts": [
           {
             "name": "addons",
-            "mountPath": "/etc/kubernetes/",
+            "mountPath": "/etc/kubernetes/addons",
             "readOnly": true
           }
         ]
@@ -30,12 +30,13 @@
         "name": "kube-addon-manager-data",
         "image": "REGISTRY/hyperkube-ARCH:VERSION",
         "command": [
-          "/copy-addons.sh"
+          "/copy-addons.sh",
+          "singlenode"
         ],
         "volumeMounts": [
           {
             "name": "addons",
-            "mountPath": "/srv/kubernetes/",
+            "mountPath": "/srv/kubernetes/addons",
             "readOnly": false
           }
         ]
