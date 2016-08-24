@@ -264,9 +264,9 @@ function set_service_accounts {
 function start_apiserver {
     # Admission Controllers to invoke prior to persisting objects in cluster
     if [[ -z "${ALLOW_SECURITY_CONTEXT}" ]]; then
-      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota
+      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,SecurityContextDeny,ServiceAccount,ResourceQuota,DefaultStorageClass
     else
-      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
+      ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota,DefaultStorageClass
     fi
     # This is the default dir and filename where the apiserver will generate a self-signed cert
     # which should be able to be used as the CA to verify itself
