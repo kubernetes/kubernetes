@@ -110,7 +110,7 @@ type GCEImage struct {
 	PreviousImages int `json:"previous_images, omitempty"`
 
 	Machine string `json:"machine, omitempty"`
-	// The test is regarded as 'benchmark' is Tests is non-empty
+	// This test is for benchmark (no limit verification, more result log, node name has format 'machine-image-uuid') if 'Tests' is non-empty.
 	Tests []string `json:"tests, omitempty"`
 }
 
@@ -591,6 +591,8 @@ func imageToInstanceName(imageConfig *internalGCEImage) string {
 	if imageConfig.machine == "" {
 		return *instanceNamePrefix + "-" + imageConfig.image
 	}
+	// For benchmark test, node name has the format 'machine-image-uuid'.
+	// Node name is added to test data item labels and used for benchmark dashboard.
 	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.NewUUID().String()[:8]
 }
 
@@ -605,6 +607,7 @@ func machineType(machine string) string {
 	return fmt.Sprintf("zones/%s/machineTypes/%s", *zone, machine)
 }
 
+// testsToGinkgoFocus converts the test string list to Ginkgo focus
 func testsToGinkgoFocus(tests []string) string {
 	focus := "--focus=\""
 	for i, test := range tests {
