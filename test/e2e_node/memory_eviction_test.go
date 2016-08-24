@@ -101,8 +101,30 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 
 			}, 60*time.Minute, 5*time.Second).Should(Equal(true))
 
+			// Wait for the memory pressure condition to disappear from the node status before continuting.
+			Eventually(func() bool {
+				nodeList, err := f.Client.Nodes().List(api.ListOptions{})
+				if err != nil {
+					glog.Errorf("Tried to get node list but got error: %v", err)
+					return false
+				}
+				// Assuming that there is only one node, because this is a node e2e test.
+				if len(nodeList.Items) != 1 {
+					glog.Errorf("Expected 1 node, but see %d.", len(nodeList.Items))
+					return false
+				}
+				node := nodeList.Items[0]
+				for _, c := range node.Status.Conditions {
+					if c.Type == api.NodeMemoryPressure {
+						return false
+					}
+				}
+				return true
+			}, 5*time.Minute, 15*time.Second).Should(Equal(true))
+
+			// Still do this, just in case:j
 			// Wait for available memory to decrease to a reasonable level before ending the test.
-			// This prevents interference with tests that start immediately after this one.
+			// This helps prevent interference with tests that start immediately after this one.
 			Eventually(func() bool {
 				glog.Infof("Waiting for available memory to decrease to a reasonable level before ending the test.")
 
@@ -153,7 +175,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				}
 
 				return false
-			}, 5*time.Minute, 5*time.Second).Should(Equal(true))
+			}, 5*time.Minute, 15*time.Second).Should(Equal(true))
 
 		})
 	})
