@@ -164,12 +164,12 @@ executor-logv
 executor-path
 executor-suicide-timeout
 exit-on-lock-contention
+experimental-allowed-unsafe-sysctls
 experimental-bootstrap-kubeconfig
 experimental-flannel-overlay
 experimental-keystone-url
 experimental-nvidia-gpus
 experimental-prefix
-experimental-sysctl-whitelist
 external-hostname
 external-ip
 extra-peer-dirs
