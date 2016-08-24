@@ -19,11 +19,15 @@ spec:
     spec:
       hostNetwork: true
       containers:
+        # The Calico per-node agent.
         - name: calico-node
           image: quay.io/calico/node:v0.21.0
           env:
+            # Tell Calico the location of the etcd Service.
             - name: ETCD_ENDPOINTS
               value: "http://10.0.0.17:6666"
+            # Disable BGP and just use Calico for enforcing
+            # policy.
             - name: CALICO_NETWORKING
               value: "false"
           securityContext:
@@ -38,7 +42,38 @@ spec:
             - mountPath: /var/run/calico
               name: var-run-calico
               readOnly: false
+          # This container installs the Calico CNI binaries
+          # and CNI network config file on each node.
+          - name: install-cni
+            image: calico/cni:latest
+            imagePullPolicy: Always
+            command: ["/install-cni.sh"]
+            env:
+              - name: CNI_NETWORK_CONFIG
+                value: |-
+                  {
+                      "name": "k8s-pod-network",
+                      "type": "calico",
+                      "etcd_authority": "10.0.0.17:6666",
+                      "log_level": "info",
+                      "ipam": {
+                          "type": "host-local",
+                          "subnet": "usePodCidr"
+                      },
+                      "policy": {
+                          "type": "k8s"
+                      },
+                      "kubernetes": {
+                          "kubeconfig": "/var/lib/kubelet/kubeconfig"
+                      }
+                  }
+            volumeMounts:
+              - mountPath: /host/opt/cni/bin
+                name: cni-bin-dir
+              - mountPath: /host/etc/cni/net.d
+                name: cni-net-dir
       volumes:
+        # Used by calico/node.
         - name: lib-modules
           hostPath:
             path: /lib/modules
@@ -48,3 +83,10 @@ spec:
         - name: var-log-calico
           hostPath:
             path: /var/log/calico
+        # Used to install CNI.
+        - name: cni-bin-dir
+          hostPath:
+            path: /opt/cni/bin
+        - name: cni-net-dir
+          hostPath:
+            path: /etc/cni/net.d
