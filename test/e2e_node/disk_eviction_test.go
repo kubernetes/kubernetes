@@ -106,6 +106,12 @@ var _ = framework.KubeDescribe("Kubelet Eviction Manager [Serial] [Disruptive]",
 				nodeDiskPressureCondition := false
 				podRescheduleable := false
 				Eventually(func() error {
+					// Avoid the test using up all the disk space
+					err := checkDiskUsage(0.05)
+					if err != nil {
+						return err
+					}
+
 					// The pod should be evicted.
 					if !evictionOccurred {
 						podData, err := podClient.Get(busyPodName)
@@ -216,4 +222,30 @@ func recordContainerId(containersToCleanUp map[string]bool, containerStatuses []
 
 func evictionOptionIsSet() bool {
 	return len(framework.TestContext.EvictionHard) > 0
+}
+
+// checkDiskUsage verifies that the available bytes on disk are above the limit.
+func checkDiskUsage(limit float64) error {
+	summary, err := getNodeSummary()
+	if err != nil {
+		return err
+	}
+
+	if nodeFs := summary.Node.Fs; nodeFs != nil {
+		if nodeFs.AvailableBytes != nil && nodeFs.CapacityBytes != nil {
+			if float64(*nodeFs.CapacityBytes)*limit > float64(*nodeFs.AvailableBytes) {
+				return fmt.Errorf("available nodefs byte is less than %v%%", int(limit)*100)
+			}
+		}
+	}
+
+	if summary.Node.Runtime != nil {
+		if imageFs := summary.Node.Runtime.ImageFs; imageFs != nil {
+			if float64(*imageFs.CapacityBytes)*limit > float64(*imageFs.AvailableBytes) {
+				return fmt.Errorf("available imagefs byte is less than %v%%", int(limit)*100)
+			}
+		}
+	}
+
+	return nil
 }
