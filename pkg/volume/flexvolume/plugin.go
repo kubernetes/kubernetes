@@ -76,7 +76,7 @@ func (plugin *flexVolumePlugin) GetVolumeName(spec *volume.Spec) (string, error)
 	} else if err != nil {
 		return "", err
 	}
-	return utilstrings.EscapeQualifiedNameForDisk(status.Device), nil
+	return utilstrings.EscapeQualifiedNameForDisk(status.DevicePath), nil
 }
 
 // CanSupport is part of the volume.VolumePlugin interface.

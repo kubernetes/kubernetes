@@ -185,7 +185,7 @@ type DriverStatus struct {
 	Message string
 	// Path to the device attached. This field is valid only for attach calls.
 	// ie: /dev/sdx
-	Device string `json:"device"`
+	DevicePath string `json:"device"`
 	// The path where the device is mounted.
 	// ie: /special/mount/path
 	Path string `json:"path"`

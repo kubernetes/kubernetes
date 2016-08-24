@@ -41,7 +41,7 @@ func (a *flexVolumeAttacher) Attach(spec *volume.Spec, hostName string) (string,
 	} else if err != nil {
 		return "", err
 	}
-	return status.Device, err
+	return status.DevicePath, err
 }
 
 // WaitForAttach is part of the volume.Attacher interface
@@ -56,7 +56,7 @@ func (a *flexVolumeAttacher) WaitForAttach(spec *volume.Spec, devicePath string,
 	} else if err != nil {
 		return "", err
 	}
-	return status.Device, nil
+	return status.DevicePath, nil
 }
 
 // GetDeviceMountPath is part of the volume.Attacher interface
