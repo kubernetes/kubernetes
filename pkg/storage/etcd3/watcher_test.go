@@ -141,10 +141,10 @@ func TestDeleteTriggerWatch(t *testing.T) {
 	testCheckEventType(t, watch.Deleted, w)
 }
 
-// TestWatchSync tests that
+// TestWatchFromZero tests that
 // - watch from 0 should sync up and grab the object added before
 // - watch from non-0 should just watch changes after given version
-func TestWatchFromZeroAndNoneZero(t *testing.T) {
+func TestWatchFromZero(t *testing.T) {
 	ctx, store, cluster := testSetup(t)
 	defer cluster.Terminate(t)
 	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
@@ -154,10 +154,16 @@ func TestWatchFromZeroAndNoneZero(t *testing.T) {
 		t.Fatalf("Watch failed: %v", err)
 	}
 	testCheckResult(t, 0, watch.Added, w, storedObj)
-	w.Stop()
-	testCheckStop(t, 0, w)
+}
 
-	w, err = store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
+// TestWatchFromNoneZero tests that
+// - watch from non-0 should just watch changes after given version
+func TestWatchFromNoneZero(t *testing.T) {
+	ctx, store, cluster := testSetup(t)
+	defer cluster.Terminate(t)
+	key, storedObj := testPropogateStore(t, store, ctx, &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}})
+
+	w, err := store.Watch(ctx, key, storedObj.ResourceVersion, storage.Everything)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
