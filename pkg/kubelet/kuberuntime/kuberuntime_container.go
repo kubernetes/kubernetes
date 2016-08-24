@@ -28,9 +28,12 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/types"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/util/term"
 )
 
@@ -300,6 +303,84 @@ func (m *kubeGenericRuntimeManager) getKubeletContainerStatuses(podSandboxID str
 
 	sort.Sort(containerStatusByCreated(statuses))
 	return statuses, nil
+}
+
+// generateFailedContainerEvent generates a failed event for the container.
+func (m *kubeGenericRuntimeManager) generateFailedContainerEvent(containerID kubecontainer.ContainerID, podName, reason, message string) {
+	ref, ok := m.containerRefManager.GetRef(containerID)
+	if !ok {
+		glog.Warningf("No ref for pod %q", podName)
+		return
+	}
+	m.recorder.Event(ref, api.EventTypeWarning, reason, message)
+}
+
+// killContainer kills a container through the following steps:
+// * Run the pre-stop lifecycle hooks (if applicable).
+// * Stop the container.
+func (m *kubeGenericRuntimeManager) killContainer(pod *api.Pod, containerID kubecontainer.ContainerID, containerSpec *api.Container, reason string, gracePeriodOverride *int64) error {
+	gracePeriod := int64(minimumGracePeriodInSeconds)
+	if pod != nil {
+		switch {
+		case pod.DeletionGracePeriodSeconds != nil:
+			gracePeriod = *pod.DeletionGracePeriodSeconds
+		case pod.Spec.TerminationGracePeriodSeconds != nil:
+			gracePeriod = *pod.Spec.TerminationGracePeriodSeconds
+		}
+	}
+
+	glog.V(2).Infof("Killing container %q with %d second grace period", containerID.String(), gracePeriod)
+	start := unversioned.Now()
+	if pod != nil && containerSpec != nil && containerSpec.Lifecycle != nil && containerSpec.Lifecycle.PreStop != nil {
+		glog.V(3).Infof("Running preStop hook for container %q", containerID.String())
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			defer utilruntime.HandleCrash()
+			if msg, err := m.runner.Run(containerID, pod, containerSpec, containerSpec.Lifecycle.PreStop); err != nil {
+				glog.Errorf("preStop hook for container %q failed: %v", containerSpec.Name, err)
+				m.generateFailedContainerEvent(containerID, pod.Name, events.FailedPreStopHook, msg)
+			}
+		}()
+		select {
+		case <-time.After(time.Duration(gracePeriod) * time.Second):
+			glog.V(2).Infof("preStop hook for container %q did not complete in %d seconds", containerID, gracePeriod)
+		case <-done:
+			glog.V(3).Infof("preStop hook for container %q completed", containerID)
+		}
+		gracePeriod -= int64(unversioned.Now().Sub(start.Time).Seconds())
+	}
+
+	if gracePeriodOverride == nil {
+		// always give containers a minimal shutdown window to avoid unnecessary SIGKILLs
+		if gracePeriod < minimumGracePeriodInSeconds {
+			gracePeriod = minimumGracePeriodInSeconds
+		}
+	} else {
+		gracePeriod = *gracePeriodOverride
+		glog.V(3).Infof("Killing container %q, but using %d second grace period override", containerID, gracePeriod)
+	}
+
+	err := m.runtimeService.StopContainer(containerID.ID, gracePeriod)
+	if err != nil {
+		glog.Errorf("Container %q termination failed after %s: %v", containerID.String(), unversioned.Now().Sub(start.Time), err)
+	} else {
+		glog.V(3).Infof("Container %q exited after %s", containerID.String(), unversioned.Now().Sub(start.Time))
+	}
+
+	ref, ok := m.containerRefManager.GetRef(containerID)
+	if !ok {
+		glog.Warningf("No ref for container %s", containerID.String())
+	} else {
+		message := fmt.Sprintf("Killing container with id %s", containerID.String())
+		if reason != "" {
+			message = fmt.Sprint(message, ":", reason)
+		}
+		m.recorder.Event(ref, api.EventTypeNormal, events.KillingContainer, message)
+		m.containerRefManager.ClearRef(containerID)
+	}
+
+	return err
 }
 
 // AttachContainer attaches to the container's console
