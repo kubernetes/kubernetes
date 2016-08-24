@@ -109,7 +109,7 @@ func Test_AddVolume_Positive_ExistingVolume(t *testing.T) {
 // Populates data struct with one volume entry.
 // Calls DeleteVolume() to delete volume.
 // Verifies no volume entries exists.
-func Test_DeleteVolume_Positive_VolumeExistsNodeExists(t *testing.T) {
+func Test_DeleteVolume_Positive_VolumeExists(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -150,10 +150,10 @@ func Test_DeleteVolume_Positive_VolumeExistsNodeExists(t *testing.T) {
 	}
 }
 
-// Populates data struct with two volume/node entries (different node and volume).
+// Populates data struct with two volume entries (different persistent volume).
 // Calls GetVolumesToSnapshot() to get list of entries.
-// Verifies both volume/node entries are returned.
-func Test_GetVolumesToSnapshot_Positive_TwoVolumeTwoNodes(t *testing.T) {
+// Verifies both volume entries are returned.
+func Test_GetVolumesToSnapshot_Positive_TwoClaimsTwoVolumes(t *testing.T) {
 	// Arrange
 	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld(volumePluginMgr)
@@ -180,10 +180,47 @@ func Test_GetVolumesToSnapshot_Positive_TwoVolumeTwoNodes(t *testing.T) {
 	}
 
 	// Act
-	attachedVolumes := asw.GetVolumesToSnapshot()
+	volumesToSnapshot := asw.GetVolumesToSnapshot()
 
 	// Assert
-	if len(attachedVolumes) != 2 {
-		t.Fatalf("len(attachedVolumes) Expected: <2> Actual: <%v>", len(attachedVolumes))
+	if len(volumesToSnapshot) != 2 {
+		t.Fatalf("len(volumesToSnapshot) Expected: <2> Actual: <%v>", len(volumesToSnapshot))
+	}
+}
+
+// Populates data struct with two volume entries (same persistent volume).
+// Calls GetVolumesToSnapshot() to get list of entries.
+// Verifies only one volume entry is returned.
+func Test_GetVolumesToSnapshot_Positive_TwoClaimsOneVolume(t *testing.T) {
+	// Arrange
+	volumePluginMgr, _ := volumetesting.GetTestVolumePluginMgr(t)
+	asw := NewActualStateOfWorld(volumePluginMgr)
+
+	volumeName := api.UniqueVolumeName("volume-name")
+	volumeSpec := controllervolumetesting.GetTestVolumeSpec(string(volumeName), volumeName)
+
+	pvcName1 := "mypvc1"
+	pvcNamespace := "mynamespace"
+	pvc1 := controllervolumetesting.GetTestPvc(pvcName1, pvcNamespace, string(volumeName))
+	snapshotName1 := "snapshot-name-1"
+	_, err1 := asw.AddVolume(volumeSpec, pvc1, snapshotName1)
+	if err1 != nil {
+		t.Fatalf("AddVolume1 failed. Expected: <no error> Actual: <%v>", err1)
+	}
+
+	pvcName2 := "mypvc2"
+	pvc2 := controllervolumetesting.GetTestPvc(pvcName2, pvcNamespace, string(volumeName))
+	snapshotName2 := "snapshot-name-2"
+	_, err2 := asw.AddVolume(volumeSpec, pvc2, snapshotName2)
+	if err2 != nil {
+		t.Fatalf("AddVolume2 failed. Expected: <no error> Actual: <%v>", err2)
+	}
+
+	// Act
+	volumesToSnapshot := asw.GetVolumesToSnapshot()
+
+	// Assert
+	if len(volumesToSnapshot) != 1 {
+		t.Fatalf("len(volumesToSnapshot) Expected: <1> Actual: <%v>", len(volumesToSnapshot))
 	}
 }
