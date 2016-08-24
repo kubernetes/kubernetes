@@ -158,7 +158,7 @@ func TestOpenPodHostports(t *testing.T) {
 		},
 	}
 
-	runningPods := make([]*RunningPod, 0)
+	activePods := make([]*ActivePod, 0)
 
 	// Fill in any match rules missing chain names
 	for _, test := range tests {
@@ -179,13 +179,13 @@ func TestOpenPodHostports(t *testing.T) {
 				}
 			}
 		}
-		runningPods = append(runningPods, &RunningPod{
+		activePods = append(activePods, &ActivePod{
 			Pod: test.pod,
 			IP:  net.ParseIP(test.ip),
 		})
 	}
 
-	err := h.OpenPodHostportsAndSync(&RunningPod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", runningPods)
+	err := h.OpenPodHostportsAndSync(&ActivePod{Pod: tests[0].pod, IP: net.ParseIP(tests[0].ip)}, "br0", activePods)
 	if err != nil {
 		t.Fatalf("Failed to OpenPodHostportsAndSync: %v", err)
 	}
