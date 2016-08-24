@@ -3191,8 +3191,8 @@ func TestDoesNotDeletePodDirsForTerminatedPods(t *testing.T) {
 	syncAndVerifyPodDir(t, testKubelet, pods, pods, true)
 	// Pod 1 failed, and pod 2 succeeded. None of the pod directories should be
 	// deleted.
-	kl.statusManager.SetPodStatus(pods[1], api.PodStatus{Phase: api.PodFailed})
-	kl.statusManager.SetPodStatus(pods[2], api.PodStatus{Phase: api.PodSucceeded})
+	kl.statusManager.SetPodStatus(pods[1], api.PodStatus{Phase: api.PodFailed}, nil)
+	kl.statusManager.SetPodStatus(pods[2], api.PodStatus{Phase: api.PodSucceeded}, nil)
 	syncAndVerifyPodDir(t, testKubelet, pods, pods, true)
 }
 

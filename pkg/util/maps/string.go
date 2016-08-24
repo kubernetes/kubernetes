@@ -27,3 +27,29 @@ func CopySS(m map[string]string) map[string]string {
 	}
 	return copy
 }
+
+// MergeSS returns a new map combining the values of the given maps.
+// If there is overlap in the keys, the value from merge is used.
+func MergeSS(base, overlay map[string]string) map[string]string {
+	if base == nil {
+		return CopySS(overlay)
+	}
+	merge := CopySS(base)
+	for k, v := range overlay {
+		merge[k] = v
+	}
+	return merge
+}
+
+// EqualSS tests whether m1 is equal (shallow) to m2. An empty map is considered equivalent to nil.
+func EqualSS(m1, m2 map[string]string) bool {
+	if len(m1) != len(m2) {
+		return false
+	}
+	for k, v1 := range m1 {
+		if v2, ok := m2[k]; !ok || v1 != v2 {
+			return false
+		}
+	}
+	return true
+}

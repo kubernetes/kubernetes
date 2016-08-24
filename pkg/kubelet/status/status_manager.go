@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/diff"
+	"k8s.io/kubernetes/pkg/util/maps"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
@@ -40,6 +41,8 @@ import (
 // not sent to the API server.
 type versionedPodStatus struct {
 	status api.PodStatus
+	// Status annotations to add to the pod.
+	statusAnnotations map[string]string
 	// Monotonically increasing version number (per pod).
 	version uint64
 	// Pod name & namespace, for sending updates to API server.
@@ -82,8 +85,9 @@ type Manager interface {
 	// Start the API server status sync loop.
 	Start()
 
-	// SetPodStatus caches updates the cached status for the given pod, and triggers a status update.
-	SetPodStatus(pod *api.Pod, status api.PodStatus)
+	// SetPodStatus updates the cached status for the given pod, and triggers a status update.  Status
+	// annotations are merged into the pod annotations, and also trigger an update as needed.
+	SetPodStatus(pod *api.Pod, status api.PodStatus, statusAnnotations map[string]string)
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
@@ -117,6 +121,17 @@ func isStatusEqual(oldStatus, status *api.PodStatus) bool {
 	return api.Semantic.DeepEqual(status, oldStatus)
 }
 
+// areStatusAnnotationsEqual returns true if all the statusAnnotations are set with the same values
+// on the podAnnotations.
+func areStatusAnnotationsEqual(podAnnotations, statusAnnotations map[string]string) bool {
+	for k, v := range statusAnnotations {
+		if pv, ok := podAnnotations[k]; !ok || pv != v {
+			return false
+		}
+	}
+	return true
+}
+
 func (m *manager) Start() {
 	// Don't start the status manager if we don't have a client. This will happen
 	// on the master, where the kubelet is responsible for bootstrapping the pods
@@ -146,7 +161,7 @@ func (m *manager) GetPodStatus(uid types.UID) (api.PodStatus, bool) {
 	return status.status, ok
 }
 
-func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
+func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus, statusAnnotations map[string]string) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	// Make sure we're caching a deep copy.
@@ -157,7 +172,7 @@ func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
 	// Force a status update if deletion timestamp is set. This is necessary
 	// because if the pod is in the non-running state, the pod worker still
 	// needs to be able to trigger an update and/or deletion.
-	m.updateStatusInternal(pod, status, pod.DeletionTimestamp != nil)
+	m.updateStatusInternal(pod, status, statusAnnotations, pod.DeletionTimestamp != nil)
 }
 
 func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontainer.ContainerID, ready bool) {
@@ -215,7 +230,7 @@ func (m *manager) SetContainerReadiness(podUID types.UID, containerID kubecontai
 		status.Conditions = append(status.Conditions, readyCondition)
 	}
 
-	m.updateStatusInternal(pod, status, false)
+	m.updateStatusInternal(pod, status, nil, false)
 }
 
 func findContainerStatus(status *api.PodStatus, containerID string) (containerStatus *api.ContainerStatus, init bool, ok bool) {
@@ -257,13 +272,13 @@ func (m *manager) TerminatePod(pod *api.Pod) {
 			Terminated: &api.ContainerStateTerminated{},
 		}
 	}
-	m.updateStatusInternal(pod, pod.Status, true)
+	m.updateStatusInternal(pod, pod.Status, nil, true)
 }
 
 // updateStatusInternal updates the internal status cache, and queues an update to the api server if
 // necessary. Returns whether an update was triggered.
 // This method IS NOT THREAD SAFE and must be called from a locked function.
-func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, forceUpdate bool) bool {
+func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, statusAnnotations map[string]string, forceUpdate bool) bool {
 	var oldStatus api.PodStatus
 	cachedStatus, isCached := m.podStatuses[pod.UID]
 	if isCached {
@@ -272,6 +287,11 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, force
 		oldStatus = mirrorPod.Status
 	} else {
 		oldStatus = pod.Status
+	}
+
+	annotations := cachedStatus.statusAnnotations
+	if statusAnnotations != nil {
+		annotations = maps.MergeSS(annotations, statusAnnotations)
 	}
 
 	// Set ReadyCondition.LastTransitionTime.
@@ -308,16 +328,18 @@ func (m *manager) updateStatusInternal(pod *api.Pod, status api.PodStatus, force
 	normalizeStatus(pod, &status)
 	// The intent here is to prevent concurrent updates to a pod's status from
 	// clobbering each other so the phase of a pod progresses monotonically.
-	if isCached && isStatusEqual(&cachedStatus.status, &status) && !forceUpdate {
+	if isCached && isStatusEqual(&cachedStatus.status, &status) &&
+		maps.EqualSS(annotations, cachedStatus.statusAnnotations) && !forceUpdate {
 		glog.V(3).Infof("Ignoring same status for pod %q, status: %+v", format.Pod(pod), status)
 		return false // No new status.
 	}
 
 	newStatus := versionedPodStatus{
-		status:       status,
-		version:      cachedStatus.version + 1,
-		podName:      pod.Name,
-		podNamespace: pod.Namespace,
+		status:            status,
+		statusAnnotations: annotations,
+		version:           cachedStatus.version + 1,
+		podName:           pod.Name,
+		podNamespace:      pod.Namespace,
 	}
 	m.podStatuses[pod.UID] = newStatus
 
@@ -376,7 +398,7 @@ func (m *manager) syncBatch() {
 			}
 			if m.needsUpdate(syncedUID, status) {
 				updatedStatuses = append(updatedStatuses, podStatusSyncRequest{uid, status})
-			} else if m.needsReconcile(uid, status.status) {
+			} else if m.needsReconcile(uid, status) {
 				// Delete the apiStatusVersions here to force an update on the pod status
 				// In most cases the deleted apiStatusVersions here should be filled
 				// soon after the following syncPod() [If the syncPod() sync an update
@@ -414,6 +436,7 @@ func (m *manager) syncPod(uid types.UID, status versionedPodStatus) {
 			m.deletePodStatus(uid)
 			return
 		}
+		pod.Annotations = maps.MergeSS(pod.Annotations, status.statusAnnotations)
 		pod.Status = status.status
 		// TODO: handle conflict as a retry, make that easier too.
 		pod, err = m.kubeClient.Core().Pods(pod.Namespace).UpdateStatus(pod)
@@ -462,7 +485,7 @@ func (m *manager) needsUpdate(uid types.UID, status versionedPodStatus) bool {
 // now the pod manager only supports getting mirror pod by static pod, so we have to pass
 // static pod uid here.
 // TODO(random-liu): Simplify the logic when mirror pod manager is added.
-func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
+func (m *manager) needsReconcile(uid types.UID, status versionedPodStatus) bool {
 	// The pod could be a static pod, so we should translate first.
 	pod, ok := m.podManager.GetPodByUID(uid)
 	if !ok {
@@ -485,15 +508,20 @@ func (m *manager) needsReconcile(uid types.UID, status api.PodStatus) bool {
 	}
 	normalizeStatus(pod, &podStatus)
 
-	if isStatusEqual(&podStatus, &status) {
-		// If the status from the source is the same with the cached status,
-		// reconcile is not needed. Just return.
-		return false
+	if !isStatusEqual(&podStatus, &status.status) {
+		glog.V(3).Infof("Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
+			diff.ObjectDiff(podStatus, status))
+		return true
 	}
-	glog.V(3).Infof("Pod status is inconsistent with cached status for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
-		diff.ObjectDiff(podStatus, status))
+	if !areStatusAnnotationsEqual(pod.Annotations, status.statusAnnotations) {
+		glog.V(3).Infof("Pod annotations are inconsistent with status annotations for pod %q, a reconciliation should be triggered:\n %+v", format.Pod(pod),
+			diff.ObjectDiff(pod.Annotations, status.statusAnnotations))
+		return true
+	}
 
-	return true
+	// If the status from the source is the same with the cached status,
+	// reconcile is not needed. Just return.
+	return false
 }
 
 // We add this function, because apiserver only supports *RFC3339* now, which means that the timestamp returned by
