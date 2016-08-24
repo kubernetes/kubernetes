@@ -3543,14 +3543,11 @@ func TestValidatePod(t *testing.T) {
 				Name:      "123",
 				Namespace: "ns",
 				Annotations: map[string]string{
-					api.SysctlsPodAnnotationKey: "kernel.shmmni=32768,kernel.shmmax=1000000000",
+					api.SysctlsPodAnnotationKey:       "kernel.shmmni=32768,kernel.shmmax=1000000000",
+					api.UnsafeSysctlsPodAnnotationKey: "knet.ipv4.route.min_pmtu=1000",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 	}
 	for _, pod := range successCases {
@@ -4009,11 +4006,7 @@ func TestValidatePod(t *testing.T) {
 					api.SysctlsPodAnnotationKey: "foo:",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
-			},
+			Spec: validPodSpec,
 		},
 		"invalid comma-separated sysctl annotation": {
 			ObjectMeta: api.ObjectMeta{
@@ -4023,11 +4016,28 @@ func TestValidatePod(t *testing.T) {
 					api.SysctlsPodAnnotationKey: "kernel.msgmax,",
 				},
 			},
-			Spec: api.PodSpec{
-				Containers:    []api.Container{{Name: "ctr", Image: "image", ImagePullPolicy: "IfNotPresent"}},
-				RestartPolicy: api.RestartPolicyAlways,
-				DNSPolicy:     api.DNSClusterFirst,
+			Spec: validPodSpec,
+		},
+		"invalid unsafe sysctl annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SysctlsPodAnnotationKey: "foo:",
+				},
 			},
+			Spec: validPodSpec,
+		},
+		"intersecting sysctl and unsafe sysctls annotation": {
+			ObjectMeta: api.ObjectMeta{
+				Name:      "123",
+				Namespace: "ns",
+				Annotations: map[string]string{
+					api.SysctlsPodAnnotationKey:       "kernel.shmmax=10000000",
+					api.UnsafeSysctlsPodAnnotationKey: "kernel.shmmax=10000000",
+				},
+			},
+			Spec: validPodSpec,
 		},
 	}
 	for k, v := range errorCases {

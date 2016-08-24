@@ -662,14 +662,17 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// Set sysctls if requested
-	sysctls, err := api.SysctlsFromPodAnnotation(pod.Annotations[api.SysctlsPodAnnotationKey])
+	sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(pod.Annotations)
 	if err != nil {
 		dm.recorder.Eventf(ref, api.EventTypeWarning, events.FailedToCreateContainer, "Failed to create docker container %q of pod %q with error: %v", container.Name, format.Pod(pod), err)
 		return kubecontainer.ContainerID{}, err
 	}
-	if len(sysctls) > 0 {
-		hc.Sysctls = make(map[string]string, len(sysctls))
+	if len(sysctls)+len(unsafeSysctls) > 0 {
+		hc.Sysctls = make(map[string]string, len(sysctls)+len(unsafeSysctls))
 		for _, c := range sysctls {
+			hc.Sysctls[c.Name] = c.Value
+		}
+		for _, c := range unsafeSysctls {
 			hc.Sysctls[c.Name] = c.Value
 		}
 	}

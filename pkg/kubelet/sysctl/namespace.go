@@ -34,27 +34,24 @@ const (
 	UnknownNamespace = Namespace("")
 )
 
-var greylist = map[string]Namespace{
-	"kernel.sem":             IpcNamespace,
-	"kernel.shm_rmid_forced": IpcNamespace,
+var namespaces = map[string]Namespace{
+	"kernel.sem": IpcNamespace,
 }
 
-var greylistPrefixes = map[string]Namespace{
+var prefixNamespaces = map[string]Namespace{
+	"kernel.shm": IpcNamespace,
 	"kernel.msg": IpcNamespace,
-	"net.":       NetNamespace,
 	"fs.mqueue.": IpcNamespace,
+	"net.":       NetNamespace,
 }
 
-// NamespacedBy checks that a sysctl is greylisted because it is known
-// to be namespaced by the Linux kernel. The namespace is returned or UnknownNamespace
-// if it is not known to be namespaced. Note that being greylisted is required
-// to be validated, but not sufficient: the kubelet has a node-level whitelist
-// and the container runtime might have a stricter check and refuse to launch a pod.
+// NamespacedBy returns the namespace of the Linux kernel for a sysctl. The namespace
+// is returned or UnknownNamespace if it is not known to be namespaced.
 func NamespacedBy(val string) Namespace {
-	if ns, found := greylist[val]; found {
+	if ns, found := namespaces[val]; found {
 		return ns
 	}
-	for p, ns := range greylistPrefixes {
+	for p, ns := range prefixNamespaces {
 		if strings.HasPrefix(val, p) {
 			return ns
 		}

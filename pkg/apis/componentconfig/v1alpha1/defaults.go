@@ -308,9 +308,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.SyncFrequency == zeroDuration {
 		obj.SyncFrequency = unversioned.Duration{Duration: 1 * time.Minute}
 	}
-	if obj.SysctlWhitelist == nil {
-		obj.SysctlWhitelist = kubetypes.DefaultSysctlWhitelist()
-	}
 	if obj.ReconcileCIDR == nil {
 		obj.ReconcileCIDR = boolVar(true)
 	}

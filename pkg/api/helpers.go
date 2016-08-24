@@ -441,9 +441,16 @@ const (
 
 	// SysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
 	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
-	// key-value pairs. Pods with unsupported or not-whitespaced sysctls (by the container runtime)
-	// might fail to launch.
+	// key-value pairs. Only a limited set of whitelisted and isolated sysctls is supported by
+	// the kubelet. Pods with other sysctls will fail to launch.
 	SysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
+
+	// UnsafeSysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
+	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
+	// key-value pairs. Unsafe sysctls must be explicitly enabled for a kubelet. They are properly
+	// namespaced to a pod or a container, but their isolation is usually unclear or weak. Their use
+	// is on-your-own-risk. Pods with sysctls not enabled for a kubelet will fail to launch.
+	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafeSysctls"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
@@ -529,8 +536,23 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, 
 	return avoidPods, nil
 }
 
-// SysctlsFromPodAnnotation parses an annotation value of the key SysctlsPodAnnotationKey
-// into a slice of Sysctls.
+// SysctlsFromPodAnnotation parses the sysctl annotations a slice of safe Sysctls
+// and a slice of unsafe Sysctls. This is only a convenience wrapper around
+// SysctlsFromPodAnnotation.
+func SysctlsFromPodAnnotations(a map[string]string) ([]Sysctl, []Sysctl, error) {
+	safe, err := SysctlsFromPodAnnotation(a[SysctlsPodAnnotationKey])
+	if err != nil {
+		return nil, nil, err
+	}
+	unsafe, err := SysctlsFromPodAnnotation(a[UnsafeSysctlsPodAnnotationKey])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return safe, unsafe, nil
+}
+
+// SysctlsFromPodAnnotation parses an annotation value into a slice of Sysctls.
 func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
 	if annotation == "" {
 		return nil, nil

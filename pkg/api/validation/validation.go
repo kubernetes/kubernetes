@@ -133,11 +133,24 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.Pod
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
 
-	sysctls, err := api.SysctlsFromPodAnnotation(annotations[api.SysctlsPodAnnotationKey])
+	sysctlAnn := annotations[api.SysctlsPodAnnotationKey]
+	sysctls, err := api.SysctlsFromPodAnnotation(sysctlAnn)
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.SysctlsPodAnnotationKey), annotations[api.SysctlsPodAnnotationKey], err.Error()))
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.SysctlsPodAnnotationKey), sysctlAnn, err.Error()))
 	} else {
 		allErrs = append(allErrs, validateSysctls(sysctls, fldPath.Key(api.SysctlsPodAnnotationKey))...)
+	}
+	unsafeSysctlAnn := annotations[api.UnsafeSysctlsPodAnnotationKey]
+	unsafeSysctls, err := api.SysctlsFromPodAnnotation(unsafeSysctlAnn)
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey), unsafeSysctlAnn, err.Error()))
+	} else {
+		allErrs = append(allErrs, validateSysctls(sysctls, fldPath.Key(api.UnsafeSysctlsPodAnnotationKey))...)
+	}
+	inBoth := sysctlIntersection(sysctls, unsafeSysctls)
+	for i := range inBoth {
+		name := inBoth[i].Name
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey).Key(name), name, "cannot be safe and unsafe"))
 	}
 
 	return allErrs
@@ -3516,4 +3529,18 @@ func isValidHostnamesMap(serializedPodHostNames string) bool {
 		}
 	}
 	return true
+}
+
+func sysctlIntersection(a []api.Sysctl, b []api.Sysctl) []api.Sysctl {
+	lookup := make(map[string]struct{}, len(a))
+	result := []api.Sysctl{}
+	for i := range a {
+		lookup[a[i].Name] = struct{}{}
+	}
+	for i := range b {
+		if _, found := lookup[b[i].Name]; found {
+			result = append(result, b[i])
+		}
+	}
+	return result
 }

@@ -31,6 +31,16 @@ const (
 	ForbiddenReason         = "SysctlForbidden"
 )
 
+// SafeSysctlWhitelist returns the whitelist of safe sysctls and safe sysctl patterns (ending in *).
+func SafeSysctlWhitelist() []string {
+	return []string{
+		"kernel.shm_rmid_forced",
+		"net.ipv4.ip_local_port_range",
+		"net.ipv4.tcp_max_syn_backlog",
+		"net.ipv4.tcp_syncookies",
+	}
+}
+
 // Whitelist provides a list of allowed sysctls and sysctl patterns (ending in *)
 // and a function to check whether a given sysctl matches this list.
 type Whitelist interface {
@@ -43,17 +53,19 @@ type Whitelist interface {
 // checks validity via a sysctl and prefix map, rejecting those which are not known
 // to be namespaced.
 type patternWhitelist struct {
-	sysctls  map[string]Namespace
-	prefixes map[string]Namespace
+	sysctls       map[string]Namespace
+	prefixes      map[string]Namespace
+	annotationKey string
 }
 
 var _ lifecycle.PodAdmitHandler = &patternWhitelist{}
 
 // NewWhitelist creates a new Whitelist from a list of sysctls and sysctl pattern (ending in *).
-func NewWhitelist(patterns []string) (*patternWhitelist, error) {
+func NewWhitelist(patterns []string, annotationKey string) (*patternWhitelist, error) {
 	w := &patternWhitelist{
-		sysctls:  map[string]Namespace{},
-		prefixes: map[string]Namespace{},
+		sysctls:       map[string]Namespace{},
+		prefixes:      map[string]Namespace{},
+		annotationKey: annotationKey,
 	}
 
 	for _, s := range patterns {
@@ -118,7 +130,7 @@ func (w *patternWhitelist) validateSysctl(sysctl string, hostNet, hostIPC bool) 
 // are valid according to the whitelist.
 func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitResult {
 	pod := attrs.Pod
-	a := pod.Annotations[api.SysctlsPodAnnotationKey]
+	a := pod.Annotations[w.annotationKey]
 	if a == "" {
 		return lifecycle.PodAdmitResult{
 			Admit: true,
@@ -130,7 +142,7 @@ func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
 			Reason:  AnnotationInvalidReason,
-			Message: fmt.Sprintf("invalid %s annotation: %v", api.SysctlsPodAnnotationKey, err),
+			Message: fmt.Sprintf("invalid %s annotation: %v", w.annotationKey, err),
 		}
 	}
 
@@ -144,7 +156,7 @@ func (w *patternWhitelist) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.
 			return lifecycle.PodAdmitResult{
 				Admit:   false,
 				Reason:  ForbiddenReason,
-				Message: fmt.Sprintf("invalid sysctl: %v", err),
+				Message: fmt.Sprintf("forbidden sysctl: %v", err),
 			}
 		}
 	}

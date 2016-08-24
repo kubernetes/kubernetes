@@ -19,7 +19,7 @@ package sysctl
 import (
 	"testing"
 
-	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/api"
 )
 
 func TestNewWhitelist(t *testing.T) {
@@ -35,7 +35,7 @@ func TestNewWhitelist(t *testing.T) {
 		{sysctls: []string{"net.*.foo"}, err: true},
 		{sysctls: []string{"foo"}, err: true},
 	} {
-		_, err := NewWhitelist(append(types.DefaultSysctlWhitelist(), test.sysctls...))
+		_, err := NewWhitelist(append(SafeSysctlWhitelist(), test.sysctls...), api.SysctlsPodAnnotationKey)
 		if test.err && err == nil {
 			t.Errorf("expected an error creating a whitelist for %v", test.sysctls)
 		} else if !test.err && err != nil {
@@ -65,7 +65,7 @@ func TestWhitelist(t *testing.T) {
 		{sysctl: "kernel.sem", hostIPC: true},
 	}
 
-	w, err := NewWhitelist(append(types.DefaultSysctlWhitelist(), "kernel.msg*", "kernel.sem"))
+	w, err := NewWhitelist(append(SafeSysctlWhitelist(), "kernel.msg*", "kernel.sem"), api.SysctlsPodAnnotationKey)
 	if err != nil {
 		t.Fatalf("failed to create whitelist: %v", err)
 	}

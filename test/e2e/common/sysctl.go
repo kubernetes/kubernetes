@@ -121,6 +121,47 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		Expect(log).To(ContainSubstring("kernel.shm_rmid_forced = 1"))
 	})
 
+	It("should support unsafe sysctls which are actually whitelisted", func() {
+		pod := testPod()
+		pod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
+			{
+				Name:  "kernel.shm_rmid_forced",
+				Value: "1",
+			},
+		})
+		pod.Spec.Containers[0].Command = []string{"/bin/sysctl", "kernel.shm_rmid_forced"}
+
+		By("Creating a pod with the kernel.shm_rmid_forced sysctl")
+		pod = podClient.Create(pod)
+
+		By("Watching for error events or started pod")
+		// watch for events instead of termination of pod because the kubelet deletes
+		// failed pods without running containers. This would create a race as the pod
+		// might have already been deleted here.
+		ev, err := waitForPodErrorEventOrStarted(pod)
+		Expect(err).NotTo(HaveOccurred())
+		if ev != nil && ev.Reason == sysctl.UnsupportedReason {
+			framework.Skipf("No sysctl support in Docker <1.12")
+		}
+		Expect(ev).To(BeNil())
+
+		By("Waiting for pod completion")
+		err = f.WaitForPodNoLongerRunning(pod.Name)
+		Expect(err).NotTo(HaveOccurred())
+		pod, err = podClient.Get(pod.Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Checking that the pod succeeded")
+		Expect(pod.Status.Phase).To(Equal(api.PodSucceeded))
+
+		By("Getting logs from the pod")
+		log, err := framework.GetPodLogs(f.Client, f.Namespace.Name, pod.Name, pod.Spec.Containers[0].Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Checking that the sysctl is actually updated")
+		Expect(log).To(ContainSubstring("kernel.shm_rmid_forced = 1"))
+	})
+
 	It("should reject invalid sysctls", func() {
 		pod := testPod()
 		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
@@ -133,8 +174,22 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 				Value: "100000000",
 			},
 			{
+				Name:  "safe-and-unsafe",
+				Value: "100000000",
+			},
+		})
+		pod.Annotations[api.UnsafeSysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
+			{
+				Name:  "kernel.shmall",
+				Value: "100000000",
+			},
+			{
 				Name:  "bar..",
 				Value: "42",
+			},
+			{
+				Name:  "safe-and-unsafe",
+				Value: "100000000",
 			},
 		})
 
@@ -146,10 +201,11 @@ var _ = framework.KubeDescribe("Sysctls", func() {
 		Expect(err).NotTo(BeNil())
 		Expect(err.Error()).To(ContainSubstring(`Invalid value: "foo-"`))
 		Expect(err.Error()).To(ContainSubstring(`Invalid value: "bar.."`))
+		Expect(err.Error()).To(ContainSubstring(`safe-and-unsafe`))
 		Expect(err.Error()).NotTo(ContainSubstring("kernel.shmmax"))
 	})
 
-	It("should not launch greylisted, but not whitelisted sysctls on the node", func() {
+	It("should not launch unsafe, but not explicitly enabled sysctls on the node", func() {
 		pod := testPod()
 		pod.Annotations[api.SysctlsPodAnnotationKey] = api.PodAnnotationsFromSysctls([]api.Sysctl{
 			{

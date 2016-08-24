@@ -252,7 +252,7 @@ func NewMainKubelet(
 	makeIPTablesUtilChains bool,
 	iptablesMasqueradeBit int,
 	iptablesDropBit int,
-	sysctlWhitelist []string,
+	allowedUnsafeSysctls []string,
 ) (*Kubelet, error) {
 	if rootDirectory == "" {
 		return nil, fmt.Errorf("invalid root directory %q", rootDirectory)
@@ -600,12 +600,17 @@ func NewMainKubelet(
 	if err != nil {
 		return nil, err
 	}
-	whitelist, err := sysctl.NewWhitelist(sysctlWhitelist)
+	safeWhitelist, err := sysctl.NewWhitelist(sysctl.SafeSysctlWhitelist(), api.SysctlsPodAnnotationKey)
+	if err != nil {
+		return nil, err
+	}
+	unsafeWhitelist, err := sysctl.NewWhitelist(allowedUnsafeSysctls, api.UnsafeSysctlsPodAnnotationKey)
 	if err != nil {
 		return nil, err
 	}
 	klet.AddPodAdmitHandler(runtimeSupport)
-	klet.AddPodAdmitHandler(whitelist)
+	klet.AddPodAdmitHandler(safeWhitelist)
+	klet.AddPodAdmitHandler(unsafeWhitelist)
 
 	// enable active deadline handler
 	activeDeadlineHandler, err := newActiveDeadlineHandler(klet.statusManager, klet.recorder, klet.clock)
