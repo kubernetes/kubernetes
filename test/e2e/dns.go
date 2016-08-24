@@ -23,6 +23,9 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"k8s.io/client-go/1.4/pkg/api/v1"
+	ext "k8s.io/client-go/1.4/pkg/apis/extensions/v1beta1"
+	"k8s.io/client-go/1.4/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -34,8 +37,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-const dnsTestPodHostName = "dns-querier-1"
-const dnsTestServiceName = "dns-test-service"
+const (
+	dnsTestPodHostName = "dns-querier-1"
+	dnsTestServiceName = "dns-test-service"
+	dnsTestIngressName = "dns-test-ingress"
+)
 
 var dnsServiceLabelSelector = labels.Set{
 	"k8s-app":                       "kube-dns",
@@ -206,7 +212,6 @@ func assertFilesExist(fileNames []string, fileDir string, pod *api.Pod, client *
 }
 
 func validateDNSResults(f *framework.Framework, pod *api.Pod, fileNames []string) {
-
 	By("submitting the pod to kubernetes")
 	podClient := f.Client.Pods(f.Namespace.Name)
 	defer func() {
@@ -267,6 +272,20 @@ func createServiceSpec(serviceName string, isHeadless bool, selector map[string]
 	return headlessService
 }
 
+func newIngress(name string, svc *api.Service) *ext.Ingress {
+	return &ext.Ingress{
+		ObjectMeta: v1.ObjectMeta{
+			Name: name,
+		},
+		Spec: ext.IngressSpec{
+			Backend: &ext.IngressBackend{
+				svc.Name,
+				intstr.FromInt(int(svc.Spec.Ports[0].Port)),
+			},
+		},
+	}
+}
+
 func reverseArray(arr []string) []string {
 	for i := 0; i < len(arr)/2; i++ {
 		j := len(arr) - i - 1
@@ -278,114 +297,167 @@ func reverseArray(arr []string) []string {
 var _ = framework.KubeDescribe("DNS", func() {
 	f := framework.NewDefaultFramework("dns")
 
-	It("should provide DNS for the cluster [Conformance]", func() {
-		// All the names we need to be able to resolve.
-		// TODO: Spin up a separate test service and test that dns works for that service.
-		namesToResolve := []string{
-			"kubernetes.default",
-			"kubernetes.default.svc",
-			"kubernetes.default.svc.cluster.local",
-			"google.com",
-		}
-		// Added due to #8512. This is critical for GCE and GKE deployments.
-		if framework.ProviderIs("gce", "gke") {
-			namesToResolve = append(namesToResolve, "metadata")
-		}
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
-		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+	var _ = Describe("Service", func() {
+		It("should provide DNS for the cluster [Conformance]", func() {
+			// All the names we need to be able to resolve.
+			// TODO: Spin up a separate test service and test that dns works for that service.
+			namesToResolve := []string{
+				"kubernetes.default",
+				"kubernetes.default.svc",
+				"kubernetes.default.svc.cluster.local",
+				"google.com",
+			}
+			// Added due to #8512. This is critical for GCE and GKE deployments.
+			if framework.ProviderIs("gce", "gke") {
+				namesToResolve = append(namesToResolve, "metadata")
+			}
+			hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
+			hostEntries := []string{hostFQDN, dnsTestPodHostName}
+			wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name)
+			jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name)
+			By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
+			By("Running these commands on jessie:" + jessieProbeCmd + "\n")
 
-		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+			// Run a pod which probes DNS and exposes the results by HTTP.
+			By("creating a pod to probe DNS")
+			pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+			validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		})
+
+		It("should provide DNS for services [Conformance]", func() {
+			// Create a test headless service.
+			By("Creating a test headless service")
+			testServiceSelector := map[string]string{
+				"dns-test": "true",
+			}
+			headlessService := createServiceSpec(dnsTestServiceName, true, testServiceSelector)
+			_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				By("deleting the test headless service")
+				defer GinkgoRecover()
+				f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
+			}()
+
+			regularService := createServiceSpec("test-service-2", false, testServiceSelector)
+			regularService, err = f.Client.Services(f.Namespace.Name).Create(regularService)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				By("deleting the test service")
+				defer GinkgoRecover()
+				f.Client.Services(f.Namespace.Name).Delete(regularService.Name)
+			}()
+
+			// All the names we need to be able to resolve.
+			// TODO: Create more endpoints and ensure that multiple A records are returned
+			// for headless service.
+			namesToResolve := []string{
+				fmt.Sprintf("%s", headlessService.Name),
+				fmt.Sprintf("%s.%s", headlessService.Name, f.Namespace.Name),
+				fmt.Sprintf("%s.%s.svc", headlessService.Name, f.Namespace.Name),
+				fmt.Sprintf("_http._tcp.%s.%s.svc", headlessService.Name, f.Namespace.Name),
+				fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
+			}
+
+			wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name)
+			jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name)
+			By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
+			By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+
+			// Run a pod which probes DNS and exposes the results by HTTP.
+			By("creating a pod to probe DNS")
+			pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
+			pod.ObjectMeta.Labels = testServiceSelector
+
+			validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		})
+
+		It("should provide DNS for pods for Hostname and Subdomain Annotation", func() {
+			// Create a test headless service.
+			By("Creating a test headless service")
+			testServiceSelector := map[string]string{
+				"dns-test-hostname-attribute": "true",
+			}
+			serviceName := "dns-test-service-2"
+			podHostname := "dns-querier-2"
+			headlessService := createServiceSpec(serviceName, true, testServiceSelector)
+			_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				By("deleting the test headless service")
+				defer GinkgoRecover()
+				f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
+			}()
+
+			hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", podHostname, serviceName, f.Namespace.Name)
+			hostNames := []string{hostFQDN, podHostname}
+			namesToResolve := []string{hostFQDN}
+			wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostNames, "", "wheezy", f.Namespace.Name)
+			jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostNames, "", "jessie", f.Namespace.Name)
+			By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
+			By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+
+			// Run a pod which probes DNS and exposes the results by HTTP.
+			By("creating a pod to probe DNS")
+			pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+			pod1.ObjectMeta.Labels = testServiceSelector
+			pod1.ObjectMeta.Annotations = map[string]string{
+				pod.PodHostnameAnnotation:  podHostname,
+				pod.PodSubdomainAnnotation: serviceName,
+			}
+
+			validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
+		})
 	})
 
-	It("should provide DNS for services [Conformance]", func() {
-		// Create a test headless service.
-		By("Creating a test headless service")
-		testServiceSelector := map[string]string{
-			"dns-test": "true",
-		}
-		headlessService := createServiceSpec(dnsTestServiceName, true, testServiceSelector)
-		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			By("deleting the test headless service")
-			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
-		}()
+	var _ = Describe("Ingress", func() {
+		// TODO(madhusudancs): Need separate tests for ingresses with only
+		// Hostname populated, both Hostname and IP populated in their
+		// statuses. In other words, we need e2e tests for both A and CNAME
+		// records in KubeDNS. The current ingress implementation for GCE L7
+		// loadbalancer gets its IP address from GCE and there is no easy way
+		// to get a domain name for it. Until we have an Ingress
+		// implementation that provides a hostname, CNAMEs can't be e2e
+		// tested. However, this feature is tested in unit tests for now.
 
-		regularService := createServiceSpec("test-service-2", false, testServiceSelector)
-		regularService, err = f.Client.Services(f.Namespace.Name).Create(regularService)
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			By("deleting the test service")
-			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(regularService.Name)
-		}()
+		It("should provide DNS for ingresses [Conformance]", func() {
+			// Create a test service.
+			By("Creating a test service")
+			testServiceSelector := map[string]string{
+				"dns-test-service": "true",
+			}
+			svc := createServiceSpec(dnsTestServiceName, false, testServiceSelector)
+			svc, err := f.Client.Services(f.Namespace.Name).Create(svc)
+			Expect(err).NotTo(HaveOccurred())
 
-		// All the names we need to be able to resolve.
-		// TODO: Create more endpoints and ensure that multiple A records are returned
-		// for headless service.
-		namesToResolve := []string{
-			fmt.Sprintf("%s", headlessService.Name),
-			fmt.Sprintf("%s.%s", headlessService.Name, f.Namespace.Name),
-			fmt.Sprintf("%s.%s.svc", headlessService.Name, f.Namespace.Name),
-			fmt.Sprintf("_http._tcp.%s.%s.svc", headlessService.Name, f.Namespace.Name),
-			fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
-		}
+			// Create a test ingress.
+			By("Creating a test ingress")
+			ing := newIngress(dnsTestIngressName, svc)
+			_, err = f.StagingClient.Ingresses(f.Namespace.Name).Create(ing)
+			Expect(err).NotTo(HaveOccurred())
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
+			// All the names we need to be able to resolve.
+			// TODO: Create more endpoints and ensure that multiple A records are returned
+			// for headless service.
+			namesToResolve := []string{
+				fmt.Sprintf("%s.%s.ing", ing.Name, f.Namespace.Name),
+				fmt.Sprintf("%s.%s.ing.cluster.local", ing.Name, f.Namespace.Name),
+				fmt.Sprintf("%s.%s.ing.cluster.local.", ing.Name, f.Namespace.Name),
+			}
 
-		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
-		pod.ObjectMeta.Labels = testServiceSelector
+			wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name)
+			jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name)
+			By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
+			By("Running these commands on jessie:" + jessieProbeCmd + "\n")
 
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
-	})
+			// Run a pod which probes DNS and exposes the results by HTTP.
+			By("creating a pod to probe DNS")
+			pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
+			pod.ObjectMeta.Labels = map[string]string{
+				"dns-test": "true",
+			}
 
-	It("should provide DNS for pods for Hostname and Subdomain Annotation", func() {
-		// Create a test headless service.
-		By("Creating a test headless service")
-		testServiceSelector := map[string]string{
-			"dns-test-hostname-attribute": "true",
-		}
-		serviceName := "dns-test-service-2"
-		podHostname := "dns-querier-2"
-		headlessService := createServiceSpec(serviceName, true, testServiceSelector)
-		_, err := f.Client.Services(f.Namespace.Name).Create(headlessService)
-		Expect(err).NotTo(HaveOccurred())
-		defer func() {
-			By("deleting the test headless service")
-			defer GinkgoRecover()
-			f.Client.Services(f.Namespace.Name).Delete(headlessService.Name)
-		}()
-
-		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", podHostname, serviceName, f.Namespace.Name)
-		hostNames := []string{hostFQDN, podHostname}
-		namesToResolve := []string{hostFQDN}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostNames, "", "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostNames, "", "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy:" + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie:" + jessieProbeCmd + "\n")
-
-		// Run a pod which probes DNS and exposes the results by HTTP.
-		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
-		pod1.ObjectMeta.Labels = testServiceSelector
-		pod1.ObjectMeta.Annotations = map[string]string{
-			pod.PodHostnameAnnotation:  podHostname,
-			pod.PodSubdomainAnnotation: serviceName,
-		}
-
-		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
+			validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		})
 	})
 })

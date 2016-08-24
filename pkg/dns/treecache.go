@@ -199,6 +199,10 @@ func (cache *TreeCache) ensureChildNode(path ...string) *TreeCache {
 	return childNode
 }
 
+func (cache *TreeCache) numEntries() int {
+	return len(cache.Entries)
+}
+
 // unused function. keeping it around in commented-fashion
 // in the future, we might need some form of this function so that
 // we can serialize to a file in a mounted empty dir..
