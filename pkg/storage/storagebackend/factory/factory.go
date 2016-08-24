@@ -24,7 +24,7 @@ import (
 )
 
 // Create creates a storage backend based on given config.
-func Create(c storagebackend.Config) (storage.Interface, error) {
+func Create(c storagebackend.Config) (storage.Interface, func(), error) {
 	switch c.Type {
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD2:
 		return newETCD2Storage(c)
@@ -35,6 +35,6 @@ func Create(c storagebackend.Config) (storage.Interface, error) {
 		// - Support non-quorum read.
 		return newETCD3Storage(c)
 	default:
-		return nil, fmt.Errorf("unknown storage type: %s", c.Type)
+		return nil, nil, fmt.Errorf("unknown storage type: %s", c.Type)
 	}
 }
