@@ -162,8 +162,6 @@ type logFileData struct {
 const (
 	// This is consistent with the level used in a cluster e2e test.
 	LOG_VERBOSITY_LEVEL = "4"
-	// Etcd binary is expected to either be available via PATH, or at this location.
-	defaultEtcdPath = "/tmp/etcd"
 )
 
 func newE2EService() *e2eService {

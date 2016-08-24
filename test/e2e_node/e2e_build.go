@@ -28,11 +28,10 @@ import (
 	"github.com/golang/glog"
 )
 
-var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet and kube-apiserver binaries.")
+var k8sBinDir = flag.String("k8s-bin-dir", "", "Directory containing k8s kubelet binaries.")
 
 var buildTargets = []string{
 	"cmd/kubelet",
-	"cmd/kube-apiserver",
 	"test/e2e_node/e2e_node.test",
 	"vendor/github.com/onsi/ginkgo/ginkgo",
 }
@@ -114,30 +113,10 @@ func getK8sBuildOutputDir() (string, error) {
 	return buildOutputDir, nil
 }
 
-func getK8sNodeTestDir() (string, error) {
-	k8sRoot, err := getK8sRootDir()
-	if err != nil {
-		return "", err
-	}
-	buildOutputDir := filepath.Join(k8sRoot, "test/e2e_node")
-	if _, err := os.Stat(buildOutputDir); err != nil {
-		return "", err
-	}
-	return buildOutputDir, nil
-}
-
 func getKubeletServerBin() string {
 	bin, err := getK8sBin("kubelet")
 	if err != nil {
 		glog.Fatalf("Could not locate kubelet binary %v.", err)
-	}
-	return bin
-}
-
-func getApiServerBin() string {
-	bin, err := getK8sBin("kube-apiserver")
-	if err != nil {
-		glog.Fatalf("Could not locate kube-apiserver binary %v.", err)
 	}
 	return bin
 }
