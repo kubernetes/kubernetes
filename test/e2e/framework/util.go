@@ -1216,10 +1216,10 @@ func waitTimeoutForPodRunningInNamespace(c *client.Client, podName, namespace, r
 // Waits default amount of time (podNoLongerRunningTimeout) for the specified pod to stop running.
 // Returns an error if timeout occurs first.
 func WaitForPodNoLongerRunningInNamespace(c *client.Client, podName, namespace, resourceVersion string) error {
-	return waitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, resourceVersion, podNoLongerRunningTimeout)
+	return WaitTimeoutForPodNoLongerRunningInNamespace(c, podName, namespace, resourceVersion, podNoLongerRunningTimeout)
 }
 
-func waitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName, namespace, resourceVersion string, timeout time.Duration) error {
+func WaitTimeoutForPodNoLongerRunningInNamespace(c *client.Client, podName, namespace, resourceVersion string, timeout time.Duration) error {
 	w, err := c.Pods(namespace).Watch(api.SingleObject(api.ObjectMeta{Name: podName, ResourceVersion: resourceVersion}))
 	if err != nil {
 		return err
