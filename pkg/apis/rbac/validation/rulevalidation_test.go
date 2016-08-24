@@ -96,7 +96,7 @@ func TestDefaultRuleResolver(t *testing.T) {
 					{Kind: rbac.UserKind, Name: "foobar"},
 					{Kind: rbac.GroupKind, Name: "group1"},
 				},
-				RoleRef: api.ObjectReference{Kind: "Role", Namespace: "namespace1", Name: "readthings"},
+				RoleRef: rbac.RoleRef{Kind: "Role", Name: "readthings"},
 			},
 		},
 		clusterRoleBindings: []rbac.ClusterRoleBinding{
@@ -105,7 +105,7 @@ func TestDefaultRuleResolver(t *testing.T) {
 					{Kind: rbac.UserKind, Name: "admin"},
 					{Kind: rbac.GroupKind, Name: "admin"},
 				},
-				RoleRef: api.ObjectReference{Kind: "ClusterRole", Name: "cluster-admin"},
+				RoleRef: rbac.RoleRef{Kind: "ClusterRole", Name: "cluster-admin"},
 			},
 		},
 	}
