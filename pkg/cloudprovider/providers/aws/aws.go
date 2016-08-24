@@ -2498,11 +2498,19 @@ func buildListener(port v1.ServicePort, annotations map[string]string, sslPorts 
 	return listener, nil
 }
 
+func nodeNames(nodes []*v1.Node) sets.String {
+	ret := sets.String{}
+	for _, node := range nodes {
+		ret.Insert(node.Name)
+	}
+	return ret
+}
+
 // EnsureLoadBalancer implements LoadBalancer.EnsureLoadBalancer
-func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, hosts []string) (*v1.LoadBalancerStatus, error) {
+func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	annotations := apiService.Annotations
 	glog.V(2).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v, %v, %v, %v)",
-		clusterName, apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, hosts, annotations)
+		clusterName, apiService.Namespace, apiService.Name, c.region, apiService.Spec.LoadBalancerIP, apiService.Spec.Ports, nodes, annotations)
 
 	if apiService.Spec.SessionAffinity != v1.ServiceAffinityNone {
 		// ELB supports sticky sessions, but only when configured for HTTP/HTTPS
@@ -2535,8 +2543,7 @@ func (c *Cloud) EnsureLoadBalancer(clusterName string, apiService *v1.Service, h
 		return nil, fmt.Errorf("LoadBalancerIP cannot be specified for AWS ELB")
 	}
 
-	hostSet := sets.NewString(hosts...)
-	instances, err := c.getInstancesByNodeNamesCached(hostSet)
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
 	if err != nil {
 		return nil, err
 	}
@@ -3085,9 +3092,8 @@ func (c *Cloud) EnsureLoadBalancerDeleted(clusterName string, service *v1.Servic
 }
 
 // UpdateLoadBalancer implements LoadBalancer.UpdateLoadBalancer
-func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, hosts []string) error {
-	hostSet := sets.NewString(hosts...)
-	instances, err := c.getInstancesByNodeNamesCached(hostSet)
+func (c *Cloud) UpdateLoadBalancer(clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	instances, err := c.getInstancesByNodeNamesCached(nodeNames(nodes))
 	if err != nil {
 		return err
 	}
