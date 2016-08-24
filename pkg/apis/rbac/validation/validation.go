@@ -102,11 +102,25 @@ func ValidateRoleBinding(roleBinding *rbac.RoleBinding) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, true, minimalNameRequirements, field.NewPath("metadata"))...)
 
-	// roleRef namespace is empty when referring to global policy.
-	if len(roleBinding.RoleRef.Namespace) > 0 {
-		for _, msg := range validation.ValidateNamespaceName(roleBinding.RoleRef.Namespace, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, msg))
+	if roleBinding.RoleRef.APIVersion != rbac.GroupName+"/" {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "apiVersion"), roleBinding.RoleRef.APIVersion, []string{rbac.GroupName}))
+	}
+
+	switch roleBinding.RoleRef.Kind {
+	case "Role":
+		// role namespace can be empty if referencing a local role
+		if len(roleBinding.RoleRef.Namespace) > 0 {
+			for _, msg := range validation.ValidateNamespaceName(roleBinding.RoleRef.Namespace, false) {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, msg))
+			}
 		}
+	case "ClusterRole":
+		if len(roleBinding.RoleRef.Namespace) != 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, "must be empty for ClusterRole references"))
+		}
+	default:
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "kind"), roleBinding.RoleRef.Kind, []string{"Role", "ClusterRole"}))
+
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
@@ -140,11 +154,17 @@ func ValidateClusterRoleBinding(roleBinding *rbac.ClusterRoleBinding) field.Erro
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validation.ValidateObjectMeta(&roleBinding.ObjectMeta, false, minimalNameRequirements, field.NewPath("metadata"))...)
 
-	// roleRef namespace is empty when referring to global policy.
-	if len(roleBinding.RoleRef.Namespace) > 0 {
-		for _, msg := range validation.ValidateNamespaceName(roleBinding.RoleRef.Namespace, false) {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, msg))
+	if roleBinding.RoleRef.APIVersion != rbac.GroupName+"/" {
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "apiVersion"), roleBinding.RoleRef.APIVersion, []string{rbac.GroupName}))
+	}
+	switch roleBinding.RoleRef.Kind {
+	case "ClusterRole":
+		if len(roleBinding.RoleRef.Namespace) != 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("roleRef", "namespace"), roleBinding.RoleRef.Namespace, "must be empty for ClusterRole references"))
 		}
+	default:
+		allErrs = append(allErrs, field.NotSupported(field.NewPath("roleRef", "kind"), roleBinding.RoleRef.Kind, []string{"ClusterRole"}))
+
 	}
 
 	if len(roleBinding.RoleRef.Name) == 0 {
