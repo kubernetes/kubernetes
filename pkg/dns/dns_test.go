@@ -39,9 +39,10 @@ import (
 )
 
 const (
-	testDomain    = "cluster.local."
-	testService   = "testservice"
-	testNamespace = "default"
+	testDomain       = "cluster.local."
+	testService      = "testservice"
+	testNamespace    = "default"
+	testExternalName = "foo.bar.example.com"
 )
 
 func newKubeDNS() *KubeDNS {
@@ -256,6 +257,17 @@ func TestSkyNamedPortSRVLookup(t *testing.T) {
 	assertARecordsMatchIPs(t, extra, eip)
 	assertSRVRecordsMatchTarget(t, rec, fmt.Sprintf("%v.%v", fmt.Sprintf("%x", hashServiceRecord(newServiceRecord(eip, 0))), svcDomain))
 	assertSRVRecordsMatchPort(t, rec, 8081)
+}
+
+func TestSimpleExternalService(t *testing.T) {
+	kd := newKubeDNS()
+	s := newExternalNameService()
+	assert.NoError(t, kd.servicesStore.Add(s))
+
+	kd.newService(s)
+	assertDNSForExternalService(t, kd, s)
+	kd.removeService(s)
+	assertNoDNSForExternalService(t, kd, s)
 }
 
 func TestSimpleHeadlessService(t *testing.T) {
@@ -560,6 +572,24 @@ func newService(namespace, serviceName, clusterIP, portName string, portNumber i
 	return &service
 }
 
+func newExternalNameService() *kapi.Service {
+	service := kapi.Service{
+		ObjectMeta: kapi.ObjectMeta{
+			Name:      testService,
+			Namespace: testNamespace,
+		},
+		Spec: kapi.ServiceSpec{
+			ClusterIP:    "None",
+			Type:         kapi.ServiceTypeExternalName,
+			ExternalName: testExternalName,
+			Ports: []kapi.ServicePort{
+				{Port: 0},
+			},
+		},
+	}
+	return &service
+}
+
 func newHeadlessService() *kapi.Service {
 	service := kapi.Service{
 		ObjectMeta: kapi.ObjectMeta{
@@ -636,6 +666,13 @@ func assertDNSForHeadlessService(t *testing.T, kd *KubeDNS, e *kapi.Endpoints) {
 	}
 }
 
+func assertDNSForExternalService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
+	records, err := kd.Records(getServiceFQDN(kd, s), false)
+	require.NoError(t, err)
+	assert.Equal(t, 1, len(records))
+	assert.Equal(t, testExternalName, records[0].Host)
+}
+
 func assertRecordPortsMatchPort(t *testing.T, port int32, records []skymsg.Service) {
 	for _, record := range records {
 		assert.Equal(t, port, int32(record.Port))
@@ -663,6 +700,12 @@ func getIPForCName(t *testing.T, kd *KubeDNS, cname string) string {
 }
 
 func assertNoDNSForHeadlessService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
+	records, err := kd.Records(getServiceFQDN(kd, s), false)
+	require.Error(t, err)
+	assert.Equal(t, 0, len(records))
+}
+
+func assertNoDNSForExternalService(t *testing.T, kd *KubeDNS, s *kapi.Service) {
 	records, err := kd.Records(getServiceFQDN(kd, s), false)
 	require.Error(t, err)
 	assert.Equal(t, 0, len(records))

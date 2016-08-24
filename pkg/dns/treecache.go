@@ -155,8 +155,14 @@ func (cache *TreeCache) deletePath(path ...string) bool {
 		return false
 	}
 	if parentNode := cache.getSubCache(path[:len(path)-1]...); parentNode != nil {
-		if _, ok := parentNode.ChildNodes[path[len(path)-1]]; ok {
-			delete(parentNode.ChildNodes, path[len(path)-1])
+		name := path[len(path)-1]
+		if _, ok := parentNode.ChildNodes[name]; ok {
+			delete(parentNode.ChildNodes, name)
+			return true
+		}
+		// ExternalName services are stored with their name as the leaf key
+		if _, ok := parentNode.Entries[name]; ok {
+			delete(parentNode.Entries, name)
 			return true
 		}
 	}
