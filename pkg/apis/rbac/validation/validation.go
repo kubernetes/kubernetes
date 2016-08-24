@@ -18,6 +18,7 @@ package validation
 
 import (
 	"k8s.io/kubernetes/pkg/api/validation"
+	"k8s.io/kubernetes/pkg/api/validation/path"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -26,7 +27,7 @@ import (
 // * https://github.com/kubernetes/kubernetes/blob/60db50/pkg/api/validation/name.go
 // * https://github.com/openshift/origin/blob/388478/pkg/api/helpers.go
 func minimalNameRequirements(name string, prefix bool) []string {
-	return validation.IsValidPathSegmentName(name)
+	return path.IsValidPathSegmentName(name)
 }
 
 func ValidateRole(policy *rbac.Role) field.ErrorList {
