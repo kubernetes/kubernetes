@@ -176,9 +176,6 @@ func SetDefaults_KubeletConfiguration(obj *KubeletConfiguration) {
 	if obj.DockerExecHandlerName == "" {
 		obj.DockerExecHandlerName = "native"
 	}
-	if obj.DockerEndpoint == "" {
-		obj.DockerEndpoint = "unix:///var/run/docker.sock"
-	}
 	if obj.EventBurst == 0 {
 		obj.EventBurst = 10
 	}
