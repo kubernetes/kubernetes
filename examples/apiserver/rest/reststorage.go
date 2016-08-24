@@ -40,7 +40,7 @@ func NewREST(config *storagebackend.Config, storageDecorator generic.StorageDeco
 	newListFunc := func() runtime.Object { return &testgroup.TestTypeList{} }
 	// Usually you should reuse your RESTCreateStrategy.
 	strategy := &NotNamespaceScoped{}
-	storageInterface := storageDecorator(
+	storageInterface, _ := storageDecorator(
 		config, 100, &testgroup.TestType{}, prefix, strategy, newListFunc, storage.NoTriggerPublisher)
 	store := &registry.Store{
 		NewFunc: func() runtime.Object { return &testgroup.TestType{} },

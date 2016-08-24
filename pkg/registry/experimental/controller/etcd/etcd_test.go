@@ -30,10 +30,11 @@ import (
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 )
 
-func newStorage(t *testing.T) (*ScaleREST, *etcdtesting.EtcdTestServer, storage.Interface) {
+func newStorage(t *testing.T) (*ScaleREST, *etcdtesting.EtcdTestServer, storage.Interface, func()) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "controllers"}
-	return NewStorage(restOptions).Scale, server, generic.NewRawStorage(etcdStorage)
+	s, destroyFunc := generic.NewRawStorage(etcdStorage)
+	return NewStorage(restOptions).Scale, server, s, destroyFunc
 }
 
 var validPodTemplate = api.PodTemplate{
@@ -82,8 +83,11 @@ var validScale = extensions.Scale{
 }
 
 func TestGet(t *testing.T) {
-	storage, server, si := newStorage(t)
-	defer server.Terminate(t)
+	storage, server, si, destroyFunc := newStorage(t)
+	defer func() {
+		destroyFunc()
+		server.Terminate(t)
+	}()
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")
@@ -101,8 +105,11 @@ func TestGet(t *testing.T) {
 }
 
 func TestUpdate(t *testing.T) {
-	storage, server, si := newStorage(t)
-	defer server.Terminate(t)
+	storage, server, si, destroyFunc := newStorage(t)
+	defer func() {
+		destroyFunc()
+		server.Terminate(t)
+	}()
 
 	ctx := api.WithNamespace(api.NewContext(), "test")
 	key := etcdtest.AddPrefix("/controllers/test/foo")

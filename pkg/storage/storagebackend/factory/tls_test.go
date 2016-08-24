@@ -56,7 +56,8 @@ func TestTLSConnection(t *testing.T) {
 		CAFile:     caFile,
 		Codec:      testapi.Default.Codec(),
 	}
-	storage, err := newETCD3Storage(cfg)
+	storage, destroyFunc, err := newETCD3Storage(cfg)
+	defer destroyFunc()
 	if err != nil {
 		t.Fatal(err)
 	}
