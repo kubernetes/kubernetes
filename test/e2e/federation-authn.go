@@ -109,11 +109,6 @@ func invalidAuthFederationClientSet(user *framework.KubeUser) (*federation_relea
 	if err != nil {
 		return nil, fmt.Errorf("error creating federation clientset: %v", err)
 	}
-	// Set timeout for each client in the set.
-	c.DiscoveryClient.Client.Timeout = framework.SingleCallTimeout
-	c.FederationClient.Client.Timeout = framework.SingleCallTimeout
-	c.CoreClient.Client.Timeout = framework.SingleCallTimeout
-	c.ExtensionsClient.Client.Timeout = framework.SingleCallTimeout
 
 	return c, nil
 }
