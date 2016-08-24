@@ -21,18 +21,18 @@ There is also early support for building Docker "run" containers
 
 ## Key scripts
 
-The following scripts are found in the `build/` directory:
+The following scripts are found in the `build/` directory. Note that all scripts must be run from the Kubernetes root directory.
 
-* `run.sh`: Run a command in a build docker container.  Common invocations:
-  *  `run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
-  *  `run.sh make cross`: Build all binaries for all platforms
-  *  `run.sh make test`: Run all unit tests
-  *  `run.sh make test-integration`: Run integration test
-  *  `run.sh make test-cmd`: Run CLI tests
-* `copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from any remote Docker container to the local `_output/dockerized/bin`.  Right now this is only necessary on Mac OS X with `boot2docker` when your git repo isn't under `/Users`.
-* `make-clean.sh`: Clean out the contents of `_output/dockerized` and remove any local built container images.
-* `shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
-* `release.sh`: Build everything, test it, and (optionally) upload the results to a GCS bucket.
+* `build/run.sh`: Run a command in a build docker container.  Common invocations:
+  *  `build/run.sh make`: Build just linux binaries in the container.  Pass options and packages as necessary.
+  *  `build/run.sh make cross`: Build all binaries for all platforms
+  *  `build/run.sh make test`: Run all unit tests
+  *  `build/run.sh make test-integration`: Run integration test
+  *  `build/run.sh make test-cmd`: Run CLI tests
+* `build/copy-output.sh`: This will copy the contents of `_output/dockerized/bin` from any remote Docker container to the local `_output/dockerized/bin`.  Right now this is only necessary on Mac OS X with `boot2docker` when your git repo isn't under `/Users`.
+* `build/make-clean.sh`: Clean out the contents of `_output/dockerized` and remove any local built container images.
+* `build/shell.sh`: Drop into a `bash` shell in a build container with a snapshot of the current repo code.
+* `build/release.sh`: Build everything, test it, and (optionally) upload the results to a GCS bucket.
 
 ## Releasing
 
