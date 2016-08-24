@@ -32,6 +32,10 @@ const (
 )
 
 // SafeSysctlWhitelist returns the whitelist of safe sysctls and safe sysctl patterns (ending in *).
+//
+// A sysctl is called safe iff
+// - it is namespaced in the container or the pod
+// - it is isolated, i.e. has no influence on any other pod on the same node.
 func SafeSysctlWhitelist() []string {
 	return []string{
 		"kernel.shm_rmid_forced",

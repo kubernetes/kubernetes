@@ -449,8 +449,9 @@ const (
 	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
 	// key-value pairs. Unsafe sysctls must be explicitly enabled for a kubelet. They are properly
 	// namespaced to a pod or a container, but their isolation is usually unclear or weak. Their use
-	// is on-your-own-risk. Pods with sysctls not enabled for a kubelet will fail to launch.
-	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafeSysctls"
+	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
+	// will fail to launch.
+	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
@@ -536,7 +537,7 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, 
 	return avoidPods, nil
 }
 
-// SysctlsFromPodAnnotation parses the sysctl annotations a slice of safe Sysctls
+// SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
 // and a slice of unsafe Sysctls. This is only a convenience wrapper around
 // SysctlsFromPodAnnotation.
 func SysctlsFromPodAnnotations(a map[string]string) ([]Sysctl, []Sysctl, error) {
@@ -554,7 +555,7 @@ func SysctlsFromPodAnnotations(a map[string]string) ([]Sysctl, []Sysctl, error) 
 
 // SysctlsFromPodAnnotation parses an annotation value into a slice of Sysctls.
 func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
-	if annotation == "" {
+	if len(annotation) == 0 {
 		return nil, nil
 	}
 
@@ -563,7 +564,7 @@ func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
 	for i, kv := range kvs {
 		cs := strings.Split(kv, "=")
 		if len(cs) != 2 {
-			return nil, fmt.Errorf("sysctl %q not of the shape sysctl_name=value", kv)
+			return nil, fmt.Errorf("sysctl %q not of the format sysctl_name=value", kv)
 		}
 		sysctls[i].Name = cs[0]
 		sysctls[i].Value = cs[1]

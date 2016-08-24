@@ -4028,7 +4028,7 @@ func TestValidatePod(t *testing.T) {
 			},
 			Spec: validPodSpec,
 		},
-		"intersecting sysctl and unsafe sysctls annotation": {
+		"intersecting safe sysctls and unsafe sysctls annotations": {
 			ObjectMeta: api.ObjectMeta{
 				Name:      "123",
 				Namespace: "ns",

@@ -133,24 +133,21 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.Pod
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
 
-	sysctlAnn := annotations[api.SysctlsPodAnnotationKey]
-	sysctls, err := api.SysctlsFromPodAnnotation(sysctlAnn)
+	sysctls, err := api.SysctlsFromPodAnnotation(annotations[api.SysctlsPodAnnotationKey])
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.SysctlsPodAnnotationKey), sysctlAnn, err.Error()))
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.SysctlsPodAnnotationKey), annotations[api.SysctlsPodAnnotationKey], err.Error()))
 	} else {
 		allErrs = append(allErrs, validateSysctls(sysctls, fldPath.Key(api.SysctlsPodAnnotationKey))...)
 	}
-	unsafeSysctlAnn := annotations[api.UnsafeSysctlsPodAnnotationKey]
-	unsafeSysctls, err := api.SysctlsFromPodAnnotation(unsafeSysctlAnn)
+	unsafeSysctls, err := api.SysctlsFromPodAnnotation(annotations[api.UnsafeSysctlsPodAnnotationKey])
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey), unsafeSysctlAnn, err.Error()))
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey), annotations[api.UnsafeSysctlsPodAnnotationKey], err.Error()))
 	} else {
 		allErrs = append(allErrs, validateSysctls(unsafeSysctls, fldPath.Key(api.UnsafeSysctlsPodAnnotationKey))...)
 	}
 	inBoth := sysctlIntersection(sysctls, unsafeSysctls)
-	for i := range inBoth {
-		name := inBoth[i].Name
-		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey).Key(name), name, "cannot be safe and unsafe"))
+	for _, s := range inBoth {
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey).Key(s), s, "cannot be safe and unsafe"))
 	}
 
 	return allErrs
@@ -3531,15 +3528,15 @@ func isValidHostnamesMap(serializedPodHostNames string) bool {
 	return true
 }
 
-func sysctlIntersection(a []api.Sysctl, b []api.Sysctl) []api.Sysctl {
+func sysctlIntersection(a []api.Sysctl, b []api.Sysctl) []string {
 	lookup := make(map[string]struct{}, len(a))
-	result := []api.Sysctl{}
+	result := []string{}
 	for i := range a {
 		lookup[a[i].Name] = struct{}{}
 	}
 	for i := range b {
 		if _, found := lookup[b[i].Name]; found {
-			result = append(result, b[i])
+			result = append(result, b[i].Name)
 		}
 	}
 	return result
