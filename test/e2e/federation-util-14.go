@@ -94,7 +94,7 @@ func buildClustersOrFail_14(f *framework.Framework) []*federation_api.Cluster {
 	}
 	result := make([]*federation_api.Cluster, 0, len(contexts))
 	for i := range clusterList.Items {
-		result[i] = &clusterList.Items[i]
+		result = append(result, &clusterList.Items[i])
 	}
 	return result
 }
