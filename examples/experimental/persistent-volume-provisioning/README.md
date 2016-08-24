@@ -127,10 +127,10 @@ parameters:
   apiVersion: extensions/v1beta1                                                                                                                                                                                   
   kind: StorageClass                                                                                                                                                                                               
   metadata: 
-   name: fast
+   name: slow
 provisioner: kubernetes.io/rbd
 parameters:
-    monitors: 10.16.153.105:6789
+    monitors: 127.0.0.1:6789
     adminID: kube
     adminSecretName: ceph-secret
     adminSecretNamespace: kube-system
@@ -214,6 +214,8 @@ $ kubectl get pv
 
 #### Ceph RBD
 
+For this to work you must have a functional Ceph cluster, and the `rbd` command line utility must be installed on any host/container that `kube-controller-manager` or `kubelet` are running on.
+
 First we must identify the Ceph client admin key. This is usually found in `/etc/ceph/ceph.client.admin.keyring` on your Ceph cluster nodes. The file will look something like this:
 
 ```
@@ -228,10 +230,10 @@ First we must identify the Ceph client admin key. This is usually found in `/etc
 From the key value, we will create a secret. We must create the Ceph admin Secret in the namespace defined in our `StorageClass`. In this example we set the namespace to `kube-system`.
 
 ```
-$ kubectl create secret generic ceph-secret --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system
+$ kubectl create secret generic ceph-secret-admin --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system
 ```
 
-We are now ready to create our RBD Storage Class:
+Now modify `examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml` to reflect your environment, particularly the `monitors` field.  We are now ready to create our RBD Storage Class:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
@@ -240,7 +242,7 @@ $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd
 The kube-controller-manager is now able to provision storage, however we still need to be able to mount it. Mounting should be done with a non-privileged key, if you have existing users you can get all keys by running `ceph auth list` on your Ceph cluster with the admin key. For this example we will create a new user:
 
 ```
-$ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rw pool=kube'
+$ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rwx pool=kube'
 [client.kube]
 	key = AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==
 ```
@@ -248,6 +250,7 @@ $ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rw pool=kube'
 As before with the admin key, we will now create a secret in a user's namespace for the non-priviledged client key:
 
 ```
+$ kubectl create namespace myns
 $ kubectl create secret generic ceph-secret-user --from-literal=key='AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==' --namespace=myns
 ```
 Now we can create a PVC in user's namespace:
@@ -279,7 +282,7 @@ Capacity:	3Gi
 Message:	
 Source:
     Type:		RBD (a Rados Block Device mount on the host that shares a pod's lifetime)
-    CephMonitors:	[10.16.153.105:6789]
+    CephMonitors:	[127.0.0.1:6789]
     RBDImage:		kubernetes-dynamic-pvc-1cfb1862-664b-11e6-9a5d-90b11c09520d
     FSType:		
     RBDPool:		kube
