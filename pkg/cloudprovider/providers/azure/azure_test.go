@@ -37,9 +37,9 @@ func TestReconcileLoadBalancerAddPort(t *testing.T) {
 	svc := getTestService("servicea", 80)
 	pip := getTestPublicIP()
 	lb := getTestLoadBalancer()
-	hosts := []string{}
+	nodes := []*api.Node{}
 
-	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, hosts)
+	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -62,15 +62,15 @@ func TestReconcileLoadBalancerRemoveAllPortsRemovesFrontendConfig(t *testing.T) 
 	svc := getTestService("servicea", 80)
 	lb := getTestLoadBalancer()
 	pip := getTestPublicIP()
-	hosts := []string{}
+	nodes := []*api.Node{}
 
-	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, hosts)
+	lb, updated, err := az.reconcileLoadBalancer(lb, &pip, testClusterName, &svc, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
 	svcUpdated := getTestService("servicea")
-	lb, updated, err = az.reconcileLoadBalancer(lb, nil, testClusterName, &svcUpdated, hosts)
+	lb, updated, err = az.reconcileLoadBalancer(lb, nil, testClusterName, &svcUpdated, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -92,12 +92,12 @@ func TestReconcileLoadBalancerRemovesPort(t *testing.T) {
 	az := getTestCloud()
 	svc := getTestService("servicea", 80, 443)
 	pip := getTestPublicIP()
-	hosts := []string{}
+	nodes := []*api.Node{}
 
 	existingLoadBalancer := getTestLoadBalancer(svc)
 
 	svcUpdated := getTestService("servicea", 80)
-	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &pip, testClusterName, &svcUpdated, hosts)
+	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &pip, testClusterName, &svcUpdated, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
@@ -111,16 +111,16 @@ func TestReconcileLoadBalancerMultipleServices(t *testing.T) {
 	svc1 := getTestService("servicea", 80, 443)
 	svc2 := getTestService("serviceb", 80)
 	pip := getTestPublicIP()
-	hosts := []string{}
+	nodes := []*api.Node{}
 
 	existingLoadBalancer := getTestLoadBalancer()
 
-	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &pip, testClusterName, &svc1, hosts)
+	updatedLoadBalancer, _, err := az.reconcileLoadBalancer(existingLoadBalancer, &pip, testClusterName, &svc1, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
 
-	updatedLoadBalancer, _, err = az.reconcileLoadBalancer(updatedLoadBalancer, &pip, testClusterName, &svc2, hosts)
+	updatedLoadBalancer, _, err = az.reconcileLoadBalancer(updatedLoadBalancer, &pip, testClusterName, &svc2, nodes)
 	if err != nil {
 		t.Errorf("Unexpected error: %q", err)
 	}
