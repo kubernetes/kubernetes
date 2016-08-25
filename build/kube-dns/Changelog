@@ -9,3 +9,7 @@
 
  ## Version 1.5 (Thu June 23 2016 Nikhil Jindal <nikhiljindal@google.com>)
  - Adding support to return local service (pr #27708)
+
+ ## Version 1.6 (Wed June 29 2016 Girish Kalele <gkalele@google.com>)
+ - Godeps update for vendor code (skydns/mux)
+
