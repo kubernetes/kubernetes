@@ -111,7 +111,7 @@ func (rsStrategy) AllowUnconditionalUpdate() bool {
 
 // ReplicaSetToSelectableFields returns a field set that represents the object.
 func ReplicaSetToSelectableFields(rs *extensions.ReplicaSet) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(rs.ObjectMeta, true)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&rs.ObjectMeta, true)
 	rsSpecificFieldsSet := fields.Set{
 		"status.replicas": strconv.Itoa(int(rs.Status.Replicas)),
 	}

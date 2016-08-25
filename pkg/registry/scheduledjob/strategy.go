@@ -98,7 +98,7 @@ func (scheduledJobStatusStrategy) ValidateUpdate(ctx api.Context, obj, old runti
 
 // ScheduledJobToSelectableFields returns a field set that represents the object for matching purposes.
 func ScheduledJobToSelectableFields(scheduledJob *batch.ScheduledJob) fields.Set {
-	return generic.ObjectMetaFieldsSet(scheduledJob.ObjectMeta, true)
+	return generic.ObjectMetaFieldsSet(&scheduledJob.ObjectMeta, true)
 }
 
 // MatchScheduledJob is the filter used by the generic etcd backend to route

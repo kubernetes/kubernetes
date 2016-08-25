@@ -110,7 +110,7 @@ func (rcStrategy) AllowUnconditionalUpdate() bool {
 
 // ControllerToSelectableFields returns a field set that represents the object.
 func ControllerToSelectableFields(controller *api.ReplicationController) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(controller.ObjectMeta, true)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&controller.ObjectMeta, true)
 	controllerSpecificFieldsSet := fields.Set{
 		"status.replicas": strconv.Itoa(int(controller.Status.Replicas)),
 	}

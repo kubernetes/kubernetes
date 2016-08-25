@@ -27,8 +27,8 @@ import (
 // AttrFunc returns label and field sets for List or Watch to compare against, or an error.
 type AttrFunc func(obj runtime.Object) (label labels.Set, field fields.Set, err error)
 
-// ObjectMetaFieldsSet returns a fields set that represents the ObjectMeta.
-func ObjectMetaFieldsSet(objectMeta api.ObjectMeta, hasNamespaceField bool) fields.Set {
+// ObjectMetaFieldsSet returns a fields that represents the ObjectMeta.
+func ObjectMetaFieldsSet(objectMeta *api.ObjectMeta, hasNamespaceField bool) fields.Set {
 	if !hasNamespaceField {
 		return fields.Set{
 			"metadata.name": objectMeta.Name,

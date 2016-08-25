@@ -151,7 +151,7 @@ func MatchNamespace(label labels.Selector, field fields.Selector) *generic.Selec
 
 // NamespaceToSelectableFields returns a field set that represents the object
 func NamespaceToSelectableFields(namespace *api.Namespace) fields.Set {
-	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(namespace.ObjectMeta, false)
+	objectMetaFieldsSet := generic.ObjectMetaFieldsSet(&namespace.ObjectMeta, false)
 	specificFieldsSet := fields.Set{
 		"status.phase": string(namespace.Status.Phase),
 		// This is a bug, but we need to support it for backward compatibility.
