@@ -127,10 +127,10 @@ parameters:
   apiVersion: extensions/v1beta1                                                                                                                                                                                   
   kind: StorageClass                                                                                                                                                                                               
   metadata: 
-   name: slow
+   name: fast
 provisioner: kubernetes.io/rbd
 parameters:
-    monitors: 127.0.0.1:6789
+    monitors: 10.16.153.105:6789
     adminID: kube
     adminSecretName: ceph-secret
     adminSecretNamespace: kube-system
@@ -176,7 +176,7 @@ In the future, the storage class may remain in an annotation or become a field o
 }
 ```
 
-### Usage Examples
+### Sample output
 
 #### GCE
 This example uses GCE but any provisioner would follow the same flow.
@@ -214,52 +214,30 @@ $ kubectl get pv
 
 #### Ceph RBD
 
-For this to work you must have a functional Ceph cluster, and the `rbd` command line utility must be installed on any host/container that `kube-controller-manager` or `kubelet` are running on.
-
-First we must identify the Ceph client admin key. This is usually found in `/etc/ceph/ceph.client.admin.keyring` on your Ceph cluster nodes. The file will look something like this:
+First create Ceph admin's Secret in the system namespace. Here the Secret is created in `kube-system`:
 
 ```
-[client.admin]
-  key = AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==
-  auid = 0
-  caps mds = "allow"
-  caps mon = "allow *"
-  caps osd = "allow *"
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-admin.yaml --namespace=kube-system
 ```
 
-From the key value, we will create a secret. We must create the Ceph admin Secret in the namespace defined in our `StorageClass`. In this example we set the namespace to `kube-system`.
-
-```
-$ kubectl create secret generic ceph-secret-admin --from-literal=key='AQBfxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx==' --namespace=kube-system
-```
-
-Now modify `examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml` to reflect your environment, particularly the `monitors` field.  We are now ready to create our RBD Storage Class:
+Then create RBD Storage Class:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/rbd-storage-class.yaml
 ```
 
-The kube-controller-manager is now able to provision storage, however we still need to be able to mount it. Mounting should be done with a non-privileged key, if you have existing users you can get all keys by running `ceph auth list` on your Ceph cluster with the admin key. For this example we will create a new user:
+Before creating PVC in user's namespace (e.g. myns), make sure the Ceph user's Secret exists, if not, create the Secret:
 
 ```
-$ ceph auth get-or-create client.kube mon 'allow r' osd 'allow rwx pool=kube'
-[client.kube]
-	key = AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==
+$ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/ceph-secret-user.yaml --namespace=myns
 ```
-
-As before with the admin key, we will now create a secret in a user's namespace for the non-priviledged client key:
-
-```
-$ kubectl create namespace myns
-$ kubectl create secret generic ceph-secret-user --from-literal=key='AQBQyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy==' --namespace=myns
-```
-Now we can create a PVC in user's namespace:
+Now create a PVC in user's namespace (e.g. myns):
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/claim1.json --namespace=myns
 ```
 
-The PVC should kick off the provisioning of an RBD volume, and will also create a PV:
+Check the PV and PVC are created:
 ```
 $ kubectl describe pvc --namespace=myns
 Name:		claim1
@@ -282,7 +260,7 @@ Capacity:	3Gi
 Message:	
 Source:
     Type:		RBD (a Rados Block Device mount on the host that shares a pod's lifetime)
-    CephMonitors:	[127.0.0.1:6789]
+    CephMonitors:	[10.16.153.105:6789]
     RBDImage:		kubernetes-dynamic-pvc-1cfb1862-664b-11e6-9a5d-90b11c09520d
     FSType:		
     RBDPool:		kube
@@ -293,16 +271,12 @@ Source:
 No events.
 ```
 
-With our storage provisioned, we can now create a Pod to use the PVC:
+Create a Pod to use the PVC:
 
 ```
 $ kubectl create -f examples/experimental/persistent-volume-provisioning/rbd/pod.yaml --namespace=myns
 ```
-Now our pod has an RBD mount!
-```
-$ kubectl exec -it server-fzawv -- df -h | grep rbd
-/dev/rbd1       2.9G  4.5M  2.8G   1% /var/lib/www/html
-```
+
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
 [![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/examples/experimental/persistent-volume-provisioning/README.md?pixel)]()
