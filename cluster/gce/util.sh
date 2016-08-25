@@ -595,9 +595,8 @@ function kube-up() {
     parse-master-env
     create-nodes
   elif [[ ${KUBE_EXPERIMENTAL_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
-    # TODO(jsz): implement adding replica for other distributions.
-    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" ]]; then
-      echo "Master replication supported only for gci"
+    if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" && "${MASTER_OS_DISTRIBUTION}" != "debian" ]]; then
+      echo "Master replication supported only for gci and debian"
       return 1
     fi
     create-loadbalancer
