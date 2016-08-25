@@ -17,12 +17,10 @@ limitations under the License.
 package storage
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/api/validation"
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/validation/field"
 )
@@ -106,11 +104,9 @@ func NamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	name := meta.GetName()
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
-		return "", fmt.Errorf("invalid name: %v", msgs)
-	}
-	return prefix + "/" + meta.GetNamespace() + "/" + name, nil
+	// We assume that NamespaceKeyFunc is used for read requests (List and Watch)
+	// and thus the object is correct and we don't perform any validation.
+	return prefix + "/" + meta.GetNamespace() + "/" + meta.GetName(), nil
 }
 
 func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
@@ -118,11 +114,9 @@ func NoNamespaceKeyFunc(prefix string, obj runtime.Object) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	name := meta.GetName()
-	if msgs := validation.IsValidPathSegmentName(name); len(msgs) != 0 {
-		return "", fmt.Errorf("invalid name: %v", msgs)
-	}
-	return prefix + "/" + name, nil
+	// We assume that NamespaceKeyFunc is used for read requests (List and Watch)
+	// and thus the object is correct and we don't perform any validation.
+	return prefix + "/" + meta.GetName(), nil
 }
 
 // hasPathPrefix returns true if the string matches pathPrefix exactly, or if is prefixed with pathPrefix at a path segment boundary
