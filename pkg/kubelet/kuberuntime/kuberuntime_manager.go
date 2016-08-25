@@ -341,7 +341,14 @@ func (m *kubeGenericRuntimeManager) GetNetNS(sandboxID kubecontainer.ContainerID
 
 // GetPodContainerID gets pod sandbox ID
 func (m *kubeGenericRuntimeManager) GetPodContainerID(pod *kubecontainer.Pod) (kubecontainer.ContainerID, error) {
-	return kubecontainer.ContainerID{}, fmt.Errorf("not implemented")
+	podFullName := kubecontainer.BuildPodFullName(pod.Name, pod.Namespace)
+	if len(pod.Sandboxes) == 0 {
+		glog.Errorf("No sandboxes are found for pod %q", podFullName)
+		return kubecontainer.ContainerID{}, fmt.Errorf("sandboxes for pod %q not found", podFullName)
+	}
+
+	// return sandboxID of the first sandbox since it is the latest one
+	return pod.Sandboxes[0].ID, nil
 }
 
 // Forward the specified port from the specified pod to the stream.
