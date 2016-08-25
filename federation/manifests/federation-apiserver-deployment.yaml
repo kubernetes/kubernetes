@@ -24,7 +24,7 @@ spec:
         - --secure-port=443
         - --advertise-address={{.FEDERATION_API_HOST}}
         - --client-ca-file=/srv/kubernetes/ca.crt
-        - --basic-auth-file=/srv/kubernetes/basic_auth.csv
+        - --basic-auth-file=/srv/kubernetes/basic-auth.csv
         - --tls-cert-file=/srv/kubernetes/server.cert
         - --tls-private-key-file=/srv/kubernetes/server.key
         - --admission-control={{.FEDERATION_ADMISSION_CONTROL}}
