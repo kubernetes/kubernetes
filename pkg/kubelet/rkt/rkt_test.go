@@ -1164,6 +1164,9 @@ func TestSetApp(t *testing.T) {
 
 func TestGenerateRunCommand(t *testing.T) {
 	hostName := "test-hostname"
+	boolTrue := true
+	boolFalse := false
+
 	tests := []struct {
 		networkPlugin network.NetworkPlugin
 		pod           *api.Pod
@@ -1184,7 +1187,9 @@ func TestGenerateRunCommand(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "pod-name-foo",
 				},
-				Spec: api.PodSpec{},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "container-foo"}},
+				},
 			},
 			"rkt-uuid-foo",
 			"default",
@@ -1200,6 +1205,9 @@ func TestGenerateRunCommand(t *testing.T) {
 			&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: "pod-name-foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "container-foo"}},
 				},
 			},
 			"rkt-uuid-foo",
@@ -1221,6 +1229,7 @@ func TestGenerateRunCommand(t *testing.T) {
 					SecurityContext: &api.PodSecurityContext{
 						HostNetwork: true,
 					},
+					Containers: []api.Container{{Name: "container-foo"}},
 				},
 			},
 			"rkt-uuid-foo",
@@ -1242,6 +1251,7 @@ func TestGenerateRunCommand(t *testing.T) {
 					SecurityContext: &api.PodSecurityContext{
 						HostNetwork: false,
 					},
+					Containers: []api.Container{{Name: "container-foo"}},
 				},
 			},
 			"rkt-uuid-foo",
@@ -1263,6 +1273,7 @@ func TestGenerateRunCommand(t *testing.T) {
 					SecurityContext: &api.PodSecurityContext{
 						HostNetwork: true,
 					},
+					Containers: []api.Container{{Name: "container-foo"}},
 				},
 			},
 			"rkt-uuid-foo",
@@ -1280,7 +1291,9 @@ func TestGenerateRunCommand(t *testing.T) {
 				ObjectMeta: api.ObjectMeta{
 					Name: "pod-name-foo",
 				},
-				Spec: api.PodSpec{},
+				Spec: api.PodSpec{
+					Containers: []api.Container{{Name: "container-foo"}},
+				},
 			},
 			"rkt-uuid-foo",
 			"default",
@@ -1289,6 +1302,50 @@ func TestGenerateRunCommand(t *testing.T) {
 			"pod-hostname-foo",
 			nil,
 			"/bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=rkt.kubernetes.io --dns=127.0.0.1 --dns-search=. --dns-opt=ndots:5 --hostname=pod-hostname-foo rkt-uuid-foo",
+		},
+		// Case #6, if all containers are privileged, the result should have 'insecure-options=all-run'
+		{
+			kubenet.NewPlugin("/tmp"),
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod-name-foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container-foo", SecurityContext: &api.SecurityContext{Privileged: &boolTrue}},
+						{Name: "container-bar", SecurityContext: &api.SecurityContext{Privileged: &boolTrue}},
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			"default",
+			[]string{},
+			[]string{},
+			"pod-hostname-foo",
+			nil,
+			"/usr/bin/nsenter --net=/var/run/netns/default -- /bin/rkt/rkt --insecure-options=image,ondisk,all-run --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=pod-hostname-foo rkt-uuid-foo",
+		},
+		// Case #7, if not all containers are privileged, the result should not have 'insecure-options=all-run'
+		{
+			kubenet.NewPlugin("/tmp"),
+			&api.Pod{
+				ObjectMeta: api.ObjectMeta{
+					Name: "pod-name-foo",
+				},
+				Spec: api.PodSpec{
+					Containers: []api.Container{
+						{Name: "container-foo", SecurityContext: &api.SecurityContext{Privileged: &boolTrue}},
+						{Name: "container-bar", SecurityContext: &api.SecurityContext{Privileged: &boolFalse}},
+					},
+				},
+			},
+			"rkt-uuid-foo",
+			"default",
+			[]string{},
+			[]string{},
+			"pod-hostname-foo",
+			nil,
+			"/usr/bin/nsenter --net=/var/run/netns/default -- /bin/rkt/rkt --insecure-options=image,ondisk --local-config=/var/rkt/local/data --dir=/var/data run-prepared --net=host --hostname=pod-hostname-foo rkt-uuid-foo",
 		},
 	}
 

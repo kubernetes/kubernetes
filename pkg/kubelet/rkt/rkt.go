@@ -70,8 +70,8 @@ const (
 	RktType                      = "rkt"
 	DefaultRktAPIServiceEndpoint = "localhost:15441"
 
-	minimumRktBinVersion     = "1.9.1"
-	recommendedRktBinVersion = "1.9.1"
+	minimumRktBinVersion     = "1.13.0"
+	recommendedRktBinVersion = "1.13.0"
 
 	minimumRktApiVersion  = "1.0.0-alpha"
 	minimumSystemdVersion = "219"
@@ -929,7 +929,26 @@ func (r *Runtime) usesRktHostNetwork(pod *api.Pod) bool {
 
 // generateRunCommand crafts a 'rkt run-prepared' command with necessary parameters.
 func (r *Runtime) generateRunCommand(pod *api.Pod, uuid, netnsName string) (string, error) {
-	runPrepared := buildCommand(r.config, "run-prepared").Args
+	config := *r.config
+	privileged := true
+
+	for _, c := range pod.Spec.Containers {
+		ctx := securitycontext.DetermineEffectiveSecurityContext(pod, &c)
+		if ctx == nil || ctx.Privileged == nil || *ctx.Privileged == false {
+			privileged = false
+			break
+		}
+	}
+
+	// Use "all-run" insecure option (https://github.com/coreos/rkt/pull/2983) to take care
+	// of privileged pod.
+	// TODO(yifan): Have more granular app-level control of the insecure options.
+	// See: https://github.com/coreos/rkt/issues/2996.
+	if privileged {
+		config.InsecureOptions = fmt.Sprintf("%s,%s", config.InsecureOptions, "all-run")
+	}
+
+	runPrepared := buildCommand(&config, "run-prepared").Args
 
 	var hostname string
 	var err error
