@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
@@ -55,9 +54,16 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
-			deleteAllTestNamespacesFed14(f.FederationClientset_1_4)
+			// TODO: set wait to true once NS controller is fixed.
+			deleteAllTestNamespaces(
+				f.FederationClientset_1_4.Core().Namespaces().List,
+				f.FederationClientset_1_4.Core().Namespaces().Delete,
+				false)
 			for _, clientset := range clusterClientSet {
-				deleteAllTestNamespaces13(clientset)
+				deleteAllTestNamespaces(
+					clientset.Core().Namespaces().List,
+					clientset.Core().Namespaces().Delete,
+					false)
 			}
 		})
 
@@ -88,40 +94,48 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			})
 			framework.ExpectNoError(err, "Not all namespaces created")
 
-			err = f.FederationClientset_1_4.Core().Namespaces().Delete(ns.Name, &api.DeleteOptions{})
-			framework.ExpectNoError(err, "Failed to delete namespace %s", ns.Name)
+			// TODO: set wait to true once NS controller is fixed.
+			deleteAllTestNamespaces(
+				f.FederationClientset_1_4.Core().Namespaces().List,
+				f.FederationClientset_1_4.Core().Namespaces().Delete,
+				false)
 		})
 	})
 })
 
-func deleteAllTestNamespacesFed14(clientset *federation_release_1_4.Clientset) {
-	list, err := clientset.Core().Namespaces().List(api.ListOptions{})
+func deleteAllTestNamespaces(lister func(api.ListOptions) (*api_v1.NamespaceList, error), deleter func(string, *api.DeleteOptions) error, waitForDeletion bool) {
+	list, err := lister(api.ListOptions{})
 	if err != nil {
 		framework.Failf("Failed to get all namespaes: %v", err)
 		return
 	}
 	for _, namespace := range list.Items {
-		if strings.HasPrefix(namespace.Name, namespacePrefix) {
-			err := clientset.Core().Namespaces().Delete(namespace.Name, &api.DeleteOptions{})
+		if strings.HasPrefix(namespace.Name, namespacePrefix) && namespace.DeletionTimestamp != nil {
+			err := deleter(namespace.Name, &api.DeleteOptions{})
 			if err != nil {
-				framework.Failf("Failed to delete %s: %v", namespace.Name, err)
+				framework.Failf("Failed to set %s for deletion: %v", namespace.Name, err)
 			}
 		}
+	}
+	if waitForDeletion {
+		waitForNoTestNamespaces(lister)
 	}
 }
 
-func deleteAllTestNamespaces13(clientset *release_1_3.Clientset) {
-	list, err := clientset.Core().Namespaces().List(api.ListOptions{})
-	if err != nil {
-		framework.Failf("Failed to get all namespaes: %v", err)
-		return
-	}
-	for _, namespace := range list.Items {
-		if strings.HasPrefix(namespace.Name, namespacePrefix) {
-			err := clientset.Core().Namespaces().Delete(namespace.Name, &api.DeleteOptions{})
-			if err != nil {
-				framework.Failf("Failed to delete %s: %v", namespace.Name, err)
+func waitForNoTestNamespaces(lister func(api.ListOptions) (*api_v1.NamespaceList, error)) {
+	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
+		list, err := lister(api.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, namespace := range list.Items {
+			if strings.HasPrefix(namespace.Name, namespacePrefix) {
+				return false, nil
 			}
 		}
+		return true, nil
+	})
+	if err != nil {
+		framework.Failf("Namespaces not deleted: %v", err)
 	}
 }
