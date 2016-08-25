@@ -24,10 +24,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update -y \
     ethtool \
     ca-certificates \
     conntrack \
-    file \
     util-linux \
     socat \
-    curl \
     git \
     nfs-common \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
@@ -40,34 +38,28 @@ RUN cp /usr/bin/nsenter /nsenter
 COPY hyperkube /hyperkube
 
 # Manifests for the docker guide
-COPY static-pods/master.json /etc/kubernetes/manifests/
-COPY static-pods/etcd.json /etc/kubernetes/manifests/
-COPY static-pods/addon-manager.json /etc/kubernetes/manifests/
-
-# TODO: Move out kube-proxy to a DaemonSet again
-COPY static-pods/kube-proxy.json /etc/kubernetes/manifests/
+COPY static-pods/master.json \
+     static-pods/etcd.json \
+     static-pods/addon-manager-singlenode.json \
+     static-pods/kube-proxy.json \
+        /etc/kubernetes/manifests/
 
 # Manifests for the docker-multinode guide
-COPY static-pods/master-multi.json /etc/kubernetes/manifests-multi/
-COPY static-pods/addon-manager.json /etc/kubernetes/manifests-multi/
-
-# TODO: Move out kube-proxy to a DaemonSet again
-COPY static-pods/kube-proxy.json /etc/kubernetes/manifests-multi/
+COPY static-pods/master-multi.json \
+     static-pods/addon-manager-multinode.json \
+        /etc/kubernetes/manifests-multi/
 
 # Copy over all addons
 COPY addons /etc/kubernetes/addons
 
-# Other required scripts for the setup
-COPY safe_format_and_mount /usr/share/google/safe_format_and_mount
-COPY setup-files.sh /setup-files.sh
-COPY make-ca-cert.sh /make-ca-cert.sh
-COPY copy-addons.sh /copy-addons.sh
+# Copy other required scripts for the setup
+COPY setup-files.sh make-ca-cert.sh copy-addons.sh /
 
 # easy-rsa package required by make-ca-cert
 ADD https://storage.googleapis.com/kubernetes-release/easy-rsa/easy-rsa.tar.gz /root/kube/
 
-# Copy the cni folder into /opt/
-COPY cni /opt/cni
+# Copy the the cni-bin folder into /opt/cni/bin
+COPY cni-bin /opt/cni/bin
 
 # Copy overlay configuration to default directory
 COPY cni-conf /etc/cni/net.d
