@@ -25,8 +25,9 @@ import (
 
 type TestType struct {
 	unversioned.TypeMeta `json:",inline"`
-	api.ObjectMeta       `json:"metadata,omitempty"`
-	Status               TestTypeStatus `json:"status,omitempty"`
+	// +k8s:openapi-gen=false
+	api.ObjectMeta `json:"metadata,omitempty"`
+	Status         TestTypeStatus `json:"status,omitempty"`
 }
 
 type TestTypeList struct {
