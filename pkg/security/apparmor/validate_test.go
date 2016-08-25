@@ -60,12 +60,12 @@ func TestValidateProfile(t *testing.T) {
 		expectValid bool
 	}{
 		{"", true},
-		{"runtime/default", true},
+		{ProfileRuntimeDefault, true},
 		{"baz", false}, // Missing local prefix.
-		{"localhost//usr/sbin/ntpd", true},
-		{"localhost/foo-bar", true},
-		{"localhost/unloaded", false}, // Not loaded.
-		{"localhost/", false},
+		{ProfileNamePrefix + "/usr/sbin/ntpd", true},
+		{ProfileNamePrefix + "foo-bar", true},
+		{ProfileNamePrefix + "unloaded", false}, // Not loaded.
+		{ProfileNamePrefix + "", false},
 	}
 
 	for _, test := range tests {
@@ -89,8 +89,8 @@ func TestValidateBadHost(t *testing.T) {
 		expectValid bool
 	}{
 		{"", true},
-		{"runtime/default", false},
-		{"localhost/docker-default", false},
+		{ProfileRuntimeDefault, false},
+		{ProfileNamePrefix + "docker-default", false},
 	}
 
 	for _, test := range tests {
@@ -113,13 +113,13 @@ func TestValidateValidHost(t *testing.T) {
 		expectValid bool
 	}{
 		{"", true},
-		{"runtime/default", true},
-		{"localhost/docker-default", true},
-		{"localhost/foo-container", true},
-		{"localhost//usr/sbin/ntpd", true},
+		{ProfileRuntimeDefault, true},
+		{ProfileNamePrefix + "docker-default", true},
+		{ProfileNamePrefix + "foo-container", true},
+		{ProfileNamePrefix + "/usr/sbin/ntpd", true},
 		{"docker-default", false},
-		{"localhost/foo", false},
-		{"localhost/", false},
+		{ProfileNamePrefix + "foo", false},
+		{ProfileNamePrefix + "", false},
 	}
 
 	for _, test := range tests {
@@ -135,9 +135,9 @@ func TestValidateValidHost(t *testing.T) {
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Annotations: map[string]string{
-				"container.apparmor.security.alpha.kubernetes.io/init":  "localhost/foo-container",
-				"container.apparmor.security.alpha.kubernetes.io/test1": "runtime/default",
-				"container.apparmor.security.alpha.kubernetes.io/test2": "localhost/docker-default",
+				ContainerAnnotationKeyPrefix + "init":  ProfileNamePrefix + "foo-container",
+				ContainerAnnotationKeyPrefix + "test1": ProfileRuntimeDefault,
+				ContainerAnnotationKeyPrefix + "test2": ProfileNamePrefix + "docker-default",
 			},
 		},
 		Spec: api.PodSpec{
@@ -173,7 +173,7 @@ func TestParseProfileName(t *testing.T) {
 
 func getPodWithProfile(profile string) *api.Pod {
 	annotations := map[string]string{
-		"container.apparmor.security.alpha.kubernetes.io/test": profile,
+		ContainerAnnotationKeyPrefix + "test": profile,
 	}
 	if profile == "" {
 		annotations = map[string]string{
