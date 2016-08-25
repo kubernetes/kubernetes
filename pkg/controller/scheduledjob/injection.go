@@ -29,7 +29,7 @@ import (
 // sjControlInterface is an interface that knows how to update ScheduledJob status
 // created as an interface to allow testing.
 type sjControlInterface interface {
-	UpdateStatus(sj *batch.ScheduledJob) error
+	UpdateStatus(sj *batch.ScheduledJob) (*batch.ScheduledJob, error)
 }
 
 // realSJControl is the default implementation of sjControlInterface.
@@ -39,9 +39,8 @@ type realSJControl struct {
 
 var _ sjControlInterface = &realSJControl{}
 
-func (c *realSJControl) UpdateStatus(sj *batch.ScheduledJob) error {
-	_, err := c.KubeClient.Batch().ScheduledJobs(sj.Namespace).UpdateStatus(sj)
-	return err
+func (c *realSJControl) UpdateStatus(sj *batch.ScheduledJob) (*batch.ScheduledJob, error) {
+	return c.KubeClient.Batch().ScheduledJobs(sj.Namespace).UpdateStatus(sj)
 }
 
 // fakeSJControl is the default implementation of sjControlInterface.
@@ -51,9 +50,9 @@ type fakeSJControl struct {
 
 var _ sjControlInterface = &fakeSJControl{}
 
-func (c *fakeSJControl) UpdateStatus(sj *batch.ScheduledJob) error {
+func (c *fakeSJControl) UpdateStatus(sj *batch.ScheduledJob) (*batch.ScheduledJob, error) {
 	c.Updates = append(c.Updates, *sj)
-	return nil
+	return sj, nil
 }
 
 // ------------------------------------------------------------------ //
