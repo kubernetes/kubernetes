@@ -149,10 +149,11 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 			}
 		}
 	}
-	err := sjc.UpdateStatus(&sj)
+	updatedSJ, err := sjc.UpdateStatus(&sj)
 	if err != nil {
-		glog.Errorf("Unable to update status for %s: %v", nameForLog, err)
+		glog.Errorf("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
 	}
+	sj = *updatedSJ
 
 	if sj.Spec.Suspend != nil && *sj.Spec.Suspend {
 		glog.V(4).Infof("Not starting job for %s because it is suspended", nameForLog)
@@ -280,8 +281,8 @@ func SyncOne(sj batch.ScheduledJob, js []batch.Job, now time.Time, jc jobControl
 		sj.Status.Active = append(sj.Status.Active, *ref)
 	}
 	sj.Status.LastScheduleTime = &unversioned.Time{Time: scheduledTime}
-	if err := sjc.UpdateStatus(&sj); err != nil {
-		glog.Infof("Unable to update status for %s: %v", nameForLog, err)
+	if _, err := sjc.UpdateStatus(&sj); err != nil {
+		glog.Infof("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
 	}
 
 	return
