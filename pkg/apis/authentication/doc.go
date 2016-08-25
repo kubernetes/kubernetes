@@ -16,4 +16,5 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 // +groupName=authentication.k8s.io
+// +k8s:openapi-gen=true
 package authentication // import "k8s.io/kubernetes/pkg/apis/authentication"
