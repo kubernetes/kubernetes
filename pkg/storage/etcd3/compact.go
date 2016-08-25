@@ -86,10 +86,10 @@ func compactor(ctx context.Context, client *clientv3.Client, interval time.Durat
 	// CAS later and would try again in 10 minutes. If an APIServer crashed, another one would "take over" the lease.
 	//
 	// For example, in the following diagram, we have a compactor C1 doing compaction in t1, t2. Another compactor C2
-	// at t1' (t1 < t1' < t2) would CAS fail, set its known oldRev to rev at t1, and try again in t2' (t2' > t2).
+	// at t1' (t1 < t1' < t2) would CAS fail, set its known oldRev to rev at t1', and try again in t2' (t2' > t2).
 	// If C1 crashed and wouldn't compact at t2, C2 would CAS successfully at t2'.
 	//
-	//                   oldRev(t2)   curRev(t2)
+	//                 oldRev(t2)     curRev(t2)
 	//                                  +
 	//   oldRev        curRev           |
 	//     +             +              |
