@@ -177,26 +177,27 @@ function install_google_cloud_sdk_tarball() {
 }
 
 # Figures out the builtin k8s version of a GCI image.
-# Assumes: JENKINS_GCI_IMAGE_FAMILY and KUBE_GCE_MASTER_IMAGE
+# Assumes: JENKINS_GCI_HEAD_IMAGE_FAMILY and KUBE_GCE_MASTER_IMAGE
 function get_gci_k8s_version() {
-    if [[ -z "${JENKINS_GCI_IMAGE_FAMILY:-}" ]] || [[ -z "${KUBE_GCE_MASTER_IMAGE:-}" ]]; then
-        echo "JENKINS_GCI_IMAGE_FAMILY and KUBE_GCE_MASTER_IMAGE must be set."
+    if [[ -z "${JENKINS_GCI_HEAD_IMAGE_FAMILY:-}" ]] || [[ -z "${KUBE_GCE_MASTER_IMAGE:-}" ]]; then
+        echo "JENKINS_GCI_HEAD_IMAGE_FAMILY and KUBE_GCE_MASTER_IMAGE must be set."
         exit 1
     fi
     local -r gci_k8s_version="v$(gsutil cat gs://container-vm-image-staging/k8s-version-map/${KUBE_GCE_MASTER_IMAGE})"
     echo "${gci_k8s_version}"
 }
 
-# GCI specific settings.
-# Assumes: JENKINS_GCI_IMAGE_FAMILY
+# Specific settings for tests that use GCI HEAD images. I.e., if your test is
+# using a public/released GCI image, you don't want to call this function.
+# Assumes: JENKINS_GCI_HEAD_IMAGE_FAMILY
 function setup_gci_vars() {
     local -r gci_staging_project=container-vm-image-staging
-    local -r image_name="$(gcloud compute images describe-from-family ${JENKINS_GCI_IMAGE_FAMILY} --project=${gci_staging_project} --format='value(name)')"
+    local -r image_name="$(gcloud compute images describe-from-family ${JENKINS_GCI_HEAD_IMAGE_FAMILY} --project=${gci_staging_project} --format='value(name)')"
 
     export KUBE_GCE_MASTER_PROJECT="${gci_staging_project}"
     export KUBE_GCE_MASTER_IMAGE="${image_name}"
     export KUBE_MASTER_OS_DISTRIBUTION="gci"
-    if [[ "${JENKINS_GCI_IMAGE_FAMILY}" == "gci-canary-test" ]]; then
+    if [[ "${JENKINS_GCI_HEAD_IMAGE_FAMILY}" == "gci-canary-test" ]]; then
         # The family "gci-canary-test" is reserved for a special type of GCI images
         # that are used to continuously validate Docker releases.
         export KUBE_GCI_DOCKER_VERSION="$(get_latest_docker_release)"
@@ -234,8 +235,10 @@ if [[ -n "${CLOUDSDK_BUCKET:-}" ]]; then
     install_google_cloud_sdk_tarball ~/repo/google-cloud-sdk.tar.gz ~/cloudsdk
 fi
 
-# GCI specific settings.
-if [[ -n "${JENKINS_GCI_IMAGE_FAMILY:-}" ]]; then
+# Specific settings for tests that use GCI HEAD images. I.e., if your test is
+# using a public/released GCI image, you don't want to set this variable or call
+# `setup_gci_vars`.
+if [[ -n "${JENKINS_GCI_HEAD_IMAGE_FAMILY:-}" ]]; then
   setup_gci_vars
 fi
 
