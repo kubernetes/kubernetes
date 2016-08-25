@@ -13,7 +13,6 @@ limitations under the License.
 package discovery
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -46,13 +45,13 @@ type fsCALoader struct {
 }
 
 func (cl *fsCALoader) LoadPEM() (string, error) {
-	if cl.certData != "" {
+	if cl.certData == "" {
 		data, err := ioutil.ReadFile(CAPath)
 		if err != nil {
 			return "", err
 		}
 
-		cl.certData = base64.StdEncoding.EncodeToString(data)
+		cl.certData = string(data)
 	}
 
 	return cl.certData, nil
@@ -139,6 +138,7 @@ func (cih *ClusterInfoHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 
 	// TODO probably should not leak server-side errors to the client
 	caPEM, err := cih.caLoader.LoadPEM()
+	log.Printf("Loaded CA: %s", caPEM)
 	if err != nil {
 		err = fmt.Errorf("Error loading root CA certificate data: %s", err)
 		log.Println(err)

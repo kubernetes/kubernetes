@@ -13,7 +13,6 @@ limitations under the License.
 package discovery
 
 import (
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -55,8 +54,7 @@ type mockCALoader struct {
 }
 
 func (cl *mockCALoader) LoadPEM() (string, error) {
-	certData := base64.StdEncoding.EncodeToString([]byte(mockCA))
-	return certData, nil
+	return mockCA, nil
 }
 
 func TestClusterInfoIndex(t *testing.T) {
@@ -164,9 +162,6 @@ func TestClusterInfoIndex(t *testing.T) {
 				t.Errorf("Unable to unmarshall payload to JSON: error=%s body=%s", err, rr.Body.String())
 				continue
 			}
-			if len(ci.CertificateAuthorities) != 1 {
-				t.Error("Expected 1 root certificate, got: %d", len(ci.CertificateAuthorities))
-			}
 			if len(ci.Endpoints) != 2 {
 				t.Errorf("Expected 2 endpoints, got: %d", len(ci.Endpoints))
 			}
@@ -177,6 +172,12 @@ func TestClusterInfoIndex(t *testing.T) {
 				t.Errorf("Unexpected endpoint: %s", ci.Endpoints[1])
 			}
 
+			if len(ci.CertificateAuthorities) != 1 {
+				t.Errorf("Expected 1 root certificate, got: %d", len(ci.CertificateAuthorities))
+			}
+			if ci.CertificateAuthorities[0] != mockCA {
+				t.Errorf("Expected CA: %s, got: %s", mockCA, ci.CertificateAuthorities[0])
+			}
 		}
 	}
 }
