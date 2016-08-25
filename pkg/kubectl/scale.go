@@ -198,27 +198,45 @@ func (scaler *ReplicationControllerScaler) Scale(namespace, name string, newSize
 		return err
 	}
 	if waitForReplicas != nil {
-		watchOptions := api.ListOptions{FieldSelector: fields.OneTermEqualSelector("metadata.name", name), ResourceVersion: updatedResourceVersion}
-		watcher, err := scaler.c.ReplicationControllers(namespace).Watch(watchOptions)
+		checkRC := func(rc *api.ReplicationController) bool {
+			if uint(rc.Spec.Replicas) != newSize {
+				// the size is changed by other party. Don't need to wait for the new change to complete.
+				return true
+			}
+			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == rc.Spec.Replicas
+		}
+		// If number of replicas doesn't change, then the update may not event
+		// be sent to underlying databse (we don't send no-op changes).
+		// In such case, <updatedResourceVersion> will have value of the most
+		// recent update (which may be far in the past) so we may get "too old
+		// RV" error from watch or potentially no ReplicationController events
+		// will be deliver, since it may already be in the expected state.
+		// To protect from these two, we first issue Get() to ensure that we
+		// are not already in the expected state.
+		currentRC, err := scaler.c.ReplicationControllers(namespace).Get(name)
 		if err != nil {
 			return err
 		}
-		_, err = watch.Until(waitForReplicas.Timeout, watcher, func(event watch.Event) (bool, error) {
-			if event.Type != watch.Added && event.Type != watch.Modified {
-				return false, nil
+		if !checkRC(currentRC) {
+			watchOptions := api.ListOptions{
+				FieldSelector:   fields.OneTermEqualSelector("metadata.name", name),
+				ResourceVersion: updatedResourceVersion,
 			}
-
-			rc := event.Object.(*api.ReplicationController)
-			if uint(rc.Spec.Replicas) != newSize {
-				// the size is changed by other party. Don't need to wait for the new change to complete.
-				return true, nil
+			watcher, err := scaler.c.ReplicationControllers(namespace).Watch(watchOptions)
+			if err != nil {
+				return err
 			}
-			return rc.Status.ObservedGeneration >= rc.Generation && rc.Status.Replicas == rc.Spec.Replicas, nil
-		})
-		if err == wait.ErrWaitTimeout {
-			return fmt.Errorf("timed out waiting for %q to be synced", name)
+			_, err = watch.Until(waitForReplicas.Timeout, watcher, func(event watch.Event) (bool, error) {
+				if event.Type != watch.Added && event.Type != watch.Modified {
+					return false, nil
+				}
+				return checkRC(event.Object.(*api.ReplicationController)), nil
+			})
+			if err == wait.ErrWaitTimeout {
+				return fmt.Errorf("timed out waiting for %q to be synced", name)
+			}
+			return err
 		}
-		return err
 	}
 	return nil
 }

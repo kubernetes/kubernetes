@@ -70,7 +70,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "watch", "delete"},
+			ExpectedActions: []string{"get", "list", "get", "update", "get", "delete"},
 		},
 		{
 			Name: "NoOverlapping",
@@ -108,7 +108,7 @@ func TestReplicationControllerStop(t *testing.T) {
 				},
 			},
 			StopError:       nil,
-			ExpectedActions: []string{"get", "list", "get", "update", "watch", "delete"},
+			ExpectedActions: []string{"get", "list", "get", "update", "get", "delete"},
 		},
 		{
 			Name: "OverlappingError",
