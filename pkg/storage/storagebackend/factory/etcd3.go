@@ -36,11 +36,7 @@ func newETCD3Storage(c storagebackend.Config) (storage.Interface, error) {
 	if err != nil {
 		return nil, err
 	}
-	// NOTE: Client relies on nil tlsConfig
-	// for non-secure connections, update the implicit variable
-	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.CAFile) == 0 {
-		tlsConfig = nil
-	}
+
 	cfg := clientv3.Config{
 		Endpoints: c.ServerList,
 		TLS:       tlsConfig,
