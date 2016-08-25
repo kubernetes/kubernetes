@@ -45,6 +45,10 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
+func init() {
+	kubeletapp.RegisterPlugins()
+}
+
 // TODO(jdef): passing the value of envContainerID to all docker containers instantiated
 // through the kubelet is part of a strategy to enable orphan container GC; this can all
 // be ripped out once we have a kubelet runtime that leverages Mesos native containerization.

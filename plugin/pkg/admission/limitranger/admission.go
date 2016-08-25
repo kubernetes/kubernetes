@@ -41,7 +41,7 @@ const (
 	limitRangerAnnotation = "kubernetes.io/limit-ranger"
 )
 
-func init() {
+func RegisterPlugin() {
 	admission.RegisterPlugin("LimitRanger", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewLimitRanger(client, &DefaultLimitRangerActions{})
 	})

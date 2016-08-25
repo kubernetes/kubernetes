@@ -90,6 +90,10 @@ func NewCMServer() *CMServer {
 	return s
 }
 
+func init() {
+	kubecontrollermanager.RegisterPlugins()
+}
+
 // AddFlags adds flags for a specific CMServer to the specified FlagSet
 func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	s.CMServer.AddFlags(fs)

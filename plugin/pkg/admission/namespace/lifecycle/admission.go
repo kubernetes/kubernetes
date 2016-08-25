@@ -40,7 +40,7 @@ const (
 	forceLiveLookupTTL = 30 * time.Second
 )
 
-func init() {
+func RegisterPlugin() {
 	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewLifecycle(client, sets.NewString(api.NamespaceDefault, api.NamespaceSystem))
 	})

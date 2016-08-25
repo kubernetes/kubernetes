@@ -46,6 +46,9 @@ func main() {
 
 	verflag.PrintAndExitIfRequested()
 
+	// Register all admission and cloudprovider plugins
+	app.RegisterPlugins()
+
 	if err := app.Run(s); err != nil {
 		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)

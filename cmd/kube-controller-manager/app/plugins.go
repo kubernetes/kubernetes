@@ -25,7 +25,7 @@ import (
 
 	// Cloud providers
 	"k8s.io/kubernetes/pkg/apis/componentconfig"
-	_ "k8s.io/kubernetes/pkg/cloudprovider/providers"
+	"k8s.io/kubernetes/pkg/cloudprovider/providers"
 
 	// Volume plugins
 	"github.com/golang/glog"
@@ -46,6 +46,10 @@ import (
 	"k8s.io/kubernetes/pkg/volume/nfs"
 	"k8s.io/kubernetes/pkg/volume/vsphere_volume"
 )
+
+func RegisterPlugins() {
+	providers.RegisterCloudProviders()
+}
 
 // ProbeAttachableVolumePlugins collects all volume plugins for the attach/
 // detach controller. VolumeConfiguration is used ot get FlexVolumePluginDir

@@ -28,7 +28,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 )
 
-func init() {
+func RegisterPlugin() {
 	admission.RegisterPlugin("LimitPodHardAntiAffinityTopology", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewInterPodAntiAffinity(client), nil
 	})

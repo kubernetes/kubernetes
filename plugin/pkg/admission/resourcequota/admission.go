@@ -28,7 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/quota/install"
 )
 
-func init() {
+func RegisterPlugin() {
 	admission.RegisterPlugin("ResourceQuota",
 		func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 			registry := install.NewRegistry(client)

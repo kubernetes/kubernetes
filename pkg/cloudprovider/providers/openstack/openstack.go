@@ -113,7 +113,7 @@ type Config struct {
 	LoadBalancer LoadBalancerOpts
 }
 
-func init() {
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {

@@ -47,7 +47,7 @@ const (
 )
 
 // WARNING: this feature is experimental and will definitely change.
-func init() {
+func RegisterPlugin() {
 	admission.RegisterPlugin("InitialResources", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		s, err := newDataSource(*source)
 		if err != nil {

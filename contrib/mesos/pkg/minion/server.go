@@ -41,6 +41,10 @@ import (
 	"k8s.io/kubernetes/pkg/client/restclient"
 )
 
+func init() {
+	kubeletapp.RegisterPlugins()
+}
+
 const (
 	proxyLogFilename    = "proxy.log"
 	executorLogFilename = "executor.log"

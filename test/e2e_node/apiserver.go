@@ -51,6 +51,9 @@ func (a *APIServer) Start() error {
 	errCh := make(chan error)
 	go func() {
 		defer close(errCh)
+
+		// Register all admission and cloudprovider plugins
+		apiserver.RegisterPlugins()
 		err := apiserver.Run(config)
 		if err != nil {
 			errCh <- fmt.Errorf("run apiserver error: %v", err)

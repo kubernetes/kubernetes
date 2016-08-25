@@ -138,7 +138,7 @@ func readConfig(config io.Reader) (VSphereConfig, error) {
 	return cfg, err
 }
 
-func init() {
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {

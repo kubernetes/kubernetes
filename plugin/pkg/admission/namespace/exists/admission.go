@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 )
 
-func init() {
+func RegisterPlugin() {
 	admission.RegisterPlugin("NamespaceExists", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewExists(client), nil
 	})

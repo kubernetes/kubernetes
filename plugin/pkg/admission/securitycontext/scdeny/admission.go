@@ -27,7 +27,7 @@ import (
 	apierrors "k8s.io/kubernetes/pkg/api/errors"
 )
 
-func init() {
+func RegisterPlugin() {
 	admission.RegisterPlugin("SecurityContextDeny", func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		return NewSecurityContextDeny(client), nil
 	})

@@ -32,6 +32,7 @@ func NewKubeAPIServer() *Server {
 		SimpleUsage: hyperkube.CommandApiserver,
 		Long:        "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
 		Run: func(_ *Server, _ []string) error {
+			app.RegisterPlugins()
 			return app.Run(s)
 		},
 	}

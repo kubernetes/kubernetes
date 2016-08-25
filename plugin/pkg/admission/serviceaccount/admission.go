@@ -52,7 +52,7 @@ const DefaultAPITokenMountPath = "/var/run/secrets/kubernetes.io/serviceaccount"
 // PluginName is the name of this admission plugin
 const PluginName = "ServiceAccount"
 
-func init() {
+func RegisterPlugin() {
 	admission.RegisterPlugin(PluginName, func(client clientset.Interface, config io.Reader) (admission.Interface, error) {
 		serviceAccountAdmission := NewServiceAccount(client)
 		serviceAccountAdmission.Run()

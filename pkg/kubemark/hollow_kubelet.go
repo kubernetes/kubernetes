@@ -32,6 +32,10 @@ import (
 	"github.com/golang/glog"
 )
 
+func init() {
+	kubeletapp.RegisterPlugins()
+}
+
 type HollowKubelet struct {
 	KubeletConfig *kubeletapp.KubeletConfig
 }

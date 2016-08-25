@@ -160,7 +160,7 @@ func readInstanceID() (string, error) {
 	return parseMetaData(file)
 }
 
-func init() {
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		cfg, err := readConfig(config)
 		if err != nil {

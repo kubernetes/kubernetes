@@ -642,7 +642,7 @@ func (s *awsSdkEC2) ModifyInstanceAttribute(request *ec2.ModifyInstanceAttribute
 	return s.ec2.ModifyInstanceAttribute(request)
 }
 
-func init() {
+func RegisterCloudProvider() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(config io.Reader) (cloudprovider.Interface, error) {
 		creds := credentials.NewChainCredentials(
 			[]credentials.Provider{

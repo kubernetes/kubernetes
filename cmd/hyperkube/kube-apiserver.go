@@ -32,6 +32,9 @@ func NewKubeAPIServer() *Server {
 		SimpleUsage: "apiserver",
 		Long:        "The main API entrypoint and interface to the storage system.  The API server is also the focal point for all authorization decisions.",
 		Run: func(_ *Server, args []string) error {
+			// Register all admission and cloudprovider plugins
+			app.RegisterPlugins()
+
 			return app.Run(s)
 		},
 	}
