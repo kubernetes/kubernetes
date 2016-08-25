@@ -298,7 +298,7 @@ function push-federation-images {
         mkdir -p ${docker_build_path}
 
         ln "${bin_path}" "${docker_build_path}/${binary}"
-        printf " FROM busybox \n ADD ${binary} /usr/local/bin/${binary}\n" > ${docker_file_path}
+        printf " FROM debian:jessie \n ADD ${binary} /usr/local/bin/${binary}\n" > ${docker_file_path}
 
         local docker_image_tag="${FEDERATION_PUSH_REPO_BASE}/${binary}:${FEDERATION_IMAGE_TAG}"
 
