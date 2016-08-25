@@ -19,7 +19,6 @@ package generators
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -107,15 +106,13 @@ func packageForGroup(gv unversioned.GroupVersion, typeList []*types.Type, packag
 			})
 
 			expansionFileName := "generated_expansion"
-			// To avoid overriding user's manual modification, only generate the expansion file if it doesn't exist.
-			if _, err := os.Stat(filepath.Join(srcTreePath, outputPackagePath, expansionFileName+".go")); os.IsNotExist(err) {
-				generators = append(generators, &genExpansion{
-					DefaultGen: generator.DefaultGen{
-						OptionalName: expansionFileName,
-					},
-					types: typeList,
-				})
-			}
+			generators = append(generators, &genExpansion{
+				groupPath: filepath.Join(srcTreePath, outputPackagePath),
+				DefaultGen: generator.DefaultGen{
+					OptionalName: expansionFileName,
+				},
+				types: typeList,
+			})
 
 			return generators
 		},
