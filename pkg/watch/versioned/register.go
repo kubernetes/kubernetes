@@ -28,13 +28,13 @@ const WatchEventKind = "WatchEvent"
 
 // AddToGroupVersion registers the watch external and internal kinds with the scheme, and ensures the proper
 // conversions are in place.
-func AddToGroupVersion(scheme *runtime.Scheme, groupVersion unversioned.GroupVersion) {
+func AddToGroupVersion(scheme *runtime.Scheme, groupVersion unversioned.GroupVersion) error {
 	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &Event{})
 	scheme.AddKnownTypeWithName(
 		unversioned.GroupVersion{Group: groupVersion.Group, Version: runtime.APIVersionInternal}.WithKind(WatchEventKind),
 		&InternalEvent{},
 	)
-	scheme.AddConversionFuncs(
+	return scheme.AddConversionFuncs(
 		Convert_versioned_Event_to_watch_Event,
 		Convert_versioned_InternalEvent_to_versioned_Event,
 		Convert_watch_Event_to_versioned_Event,
