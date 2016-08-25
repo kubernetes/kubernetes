@@ -143,8 +143,14 @@ func messageCopy(ws *websocket.Conn, r io.Reader, base64Encode, ping bool, timeo
 	buf := make([]byte, 2048)
 	if ping {
 		resetTimeout(ws, timeout)
-		if err := websocket.Message.Send(ws, []byte{}); err != nil {
-			return err
+		if base64Encode {
+			if err := websocket.Message.Send(ws, ""); err != nil {
+				return err
+			}
+		} else {
+			if err := websocket.Message.Send(ws, []byte{}); err != nil {
+				return err
+			}
 		}
 	}
 	for {
