@@ -30,60 +30,17 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 )
 
-type SchemeFunc func(*runtime.Scheme) error
-type VersionToSchemeFunc map[string]SchemeFunc
-
-// GroupVersionFactoryArgs contains all the per-version parts of a GroupMetaFactory.
-type GroupVersionFactoryArgs struct {
-	GroupName   string
-	VersionName string
-
-	AddToScheme SchemeFunc
-}
-
-// GroupMetaFactoryArgs contains the group-level args of a GroupMetaFactory.
-type GroupMetaFactoryArgs struct {
-	GroupName              string
-	VersionPreferenceOrder []string
-	ImportPrefix           string
-
-	RootScopedKinds sets.String // nil is allowed
-	IgnoredKinds    sets.String // nil is allowed
-
-	// May be nil if there are no internal objects.
-	AddInternalObjectsToScheme SchemeFunc
-}
-
-// NewGroupMetaFactory builds the args for you. This is for if you're
-// constructing a factory all at once and not using the registry.
-func NewGroupMetaFactory(groupArgs *GroupMetaFactoryArgs, versions VersionToSchemeFunc) *GroupMetaFactory {
-	gmf := &GroupMetaFactory{
-		GroupArgs:   groupArgs,
-		VersionArgs: map[string]*GroupVersionFactoryArgs{},
-	}
-	for v, f := range versions {
-		gmf.VersionArgs[v] = &GroupVersionFactoryArgs{
-			GroupName:   groupArgs.GroupName,
-			VersionName: v,
-			AddToScheme: f,
-		}
-	}
-	return gmf
-}
-
-// Announce adds this Group factory to the global factory registry. It should
-// only be called if you constructed the GroupMetaFactory yourself via
-// NewGroupMetadFactory.
-// Note that this will panic on an error, since it's expected that you'll be
-// calling this at initialization time and any error is a result of a
-// programmer importing the wrong set of packages. If this assumption doesn't
-// work for you, just call DefaultGroupFactoryRegistry.AnnouncePreconstructedFactory
-// yourself.
-func (gmf *GroupMetaFactory) Announce() *GroupMetaFactory {
-	if err := DefaultGroupFactoryRegistry.AnnouncePreconstructedFactory(gmf); err != nil {
-		panic(err)
-	}
-	return gmf
+// KindResourceConstructor is an interface that captures the loose functions
+// that are scattered around in register.go files. It's written here for
+// documentation.
+type KindResourceConstructor interface {
+	// SchemeGroupVersion returns the version that will be used to register
+	// objects, e.g. batch/__internal or batch/v1.
+	SchemeGroupVersion() unversioned.GroupVersion
+	// Kind constructs a GroupKind for objects from this group.
+	Kind(kind string) unversioned.GroupKind
+	// Resource constructs a GroupResource for objects from this group.
+	Resource(resource string) unversioned.GroupResource
 }
 
 // GroupMetaFactory has the logic for actually assembling and registering a group.
@@ -192,16 +149,16 @@ func (gmf *GroupMetaFactory) Enable(m *registered.APIRegistrationManager, scheme
 		if err := m.EnableVersions(v); err != nil {
 			return err
 		}
-		gmf.VersionArgs[v.Version].AddToScheme(scheme)
+		if err := gmf.VersionArgs[v.Version].AddToScheme(scheme); err != nil {
+			return err
+		}
 	}
 	if len(externalVersions) == 0 {
 		glog.V(4).Infof("No version is registered for group %v", gmf.GroupArgs.GroupName)
 		return nil
 	}
 
-	if gmf.GroupArgs.AddInternalObjectsToScheme != nil {
-		gmf.GroupArgs.AddInternalObjectsToScheme(scheme)
-	}
+	gmf.GroupArgs.AddInternalObjectsToScheme(scheme)
 
 	preferredExternalVersion := externalVersions[0]
 	accessor := meta.NewAccessor()
