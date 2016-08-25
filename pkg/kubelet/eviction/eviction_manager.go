@@ -111,7 +111,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  reason,
-		Message: message,
+		Message: getMessage(api.ResourceMemory),
 	}
 }
 
@@ -244,6 +244,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	glog.Infof("eviction manager: pods ranked for eviction: %s", format.Pods(activePods))
 
 	// we kill at most a single pod during each eviction interval
+	message := getMessage(resourceToReclaim)
 	for i := range activePods {
 		pod := activePods[i]
 		status := api.PodStatus{
