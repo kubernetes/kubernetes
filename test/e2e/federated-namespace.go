@@ -22,10 +22,10 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
-	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -39,7 +39,7 @@ const (
 // Create/delete ingress api objects
 var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federation-namespace")
-	clusterClientSet := make(map[string]*federation_release_1_4.Clientset)
+	clusterClientSet := make(map[string]*release_1_3.Clientset)
 
 	Describe("Namespace objects", func() {
 		BeforeEach(func() {
@@ -47,10 +47,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			clusters := buildClustersOrFail_14(f)
 			for _, cluster := range clusters {
 				if _, found := clusterClientSet[cluster.Name]; !found {
-					clientset, err := util.GetClientsetForCluster(cluster)
-					if err != nil {
-						framework.Failf("Failed to create client for %s: %v", cluster.Name, err)
-					}
+					clientset := createClientsetForCluster(*cluster, 1, "e2e-test")
 					clusterClientSet[cluster.Name] = clientset
 				}
 			}
@@ -58,9 +55,9 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
-			deleteAllTestNamespaces(f.FederationClientset_1_4)
+			deleteAllTestNamespacesFed14(f.FederationClientset_1_4)
 			for _, clientset := range clusterClientSet {
-				deleteAllTestNamespaces(clientset)
+				deleteAllTestNamespaces13(clientset)
 			}
 		})
 
@@ -97,7 +94,23 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 	})
 })
 
-func deleteAllTestNamespaces(clientset *federation_release_1_4.Clientset) {
+func deleteAllTestNamespacesFed14(clientset *federation_release_1_4.Clientset) {
+	list, err := clientset.Core().Namespaces().List(api.ListOptions{})
+	if err != nil {
+		framework.Failf("Failed to get all namespaes: %v", err)
+		return
+	}
+	for _, namespace := range list.Items {
+		if strings.HasPrefix(namespace.Name, namespacePrefix) {
+			err := clientset.Core().Namespaces().Delete(namespace.Name, &api.DeleteOptions{})
+			if err != nil {
+				framework.Failf("Failed to delete %s: %v", namespace.Name, err)
+			}
+		}
+	}
+}
+
+func deleteAllTestNamespaces13(clientset *release_1_3.Clientset) {
 	list, err := clientset.Core().Namespaces().List(api.ListOptions{})
 	if err != nil {
 		framework.Failf("Failed to get all namespaes: %v", err)
