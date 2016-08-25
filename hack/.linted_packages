@@ -100,6 +100,7 @@ pkg/kubelet/api
 pkg/kubelet/container
 pkg/kubelet/envvars
 pkg/kubelet/eviction
+pkg/kubelet/sysctls
 pkg/kubelet/util/format
 pkg/kubelet/util/ioutils
 pkg/kubelet/volume
@@ -139,6 +140,7 @@ pkg/runtime/serializer/yaml
 pkg/security
 pkg/security/podsecuritypolicy/apparmor
 pkg/security/podsecuritypolicy/capabilities
+pkg/security/podsecuritypolicy/sysctl
 pkg/serviceaccount
 pkg/storage
 pkg/storage/etcd3

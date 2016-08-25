@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
 	"strings"
 
 	"github.com/golang/glog"
@@ -131,6 +132,23 @@ func ValidatePodSpecificAnnotations(annotations map[string]string, spec *api.Pod
 
 	allErrs = append(allErrs, ValidateSeccompPodAnnotations(annotations, fldPath)...)
 	allErrs = append(allErrs, ValidateAppArmorPodAnnotations(annotations, spec, fldPath)...)
+
+	sysctls, err := api.SysctlsFromPodAnnotation(annotations[api.SysctlsPodAnnotationKey])
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.SysctlsPodAnnotationKey), annotations[api.SysctlsPodAnnotationKey], err.Error()))
+	} else {
+		allErrs = append(allErrs, validateSysctls(sysctls, fldPath.Key(api.SysctlsPodAnnotationKey))...)
+	}
+	unsafeSysctls, err := api.SysctlsFromPodAnnotation(annotations[api.UnsafeSysctlsPodAnnotationKey])
+	if err != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey), annotations[api.UnsafeSysctlsPodAnnotationKey], err.Error()))
+	} else {
+		allErrs = append(allErrs, validateSysctls(unsafeSysctls, fldPath.Key(api.UnsafeSysctlsPodAnnotationKey))...)
+	}
+	inBoth := sysctlIntersection(sysctls, unsafeSysctls)
+	if len(inBoth) > 0 {
+		allErrs = append(allErrs, field.Invalid(fldPath.Key(api.UnsafeSysctlsPodAnnotationKey), strings.Join(inBoth, ", "), "can not be safe and unsafe"))
+	}
 
 	return allErrs
 }
@@ -2128,6 +2146,40 @@ func podSpecHasContainer(spec *api.PodSpec, containerName string) bool {
 	return false
 }
 
+const (
+	// a sysctl segment regex, concatenated with dots to form a sysctl name
+	SysctlSegmentFmt string = "[a-z0-9]([-_a-z0-9]*[a-z0-9])?"
+
+	// a sysctl name regex
+	SysctlFmt string = "(" + SysctlSegmentFmt + "\\.)*" + SysctlSegmentFmt
+
+	// the maximal length of a sysctl name
+	SysctlMaxLength int = 253
+)
+
+var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
+
+// IsValidSysctlName checks that the given string is a valid sysctl name,
+// i.e. matches SysctlFmt.
+func IsValidSysctlName(name string) bool {
+	if len(name) > SysctlMaxLength {
+		return false
+	}
+	return sysctlRegexp.MatchString(name)
+}
+
+func validateSysctls(sysctls []api.Sysctl, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for i, s := range sysctls {
+		if len(s.Name) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Index(i).Child("name"), ""))
+		} else if !IsValidSysctlName(s.Name) {
+			allErrs = append(allErrs, field.Invalid(fldPath.Index(i).Child("name"), s.Name, fmt.Sprintf("must have at most %d characters and match regex %s", SysctlMaxLength, SysctlFmt)))
+		}
+	}
+	return allErrs
+}
+
 // ValidatePodSecurityContext test that the specified PodSecurityContext has valid data.
 func ValidatePodSecurityContext(securityContext *api.PodSecurityContext, spec *api.PodSpec, specPath, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
@@ -3474,4 +3526,18 @@ func isValidHostnamesMap(serializedPodHostNames string) bool {
 		}
 	}
 	return true
+}
+
+func sysctlIntersection(a []api.Sysctl, b []api.Sysctl) []string {
+	lookup := make(map[string]struct{}, len(a))
+	result := []string{}
+	for i := range a {
+		lookup[a[i].Name] = struct{}{}
+	}
+	for i := range b {
+		if _, found := lookup[b[i].Name]; found {
+			result = append(result, b[i].Name)
+		}
+	}
+	return result
 }

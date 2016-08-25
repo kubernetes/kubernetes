@@ -474,4 +474,7 @@ type KubeletConfiguration struct {
 	// iptablesDropBit is the bit of the iptables fwmark space to mark for dropping packets.
 	// Values must be within the range [0, 31]. Must be different from other mark bits.
 	IPTablesDropBit *int32 `json:"iptablesDropBit"`
+	// Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk.
+	// Resource isolation might be lacking and pod might influence each other on the same node.
+	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
 }
