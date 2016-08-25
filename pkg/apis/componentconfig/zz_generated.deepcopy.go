@@ -337,6 +337,13 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.MakeIPTablesUtilChains = in.MakeIPTablesUtilChains
 		out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
 		out.IPTablesDropBit = in.IPTablesDropBit
+		if in.AllowedUnsafeSysctls != nil {
+			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.AllowedUnsafeSysctls = nil
+		}
 		return nil
 	}
 }
