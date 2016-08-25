@@ -138,57 +138,6 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 		})
 	})
 
-	framework.KubeDescribe("Celery-RabbitMQ", func() {
-		It("should create and stop celery+rabbitmq servers", func() {
-			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "examples/celery-rabbitmq", file)
-			}
-			rabbitmqServiceYaml := mkpath("rabbitmq-service.yaml")
-			rabbitmqControllerYaml := mkpath("rabbitmq-controller.yaml")
-			celeryControllerYaml := mkpath("celery-controller.yaml")
-			flowerControllerYaml := mkpath("flower-controller.yaml")
-			flowerServiceYaml := mkpath("flower-service.yaml")
-			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-
-			By("starting rabbitmq")
-			framework.RunKubectlOrDie("create", "-f", rabbitmqServiceYaml, nsFlag)
-			framework.RunKubectlOrDie("create", "-f", rabbitmqControllerYaml, nsFlag)
-			label := labels.SelectorFromSet(labels.Set(map[string]string{"component": "rabbitmq"}))
-			err := framework.WaitForPodsWithLabelRunning(c, ns, label)
-			Expect(err).NotTo(HaveOccurred())
-			forEachPod("component", "rabbitmq", func(pod api.Pod) {
-				_, err := framework.LookForStringInLog(ns, pod.Name, "rabbitmq", "Server startup complete", serverStartTimeout)
-				Expect(err).NotTo(HaveOccurred())
-			})
-			err = framework.WaitForEndpoint(c, ns, "rabbitmq-service")
-			Expect(err).NotTo(HaveOccurred())
-
-			By("starting celery")
-			framework.RunKubectlOrDie("create", "-f", celeryControllerYaml, nsFlag)
-			label = labels.SelectorFromSet(labels.Set(map[string]string{"component": "celery"}))
-			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
-			Expect(err).NotTo(HaveOccurred())
-			forEachPod("component", "celery", func(pod api.Pod) {
-				_, err := framework.LookForStringInFile(ns, pod.Name, "celery", "/data/celery.log", " ready.", serverStartTimeout)
-				Expect(err).NotTo(HaveOccurred())
-			})
-
-			By("starting flower")
-			framework.RunKubectlOrDie("create", "-f", flowerServiceYaml, nsFlag)
-			framework.RunKubectlOrDie("create", "-f", flowerControllerYaml, nsFlag)
-			label = labels.SelectorFromSet(labels.Set(map[string]string{"component": "flower"}))
-			err = framework.WaitForPodsWithLabelRunning(c, ns, label)
-			Expect(err).NotTo(HaveOccurred())
-			forEachPod("component", "flower", func(pod api.Pod) {
-				content, err := makeHttpRequestToService(c, ns, "flower-service", "/", framework.EndpointRegisterTimeout)
-				Expect(err).NotTo(HaveOccurred())
-				if !strings.Contains(content, "<title>Celery Flower</title>") {
-					framework.Failf("Flower HTTP request failed")
-				}
-			})
-		})
-	})
-
 	framework.KubeDescribe("Spark", func() {
 		It("should start spark master, driver and workers", func() {
 			mkpath := func(file string) string {
