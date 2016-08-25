@@ -645,12 +645,18 @@ func (dm *DockerManager) runContainer(
 		}
 	}
 
+	userNsMode := ""
+	if opts.EnableHostUserNamespace {
+		userNsMode = "host"
+	}
+
 	hc := &dockercontainer.HostConfig{
 		Binds:          binds,
 		NetworkMode:    dockercontainer.NetworkMode(netMode),
 		IpcMode:        dockercontainer.IpcMode(ipcMode),
 		UTSMode:        dockercontainer.UTSMode(utsMode),
 		PidMode:        dockercontainer.PidMode(pidMode),
+		UsernsMode:     dockercontainer.UsernsMode(userNsMode),
 		ReadonlyRootfs: readOnlyRootFilesystem(container),
 		Resources: dockercontainer.Resources{
 			Memory:     memoryLimit,

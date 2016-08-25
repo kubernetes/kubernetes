@@ -42,16 +42,23 @@ const (
 	dynamicKubeletConfig      = "DynamicKubeletConfig"
 	dynamicVolumeProvisioning = "DynamicVolumeProvisioning"
 	// TODO: Define gate/accessor for AppArmor
+
+	// experimentalHostUserNamespaceDefaulting Default userns=host for containers
+	// that are using other host namespaces, host mounts, or specific non-namespaced capabilities
+	// (MKNOD, SYS_MODULE, SYS_TIME). This should only be enabled if user namespace remapping is enabled
+	// in the docker daemon.
+	experimentalHostUserNamespaceDefaultingGate = "ExperimentalHostUserNamespaceDefaulting"
 )
 
 var (
 	// Default values for recorded features.  Every new feature gate should be
 	// represented here.
 	knownFeatures = map[string]featureSpec{
-		allAlphaGate:              {false, alpha},
-		externalTrafficLocalOnly:  {false, alpha},
-		dynamicKubeletConfig:      {false, alpha},
-		dynamicVolumeProvisioning: {true, alpha},
+		allAlphaGate:                                {false, alpha},
+		externalTrafficLocalOnly:                    {false, alpha},
+		dynamicKubeletConfig:                        {false, alpha},
+		dynamicVolumeProvisioning:                   {true, alpha},
+		experimentalHostUserNamespaceDefaultingGate: {false, alpha},
 	}
 
 	// Special handling for a few gates.
@@ -102,6 +109,10 @@ type FeatureGate interface {
 	// owner: mtaufen
 	// alpha: v1.4
 	DynamicKubeletConfig() bool
+
+	// owner: @pweil-
+	// alpha: v1.4
+	ExperimentalHostUserNamespaceDefaulting() bool
 }
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
@@ -183,6 +194,11 @@ func (f *featureGate) DynamicKubeletConfig() bool {
 // DynamicVolumeProvisioning returns value for dynamicVolumeProvisioning
 func (f *featureGate) DynamicVolumeProvisioning() bool {
 	return f.lookup(dynamicVolumeProvisioning)
+}
+
+// ExperimentalHostUserNamespaceDefaulting returns value for experimentalHostUserNamespaceDefaulting
+func (f *featureGate) ExperimentalHostUserNamespaceDefaulting() bool {
+	return f.lookup(experimentalHostUserNamespaceDefaultingGate)
 }
 
 func (f *featureGate) lookup(key string) bool {

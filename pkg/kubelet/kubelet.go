@@ -492,6 +492,14 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		makeIPTablesUtilChains:       kubeCfg.MakeIPTablesUtilChains,
 		iptablesMasqueradeBit:        int(kubeCfg.IPTablesMasqueradeBit),
 		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
+
+		// TODO: this can be removed and changed to use the feature gate when it is added to the kubelet
+		// config
+		experimentalHostUserNamespaceDefaulting: utilconfig.DefaultFeatureGate.ExperimentalHostUserNamespaceDefaulting(),
+	}
+
+	if klet.experimentalHostUserNamespaceDefaulting {
+		glog.Infof("Experimental host user namespace defaulting is enabled.")
 	}
 
 	if klet.flannelExperimentalOverlay {
@@ -1041,6 +1049,13 @@ type Kubelet struct {
 
 	// The bit of the fwmark space to mark packets for dropping.
 	iptablesDropBit int
+
+	// experimentalHostUserNamespaceDefaulting sets userns=true when users request host namespaces (pid, ipc, net),
+	// are using non-namespaced capabilities (mknod, sys_time, sys_module), or using host path volumes.
+	// This should only be enabled when the container runtime is performing user remapping AND if the
+	// experimental behavior is desired.
+	// TODO this can be removed when FeatureConfig is added.
+	experimentalHostUserNamespaceDefaulting bool
 }
 
 // setupDataDirs creates:
@@ -1404,6 +1419,11 @@ func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Cont
 	opts.DNS, opts.DNSSearch, err = kl.GetClusterDNS(pod)
 	if err != nil {
 		return nil, err
+	}
+
+	// only do this check if the experimental behavior is enabled, otherwise allow it to default to false
+	if kl.experimentalHostUserNamespaceDefaulting {
+		opts.EnableHostUserNamespace = kl.enableHostUserNamespace(pod)
 	}
 
 	return opts, nil
