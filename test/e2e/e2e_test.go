@@ -23,8 +23,7 @@ import (
 )
 
 func init() {
-	framework.RegisterCommonFlags()
-	framework.RegisterClusterFlags()
+	framework.ViperizeFlags()
 }
 
 func TestE2E(t *testing.T) {
