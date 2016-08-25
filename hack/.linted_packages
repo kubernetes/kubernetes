@@ -193,6 +193,7 @@ plugin/pkg/client/auth/gcp
 test/e2e/cleanup
 test/e2e/generated
 test/e2e/perftype
+test/e2e_node/runner/local
 test/images/clusterapi-tester
 test/images/entrypoint-tester
 test/images/fakegitserver
