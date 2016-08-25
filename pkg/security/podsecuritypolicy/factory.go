@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/capabilities"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/group"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/selinux"
+	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/user"
 	"k8s.io/kubernetes/pkg/util/errors"
 )
@@ -70,6 +71,19 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		errs = append(errs, err)
 	}
 
+	var unsafeSysctls []string
+	if ann, found := psp.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey]; found {
+		var err error
+		unsafeSysctls, err = extensions.SysctlsFromPodSecurityPolicyAnnotation(ann)
+		if err != nil {
+			errs = append(errs, err)
+		}
+	}
+	sysctlsStrat, err := createSysctlsStrategy(unsafeSysctls)
+	if err != nil {
+		errs = append(errs, err)
+	}
+
 	if len(errs) > 0 {
 		return nil, errors.NewAggregate(errs)
 	}
@@ -81,6 +95,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		FSGroupStrategy:           fsGroupStrat,
 		SupplementalGroupStrategy: supGroupStrat,
 		CapabilitiesStrategy:      capStrat,
+		SysctlsStrategy:           sysctlsStrat,
 	}
 
 	return strategies, nil
@@ -144,4 +159,9 @@ func createSupplementalGroupStrategy(opts *extensions.SupplementalGroupsStrategy
 // createCapabilitiesStrategy creates a new capabilities strategy.
 func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []api.Capability) (capabilities.Strategy, error) {
 	return capabilities.NewDefaultCapabilities(defaultAddCaps, requiredDropCaps, allowedCaps)
+}
+
+// createSysctlsStrategy creates a new unsafe sysctls strategy.
+func createSysctlsStrategy(sysctlsPatterns []string) (sysctl.SysctlsStrategy, error) {
+	return sysctl.NewMustMatchPatterns(sysctlsPatterns)
 }
