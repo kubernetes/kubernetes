@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/snapshot/testing"
 )
@@ -30,10 +31,12 @@ func Test_NewSnapshotController_Positive(t *testing.T) {
 	resyncPeriod := 5 * time.Minute
 	pvcInformer := informers.NewPVCInformer(fakeKubeClient, resyncPeriod)
 	pvInformer := informers.NewPVInformer(fakeKubeClient, resyncPeriod)
+	fakeRecorder := &record.FakeRecorder{}
 
 	// Act
 	_, err := NewSnapshotController(
 		fakeKubeClient,
+		fakeRecorder,
 		pvcInformer,
 		pvInformer,
 		nil, /* cloud */

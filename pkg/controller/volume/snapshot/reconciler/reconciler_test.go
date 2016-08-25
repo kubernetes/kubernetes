@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller/volume/snapshot/cache"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/snapshot/testing"
 	"k8s.io/kubernetes/pkg/util/wait"
@@ -40,8 +41,9 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
 	soe := operationexecutor.NewOperationExecutor(
-		fakeKubeClient, volumePluginMgr)
+		fakeKubeClient, volumePluginMgr, fakeRecorder)
 
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, asw, soe)
@@ -64,8 +66,9 @@ func Test_Run_Positive_OneDesiredCreateSnapshot(t *testing.T) {
 	volumePluginMgr, fakePlugin := volumetesting.GetTestVolumePluginMgr(t)
 	asw := cache.NewActualStateOfWorld(volumePluginMgr)
 	fakeKubeClient := controllervolumetesting.CreateTestClient()
+	fakeRecorder := &record.FakeRecorder{}
 	soe := operationexecutor.NewOperationExecutor(
-		fakeKubeClient, volumePluginMgr)
+		fakeKubeClient, volumePluginMgr, fakeRecorder)
 	reconciler := NewReconciler(
 		reconcilerLoopPeriod, asw, soe)
 
