@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
 	"github.com/golang/glog"
@@ -237,13 +238,8 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		return
 	}
 	baseNamespace := baseNamespaceObj.(*api_v1.Namespace)
-	if baseNamespace.Status.Phase == api_v1.NamespaceTerminating {
-		// TODO: What about namespaces in subclusters ???
-		err = nc.federatedApiClient.Core().Namespaces().Delete(baseNamespace.Name, &api.DeleteOptions{})
-		if err != nil {
-			glog.Errorf("Failed to delete namespace %s: %v", baseNamespace.Name, err)
-			nc.deliverNamespace(namespace, 0, true)
-		}
+	if baseNamespace.DeletionTimestamp != nil {
+		nc.delete(baseNamespace)
 		return
 	}
 
@@ -301,4 +297,52 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 
 	// Evertyhing is in order but lets be double sure
 	nc.deliverNamespace(namespace, nc.namespaceReviewDelay, false)
+}
+
+func (nc *NamespaceController) delete(namespace *api_v1.Namespace) {
+	// Set Terminating status.
+	updatedNamespace := &api_v1.Namespace{
+		ObjectMeta: namespace.ObjectMeta,
+		Spec:       namespace.Spec,
+		Status: api_v1.NamespaceStatus{
+			Phase: api_v1.NamespaceTerminating,
+		},
+	}
+	if namespace.Status.Phase != api_v1.NamespaceTerminating {
+		_, err := nc.federatedApiClient.Core().Namespaces().Update(updatedNamespace)
+		if err != nil {
+			glog.Errorf("Failed to update namespace %s: %v", updatedNamespace.Name, err)
+			nc.deliverNamespace(namespace.Name, 0, true)
+			return
+		}
+	}
+
+	// TODO: delete all namespace content.
+
+	// Remove kube_api.FinalzerKubernetes
+	if len(updatedNamespace.Spec.Finalizers) != 0 {
+		finalizerSet := sets.NewString()
+		for i := range namespace.Spec.Finalizers {
+			if namespace.Spec.Finalizers[i] != api_v1.FinalizerKubernetes {
+				finalizerSet.Insert(string(namespace.Spec.Finalizers[i]))
+			}
+		}
+		updatedNamespace.Spec.Finalizers = make([]api_v1.FinalizerName, 0, len(finalizerSet))
+		for _, value := range finalizerSet.List() {
+			updatedNamespace.Spec.Finalizers = append(updatedNamespace.Spec.Finalizers, api_v1.FinalizerName(value))
+		}
+		_, err := nc.federatedApiClient.Core().Namespaces().Finalize(updatedNamespace)
+		if err != nil {
+			glog.Errorf("Failed to update namespace %s: %v", updatedNamespace.Name, err)
+			nc.deliverNamespace(namespace.Name, 0, true)
+			return
+		}
+	}
+
+	// TODO: What about namespaces in subclusters ???
+	err := nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, &api.DeleteOptions{})
+	if err != nil {
+		glog.Errorf("Failed to delete namespace %s: %v", namespace.Name, err)
+		nc.deliverNamespace(namespace.Name, 0, true)
+	}
 }
