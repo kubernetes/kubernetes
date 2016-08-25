@@ -47,7 +47,7 @@ __kubectl_override_flags()
         for of in "${__kubectl_override_flag_list[@]}"; do
             case "${w}" in
                 --${of}=*)
-                    eval "${of}=\"--${of}=\${w}\""
+                    eval "${of}=\"${w}\""
                     ;;
                 --${of})
                     two_word_of="${of}"
@@ -115,7 +115,7 @@ __kubectl_get_containers()
     fi
     local last=${nouns[${len} -1]}
     local kubectl_out
-    if kubectl_out=$(kubectl get $(__kubectl_namespace_flag) -o template --template="${template}" pods "${last}" 2>/dev/null); then
+    if kubectl_out=$(kubectl get $(__kubectl_override_flags) -o template --template="${template}" pods "${last}" 2>/dev/null); then
         COMPREPLY=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
     fi
 }
