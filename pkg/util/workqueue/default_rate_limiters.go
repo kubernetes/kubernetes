@@ -90,9 +90,16 @@ func (r *ItemExponentialFailureRateLimiter) When(item interface{}) time.Duration
 	r.failuresLock.Lock()
 	defer r.failuresLock.Unlock()
 
+	exp := r.failures[item]
 	r.failures[item] = r.failures[item] + 1
 
-	calculated := r.baseDelay * time.Duration(math.Pow10(r.failures[item]-1))
+	// The backoff is capped such that 'calculated' value never overflows.
+	backoff := float64(r.baseDelay.Nanoseconds()) * math.Pow10(exp)
+	if backoff > math.MaxInt64 {
+		return r.maxDelay
+	}
+
+	calculated := time.Duration(backoff)
 	if calculated > r.maxDelay {
 		return r.maxDelay
 	}
