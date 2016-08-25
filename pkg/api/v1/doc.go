@@ -16,6 +16,6 @@ limitations under the License.
 
 // +k8s:deepcopy-gen=package,register
 // +k8s:conversion-gen=k8s.io/kubernetes/pkg/api
-
+// +openapi=package
 // Package v1 is the v1 version of the API.
 package v1 // import "k8s.io/kubernetes/pkg/api/v1"

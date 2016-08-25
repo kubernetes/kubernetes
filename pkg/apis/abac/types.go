@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// +openapi=package
 package abac
 
 import "k8s.io/kubernetes/pkg/api/unversioned"
