@@ -163,6 +163,7 @@ func UnsecuredKubeletConfig(s *options.KubeletServer) (*KubeletConfig, error) {
 		dockerExecHandler = &dockertools.NsenterExecHandler{}
 	default:
 		glog.Warningf("Unknown Docker exec handler %q; defaulting to native", s.DockerExecHandlerName)
+		s.DockerExecHandlerName = "native"
 		dockerExecHandler = &dockertools.NativeExecHandler{}
 	}
 
