@@ -1361,16 +1361,10 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 		return "", errors.New("AWS volumes cannot be mounted read-only")
 	}
 
-	mountDevice, alreadyAttached, err := c.getMountDevice(awsInstance, disk.awsID, true)
-	if err != nil {
-		return "", err
-	}
-
-	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
-	hostDevice := "/dev/xvd" + string(mountDevice)
-	// We are using xvd names (so we are HVM only)
-	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
-	ec2Device := "/dev/xvd" + string(mountDevice)
+	// mountDevice will hold the device where we should try to attach the disk
+	var mountDevice mountDevice
+	// alreadyAttached is true if we have already called AttachVolume on this disk
+	var alreadyAttached bool
 
 	// attachEnded is set to true if the attach operation completed
 	// (successfully or not), and is thus no longer in progress
@@ -1382,6 +1376,17 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 			}
 		}
 	}()
+
+	mountDevice, alreadyAttached, err = c.getMountDevice(awsInstance, disk.awsID, true)
+	if err != nil {
+		return "", err
+	}
+
+	// Inside the instance, the mountpoint always looks like /dev/xvdX (?)
+	hostDevice := "/dev/xvd" + string(mountDevice)
+	// We are using xvd names (so we are HVM only)
+	// See http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/device_naming.html
+	ec2Device := "/dev/xvd" + string(mountDevice)
 
 	if !alreadyAttached {
 		request := &ec2.AttachVolumeInput{
@@ -1413,13 +1418,13 @@ func (c *Cloud) AttachDisk(diskName string, instanceName string, readOnly bool) 
 	// which could theoretically be against a different device (or even instance).
 	if attachment == nil {
 		// Impossible?
-		return "", fmt.Errorf("unexpected state: attachment nil after attached")
+		return "", fmt.Errorf("unexpected state: attachment nil after attached %q to %q", diskName, instanceName)
 	}
 	if ec2Device != aws.StringValue(attachment.Device) {
-		return "", fmt.Errorf("disk attachment failed: requested device %q but found %q", ec2Device, aws.StringValue(attachment.Device))
+		return "", fmt.Errorf("disk attachment of %q to %q failed: requested device %q but found %q", diskName, instanceName, ec2Device, aws.StringValue(attachment.Device))
 	}
 	if awsInstance.awsID != aws.StringValue(attachment.InstanceId) {
-		return "", fmt.Errorf("disk attachment failed: requested instance %q but found %q", awsInstance.awsID, aws.StringValue(attachment.InstanceId))
+		return "", fmt.Errorf("disk attachment of %q to %q failed: requested instance %q but found %q", diskName, instanceName, awsInstance.awsID, aws.StringValue(attachment.InstanceId))
 	}
 
 	return hostDevice, nil
