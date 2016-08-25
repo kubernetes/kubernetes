@@ -450,15 +450,20 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 		containerManager:  kubeDeps.ContainerManager,
 		nodeIP:            net.ParseIP(kubeCfg.NodeIP),
 		clock:             clock.RealClock{},
-		outOfDiskTransitionFrequency: kubeCfg.OutOfDiskTransitionFrequency.Duration,
-		reservation:                  *reservation,
-		enableCustomMetrics:          kubeCfg.EnableCustomMetrics,
-		babysitDaemons:               kubeCfg.BabysitDaemons,
-		enableControllerAttachDetach: kubeCfg.EnableControllerAttachDetach,
-		iptClient:                    utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
-		makeIPTablesUtilChains:       kubeCfg.MakeIPTablesUtilChains,
-		iptablesMasqueradeBit:        int(kubeCfg.IPTablesMasqueradeBit),
-		iptablesDropBit:              int(kubeCfg.IPTablesDropBit),
+		outOfDiskTransitionFrequency:            kubeCfg.OutOfDiskTransitionFrequency.Duration,
+		reservation:                             *reservation,
+		enableCustomMetrics:                     kubeCfg.EnableCustomMetrics,
+		babysitDaemons:                          kubeCfg.BabysitDaemons,
+		enableControllerAttachDetach:            kubeCfg.EnableControllerAttachDetach,
+		iptClient:                               utilipt.New(utilexec.New(), utildbus.New(), utilipt.ProtocolIpv4),
+		makeIPTablesUtilChains:                  kubeCfg.MakeIPTablesUtilChains,
+		iptablesMasqueradeBit:                   int(kubeCfg.IPTablesMasqueradeBit),
+		iptablesDropBit:                         int(kubeCfg.IPTablesDropBit),
+		experimentalHostUserNamespaceDefaulting: utilconfig.DefaultFeatureGate.ExperimentalHostUserNamespaceDefaulting(),
+	}
+
+	if klet.experimentalHostUserNamespaceDefaulting {
+		glog.Infof("Experimental host user namespace defaulting is enabled.")
 	}
 
 	if mode, err := effectiveHairpinMode(componentconfig.HairpinMode(kubeCfg.HairpinMode), kubeCfg.ContainerRuntime, kubeCfg.NetworkPluginName); err != nil {
@@ -1087,6 +1092,13 @@ type Kubelet struct {
 
 	// The handler serving CRI streaming calls (exec/attach/port-forward).
 	criHandler http.Handler
+
+	// experimentalHostUserNamespaceDefaulting sets userns=true when users request host namespaces (pid, ipc, net),
+	// are using non-namespaced capabilities (mknod, sys_time, sys_module), the pod contains a privileged container,
+	// or using host path volumes.
+	// This should only be enabled when the container runtime is performing user remapping AND if the
+	// experimental behavior is desired.
+	experimentalHostUserNamespaceDefaulting bool
 }
 
 // setupDataDirs creates:
