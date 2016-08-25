@@ -68,12 +68,15 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
+	// TODO: rename podInfraContainerID to sandboxID
 	SetUpPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
+	// TODO: rename podInfraContainerID to sandboxID
 	TearDownPod(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) error
 
 	// Status is the method called to obtain the ipv4 or ipv6 addresses of the container
+	// TODO: rename podInfraContainerID to sandboxID
 	GetPodNetworkStatus(namespace string, name string, podInfraContainerID kubecontainer.ContainerID) (*PodNetworkStatus, error)
 
 	// NetworkStatus returns error if the network plugin is in error state
