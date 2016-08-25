@@ -29,3 +29,13 @@ func IsJobFinished(j *batch.Job) bool {
 	}
 	return false
 }
+
+func FilterActive(jobs *batch.JobList) (active []*batch.Job) {
+	for i := range jobs.Items {
+		job := jobs.Items[i]
+		if !IsJobFinished(&job) {
+			active = append(active, &job)
+		}
+	}
+	return
+}

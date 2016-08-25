@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -64,10 +65,11 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 		err = waitForActiveJobs(f.Client, f.Namespace.Name, scheduledJob.Name, 2)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Ensuring exactly two jobs exists by listing jobs explicitly")
+		By("Ensuring at least two running jobs exists by listing jobs explicitly")
 		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(jobs.Items) >= 2).To(BeTrue())
+		activeJobs := job.FilterActive(jobs)
+		Expect(len(activeJobs) >= 2).To(BeTrue())
 
 		By("Removing scheduledjob")
 		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
@@ -112,10 +114,11 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(scheduledJob.Status.Active).Should(HaveLen(1))
 
-		By("Ensuring exaclty one job exists by listing jobs explicitly")
+		By("Ensuring exaclty one running job exists by listing jobs explicitly")
 		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(jobs.Items).To(HaveLen(1))
+		activeJobs := job.FilterActive(jobs)
+		Expect(activeJobs).To(HaveLen(1))
 
 		By("Ensuring no more jobs are scheduled")
 		err = waitForActiveJobs(f.Client, f.Namespace.Name, scheduledJob.Name, 2)
@@ -142,10 +145,11 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(scheduledJob.Status.Active).Should(HaveLen(1))
 
-		By("Ensuring exaclty one job exists by listing jobs explicitly")
+		By("Ensuring exaclty one running job exists by listing jobs explicitly")
 		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(jobs.Items).To(HaveLen(1))
+		activeJobs := job.FilterActive(jobs)
+		Expect(activeJobs).To(HaveLen(1))
 
 		By("Ensuring the job is replaced with a new one")
 		err = waitForJobReplaced(f.Client, f.Namespace.Name, jobs.Items[0].Name)
