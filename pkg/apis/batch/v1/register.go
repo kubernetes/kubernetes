@@ -17,31 +17,38 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apimachinery/announced"
 	"k8s.io/kubernetes/pkg/runtime"
 	versionedwatch "k8s.io/kubernetes/pkg/watch/versioned"
 )
 
-// GroupName is the group name use in this package
-const GroupName = "batch"
-
-// SchemeGroupVersion is group version used to register these objects
-var SchemeGroupVersion = unversioned.GroupVersion{Group: GroupName, Version: "v1"}
-
 var (
-	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes, addDefaultingFuncs, addConversionFuncs)
-	AddToScheme   = SchemeBuilder.AddToScheme
+	// VersionArgs is the canonical place for facts about this group version.
+	VersionArgs = &announced.GroupVersionFactoryArgs{
+		GroupName:   "batch",
+		VersionName: "v1",
+		VersionedObjects: []runtime.Object{
+			&Job{},
+			&JobList{},
+			&v1.ListOptions{},
+			&v1.DeleteOptions{},
+		},
+		SchemeAdjustment: runtime.NewSchemeBuilder(
+			addDefaultingFuncs, addConversionFuncs,
+		).VersionedRegister(versionedwatch.AddToGroupVersion),
+	}
+	SchemeBuilder = VersionArgs.SchemeAdjustment
 )
 
-// Adds the list of known types to api.Scheme.
-func addKnownTypes(scheme *runtime.Scheme) error {
-	scheme.AddKnownTypes(SchemeGroupVersion,
-		&Job{},
-		&JobList{},
-		&v1.ListOptions{},
-		&v1.DeleteOptions{},
-	)
-	versionedwatch.AddToGroupVersion(scheme, SchemeGroupVersion)
-	return nil
+var (
+	AddToScheme        = SchemeBuilder.AddToScheme
+	GroupName          = VersionArgs.GroupName
+	SchemeGroupVersion = VersionArgs.SchemeGroupVersion()
+)
+
+func init() {
+	if err := announced.AnnounceGroupVersion(VersionArgs); err != nil {
+		panic(err)
+	}
 }
