@@ -47,6 +47,13 @@ const (
 	containerTypeLabelKey       = "io.kubernetes.docker.type"
 	containerTypeLabelSandbox   = "podsandbox"
 	containerTypeLabelContainer = "container"
+
+	// TODO: https://github.com/kubernetes/kubernetes/pull/31169 provides experimental
+	// defaulting of host user namespace that may be enabled when the docker daemon
+	// is using remapped UIDs.
+	// Dockershim should provide detection support for a remapping environment .
+	// This should be included in the feature proposal.  Defaulting may still occur according
+	// to kubelet behavior and system settings in addition to any API flags that may be introduced.
 )
 
 func NewDockerSevice(client dockertools.DockerInterface) DockerLegacyService {
