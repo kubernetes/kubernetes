@@ -18,7 +18,7 @@ client-go has the same release cycle as the Kubernetes main repository. For exam
 
 ### How to get it
 
-You can `go get` a release of client-go, e.g., `go get k8s.io/client-go/1.4`.
+You can `go get` a release of client-go, e.g., `go get k8s.io/client-go/1.4/...` for the whole thing or `go get k8s.io/client-go/1.4/kubernetes` if you just need the clientset.
 
 ### Reporting bugs
 
