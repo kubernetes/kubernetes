@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,26 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package fake
 
-type ComponentStatusExpansion interface{}
+import (
+	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+)
 
-type ConfigMapExpansion interface{}
+func (c *FakeNamespaces) Finalize(namespace *v1.Namespace) (*v1.Namespace, error) {
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = namespacesResource
+	action.Subresource = "finalize"
+	action.Object = namespace
 
-type EndpointsExpansion interface{}
+	obj, err := c.Fake.Invokes(action, namespace)
+	if obj == nil {
+		return nil, err
+	}
 
-type LimitRangeExpansion interface{}
-
-type PersistentVolumeExpansion interface{}
-
-type PersistentVolumeClaimExpansion interface{}
-
-type PodTemplateExpansion interface{}
-
-type ReplicationControllerExpansion interface{}
-
-type ResourceQuotaExpansion interface{}
-
-type SecretExpansion interface{}
-
-type ServiceAccountExpansion interface{}
+	return obj.(*v1.Namespace), err
+}

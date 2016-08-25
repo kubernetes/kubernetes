@@ -16,8 +16,8 @@ limitations under the License.
 
 package unversioned
 
-type SecretExpansion interface{}
-
 type EventExpansion interface{}
+
+type SecretExpansion interface{}
 
 type ServiceExpansion interface{}

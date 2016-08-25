@@ -16,6 +16,6 @@ limitations under the License.
 
 package unversioned
 
-type ReplicaSetExpansion interface{}
-
 type IngressExpansion interface{}
+
+type ReplicaSetExpansion interface{}
