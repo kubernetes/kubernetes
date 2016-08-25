@@ -123,7 +123,7 @@ func TestRelisting(t *testing.T) {
 	actual := getEventsFromChannel(ch)
 	verifyEvents(t, expected, actual)
 
-	// The second relist should not send out any event because no container
+	// The second relist should not send out any event because no container has
 	// changed.
 	pleg.relist()
 	verifyEvents(t, expected, actual)
@@ -429,4 +429,70 @@ func TestRelistWithReinspection(t *testing.T) {
 	// relist #3 forced the reinspection of the pod to retrieve its status, but because the list of
 	// containers was the same as relist #1, nothing "changed", so there are no new events.
 	assert.Exactly(t, []*PodLifecycleEvent{}, actualEvents)
+}
+
+// Test detecting sandbox state changes.
+func TestRelistingWithSandboxes(t *testing.T) {
+	testPleg := newTestGenericPLEG()
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+	ch := pleg.Watch()
+	// The first relist should send a PodSync event to each pod.
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "1234",
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
+				createTestContainer("c2", kubecontainer.ContainerStateRunning),
+				createTestContainer("c3", kubecontainer.ContainerStateUnknown),
+			},
+		}},
+		{Pod: &kubecontainer.Pod{
+			ID: "4567",
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
+			},
+		}},
+	}
+	pleg.relist()
+	// Report every running/exited container if we see them for the first time.
+	expected := []*PodLifecycleEvent{
+		{ID: "1234", Type: ContainerStarted, Data: "c2"},
+		{ID: "4567", Type: ContainerDied, Data: "c1"},
+		{ID: "1234", Type: ContainerDied, Data: "c1"},
+	}
+	actual := getEventsFromChannel(ch)
+	verifyEvents(t, expected, actual)
+
+	// The second relist should not send out any event because no container has
+	// changed.
+	pleg.relist()
+	verifyEvents(t, expected, actual)
+
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "1234",
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("c2", kubecontainer.ContainerStateExited),
+				createTestContainer("c3", kubecontainer.ContainerStateRunning),
+			},
+		}},
+		{Pod: &kubecontainer.Pod{
+			ID: "4567",
+			Sandboxes: []*kubecontainer.Container{
+				createTestContainer("c4", kubecontainer.ContainerStateRunning),
+			},
+		}},
+	}
+	pleg.relist()
+	// Only report containers that transitioned to running or exited status.
+	expected = []*PodLifecycleEvent{
+		{ID: "1234", Type: ContainerRemoved, Data: "c1"},
+		{ID: "1234", Type: ContainerDied, Data: "c2"},
+		{ID: "1234", Type: ContainerStarted, Data: "c3"},
+		{ID: "4567", Type: ContainerRemoved, Data: "c1"},
+		{ID: "4567", Type: ContainerStarted, Data: "c4"},
+	}
+
+	actual = getEventsFromChannel(ch)
+	verifyEvents(t, expected, actual)
 }
