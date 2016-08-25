@@ -21,19 +21,23 @@ import (
 )
 
 func main() {
-
-	// Make sure the CA cert for the cluster exists and is readable.
-	// We are expecting a base64 encoded version of the cert PEM as this is how
-	// the cert would most likely be provided via kubernetes secrets.
-	if _, err := os.Stat(kd.CAPath); os.IsNotExist(err) {
-		log.Fatalf("CA does not exist: %s", kd.CAPath)
+	// Make sure we can load critical files, and be nice to the user by
+	// printing descriptive error message when we fail.
+	for desc, path := range map[string]string{
+		"root CA certificate":   kd.CAPath,
+		"token map file":        kd.TokenMapPath,
+		"list of API endpoints": kd.EndpointListPath,
+	} {
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			log.Fatalf("%s does not exist: %s", desc, path)
+		}
+		// Test read permissions
+		file, err := os.Open(path)
+		if err != nil {
+			log.Fatalf("Unable to open %s (%q [%s])", desc, path, err)
+		}
+		file.Close()
 	}
-	// Test read permissions
-	file, err := os.Open(kd.CAPath)
-	if err != nil {
-		log.Fatalf("ERROR: Unable to read %s", kd.CAPath)
-	}
-	file.Close()
 
 	router := kd.NewRouter()
 	log.Printf("Listening for requests on port 9898.")
