@@ -303,7 +303,7 @@ func (ctrl *PersistentVolumeController) deleteVolume(obj interface{}) {
 		}
 	}
 
-	if !ok || volume == nil || volume.Spec.ClaimRef == nil {
+	if volume == nil || volume.Spec.ClaimRef == nil {
 		return
 	}
 
