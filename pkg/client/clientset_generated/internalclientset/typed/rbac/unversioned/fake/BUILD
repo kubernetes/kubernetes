@@ -14,8 +14,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "fake_addrolerequest.go",
         "fake_clusterrole.go",
         "fake_clusterrolebinding.go",
+        "fake_generated_expansion.go",
         "fake_rbac_client.go",
         "fake_role.go",
         "fake_rolebinding.go",

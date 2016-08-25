@@ -29,6 +29,7 @@ import (
 	rbacvalidation "k8s.io/kubernetes/pkg/apis/rbac/validation"
 	rbacclient "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/rbac/unversioned"
 	"k8s.io/kubernetes/pkg/genericapiserver"
+	"k8s.io/kubernetes/pkg/registry/rbac/addrolerequest"
 	"k8s.io/kubernetes/pkg/registry/rbac/clusterrole"
 	clusterroleetcd "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/etcd"
 	clusterrolepolicybased "k8s.io/kubernetes/pkg/registry/rbac/clusterrole/policybased"
@@ -87,7 +88,9 @@ func (p *RESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapi
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("rolebindings")) {
 		roleBindingsStorage := rolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("rolebindings")))
-		storage["rolebindings"] = rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		policyRestrictedStorage := rolebindingpolicybased.NewStorage(roleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+		storage["rolebindings"] = policyRestrictedStorage
+		storage["addrolerequests"] = addrolerequest.NewREST(rolebinding.NewRegistry(policyRestrictedStorage))
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
 		clusterRolesStorage := clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))
