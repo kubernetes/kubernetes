@@ -72,14 +72,14 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 	}
 
 	var unsafeSysctls []string
-	if ann, found := psp.Annotations[extensions.UnsafeSysctlsPodSecurityPolicyAnnotationKey]; found {
+	if ann, found := psp.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey]; found {
 		var err error
 		unsafeSysctls, err = extensions.SysctlsFromPodSecurityPolicyAnnotation(ann)
 		if err != nil {
 			errs = append(errs, err)
 		}
 	}
-	unsafeSysctlsStrat, err := createUnsafeSysctlsStrategy(unsafeSysctls)
+	sysctlsStrat, err := createSysctlsStrategy(unsafeSysctls)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -95,7 +95,7 @@ func (f *simpleStrategyFactory) CreateStrategies(psp *extensions.PodSecurityPoli
 		FSGroupStrategy:           fsGroupStrat,
 		SupplementalGroupStrategy: supGroupStrat,
 		CapabilitiesStrategy:      capStrat,
-		SysctlsStrategy:           unsafeSysctlsStrat,
+		SysctlsStrategy:           sysctlsStrat,
 	}
 
 	return strategies, nil
@@ -161,7 +161,7 @@ func createCapabilitiesStrategy(defaultAddCaps, requiredDropCaps, allowedCaps []
 	return capabilities.NewDefaultCapabilities(defaultAddCaps, requiredDropCaps, allowedCaps)
 }
 
-// createUnsafeSysctlsStrategy creates a new unsafe sysctls strategy.
-func createUnsafeSysctlsStrategy(unsafeSysctlsPatterns []string) (sysctl.SysctlsStrategy, error) {
-	return sysctl.NewMustMatchPatterns(unsafeSysctlsPatterns)
+// createSysctlsStrategy creates a new unsafe sysctls strategy.
+func createSysctlsStrategy(sysctlsPatterns []string) (sysctl.SysctlsStrategy, error) {
+	return sysctl.NewMustMatchPatterns(sysctlsPatterns)
 }

@@ -1598,7 +1598,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	invalidSysctlPattern := validPSP()
-	invalidSysctlPattern.Annotations[extensions.UnsafeSysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
+	invalidSysctlPattern.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "a.*.b"
 
 	errorCases := map[string]struct {
 		psp         *extensions.PodSecurityPolicy
@@ -1738,7 +1738,7 @@ func TestValidatePodSecurityPolicy(t *testing.T) {
 	}
 
 	withSysctl := validPSP()
-	withSysctl.Annotations[extensions.UnsafeSysctlsPodSecurityPolicyAnnotationKey] = "net.*"
+	withSysctl.Annotations[extensions.SysctlsPodSecurityPolicyAnnotationKey] = "net.*"
 
 	successCases := map[string]struct {
 		psp *extensions.PodSecurityPolicy

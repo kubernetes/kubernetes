@@ -49,20 +49,26 @@ func NewMustMatchPatterns(patterns []string) (SysctlsStrategy, error) {
 // Validate ensures that the specified values fall within the range of the strategy.
 func (s *mustMatchPatterns) Validate(pod *api.Pod) field.ErrorList {
 	allErrs := field.ErrorList{}
+	allErrs = append(allErrs, s.validateAnnotation(pod, api.SysctlsPodAnnotationKey)...)
+	allErrs = append(allErrs, s.validateAnnotation(pod, api.UnsafeSysctlsPodAnnotationKey)...)
+	return allErrs
+}
 
-	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(api.UnsafeSysctlsPodAnnotationKey)
+func (s *mustMatchPatterns) validateAnnotation(pod *api.Pod, key string) field.ErrorList {
+	allErrs := field.ErrorList{}
 
-	sysctlAnn := pod.Annotations[api.UnsafeSysctlsPodAnnotationKey]
-	unsafeSysctls, err := api.SysctlsFromPodAnnotation(sysctlAnn)
+	fieldPath := field.NewPath("pod", "metadata", "annotations").Key(key)
+
+	sysctls, err := api.SysctlsFromPodAnnotation(pod.Annotations[key])
 	if err != nil {
-		allErrs = append(allErrs, field.Invalid(fieldPath, sysctlAnn, err.Error()))
+		allErrs = append(allErrs, field.Invalid(fieldPath, pod.Annotations[key], err.Error()))
 	}
 
-	if len(unsafeSysctls) > 0 {
+	if len(sysctls) > 0 {
 		if len(s.patterns) == 0 {
-			allErrs = append(allErrs, field.Invalid(fieldPath, sysctlAnn, "unsafe sysctls are not allowed"))
+			allErrs = append(allErrs, field.Invalid(fieldPath, pod.Annotations[key], "sysctls are not allowed"))
 		} else {
-			for i, sysctl := range unsafeSysctls {
+			for i, sysctl := range sysctls {
 				allErrs = append(allErrs, s.ValidateSysctl(sysctl.Name, fieldPath.Index(i))...)
 			}
 		}
@@ -82,5 +88,5 @@ func (s *mustMatchPatterns) ValidateSysctl(sysctlName string, fldPath *field.Pat
 			return nil
 		}
 	}
-	return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf("unsafe sysctl %q is not allowed", sysctlName))}
+	return field.ErrorList{field.Forbidden(fldPath, fmt.Sprintf("sysctl %q is not allowed", sysctlName))}
 }

@@ -77,18 +77,30 @@ func TestValidate(t *testing.T) {
 				Value: "dummy",
 			})
 		}
-		pod.Annotations = map[string]string{api.UnsafeSysctlsPodAnnotationKey: api.PodAnnotationsFromSysctls(sysctls)}
-		errs = strategy.Validate(pod)
-		if len(errs) != 0 {
-			t.Errorf("%s: unexpected validaton errors: %v", k, errs)
-		}
-
-		for _, s := range v.disallowed {
-			pod.Annotations = map[string]string{api.UnsafeSysctlsPodAnnotationKey: api.PodAnnotationsFromSysctls([]api.Sysctl{{s, "dummy"}})}
+		testAllowed := func(key string, category string) {
+			pod.Annotations = map[string]string{
+				key: api.PodAnnotationsFromSysctls(sysctls),
+			}
 			errs = strategy.Validate(pod)
-			if len(errs) == 0 {
-				t.Errorf("%s: expected error for sysctl %q", k, s)
+			if len(errs) != 0 {
+				t.Errorf("%s: unexpected validaton errors for %s sysctls: %v", k, category, errs)
 			}
 		}
+		testDisallowed := func(key string, category string) {
+			for _, s := range v.disallowed {
+				pod.Annotations = map[string]string{
+					key: api.PodAnnotationsFromSysctls([]api.Sysctl{{s, "dummy"}}),
+				}
+				errs = strategy.Validate(pod)
+				if len(errs) == 0 {
+					t.Errorf("%s: expected error for %s sysctl %q", k, category, s)
+				}
+			}
+		}
+
+		testAllowed(api.SysctlsPodAnnotationKey, "safe")
+		testAllowed(api.UnsafeSysctlsPodAnnotationKey, "unsafe")
+		testDisallowed(api.SysctlsPodAnnotationKey, "safe")
+		testDisallowed(api.UnsafeSysctlsPodAnnotationKey, "unsafe")
 	}
 }
