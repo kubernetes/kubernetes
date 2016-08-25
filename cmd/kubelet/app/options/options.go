@@ -49,12 +49,17 @@ type KubeletServer struct {
 	AuthPath          util.StringFlag // Deprecated -- use KubeConfig instead
 	APIServerList     []string        // Deprecated -- use KubeConfig instead
 
-	RunOnce bool
-
 	// Insert a probability of random errors during calls to the master.
 	ChaosChance float64
 	// Crash immediately, rather than eating panics.
 	ReallyCrashForTesting bool
+
+	// TODO(mtaufen): It is increasingly looking like nobody actually uses the
+	//                Kubelet's runonce mode anymore, so it may be a candidate
+	//                for deprecation and removal.
+	// If runOnce is true, the Kubelet will check the API server once for pods,
+	// run those in addition to the pods specified by the local manifest, and exit.
+	RunOnce bool
 }
 
 // NewKubeletServer will create a new KubeletServer with default values.
@@ -62,7 +67,6 @@ func NewKubeletServer() *KubeletServer {
 	config := componentconfig.KubeletConfiguration{}
 	api.Scheme.Convert(&v1alpha1.KubeletConfiguration{}, &config, nil)
 	return &KubeletServer{
-		AuthPath:             util.NewStringFlag("/var/lib/kubelet/kubernetes_auth"), // deprecated
 		KubeConfig:           util.NewStringFlag("/var/lib/kubelet/kubeconfig"),
 		RequireKubeConfig:    false, // in 1.5, default to true
 		KubeletConfiguration: config,
