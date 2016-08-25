@@ -29,7 +29,7 @@ func CopySS(m map[string]string) map[string]string {
 }
 
 // MergeSS returns a new map combining the values of the given maps.
-// If there is overlap in the keys, the value from merge is used.
+// If there is overlap in the keys, the value from overlay is used.
 func MergeSS(base, overlay map[string]string) map[string]string {
 	if base == nil {
 		return CopySS(overlay)

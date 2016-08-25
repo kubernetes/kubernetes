@@ -1624,7 +1624,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 			return fmt.Errorf("kill pod options are required if update type is kill")
 		}
 		apiPodStatus := killPodOptions.PodStatusFunc(pod, podStatus)
-		kl.statusManager.SetPodStatus(pod, apiPodStatus, nil)
+		kl.statusManager.SetPodStatus(pod, apiPodStatus)
 		// we kill the pod with the specified grace period since this is a termination
 		if err := kl.killPod(pod, nil, podStatus, killPodOptions.PodTerminationGracePeriodSecondsOverride); err != nil {
 			// there was an error killing the pod, so we return that error directly
@@ -1674,7 +1674,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Update status in the status manager
-	kl.statusManager.SetPodStatus(pod, apiPodStatus, statusAnnotations)
+	kl.statusManager.SetPodStatusWithAnnotations(pod, apiPodStatus, statusAnnotations)
 
 	// Kill pod if it should not be running
 	if errOuter := canRunPod(pod); errOuter != nil || pod.DeletionTimestamp != nil || apiPodStatus.Phase == api.PodFailed {
@@ -2114,7 +2114,7 @@ func (kl *Kubelet) rejectPod(pod *api.Pod, reason, message string) {
 	kl.statusManager.SetPodStatus(pod, api.PodStatus{
 		Phase:   api.PodFailed,
 		Reason:  reason,
-		Message: "Pod " + message}, nil)
+		Message: "Pod " + message})
 }
 
 // canAdmitPod determines if a pod can be admitted, and gives a reason if it

@@ -85,9 +85,12 @@ type Manager interface {
 	// Start the API server status sync loop.
 	Start()
 
-	// SetPodStatus updates the cached status for the given pod, and triggers a status update.  Status
-	// annotations are merged into the pod annotations, and also trigger an update as needed.
-	SetPodStatus(pod *api.Pod, status api.PodStatus, statusAnnotations map[string]string)
+	// SetPodStatus updates the cached status for the given pod, and triggers a status update.
+	SetPodStatus(pod *api.Pod, status api.PodStatus)
+
+	// SetPodStatusWithAnnotations sets the pod status, and also merges the statusAnnotations into the
+	// pod annotations, triggering an update as needed.
+	SetPodStatusWithAnnotations(pod *api.Pod, status api.PodStatus, statusAnnotations map[string]string)
 
 	// SetContainerReadiness updates the cached container status with the given readiness, and
 	// triggers a status update.
@@ -161,7 +164,11 @@ func (m *manager) GetPodStatus(uid types.UID) (api.PodStatus, bool) {
 	return status.status, ok
 }
 
-func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus, statusAnnotations map[string]string) {
+func (m *manager) SetPodStatus(pod *api.Pod, status api.PodStatus) {
+	m.SetPodStatusWithAnnotations(pod, status, nil)
+}
+
+func (m *manager) SetPodStatusWithAnnotations(pod *api.Pod, status api.PodStatus, statusAnnotations map[string]string) {
 	m.podStatusesLock.Lock()
 	defer m.podStatusesLock.Unlock()
 	// Make sure we're caching a deep copy.
