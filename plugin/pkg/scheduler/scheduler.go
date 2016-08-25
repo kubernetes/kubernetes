@@ -93,11 +93,11 @@ func (s *Scheduler) Run() {
 func (s *Scheduler) scheduleOne() {
 	pod := s.config.NextPod()
 
-	glog.V(3).Infof("Attempting to schedule: %+v", pod)
+	glog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 	start := time.Now()
 	dest, err := s.config.Algorithm.Schedule(pod, s.config.NodeLister)
 	if err != nil {
-		glog.V(1).Infof("Failed to schedule: %+v", pod)
+		glog.V(1).Infof("Failed to schedule pod: %v/%v", pod.Namespace, pod.Name)
 		s.config.Error(pod, err)
 		s.config.Recorder.Eventf(pod, api.EventTypeWarning, "FailedScheduling", "%v", err)
 		s.config.PodConditionUpdater.Update(pod, &api.PodCondition{
