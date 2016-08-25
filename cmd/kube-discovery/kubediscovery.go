@@ -17,7 +17,7 @@ import (
 	"net/http"
 	"os"
 
-	kd "k8s.io/kubernetes/pkg/kubediscovery"
+	kd "k8s.io/kubernetes/pkg/discovery"
 )
 
 func main() {

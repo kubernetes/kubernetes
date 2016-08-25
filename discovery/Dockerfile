@@ -1,6 +1,6 @@
 FROM golang
 
-ADD kubediscovery /usr/bin/
-ENTRYPOINT /usr/bin/kubernetes-discovery
+ADD kube-discovery /usr/bin/
+ENTRYPOINT /usr/bin/kube-discovery
 
 EXPOSE 8080
