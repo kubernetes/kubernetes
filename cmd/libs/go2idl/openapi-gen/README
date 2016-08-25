@@ -1,0 +1,10 @@
+# Generate OpenAPI definitions
+
+To generate a definition for an specific type of package add "+openapi=$VALUE" tag to the type/package comment lines.
+$VALUE can be any of these:
+
+- "package": Generate spec for all types in this package (should only be added to package comments)
+- "definition": Generate spec for a single type (should only be added to type comments)
+- "ignore": Ignore an specific type (only for types)
+- "should-fail": For test purposes, any type that has this value will expect to fail code generation. The generator
+  will stop if the type code generation succeeded.
