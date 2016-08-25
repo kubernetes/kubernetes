@@ -82,8 +82,7 @@ func (e *E2EServices) Start() error {
 		// out of the test.
 		"--node-name", framework.TestContext.NodeName,
 		"--disable-kubenet="+strconv.FormatBool(framework.TestContext.DisableKubenet),
-		// TODO: enable when flag is introduced in 1.5
-		// "--cgroups-per-qos="+strconv.FormatBool(framework.TestContext.CgroupsPerQOS),
+		"--experimental-cgroups-per-qos="+strconv.FormatBool(framework.TestContext.CgroupsPerQOS),
 		"--manifest-path", framework.TestContext.ManifestPath,
 		"--eviction-hard", framework.TestContext.EvictionHard,
 	)
@@ -355,6 +354,11 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 			"--cgroup-root=/",
 			"--system-cgroups=/system",
 		)
+		if framework.TestContext.CgroupsPerQOS {
+			cmdArgs = append(cmdArgs,
+				"--experimental-cgroups-per-qos", "true",
+			)
+		}
 	}
 	cmdArgs = append(cmdArgs,
 		"--api-servers", getAPIServerClientURL(),
@@ -373,12 +377,6 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		"--eviction-pressure-transition-period", "30s",
 		"--feature-gates", "DynamicKubeletConfig=true", // TODO(mtaufen): Eventually replace with a value from the framework.TestContext
 	)
-	if framework.TestContext.CgroupsPerQOS {
-		// TODO: enable this when the flag is stable and available in kubelet.
-		// cmdArgs = append(cmdArgs,
-		// 	"--cgroups-per-qos", "true",
-		// )
-	}
 	if !framework.TestContext.DisableKubenet {
 		cwd, err := os.Getwd()
 		if err != nil {

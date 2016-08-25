@@ -1267,7 +1267,9 @@ func (kl *Kubelet) GeneratePodHostNameAndDomain(pod *api.Pod) (string, string, e
 // the container runtime to set parameters for launching a container.
 func (kl *Kubelet) GenerateRunContainerOptions(pod *api.Pod, container *api.Container, podIP string) (*kubecontainer.RunContainerOptions, error) {
 	var err error
-	opts := &kubecontainer.RunContainerOptions{CgroupParent: kl.cgroupRoot}
+	pcm := kl.containerManager.NewPodContainerManager()
+	podContainerName := pcm.GetPodContainerName(pod)
+	opts := &kubecontainer.RunContainerOptions{CgroupParent: podContainerName}
 	hostname, hostDomainName, err := kl.GeneratePodHostNameAndDomain(pod)
 	if err != nil {
 		return nil, err
@@ -1568,7 +1570,35 @@ func (kl *Kubelet) killPod(pod *api.Pod, runningPod *kubecontainer.Pod, status *
 	} else if status != nil {
 		p = kubecontainer.ConvertPodStatusToRunningPod(status)
 	}
-	return kl.containerRuntime.KillPod(pod, p, gracePeriodOverride)
+	// cache the pod cgroup Name for reducing the cpu resource limits of the pod cgroup once the pod is killed
+	pcm := kl.containerManager.NewPodContainerManager()
+	var podCgroup string
+	reduceCpuLimts := true
+	if pod != nil {
+		podCgroup = pcm.GetPodContainerName(pod)
+	} else {
+		// If the pod is nil then cgroup limit must have already
+		// been decreased earlier
+		reduceCpuLimts = false
+	}
+
+	// Call the container runtime KillPod method which stops all running containers of the pod
+	if err := kl.containerRuntime.KillPod(pod, p, gracePeriodOverride); err != nil {
+		return err
+	}
+	// At this point the pod might not completely free up cpu and memory resources.
+	// In such a case deleting the pod's cgroup might cause the pod's charges to be transferred
+	// to the parent cgroup. There might be various kinds of pod charges at this point.
+	// One example is if there exists some tmpfs pages belonging to the pod
+	// which are not removed until the pod's volumes have been cleaned up.
+	// Hence we only reduce the cpu resource limits of the pod's cgroup
+	// and defer the responsibilty of destroying the pod's cgroup to the
+	// cleanup method and the housekeeping loop.
+	// Don't reduce the memory limits as that might trigger unwanted OOM_Kills
+	if reduceCpuLimts {
+		cm.ReduceCpuLimits(podCgroup, kl.containerManager.GetMountedSubsystems())
+	}
+	return nil
 }
 
 // makePodDataDirs creates the dirs for the pod datas.
@@ -1679,6 +1709,45 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 		return errOuter
 	}
 
+	// Create Cgroups for the pod and apply resource parameters
+	// to them if cgroup-per-qos flag is enabled.
+	pcm := kl.containerManager.NewPodContainerManager()
+	// If pod has already been terminated then we need not create
+	// or update the pod's cgroup
+	if !kl.podIsTerminated(pod) {
+		// When the kubelet is restarted with the cgroup-per-qos
+		// flag enabled, all the pod's running containers
+		// should be killed intermittently and brought back up
+		// under the qos cgroup hierarchy.
+		// Check if this is the pod's first sync
+		firstSync := true
+		for _, containerStatus := range apiPodStatus.ContainerStatuses {
+			if containerStatus.State.Running != nil {
+				firstSync = false
+				break
+			}
+		}
+		// Don't kill containers in pod if pod's cgroups already
+		// exists or the pod is running for the first time
+		podKilled := false
+		if !pcm.Exists(pod) && !firstSync {
+			kl.killPod(pod, nil, podStatus, nil)
+			podKilled = true
+		}
+		// Create and Update pod's Cgroups
+		// Don't create cgroups for run once pod if it was killed above
+		// The current policy is not to restart the run once pods when
+		// the kubelet is restarted with the new flag as run once pods are
+		// expected to run only once and if the kubelet is restarted then
+		// they are not expected to run again.
+		// We don't create and apply updates to cgroup if its a run once pod and was killed above
+		if !(podKilled && pod.Spec.RestartPolicy == api.RestartPolicyNever) {
+			if err := pcm.EnsureExists(pod); err != nil {
+				return fmt.Errorf("Failed to ensure that the pod: %v cgroups exist and are correctly applied: %v", pod.UID, err)
+			}
+		}
+	}
+
 	// Create Mirror Pod for Static Pod if it doesn't already exist
 	if kubepod.IsStaticPod(pod) {
 		podFullName := kubecontainer.GetPodFullName(pod)
@@ -1695,6 +1764,7 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 				}
 			}
 		}
+
 		if mirrorPod == nil || deleted {
 			glog.V(3).Infof("Creating a mirror pod for static pod %q", format.Pod(pod))
 			if err := kl.podManager.CreateMirrorPod(pod); err != nil {
@@ -1710,7 +1780,11 @@ func (kl *Kubelet) syncPod(o syncPodOptions) error {
 	}
 
 	// Wait for volumes to attach/mount
-	if err := kl.volumeManager.WaitForAttachAndMount(pod); err != nil {
+	defaultedPod, _, err := kl.defaultPodLimitsForDownwardApi(pod, nil)
+	if err != nil {
+		return err
+	}
+	if err := kl.volumeManager.WaitForAttachAndMount(defaultedPod); err != nil {
 		kl.recorder.Eventf(pod, api.EventTypeWarning, events.FailedMountVolume, "Unable to mount volumes for pod %q: %v", format.Pod(pod), err)
 		glog.Errorf("Unable to mount volumes for pod %q: %v; skipping pod", format.Pod(pod), err)
 		return err
@@ -1779,6 +1853,48 @@ func (kl *Kubelet) getPullSecretsForPod(pod *api.Pod) ([]api.Secret, error) {
 	}
 
 	return pullSecrets, nil
+}
+
+// cleanupOrphanedPodCgroups removes the Cgroups of pods that should not be
+// running and whose volumes have been cleanedup.
+func (kl *Kubelet) cleanupOrphanedPodCgroups(
+	pods []*api.Pod, runningPods []*kubecontainer.Pod) error {
+	// Add all running and existing terminated pods to a set allPods
+	allPods := sets.NewString()
+	for _, pod := range pods {
+		allPods.Insert(string(pod.UID))
+	}
+	for _, pod := range runningPods {
+		allPods.Insert(string(pod.ID))
+	}
+	subsystems := kl.containerManager.GetMountedSubsystems()
+	qosContainers := kl.containerManager.GetQOSContainersInfo()
+	// Get list of pods cgroups that still exist on the cgroup mounts
+	found, err := cm.GetAllPodsFromCgroups(subsystems, qosContainers)
+	if err != nil {
+		return fmt.Errorf("failed to get list of pods that still exist on cgroup Mounts: %v", err)
+	}
+
+	pcm := kl.containerManager.NewPodContainerManager()
+	// Iterate over all the found pods to verify if they should be running
+	for uid, val := range found {
+		if allPods.Has(string(uid)) {
+			continue
+		}
+		if podVolumesExist := kl.podVolumesExist(uid); podVolumesExist {
+			// If volumes have not been unmounted/detached, do not delete directory.
+			// Doing so may result in corruption of data.
+			glog.V(3).Infof("Orphaned pod %q found, but volumes are not cleaned up, Skipping cgroups deletion; err: %v", uid, err)
+			continue
+		}
+		glog.V(3).Infof("Orphaned pod %q found, removing pod cgroups", uid)
+		// Destroy all cgroups of pod that should not be running,
+		// by first killing all the attached processes to these cgroups.
+		// We ignore errors thrown by the method, as the housekeeping loop would
+		// again try to delete these unwanted pod cgroups
+		go pcm.Destroy(val)
+	}
+	return nil
 }
 
 // cleanupOrphanedPodDirs removes the volumes of pods that should not be
@@ -2003,6 +2119,8 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	if err != nil {
 		glog.Errorf("Failed cleaning up bandwidth limits: %v", err)
 	}
+
+	kl.cleanupOrphanedPodCgroups(allPods, runningPods)
 
 	kl.backOff.GC()
 	return nil
