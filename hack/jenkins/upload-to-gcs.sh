@@ -157,22 +157,20 @@ function update_job_result_cache() {
   for upload_attempt in $(seq 3); do
     echo "Copying ${job_results} to ${tmp_results} (attempt ${upload_attempt})"
     gsutil -q cat ${job_results} 2>&- |\
-     sed -n 's/^\({"version".*}\),*/\1,/p' >> ${tmp_results} || continue
-
+     sed -n 's/^\({"version".*}\),*/\1,/p' |\
+     tail -${cache_size} >> ${tmp_results} || continue
     break
   done
 
   echo "{\"version\": \"${version}\", \"buildnumber\": \"${BUILD_NUMBER}\"," \
        "\"result\": \"${build_result}\"}" >> ${tmp_results}
 
-  # JSON doesn't like terminating elements to contain a "," separator, so
-  # terminate the elements with an empty one.
-  echo -e "{}\n]" >> ${tmp_results}
+  echo "]" >> ${tmp_results}
 
   for upload_attempt in $(seq 3); do
     echo "Copying ${tmp_results} to ${job_results} (attempt ${upload_attempt})"
     gsutil -q -h "Content-Type:application/json" cp -a "${gcs_acl}" \
-           <(tail -${cache_size} ${tmp_results}) ${job_results} || continue
+           ${tmp_results} ${job_results} || continue
     break
   done
 
