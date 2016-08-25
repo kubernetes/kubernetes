@@ -19,13 +19,13 @@ package cache
 import (
 	"sync"
 
+	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/util/sets"
-    "k8s.io/kubernetes/pkg/api/meta"
-    "k8s.io/kubernetes/pkg/api"
-    "fmt"
-    "strconv"
-    "container/heap"
-    "errors"
+	"container/heap"
+	"errors"
+	"fmt"
+	"github.com/golang/glog"
+	"strconv"
 )
 
 // Priority recieves adds and updates from a Reflector, and puts them in a queue for
@@ -43,8 +43,8 @@ import (
 type Priority struct {
 	lock sync.RWMutex
 	cond sync.Cond
-    // This is the underlying queue object without syncronization features
-    queue *PriorityQueue
+	// This is the underlying queue object without syncronization features
+	queue *PriorityQueue
 
 	// populated is true if the first batch of items inserted by Replace() has been populated
 	// or Delete/Add/Update was called first.
@@ -54,20 +54,20 @@ type Priority struct {
 
 	// keyFunc is used to make the key used for queued item insertion and retrieval, and
 	// should be deterministic.
-    // TODO: is this needed at the top level object?
+	// TODO: is this needed at the top level object?
 	keyFunc KeyFunc
 }
 
 type PriorityKey struct {
-    key         string
-    priority    int
-    index       int
+	key      string
+	priority int
+	index    int
 }
 
 type PriorityQueue struct {
-    //this is the underlying priority queue object
-    queue []PriorityKey
-    items map[string]interface{}
+	//this is the underlying priority queue object
+	queue []PriorityKey
+	items map[string]interface{}
 
 	// keyFunc is used to make the key used for queued item insertion and retrieval, and
 	// should be deterministic.
@@ -82,32 +82,32 @@ func NewPriorityQueue(keyFunc KeyFunc) *PriorityQueue {
 	pq := &PriorityQueue{
 		items:   map[string]interface{}{},
 		queue:   []PriorityKey{},
-        keyFunc: keyFunc,
+		keyFunc: keyFunc,
 	}
-    heap.Init(pq)
+	heap.Init(pq)
 	return pq
 }
 
 // NewPriority returns a Store which can be used to queue up items to
 // process.
 func NewPriority(keyFunc KeyFunc) *Priority {
-    p := &Priority{
-        queue:   NewPriorityQueue(keyFunc),
+	p := &Priority{
+		queue:   NewPriorityQueue(keyFunc),
 		keyFunc: keyFunc, //TODO: is this needed here?
-    }
-        
+	}
+
 	p.cond.L = &p.lock
 	return p
 }
 
 // Helper Methods
 func (pq PriorityQueue) GetPlaceInQueue(key string) (int, error) {
-    for i, pk := range pq.queue {
-        if pk.key == key {
-            return i, nil
-        }
-    }
-    return -1, errors.New("key not found in queue")
+	for i, pk := range pq.queue {
+		if pk.key == key {
+			return i, nil
+		}
+	}
+	return -1, errors.New("key not found in queue")
 }
 
 // Methods for the heap interface:
@@ -115,28 +115,28 @@ func (pq PriorityQueue) GetPlaceInQueue(key string) (int, error) {
 // Len
 // returns the length of the queue
 func (pq PriorityQueue) Len() int {
-    return len(pq.queue)
+	return len(pq.queue)
 }
 
 // Less
 // compares the relative priority of two items in the queue and
 // for a priority queue, less is more
 func (pq PriorityQueue) Less(i, j int) bool {
-    //Pop should give us the highest priority item
-    return pq.more(i, j)
+	//Pop should give us the highest priority item
+	return pq.more(i, j)
 }
 
 // more
 func (pq PriorityQueue) more(i, j int) bool {
-    return pq.queue[i].priority > pq.queue[j].priority
+	return pq.queue[i].priority > pq.queue[j].priority
 }
 
 // Swap
 // switches the position of two items in the queue
 func (pq PriorityQueue) Swap(i, j int) {
-    pq.queue[i], pq.queue[j] = pq.queue[j], pq.queue[i]
-    pq.queue[i].index = i
-    pq.queue[j].index = j
+	pq.queue[i], pq.queue[j] = pq.queue[j], pq.queue[i]
+	pq.queue[i].index = i
+	pq.queue[j].index = j
 }
 
 // Push
@@ -144,33 +144,37 @@ func (pq PriorityQueue) Swap(i, j int) {
 // outside heap.Push!
 func (pq *PriorityQueue) Push(obj interface{}) {
 	key, _ := pq.keyFunc(obj)
-    priority, _ := MetaPriorityFunc(obj)
-    n := pq.Len()
-    pk := PriorityKey{
-        key:        key,
-        priority:   priority,
-        index:      n,
-    }
+	priority, _ := MetaPriorityFunc(obj)
+	n := pq.Len()
+	pk := PriorityKey{
+		key:      key,
+		priority: priority,
+		index:    n,
+	}
 
-    pq.items[key] = obj
-    pq.queue = append(pq.queue, pk)
+	pq.items[key] = obj
+	pq.queue = append(pq.queue, pk)
 }
 
 // Pop
 // grabs the highest priority item from the queue, returns and deletes it
 // Do not use outside of heap.Pop!
 func (pq *PriorityQueue) Pop() interface{} {
-    //grab the queue
-    old := pq.queue
-    n := len(old)
-    pk := old[n-1]
-    item := pq.items[pk.key]
+	//grab the queue
+	old := pq.queue
+	n := len(old)
+	pk := old[n-1]
+	item := pq.items[pk.key]
+	glog.V(2).Info("priority pop")
+	glog.V(2).Infof("current queue %#v", pq.items)
 
-    //delete from map and array
-    delete(pq.items, pk.key)
-    pq.queue = old[0:n-1]
+	//delete from map and array
+	delete(pq.items, pk.key)
+	pq.queue = old[0 : n-1]
 
-    return item
+	priority, _ := MetaPriorityFunc(item)
+	glog.V(2).Infof("priority: '%v'", priority)
+	return item
 }
 
 ////update
@@ -180,14 +184,13 @@ func (pq *PriorityQueue) Pop() interface{} {
 //    heap.Fix(pq.queue, item.index)
 //}
 
-
 // Methods for the Store interface:
 
 // Add
 // inserts an item, and puts it in the queue. The item is only enqueued
 // if it doesn't already exist in the set.
 func (p *Priority) Add(obj interface{}) error {
-    return p.AddIfNotPresent(obj)
+	return p.AddIfNotPresent(obj)
 }
 
 // Update
@@ -198,23 +201,23 @@ func (p *Priority) Add(obj interface{}) error {
 // else.
 func (p *Priority) Update(obj interface{}) error {
 	key, err := p.keyFunc(obj)
-    pq := p.queue
+	pq := p.queue
 
-    //if it already exists, then update the object and don't add a new key
+	//if it already exists, then update the object and don't add a new key
 	if _, exists := pq.items[key]; exists {
-        pq.items[key] = obj
-        //the item is already indexed, but might need a new priority
-        index, _ :=  pq.GetPlaceInQueue(key)
-        priority, _ := MetaPriorityFunc(obj)
+		pq.items[key] = obj
+		//the item is already indexed, but might need a new priority
+		index, _ := pq.GetPlaceInQueue(key)
+		priority, _ := MetaPriorityFunc(obj)
 
-        pq.queue[index].priority = priority
-        heap.Fix(pq, index)
-    } else {
-        //if it doesn't already exist (or it has a new key), then add it
-        heap.Push(pq, obj) //I hope this actually works...
+		pq.queue[index].priority = priority
+		heap.Fix(pq, index)
+	} else {
+		//if it doesn't already exist (or it has a new key), then add it
+		heap.Push(pq, obj) //I hope this actually works...
 	}
-    //TODO: fix error handling
-    return err
+	//TODO: fix error handling
+	return err
 }
 
 // Delete
@@ -229,10 +232,10 @@ func (p *Priority) Delete(obj interface{}) error {
 	defer p.lock.Unlock()
 	p.populated = true
 
-    pq := p.queue
+	pq := p.queue
 	delete(pq.items, key)
-    i, err :=  pq.GetPlaceInQueue(key)
-    pq.queue = append(pq.queue[:i], pq.queue[i+1:]...)
+	i, err := pq.GetPlaceInQueue(key)
+	pq.queue = append(pq.queue[:i], pq.queue[i+1:]...)
 
 	return err
 }
@@ -242,12 +245,12 @@ func (p *Priority) Delete(obj interface{}) error {
 func (p *Priority) List() []interface{} {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-    pq := p.queue
+	pq := p.queue
 	list := make([]interface{}, 0, len(pq.items))
 
-    for i := len(pq.items)-1; i >=0; i-- {
-        list = append(list, pq.items[pq.queue[i].key])
-    }
+	for i := len(pq.items) - 1; i >= 0; i-- {
+		list = append(list, pq.items[pq.queue[i].key])
+	}
 	return list
 }
 
@@ -257,7 +260,7 @@ func (p *Priority) List() []interface{} {
 func (p *Priority) ListKeys() []string {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-    pq := p.queue
+	pq := p.queue
 	list := make([]string, 0, len(pq.items))
 	for item := range pq.items {
 		list = append(list, item)
@@ -280,7 +283,7 @@ func (p *Priority) Get(obj interface{}) (item interface{}, exists bool, err erro
 func (p *Priority) GetByKey(key string) (item interface{}, exists bool, err error) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
-    pq := p.queue
+	pq := p.queue
 	item, exists = pq.items[key]
 	return item, exists, nil
 }
@@ -292,10 +295,10 @@ func (p *Priority) GetByKey(key string) (item interface{}, exists bool, err erro
 // will contain the items in the map, in priority order.
 func (p *Priority) Replace(list []interface{}, resourceVersion string) error {
 
-    pq := NewPriorityQueue(p.keyFunc)
-    for _, item := range list {
-        heap.Push(pq, item)
-    }
+	pq := NewPriorityQueue(p.keyFunc)
+	for _, item := range list {
+		heap.Push(pq, item)
+	}
 
 	p.lock.Lock()
 	defer p.lock.Unlock()
@@ -305,7 +308,7 @@ func (p *Priority) Replace(list []interface{}, resourceVersion string) error {
 		p.initialPopulationCount = pq.Len()
 	}
 
-    p.queue = pq
+	p.queue = pq
 
 	if p.queue.Len() > 0 {
 		p.cond.Broadcast()
@@ -321,19 +324,19 @@ func (p *Priority) Resync() error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-    pq := p.queue
+	pq := p.queue
 	inQueue := sets.NewString()
 	for _, pk := range pq.queue {
 		inQueue.Insert(pk.key)
 	}
 	for key, item := range pq.items {
 		if !inQueue.Has(key) {
-            heap.Push(pq, item)
+			heap.Push(pq, item)
 		}
 	}
-    if len(pq.queue) != len(pq.items) {
-        return errors.New("PriorityQueue failed to sync")
-    }
+	if len(pq.queue) != len(pq.items) {
+		return errors.New("PriorityQueue failed to sync")
+	}
 
 	if p.queue.Len() > 0 {
 		p.cond.Broadcast()
@@ -343,7 +346,7 @@ func (p *Priority) Resync() error {
 
 // Methods for the Queue interface:
 
-// Pop 
+// Pop
 // Pop waits until an item is ready and processes it. If multiple items are
 // ready, the highest priority one is returned.
 // The item is removed from the queue (and the store) before it is processed,
@@ -354,22 +357,24 @@ func (p *Priority) Pop(process PopProcessFunc) (interface{}, error) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	for { //what is this forever loop for? To cycle through items until one is ready?
-        for p.queue.Len() == 0 {
-            p.cond.Wait()
+		for p.queue.Len() == 0 {
+			p.cond.Wait()
 		}
 
-        item := heap.Pop(p.queue)
+		item := heap.Pop(p.queue)
 		if p.initialPopulationCount > 0 {
 			p.initialPopulationCount--
 		}
 
-        err := process(item)
+		err := process(item)
+		//TODO: this never returns anything but nil currently...
+		glog.V(2).Infof("requeue?: '%#v'", err)
 		if e, ok := err.(ErrRequeue); ok {
-            key, _ := p.keyFunc(item) //TODO: add error handling
+			key, _ := p.keyFunc(item) //TODO: add error handling
 			p.addIfNotPresent(key, item)
 			err = e.Err
 		}
-        return item, err
+		return item, err
 	}
 }
 
@@ -391,7 +396,7 @@ func (p *Priority) AddIfNotPresent(obj interface{}) error {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-    p.addIfNotPresent(key, obj)
+	p.addIfNotPresent(key, obj)
 
 	return nil
 }
@@ -401,10 +406,10 @@ func (p *Priority) AddIfNotPresent(obj interface{}) error {
 func (p *Priority) addIfNotPresent(key string, obj interface{}) {
 
 	p.populated = true
-    pq := p.queue
-    //here's where the map is important...
+	pq := p.queue
+	//here's where the map is important...
 	if _, exists := pq.items[key]; !exists {
-        heap.Push(pq, obj)
+		heap.Push(pq, obj)
 	}
 	p.cond.Broadcast()
 }
@@ -431,27 +436,23 @@ const annotationKey = "k8s_priority"
 // The object must be a pointer of a valid API type
 // TODO: make this allow non-pod objects
 func MetaPriorityFunc(obj interface{}) (int, error) {
-    pod, _ := obj.(api.Pod)
-    //if err != nil {
-    //    return -1, fmt.Errorf("object is not a pod: %v", err)
-    //}
-    meta, err := meta.Accessor(&pod)
-    if err != nil {
-        return -1, fmt.Errorf("object has no meta: %v", err)
-    }
-    annotations := meta.GetAnnotations()
-    if annotations == nil {
-        return -1, fmt.Errorf("object does not have annotations") 
-    }
-
-    if p, ok := annotations[annotationKey]; ok {
-        priority, err := strconv.Atoi(p)
-        if err != nil {
-            return -1, fmt.Errorf("priority is not an integer: %q", p)
-        }
-        return priority, nil
-    }
-    return -1, nil
+	thing, err := meta.Accessor(obj)
+	if err != nil {
+		return -1, fmt.Errorf("object has no meta: %v", err)
+	}
+	annotations := thing.GetAnnotations()
+	if annotations == nil {
+		return -1, fmt.Errorf("object does not have annotations")
+	}
+	if p, ok := annotations[annotationKey]; ok {
+		glog.V(2).Infof("priority annotation: '%v'", p)
+		priority, err := strconv.Atoi(p)
+		if err != nil {
+			return -1, fmt.Errorf("priority is not an integer: %q", p)
+		}
+		return priority, nil
+	}
+	return -1, nil
 }
 
 // There are a number of objects pulled from other files in the package. Here
