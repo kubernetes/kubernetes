@@ -93,6 +93,7 @@ func testNonAppArmorNode() {
 			status := pod.Status
 			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
 			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
+			Expect(pod.Annotations).To(Not(HaveKey(apparmor.StatusAnnotationKey)))
 		})
 	})
 }
