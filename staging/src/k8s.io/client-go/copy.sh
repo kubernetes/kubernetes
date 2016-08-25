@@ -65,13 +65,13 @@ echo "move to the client repo"
 ls "${CLIENT_REPO}" | grep -v '_tmp' | xargs rm -r
 mv "${CLIENT_REPO_TEMP}"/* "${CLIENT_REPO}"
 rm -r "${CLIENT_REPO_TEMP}"
-rm -r "${CLIENT_REPO}"/Godeps
 
 echo "moving vendor/k8s.io/kuberentes"
 cp -rn "${CLIENT_REPO}"/vendor/k8s.io/kubernetes/. "${CLIENT_REPO}"/
+rm -rf "${CLIENT_REPO}"/vendor/k8s.io/kubernetes
 # client-go will share the vendor of the main repo for now. When client-go
 # becomes a standalone repo, it will have its own vendor
-rm -r "${CLIENT_REPO}"/vendor
+mv "${CLIENT_REPO}"/vendor "${CLIENT_REPO}"/_vendor
 # remove the pkg/util/net/sets/README.md to silent hack/verify-munge-docs.sh
 # TODO: probably we should convert the README.md a doc.go
 find ./ -name "README.md" -delete

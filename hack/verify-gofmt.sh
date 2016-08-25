@@ -37,6 +37,7 @@ find_files() {
         -o -wholename './target' \
         -o -wholename '*/third_party/*' \
         -o -wholename '*/vendor/*' \
+        -o -wholename './staging' \
       \) -prune \
     \) -name '*.go'
 }
