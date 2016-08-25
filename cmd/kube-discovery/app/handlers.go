@@ -1,19 +1,22 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
+
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
+
     http://www.apache.org/licenses/LICENSE-2.0
+
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-package kubediscovery
+
+package discovery
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -45,13 +48,13 @@ type fsCALoader struct {
 }
 
 func (cl *fsCALoader) LoadPEM() (string, error) {
-	if cl.certData != "" {
+	if cl.certData == "" {
 		data, err := ioutil.ReadFile(CAPath)
 		if err != nil {
 			return "", err
 		}
 
-		cl.certData = base64.StdEncoding.EncodeToString(data)
+		cl.certData = string(data)
 	}
 
 	return cl.certData, nil
@@ -92,11 +95,11 @@ type endpointsLoader interface {
 	LoadList() ([]string, error)
 }
 
-type jsonFileEnpointsLoader struct {
+type jsonFileEndpointsLoader struct {
 	endpoints []string
 }
 
-func (el *jsonFileEnpointsLoader) LoadList() ([]string, error) {
+func (el *jsonFileEndpointsLoader) LoadList() ([]string, error) {
 	if len(el.endpoints) == 0 {
 		data, err := ioutil.ReadFile(EndpointListPath)
 		if err != nil {
@@ -121,7 +124,7 @@ func NewClusterInfoHandler() *ClusterInfoHandler {
 	return &ClusterInfoHandler{
 		tokenLoader:     &jsonFileTokenLoader{},
 		caLoader:        &fsCALoader{},
-		endpointsLoader: &jsonFileEnpointsLoader{},
+		endpointsLoader: &jsonFileEndpointsLoader{},
 	}
 }
 
@@ -130,7 +133,7 @@ func (cih *ClusterInfoHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 	log.Printf("Got token ID: %s", tokenID)
 	token, err := cih.tokenLoader.LoadAndLookup(tokenID)
 	if err != nil {
-		log.Printf("Invalid token: %s", err)
+		log.Print(err)
 		http.Error(resp, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -138,6 +141,7 @@ func (cih *ClusterInfoHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 
 	// TODO probably should not leak server-side errors to the client
 	caPEM, err := cih.caLoader.LoadPEM()
+	log.Printf("Loaded CA: %s", caPEM)
 	if err != nil {
 		err = fmt.Errorf("Error loading root CA certificate data: %s", err)
 		log.Println(err)
@@ -159,7 +163,10 @@ func (cih *ClusterInfoHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 	}
 
 	// Instantiate an signer using HMAC-SHA256.
-	signer, err := jose.NewSigner(jose.HS256, []byte(token))
+	hmacKey := []byte(token)
+
+	log.Printf("Key is %d bytes long", len(hmacKey))
+	signer, err := jose.NewSigner(jose.HS256, hmacKey)
 	if err != nil {
 		err = fmt.Errorf("Error creating JWS signer: %s", err)
 		log.Println(err)
