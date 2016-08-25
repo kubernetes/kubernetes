@@ -42,17 +42,21 @@ var (
 
 // ErrTaintsTolerationsNotMatch is an error type that indicates with if it should be aware by kubelet.
 type ErrTaintsTolerationsNotMatch struct {
-	KubeletAwareness bool
+	SomeUntoleratedTaintIsNoAdmit bool
 }
 
-func newErrTaintsTolerationsNotMatch(kubeletAwareness bool) *ErrTaintsTolerationsNotMatch {
+func newErrTaintsTolerationsNotMatch(someUntoleratedTaintIsNoAdmit bool) *ErrTaintsTolerationsNotMatch {
 	return &ErrTaintsTolerationsNotMatch{
-		KubeletAwareness: kubeletAwareness,
+		SomeUntoleratedTaintIsNoAdmit: someUntoleratedTaintIsNoAdmit,
 	}
 }
 
 func (e *ErrTaintsTolerationsNotMatch) Error() string {
-	return fmt.Sprintf("Taint Toleration unmatched with KubeletAwareness: %v", e.KubeletAwareness)
+	return fmt.Sprintf("Taint Toleration unmatched with SomeUntoleratedTaintIsNoAdmit is: %v", e.SomeUntoleratedTaintIsNoAdmit)
+}
+
+func (e *ErrTaintsTolerationsNotMatch) GetReason() string {
+	return fmt.Sprintf("ErrTaintsTolerationsNotMatch, and SomeUntoleratedTaintIsNoAdmit is: %v", e.SomeUntoleratedTaintIsNoAdmit)
 }
 
 // InsufficientResourceError is an error type that indicates what kind of resource limit is

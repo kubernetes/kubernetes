@@ -2169,18 +2169,17 @@ func (kl *Kubelet) canAdmitPod(pods []*api.Pod, pod *api.Pod) (bool, string, str
 	}
 	nodeInfo := schedulercache.NewNodeInfo(pods...)
 	nodeInfo.SetNode(node)
+
+	return kl.checkPredicatesFitness(pod, nodeInfo)
+}
+
+func (kl *Kubelet) checkPredicatesFitness(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, string, string) {
 	fit, reasons, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
 	if err != nil {
 		message := fmt.Sprintf("GeneralPredicates failed due to %v, which is unexpected.", err)
 		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 		return fit, "UnexpectedError", message
 	}
-
-	return kl.checkPredicatesFitness(pod, nodeInfo)
-}
-
-func (kl *Kubelet) checkPredicatesFitness(pod *api.Pod, nodeInfo *schedulercache.NodeInfo) (bool, string, string) {
-	fit, err := predicates.GeneralPredicates(pod, nil, nodeInfo)
 	if !fit {
 		var reason string
 		var message string
@@ -2212,20 +2211,33 @@ func (kl *Kubelet) checkPredicatesFitness(pod *api.Pod, nodeInfo *schedulercache
 		return fit, reason, message
 	}
 
-	fit, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
-	var reason string
-	var message string
+	// TODO(harryz) consider move PodToleratesNodeTaints to GeneralPredicates to eliminate duplicate code here
+	fit, reasons, err = predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
+	if err != nil {
+		message := fmt.Sprintf("PodToleratesNodeTaints failed due to %v, which is unexpected.", err)
+		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+		return fit, "UnexpectedError", message
+	}
 	if !fit {
-		if re, ok := err.(*predicates.ErrTaintsTolerationsNotMatch); ok {
+		var reason string
+		var message string
+		if len(reasons) == 0 {
+			message = fmt.Sprint("PodToleratesNodeTaints failed due to unknown reason, which is unexpected.")
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
+			return fit, "UnknownReason", message
+		}
+		r := reasons[0]
+		switch re := r.(type) {
+		case *predicates.ErrTaintsTolerationsNotMatch:
 			// if kubelet should not care this un-fit, just return true
-			if !re.KubeletAwareness {
+			if !re.SomeUntoleratedTaintIsNoAdmit {
 				return true, "", ""
 			}
+			reason = "PodToleratesNodeTaints"
+			message = re.Error()
+			glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 		}
 
-		reason = "PodToleratesNodeTaints"
-		message = re.Error()
-		glog.Warningf("Failed to admit pod %v - %s", format.Pod(pod), message)
 		return fit, reason, message
 	}
 

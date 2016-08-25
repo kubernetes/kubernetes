@@ -2897,8 +2897,8 @@ func TestPodToleratesTaints(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s, unexpected error: %v", test.test, err)
 		}
-		if !fits && !reflect.DeepEqual(reasons, test.reason) {
-			t.Errorf("%s, unexpected failure reason: %v, want: %v", test.test, reasons, expectedFailureReasons)
+		if !fits && !reflect.DeepEqual(reasons, test.expectedFailureReasons) {
+			t.Errorf("%s, unexpected failure reason: %v, want: %v", test.test, reasons, test.expectedFailureReasons)
 		}
 		if fits != test.fits {
 			t.Errorf("%s,\n expected: %v got %v", test.test, test.fits, fits)

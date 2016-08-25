@@ -515,18 +515,15 @@ func TolerationToleratesTaint(toleration *Toleration, taint *Taint) bool {
 }
 
 // TaintToleratedByTolerations checks if taint is tolerated by any of the tolerations.
-func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) (bool, bool) {
-	var tolerated, kubeletAwareness bool
+func TaintToleratedByTolerations(taint *Taint, tolerations []Toleration) bool {
+	tolerated := false
 	for i := range tolerations {
-		if taint.Effect == TaintEffectNoScheduleNoAdmit || tolerations[i].Effect == TaintEffectNoScheduleNoAdmit {
-			kubeletAwareness = true
-		}
 		if TolerationToleratesTaint(&tolerations[i], taint) {
 			tolerated = true
 			break
 		}
 	}
-	return tolerated, kubeletAwareness
+	return tolerated
 }
 
 func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, error) {

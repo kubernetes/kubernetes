@@ -1083,17 +1083,17 @@ func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulerc
 		return false, nil, err
 	}
 
-	if tolerated, kubeltAwareness := tolerationsToleratesTaints(tolerations, taints); tolerated {
+	if tolerated, someUntoleratedTaintIsNoAdmit := tolerationsToleratesTaints(tolerations, taints); tolerated {
 		return true, nil, nil
 	} else {
-		return false, []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(kubeltAwareness)}, nil
+		return false, []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(someUntoleratedTaintIsNoAdmit)}, nil
 	}
 }
 
 // tolerationsToleratesTaints checks if given tolerations can live with given taints.
 // It returns:
 // 1. whether tolerated or not;
-// 2. whether kubelet should be aware of 1.
+// 2. whether kubelet should be aware of (1).
 func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) (bool, bool) {
 	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
 	if len(taints) == 0 {
@@ -1111,6 +1111,9 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 		return false, false
 	}
 
+	someUntoleratedTaintIsNoAdmit := false
+	fits := true
+
 	for i := range taints {
 		taint := &taints[i]
 		// skip taints that have effect PreferNoSchedule, since it is for priorities
@@ -1118,14 +1121,16 @@ func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint
 			continue
 		}
 
-		if tolerated, kubeleteAwareness := api.TaintToleratedByTolerations(taint, tolerations); !tolerated {
-			return false, kubeleteAwareness
-		} else {
-			return true, kubeleteAwareness
+		if tolerated := api.TaintToleratedByTolerations(taint, tolerations); !tolerated {
+			fits = false
+			if taint.Effect == api.TaintEffectNoScheduleNoAdmit {
+				someUntoleratedTaintIsNoAdmit = true
+				return fits, someUntoleratedTaintIsNoAdmit
+			}
 		}
 	}
 
-	return true, false
+	return fits, someUntoleratedTaintIsNoAdmit
 }
 
 // Determine if a pod is scheduled with best-effort QoS
