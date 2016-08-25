@@ -72,18 +72,18 @@ examples/cluster-dns/images/frontend/client.py:  service_address = socket.gethos
 examples/storage/cassandra/image/run.sh:	cluster_name \
 examples/storage/vitess/env.sh:    node_ip=$(get_node_ip)
 federation/cluster/common.sh:  local cert_dir="${kube_temp}/easy-rsa-master/easyrsa3"
-federation/config.default.json:      "cloud_provider": "gce",
-federation/config.default.json:      "cloud_provider": "gce",
-federation/config.default.json:      "cloud_provider": "gce",
-federation/config.default.json:      "cluster_cidr": "10.180.0.0/14",
-federation/config.default.json:      "cluster_cidr": "10.184.0.0/14",
-federation/config.default.json:      "cluster_cidr": "10.188.0.0/14",
-federation/config.default.json:      "cluster_name": "cluster1-kubernetes",
-federation/config.default.json:      "cluster_name": "cluster2-kubernetes",
-federation/config.default.json:      "cluster_name": "cluster3-kubernetes",
-federation/config.default.json:      "num_nodes": 3,
-federation/config.default.json:      "num_nodes": 3,
-federation/config.default.json:      "num_nodes": 3,
+federation/deploy/config.json.sample:      "cloud_provider": "gce",
+federation/deploy/config.json.sample:      "cloud_provider": "gce",
+federation/deploy/config.json.sample:      "cloud_provider": "gce",
+federation/deploy/config.json.sample:      "cluster_cidr": "10.180.0.0/14",
+federation/deploy/config.json.sample:      "cluster_cidr": "10.184.0.0/14",
+federation/deploy/config.json.sample:      "cluster_cidr": "10.188.0.0/14",
+federation/deploy/config.json.sample:      "cluster_name": "cluster1-kubernetes",
+federation/deploy/config.json.sample:      "cluster_name": "cluster2-kubernetes",
+federation/deploy/config.json.sample:      "cluster_name": "cluster3-kubernetes",
+federation/deploy/config.json.sample:      "num_nodes": 3,
+federation/deploy/config.json.sample:      "num_nodes": 3,
+federation/deploy/config.json.sample:      "num_nodes": 3,
 hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HOST}"
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    advertise_address=""

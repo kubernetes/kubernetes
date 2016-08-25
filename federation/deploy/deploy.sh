@@ -52,8 +52,8 @@ function pull_installer() {
 
 function ensure_files() {
   kube::log::status "Ensure provider is supported"
-  if [[ "${KUBERNETES_PROVIDER:-}" != "gce" ]]; then
-    echo "Supported providers: \"gce\""
+  if [[ "${KUBERNETES_PROVIDER:-}" != "gce" && "${KUBERNETES_PROVIDER:-}" != "gke" ]]; then
+    echo "Supported providers: \"gce\", \"gke\""
     exit 1
   fi
 

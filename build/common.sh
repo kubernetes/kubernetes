@@ -1040,7 +1040,7 @@ function kube::release::package_full_tarball() {
   mkdir "${release_stage}/federation"
   cp -R "${KUBE_ROOT}/federation/cluster" "${release_stage}/federation/"
   cp -R "${KUBE_ROOT}/federation/manifests" "${release_stage}/federation/"
-  cp -R "${KUBE_ROOT}/federation/deploy" "${release_stage}/federation"
+  cp -R "${KUBE_ROOT}/federation/deploy" "${release_stage}/federation/"
 
   cp -R "${KUBE_ROOT}/examples" "${release_stage}/"
   cp -R "${KUBE_ROOT}/docs" "${release_stage}/"
