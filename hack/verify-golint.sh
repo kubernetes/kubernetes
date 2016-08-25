@@ -44,7 +44,7 @@ if ! diff -u "${linted_file}" <(LANG=C sort "${linted_file}"); then
 		echo
 		echo "hack/.linted_packages is not in alphabetical order. Please sort it:"
 		echo
-		echo "  sort -o hack/.linted_packages hack/.linted_packages"
+		echo "  LANG=C sort -o hack/.linted_packages hack/.linted_packages"
 		echo
 	} >&2
 	false
