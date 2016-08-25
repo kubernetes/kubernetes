@@ -19,7 +19,7 @@
 
 REGISTRY?=gcr.io/google_containers
 ARCH?=amd64
-TEMP_DIR:=$(shell mktemp -d)
+TEMP_DIR=/tmp/hyperkube
 CNI_RELEASE=9d5e6e60e79491207834ae8439e80c943db65a69
 
 UNAME_S:=$(shell uname -s)
@@ -53,57 +53,86 @@ build:
 ifndef VERSION
     $(error VERSION is undefined)
 endif
-	cp -r ./* ${TEMP_DIR}
-	mkdir -p ${TEMP_DIR}/cni-bin ${TEMP_DIR}/addons ${TEMP_DIR}/addons/singlenode ${TEMP_DIR}/addons/multinode
+
+
+	# Inital folder layout
+	rm -rf ${TEMP_DIR}/*
+	mkdir -p ${TEMP_DIR}/cni-bin \
+	         ${TEMP_DIR}/addons/singlenode ${TEMP_DIR}/addons/multinode \
+					 ${TEMP_DIR}/static-pods/singlenode ${TEMP_DIR}/static-pods/multinode
+
+
+
+ 	# Binaries and scripts
+	cp -r ./Dockerfile ./setup-files.sh ./copy-addons.sh ./cni-conf ${TEMP_DIR}
 	cp ../../saltbase/salt/generate-cert/make-ca-cert.sh ${TEMP_DIR}
-
-	# Singlenode addons
-	cp ../../addons/dns/skydns-rc.yaml.base ${TEMP_DIR}/addons/singlenode/skydns-rc.yaml
-	cp ../../addons/dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/singlenode/skydns-svc.yaml
-	cp ../../addons/dashboard/dashboard-controller.yaml ${TEMP_DIR}/addons/singlenode/
-	cp ../../addons/dashboard/dashboard-service.yaml ${TEMP_DIR}/addons/singlenode/
-
-	# Multinode addons; all singlenode addons plus kube-proxy (and soon flannel)
-	cp ${TEMP_DIR}/addons/singlenode/*.yaml ${TEMP_DIR}/addons/multinode/
-	cp kube-proxy-ds.yaml ${TEMP_DIR}/addons/multinode/kube-proxy.yaml
-
 	cp ../../../_output/dockerized/bin/linux/${ARCH}/hyperkube ${TEMP_DIR}
-
-	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" addons/singlenode/*.yaml addons/multinode/*.yaml static-pods/*.json
-	cd ${TEMP_DIR} && sed -i.back "s|REGISTRY|${REGISTRY}|g" addons/singlenode/*.yaml addons/multinode/*.yaml static-pods/*.json
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" addons/singlenode/*.yaml addons/multinode/*.yaml static-pods/*.json
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
-	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
-	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" addons/singlenode/*.yaml addons/multinode/*.yaml
-	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__REPLICAS__|1|g;s|__PILLAR__DNS__SERVER__|10.0.0.10|g;" addons/singlenode/skydns*.yaml addons/multinode/skydns*.yaml
-	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/singlenode/skydns*.yaml addons/multinode/skydns*.yaml
-	cd ${TEMP_DIR} && rm -f addons/singlenode/*.back addons/multinode/*.back static-pods/*.back
-
-	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer
-	# they'll take up twice the space because the new executable binary differs from the old one, but everything is cached in layers.
+ 	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer
+ 	# they'll take up twice the space because the new executable binary differs from the old one, but everything is cached in layers.
 	cd ${TEMP_DIR} && chmod a+rx \
 		hyperkube \
 		setup-files.sh \
 		make-ca-cert.sh \
 		copy-addons.sh
+	# Download CNI
+	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
 
+
+
+
+	# Manifests
+	cp ./static-pods/master.json \
+	   ./static-pods/etcd.json \
+	   ./static-pods/addon-manager-singlenode.json \
+	   ./static-pods/kube-proxy.json \
+	        ${TEMP_DIR}/static-pods/singlenode
+	# Manifests for multinode
+	cp ./static-pods/master-multi.json \
+	   ./static-pods/addon-manager-multinode.json \
+	        ${TEMP_DIR}/static-pods/multinode
+
+
+
+	# Addons
+	cp ../../addons/dns/skydns-rc.yaml.base ${TEMP_DIR}/addons/singlenode/skydns-rc.yaml
+	cp ../../addons/dns/skydns-svc.yaml.base ${TEMP_DIR}/addons/singlenode/skydns-svc.yaml
+	cp ../../addons/dashboard/dashboard-controller.yaml ${TEMP_DIR}/addons/singlenode/
+	cp ../../addons/dashboard/dashboard-service.yaml ${TEMP_DIR}/addons/singlenode/
+	# Addons for multinode; all singlenode addons plus kube-proxy (and soon flannel)
+	cp ${TEMP_DIR}/addons/singlenode/*.yaml ${TEMP_DIR}/addons/multinode/
+	cp kube-proxy-ds.yaml ${TEMP_DIR}/addons/multinode/kube-proxy.yaml
+
+
+
+  # Fill placeholders in templates
+	cd ${TEMP_DIR} && sed -i.back "s|VERSION|${VERSION}|g" addons/*/*.yaml static-pods/*/*.json
+	cd ${TEMP_DIR} && sed -i.back "s|REGISTRY|${REGISTRY}|g" addons/*/*.yaml static-pods/*/*.json
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${ARCH}|g" addons/*/*.yaml  static-pods/*/*.json
+	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
+	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
+	cd ${TEMP_DIR} && sed -i.back "s|-amd64|-${ARCH}|g" addons/*/*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__REPLICAS__|1|g;s|__PILLAR__DNS__SERVER__|10.0.0.10|g;" addons/*/skydns*.yaml
+	cd ${TEMP_DIR} && sed -i.back "s|__PILLAR__DNS__DOMAIN__|cluster.local|g;s|__PILLAR__FEDERATIONS__DOMAIN__MAP__||g;" addons/*/skydns*.yaml
+	cd ${TEMP_DIR} && rm -f addons/*/*.back static-pods/*/*.back Dockerfile.back
+
+
+
+# Build hyperkube image
 ifeq ($(ARCH),amd64)
 	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
 	cd ${TEMP_DIR} && ${SED_CMD} "/CROSS_BUILD_/d" Dockerfile
 else
 	cd ${TEMP_DIR} && ${SED_CMD} "s/CROSS_BUILD_//g" Dockerfile
-
 	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
 	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	curl -sSL --retry 5 https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-${QEMUARCH}-static.tar.xz | tar -xJ -C ${TEMP_DIR}
 endif
-	# Download CNI
-	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
-
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
-	rm -rf "${TEMP_DIR}"
 
+
+
+# Push to registry
 push: build
 	gcloud docker push ${REGISTRY}/hyperkube-${ARCH}:${VERSION}
 ifeq ($(ARCH),amd64)
