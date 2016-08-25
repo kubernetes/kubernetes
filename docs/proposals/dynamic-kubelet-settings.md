@@ -124,24 +124,25 @@ This is a rudimentary solution, and @aaronlevy brought up some good reasons to c
 
 I think it might be worth opening a separate issue to discuss a general solution for checkpointing config (unless one already exists, but I haven't seen one). There is https://github.com/kubernetes/kubernetes/issues/489, but that seems more geared towards checkpointing pod manifests. Is that, in fact, the right place to discuss this, or should I open a separate issue (if I open a separate issue, I'll post a link here)?
 
+### Annotations vs. Per-Node Config
+There is a storage burden associated with storing a configmap in etcd for every node in the cluster, especially when the vast majority of node configurations will likely be similar or the same. We can distribute this burden by storing a few named configmaps and pointing each node at its desired config using annotations on the node. This will not be complete for the alpha version of dynamic Kubelet configuration (in Kubernetes v1.4), but we will likely move to this or a similar model in a future release. This will probably necessitate a discussion of layering configs, because certain configuration fields (e.g. `HostnameOverride`) are unique to individual nodes. 
+
 
 # Staging
 ## 1.4
 - v1alpha1 KubeletConfiguration type
-- Dynamic configuration of Kubelets on individual nodes by creating configmaps called "kube-<node-name>" in the "kube-system" namespace.
+- Dynamic configuration of Kubelets on individual nodes by creating configmaps called `kubelet-&lt;node-name&gt;` in the `kube-system` namespace.
 - A test that makes sure Kubelets take up new config when the above configmap is posted. 
-- An endpoint on the node (/configz) for inspecting Kubelet configuration on a given node. This may or may not be the final way we end up exposing the state of Kubelet configuration on the node.
-- The dynamic kubelet configuration needs to be alpha-gated using the functionality in #30003.
-
-## Reach goal for 1.4
-- Flag to use an on-disk file containing the KubeletConfiguration as a source of config.  
+- An endpoint on the node (/configz) for inspecting Kubelet configuration on a given node.
+- Dynamic Kubelet configuration is alpha-gated using the functionality in #30003.
 
 ## Future releases
+- Flag to use an on-disk file containing the KubeletConfiguration as a source of config. 
+- Move to using annotations on nodes to specify desired config.
 - One question is whether the dynamic configuration feature needs to be alpha as long as the componentconfig API group is alpha. I would think yes, since it relies in large part on the KubeletConfiguration type, which is part of the componentconfig API group. 
 - Reorganize KubeletConfiguration into substructures to improve code readability before the componentconfig API group hits beta. 
 - A discussion still needs to happen around whether, instead of posting config maps per-node, we should use annotations to point individual nodes at which configmap to use. @kfox1111 suggested this in #30090 as a way to maintain the ability to do rolling updates of config while consuming less storage than with per-node configmaps. I think this might be a good idea, but we should have this conversation post 1.4 release due to time constraints. I think that per-node config will be plenty for the community to try out the feature.
 - We need to figure out the correct/best way to expose KubeletConfiguration state from the node. One option would be to expose via configz, as it currently is. Another would be to expose via Prometheus metrics. Another would be just to log KubeletConfiguration during Kubelet start-up. 
-- On-disk config if it doesn't make it by 1.4.
 
 
 <!-- BEGIN MUNGE: GENERATED_ANALYTICS -->
