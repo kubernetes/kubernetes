@@ -1404,10 +1404,6 @@
 			"Rev": "d8c773c4cba11b11539e3d45f93daeaa5dcf1fa1"
 		},
 		{
-			"ImportPath": "github.com/hashicorp/raft-boltdb",
-			"Rev": "d1e82c1ec3f15ee991f7cc7ffd5b67ff6f5bbaee"
-		},
-		{
 			"ImportPath": "github.com/hawkular/hawkular-client-go/metrics",
 			"Comment": "v0.5.1-1-g1d46ce7",
 			"Rev": "1d46ce7e1eca635f372357a8ccbf1fa7cc28b7d2"
@@ -2161,6 +2157,10 @@
 			"Rev": "1560c1005499d61b80f865c04d39ca7505bf7f0b"
 		},
 		{
+			"ImportPath": "github.com/spf13/viper",
+			"Rev": "7fb2782df3d83e0036cc89f461ed0422628776f4"
+		},
+		{
 			"ImportPath": "github.com/square/go-jose",
 			"Rev": "789a4c4bd4c118f7564954f441b29c153ccd6a96"
 		},
@@ -2171,10 +2171,6 @@
 		{
 			"ImportPath": "github.com/square/go-jose/json",
 			"Rev": "789a4c4bd4c118f7564954f441b29c153ccd6a96"
-		},
-		{
-			"ImportPath": "github.com/spf13/viper",
-			"Rev": "7fb2782df3d83e0036cc89f461ed0422628776f4"
 		},
 		{
 			"ImportPath": "github.com/stretchr/objx",
