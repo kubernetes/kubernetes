@@ -106,11 +106,9 @@ type fakeNeverRateLimiter struct {
 }
 
 func NewFakeNeverRateLimiter() RateLimiter {
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	return &fakeNeverRateLimiter{
-		wg: wg,
-	}
+	rl := fakeNeverRateLimiter{}
+	rl.wg.Add(1)
+	return &rl
 }
 
 func (t *fakeNeverRateLimiter) TryAccept() bool {
