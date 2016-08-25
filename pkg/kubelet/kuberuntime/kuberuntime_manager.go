@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	proberesults "k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	kubetypes "k8s.io/kubernetes/pkg/types"
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 )
@@ -45,6 +46,8 @@ const (
 	kubeRuntimeAPIVersion = "0.1.0"
 	// The root directory for pod logs
 	podLogsRootDirectory = "/var/log/pods"
+	// A minimal shutdown window for avoiding unnecessary SIGKILLs
+	minimumGracePeriodInSeconds = 2
 )
 
 var (
@@ -307,7 +310,77 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *api.Pod, _ api.PodStatus,
 // only hard kill paths are allowed to specify a gracePeriodOverride in the kubelet in order to not corrupt user data.
 // it is useful when doing SIGKILL for hard eviction scenarios, or max grace period during soft eviction scenarios.
 func (m *kubeGenericRuntimeManager) KillPod(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) error {
-	return fmt.Errorf("not implemented")
+	err := m.killPodWithSyncResult(pod, runningPod, gracePeriodOverride)
+	return err.Error()
+}
+
+// killPodWithSyncResult kills a runningPod and returns SyncResult.
+// Note: The pod passed in could be *nil* when kubelet restarted.
+func (m *kubeGenericRuntimeManager) killPodWithSyncResult(pod *api.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (result kubecontainer.PodSyncResult) {
+	killContainerResults := m.killContainersWithSyncResult(pod, runningPod, gracePeriodOverride)
+	for _, containerResult := range killContainerResults {
+		result.AddSyncResult(containerResult)
+	}
+
+	// Teardown network plugin
+	if len(runningPod.Sandboxes) == 0 {
+		glog.V(4).Infof("Can not find pod sandbox by UID %q, assuming already removed.", runningPod.ID)
+		return
+	}
+
+	sandboxID := runningPod.Sandboxes[0].ID.ID
+	isHostNetwork, err := m.isHostNetwork(sandboxID, pod)
+	if err != nil {
+		result.Fail(err)
+		return
+	}
+	if !isHostNetwork {
+		teardownNetworkResult := kubecontainer.NewSyncResult(kubecontainer.TeardownNetwork, pod.UID)
+		result.AddSyncResult(teardownNetworkResult)
+		// Tear down network plugin with sandbox id
+		if err := m.networkPlugin.TearDownPod(runningPod.Namespace, runningPod.Name, kubecontainer.ContainerID{
+			Type: m.runtimeName,
+			ID:   sandboxID,
+		}); err != nil {
+			message := fmt.Sprintf("Failed to teardown network for pod %q using network plugins %q: %v",
+				format.Pod(pod), m.networkPlugin.Name(), err)
+			teardownNetworkResult.Fail(kubecontainer.ErrTeardownNetwork, message)
+			glog.Error(message)
+		}
+	}
+
+	// stop sandbox, the sandbox will be removed in GarbageCollect
+	killSandboxResult := kubecontainer.NewSyncResult(kubecontainer.KillPodSandbox, runningPod.ID)
+	result.AddSyncResult(killSandboxResult)
+	// Stop all sandboxes belongs to same pod
+	for _, podSandbox := range runningPod.Sandboxes {
+		if err := m.runtimeService.StopPodSandbox(podSandbox.ID.ID); err != nil {
+			killSandboxResult.Fail(kubecontainer.ErrKillPodSandbox, err.Error())
+			glog.Errorf("Failed to stop sandbox %q", podSandbox.ID)
+		}
+	}
+
+	return
+}
+
+// isHostNetwork checks whether the pod is running in host-network mode.
+func (m *kubeGenericRuntimeManager) isHostNetwork(podSandBoxID string, pod *api.Pod) (bool, error) {
+	if pod != nil {
+		return kubecontainer.IsHostNetworkPod(pod), nil
+	}
+
+	podStatus, err := m.runtimeService.PodSandboxStatus(podSandBoxID)
+	if err != nil {
+		return false, err
+	}
+
+	if podStatus.Linux != nil && podStatus.Linux.Namespaces != nil && podStatus.Linux.Namespaces.Options != nil {
+		if podStatus.Linux.Namespaces.Options.HostNetwork != nil {
+			return podStatus.Linux.Namespaces.Options.GetHostNetwork(), nil
+		}
+	}
+
+	return false, nil
 }
 
 // GetPodStatus retrieves the status of the pod, including the
