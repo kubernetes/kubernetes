@@ -105,34 +105,51 @@ func testServerAndClientConfig(handler func(http.ResponseWriter, *http.Request))
 	return srv, config
 }
 
-func newDanglingPod() *v1.Pod {
+func setupGC(t *testing.T, config *restclient.Config) *GarbageCollector {
+	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
+	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	config.ContentConfig.NegotiatedSerializer = nil
+	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
+	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
+	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return gc
+}
+
+func getPod(podName string, ownerReferences []v1.OwnerReference) *v1.Pod {
 	return &v1.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
 			APIVersion: "v1",
 		},
 		ObjectMeta: v1.ObjectMeta{
-			Name:      "ToBeDeletedPod",
-			Namespace: "ns1",
-			OwnerReferences: []v1.OwnerReference{
-				{
-					Kind:       "ReplicationController",
-					Name:       "owner1",
-					UID:        "123",
-					APIVersion: "v1",
-				},
-			},
+			Name:            podName,
+			Namespace:       "ns1",
+			OwnerReferences: ownerReferences,
 		},
 	}
 }
 
-// test the processItem function making the expected actions.
-func TestProcessItem(t *testing.T) {
-	pod := newDanglingPod()
-	podBytes, err := json.Marshal(pod)
+func serilizeOrDie(t *testing.T, object interface{}) []byte {
+	data, err := json.Marshal(object)
 	if err != nil {
 		t.Fatal(err)
 	}
+	return data
+}
+
+// test the processItem function making the expected actions.
+func TestProcessItem(t *testing.T) {
+	pod := getPod("ToBeDeletedPod", []v1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "owner1",
+			UID:        "123",
+			APIVersion: "v1",
+		},
+	})
 	testHandler := &fakeActionHandler{
 		response: map[string]FakeResponse{
 			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/owner1": {
@@ -141,21 +158,13 @@ func TestProcessItem(t *testing.T) {
 			},
 			"GET" + "/api/v1/namespaces/ns1/pods/ToBeDeletedPod": {
 				200,
-				podBytes,
+				serilizeOrDie(t, pod),
 			},
 		},
 	}
-	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
 	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
 	defer srv.Close()
-	clientConfig.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	metaOnlyClientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
-	clientConfig.ContentConfig.NegotiatedSerializer = nil
-	clientPool := dynamic.NewClientPool(clientConfig, dynamic.LegacyAPIPathResolverFunc)
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
-	if err != nil {
-		t.Fatal(err)
-	}
+	gc := setupGC(t, clientConfig)
 	item := &node{
 		identity: objectReference{
 			OwnerReference: metatypes.OwnerReference{
@@ -169,7 +178,7 @@ func TestProcessItem(t *testing.T) {
 		// owners are intentionally left empty. The processItem routine should get the latest item from the server.
 		owners: nil,
 	}
-	err = gc.processItem(item)
+	err := gc.processItem(item)
 	if err != nil {
 		t.Errorf("Unexpected Error: %v", err)
 	}
@@ -304,16 +313,7 @@ func TestProcessEvent(t *testing.T) {
 // TestDependentsRace relies on golang's data race detector to check if there is
 // data race among in the dependents field.
 func TestDependentsRace(t *testing.T) {
-	config := &restclient.Config{}
-	config.ContentConfig.NegotiatedSerializer = serializer.DirectCodecFactory{CodecFactory: metaonly.NewMetadataCodecFactory()}
-	metaOnlyClientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
-	config.ContentConfig.NegotiatedSerializer = nil
-	clientPool := dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
-	podResource := []unversioned.GroupVersionResource{{Version: "v1", Resource: "pods"}}
-	gc, err := NewGarbageCollector(metaOnlyClientPool, clientPool, podResource)
-	if err != nil {
-		t.Fatal(err)
-	}
+	gc := setupGC(t, &restclient.Config{})
 
 	const updates = 100
 	owner := &node{dependents: make(map[*node]struct{})}
@@ -356,5 +356,118 @@ func TestGCListWatcher(t *testing.T) {
 	}
 	if e, a := "resourceVersion=1", testHandler.actions[1].query; e != a {
 		t.Errorf("expect %s, got %s", e, a)
+	}
+}
+
+func podToGCNode(pod *v1.Pod) *node {
+	return &node{
+		identity: objectReference{
+			OwnerReference: metatypes.OwnerReference{
+				Kind:       pod.Kind,
+				APIVersion: pod.APIVersion,
+				Name:       pod.Name,
+				UID:        pod.UID,
+			},
+			Namespace: pod.Namespace,
+		},
+		// owners are intentionally left empty. The processItem routine should get the latest item from the server.
+		owners: nil,
+	}
+}
+
+func TestAbsentUIDCache(t *testing.T) {
+	rc1Pod1 := getPod("rc1Pod1", []v1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "rc1",
+			UID:        "1",
+			APIVersion: "v1",
+		},
+	})
+	rc1Pod2 := getPod("rc1Pod2", []v1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "rc1",
+			UID:        "1",
+			APIVersion: "v1",
+		},
+	})
+	rc2Pod1 := getPod("rc2Pod1", []v1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "rc2",
+			UID:        "2",
+			APIVersion: "v1",
+		},
+	})
+	rc3Pod1 := getPod("rc3Pod1", []v1.OwnerReference{
+		{
+			Kind:       "ReplicationController",
+			Name:       "rc3",
+			UID:        "3",
+			APIVersion: "v1",
+		},
+	})
+	testHandler := &fakeActionHandler{
+		response: map[string]FakeResponse{
+			"GET" + "/api/v1/namespaces/ns1/pods/rc1Pod1": {
+				200,
+				serilizeOrDie(t, rc1Pod1),
+			},
+			"GET" + "/api/v1/namespaces/ns1/pods/rc1Pod2": {
+				200,
+				serilizeOrDie(t, rc1Pod2),
+			},
+			"GET" + "/api/v1/namespaces/ns1/pods/rc2Pod1": {
+				200,
+				serilizeOrDie(t, rc2Pod1),
+			},
+			"GET" + "/api/v1/namespaces/ns1/pods/rc3Pod1": {
+				200,
+				serilizeOrDie(t, rc3Pod1),
+			},
+			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/rc1": {
+				404,
+				[]byte{},
+			},
+			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/rc2": {
+				404,
+				[]byte{},
+			},
+			"GET" + "/api/v1/namespaces/ns1/replicationcontrollers/rc3": {
+				404,
+				[]byte{},
+			},
+		},
+	}
+	srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+	defer srv.Close()
+	gc := setupGC(t, clientConfig)
+	gc.absentOwnerCache = NewUIDCache(2)
+	gc.processItem(podToGCNode(rc1Pod1))
+	gc.processItem(podToGCNode(rc2Pod1))
+	// rc1 should already be in the cache, no request should be sent. rc1 should be promoted in the UIDCache
+	gc.processItem(podToGCNode(rc1Pod2))
+	// after this call, rc2 should be evicted from the UIDCache
+	gc.processItem(podToGCNode(rc3Pod1))
+	// check cache
+	if !gc.absentOwnerCache.Has(types.UID("1")) {
+		t.Errorf("expected rc1 to be in the cache")
+	}
+	if gc.absentOwnerCache.Has(types.UID("2")) {
+		t.Errorf("expected rc2 to not exist in the cache")
+	}
+	if !gc.absentOwnerCache.Has(types.UID("3")) {
+		t.Errorf("expected rc3 to be in the cache")
+	}
+	// check the request sent to the server
+	count := 0
+	for _, action := range testHandler.actions {
+		if action.String() == "GET=/api/v1/namespaces/ns1/replicationcontrollers/rc1" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Errorf("expected only 1 GET rc1 request, got %d", count)
 	}
 }
