@@ -1,0 +1,18 @@
+language: go
+go:
+  - 1.5.4
+  - 1.6.3
+  - 1.7
+  - tip
+matrix:
+  allow_failures:
+    - go: tip
+  fast_finish: true
+script:
+  - ./test.sh
+before_install:
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
+after_success:
+  - $HOME/gopath/bin/goveralls -service=travis-ci
