@@ -1142,7 +1142,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (*etcdtesti
 					if !ok {
 						return nil, nil, fmt.Errorf("not a pod")
 					}
-					return labels.Set(pod.ObjectMeta.Labels), generic.ObjectMetaFieldsSet(pod.ObjectMeta, true), nil
+					return labels.Set(pod.ObjectMeta.Labels), generic.ObjectMetaFieldsSet(&pod.ObjectMeta, true), nil
 				},
 			}
 		},

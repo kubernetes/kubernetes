@@ -94,5 +94,5 @@ func MatchStorageClasses(label labels.Selector, field fields.Selector) *generic.
 
 // StorageClassToSelectableFields returns a label set that represents the object
 func StorageClassToSelectableFields(storageClass *extensions.StorageClass) fields.Set {
-	return generic.ObjectMetaFieldsSet(storageClass.ObjectMeta, false)
+	return generic.ObjectMetaFieldsSet(&storageClass.ObjectMeta, false)
 }
