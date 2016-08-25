@@ -2268,7 +2268,7 @@ func getPodsTotalRequestsAndLimits(podList *api.PodList) (reqs map[api.ResourceN
 
 func DescribeEvents(el *api.EventList, w io.Writer) {
 	if len(el.Items) == 0 {
-		fmt.Fprint(w, "No events.")
+		fmt.Fprint(w, "No events.\n")
 		return
 	}
 	sort.Sort(SortableEvents(el.Items))
