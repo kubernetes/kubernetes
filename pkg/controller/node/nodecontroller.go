@@ -23,6 +23,8 @@ import (
 	"sync"
 	"time"
 
+	"encoding/json"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
@@ -551,17 +553,20 @@ func (nc *NodeController) monitorNodeStatus() error {
 			// Check eviction timeout against decisionTimestamp
 			if observedReadyCondition.Status == api.ConditionFalse &&
 				decisionTimestamp.After(nc.nodeStatusMap[node.Name].readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
+					nc.addNodeOutageTaint(node)
 				if nc.evictPods(node) {
 					glog.V(4).Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout)
 				}
 			}
 			if observedReadyCondition.Status == api.ConditionUnknown &&
 				decisionTimestamp.After(nc.nodeStatusMap[node.Name].probeTimestamp.Add(nc.podEvictionTimeout)) {
+					nc.addNodeOutageTaint(node)
 				if nc.evictPods(node) {
 					glog.V(4).Infof("Evicting pods on node %s: %v is later than %v + %v", node.Name, decisionTimestamp, nc.nodeStatusMap[node.Name].readyTransitionTimestamp, nc.podEvictionTimeout-gracePeriod)
 				}
 			}
 			if observedReadyCondition.Status == api.ConditionTrue {
+				removeNodeOutageTaint(node)
 				if nc.cancelPodEviction(node) {
 					glog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
 				}
@@ -931,6 +936,54 @@ func (nc *NodeController) evictPods(node *api.Node) bool {
 	nc.evictorLock.Lock()
 	defer nc.evictorLock.Unlock()
 	return nc.zonePodEvictor[utilnode.GetZoneKey(node)].Add(node.Name, string(node.UID))
+}
+
+const taintNodeOutage := api.Taint{Key: "operator", Value: "node-outage", Effect: api.TaintEffectNoSchedule}
+
+
+func (nc *NodeController) addNodeOutageTaint(node *api.Node) error {
+	annotations := node.GetAnnotations()
+	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	if err != nil {
+		return err
+	}
+	for _, taint := range taints {
+		if taint.Key == taintNodeOutage.Key && taint.Effect == taintNodeOutage.Effect {
+			glog.V(2).Infof("operator taint already exists with value %v", taint.Effect)
+			return nil
+		}
+	}
+	taints := append(taints, taintNodeOutage)
+	taintsData, err := json.Marshal(taints)
+	if err != nil {
+		return err
+	}
+	annotations[api.TaintsAnnotationKey] = string(taintsData)
+	node.SetAnnotations(annotations)
+	_, err := nc.kubeClient.Core().Nodes().Update(node)
+	return err
+}
+
+func (nc *NodeController) removeNodeOutageTaint(node *api.Node) error {
+	annotations := node.GetAnnotations()
+	taints, err := api.GetTaintsFromNodeAnnotations(annotations)
+	if err != nil {
+		return err
+	}
+	var newTaints []api.Taint
+	for _, taint := range taints {
+		if !(taint.Key == taintNodeOutage.Key && taint.Effect == taintNodeOutage.Effect && taint.Value == taintNodeOutage.Value) {
+			newTaits = append(newTaints, taint)
+		}
+	}
+	taintsData, err := json.Marshal(newTaints)
+	if err != nil {
+		return err
+	}
+	annotations[api.TaintsAnnotationKey] = string(taintsData)
+	node.SetAnnotations(annotations)
+	_, err := nc.kubeClient.Core().Nodes().Update(node)
+	return err
 }
 
 // Default value for cluster eviction rate - we take nodeNum for consistency with ReducedQPSFunc.
