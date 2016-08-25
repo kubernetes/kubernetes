@@ -1096,6 +1096,8 @@ func getServiceExternalIP(svc *api.Service, wide bool) string {
 			return lbIps
 		}
 		return "<pending>"
+	case api.ServiceTypeExternalName:
+		return svc.Spec.ExternalName
 	}
 	return "<unknown>"
 }

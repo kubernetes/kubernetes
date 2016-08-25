@@ -1574,6 +1574,12 @@ func describeService(service *api.Service, endpoints *api.Endpoints, events *api
 		fmt.Fprintf(out, "Selector:\t%s\n", labels.FormatLabels(service.Spec.Selector))
 		fmt.Fprintf(out, "Type:\t%s\n", service.Spec.Type)
 		fmt.Fprintf(out, "IP:\t%s\n", service.Spec.ClusterIP)
+		if len(service.Spec.ExternalIPs) > 0 {
+			fmt.Fprintf(out, "External IPs:\t%v\n", strings.Join(service.Spec.ExternalIPs, ","))
+		}
+		if service.Spec.ExternalName != "" {
+			fmt.Fprintf(out, "External Name:\t%s\n", service.Spec.ExternalName)
+		}
 		if len(service.Status.LoadBalancer.Ingress) > 0 {
 			list := buildIngressString(service.Status.LoadBalancer.Ingress)
 			fmt.Fprintf(out, "LoadBalancer Ingress:\t%s\n", list)
