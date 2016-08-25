@@ -42,7 +42,7 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 	if int64(len(p)) > w.n {
 		p = p[:w.n]
 	}
-	if len(p) > 0 {
+	if w.n > 0 {
 		n, err = w.w.Write(p)
 		w.n -= int64(n)
 	}
