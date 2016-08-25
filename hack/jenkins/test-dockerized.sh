@@ -33,7 +33,7 @@ retry() {
 
 export PATH=${GOPATH}/bin:${PWD}/third_party/etcd:/usr/local/go/bin:${PATH}
 
-retry go get github.com/tools/godep && godep version
+retry go get github.com/kardianos/govendor
 retry go get github.com/jteeuwen/go-bindata/go-bindata
 retry go get github.com/jstemmer/go-junit-report
 
@@ -51,7 +51,6 @@ export KUBE_INTEGRATION_TEST_MAX_CONCURRENCY=4
 export LOG_LEVEL=4
 
 cd /go/src/k8s.io/kubernetes
-rm -rf Godeps/_workspace # Temporary until _workspace is fully obliterated
 
 make generated_files
 go install ./cmd/...

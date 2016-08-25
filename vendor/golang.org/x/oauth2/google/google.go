@@ -12,7 +12,7 @@
 // https://developers.google.com/accounts/docs/OAuth2
 // and
 // https://developers.google.com/accounts/docs/application-default-credentials.
-package google
+package google // import "golang.org/x/oauth2/google"
 
 import (
 	"encoding/json"

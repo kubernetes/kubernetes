@@ -16,11 +16,11 @@ else
 fi
 echo "${reset}"
 
-# Check if changes to Godeps are reproducible...
-files=($(git diff --cached --name-only --diff-filter ACM | grep "Godeps"))
+# Check if changes to vendor/ are reproducible...
+files=($(git diff --cached --name-only --diff-filter ACM | grep "vendor"))
 if [[ "${#files[@]}" -ne 0 ]]; then
-  echo -ne "Check if changes to Godeps are reproducible (this is pretty slow)..."
-  if ! OUT=$("hack/verify-godeps.sh" 2>&1); then
+  echo -ne "Check if changes to vendor are reproducible (this is pretty slow)..."
+  if ! OUT=$("hack/verify-vendored-deps.sh" 2>&1); then
     echo
     echo "${red}${OUT}"
     exit_code=1
@@ -29,8 +29,8 @@ if [[ "${#files[@]}" -ne 0 ]]; then
   fi
   echo "${reset}"
 
-  echo -ne "Check if Godep licenses are up to date..."
-  if ! OUT=$("hack/verify-godep-licenses.sh" 2>&1); then
+  echo -ne "Check if vendored deps licenses are up to date..."
+  if ! OUT=$("hack/verify-vendored-deps-licenses.sh" 2>&1); then
     echo
     echo "${red}${OUT}"
     exit_code=1

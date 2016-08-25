@@ -4,7 +4,7 @@
 
 // Package curve25519 provides an implementation of scalar multiplication on
 // the elliptic curve known as curve25519. See http://cr.yp.to/ecdh.html
-package curve25519
+package curve25519 // import "golang.org/x/crypto/curve25519"
 
 // basePoint is the x coordinate of the generator of the curve.
 var basePoint = [32]byte{9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}

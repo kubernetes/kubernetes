@@ -88,7 +88,7 @@ func (g *Generator) BindFlags(flag *flag.FlagSet) {
 	flag.BoolVar(&g.Common.VerifyOnly, "verify-only", g.Common.VerifyOnly, "If true, only verify existing output, do not write anything.")
 	flag.StringVarP(&g.Packages, "packages", "p", g.Packages, "comma-separated list of directories to get input types from. Directories prefixed with '-' are not generated, directories prefixed with '+' only create types with explicit IDL instructions.")
 	flag.StringVarP(&g.OutputBase, "output-base", "o", g.OutputBase, "Output base; defaults to $GOPATH/src/")
-	flag.StringSliceVar(&g.ProtoImport, "proto-import", g.ProtoImport, "The search path for the core protobuf .protos, required, defaults to GODEPS on path.")
+	flag.StringSliceVar(&g.ProtoImport, "proto-import", g.ProtoImport, "The search path for the core protobuf .protos, required, defaults to vendor on path.")
 	flag.StringVar(&g.Conditional, "conditional", g.Conditional, "An optional Golang build tag condition to add to the generated Go code")
 	flag.BoolVar(&g.Clean, "clean", g.Clean, "If true, remove all generated files for the specified Packages.")
 	flag.BoolVar(&g.OnlyIDL, "only-idl", g.OnlyIDL, "If true, only generate the IDL for each package.")

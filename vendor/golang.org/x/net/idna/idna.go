@@ -5,7 +5,7 @@
 // Package idna implements IDNA2008 (Internationalized Domain Names for
 // Applications), defined in RFC 5890, RFC 5891, RFC 5892, RFC 5893 and
 // RFC 5894.
-package idna
+package idna // import "golang.org/x/net/idna"
 
 import (
 	"strings"

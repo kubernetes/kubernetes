@@ -52,7 +52,7 @@ RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys 581
 
 RUN pip install -U docker-compose==1.5.0
 
-RUN go get github.com/tools/godep
+RUN go get github.com/kardianos/govendor
 
 RUN mkdir -p /go/src/github.com/GoogleCloudPlatform/kubernetes
 WORKDIR /go/src/github.com/GoogleCloudPlatform/kubernetes

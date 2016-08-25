@@ -7,7 +7,7 @@
 //   import "google.golang.org/api/cloudmonitoring/v2beta2"
 //   ...
 //   cloudmonitoringService, err := cloudmonitoring.New(oauthHttpClient)
-package cloudmonitoring
+package cloudmonitoring // import "google.golang.org/api/cloudmonitoring/v2beta2"
 
 import (
 	"bytes"
