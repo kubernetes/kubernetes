@@ -30,16 +30,17 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
-func newETCD2Storage(c storagebackend.Config) (storage.Interface, error) {
+func newETCD2Storage(c storagebackend.Config) (storage.Interface, func(), error) {
 	tr, err := newTransportForETCD2(c.CertFile, c.KeyFile, c.CAFile)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	client, err := newETCD2Client(tr, c.ServerList)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return etcd.NewEtcdStorage(client, c.Codec, c.Prefix, c.Quorum, c.DeserializationCacheSize), nil
+	s := etcd.NewEtcdStorage(client, c.Codec, c.Prefix, c.Quorum, c.DeserializationCacheSize)
+	return s, tr.CloseIdleConnections, nil
 }
 
 func newETCD2Client(tr *http.Transport, serverList []string) (etcd2client.Client, error) {
