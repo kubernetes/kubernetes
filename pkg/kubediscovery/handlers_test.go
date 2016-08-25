@@ -13,31 +13,79 @@ limitations under the License.
 package kubediscovery
 
 import (
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/square/go-jose"
 )
 
+const mockTokenID = "AAAAAA"
+const mockToken = "9537434E638E4378" // 64-bit key
+
+type mockTokenLoader struct {
+}
+
+func (tl *mockTokenLoader) LoadAndLookup(tokenID string) (string, error) {
+	if tokenID == mockTokenID {
+		return mockToken, nil
+	}
+	return "", errors.New(fmt.Sprintf("invalid token: %s", tokenID))
+}
+
+const mockEndpoint1 = "https://192.168.1.5:8080"
+const mockEndpoint2 = "https://192.168.1.6:8080"
+
+type mockEndpointsLoader struct {
+}
+
+func (el *mockEndpointsLoader) LoadList() ([]string, error) {
+	return []string{mockEndpoint1, mockEndpoint2}, nil
+}
+
+const mockCA = "---BEGIN------END---DUMMYDATA"
+
+type mockCALoader struct {
+}
+
+func (cl *mockCALoader) LoadPEM() (string, error) {
+	certData := base64.StdEncoding.EncodeToString([]byte(mockCA))
+	return certData, nil
+}
+
 func TestClusterInfoIndex(t *testing.T) {
 	tests := map[string]struct {
-		url       string
-		expStatus int
+		tokenID          string
+		token            string
+		expStatus        int
+		expVerifyFailure bool
 	}{
 		"no token": {
-			"/cluster-info/v1/",
-			http.StatusForbidden,
+			tokenID:   "",
+			token:     "",
+			expStatus: http.StatusForbidden,
 		},
-		"valid token": {
-			fmt.Sprintf("/cluster-info/v1/?token-id=%s", tempTokenId),
-			http.StatusOK,
+		"valid token ID": {
+			tokenID:   mockTokenID,
+			token:     mockToken,
+			expStatus: http.StatusOK,
+		},
+		"invalid token ID": {
+			tokenID:   "BADTOKEN",
+			token:     mockToken,
+			expStatus: http.StatusForbidden,
 		},
 		"invalid token": {
-			"/cluster-info/v1/?token-id=JUNK",
-			http.StatusForbidden,
+			tokenID:          mockTokenID,
+			token:            "ABCDEF1234123456",
+			expStatus:        http.StatusOK,
+			expVerifyFailure: true,
 		},
 	}
 
@@ -45,14 +93,21 @@ func TestClusterInfoIndex(t *testing.T) {
 		t.Logf("Running test: %s", name)
 		// Create a request to pass to our handler. We don't have any query parameters for now, so we'll
 		// pass 'nil' as the third parameter.
-		req, err := http.NewRequest("GET", test.url, nil)
+		url := "/cluster-info/v1/"
+		if test.tokenID != "" {
+			url = fmt.Sprintf("%s?token-id=%s", url, test.tokenID)
+		}
+		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		rr := httptest.NewRecorder()
-		// TODO: mock/stub here
-		handler := NewClusterInfoHandler()
+		handler := &ClusterInfoHandler{
+			tokenLoader:     &mockTokenLoader{},
+			caLoader:        &mockCALoader{},
+			endpointsLoader: &mockEndpointsLoader{},
+		}
 
 		handler.ServeHTTP(rr, req)
 
@@ -79,10 +134,28 @@ func TestClusterInfoIndex(t *testing.T) {
 			// indicate the the message failed to verify, e.g. because the signature was
 			// broken or the message was tampered with.
 			var clusterInfoBytes []byte
-			hmacTestKey := fromHexBytes(tempToken)
+			hmacTestKey, _ := hex.DecodeString(test.token)
 			clusterInfoBytes, err = jws.Verify(hmacTestKey)
+
+			if test.expVerifyFailure {
+				if err == nil {
+					t.Errorf("Signature verification did not fail as expected.")
+				}
+				// We are done the test here either way.
+				continue
+			}
+
 			if err != nil {
 				t.Errorf("Error verifing signature: %s", err)
+				continue
+			}
+
+			// Technically we should be able to lowercase our hex key and still
+			// get a valid result:
+			hmacTestKey, _ = hex.DecodeString(strings.ToLower(mockToken))
+			clusterInfoBytes, err = jws.Verify(hmacTestKey)
+			if err != nil {
+				t.Errorf("Error verifing signature when token converted to lowercase: %s", err)
 				continue
 			}
 
@@ -91,10 +164,19 @@ func TestClusterInfoIndex(t *testing.T) {
 				t.Errorf("Unable to unmarshall payload to JSON: error=%s body=%s", err, rr.Body.String())
 				continue
 			}
-			if ci.RootCertificates == "" {
-				t.Error("No root certificates in response")
-				continue
+			if len(ci.CertificateAuthorities) != 1 {
+				t.Error("Expected 1 root certificate, got: %d", len(ci.CertificateAuthorities))
 			}
+			if len(ci.Endpoints) != 2 {
+				t.Errorf("Expected 2 endpoints, got: %d", len(ci.Endpoints))
+			}
+			if mockEndpoint1 != ci.Endpoints[0] {
+				t.Errorf("Unexpected endpoint: %s", ci.Endpoints[0])
+			}
+			if mockEndpoint2 != ci.Endpoints[1] {
+				t.Errorf("Unexpected endpoint: %s", ci.Endpoints[1])
+			}
+
 		}
 	}
 }

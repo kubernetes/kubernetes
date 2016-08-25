@@ -14,6 +14,7 @@ package kubediscovery
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,11 +93,11 @@ type endpointsLoader interface {
 	LoadList() ([]string, error)
 }
 
-type jsonFileEnpointsLoader struct {
+type jsonFileEndpointsLoader struct {
 	endpoints []string
 }
 
-func (el *jsonFileEnpointsLoader) LoadList() ([]string, error) {
+func (el *jsonFileEndpointsLoader) LoadList() ([]string, error) {
 	if len(el.endpoints) == 0 {
 		data, err := ioutil.ReadFile(EndpointListPath)
 		if err != nil {
@@ -121,7 +122,7 @@ func NewClusterInfoHandler() *ClusterInfoHandler {
 	return &ClusterInfoHandler{
 		tokenLoader:     &jsonFileTokenLoader{},
 		caLoader:        &fsCALoader{},
-		endpointsLoader: &jsonFileEnpointsLoader{},
+		endpointsLoader: &jsonFileEndpointsLoader{},
 	}
 }
 
@@ -130,7 +131,7 @@ func (cih *ClusterInfoHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 	log.Printf("Got token ID: %s", tokenID)
 	token, err := cih.tokenLoader.LoadAndLookup(tokenID)
 	if err != nil {
-		log.Printf("Invalid token: %s", err)
+		log.Print(err)
 		http.Error(resp, "Forbidden", http.StatusForbidden)
 		return
 	}
@@ -159,7 +160,15 @@ func (cih *ClusterInfoHandler) ServeHTTP(resp http.ResponseWriter, req *http.Req
 	}
 
 	// Instantiate an signer using HMAC-SHA256.
-	signer, err := jose.NewSigner(jose.HS256, []byte(token))
+	hmacKey, err := hex.DecodeString(token)
+	if err != nil {
+		log.Printf("Unable to decode hex token: %s", token)
+		http.Error(resp, "", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Key is %d bytes long", len(hmacKey))
+	signer, err := jose.NewSigner(jose.HS256, hmacKey)
 	if err != nil {
 		err = fmt.Errorf("Error creating JWS signer: %s", err)
 		log.Println(err)
