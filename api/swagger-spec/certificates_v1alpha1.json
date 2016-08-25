@@ -750,7 +750,7 @@
      },
      "spec": {
       "$ref": "v1alpha1.CertificateSigningRequestSpec",
-      "description": "The certificate request itself and any additonal information."
+      "description": "The certificate request itself and any additional information."
      },
      "status": {
       "$ref": "v1alpha1.CertificateSigningRequestStatus",
