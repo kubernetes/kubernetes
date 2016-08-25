@@ -46,7 +46,6 @@ import (
 	"github.com/evanphx/json-patch"
 	"github.com/golang/glog"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 const (
@@ -286,14 +285,6 @@ func isWatch(cmd *cobra.Command) bool {
 	}
 
 	return false
-}
-
-func getFlag(cmd *cobra.Command, flag string) *pflag.Flag {
-	f := cmd.Flags().Lookup(flag)
-	if f == nil {
-		glog.Fatalf("flag accessed but not defined for command %s: %s", cmd.Name(), flag)
-	}
-	return f
 }
 
 func GetFlagString(cmd *cobra.Command, flag string) string {
