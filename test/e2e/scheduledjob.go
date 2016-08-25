@@ -65,10 +65,11 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 		err = waitForActiveJobs(f.Client, f.Namespace.Name, scheduledJob.Name, 2)
 		Expect(err).NotTo(HaveOccurred())
 
-		By("Ensuring exactly two jobs exists by listing jobs explicitly")
+		By("Ensuring at least two running jobs exists by listing jobs explicitly")
 		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(len(jobs.Items) >= 2).To(BeTrue())
+		activeJobs := filterActiveJobs(jobs)
+		Expect(len(activeJobs) >= 2).To(BeTrue())
 
 		By("Removing scheduledjob")
 		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
@@ -113,10 +114,11 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(scheduledJob.Status.Active).Should(HaveLen(1))
 
-		By("Ensuring exaclty one job exists by listing jobs explicitly")
+		By("Ensuring exaclty one running job exists by listing jobs explicitly")
 		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(jobs.Items).To(HaveLen(1))
+		activeJobs := filterActiveJobs(jobs)
+		Expect(activeJobs).To(HaveLen(1))
 
 		By("Ensuring no more jobs are scheduled")
 		err = waitForActiveJobs(f.Client, f.Namespace.Name, scheduledJob.Name, 2)
@@ -143,10 +145,11 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(scheduledJob.Status.Active).Should(HaveLen(1))
 
-		By("Ensuring exaclty one job exists by listing jobs explicitly")
+		By("Ensuring exaclty one running job exists by listing jobs explicitly")
 		jobs, err := f.Client.Batch().Jobs(f.Namespace.Name).List(api.ListOptions{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(jobs.Items).To(HaveLen(1))
+		activeJobs := filterActiveJobs(jobs)
+		Expect(activeJobs).To(HaveLen(1))
 
 		By("Ensuring the job is replaced with a new one")
 		err = waitForJobReplaced(f.Client, f.Namespace.Name, jobs.Items[0].Name)
@@ -323,4 +326,14 @@ func checkNoUnexpectedEvents(c *client.Client, ns, scheduledJobName string) erro
 		}
 	}
 	return nil
+}
+
+func filterActiveJobs(jobs *batch.JobList) (active []*batch.Job) {
+	for i := range jobs.Items {
+		j := jobs.Items[i]
+		if !job.IsJobFinished(&j) {
+			active = append(active, &j)
+		}
+	}
+	return
 }
