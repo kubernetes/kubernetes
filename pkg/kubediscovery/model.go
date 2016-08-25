@@ -12,10 +12,9 @@ limitations under the License.
 */
 package kubediscovery
 
-// TODO: Sync with kubeadm api type
 type ClusterInfo struct {
-	Type             string
-	Version          string
-	RootCertificates string `json:"rootCertificates"`
-	// TODO: ClusterID, Endpoints
+	// TODO Kind, apiVersion
+	// TODO clusterId, fetchedTime, expiredTime
+	CertificateAuthorities []string `json:"certificateAuthorities,omitempty"`
+	Endpoints              []string `json:"endpoints,omitempty"`
 }
