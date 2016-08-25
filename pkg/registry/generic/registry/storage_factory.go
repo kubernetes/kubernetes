@@ -33,13 +33,14 @@ func StorageWithCacher(
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object,
-	triggerFunc storage.TriggerPublisherFunc) storage.Interface {
+	triggerFunc storage.TriggerPublisherFunc) (storage.Interface, func()) {
 
+	s, d := generic.NewRawStorage(storageConfig)
 	// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.
 	// Currently it has two layers of same storage interface -- cacher and low level kv.
 	cacherConfig := storage.CacherConfig{
 		CacheCapacity:        capacity,
-		Storage:              generic.NewRawStorage(storageConfig),
+		Storage:              s,
 		Versioner:            etcdstorage.APIObjectVersioner{},
 		Type:                 objectType,
 		ResourcePrefix:       resourcePrefix,
@@ -56,6 +57,11 @@ func StorageWithCacher(
 			return storage.NoNamespaceKeyFunc(resourcePrefix, obj)
 		}
 	}
+	cacher := storage.NewCacherFromConfig(cacherConfig)
+	destroyFunc := func() {
+		cacher.Stop()
+		d()
+	}
 
-	return storage.NewCacherFromConfig(cacherConfig)
+	return cacher, destroyFunc
 }

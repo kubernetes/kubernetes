@@ -28,8 +28,10 @@ import (
 
 func TestPodLogValidates(t *testing.T) {
 	etcdStorage, _ := registrytest.NewEtcdStorage(t, "")
+	s, destroyFunc := generic.NewRawStorage(etcdStorage)
+	defer destroyFunc()
 	store := &registry.Store{
-		Storage: generic.NewRawStorage(etcdStorage),
+		Storage: s,
 	}
 	logRest := &LogREST{Store: store, KubeletConn: nil}
 

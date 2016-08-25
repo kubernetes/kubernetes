@@ -69,7 +69,7 @@ func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter
 	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.NodeList{} }
-	storageInterface := opts.Decorator(
+	storageInterface, _ := opts.Decorator(
 		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.Nodes),
 		&api.Node{},
