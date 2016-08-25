@@ -25,6 +25,7 @@ import (
 // Event represents a single event to a watched resource.
 //
 // +protobuf=true
+// +k8s:openapi-gen=true
 type Event struct {
 	Type string `json:"type" protobuf:"bytes,1,opt,name=type"`
 
