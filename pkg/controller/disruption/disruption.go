@@ -358,7 +358,7 @@ func (dc *DisruptionController) getPdbForPod(pod *api.Pod) *policy.PodDisruption
 	// caller.
 	pdbs, err := dc.pdbLister.GetPodPodDisruptionBudgets(pod)
 	if err != nil {
-		glog.V(0).Infof("No PodDisruptionBudgets found for pod %v, PodDisruptionBudget controller will avoid syncing.", pod.Name)
+		glog.V(4).Infof("No PodDisruptionBudgets found for pod %v, PodDisruptionBudget controller will avoid syncing.", pod.Name)
 		return nil
 	}
 
