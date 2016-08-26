@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/record"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/network/mock_network"
@@ -58,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/flowcontrol"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
+	utilstrings "k8s.io/kubernetes/pkg/util/strings"
 )
 
 type fakeHTTP struct {
@@ -1754,19 +1756,8 @@ func TestSecurityOptsOperator(t *testing.T) {
 	dm110, _ := newTestDockerManagerWithVersion("1.10.1", "1.22")
 	dm111, _ := newTestDockerManagerWithVersion("1.11.0", "1.23")
 
-	pod := &api.Pod{
-		ObjectMeta: api.ObjectMeta{
-			UID:       "12345678",
-			Name:      "foo",
-			Namespace: "new",
-		},
-		Spec: api.PodSpec{
-			Containers: []api.Container{
-				{Name: "bar"},
-			},
-		},
-	}
-	opts, err := dm110.getSecurityOpts(pod, "bar")
+	secOpts := []dockerOpt{{"seccomp", "unconfined", ""}}
+	opts, err := dm110.fmtDockerOpts(secOpts)
 	if err != nil {
 		t.Fatalf("error getting security opts for Docker 1.10: %v", err)
 	}
@@ -1774,7 +1765,7 @@ func TestSecurityOptsOperator(t *testing.T) {
 		t.Fatalf("security opts for Docker 1.10: expected %v, got: %v", expected, opts)
 	}
 
-	opts, err = dm111.getSecurityOpts(pod, "bar")
+	opts, err = dm111.fmtDockerOpts(secOpts)
 	if err != nil {
 		t.Fatalf("error getting security opts for Docker 1.11: %v", err)
 	}
@@ -1838,7 +1829,9 @@ func TestGetSecurityOpts(t *testing.T) {
 
 	dm, _ := newTestDockerManagerWithVersion("1.11.1", "1.23")
 	for i, test := range tests {
-		opts, err := dm.getSecurityOpts(test.pod, containerName)
+		securityOpts, err := dm.getSecurityOpts(test.pod, containerName)
+		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
+		opts, err := dm.fmtDockerOpts(securityOpts)
 		assert.NoError(t, err, "TestCase[%d]: %s", i, test.msg)
 		assert.Len(t, opts, len(test.expectedOpts), "TestCase[%d]: %s", i, test.msg)
 		for _, opt := range test.expectedOpts {
@@ -1849,6 +1842,10 @@ func TestGetSecurityOpts(t *testing.T) {
 
 func TestSeccompIsUnconfinedByDefaultWithDockerV110(t *testing.T) {
 	dm, fakeDocker := newTestDockerManagerWithVersion("1.10.1", "1.22")
+	// We want to capture events.
+	recorder := record.NewFakeRecorder(20)
+	dm.recorder = recorder
+
 	pod := &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			UID:       "12345678",
@@ -1884,6 +1881,10 @@ func TestSeccompIsUnconfinedByDefaultWithDockerV110(t *testing.T) {
 		t.Fatalf("unexpected error %v", err)
 	}
 	assert.Contains(t, newContainer.HostConfig.SecurityOpt, "seccomp:unconfined", "Pods with Docker versions >= 1.10 must not have seccomp disabled by default")
+
+	cid := utilstrings.ShortenString(fakeDocker.Created[1], 12)
+	assert.NoError(t, expectEvent(recorder, api.EventTypeNormal, events.CreatedContainer,
+		fmt.Sprintf("Created container with docker id %s; Security:[seccomp=unconfined]", cid)))
 }
 
 func TestUnconfinedSeccompProfileWithDockerV110(t *testing.T) {
@@ -2017,6 +2018,7 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 	tests := []struct {
 		annotations    map[string]string
 		expectedSecOpt string
+		expectedSecMsg string
 		expectedError  string
 	}{
 		{
@@ -2024,12 +2026,14 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 				api.SeccompPodAnnotationKey: "localhost/test",
 			},
 			expectedSecOpt: `seccomp={"foo":"bar"}`,
+			expectedSecMsg: "seccomp=test(md5:21aeae45053385adebd25311f9dd9cb1)",
 		},
 		{
 			annotations: map[string]string{
 				api.SeccompPodAnnotationKey: "localhost/sub/subtest",
 			},
 			expectedSecOpt: `seccomp={"abc":"def"}`,
+			expectedSecMsg: "seccomp=sub/subtest(md5:07c9bcb4db631f7ca191d6e0bca49f76)",
 		},
 		{
 			annotations: map[string]string{
@@ -2039,8 +2043,12 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for i, test := range tests {
 		dm, fakeDocker := newTestDockerManagerWithVersion("1.11.0", "1.23")
+		// We want to capture events.
+		recorder := record.NewFakeRecorder(20)
+		dm.recorder = recorder
+
 		_, filename, _, _ := goruntime.Caller(0)
 		dm.seccompProfileRoot = path.Join(path.Dir(filename), "fixtures", "seccomp")
 
@@ -2084,6 +2092,11 @@ func TestSeccompLocalhostProfileIsLoaded(t *testing.T) {
 			t.Fatalf("unexpected error %v", err)
 		}
 		assert.Contains(t, newContainer.HostConfig.SecurityOpt, test.expectedSecOpt, "The compacted seccomp json profile should be loaded.")
+
+		cid := utilstrings.ShortenString(fakeDocker.Created[1], 12)
+		assert.NoError(t, expectEvent(recorder, api.EventTypeNormal, events.CreatedContainer,
+			fmt.Sprintf("Created container with docker id %s; Security:[%s]", cid, test.expectedSecMsg)),
+			"testcase %d", i)
 	}
 }
 
@@ -2154,6 +2167,76 @@ func TestCheckVersionCompatibility(t *testing.T) {
 			fakeDocker.InjectError("version", fmt.Errorf("injected version error"))
 			err := dm.checkVersionCompatibility()
 			assert.NotNil(t, err, testCase+" version error check")
+		}
+	}
+}
+
+func TestCreateAppArmorContanier(t *testing.T) {
+	dm, fakeDocker := newTestDockerManagerWithVersion("1.11.1", "1.23")
+	// We want to capture events.
+	recorder := record.NewFakeRecorder(20)
+	dm.recorder = recorder
+
+	pod := &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			UID:       "12345678",
+			Name:      "foo",
+			Namespace: "new",
+			Annotations: map[string]string{
+				apparmor.ContainerAnnotationKeyPrefix + "test": apparmor.ProfileNamePrefix + "test-profile",
+			},
+		},
+		Spec: api.PodSpec{
+			Containers: []api.Container{
+				{Name: "test"},
+			},
+		},
+	}
+
+	runSyncPod(t, dm, fakeDocker, pod, nil, false)
+
+	verifyCalls(t, fakeDocker, []string{
+		// Create pod infra container.
+		"create", "start", "inspect_container", "inspect_container",
+		// Create container.
+		"create", "start", "inspect_container",
+	})
+
+	fakeDocker.Lock()
+	if len(fakeDocker.Created) != 2 ||
+		!matchString(t, "/k8s_POD\\.[a-f0-9]+_foo_new_", fakeDocker.Created[0]) ||
+		!matchString(t, "/k8s_test\\.[a-f0-9]+_foo_new_", fakeDocker.Created[1]) {
+		t.Errorf("unexpected containers created %v", fakeDocker.Created)
+	}
+	fakeDocker.Unlock()
+
+	// Verify security opts.
+	newContainer, err := fakeDocker.InspectContainer(fakeDocker.Created[1])
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	securityOpts := newContainer.HostConfig.SecurityOpt
+	assert.Contains(t, securityOpts, "apparmor=test-profile", "Container should have apparmor security opt")
+
+	cid := utilstrings.ShortenString(fakeDocker.Created[1], 12)
+	assert.NoError(t, expectEvent(recorder, api.EventTypeNormal, events.CreatedContainer,
+		fmt.Sprintf("Created container with docker id %s; Security:[seccomp=unconfined apparmor=test-profile]", cid)))
+}
+
+func expectEvent(recorder *record.FakeRecorder, eventType, reason, msg string) error {
+	expected := fmt.Sprintf("%s %s %s", eventType, reason, msg)
+	var events []string
+	// Drain the event channel.
+	for {
+		select {
+		case event := <-recorder.Events:
+			if event == expected {
+				return nil
+			}
+			events = append(events, event)
+		default:
+			// No more events!
+			return fmt.Errorf("Event %q not found in [%s]", expected, strings.Join(events, ", "))
 		}
 	}
 }
