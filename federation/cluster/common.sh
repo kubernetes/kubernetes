@@ -53,25 +53,24 @@ KUBE_ARCH=${KUBE_ARCH:-amd64}
 KUBE_BUILD_STAGE=${KUBE_BUILD_STAGE:-release-stage}
 
 source "${KUBE_ROOT}/cluster/common.sh"
-source "${KUBE_ROOT}/hack/lib/util.sh"
 
 host_kubectl="${KUBE_ROOT}/cluster/kubectl.sh --namespace=${FEDERATION_NAMESPACE}"
 
 # required:
 # FEDERATION_PUSH_REPO_BASE: repo to which federated container images will be pushed
-
-# Optional
-# FEDERATION_IMAGE_TAG: reference and pull all federated images with this tag. Used for ci testing
+# FEDERATION_IMAGE_TAG: reference and pull all federated images with this tag.
 function create-federation-api-objects {
 (
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
+    : "${FEDERATION_IMAGE_TAG?Must set FEDERATION_IMAGE_TAG env var}"
+
     export FEDERATION_APISERVER_DEPLOYMENT_NAME="federation-apiserver"
-    export FEDERATION_APISERVER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/federation-apiserver"
-    export FEDERATION_APISERVER_IMAGE_TAG="${FEDERATION_IMAGE_TAG:-$(cat ${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin/federation-apiserver.docker_tag)}"
+    export FEDERATION_APISERVER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/hyperkube"
+    export FEDERATION_APISERVER_IMAGE_TAG="${FEDERATION_IMAGE_TAG}"
 
     export FEDERATION_CONTROLLER_MANAGER_DEPLOYMENT_NAME="federation-controller-manager"
-    export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/federation-controller-manager"
-    export FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG="${FEDERATION_IMAGE_TAG:-$(cat ${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin/federation-controller-manager.docker_tag)}"
+    export FEDERATION_CONTROLLER_MANAGER_IMAGE_REPO="${FEDERATION_PUSH_REPO_BASE}/hyperkube"
+    export FEDERATION_CONTROLLER_MANAGER_IMAGE_TAG="${FEDERATION_IMAGE_TAG}"
 
     if [[ -z "${FEDERATION_DNS_PROVIDER:-}" ]]; then
       # Set the appropriate value based on cloud provider.
@@ -267,58 +266,68 @@ function create-federation-apiserver-certs {
 
 # Required
 # FEDERATION_PUSH_REPO_BASE: the docker repo where federated images will be pushed
-
-# Optional
-# FEDERATION_IMAGE_TAG: push all federated images with this tag. Used for ci testing
+# FEDERATION_IMAGE_TAG: the tag of the image to be pushed
 function push-federation-images {
     : "${FEDERATION_PUSH_REPO_BASE?Must set FEDERATION_PUSH_REPO_BASE env var}"
-    local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"federation-apiserver federation-controller-manager"}
+    : "${FEDERATION_IMAGE_TAG?Must set FEDERATION_IMAGE_TAG env var}"
 
-    local imageFolder="${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin"
+    source "${KUBE_ROOT}/build/common.sh"
+    source "${KUBE_ROOT}/hack/lib/util.sh"
 
-    if [[ ! -d "$imageFolder" ]];then
-	echo "${imageFolder} does not exist! Run make quick-release or make release"
-	exit 1
+    local FEDERATION_BINARIES=${FEDERATION_BINARIES:-"hyperkube"}
+
+    local bin_dir="${KUBE_ROOT}/_output/${KUBE_BUILD_STAGE}/server/${KUBE_PLATFORM}-${KUBE_ARCH}/kubernetes/server/bin"
+
+    if [[ ! -d "${bin_dir}" ]];then
+        echo "${bin_dir} does not exist! Run make quick-release or make release"
+        exit 1
     fi
 
-    for binary in $FEDERATION_BINARIES;do
-	local imageFile="${imageFolder}/${binary}.tar"
+    for binary in ${FEDERATION_BINARIES}; do
+        local bin_path="${bin_dir}/${binary}"
 
-	if [[ ! -f "$imageFile" ]];then
-	    echo "${imageFile} does not exist!"
-	    exit 1
-	fi
+        if [[ ! -f "${bin_path}" ]]; then
+            echo "${bin_path} does not exist!"
+            exit 1
+        fi
 
-	echo "Load: ${imageFile}"
-	# Load the image. Trust we know what it's called, as docker load provides no help there :(
-	docker load < "${imageFile}"
+        local docker_build_path="${bin_path}.dockerbuild"
+        local docker_file_path="${docker_build_path}/Dockerfile"
 
-	local srcImageTag="$(cat ${imageFolder}/${binary}.docker_tag)"
-	local dstImageTag="${FEDERATION_IMAGE_TAG:-$srcImageTag}"
-	local srcImageName="${FEDERATION_IMAGE_REPO_BASE}/${binary}:${srcImageTag}"
-	local dstImageName="${FEDERATION_PUSH_REPO_BASE}/${binary}:${dstImageTag}"
+        rm -rf ${docker_build_path}
+        mkdir -p ${docker_build_path}
 
-	echo "Tag: ${srcImageName} --> ${dstImageName}"
-	docker tag -f "$srcImageName" "$dstImageName"
+        ln "${bin_path}" "${docker_build_path}/${binary}"
+        printf " FROM debian:jessie \n ADD ${binary} /usr/local/bin/${binary}\n" > ${docker_file_path}
 
-	echo "Push: $dstImageName"
-	if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]];then
-	    echo " -> GCR repository detected. Using gcloud"
-	    gcloud docker push "$dstImageName"
-	else
-	    docker push "$dstImageName"
-	fi
+        local docker_image_tag="${FEDERATION_PUSH_REPO_BASE}/${binary}:${FEDERATION_IMAGE_TAG}"
 
-	echo "Remove: $srcImageName"
-	docker rmi "$srcImageName"
+        # Build the docker image on-the-fly.
+        #
+        # NOTE: This is only a temporary fix until the proposal in issue
+        # https://github.com/kubernetes/kubernetes/issues/28630 is implemented.
+        # Also, the new turn up mechanism completely obviates this step.
+        #
+        # TODO(madhusudancs): Remove this code when the new turn up mechanism work
+        # is merged.
+        kube::log::status "Building docker image ${docker_image_tag} from the binary"
+        docker build -q -t "${docker_image_tag}" ${docker_build_path} >/dev/null
 
-	if [[ "$srcImageName" != "dstImageName" ]];then
-	    echo "Remove: $dstImageName"
-	    docker rmi "$dstImageName"
-	fi
+        rm -rf ${docker_build_path}
 
+        kube::log::status "Pushing ${docker_image_tag}"
+        if [[ "${FEDERATION_PUSH_REPO_BASE}" == "gcr.io/"* ]]; then
+            echo " -> GCR repository detected. Using gcloud"
+            gcloud docker push "${docker_image_tag}"
+        else
+            docker push "${docker_image_tag}"
+        fi
+
+        kube::log::status "Deleting docker image ${docker_image_tag}"
+        docker rmi "${docker_image_tag}" 2>/dev/null || true
     done
 }
+
 function cleanup-federation-api-objects {
   # Delete all resources with the federated-cluster label.
   $host_kubectl delete pods,svc,rc,deployment,secret -lapp=federated-cluster
