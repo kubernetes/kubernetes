@@ -21,7 +21,6 @@ import (
 	"os"
 
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
