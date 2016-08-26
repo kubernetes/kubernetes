@@ -1396,43 +1396,18 @@
 		},
 		{
 			"ImportPath": "github.com/influxdata/influxdb/client",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
+			"Comment": "v0.12.2",
+			"Rev": "383332daed5595926c235f250b11433f67229c35"
 		},
 		{
-			"ImportPath": "github.com/influxdata/influxdb/influxql",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
+			"ImportPath": "github.com/influxdata/influxdb/models",
+			"Comment": "v0.12.2",
+			"Rev": "383332daed5595926c235f250b11433f67229c35"
 		},
 		{
-			"ImportPath": "github.com/influxdata/influxdb/meta",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdata/influxdb/meta/internal",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdata/influxdb/snapshot",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdata/influxdb/toml",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdata/influxdb/tsdb",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdata/influxdb/tsdb/internal",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
+			"ImportPath": "github.com/influxdata/influxdb/pkg/escape",
+			"Comment": "v0.12.2",
+			"Rev": "383332daed5595926c235f250b11433f67229c35"
 		},
 		{
 			"ImportPath": "github.com/jmespath/go-jmespath",

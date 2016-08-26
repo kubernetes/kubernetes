@@ -1,8 +1,12 @@
 # InfluxDB Client
 
-[![GoDoc](https://godoc.org/github.com/influxdb/influxdb?status.svg)](http://godoc.org/github.com/influxdb/influxdb/client)
+[![GoDoc](https://godoc.org/github.com/influxdata/influxdb?status.svg)](http://godoc.org/github.com/influxdata/influxdb/client/v2)
 
 ## Description
+
+**NOTE:** The Go client library now has a "v2" version, with the old version
+being deprecated. The new version can be imported at
+`import "github.com/influxdata/influxdb/client/v2"`. It is not backwards-compatible.
 
 A Go client library written and maintained by the **InfluxDB** team.
 This package provides convenience functions to read and write time series data.
@@ -14,18 +18,18 @@ It uses the HTTP protocol to communicate with your **InfluxDB** cluster.
 ### Connecting To Your Database
 
 Connecting to an **InfluxDB** database is straightforward. You will need a host
-name, a port and the cluster user credentials if applicable. The default port is 8086.
-You can customize these settings to your specific installation via the
+name, a port and the cluster user credentials if applicable. The default port is
+8086. You can customize these settings to your specific installation via the
 **InfluxDB** configuration file.
 
-Thought not necessary for experimentation, you may want to create a new user
+Though not necessary for experimentation, you may want to create a new user
 and authenticate the connection to your database.
 
 For more information please check out the
-[Cluster Admin Docs](http://influxdb.com/docs/v0.9/query_language/database_administration.html).
+[Admin Docs](https://docs.influxdata.com/influxdb/v0.10/administration).
 
 For the impatient, you can create a new admin user _bubba_ by firing off the
-[InfluxDB CLI](https://github.com/influxdb/influxdb/blob/master/cmd/influx/main.go).
+[InfluxDB CLI](https://github.com/influxdata/influxdb/blob/master/cmd/influx/main.go).
 
 ```shell
 influx
@@ -44,37 +48,60 @@ the configuration below.
 ```go
 package main
 
-import "github.com/influxdb/influxdb/client"
+import (
+	"net/url"
+	"fmt"
+	"log"
+	"os"
+
+	"github.com/influxdata/influxdb/client/v2"
+)
 
 const (
-	MyHost        = "localhost"
-	MyPort        = 8086
-	MyDB          = "square_holes"
-	MyMeasurement = "shapes"
+	MyDB = "square_holes"
+	username = "bubba"
+	password = "bumblebeetuna"
 )
 
 func main() {
-	u, err := url.Parse(fmt.Sprintf("http://%s:%d", MyHost, MyPort))
+	// Make client
+	c, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr: "http://localhost:8086",
+		Username: username,
+		Password: password,
+	})
+	
 	if err != nil {
-		log.Fatal(err)
+	    log.Fatalln("Error: ", err)
+	}
+	
+	// Create a new point batch
+	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  MyDB,
+		Precision: "s",
+	})
+	
+	if err != nil {
+	    log.Fatalln("Error: ", err)
 	}
 
-	conf := client.Config{
-		URL:      *u,
-		Username: os.Getenv("INFLUX_USER"),
-		Password: os.Getenv("INFLUX_PWD"),
+	// Create a point and add to batch
+	tags := map[string]string{"cpu": "cpu-total"}
+	fields := map[string]interface{}{
+		"idle":   10.1,
+		"system": 53.3,
+		"user":   46.6,
 	}
-
-	con, err := client.NewClient(conf)
+	pt, err := client.NewPoint("cpu_usage", tags, fields, time.Now())
+	
 	if err != nil {
-		log.Fatal(err)
+	    log.Fatalln("Error: ", err)
 	}
+    	
+	bp.AddPoint(pt)
 
-	dur, ver, err := con.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("Happy as a Hippo! %v, %s", dur, ver)
+	// Write the batch
+	c.Write(bp)
 }
 
 ```
@@ -82,49 +109,50 @@ func main() {
 ### Inserting Data
 
 Time series data aka *points* are written to the database using batch inserts.
-The mechanism is to create one or more points and then create a batch aka *batch points*
-and write these to a given database and series. A series is a combination of a
-measurement (time/values) and a set of tags.
+The mechanism is to create one or more points and then create a batch aka
+*batch points* and write these to a given database and series. A series is a
+combination of a measurement (time/values) and a set of tags.
 
 In this sample we will create a batch of a 1,000 points. Each point has a time and
 a single value as well as 2 tags indicating a shape and color. We write these points
 to a database called _square_holes_ using a measurement named _shapes_.
 
 NOTE: You can specify a RetentionPolicy as part of the batch points. If not
-provided InfluxDB will use the database _default_ retention policy. By default, the _default_
-retention policy never deletes any data it contains.
+provided InfluxDB will use the database _default_ retention policy.
 
 ```go
-func writePoints(con *client.Client) {
-	var (
-		shapes     = []string{"circle", "rectangle", "square", "triangle"}
-		colors     = []string{"red", "blue", "green"}
-		sampleSize = 1000
-		pts        = make([]client.Point, sampleSize)
-	)
-
+func writePoints(clnt client.Client) {
+	sampleSize := 1000
 	rand.Seed(42)
+
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Database:  "systemstats",
+		Precision: "us",
+	})
+
 	for i := 0; i < sampleSize; i++ {
-		pts[i] = client.Point{
-			Measurement: "shapes",
-			Tags: map[string]string{
-				"color": strconv.Itoa(rand.Intn(len(colors))),
-				"shape": strconv.Itoa(rand.Intn(len(shapes))),
-			},
-			Fields: map[string]interface{}{
-				"value": rand.Intn(sampleSize),
-			},
-			Time: time.Now(),
-			Precision: "s",
+		regions := []string{"us-west1", "us-west2", "us-west3", "us-east1"}
+		tags := map[string]string{
+			"cpu":    "cpu-total",
+			"host":   fmt.Sprintf("host%d", rand.Intn(1000)),
+			"region": regions[rand.Intn(len(regions))],
 		}
+
+		idle := rand.Float64() * 100.0
+		fields := map[string]interface{}{
+			"idle": idle,
+			"busy": 100.0 - idle,
+		}
+
+		bp.AddPoint(client.NewPoint(
+			"cpu_usage",
+			tags,
+			fields,
+			time.Now(),
+		))
 	}
 
-	bps := client.BatchPoints{
-		Points:          pts,
-		Database:        MyDB,
-		RetentionPolicy: "default",
-	}
-	_, err := con.Write(bps)
+	err := clnt.Write(bp)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,46 +168,49 @@ as follows:
 
 ```go
 // queryDB convenience function to query the database
-func queryDB(con *client.Client, cmd string) (res []client.Result, err error) {
+func queryDB(clnt client.Client, cmd string) (res []client.Result, err error) {
 	q := client.Query{
 		Command:  cmd,
 		Database: MyDB,
 	}
-	if response, err := con.Query(q); err == nil {
+	if response, err := clnt.Query(q); err == nil {
 		if response.Error() != nil {
 			return res, response.Error()
 		}
 		res = response.Results
+	} else {
+		return res, err
 	}
-	return
+	return res, nil
 }
 ```
 
 #### Creating a Database
+
 ```go
-_, err := queryDB(con, fmt.Sprintf("create database %s", MyDB))
+_, err := queryDB(clnt, fmt.Sprintf("CREATE DATABASE %s", MyDB))
 if err != nil {
 	log.Fatal(err)
 }
 ```
 
 #### Count Records
+
 ```go
-q := fmt.Sprintf("select count(%s) from %s", "value", MyMeasurement)
-res, err := queryDB(con, q)
+q := fmt.Sprintf("SELECT count(%s) FROM %s", "value", MyMeasurement)
+res, err := queryDB(clnt, q)
 if err != nil {
 	log.Fatal(err)
 }
 count := res[0].Series[0].Values[0][1]
-log.Printf("Found a total of `%v records", count)
-
+log.Printf("Found a total of %v records\n", count)
 ```
 
 #### Find the last 10 _shapes_ records
 
 ```go
-q := fmt.Sprintf("select * from %s limit %d", MyMeasurement, 20)
-res, err = queryDB(con, q)
+q := fmt.Sprintf("SELECT * FROM %s LIMIT %d", MyMeasurement, 20)
+res, err = queryDB(clnt, q)
 if err != nil {
 	log.Fatal(err)
 }
@@ -189,18 +220,50 @@ for i, row := range res[0].Series[0].Values {
 	if err != nil {
 		log.Fatal(err)
 	}
-	val, err := row[1].(json.Number).Int64()
-	log.Printf("[%2d] %s: %03d\n", i, t.Format(time.Stamp), val)
+	val := row[1].(string)
+	log.Printf("[%2d] %s: %s\n", i, t.Format(time.Stamp), val)
+}
+```
+
+### Using the UDP Client
+
+The **InfluxDB** client also supports writing over UDP.
+
+```go
+func WriteUDP() {
+	// Make client
+	c := client.NewUDPClient("localhost:8089")
+
+	// Create a new point batch
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
+		Precision: "s",
+	})
+
+	// Create a point and add to batch
+	tags := map[string]string{"cpu": "cpu-total"}
+	fields := map[string]interface{}{
+		"idle":   10.1,
+		"system": 53.3,
+		"user":   46.6,
+	}
+	pt, err := client.NewPoint("cpu_usage", tags, fields, time.Now())
+	if err != nil {
+		panic(err.Error())
+	}
+	bp.AddPoint(pt)
+
+	// Write the batch
+	c.Write(bp)
 }
 ```
 
 ## Go Docs
 
 Please refer to
-[http://godoc.org/github.com/influxdb/influxdb/client](http://godoc.org/github.com/influxdb/influxdb/client)
+[http://godoc.org/github.com/influxdata/influxdb/client/v2](http://godoc.org/github.com/influxdata/influxdb/client/v2)
 for documentation.
 
 ## See Also
 
 You can also examine how the client library is used by the
-[InfluxDB CLI](https://github.com/influxdb/influxdb/blob/master/cmd/influx/main.go).
+[InfluxDB CLI](https://github.com/influxdata/influxdb/blob/master/cmd/influx/main.go).
