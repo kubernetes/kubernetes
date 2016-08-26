@@ -154,6 +154,16 @@ func newAuthenticatorFromTokenFile(tokenAuthFile string) (authenticator.Request,
 	return bearertoken.New(tokenAuthenticator), nil
 }
 
+// newAuthenticatorFromToken returns an authenticator.Request or an error
+func NewAuthenticatorFromToken(token string, name string, uid string, groups string) (authenticator.Request, error) {
+	tokenAuthenticator, err := tokenfile.New(token, name, uid, groups)
+	if err != nil {
+		return nil, err
+	}
+
+	return bearertoken.New(tokenAuthenticator), nil
+}
+
 // newAuthenticatorFromOIDCIssuerURL returns an authenticator.Request or an error.
 func newAuthenticatorFromOIDCIssuerURL(issuerURL, clientID, caFile, usernameClaim, groupsClaim string) (authenticator.Request, error) {
 	tokenAuthenticator, err := oidc.New(oidc.OIDCOptions{

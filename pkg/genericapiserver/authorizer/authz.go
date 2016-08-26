@@ -72,6 +72,29 @@ func NewAlwaysFailAuthorizer() authorizer.Authorizer {
 	return new(alwaysFailAuthorizer)
 }
 
+type adminAuthorizer struct {
+	user string
+	uid  string
+}
+
+func (r *adminAuthorizer) Authorize(attr authorizer.Attributes) (bool, string, error) {
+	if r.user != "" && attr.GetUser() != nil &&
+		attr.GetUser().GetName() == r.user &&
+		attr.GetUser().GetUID() == r.uid {
+		return true, "", nil
+	}
+	return false, "", errors.New("Authorization failure.")
+}
+
+// NewTokenAuthorizer is for use in loopback scenarios
+func NewTokenAuthorizer(user string, uid string) *adminAuthorizer {
+	authorizer := &adminAuthorizer{
+		user: user,
+		uid:  uid,
+	}
+	return authorizer
+}
+
 type AuthorizationConfig struct {
 	// Options for ModeABAC
 

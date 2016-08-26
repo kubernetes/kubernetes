@@ -34,6 +34,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 
 	"github.com/golang/glog"
+	"github.com/pborman/uuid"
 	"github.com/spf13/pflag"
 )
 
@@ -212,15 +213,22 @@ func mergeGroupVersionIntoMap(gvList string, dest map[string]unversioned.GroupVe
 }
 
 // Returns a clientset which can be used to talk to this apiserver.
-func (s *ServerRunOptions) NewSelfClient() (clientset.Interface, error) {
+func (s *ServerRunOptions) NewSelfClient() (clientset.Interface, string, error) {
 	clientConfig := &restclient.Config{
-		Host: net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort)),
 		// Increase QPS limits. The client is currently passed to all admission plugins,
 		// and those can be throttled in case of higher load on apiserver - see #22340 and #22422
 		// for more details. Once #22422 is fixed, we may want to remove it.
 		QPS:   50,
 		Burst: 100,
 	}
+	if s.InsecurePort == 0 {
+		clientConfig.Host = "https://" + net.JoinHostPort(s.BindAddress.String(), strconv.Itoa(s.SecurePort))
+		clientConfig.Insecure = true
+		clientConfig.BearerToken = uuid.NewRandom().String()
+	} else {
+		clientConfig.Host = net.JoinHostPort(s.InsecureBindAddress.String(), strconv.Itoa(s.InsecurePort))
+	}
+
 	if len(s.DeprecatedStorageVersion) != 0 {
 		gv, err := unversioned.ParseGroupVersion(s.DeprecatedStorageVersion)
 		if err != nil {
@@ -229,7 +237,8 @@ func (s *ServerRunOptions) NewSelfClient() (clientset.Interface, error) {
 		clientConfig.GroupVersion = &gv
 	}
 
-	return clientset.NewForConfig(clientConfig)
+	iface, err := clientset.NewForConfig(clientConfig)
+	return iface, clientConfig.BearerToken, err
 }
 
 // AddFlags adds flags for a specific APIServer to the specified FlagSet

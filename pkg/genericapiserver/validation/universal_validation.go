@@ -47,9 +47,8 @@ func verifySecureAndInsecurePort(options *options.ServerRunOptions) {
 		glog.Fatalf("--secure-port %v must be between 0 and 65535, inclusive. 0 for turning off secure port.", options.SecurePort)
 	}
 
-	// TODO: Allow 0 to turn off insecure port.
-	if options.InsecurePort < 1 || options.InsecurePort > 65535 {
-		glog.Fatalf("--insecure-port %v must be between 1 and 65535, inclusive.", options.InsecurePort)
+	if options.InsecurePort < 0 || options.InsecurePort > 65535 {
+		glog.Fatalf("--insecure-port %v must be between 0 and 65535, inclusive. 0 for turning off insecure port.", options.InsecurePort)
 	}
 
 	if options.SecurePort == options.InsecurePort {
