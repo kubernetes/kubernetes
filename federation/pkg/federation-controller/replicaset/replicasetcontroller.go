@@ -17,8 +17,11 @@ limitations under the License.
 package replicaset
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/golang/glog"
@@ -329,6 +332,23 @@ func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, cluster
 	for clusterName, replicas := range overflow {
 		result[clusterName] += replicas
 	}
+	if glog.V(2) {
+		buf := bytes.NewBufferString(fmt.Sprintf("Schedule - ReplicaSet: %s/%s\n", frs.Namespace, frs.Name))
+		sort.Strings(clusterNames)
+		for _, clusterName := range clusterNames {
+			cur := current[clusterName]
+			target := scheduleResult[clusterName]
+			fmt.Fprintf(buf, "%s: current: %d target: %d", clusterName, cur, target)
+			if over, found := overflow[clusterName]; found {
+				fmt.Fprintf(buf, " overflow: %d", over)
+			}
+			if capacity, found := estimatedCapacity[clusterName]; found {
+				fmt.Fprintf(buf, " capacity: %d", capacity)
+			}
+			fmt.Fprintf(buf, "\n")
+		}
+		glog.V(2).Infof(buf.String())
+	}
 	return result
 }
 
@@ -338,9 +358,9 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) error {
 		return nil
 	}
 
-	glog.Infof("Start reconcile replicaset %q", key)
+	glog.V(1).Infof("Start reconcile replicaset %q", key)
 	startTime := time.Now()
-	defer glog.Infof("Finished reconcile replicaset %q (%v)", key, time.Now().Sub(startTime))
+	defer glog.V(1).Infof("Finished reconcile replicaset %q (%v)", key, time.Now().Sub(startTime))
 
 	obj, exists, err := frsc.replicaSetStore.Store.GetByKey(key)
 	if err != nil {
@@ -382,7 +402,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) error {
 
 	scheduleResult := frsc.schedule(frs, clusters, current, estimatedCapacity)
 
-	glog.Infof("Start syncing local replicaset %v", scheduleResult)
+	glog.V(1).Infof("Start syncing local replicaset %s: %v", key, scheduleResult)
 
 	fedStatus := extensionsv1.ReplicaSetStatus{ObservedGeneration: frs.Generation}
 	for clusterName, replicas := range scheduleResult {
