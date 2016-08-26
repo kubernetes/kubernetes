@@ -33,12 +33,12 @@ func UpdateEndpoints(serviceName types.NamespacedName, endpointUids sets.String)
 	healthchecker.mutationRequestChannel <- req
 }
 
-func updateServiceListener(serviceName types.NamespacedName, listenPort int, addOrDelete bool) bool {
+func updateServiceListener(serviceName types.NamespacedName, listenPort int, add bool) bool {
 	responseChannel := make(chan bool)
 	req := &proxyListenerRequest{
 		serviceName:     serviceName,
 		listenPort:      uint16(listenPort),
-		add:             addOrDelete,
+		add:             add,
 		responseChannel: responseChannel,
 	}
 	healthchecker.listenerRequestChannel <- req
@@ -50,7 +50,7 @@ func AddServiceListener(serviceName types.NamespacedName, listenPort int) bool {
 	return updateServiceListener(serviceName, listenPort, true)
 }
 
-// DeleteServiceListener Request addition of a listener for a service's health check
+// DeleteServiceListener Request deletion of a listener for a service's health check
 func DeleteServiceListener(serviceName types.NamespacedName, listenPort int) bool {
 	return updateServiceListener(serviceName, listenPort, false)
 }

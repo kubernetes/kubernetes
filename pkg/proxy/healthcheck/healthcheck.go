@@ -68,7 +68,7 @@ func (h *proxyHC) handleHealthCheckRequest(rw http.ResponseWriter, serviceName s
 	s, ok := h.serviceEndpointsMap.Get(serviceName)
 	if !ok {
 		glog.V(4).Infof("Service %s not found or has no local endpoints", serviceName)
-		sendHealthCheckResponse(rw, http.StatusServiceUnavailable, "No Service Endpoints Not Found")
+		sendHealthCheckResponse(rw, http.StatusServiceUnavailable, "No Service Endpoints Found")
 		return
 	}
 	numEndpoints := len(*s.(*serviceEndpointsList).endpoints)
