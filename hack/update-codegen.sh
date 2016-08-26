@@ -39,7 +39,7 @@ setgen=$(kube::util::find-binary "set-gen")
 # update- and verify- scripts.
 ${clientgen} "$@"
 ${clientgen} -t "$@"
-${clientgen} --clientset-name="release_1_4" --input="api/v1,authorization/v1beta1,autoscaling/v1,batch/v1,extensions/v1beta1"
+${clientgen} --clientset-name="release_1_4" --input="api/v1,authorization/v1beta1,autoscaling/v1,batch/v1,extensions/v1beta1,policy/v1alpha1"
 # Clientgen for federation clientset.
 ${clientgen} --clientset-name=federation_internalclientset --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/","api/","extensions/" --included-types-overrides="api/Service,api/Namespace,extensions/ReplicaSet,api/Secret,extensions/Ingress,api/Event"   "$@"
 ${clientgen} --clientset-name=federation_release_1_4 --clientset-path=k8s.io/kubernetes/federation/client/clientset_generated --input="../../federation/apis/federation/v1beta1","api/v1","extensions/v1beta1" --included-types-overrides="api/v1/Service,api/v1/Namespace,extensions/v1beta1/ReplicaSet,api/v1/Secret,extensions/v1beta1/Ingress,api/v1/Event"   "$@"
