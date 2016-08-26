@@ -38,7 +38,7 @@ const (
 var (
 	prefix       = "/apis"
 	groupVersion = fmt.Sprintf("%s/%s", metricsGv.Group, metricsGv.Version)
-	MetricsRoot  = fmt.Sprintf("%s/%s", prefix, groupVersion)
+	metricsRoot  = fmt.Sprintf("%s/%s", prefix, groupVersion)
 
 	// TODO: get this from metrics api once it's finished
 	metricsGv = unversioned.GroupVersion{Group: "metrics", Version: "v1alpha1"}
@@ -67,6 +67,9 @@ func DefaultHeapsterMetricsClient(client *client.Client) *HeapsterMetricsClient 
 }
 
 func podMetricsUrl(namespace string, name string) (string, error) {
+	if namespace == api.NamespaceAll {
+		return fmt.Sprintf("%s/pods", metricsRoot), nil
+	}
 	errs := validation.ValidateNamespaceName(namespace, false)
 	if len(errs) > 0 {
 		message := fmt.Sprintf("invalid namespace: %s - %v", namespace, errs)
@@ -79,7 +82,7 @@ func podMetricsUrl(namespace string, name string) (string, error) {
 			return "", errors.New(message)
 		}
 	}
-	return fmt.Sprintf("%s/namespaces/%s/pods/%s", MetricsRoot, namespace, name), nil
+	return fmt.Sprintf("%s/namespaces/%s/pods/%s", metricsRoot, namespace, name), nil
 }
 
 func nodeMetricsUrl(name string) (string, error) {
@@ -90,7 +93,7 @@ func nodeMetricsUrl(name string) (string, error) {
 			return "", errors.New(message)
 		}
 	}
-	return fmt.Sprintf("%s/nodes/%s", MetricsRoot, name), nil
+	return fmt.Sprintf("%s/nodes/%s", metricsRoot, name), nil
 }
 
 func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector string) ([]metrics_api.NodeMetrics, error) {
@@ -123,47 +126,34 @@ func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector strin
 }
 
 func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string, allNamespaces bool, selector string) ([]metrics_api.PodMetrics, error) {
-	// TODO: extend Master Metrics API with getting pods from all namespaces
-	// instead of aggregating the results here
-	namespaces := make([]string, 0)
 	if allNamespaces {
-		list, err := cli.Client.Namespaces().List(api.ListOptions{})
-		if err != nil {
-			return []metrics_api.PodMetrics{}, err
-		}
-		for _, ns := range list.Items {
-			namespaces = append(namespaces, ns.Name)
-		}
-	} else {
-		namespaces = append(namespaces, namespace)
+		namespace = api.NamespaceAll
 	}
-
+	path, err := podMetricsUrl(namespace, podName)
+	if err != nil {
+		return []metrics_api.PodMetrics{}, err
+	}
 	params := map[string]string{"labelSelector": selector}
 	allMetrics := make([]metrics_api.PodMetrics, 0)
-	for _, ns := range namespaces {
-		path, err := podMetricsUrl(ns, podName)
+
+	resultRaw, err := GetHeapsterMetrics(cli, path, params)
+	if err != nil {
+		return []metrics_api.PodMetrics{}, err
+	}
+	if len(podName) == 0 {
+		metrics := metrics_api.PodMetricsList{}
+		err = json.Unmarshal(resultRaw, &metrics)
 		if err != nil {
-			return []metrics_api.PodMetrics{}, err
+			return []metrics_api.PodMetrics{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
 		}
-		resultRaw, err := GetHeapsterMetrics(cli, path, params)
+		allMetrics = append(allMetrics, metrics.Items...)
+	} else {
+		var singleMetric metrics_api.PodMetrics
+		err = json.Unmarshal(resultRaw, &singleMetric)
 		if err != nil {
-			return []metrics_api.PodMetrics{}, err
+			return []metrics_api.PodMetrics{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
 		}
-		if len(podName) == 0 {
-			metrics := metrics_api.PodMetricsList{}
-			err = json.Unmarshal(resultRaw, &metrics)
-			if err != nil {
-				return []metrics_api.PodMetrics{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
-			}
-			allMetrics = append(allMetrics, metrics.Items...)
-		} else {
-			var singleMetric metrics_api.PodMetrics
-			err = json.Unmarshal(resultRaw, &singleMetric)
-			if err != nil {
-				return []metrics_api.PodMetrics{}, fmt.Errorf("failed to unmarshall heapster response: %v", err)
-			}
-			allMetrics = append(allMetrics, singleMetric)
-		}
+		allMetrics = append(allMetrics, singleMetric)
 	}
 	return allMetrics, nil
 }
