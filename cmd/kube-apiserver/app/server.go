@@ -20,7 +20,6 @@ limitations under the License.
 package app
 
 import (
-	"crypto/tls"
 	"net"
 	"net/url"
 	"strconv"
@@ -42,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/apiserver"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
 	"k8s.io/kubernetes/pkg/capabilities"
+	"k8s.io/kubernetes/pkg/client/transport"
 	"k8s.io/kubernetes/pkg/cloudprovider"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	serviceaccountcontroller "k8s.io/kubernetes/pkg/controller/serviceaccount"
@@ -133,7 +133,10 @@ func Run(s *options.APIServer) error {
 	}
 
 	// Proxying to pods and services is IP-based... don't expect to be able to verify the hostname
-	proxyTLSClientConfig := &tls.Config{InsecureSkipVerify: true}
+	proxyTLSClientConfig, err := transport.TLSConfigFor(s.KubeletConfig.TransportConfig())
+	if err != nil {
+		glog.Fatalf("Failure to read kubelet TLS config: %v", err)
+	}
 
 	kubeletClient, err := kubeletclient.NewStaticKubeletClient(&s.KubeletConfig)
 	if err != nil {

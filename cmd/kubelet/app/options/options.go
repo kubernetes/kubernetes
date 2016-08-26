@@ -96,6 +96,9 @@ func (s *KubeletServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Var(componentconfig.IPVar{Val: &s.Address}, "address", "The IP address for the Kubelet to serve on (set to 0.0.0.0 for all interfaces)")
 	fs.Int32Var(&s.Port, "port", s.Port, "The port for the Kubelet to serve on.")
 	fs.Int32Var(&s.ReadOnlyPort, "read-only-port", s.ReadOnlyPort, "The read-only port for the Kubelet to serve on with no authentication/authorization (set to 0 to disable)")
+	fs.BoolVar(&s.TLSCertAuth, "tls-cert-auth", s.TLSCertAuth, "Enable TLS client authentication")
+	fs.StringVar(&s.TLSCAFile, "tls-ca-file", s.TLSCAFile, ""+
+		"File containing x509 CA cert for HTTPS.")
 	fs.StringVar(&s.TLSCertFile, "tls-cert-file", s.TLSCertFile, ""+
 		"File containing x509 Certificate for HTTPS.  (CA cert, if any, concatenated after server cert). "+
 		"If --tls-cert-file and --tls-private-key-file are not provided, a self-signed certificate and key "+

@@ -65,7 +65,7 @@ type HTTPKubeletClient struct {
 }
 
 func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
-	tlsConfig, err := transport.TLSConfigFor(config.transportConfig())
+	tlsConfig, err := transport.TLSConfigFor(config.TransportConfig())
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 		})
 	}
 
-	return transport.HTTPWrappersForConfig(config.transportConfig(), rt)
+	return transport.HTTPWrappersForConfig(config.TransportConfig(), rt)
 }
 
 // TODO: this structure is questionable, it should be using client.Config and overriding defaults.
@@ -118,8 +118,8 @@ func (c FakeKubeletClient) GetConnectionInfo(ctx api.Context, nodeName string) (
 	return "", 0, nil, errors.New("Not Implemented")
 }
 
-// transportConfig converts a client config to an appropriate transport config.
-func (c *KubeletClientConfig) transportConfig() *transport.Config {
+// TransportConfig converts a client config to an appropriate transport config.
+func (c *KubeletClientConfig) TransportConfig() *transport.Config {
 	cfg := &transport.Config{
 		TLS: transport.TLSConfig{
 			CAFile:   c.CAFile,
