@@ -2713,7 +2713,7 @@
       "description": "Subjects holds references to the objects the role applies to."
      },
      "roleRef": {
-      "$ref": "v1.ObjectReference",
+      "$ref": "v1alpha1.RoleRef",
       "description": "RoleRef can only reference a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
      }
     }
@@ -2852,37 +2852,26 @@
      }
     }
    },
-   "v1.ObjectReference": {
-    "id": "v1.ObjectReference",
-    "description": "ObjectReference contains enough information to let you inspect or modify the referred object.",
+   "v1alpha1.RoleRef": {
+    "id": "v1alpha1.RoleRef",
+    "description": "RoleRef contains information that points to the role being used",
+    "required": [
+     "apiGroup",
+     "kind",
+     "name"
+    ],
     "properties": {
+     "apiGroup": {
+      "type": "string",
+      "description": "APIGroup is the group for the resource being referenced"
+     },
      "kind": {
       "type": "string",
-      "description": "Kind of the referent. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
-     },
-     "namespace": {
-      "type": "string",
-      "description": "Namespace of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/namespaces.md"
+      "description": "Kind is the type of resource being referenced"
      },
      "name": {
       "type": "string",
-      "description": "Name of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#names"
-     },
-     "uid": {
-      "type": "string",
-      "description": "UID of the referent. More info: http://releases.k8s.io/HEAD/docs/user-guide/identifiers.md#uids"
-     },
-     "apiVersion": {
-      "type": "string",
-      "description": "API version of the referent."
-     },
-     "resourceVersion": {
-      "type": "string",
-      "description": "Specific resourceVersion to which this reference is made, if any. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#concurrency-control-and-consistency"
-     },
-     "fieldPath": {
-      "type": "string",
-      "description": "If referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: \"spec.containers{name}\" (where \"name\" refers to the name of the container that triggered the event) or if no container name is specified \"spec.containers[2]\" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object."
+      "description": "Name is the name of resource being referenced"
      }
     }
    },
@@ -3183,7 +3172,7 @@
       "description": "Subjects holds references to the objects the role applies to."
      },
      "roleRef": {
-      "$ref": "v1.ObjectReference",
+      "$ref": "v1alpha1.RoleRef",
       "description": "RoleRef can reference a Role in the current namespace or a ClusterRole in the global namespace. If the RoleRef cannot be resolved, the Authorizer must return an error."
      }
     }

@@ -123,6 +123,17 @@ func (RoleList) SwaggerDoc() map[string]string {
 	return map_RoleList
 }
 
+var map_RoleRef = map[string]string{
+	"":         "RoleRef contains information that points to the role being used",
+	"apiGroup": "APIGroup is the group for the resource being referenced",
+	"kind":     "Kind is the type of resource being referenced",
+	"name":     "Name is the name of resource being referenced",
+}
+
+func (RoleRef) SwaggerDoc() map[string]string {
+	return map_RoleRef
+}
+
 var map_Subject = map[string]string{
 	"":           "Subject contains a reference to the object or user identities a role binding applies to.  This can either hold a direct API object reference, or a value for non-objects such as user and group names.",
 	"kind":       "Kind of object being referenced. Values defined by this API group are \"User\", \"Group\", and \"ServiceAccount\". If the Authorizer does not recognized the kind value, the Authorizer should report an error.",
