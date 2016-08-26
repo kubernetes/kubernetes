@@ -34,7 +34,7 @@ option go_package = "v1alpha1";
 message CertificateSigningRequest {
   optional k8s.io.kubernetes.pkg.api.v1.ObjectMeta metadata = 1;
 
-  // The certificate request itself and any additonal information.
+  // The certificate request itself and any additional information.
   optional CertificateSigningRequestSpec spec = 2;
 
   // Derived information about the request.
