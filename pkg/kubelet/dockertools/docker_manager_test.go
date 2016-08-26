@@ -2401,3 +2401,73 @@ func makePod(name string, spec *api.PodSpec) *api.Pod {
 	}
 	return pod
 }
+
+func TestMakeMountBindings(t *testing.T) {
+	tests := []struct {
+		mounts             []kubecontainer.Mount
+		selinux            bool
+		propagationSupport bool
+		bindings           []string
+	}{
+		{
+			mounts: []kubecontainer.Mount{
+				{
+					HostPath:      "/tmp",
+					ContainerPath: "/tmp1",
+					ReadOnly:      true,
+					Propagation:   "shared",
+				},
+				{
+					HostPath:       "/tmp",
+					ContainerPath:  "/tmp2",
+					ReadOnly:       false,
+					SELinuxRelabel: true,
+					Propagation:    "shared",
+				},
+			},
+			selinux:            false,
+			propagationSupport: true,
+			bindings: []string{
+				"/tmp:/tmp1:ro,shared",
+				"/tmp:/tmp2:shared",
+			},
+		},
+		{
+			mounts: []kubecontainer.Mount{
+				{
+					HostPath:       "/tmp",
+					ContainerPath:  "/tmp1",
+					ReadOnly:       true,
+					SELinuxRelabel: true,
+					Propagation:    "shared",
+				},
+				{
+					HostPath:       "/tmp",
+					ContainerPath:  "/tmp2",
+					ReadOnly:       false,
+					SELinuxRelabel: true,
+					Propagation:    "shared",
+				},
+				{
+					HostPath:       "/tmp",
+					ContainerPath:  "/tmp3",
+					ReadOnly:       false,
+					SELinuxRelabel: false,
+				},
+			},
+			selinux:            true,
+			propagationSupport: false,
+			bindings: []string{
+				"/tmp:/tmp1:ro,Z",
+				"/tmp:/tmp2:Z",
+				"/tmp:/tmp3",
+			},
+		},
+	}
+	for _, test := range tests {
+		bindings := makeMountBindings(test.mounts, test.selinux, test.propagationSupport)
+		if !reflect.DeepEqual(bindings, test.bindings) {
+			t.Errorf("Expected %v, got %v", test.bindings, bindings)
+		}
+	}
+}
