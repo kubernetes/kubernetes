@@ -48,12 +48,12 @@
 {% endif -%}
 
 {% set cloud_provider = "" -%}
-{% if grains.cloud is defined and grains.cloud not in ['vagrant', 'vsphere', 'photon-controller', 'azure-legacy'] -%}
+{% if grains.cloud is defined and grains.cloud not in ['vagrant', 'photon-controller', 'azure-legacy'] -%}
   {% set cloud_provider = "--cloud-provider=" + grains.cloud -%}
 {% endif -%}
 
 {% set cloud_config = "" -%}
-{% if grains.cloud in [ 'openstack' ] and grains.cloud_config is defined -%}
+{% if grains.cloud in [ 'openstack', 'vsphere' ] and grains.cloud_config is defined -%}
   {% set cloud_config = "--cloud-config=" + grains.cloud_config -%}
 {% endif -%}
 
