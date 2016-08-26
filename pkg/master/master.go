@@ -167,7 +167,12 @@ type thirdPartyEntry struct {
 type RESTOptionsGetter func(resource unversioned.GroupResource) generic.RESTOptions
 
 type RESTStorageProvider interface {
-	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (groupInfo genericapiserver.APIGroupInfo, enabled bool)
+}
+
+// PostStartHookProvider is an interface in addition to provide a post start hook for the api server
+type PostStartHookProvider interface {
+	PostStartHook() (string, genericapiserver.PostStartHookFunc, error)
 }
 
 // New returns a new instance of Master from the given config.
@@ -215,7 +220,7 @@ func New(c *Config) (*Master, error) {
 		DisableThirdPartyControllerForTesting: m.disableThirdPartyControllerForTesting,
 	}
 	c.RESTStorageProviders[policy.GroupName] = PolicyRESTStorageProvider{}
-	c.RESTStorageProviders[rbac.GroupName] = RBACRESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
+	c.RESTStorageProviders[rbac.GroupName] = &RBACRESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
 	c.RESTStorageProviders[storage.GroupName] = StorageRESTStorageProvider{}
 	c.RESTStorageProviders[authenticationv1beta1.GroupName] = AuthenticationRESTStorageProvider{Authenticator: c.Authenticator}
 	c.RESTStorageProviders[authorization.GroupName] = AuthorizationRESTStorageProvider{Authorizer: c.Authorizer}
@@ -303,6 +308,16 @@ func (m *Master) InstallAPIs(c *Config) {
 			continue
 		}
 		glog.V(1).Infof("Enabling API group %q.", group)
+
+		if postHookProvider, ok := restStorageBuilder.(PostStartHookProvider); ok {
+			name, hook, err := postHookProvider.PostStartHook()
+			if err != nil {
+				glog.Fatalf("Error building PostStartHook: %v", err)
+			}
+			if err := m.GenericAPIServer.AddPostStartHook(name, hook); err != nil {
+				glog.Fatalf("Error registering PostStartHook %q: %v", name, err)
+			}
+		}
 
 		// This is here so that, if the policy group is present, the eviction
 		// subresource handler wil be able to find poddisruptionbudgets
