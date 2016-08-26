@@ -133,6 +133,7 @@ func mount(source *api.HostPathVolumeSource) []api.Volume {
 func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod {
 	podName := "pod-host-path-test"
 
+	priv := true
 	return &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
@@ -152,6 +153,9 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 							MountPath: path,
 						},
 					},
+					SecurityContext: &api.SecurityContext{
+						Privileged: &priv,
+					},
 				},
 				{
 					Name:  containerName2,
@@ -161,6 +165,9 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 							Name:      volumeName,
 							MountPath: path,
 						},
+					},
+					SecurityContext: &api.SecurityContext{
+						Privileged: &priv,
 					},
 				},
 			},
