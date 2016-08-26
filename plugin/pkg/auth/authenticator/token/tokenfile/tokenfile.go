@@ -30,6 +30,22 @@ type TokenAuthenticator struct {
 	tokens map[string]*user.DefaultInfo
 }
 
+// New returns a TokenAuthenticator for a single token
+func New(token string, name string, uid string, groups string) (*TokenAuthenticator, error) {
+	tokens := make(map[string]*user.DefaultInfo)
+	obj := &user.DefaultInfo{
+		Name: name,
+		UID:  uid,
+	}
+	if len(groups) > 0 {
+		obj.Groups = strings.Split(groups, ",")
+	}
+	tokens[token] = obj
+	return &TokenAuthenticator{
+		tokens: tokens,
+	}, nil
+}
+
 // NewCSV returns a TokenAuthenticator, populated from a CSV file.
 // The CSV file must contain records in the format "token,username,useruid"
 func NewCSV(path string) (*TokenAuthenticator, error) {
