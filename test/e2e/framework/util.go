@@ -3470,6 +3470,19 @@ func WaitForDeploymentRevisionAndImage(c clientset.Interface, ns, deploymentName
 	return nil
 }
 
+func WaitForOverlappingAnnotationMatch(c clientset.Interface, ns, deploymentName, expected string) error {
+	return wait.Poll(Poll, 1*time.Minute, func() (bool, error) {
+		deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)
+		if err != nil {
+			return false, err
+		}
+		if deployment.Annotations[deploymentutil.OverlapAnnotation] == expected {
+			return true, nil
+		}
+		return false, nil
+	})
+}
+
 // CheckNewRSAnnotations check if the new RS's annotation is as expected
 func CheckNewRSAnnotations(c clientset.Interface, ns, deploymentName string, expectedAnnotations map[string]string) error {
 	deployment, err := c.Extensions().Deployments(ns).Get(deploymentName)

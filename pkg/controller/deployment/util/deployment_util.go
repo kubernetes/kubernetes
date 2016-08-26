@@ -58,6 +58,12 @@ const (
 	RollbackTemplateUnchanged = "DeploymentRollbackTemplateUnchanged"
 	// RollbackDone is the done rollback event reason
 	RollbackDone = "DeploymentRollback"
+	// OverlapAnnotation marks deployments with overlapping selector with other deployments
+	// TODO: Delete this annotation when we gracefully handle overlapping selectors. See https://github.com/kubernetes/kubernetes/issues/2210
+	OverlapAnnotation = "deployment.kubernetes.io/error-selector-overlapping-with"
+	// SelectorUpdateAnnotation marks the last time deployment selector update
+	// TODO: Delete this annotation when we gracefully handle overlapping selectors. See https://github.com/kubernetes/kubernetes/issues/2210
+	SelectorUpdateAnnotation = "deployment.kubernetes.io/selector-updated-at"
 )
 
 // MaxRevision finds the highest revision in the replica sets
@@ -790,4 +796,43 @@ func DeploymentDeepCopy(deployment *extensions.Deployment) (*extensions.Deployme
 		return nil, fmt.Errorf("expected Deployment, got %#v", objCopy)
 	}
 	return copied, nil
+}
+
+// SelectorUpdatedBefore returns true if the former deployment's selector
+// is updated before the latter, false otherwise
+func SelectorUpdatedBefore(d1, d2 *extensions.Deployment) bool {
+	t1, t2 := LastSelectorUpdate(d1), LastSelectorUpdate(d2)
+	return t1.Before(t2)
+}
+
+// LastSelectorUpdate returns the last time given deployment's selector is updated
+func LastSelectorUpdate(d *extensions.Deployment) unversioned.Time {
+	t := d.Annotations[SelectorUpdateAnnotation]
+	if len(t) > 0 {
+		parsedTime, err := time.Parse(t, time.RFC3339)
+		// If failed to parse the time, use creation timestamp instead
+		if err != nil {
+			return d.CreationTimestamp
+		}
+		return unversioned.Time{Time: parsedTime}
+	}
+	// If it's never updated, use creation timestamp instead
+	return d.CreationTimestamp
+}
+
+// BySelectorLastUpdateTime sorts a list of deployments by the last update time of their selector,
+// first using their creation timestamp and then their names as a tie breaker.
+type BySelectorLastUpdateTime []extensions.Deployment
+
+func (o BySelectorLastUpdateTime) Len() int      { return len(o) }
+func (o BySelectorLastUpdateTime) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o BySelectorLastUpdateTime) Less(i, j int) bool {
+	ti, tj := LastSelectorUpdate(&o[i]), LastSelectorUpdate(&o[j])
+	if ti.Equal(tj) {
+		if o[i].CreationTimestamp.Equal(o[j].CreationTimestamp) {
+			return o[i].Name < o[j].Name
+		}
+		return o[i].CreationTimestamp.Before(o[j].CreationTimestamp)
+	}
+	return ti.Before(tj)
 }

@@ -81,7 +81,7 @@ func newFakeDisruptionController() (*DisruptionController, *pdbStates) {
 		podLister:   cache.StoreToPodLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		rcLister:    cache.StoreToReplicationControllerLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})},
 		rsLister:    cache.StoreToReplicaSetLister{Store: cache.NewStore(controller.KeyFunc)},
-		dLister:     cache.StoreToDeploymentLister{Store: cache.NewStore(controller.KeyFunc)},
+		dLister:     cache.StoreToDeploymentLister{Indexer: cache.NewIndexer(controller.KeyFunc, cache.Indexers{})},
 		getUpdater:  func() updater { return ps.Set },
 		broadcaster: record.NewBroadcaster(),
 	}
@@ -442,7 +442,7 @@ func TestTwoControllers(t *testing.T) {
 
 	d, _ := newDeployment(t, 11)
 	d.Spec.Selector = newSel(dLabels)
-	add(t, dc.dLister.Store, d)
+	add(t, dc.dLister.Indexer, d)
 	dc.sync(pdbName)
 	ps.VerifyPdbStatus(t, pdbName, true, 4, 4, 11)
 
