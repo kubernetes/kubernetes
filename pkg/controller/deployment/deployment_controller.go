@@ -518,7 +518,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	if d.Spec.RollbackTo != nil {
 		revision := d.Spec.RollbackTo.Revision
-		if _, err = dc.rollback(d, &revision); err != nil {
+		if d, err = dc.rollback(d, &revision); err != nil {
 			return err
 		}
 	}
