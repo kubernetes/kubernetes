@@ -2093,6 +2093,18 @@
 			"Rev": "1560c1005499d61b80f865c04d39ca7505bf7f0b"
 		},
 		{
+			"ImportPath": "github.com/square/go-jose",
+			"Rev": "5848f91487706c6a19d3fc829ff3743665031146"
+		},
+		{
+			"ImportPath": "github.com/square/go-jose/cipher",
+			"Rev": "5848f91487706c6a19d3fc829ff3743665031146"
+		},
+		{
+			"ImportPath": "github.com/square/go-jose/json",
+			"Rev": "5848f91487706c6a19d3fc829ff3743665031146"
+		},
+		{
 			"ImportPath": "github.com/stretchr/objx",
 			"Rev": "1a9d0bb9f541897e62256577b352fdbc1fb4fd94"
 		},
