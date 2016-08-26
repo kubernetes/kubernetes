@@ -77,13 +77,14 @@ type serviceCache struct {
 }
 
 type ServiceController struct {
-	cloud       cloudprovider.Interface
-	knownHosts  []string
-	kubeClient  clientset.Interface
-	clusterName string
-	balancer    cloudprovider.LoadBalancer
-	zone        cloudprovider.Zone
-	cache       *serviceCache
+	cloud            cloudprovider.Interface
+	knownHosts       []string
+	servicesToUpdate []*api.Service
+	kubeClient       clientset.Interface
+	clusterName      string
+	balancer         cloudprovider.LoadBalancer
+	zone             cloudprovider.Zone
+	cache            *serviceCache
 	// A store of services, populated by the serviceController
 	serviceStore cache.StoreToServiceLister
 	// Watches changes to all services
@@ -619,7 +620,6 @@ func getNodeConditionPredicate() cache.NodeConditionPredicate {
 // nodeSyncLoop handles updating the hosts pointed to by all load
 // balancers whenever the set of nodes in the cluster changes.
 func (s *ServiceController) nodeSyncLoop() {
-	var servicesToUpdate []*api.Service
 	nodes, err := s.nodeLister.NodeCondition(getNodeConditionPredicate()).List()
 	if err != nil {
 		glog.Errorf("Failed to retrieve current set of nodes from node lister: %v", err)
@@ -629,18 +629,18 @@ func (s *ServiceController) nodeSyncLoop() {
 	if stringSlicesEqual(newHosts, s.knownHosts) {
 		// The set of nodes in the cluster hasn't changed, but we can retry
 		// updating any services that we failed to update last time around.
-		servicesToUpdate = s.updateLoadBalancerHosts(servicesToUpdate, newHosts)
+		s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, newHosts)
 		return
 	}
 	glog.Infof("Detected change in list of current cluster nodes. New node set: %v", newHosts)
 
 	// Try updating all services, and save the ones that fail to try again next
 	// round.
-	servicesToUpdate = s.cache.allServices()
-	numServices := len(servicesToUpdate)
-	servicesToUpdate = s.updateLoadBalancerHosts(servicesToUpdate, newHosts)
+	s.servicesToUpdate = s.cache.allServices()
+	numServices := len(s.servicesToUpdate)
+	s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, newHosts)
 	glog.Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
-		numServices-len(servicesToUpdate), numServices)
+		numServices-len(s.servicesToUpdate), numServices)
 
 	s.knownHosts = newHosts
 }
