@@ -76,7 +76,10 @@ func (r *Runtime) PullImage(image kubecontainer.ImageSpec, pullSecrets []api.Sec
 		return err
 	}
 
-	if _, err := r.cli.RunCommand(&config, "fetch", dockerPrefix+img); err != nil {
+	// Today, `--no-store` will fetch the remote image regardless of whether the content of the image
+	// has changed or not. This causes performance downgrades when the image tag is ':latest' and
+	// the image pull policy is 'always'. The issue is tracked in https://github.com/coreos/rkt/issues/2937.
+	if _, err := r.cli.RunCommand(&config, "fetch", "--no-store", dockerPrefix+img); err != nil {
 		glog.Errorf("Failed to fetch: %v", err)
 		return err
 	}
