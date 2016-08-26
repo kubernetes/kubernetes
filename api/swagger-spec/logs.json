@@ -16,7 +16,16 @@
       "type": "void",
       "method": "GET",
       "nickname": "logFileHandler",
-      "parameters": []
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "path",
+        "name": "logpath",
+        "description": "path to the log",
+        "required": true,
+        "allowMultiple": false
+       }
+      ]
      }
     ]
    },
