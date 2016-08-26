@@ -108,7 +108,7 @@ The above example generates the following links:
 ## How to Include an Example
 
 While writing examples, you may want to show the content of certain example
-files (e.g. [pod.yaml](../user-guide/pod.yaml)). In this case, insert the
+files (e.g. [pod.yaml](../../test/fixtures/doc-yaml/user-guide/pod.yaml)). In this case, insert the
 following code in the md file:
 
 ```
@@ -125,13 +125,13 @@ out-of-date every time you update the example file.
 For example, the following:
 
 ```
-<!-- BEGIN MUNGE: EXAMPLE ../user-guide/pod.yaml -->
-<!-- END MUNGE: EXAMPLE ../user-guide/pod.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE ../../test/fixtures/doc-yaml/user-guide/pod.yaml -->
+<!-- END MUNGE: EXAMPLE ../../test/fixtures/doc-yaml/user-guide/pod.yaml -->
 ```
 
 generates the following after `hack/update-munge-docs.sh`:
 
-<!-- BEGIN MUNGE: EXAMPLE ../user-guide/pod.yaml -->
+<!-- BEGIN MUNGE: EXAMPLE ../../test/fixtures/doc-yaml/user-guide/pod.yaml -->
 
 ```yaml
 apiVersion: v1
@@ -148,8 +148,8 @@ spec:
     - containerPort: 80
 ```
 
-[Download example](../user-guide/pod.yaml?raw=true)
-<!-- END MUNGE: EXAMPLE ../user-guide/pod.yaml -->
+[Download example](../../test/fixtures/doc-yaml/user-guide/pod.yaml?raw=true)
+<!-- END MUNGE: EXAMPLE ../../test/fixtures/doc-yaml/user-guide/pod.yaml -->
 
 ## Misc.
 
@@ -170,7 +170,7 @@ console code block:
 ```
 ```console
 
-$ kubectl create -f docs/user-guide/pod.yaml
+$ kubectl create -f test/fixtures/doc-yaml/user-guide/pod.yaml
 pod "foo" created
 
 ```　
@@ -179,7 +179,7 @@ pod "foo" created
 which renders as:
 
 ```console
-$ kubectl create -f docs/user-guide/pod.yaml
+$ kubectl create -f test/fixtures/doc-yaml/user-guide/pod.yaml
 pod "foo" created
 ```
 

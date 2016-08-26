@@ -352,7 +352,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Liveness", func() {
 		It("liveness pods should be automatically restarted", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/liveness", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/fixtures/doc-yaml/user-guide/liveness", file)
 			}
 			execYaml := mkpath("exec-liveness.yaml")
 			httpYaml := mkpath("http-liveness.yaml")
@@ -402,7 +402,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Secret", func() {
 		It("should create a pod that reads a secret", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/secrets", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/fixtures/doc-yaml/user-guide/secrets", file)
 			}
 			secretYaml := mkpath("secret.yaml")
 			podYaml := mkpath("secret-pod.yaml")
@@ -424,7 +424,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Downward API", func() {
 		It("should create a pod that prints his name and namespace", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "docs/user-guide/downward-api", file)
+				return filepath.Join(framework.TestContext.RepoRoot, "test/fixtures/doc-yaml/user-guide/downward-api", file)
 			}
 			podYaml := mkpath("dapi-pod.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
