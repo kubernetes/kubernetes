@@ -606,6 +606,31 @@ func TestDescribeCluster(t *testing.T) {
 	}
 }
 
+func TestDescribeStorageClass(t *testing.T) {
+	f := testclient.NewSimpleFake(&extensions.StorageClass{
+		ObjectMeta: api.ObjectMeta{
+			Name:            "foo",
+			ResourceVersion: "4",
+			Annotations: map[string]string{
+				"name": "foo",
+			},
+		},
+		Provisioner: "my-provisioner",
+		Parameters: map[string]string{
+			"param1": "value1",
+			"param2": "value2",
+		},
+	})
+	s := StorageClassDescriber{f}
+	out, err := s.Describe("", "foo", DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !strings.Contains(out, "foo") {
+		t.Errorf("unexpected out: %s", out)
+	}
+}
+
 func TestDescribeEvents(t *testing.T) {
 
 	events := &api.EventList{
@@ -698,6 +723,14 @@ func TestDescribeEvents(t *testing.T) {
 		},
 		"Service": &ServiceDescriber{
 			testclient.NewSimpleFake(&api.Service{
+				ObjectMeta: api.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
+		"StorageClass": &StorageClassDescriber{
+			testclient.NewSimpleFake(&extensions.StorageClass{
 				ObjectMeta: api.ObjectMeta{
 					Name:      "bar",
 					Namespace: "foo",

@@ -116,6 +116,7 @@ func describerMap(c *client.Client) map[unversioned.GroupKind]Describer {
 		batch.Kind("ScheduledJob"):                     &ScheduledJobDescriber{adapter.FromUnversionedClient(c)},
 		apps.Kind("PetSet"):                            &PetSetDescriber{c},
 		certificates.Kind("CertificateSigningRequest"): &CertificateSigningRequestDescriber{c},
+		extensions.Kind("StorageClass"):                &StorageClassDescriber{c},
 	}
 
 	return m
@@ -2370,6 +2371,30 @@ func describeNetworkPolicy(networkPolicy *extensions.NetworkPolicy) (string, err
 		printLabelsMultiline(out, "Labels", networkPolicy.Labels)
 		printLabelsMultiline(out, "Annotations", networkPolicy.Annotations)
 
+		return nil
+	})
+}
+
+type StorageClassDescriber struct {
+	client.Interface
+}
+
+func (s *StorageClassDescriber) Describe(namespace, name string, describerSettings DescriberSettings) (string, error) {
+	sc, err := s.Extensions().StorageClasses().Get(name)
+	if err != nil {
+		return "", err
+	}
+	return tabbedString(func(out io.Writer) error {
+		fmt.Fprintf(out, "Name:\t%s\n", sc.Name)
+		fmt.Fprintf(out, "Annotations:\t%s\n", labels.FormatLabels(sc.Annotations))
+		fmt.Fprintf(out, "Provisioner:\t%s\n", sc.Provisioner)
+		fmt.Fprintf(out, "Parameters:\t%s\n", labels.FormatLabels(sc.Parameters))
+		if describerSettings.ShowEvents {
+			events, _ := s.Events(namespace).Search(sc)
+			if events != nil {
+				DescribeEvents(events, out)
+			}
+		}
 		return nil
 	})
 }
