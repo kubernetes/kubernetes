@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apiserver/authenticator"
+	authenticator2 "k8s.io/kubernetes/pkg/auth/authenticator"
 	"k8s.io/kubernetes/pkg/controller/framework/informers"
 	"k8s.io/kubernetes/pkg/genericapiserver"
 	"k8s.io/kubernetes/pkg/genericapiserver/authorizer"
@@ -49,6 +50,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
 	"k8s.io/kubernetes/pkg/util/wait"
+	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/request/union"
 )
 
 // NewAPIServerCommand creates a *cobra.Command object with default parameters
@@ -107,7 +109,7 @@ func Run(s *options.ServerRunOptions) error {
 		storageFactory.SetEtcdLocation(groupResource, servers)
 	}
 
-	authenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
+	apiAuthenticator, err := authenticator.New(authenticator.AuthenticatorConfig{
 		BasicAuthFile:     s.BasicAuthFile,
 		ClientCAFile:      s.ClientCAFile,
 		TokenAuthFile:     s.TokenAuthFile,
@@ -162,9 +164,21 @@ func Run(s *options.ServerRunOptions) error {
 	}
 
 	admissionControlPluginNames := strings.Split(s.AdmissionControl, ",")
-	client, err := s.NewSelfClient()
+	client, token, err := s.NewSelfClient()
 	if err != nil {
 		glog.Errorf("Failed to create clientset: %v", err)
+	} else if len(token) > 0 {
+		var authenticators []authenticator2.Request
+		if apiAuthenticator != nil {
+			authenticators = append(authenticators, apiAuthenticator)
+		}
+		tokenAuthenticator, err := authenticator.NewAuthenticatorFromToken(token, "apiserver", "apiserver", "")
+		if err != nil {
+			glog.Errorf("Failed to create authenticator from token: %v", err)
+		} else {
+			authenticators = append(authenticators, tokenAuthenticator)
+		}
+		apiAuthenticator = union.New(authenticators...)
 	}
 	sharedInformers := informers.NewSharedInformerFactory(client, 10*time.Minute)
 	pluginInitializer := admission.NewPluginInitializer(sharedInformers)
@@ -176,7 +190,7 @@ func Run(s *options.ServerRunOptions) error {
 	genericConfig := genericapiserver.NewConfig(s.ServerRunOptions)
 	// TODO: Move the following to generic api server as well.
 	genericConfig.StorageFactory = storageFactory
-	genericConfig.Authenticator = authenticator
+	genericConfig.Authenticator = apiAuthenticator
 	genericConfig.SupportsBasicAuth = len(s.BasicAuthFile) > 0
 	genericConfig.Authorizer = authorizer
 	genericConfig.AuthorizerRBACSuperUser = s.AuthorizationRBACSuperUser
