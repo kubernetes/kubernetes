@@ -1643,6 +1643,10 @@
       "type": "string",
       "description": "EndpointsName is the endpoint name that details Glusterfs topology. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"
      },
+     "servers": {
+      "type": "string",
+      "description": "Optional: Servers is the gluster server list as a string seperated by a comma."
+     },
      "path": {
       "type": "string",
       "description": "Path is the Glusterfs volume path. More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod"

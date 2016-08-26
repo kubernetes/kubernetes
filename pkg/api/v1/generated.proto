@@ -901,6 +901,9 @@ message GlusterfsVolumeSource {
   // More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
   optional string endpoints = 1;
 
+  // Optional: Servers is the gluster server list as a string seperated by a comma.
+  optional string servers = 4;
+
   // Path is the Glusterfs volume path.
   // More info: http://releases.k8s.io/HEAD/examples/volumes/glusterfs/README.md#create-a-pod
   optional string path = 2;

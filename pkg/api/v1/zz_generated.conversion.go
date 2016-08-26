@@ -2260,6 +2260,7 @@ func Convert_api_GitRepoVolumeSource_To_v1_GitRepoVolumeSource(in *api.GitRepoVo
 
 func autoConvert_v1_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource(in *GlusterfsVolumeSource, out *api.GlusterfsVolumeSource, s conversion.Scope) error {
 	out.EndpointsName = in.EndpointsName
+	out.Servers = in.Servers
 	out.Path = in.Path
 	out.ReadOnly = in.ReadOnly
 	return nil
@@ -2271,6 +2272,7 @@ func Convert_v1_GlusterfsVolumeSource_To_api_GlusterfsVolumeSource(in *Glusterfs
 
 func autoConvert_api_GlusterfsVolumeSource_To_v1_GlusterfsVolumeSource(in *api.GlusterfsVolumeSource, out *GlusterfsVolumeSource, s conversion.Scope) error {
 	out.EndpointsName = in.EndpointsName
+	out.Servers = in.Servers
 	out.Path = in.Path
 	out.ReadOnly = in.ReadOnly
 	return nil

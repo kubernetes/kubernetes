@@ -1182,6 +1182,7 @@ func DeepCopy_v1_GlusterfsVolumeSource(in interface{}, out interface{}, c *conve
 		in := in.(*GlusterfsVolumeSource)
 		out := out.(*GlusterfsVolumeSource)
 		out.EndpointsName = in.EndpointsName
+		out.Servers = in.Servers
 		out.Path = in.Path
 		out.ReadOnly = in.ReadOnly
 		return nil
