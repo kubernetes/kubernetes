@@ -99,7 +99,7 @@ type FeatureGate interface {
 	// alpha: v1.3
 	DynamicVolumeProvisioning() bool
 
-	// owner: mtaufen
+	// owner: @mtaufen
 	// alpha: v1.4
 	DynamicKubeletConfig() bool
 }
@@ -198,6 +198,25 @@ func (f *featureGate) lookup(key string) bool {
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.
 func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
+	known := f.KnownFeatures()
+	fs.Var(f, flagName, ""+
+		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+		"Options are:\n"+strings.Join(known, "\n"))
+}
+
+// AddStringFlag lets you provide a string target for the flag value, in case you want to direct
+// the flag value to another location instead of parsing it into the FeatureGate object, but still want
+// the known features reported in the usage string. If you use this to set up the flag, you must parse
+// the string yourself using featureGate.Set.
+func (f *featureGate) AddStringFlag(fs *pflag.FlagSet, target *string) {
+	known := f.KnownFeatures()
+	fs.StringVar(target, flagName, "",
+		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
+			"Options are:\n"+strings.Join(known, "\n"))
+}
+
+// Returns a string describing the FeatureGate's known features.
+func (f *featureGate) KnownFeatures() []string {
 	var known []string
 	for k, v := range f.known {
 		pre := ""
@@ -206,7 +225,5 @@ func (f *featureGate) AddFlag(fs *pflag.FlagSet) {
 		}
 		known = append(known, fmt.Sprintf("%s=true|false (%sdefault=%t)", k, pre, v.enabled))
 	}
-	fs.Var(f, flagName, ""+
-		"A set of key=value pairs that describe feature gates for alpha/experimental features. "+
-		"Options are:\n"+strings.Join(known, "\n"))
+	return known
 }
