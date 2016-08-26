@@ -17,12 +17,19 @@
 SSH_OPTS="-oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null -oLogLevel=ERROR -C"
 
 # These need to be set
-#export GOVC_URL=
-#export GOVC_DATACENTER=
-#export GOVC_DATASTORE=
-#export GOVC_NETWORK=
-#export GOVC_GUEST_LOGIN=
+# export GOVC_URL='hostname' # hostname of the vc
+# export GOVC_USERNAME='username' # username for logging into the vsphere.
+# export GOVC_PASSWORD='password' # password for the above username
+# export GOVC_NETWORK='Network Name' # Name of the network the vms should join. Many times it could be "VM Network"
+# export GOVC_DATASTORE='target datastore'
+# To get resource pool via govc: govc ls -l 'host/*' | grep ResourcePool | awk '{print $1}' | xargs -n1 -t govc pool.info
+# export GOVC_RESOURCE_POOL='resource pool or cluster with access to datastore'
+# export GOVC_GUEST_LOGIN='kube:kube' # Used for logging into kube.vmdk during deployment.
+# export GOVC_PORT=443 # The port to be used by vSphere cloud provider plugin
+# To get datacente via govc: govc datacenter.info
+# export GOVC_DATACENTER='ha-datacenter' # The datacenter to be used by vSphere cloud provider plugin
+# export GOVC_GUEST_LOGIN='kube:kube' # Used for logging into kube.vmdk during deployment.
 
 # Set GOVC_INSECURE if the host in GOVC_URL is using a certificate that cannot
 # be verified (i.e. a self-signed certificate), but IS trusted.
-#export GOVC_INSECURE=1
+# export GOVC_INSECURE=1
