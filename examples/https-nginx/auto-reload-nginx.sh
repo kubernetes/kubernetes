@@ -1,3 +1,5 @@
+#!/bin/sh
+
 # Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,16 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM nginx
+nginx
 
-MAINTAINER Mengqi Yu <mengqiy@google.com>
+inotifywait -mr --timefmt '%d/%m/%y %H:%M' --format '%T' \
+-e create /etc/nginx/conf.d/ | while read date time; do
 
-COPY index2.html /usr/share/nginx/html/index2.html
-RUN chmod +r /usr/share/nginx/html/index2.html
-COPY auto-reload-nginx.sh /home/auto-reload-nginx.sh
-RUN chmod +x /home/auto-reload-nginx.sh
+	echo "At ${time} on ${date}, config file update detected."
+	sleep .1
+	nginx -s reload
 
-# install inotify
-RUN apt-get update && apt-get install -y inotify-tools
-
-CMD ["/home/auto-reload-nginx.sh"]
+done
