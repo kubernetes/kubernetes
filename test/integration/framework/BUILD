@@ -13,6 +13,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "consul_utils.go",
         "etcd_utils.go",
         "master_utils.go",
         "perf_utils.go",
@@ -54,6 +55,7 @@ go_library(
         "//pkg/runtime:go_default_library",
         "//pkg/runtime/schema:go_default_library",
         "//pkg/runtime/serializer/versioning:go_default_library",
+        "//pkg/storage:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
         "//pkg/util/env:go_default_library",
         "//pkg/util/wait:go_default_library",
@@ -66,6 +68,7 @@ go_library(
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:github.com/go-openapi/spec",
         "//vendor:github.com/golang/glog",
+        "//vendor:github.com/hashicorp/consul/api",
         "//vendor:github.com/pborman/uuid",
         "//vendor:golang.org/x/net/context",
     ],

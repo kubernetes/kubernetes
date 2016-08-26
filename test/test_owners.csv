@@ -803,6 +803,7 @@ k8s.io/kubernetes/pkg/securitycontext,erictune,1
 k8s.io/kubernetes/pkg/serviceaccount,liggitt,0
 k8s.io/kubernetes/pkg/ssh,jbeda,1
 k8s.io/kubernetes/pkg/storage,xiang90,0
+k8s.io/kubernetes/pkg/storage/consul,MustWin,0
 k8s.io/kubernetes/pkg/storage/etcd,eparis,1
 k8s.io/kubernetes/pkg/storage/etcd/util,xiang90,0
 k8s.io/kubernetes/pkg/storage/etcd3,xiang90,0
