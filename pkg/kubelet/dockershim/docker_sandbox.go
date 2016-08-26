@@ -182,7 +182,8 @@ func (ds *dockerService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter) ([]
 
 	// Convert docker containers to runtime api sandboxes.
 	result := []*runtimeApi.PodSandbox{}
-	for _, c := range containers {
+	for i := range containers {
+		c := containers[i]
 		if len(filter.GetName()) > 0 {
 			sandboxName, _, _, _, err := parseSandboxName(c.Names[0])
 			if err != nil || sandboxName != filter.GetName() {

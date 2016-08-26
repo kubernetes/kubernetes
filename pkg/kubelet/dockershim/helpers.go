@@ -206,6 +206,9 @@ func buildContainerName(sandboxConfig *runtimeApi.PodSandboxConfig, containerCon
 // parseContainerName unpacks a container name, returning the pod name, namespace, UID,
 // container name and attempt.
 func parseContainerName(name string) (podName, podNamespace, podUID, containerName string, attempt uint32, err error) {
+	// Docker adds a "/" prefix to names. so trim it.
+	name = strings.TrimPrefix(name, "/")
+
 	parts := strings.Split(name, "_")
 	if len(parts) == 0 || parts[0] != kubePrefix {
 		err = fmt.Errorf("failed to parse container name %q into parts", name)
