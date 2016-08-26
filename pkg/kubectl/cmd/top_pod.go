@@ -19,10 +19,14 @@ package cmd
 import (
 	"errors"
 	"io"
+	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/metricsutil"
+	"k8s.io/kubernetes/pkg/labels"
 
+	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 )
@@ -30,19 +34,26 @@ import (
 // TopPodOptions contains all the options for running the top-pod cli command.
 type TopPodOptions struct {
 	ResourceName    string
+	Namespace       string
+	Selector        string
 	AllNamespaces   bool
 	PrintContainers bool
-	Selector        string
-	Namespace       string
 	Client          *metricsutil.HeapsterMetricsClient
 	Printer         *metricsutil.TopCmdPrinter
 }
+
+const metricsCreationDelay = time.Minute * 2
 
 var (
 	topPodLong = dedent.Dedent(`
 		Display Resource (CPU/Memory/Storage) usage of pods.
 
-		The 'top pod' command allows you to see the resource consumption of pods.`)
+		The 'top pod' command allows you to see the resource consumption of pods.
+
+		Computing the initial metrics may take up to 2 minutes since pod creation.
+		After that, the metrics are updated every minute.
+		See https://github.com/kubernetes/kubernetes/blob/master/docs/proposals/resource-metrics-api.md#resource-metrics-api
+		to learn more.`)
 
 	topPodExample = dedent.Dedent(`
 		  # Show metrics for all pods in the default namespace
@@ -113,9 +124,66 @@ func (o *TopPodOptions) Validate() error {
 
 // RunTop implements all the necessary functionality for top.
 func (o TopPodOptions) RunTopPod() error {
-	metrics, err := o.Client.GetPodMetrics(o.Namespace, o.ResourceName, o.AllNamespaces, o.Selector)
+	var err error
+	selector := labels.Everything()
+	if len(o.Selector) > 0 {
+		selector, err = labels.Parse(o.Selector)
+		if err != nil {
+			return err
+		}
+	}
+	metrics, err := o.Client.GetPodMetrics(o.Namespace, o.ResourceName, o.AllNamespaces, selector)
+	// TODO: Refactor this once Heapster becomes the API server.
+	// First we check why no metrics have been received.
+	if len(metrics) == 0 {
+		// If the API server query is successful but all the pods are newly created,
+		// the metrics are probably not ready yet, so we return the error here in the first place.
+		e := verifyEmptyMetrics(o, selector)
+		if e != nil {
+			return e
+		}
+	}
 	if err != nil {
 		return err
 	}
 	return o.Printer.PrintPodMetrics(metrics, o.PrintContainers, o.AllNamespaces)
+}
+
+func verifyEmptyMetrics(o TopPodOptions, selector labels.Selector) error {
+	if len(o.ResourceName) > 0 {
+		pod, err := o.Client.Pods(o.Namespace).Get(o.ResourceName)
+		if err != nil {
+			return err
+		}
+		if err := checkPodAge(pod); err != nil {
+			return err
+		}
+	} else {
+		pods, err := o.Client.Pods(o.Namespace).List(api.ListOptions{
+			LabelSelector: selector,
+		})
+		if err != nil {
+			return err
+		}
+		if len(pods.Items) == 0 {
+			return nil
+		}
+		for _, pod := range pods.Items {
+			if err := checkPodAge(&pod); err != nil {
+				return err
+			}
+		}
+	}
+	return errors.New("metrics not available yet")
+}
+
+func checkPodAge(pod *api.Pod) error {
+	age := time.Now().Sub(pod.CreationTimestamp.Time)
+	if age > metricsCreationDelay {
+		glog.Warningf("Metrics not available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
+		return errors.New("metrics not available")
+	} else {
+		glog.V(2).Infof("Metrics not yet available for pod %s/%s, age: %s", pod.Namespace, pod.Name, age.String())
+		return nil
+	}
 }
