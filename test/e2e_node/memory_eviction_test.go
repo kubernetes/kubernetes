@@ -42,7 +42,9 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 	f := framework.NewDefaultFramework("eviction-test")
 
 	Context("When there is memory pressure", func() {
-		It("It should evict pods in the correct order (besteffort first, then burstable, then guaranteed)", func() {
+		// Skip the test temporarily because of #30550.
+		// TODO(random-liu): Re-enable this test after #30550 is fixed.
+		PIt("It should evict pods in the correct order (besteffort first, then burstable, then guaranteed)", func() {
 			By("Creating a guaranteed pod, a burstable pod, and a besteffort pod.")
 
 			// A pod is guaranteed only when requests and limits are specified for all the containers and they are equal.
