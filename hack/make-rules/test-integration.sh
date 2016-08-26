@@ -50,12 +50,17 @@ kube::test::find_integration_test_dirs() {
 cleanup() {
   kube::log::status "Cleaning up etcd"
   kube::etcd::cleanup
+  kube::log::status "Cleaning up Consul"
+  kube::consul::cleanup
   kube::log::status "Integration test cleanup complete"
 }
 
 runTests() {
   kube::log::status "Starting etcd instance"
   kube::etcd::start
+  kube::log::status "Starting Consul instance"
+  kube::consul::start
+
   kube::log::status "Running integration test cases"
 
   # TODO: Re-enable race detection when we switch to a thread-safe etcd client
@@ -79,7 +84,16 @@ checkEtcdOnPath() {
   return 1
 }
 
+checkConsulOnPath() {
+  kube::log::status "Checking Consul is on PATH"
+  which consul && return
+  kube::log::status "Cannot find consul, cannot run integration tests."
+  kube::log::status "Please see docs/devel/testing.md for instructions."
+  return 1
+}
+
 checkEtcdOnPath
+checkConsulOnPath
 
 # Run cleanup to stop etcd on interrupt or other kill signal.
 trap cleanup EXIT

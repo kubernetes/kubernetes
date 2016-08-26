@@ -19,9 +19,10 @@ package storagebackend
 import "k8s.io/kubernetes/pkg/runtime"
 
 const (
-	StorageTypeUnset = ""
-	StorageTypeETCD2 = "etcd2"
-	StorageTypeETCD3 = "etcd3"
+	StorageTypeUnset  = ""
+	StorageTypeETCD2  = "etcd2"
+	StorageTypeETCD3  = "etcd3"
+	StorageTypeConsul = "consul"
 )
 
 // Config is configuration for creating a storage backend.

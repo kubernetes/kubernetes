@@ -13,6 +13,7 @@ load(
 go_library(
     name = "go_default_library",
     srcs = [
+        "consul.go",
         "etcd2.go",
         "etcd3.go",
         "factory.go",
@@ -20,6 +21,7 @@ go_library(
     tags = ["automanaged"],
     deps = [
         "//pkg/storage:go_default_library",
+        "//pkg/storage/consul:go_default_library",
         "//pkg/storage/etcd:go_default_library",
         "//pkg/storage/etcd3:go_default_library",
         "//pkg/storage/storagebackend:go_default_library",
@@ -27,6 +29,8 @@ go_library(
         "//vendor:github.com/coreos/etcd/client",
         "//vendor:github.com/coreos/etcd/clientv3",
         "//vendor:github.com/coreos/etcd/pkg/transport",
+        "//vendor:github.com/hashicorp/consul/api",
+        "//vendor:github.com/hashicorp/consul/tlsutil",
         "//vendor:golang.org/x/net/context",
     ],
 )
