@@ -430,7 +430,7 @@ func StartControllers(s *options.CMServer, kubeClient *client.Client, kubeconfig
 		ProbeControllerVolumePlugins(cloud, s.VolumeConfiguration),
 		cloud,
 		s.ClusterName,
-		nil, // volumeSource
+		sharedInformers.PersistentVolumes().Informer(),
 		nil, // claimSource
 		nil, // classSource
 		nil, // eventRecorder
