@@ -88,6 +88,8 @@ type Attributes struct {
 	ReadOnly        bool
 	Managed         bool
 	SupportsSELinux bool
+	// Default to private to keep consistent with old behavior.
+	Propagation string
 }
 
 // Mounter interface provides methods to set up/mount the volume.

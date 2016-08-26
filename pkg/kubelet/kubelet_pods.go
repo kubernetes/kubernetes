@@ -147,6 +147,7 @@ func makeMounts(pod *api.Pod, podDir string, container *api.Container, hostName,
 			HostPath:       hostPath,
 			ReadOnly:       mount.ReadOnly,
 			SELinuxRelabel: relabelVolume,
+			Propagation:    vol.Mounter.GetAttributes().Propagation,
 		})
 	}
 	if mountEtcHostsFile {

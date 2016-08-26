@@ -522,16 +522,20 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 func makeMountBindings(mounts []kubecontainer.Mount) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
+		attr := make([]string, 0, 3)
 		if m.ReadOnly {
-			bind += ":ro"
+			attr = append(attr, "ro")
 		}
-		if m.SELinuxRelabel && selinux.SELinuxEnabled() {
-			if m.ReadOnly {
-				bind += ",Z"
-			} else {
-				bind += ":Z"
-			}
 
+		if m.SELinuxRelabel && selinux.SELinuxEnabled() {
+			attr = append(attr, "Z")
+		}
+		// Propagation
+		if len(m.Propagation) != 0 {
+			attr = append(attr, m.Propagation)
+		}
+		if len(attr) > 0 {
+			bind = fmt.Sprintf("%s:%s", bind, strings.Join(attr, ","))
 		}
 		result = append(result, bind)
 	}
