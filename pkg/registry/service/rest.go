@@ -114,24 +114,46 @@ func (rs *REST) Create(ctx api.Context, obj runtime.Object) (runtime.Object, err
 	}
 
 	assignNodePorts := shouldAssignNodePorts(service)
+	svcPortToNodePort := map[int]int{}
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
-		if servicePort.NodePort != 0 {
-			err := nodePortOp.Allocate(int(servicePort.NodePort))
-			if err != nil {
-				// TODO: when validation becomes versioned, this gets more complicated.
-				el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
-				return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
+		allocatedNodePort := svcPortToNodePort[int(servicePort.Port)]
+		if allocatedNodePort == 0 {
+			// This will only scan forward in the service.Spec.Ports list because any matches
+			// before the current port would have been found in svcPortToNodePort. This is really
+			// looking for any user provided values.
+			np := findRequestedNodePort(int(servicePort.Port), service.Spec.Ports)
+			if np != 0 {
+				err := nodePortOp.Allocate(np)
+				if err != nil {
+					// TODO: when validation becomes versioned, this gets more complicated.
+					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), np, err.Error())}
+					return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
+				}
+				servicePort.NodePort = int32(np)
+				svcPortToNodePort[int(servicePort.Port)] = np
+			} else if assignNodePorts {
+				nodePort, err := nodePortOp.AllocateNext()
+				if err != nil {
+					// TODO: what error should be returned here?  It's not a
+					// field-level validation failure (the field is valid), and it's
+					// not really an internal error.
+					return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+				}
+				servicePort.NodePort = int32(nodePort)
+				svcPortToNodePort[int(servicePort.Port)] = nodePort
 			}
-		} else if assignNodePorts {
-			nodePort, err := nodePortOp.AllocateNext()
-			if err != nil {
-				// TODO: what error should be returned here?  It's not a
-				// field-level validation failure (the field is valid), and it's
-				// not really an internal error.
-				return nil, errors.NewInternalError(fmt.Errorf("failed to allocate a nodePort: %v", err))
+		} else if int(servicePort.NodePort) != allocatedNodePort {
+			if servicePort.NodePort == 0 {
+				servicePort.NodePort = int32(allocatedNodePort)
+			} else {
+				err := nodePortOp.Allocate(int(servicePort.NodePort))
+				if err != nil {
+					// TODO: when validation becomes versioned, this gets more complicated.
+					el := field.ErrorList{field.Invalid(field.NewPath("spec", "ports").Index(i).Child("nodePort"), servicePort.NodePort, err.Error())}
+					return nil, errors.NewInvalid(api.Kind("Service"), service.Name, el)
+				}
 			}
-			servicePort.NodePort = int32(nodePort)
 		}
 	}
 
@@ -437,4 +459,16 @@ func shouldCheckOrAssignHealthCheckNodePort(service *api.Service) bool {
 	}
 	glog.V(4).Infof("Service type: %v does not need health check node port", service.Spec.Type)
 	return false
+}
+
+// Loop through the service ports list, find one with the same port number and
+// NodePort specified, return this NodePort otherwise return 0.
+func findRequestedNodePort(port int, servicePorts []api.ServicePort) int {
+	for i := range servicePorts {
+		servicePort := servicePorts[i]
+		if port == int(servicePort.Port) && servicePort.NodePort != 0 {
+			return int(servicePort.NodePort)
+		}
+	}
+	return 0
 }
