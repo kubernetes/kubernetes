@@ -332,7 +332,7 @@ func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, cluster
 	for clusterName, replicas := range overflow {
 		result[clusterName] += replicas
 	}
-	if glog.V(2) {
+	if glog.V(4) {
 		buf := bytes.NewBufferString(fmt.Sprintf("Schedule - ReplicaSet: %s/%s\n", frs.Namespace, frs.Name))
 		sort.Strings(clusterNames)
 		for _, clusterName := range clusterNames {
@@ -347,7 +347,7 @@ func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, cluster
 			}
 			fmt.Fprintf(buf, "\n")
 		}
-		glog.V(2).Infof(buf.String())
+		glog.V(4).Infof(buf.String())
 	}
 	return result
 }
@@ -358,9 +358,9 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) error {
 		return nil
 	}
 
-	glog.V(1).Infof("Start reconcile replicaset %q", key)
+	glog.V(4).Infof("Start reconcile replicaset %q", key)
 	startTime := time.Now()
-	defer glog.V(1).Infof("Finished reconcile replicaset %q (%v)", key, time.Now().Sub(startTime))
+	defer glog.V(4).Infof("Finished reconcile replicaset %q (%v)", key, time.Now().Sub(startTime))
 
 	obj, exists, err := frsc.replicaSetStore.Store.GetByKey(key)
 	if err != nil {
@@ -402,7 +402,7 @@ func (frsc *ReplicaSetController) reconcileReplicaSet(key string) error {
 
 	scheduleResult := frsc.schedule(frs, clusters, current, estimatedCapacity)
 
-	glog.V(1).Infof("Start syncing local replicaset %s: %v", key, scheduleResult)
+	glog.V(4).Infof("Start syncing local replicaset %s: %v", key, scheduleResult)
 
 	fedStatus := extensionsv1.ReplicaSetStatus{ObservedGeneration: frs.Generation}
 	for clusterName, replicas := range scheduleResult {
