@@ -193,6 +193,7 @@ func (b *hostPathMounter) GetAttributes() volume.Attributes {
 		ReadOnly:        b.readOnly,
 		Managed:         false,
 		SupportsSELinux: false,
+		Propagation:     "shared",
 	}
 }
 

@@ -491,8 +491,9 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
+		attr := make([]string, 0, 3)
 		if m.ReadOnly {
-			bind += ":ro"
+			attr = append(attr, "ro")
 		}
 		// Only request relabeling if the pod provides an
 		// SELinux context. If the pod does not provide an
@@ -501,12 +502,14 @@ func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (r
 		// This would restrict access to the volume to the
 		// container which mounts it first.
 		if m.SELinuxRelabel && podHasSELinuxLabel {
-			if m.ReadOnly {
-				bind += ",Z"
-			} else {
-				bind += ":Z"
-			}
-
+			attr = append(attr, "Z")
+		}
+		// Propagation
+		if len(m.Propagation) != 0 {
+			attr = append(attr, m.Propagation)
+		}
+		if len(attr) > 0 {
+			bind = fmt.Sprintf("%s:%s", bind, strings.Join(attr, ","))
 		}
 		result = append(result, bind)
 	}
