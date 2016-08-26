@@ -21,39 +21,49 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/client/unversioned"
+	//"k8s.io/kubernetes/pkg/client/unversioned" // TODO use a clientset
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
 
-func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) error {
+func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Clientset, error) {
 	adminClientConfig, err := clientcmd.NewDefaultClientConfig(
 		*adminConfig,
 		&clientcmd.ConfigOverrides{},
 	).ClientConfig()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	client, err := unversioned.New(adminClientConfig)
+	fmt.Println("configuring the client...")
+
+	client, err := clientset.NewForConfig(adminClientConfig)
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	fmt.Println("polling API server forever...")
+
+	count := 0
 
 	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
 		_, err := client.ComponentStatuses().List(api.ListOptions{})
+		count = count + 1
 		return err == nil, nil
 	})
 
+	fmt.Printf("ok, got API server response after %v half-seconds\n", count)
+
 	cs, err := client.ComponentStatuses().List(api.ListOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	fmt.Printf("ComponentStatuses: %#v", cs.Items)
+	fmt.Printf("ComponentStatuses: %#v\n", cs.Items)
 
 	// TODO check if len(cs.Items) < 3 (or what is it supposed to be)
 	// TODO check if all components are healthy, and wait if they aren't
-	return nil
+	return client, nil
 }

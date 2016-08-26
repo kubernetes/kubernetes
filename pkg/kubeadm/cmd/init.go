@@ -61,11 +61,13 @@ func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Comman
 				}
 			}
 
-			if err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"]); err != nil {
+			client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
+			if err != nil {
 				return err
 			}
-			// TODO: move Jose server into a separate command or static pod or whatever
-			kubemaster.NewDiscoveryEndpoint(params, string(tlsutil.EncodeCertificatePEM(caCert)))
+
+			//kubemaster.NewDiscoveryEndpoint(params, string(tlsutil.EncodeCertificatePEM(caCert)))
+			kubemaster.CreateDiscoveryDeploymentAndSecret(params, client, string(tlsutil.EncodeCertificatePEM(caCert)))
 
 			return nil
 		},
