@@ -1,2 +1,9 @@
 maintainers:
 - rootfs
+
+reviewers:
+ - saad-ali
+ - swagiaal
+ - caesarxuchao
+ - pmorie
+ - thockin

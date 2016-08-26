@@ -1,0 +1,14 @@
+export DOCKER_HOST="172.17.4.99:2376"
+export BUILD_PYTHON_IMAGE=true
+export KUBE_GCE_ZONE=us-east1-b
+export KUBE_GCE_MINION_IMAGE=coreos-alpha-962-0-0-v20160218
+export KUBE_OS_DISTRIBUTION=coreos
+export KUBE_GCE_MINION_PROJECT=coreos-cloud
+export KUBE_GCE_INSTANCE_PREFIX=${USER}-kube-rkt-test
+
+export KUBE_GCE_MASTER_IMAGE=coreos-alpha-962-0-0-v20160218
+export KUBE_GCE_MASTER_PROJECT=coreos-cloud
+
+export KUBE_CONTAINER_RUNTIME=rkt
+export KUBE_ENABLE_NODE_LOGGING=false
+export KUBE_ENABLE_CLUSTER_MONITORING=none

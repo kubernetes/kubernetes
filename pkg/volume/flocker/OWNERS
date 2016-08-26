@@ -1,3 +1,10 @@
 maintainers:
 - agonzalezro
 - simonswine
+
+reviewers:
+ - saad-ali
+ - swagiaal
+ - resouer
+ - pmorie
+ - simonswine

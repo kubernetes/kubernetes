@@ -1,0 +1,7941 @@
+diff --git a/.github/OWNERS b/.github/OWNERS
+new file mode 100644
+index 0000000..90e4c07
+--- /dev/null
++++ b/.github/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - david-mcmahon
++ - asalkeld
++ - tmrts
++ - janetkuo
++ - thockin
+diff --git a/OWNERS b/OWNERS
+index b55c479..c115485 100644
+--- a/OWNERS
++++ b/OWNERS
+@@ -1,7 +1,5 @@
+-assignees:
+-  - bgrant0607
+-  - brendandburns
+-  - dchen1107
+-  - lavalamp
+-  - smarterclayton
+-  - thockin
++
++reviewers:
++ - wojtek-t
++ - gmarek
++ - caesarxuchao
+diff --git a/api/OWNERS b/api/OWNERS
+new file mode 100644
+index 0000000..6862a9c
+--- /dev/null
++++ b/api/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - nikhiljindal
++ - pmorie
+diff --git a/api/swagger-spec/OWNERS b/api/swagger-spec/OWNERS
+new file mode 100644
+index 0000000..6862a9c
+--- /dev/null
++++ b/api/swagger-spec/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - nikhiljindal
++ - pmorie
+diff --git a/build/OWNERS b/build/OWNERS
+index acc600a..a14a968 100644
+--- a/build/OWNERS
++++ b/build/OWNERS
+@@ -1,5 +1,6 @@
+-assignees:
+-  - ihmccreery
+-  - ixdy
+-  - lavalamp
+-  - zmerlynn
++
++reviewers:
++ - thockin
++ - mikedanese
++ - luxas
++ - andyzheng0831
+diff --git a/build/build-image/OWNERS b/build/build-image/OWNERS
+new file mode 100644
+index 0000000..0bd7b5c
+--- /dev/null
++++ b/build/build-image/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - luxas
++ - thockin
++ - ixdy
++ - mfanjie
++ - zmerlynn
++ - smarterclayton
++ - timothysc
+diff --git a/build/build-image/cross/OWNERS b/build/build-image/cross/OWNERS
+new file mode 100644
+index 0000000..4cf9869
+--- /dev/null
++++ b/build/build-image/cross/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - luxas
++ - smarterclayton
++ - timothysc
++ - thockin
+diff --git a/build/debian-iptables/OWNERS b/build/debian-iptables/OWNERS
+new file mode 100644
+index 0000000..e156024
+--- /dev/null
++++ b/build/debian-iptables/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - mikedanese
++ - pmorie
++ - luxas
++ - david-mcmahon
++ - freehan
+diff --git a/build/kube-dns/OWNERS b/build/kube-dns/OWNERS
+index 3e9886c..66105b3 100644
+--- a/build/kube-dns/OWNERS
++++ b/build/kube-dns/OWNERS
+@@ -1,3 +1,5 @@
+-assignees:
+-  - ArtfulCoder
+-  - thockin
++
++reviewers:
++ - girishkalele
++ - ArtfulCoder
++ - nikhiljindal
+diff --git a/build/pause/OWNERS b/build/pause/OWNERS
+new file mode 100644
+index 0000000..3708c23
+--- /dev/null
++++ b/build/pause/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - pmorie
++ - mattmoor
++ - brendandburns
++ - david-mcmahon
++ - uluyol
++ - luxas
+diff --git a/cluster/OWNERS b/cluster/OWNERS
+index a832d50..fc217cb 100644
+--- a/cluster/OWNERS
++++ b/cluster/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - eparis
+-  - mikedanese
+-  - roberthbailey
+-  - zmerlynn
++
++reviewers:
++ - justinsb
++ - andyzheng0831
++ - gmarek
+diff --git a/cluster/addons/OWNERS b/cluster/addons/OWNERS
+new file mode 100644
+index 0000000..8c3654f
+--- /dev/null
++++ b/cluster/addons/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - piosz
++ - bprashanth
++ - mikedanese
+diff --git a/cluster/addons/addon-manager/OWNERS b/cluster/addons/addon-manager/OWNERS
+new file mode 100644
+index 0000000..f179c55
+--- /dev/null
++++ b/cluster/addons/addon-manager/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - mikedanese
++ - luxas
++ - jszczepkowski
++ - bbreslauer
++ - zenly
++ - gmarek
++ - david-mcmahon
+diff --git a/cluster/addons/calico-policy-controller/OWNERS b/cluster/addons/calico-policy-controller/OWNERS
+new file mode 100644
+index 0000000..facd80f
+--- /dev/null
++++ b/cluster/addons/calico-policy-controller/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - matthewdupre
+diff --git a/cluster/addons/cluster-loadbalancing/OWNERS b/cluster/addons/cluster-loadbalancing/OWNERS
+new file mode 100644
+index 0000000..ae35a86
+--- /dev/null
++++ b/cluster/addons/cluster-loadbalancing/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - bprashanth
++ - aknuds1
++ - laushinka
++ - derekparker
+diff --git a/cluster/addons/cluster-monitoring/OWNERS b/cluster/addons/cluster-monitoring/OWNERS
+new file mode 100644
+index 0000000..5ec2226
+--- /dev/null
++++ b/cluster/addons/cluster-monitoring/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - piosz
++ - mwielgus
++ - gmarek
+diff --git a/cluster/addons/dashboard/OWNERS b/cluster/addons/dashboard/OWNERS
+new file mode 100644
+index 0000000..18bbc99
+--- /dev/null
++++ b/cluster/addons/dashboard/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - bryk
++ - luxas
++ - maciaszczykm
+diff --git a/cluster/addons/dns/OWNERS b/cluster/addons/dns/OWNERS
+new file mode 100644
+index 0000000..cd54efa
+--- /dev/null
++++ b/cluster/addons/dns/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - ArtfulCoder
++ - luxas
++ - bprashanth
++ - yuvipanda
++ - thockin
++ - mikedanese
+diff --git a/cluster/addons/etcd-empty-dir-cleanup/OWNERS b/cluster/addons/etcd-empty-dir-cleanup/OWNERS
+new file mode 100644
+index 0000000..9218e43
+--- /dev/null
++++ b/cluster/addons/etcd-empty-dir-cleanup/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mbohlool
+diff --git a/cluster/addons/fluentd-elasticsearch/OWNERS b/cluster/addons/fluentd-elasticsearch/OWNERS
+new file mode 100644
+index 0000000..44366ae
+--- /dev/null
++++ b/cluster/addons/fluentd-elasticsearch/OWNERS
+@@ -0,0 +1,16 @@
++
++reviewers:
++ - pmorie
++ - mattmoor
++ - chrisleck
++ - keontang
++ - mzupan
++ - harryge00
++ - jimmidyson
++ - PiotrProkop
++ - freehan
++ - tmrts
++ - rbuskens
++ - david-mcmahon
++ - gmarek
++ - eparis
+diff --git a/cluster/addons/fluentd-gcp/OWNERS b/cluster/addons/fluentd-gcp/OWNERS
+new file mode 100644
+index 0000000..04a57fd
+--- /dev/null
++++ b/cluster/addons/fluentd-gcp/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - pmorie
++ - david-mcmahon
++ - chrisleck
++ - eparis
++ - rbuskens
+diff --git a/cluster/addons/node-problem-detector/OWNERS b/cluster/addons/node-problem-detector/OWNERS
+new file mode 100644
+index 0000000..e98a9a3
+--- /dev/null
++++ b/cluster/addons/node-problem-detector/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - Random-Liu
+diff --git a/cluster/addons/podsecuritypolicies/OWNERS b/cluster/addons/podsecuritypolicies/OWNERS
+new file mode 100644
+index 0000000..c3dfeca
+--- /dev/null
++++ b/cluster/addons/podsecuritypolicies/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - pweil-
+diff --git a/cluster/addons/python-image/OWNERS b/cluster/addons/python-image/OWNERS
+new file mode 100644
+index 0000000..e8e8fb8
+--- /dev/null
++++ b/cluster/addons/python-image/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - yifan-gu
++ - david-mcmahon
++ - mikedanese
++ - pmorie
+diff --git a/cluster/addons/registry/OWNERS b/cluster/addons/registry/OWNERS
+new file mode 100644
+index 0000000..3ae9ed7
+--- /dev/null
++++ b/cluster/addons/registry/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - freehan
++ - pmorie
++ - david-mcmahon
++ - laushinka
++ - gmarek
++ - thockin
+diff --git a/cluster/aws/OWNERS b/cluster/aws/OWNERS
+new file mode 100644
+index 0000000..ae882c2
+--- /dev/null
++++ b/cluster/aws/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - justinsb
++ - eosrei
++ - spxtr
+diff --git a/cluster/aws/common/OWNERS b/cluster/aws/common/OWNERS
+new file mode 100644
+index 0000000..2d1b863
+--- /dev/null
++++ b/cluster/aws/common/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - justinsb
+diff --git a/cluster/aws/jessie/OWNERS b/cluster/aws/jessie/OWNERS
+new file mode 100644
+index 0000000..29a217e
+--- /dev/null
++++ b/cluster/aws/jessie/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - justinsb
++ - david-mcmahon
+diff --git a/cluster/aws/templates/OWNERS b/cluster/aws/templates/OWNERS
+new file mode 100644
+index 0000000..6490316
+--- /dev/null
++++ b/cluster/aws/templates/OWNERS
+@@ -0,0 +1,12 @@
++
++reviewers:
++ - justinsb
++ - paralin
++ - david-mcmahon
++ - rombie
++ - bigeasy
++ - jsafrane
++ - jvalencia
++ - brendandburns
++ - eosrei
++ - therc
+diff --git a/cluster/aws/wily/OWNERS b/cluster/aws/wily/OWNERS
+new file mode 100644
+index 0000000..9beed85
+--- /dev/null
++++ b/cluster/aws/wily/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - justinsb
++ - david-mcmahon
++ - matthewrudy
+diff --git a/cluster/azure-legacy/OWNERS b/cluster/azure-legacy/OWNERS
+new file mode 100644
+index 0000000..8b287c2
+--- /dev/null
++++ b/cluster/azure-legacy/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - WeixuZhuang
++ - thockin
++ - david-mcmahon
+diff --git a/cluster/azure-legacy/templates/OWNERS b/cluster/azure-legacy/templates/OWNERS
+new file mode 100644
+index 0000000..d5a62b4
+--- /dev/null
++++ b/cluster/azure-legacy/templates/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - WeixuZhuang
++ - david-mcmahon
+diff --git a/cluster/azure/OWNERS b/cluster/azure/OWNERS
+new file mode 100644
+index 0000000..23545b6
+--- /dev/null
++++ b/cluster/azure/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - colemickens
++ - david-mcmahon
++ - mikedanese
++ - ArtfulCoder
++ - pweil-
++ - derekwaynecarr
++ - jlowdermilk
+diff --git a/cluster/centos/OWNERS b/cluster/centos/OWNERS
+new file mode 100644
+index 0000000..d9067d8
+--- /dev/null
++++ b/cluster/centos/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - kevin-wangzefeng
++ - eosrei
++ - timothysc
+diff --git a/cluster/centos/master/OWNERS b/cluster/centos/master/OWNERS
+new file mode 100644
+index 0000000..92fe082
+--- /dev/null
++++ b/cluster/centos/master/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - kevin-wangzefeng
++ - ArtfulCoder
++ - pweil-
++ - timothysc
++ - david-mcmahon
++ - mamikonyana
++ - dalanlan
++ - eosrei
+diff --git a/cluster/centos/node/OWNERS b/cluster/centos/node/OWNERS
+new file mode 100644
+index 0000000..7a447c0
+--- /dev/null
++++ b/cluster/centos/node/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - eosrei
++ - timothysc
++ - david-mcmahon
++ - thockin
++ - jiangyaoguo
++ - kevin-wangzefeng
++ - onorua
++ - ysh7
++ - tmrts
+diff --git a/cluster/gce/OWNERS b/cluster/gce/OWNERS
+new file mode 100644
+index 0000000..b030b2a
+--- /dev/null
++++ b/cluster/gce/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - andyzheng0831
++ - gmarek
++ - zmerlynn
+diff --git a/cluster/gce/coreos/OWNERS b/cluster/gce/coreos/OWNERS
+new file mode 100644
+index 0000000..de8e390
+--- /dev/null
++++ b/cluster/gce/coreos/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - yifan-gu
++ - bryk
++ - jszczepkowski
+diff --git a/cluster/gce/debian/OWNERS b/cluster/gce/debian/OWNERS
+new file mode 100644
+index 0000000..92a9d5f
+--- /dev/null
++++ b/cluster/gce/debian/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - mikedanese
++ - gmarek
++ - dchen1107
++ - wstrange
++ - jszczepkowski
++ - piosz
++ - mbforbes
+diff --git a/cluster/gce/gci/OWNERS b/cluster/gce/gci/OWNERS
+new file mode 100644
+index 0000000..a78d352
+--- /dev/null
++++ b/cluster/gce/gci/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - andyzheng0831
++ - wojtek-t
++ - mwielgus
++ - jszczepkowski
++ - zmerlynn
++ - adityakali
+diff --git a/cluster/gce/trusty/OWNERS b/cluster/gce/trusty/OWNERS
+new file mode 100644
+index 0000000..ecd8e19
+--- /dev/null
++++ b/cluster/gce/trusty/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - andyzheng0831
++ - gmarek
++ - mikedanese
++ - mwielgus
++ - wojtek-t
+diff --git a/cluster/gke/OWNERS b/cluster/gke/OWNERS
+new file mode 100644
+index 0000000..a62110f
+--- /dev/null
++++ b/cluster/gke/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - eosrei
++ - spxtr
++ - jlowdermilk
++ - zmerlynn
++ - roberthbailey
++ - ixdy
++ - nikhiljindal
+diff --git a/cluster/images/OWNERS b/cluster/images/OWNERS
+new file mode 100644
+index 0000000..9089478
+--- /dev/null
++++ b/cluster/images/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - luxas
++ - fgrzadkowski
++ - gmarek
+diff --git a/cluster/images/etcd-empty-dir-cleanup/OWNERS b/cluster/images/etcd-empty-dir-cleanup/OWNERS
+new file mode 100644
+index 0000000..9218e43
+--- /dev/null
++++ b/cluster/images/etcd-empty-dir-cleanup/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mbohlool
+diff --git a/cluster/images/etcd/OWNERS b/cluster/images/etcd/OWNERS
+new file mode 100644
+index 0000000..11c4943
+--- /dev/null
++++ b/cluster/images/etcd/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - luxas
++ - wojtek-t
++ - oszi
++ - pmorie
+diff --git a/cluster/images/flannel/OWNERS b/cluster/images/flannel/OWNERS
+new file mode 100644
+index 0000000..53eab4a
+--- /dev/null
++++ b/cluster/images/flannel/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - luxas
++ - david-mcmahon
++ - thockin
++ - spxtr
+diff --git a/cluster/images/hyperkube/OWNERS b/cluster/images/hyperkube/OWNERS
+new file mode 100644
+index 0000000..41ddeb0
+--- /dev/null
++++ b/cluster/images/hyperkube/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - luxas
++ - fgrzadkowski
++ - bryk
++ - timothysc
+diff --git a/cluster/images/kubelet/OWNERS b/cluster/images/kubelet/OWNERS
+new file mode 100644
+index 0000000..da8815e
+--- /dev/null
++++ b/cluster/images/kubelet/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - david-mcmahon
++ - resouer
+diff --git a/cluster/images/kubemark/OWNERS b/cluster/images/kubemark/OWNERS
+new file mode 100644
+index 0000000..5eb9c7a
+--- /dev/null
++++ b/cluster/images/kubemark/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - gmarek
++ - pmorie
++ - david-mcmahon
+diff --git a/cluster/juju/OWNERS b/cluster/juju/OWNERS
+new file mode 100644
+index 0000000..ed056e2
+--- /dev/null
++++ b/cluster/juju/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - mbruzek
++ - chuckbutler
++ - eosrei
+diff --git a/cluster/juju/bundles/OWNERS b/cluster/juju/bundles/OWNERS
+new file mode 100644
+index 0000000..67e112a
+--- /dev/null
++++ b/cluster/juju/bundles/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - chuckbutler
++ - mbruzek
++ - joe2far
++ - epc
+diff --git a/cluster/juju/layers/OWNERS b/cluster/juju/layers/OWNERS
+new file mode 100644
+index 0000000..5409b42
+--- /dev/null
++++ b/cluster/juju/layers/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - chuckbutler
++ - mbruzek
++ - joe2far
++ - david-mcmahon
++ - mattyw
+diff --git a/cluster/juju/prereqs/OWNERS b/cluster/juju/prereqs/OWNERS
+new file mode 100644
+index 0000000..71373ee
+--- /dev/null
++++ b/cluster/juju/prereqs/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - chuckbutler
+diff --git a/cluster/kubemark/OWNERS b/cluster/kubemark/OWNERS
+new file mode 100644
+index 0000000..c9f0c09
+--- /dev/null
++++ b/cluster/kubemark/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - gmarek
++ - wojtek-t
++ - eosrei
+diff --git a/cluster/lib/OWNERS b/cluster/lib/OWNERS
+new file mode 100644
+index 0000000..f53bfb4
+--- /dev/null
++++ b/cluster/lib/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - fabioy
++ - porridge
++ - spxtr
++ - mikedanese
++ - timstclair
++ - david-mcmahon
+diff --git a/cluster/libvirt-coreos/OWNERS b/cluster/libvirt-coreos/OWNERS
+new file mode 100644
+index 0000000..fd1f89f
+--- /dev/null
++++ b/cluster/libvirt-coreos/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - linzichang
++ - thomasfricke
++ - sdminonne
+diff --git a/cluster/local/OWNERS b/cluster/local/OWNERS
+new file mode 100644
+index 0000000..829730f
+--- /dev/null
++++ b/cluster/local/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - gouyang
++ - david-mcmahon
+diff --git a/cluster/mesos/OWNERS b/cluster/mesos/OWNERS
+new file mode 100644
+index 0000000..2caf910
+--- /dev/null
++++ b/cluster/mesos/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - sttts
++ - karlkfi
++ - jdef
+diff --git a/cluster/mesos/docker/OWNERS b/cluster/mesos/docker/OWNERS
+index 3501154..2caf910 100644
+--- a/cluster/mesos/docker/OWNERS
++++ b/cluster/mesos/docker/OWNERS
+@@ -1,2 +1,5 @@
+-assignees:
+-  - karlkfi
++
++reviewers:
++ - sttts
++ - karlkfi
++ - jdef
+diff --git a/cluster/openstack-heat/OWNERS b/cluster/openstack-heat/OWNERS
+new file mode 100644
+index 0000000..d0a7d7b
+--- /dev/null
++++ b/cluster/openstack-heat/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - elsonrodriguez
++ - cjcullen
++ - david-mcmahon
++ - madhusudancs
++ - ctrlaltdel
++ - zreigz
++ - ohtake
+diff --git a/cluster/openstack-heat/kubernetes-heat/OWNERS b/cluster/openstack-heat/kubernetes-heat/OWNERS
+new file mode 100644
+index 0000000..17eefc8
+--- /dev/null
++++ b/cluster/openstack-heat/kubernetes-heat/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - elsonrodriguez
++ - ohtake
++ - cjcullen
++ - david-mcmahon
++ - madhusudancs
+diff --git a/cluster/photon-controller/OWNERS b/cluster/photon-controller/OWNERS
+new file mode 100644
+index 0000000..2b2d162
+--- /dev/null
++++ b/cluster/photon-controller/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - AlainRoy
++ - MHBauer
++ - rmmh
++ - cjcullen
++ - david-mcmahon
++ - madhusudancs
+diff --git a/cluster/photon-controller/templates/OWNERS b/cluster/photon-controller/templates/OWNERS
+new file mode 100644
+index 0000000..ecde466
+--- /dev/null
++++ b/cluster/photon-controller/templates/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - AlainRoy
++ - cjcullen
++ - david-mcmahon
++ - madhusudancs
+diff --git a/cluster/rackspace/OWNERS b/cluster/rackspace/OWNERS
+new file mode 100644
+index 0000000..1af706c
+--- /dev/null
++++ b/cluster/rackspace/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - jlowdermilk
++ - zhengguoyong
++ - onorua
++ - spxtr
++ - mamikonyana
++ - jiangyaoguo
++ - eosrei
++ - david-mcmahon
+diff --git a/cluster/rackspace/cloud-config/OWNERS b/cluster/rackspace/cloud-config/OWNERS
+new file mode 100644
+index 0000000..72555e6
+--- /dev/null
++++ b/cluster/rackspace/cloud-config/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - onorua
++ - mamikonyana
++ - jiangyaoguo
++ - zhengguoyong
+diff --git a/cluster/saltbase/OWNERS b/cluster/saltbase/OWNERS
+new file mode 100644
+index 0000000..0f39a9a
+--- /dev/null
++++ b/cluster/saltbase/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - bprashanth
++ - mikedanese
++ - justinsb
+diff --git a/cluster/saltbase/pillar/OWNERS b/cluster/saltbase/pillar/OWNERS
+new file mode 100644
+index 0000000..fff6c7d
+--- /dev/null
++++ b/cluster/saltbase/pillar/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - justinsb
++ - mikedanese
++ - yehuis4
++ - ArtfulCoder
+diff --git a/cluster/saltbase/salt/OWNERS b/cluster/saltbase/salt/OWNERS
+new file mode 100644
+index 0000000..5fd2f27
+--- /dev/null
++++ b/cluster/saltbase/salt/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - bprashanth
++ - justinsb
++ - mikedanese
+diff --git a/cluster/skeleton/OWNERS b/cluster/skeleton/OWNERS
+new file mode 100644
+index 0000000..6e886c0
+--- /dev/null
++++ b/cluster/skeleton/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - aaronlevy
+diff --git a/cluster/ubuntu/OWNERS b/cluster/ubuntu/OWNERS
+new file mode 100644
+index 0000000..f542673
+--- /dev/null
++++ b/cluster/ubuntu/OWNERS
+@@ -0,0 +1,12 @@
++
++reviewers:
++ - dalanlan
++ - MikeSpreitzer
++ - robdaemon
++ - kevin-wangzefeng
++ - jlowdermilk
++ - jcrugzz
++ - derekwaynecarr
++ - ZhangZhenhua
++ - zhengguoyong
++ - resouer
+diff --git a/cluster/ubuntu/master-flannel/OWNERS b/cluster/ubuntu/master-flannel/OWNERS
+new file mode 100644
+index 0000000..e38de0a
+--- /dev/null
++++ b/cluster/ubuntu/master-flannel/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - MikeSpreitzer
++ - CodeJuan
+diff --git a/cluster/ubuntu/master/OWNERS b/cluster/ubuntu/master/OWNERS
+new file mode 100644
+index 0000000..53c9ac2
+--- /dev/null
++++ b/cluster/ubuntu/master/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - CodeJuan
++ - MikeSpreitzer
++ - dalanlan
++ - darron
+diff --git a/cluster/ubuntu/minion-flannel/OWNERS b/cluster/ubuntu/minion-flannel/OWNERS
+new file mode 100644
+index 0000000..e38de0a
+--- /dev/null
++++ b/cluster/ubuntu/minion-flannel/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - MikeSpreitzer
++ - CodeJuan
+diff --git a/cluster/ubuntu/minion/OWNERS b/cluster/ubuntu/minion/OWNERS
+new file mode 100644
+index 0000000..f1691a8
+--- /dev/null
++++ b/cluster/ubuntu/minion/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - dalanlan
++ - CodeJuan
++ - MikeSpreitzer
++ - jfchevrette
+diff --git a/cluster/vagrant/OWNERS b/cluster/vagrant/OWNERS
+index 6b9dd4b..12957a8 100644
+--- a/cluster/vagrant/OWNERS
++++ b/cluster/vagrant/OWNERS
+@@ -1,2 +1,5 @@
+-assignees:
+-  - derekwaynecarr
++
++reviewers:
++ - derekwaynecarr
++ - eosrei
++ - olivierlemasle
+diff --git a/cluster/vsphere/OWNERS b/cluster/vsphere/OWNERS
+new file mode 100644
+index 0000000..0fb2690
+--- /dev/null
++++ b/cluster/vsphere/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - eosrei
++ - imkin
++ - jlowdermilk
+diff --git a/cluster/vsphere/templates/OWNERS b/cluster/vsphere/templates/OWNERS
+new file mode 100644
+index 0000000..b2cbb71
+--- /dev/null
++++ b/cluster/vsphere/templates/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - imkin
++ - madhusudancs
++ - AlainRoy
++ - eosrei
++ - jsafrane
++ - cjcullen
++ - david-mcmahon
+diff --git a/cmd/OWNERS b/cmd/OWNERS
+index 03ca52f..642d0d7 100644
+--- a/cmd/OWNERS
++++ b/cmd/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - dchen1107
+-  - lavalamp
+-  - mikedanese
+-  - thockin
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - smarterclayton
+diff --git a/cmd/gendocs/OWNERS b/cmd/gendocs/OWNERS
+new file mode 100644
+index 0000000..a7f7289
+--- /dev/null
++++ b/cmd/gendocs/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - sttts
++ - nagarjung
+diff --git a/cmd/genkubedocs/OWNERS b/cmd/genkubedocs/OWNERS
+new file mode 100644
+index 0000000..cf6d1b6
+--- /dev/null
++++ b/cmd/genkubedocs/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - david-mcmahon
++ - sttts
++ - zhengguoyong
++ - feiskyer
+diff --git a/cmd/genman/OWNERS b/cmd/genman/OWNERS
+new file mode 100644
+index 0000000..8718f01
+--- /dev/null
++++ b/cmd/genman/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - nagarjung
++ - feihujiang
++ - david-mcmahon
+diff --git a/cmd/genswaggertypedocs/OWNERS b/cmd/genswaggertypedocs/OWNERS
+new file mode 100644
+index 0000000..8654d4b
+--- /dev/null
++++ b/cmd/genswaggertypedocs/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - mqliang
++ - andronat
++ - luxas
++ - david-mcmahon
+diff --git a/cmd/genutils/OWNERS b/cmd/genutils/OWNERS
+new file mode 100644
+index 0000000..105bd9c
+--- /dev/null
++++ b/cmd/genutils/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - david-mcmahon
+diff --git a/cmd/genyaml/OWNERS b/cmd/genyaml/OWNERS
+new file mode 100644
+index 0000000..ecb3388
+--- /dev/null
++++ b/cmd/genyaml/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - tyangliu
+diff --git a/cmd/hyperkube/OWNERS b/cmd/hyperkube/OWNERS
+new file mode 100644
+index 0000000..1b6107b
+--- /dev/null
++++ b/cmd/hyperkube/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - smarterclayton
++ - ncdc
++ - colhom
++ - liubin
+diff --git a/cmd/kube-apiserver/OWNERS b/cmd/kube-apiserver/OWNERS
+index c5bdda2..e26b2ae 100644
+--- a/cmd/kube-apiserver/OWNERS
++++ b/cmd/kube-apiserver/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - lavalamp
+-  - smarterclayton
+-  - nikhiljindal
+-  - krousey
++
++reviewers:
++ - caesarxuchao
++ - nikhiljindal
++ - smarterclayton
+diff --git a/cmd/kube-apiserver/app/OWNERS b/cmd/kube-apiserver/app/OWNERS
+new file mode 100644
+index 0000000..e26b2ae
+--- /dev/null
++++ b/cmd/kube-apiserver/app/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - nikhiljindal
++ - smarterclayton
+diff --git a/cmd/kube-controller-manager/OWNERS b/cmd/kube-controller-manager/OWNERS
+index 0b03cfd..23ac3c0 100644
+--- a/cmd/kube-controller-manager/OWNERS
++++ b/cmd/kube-controller-manager/OWNERS
+@@ -1,3 +1,6 @@
+-assignees:
+-  - lavalamp
+-  - mikedanese
++
++reviewers:
++ - caesarxuchao
++ - jsafrane
++ - gmarek
++ - mikedanese
+diff --git a/cmd/kube-controller-manager/app/OWNERS b/cmd/kube-controller-manager/app/OWNERS
+new file mode 100644
+index 0000000..f293d44
+--- /dev/null
++++ b/cmd/kube-controller-manager/app/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - caesarxuchao
++ - jsafrane
++ - mikedanese
++ - gmarek
+diff --git a/cmd/kube-dns/OWNERS b/cmd/kube-dns/OWNERS
+new file mode 100644
+index 0000000..db5b6e7
+--- /dev/null
++++ b/cmd/kube-dns/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - ArtfulCoder
++ - mml
++ - madhusudancs
+diff --git a/cmd/kube-dns/app/OWNERS b/cmd/kube-dns/app/OWNERS
+new file mode 100644
+index 0000000..cff62c6
+--- /dev/null
++++ b/cmd/kube-dns/app/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - ArtfulCoder
++ - madhusudancs
++ - mml
+diff --git a/cmd/kube-proxy/OWNERS b/cmd/kube-proxy/OWNERS
+new file mode 100644
+index 0000000..ca83ff3
+--- /dev/null
++++ b/cmd/kube-proxy/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - thockin
++ - aveshagarwal
++ - smarterclayton
++ - mikedanese
+diff --git a/cmd/kube-proxy/app/OWNERS b/cmd/kube-proxy/app/OWNERS
+new file mode 100644
+index 0000000..e05f702
+--- /dev/null
++++ b/cmd/kube-proxy/app/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - thockin
++ - aveshagarwal
++ - mikedanese
++ - smarterclayton
+diff --git a/cmd/kubectl/OWNERS b/cmd/kubectl/OWNERS
+new file mode 100644
+index 0000000..6dd3e38
+--- /dev/null
++++ b/cmd/kubectl/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - ncdc
++ - sttts
++ - luxas
++ - david-mcmahon
++ - colhom
++ - brendandburns
+diff --git a/cmd/kubectl/app/OWNERS b/cmd/kubectl/app/OWNERS
+new file mode 100644
+index 0000000..6b7eeed
+--- /dev/null
++++ b/cmd/kubectl/app/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - ncdc
++ - brendandburns
++ - sttts
++ - david-mcmahon
++ - colhom
+diff --git a/cmd/kubelet/OWNERS b/cmd/kubelet/OWNERS
+index c0b8d3a..9bb5d9e 100644
+--- a/cmd/kubelet/OWNERS
++++ b/cmd/kubelet/OWNERS
+@@ -1,4 +1,6 @@
+-assignees:
+-  - dchen1107
+-  - vishh
+-  - yujuhong
++
++reviewers:
++ - derekwaynecarr
++ - caesarxuchao
++ - vishh
++ - bprashanth
+diff --git a/cmd/kubelet/app/OWNERS b/cmd/kubelet/app/OWNERS
+new file mode 100644
+index 0000000..61421ea
+--- /dev/null
++++ b/cmd/kubelet/app/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - derekwaynecarr
++ - bprashanth
++ - caesarxuchao
++ - vishh
+diff --git a/cmd/kubemark/OWNERS b/cmd/kubemark/OWNERS
+new file mode 100644
+index 0000000..47be53e
+--- /dev/null
++++ b/cmd/kubemark/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - gmarek
++ - caesarxuchao
++ - wojtek-t
+diff --git a/cmd/kubernetes-discovery/OWNERS b/cmd/kubernetes-discovery/OWNERS
+new file mode 100644
+index 0000000..5c8e1e5
+--- /dev/null
++++ b/cmd/kubernetes-discovery/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - nikhiljindal
++ - timothysc
++ - dims
++ - nebril
++ - david-mcmahon
+diff --git a/cmd/kubernetes-discovery/discoverysummarizer/OWNERS b/cmd/kubernetes-discovery/discoverysummarizer/OWNERS
+new file mode 100644
+index 0000000..dfbc4fc
+--- /dev/null
++++ b/cmd/kubernetes-discovery/discoverysummarizer/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - timothysc
++ - dims
++ - nebril
++ - david-mcmahon
++ - nikhiljindal
+diff --git a/cmd/libs/OWNERS b/cmd/libs/OWNERS
+new file mode 100644
+index 0000000..2b545ba
+--- /dev/null
++++ b/cmd/libs/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - smarterclayton
++ - thockin
+diff --git a/cmd/libs/go2idl/OWNERS b/cmd/libs/go2idl/OWNERS
+index 9ec923f..d257541 100644
+--- a/cmd/libs/go2idl/OWNERS
++++ b/cmd/libs/go2idl/OWNERS
+@@ -1,3 +1,6 @@
+-assignees:
+-  - lavalamp
+-  - wojtek-t
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - thockin
++ - smarterclayton
+diff --git a/cmd/linkcheck/OWNERS b/cmd/linkcheck/OWNERS
+new file mode 100644
+index 0000000..2fdbe2a
+--- /dev/null
++++ b/cmd/linkcheck/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - caesarxuchao
++ - nagarjung
+diff --git a/cmd/mungedocs/OWNERS b/cmd/mungedocs/OWNERS
+new file mode 100644
+index 0000000..dea9b19
+--- /dev/null
++++ b/cmd/mungedocs/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - erictune
++ - thockin
+diff --git a/cmd/mungedocs/testdata/OWNERS b/cmd/mungedocs/testdata/OWNERS
+new file mode 100644
+index 0000000..386f3c4
+--- /dev/null
++++ b/cmd/mungedocs/testdata/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - erictune
+diff --git a/contrib/OWNERS b/contrib/OWNERS
+new file mode 100644
+index 0000000..8ca0955
+--- /dev/null
++++ b/contrib/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - sttts
++ - jdef
++ - smarterclayton
++ - wojtek-t
+diff --git a/contrib/mesos/OWNERS b/contrib/mesos/OWNERS
+index 7cdb4cd..fb2dd66 100644
+--- a/contrib/mesos/OWNERS
++++ b/contrib/mesos/OWNERS
+@@ -1,3 +1,5 @@
+-assignees:
+-  - jdef
+-  - karlkfi
++
++reviewers:
++ - sttts
++ - jdef
++ - wojtek-t
+diff --git a/docs/OWNERS b/docs/OWNERS
+index 1c719a4..4af93b7 100644
+--- a/docs/OWNERS
++++ b/docs/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - bgrant0607
+-  - brendandburns
+-  - smarterclayton
+-  - thockin
++
++reviewers:
++ - caesarxuchao
++ - janetkuo
++ - derekwaynecarr
+diff --git a/docs/admin/OWNERS b/docs/admin/OWNERS
+new file mode 100644
+index 0000000..f7020da
+--- /dev/null
++++ b/docs/admin/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - mikedanese
++ - derekwaynecarr
++ - nikhiljindal
++ - caesarxuchao
+diff --git a/docs/admin/high-availability/OWNERS b/docs/admin/high-availability/OWNERS
+new file mode 100644
+index 0000000..2b23514
+--- /dev/null
++++ b/docs/admin/high-availability/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - pweil-
++ - derekwaynecarr
++ - timothysc
++ - mikedanese
++ - ArtfulCoder
+diff --git a/docs/admin/limitrange/OWNERS b/docs/admin/limitrange/OWNERS
+new file mode 100644
+index 0000000..86559b9
+--- /dev/null
++++ b/docs/admin/limitrange/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - dchen1107
++ - caesarxuchao
++ - derekwaynecarr
++ - thockin
++ - HaiyangDING
++ - joe2far
+diff --git a/docs/admin/namespaces/OWNERS b/docs/admin/namespaces/OWNERS
+new file mode 100644
+index 0000000..11321f4
+--- /dev/null
++++ b/docs/admin/namespaces/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - zhengguoyong
++ - clasohm
++ - joe2far
++ - dchen1107
++ - caesarxuchao
++ - thockin
+diff --git a/docs/admin/resourcequota/OWNERS b/docs/admin/resourcequota/OWNERS
+new file mode 100644
+index 0000000..6ed6397
+--- /dev/null
++++ b/docs/admin/resourcequota/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - derekwaynecarr
+diff --git a/docs/api-reference/OWNERS b/docs/api-reference/OWNERS
+new file mode 100644
+index 0000000..293ebcc
+--- /dev/null
++++ b/docs/api-reference/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - pmorie
++ - nikhiljindal
+diff --git a/docs/api-reference/autoscaling/OWNERS b/docs/api-reference/autoscaling/OWNERS
+new file mode 100644
+index 0000000..db3f9af
+--- /dev/null
++++ b/docs/api-reference/autoscaling/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - gmarek
++ - smarterclayton
+diff --git a/docs/api-reference/batch/OWNERS b/docs/api-reference/batch/OWNERS
+new file mode 100644
+index 0000000..063083d
+--- /dev/null
++++ b/docs/api-reference/batch/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - smarterclayton
++ - gmarek
+diff --git a/docs/api-reference/certificates/OWNERS b/docs/api-reference/certificates/OWNERS
+new file mode 100644
+index 0000000..ff0e60a
+--- /dev/null
++++ b/docs/api-reference/certificates/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - caesarxuchao
++ - mbohlool
++ - gtank
++ - mikedanese
+diff --git a/docs/api-reference/extensions/OWNERS b/docs/api-reference/extensions/OWNERS
+new file mode 100644
+index 0000000..37e7422
+--- /dev/null
++++ b/docs/api-reference/extensions/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - pmorie
++ - smarterclayton
+diff --git a/docs/api-reference/v1/OWNERS b/docs/api-reference/v1/OWNERS
+new file mode 100644
+index 0000000..37e7422
+--- /dev/null
++++ b/docs/api-reference/v1/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - pmorie
++ - smarterclayton
+diff --git a/docs/design/OWNERS b/docs/design/OWNERS
+new file mode 100644
+index 0000000..5ab7ab6
+--- /dev/null
++++ b/docs/design/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - davidopp
++ - justinsb
++ - david-mcmahon
++ - erictune
+diff --git a/docs/design/clustering/OWNERS b/docs/design/clustering/OWNERS
+new file mode 100644
+index 0000000..601517f
+--- /dev/null
++++ b/docs/design/clustering/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - caesarxuchao
++ - joe2far
++ - dchen1107
++ - mikebrow
++ - laushinka
++ - thockin
+diff --git a/docs/devel/OWNERS b/docs/devel/OWNERS
+new file mode 100644
+index 0000000..2d4a46c
+--- /dev/null
++++ b/docs/devel/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - thockin
++ - david-mcmahon
++ - caesarxuchao
+diff --git a/docs/devel/developer-guides/OWNERS b/docs/devel/developer-guides/OWNERS
+new file mode 100644
+index 0000000..5eb6a5f
+--- /dev/null
++++ b/docs/devel/developer-guides/OWNERS
+@@ -0,0 +1,13 @@
++
++reviewers:
++ - eosrei
++ - david-mcmahon
++ - joe2far
++ - ivan4th
++ - derekwaynecarr
++ - lixiaobing10051267
++ - mikebrow
++ - spxtr
++ - dchen1107
++ - thockin
++ - caesarxuchao
+diff --git a/docs/devel/gubernator-images/OWNERS b/docs/devel/gubernator-images/OWNERS
+new file mode 100644
+index 0000000..b5b672f
+--- /dev/null
++++ b/docs/devel/gubernator-images/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mnshaw
+diff --git a/docs/devel/local-cluster/OWNERS b/docs/devel/local-cluster/OWNERS
+new file mode 100644
+index 0000000..2f6e9e6
+--- /dev/null
++++ b/docs/devel/local-cluster/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - pwittrock
+diff --git a/docs/getting-started-guides/OWNERS b/docs/getting-started-guides/OWNERS
+new file mode 100644
+index 0000000..1d49da1
+--- /dev/null
++++ b/docs/getting-started-guides/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dalanlan
++ - fgrzadkowski
++ - freedev
+diff --git a/docs/getting-started-guides/centos/OWNERS b/docs/getting-started-guides/centos/OWNERS
+new file mode 100644
+index 0000000..8cc10dc
+--- /dev/null
++++ b/docs/getting-started-guides/centos/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - caesarxuchao
++ - joe2far
++ - dchen1107
++ - kolyshkin
++ - thockin
++ - JorgenG
++ - kennethkalmer
+diff --git a/docs/getting-started-guides/coreos/OWNERS b/docs/getting-started-guides/coreos/OWNERS
+new file mode 100644
+index 0000000..c759f8f
+--- /dev/null
++++ b/docs/getting-started-guides/coreos/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - freedev
++ - david-mcmahon
++ - eparis
++ - errordeveloper
+diff --git a/docs/getting-started-guides/fedora/OWNERS b/docs/getting-started-guides/fedora/OWNERS
+new file mode 100644
+index 0000000..4f32d32
+--- /dev/null
++++ b/docs/getting-started-guides/fedora/OWNERS
+@@ -0,0 +1,14 @@
++
++reviewers:
++ - david-mcmahon
++ - jijun2
++ - eparis
++ - thockin
++ - hw-qiaolei
++ - aveshagarwal
++ - joe2far
++ - caesarxuchao
++ - sroze
++ - alexhersh
++ - dchen1107
++ - caseydavenport
+diff --git a/docs/getting-started-guides/mesos/OWNERS b/docs/getting-started-guides/mesos/OWNERS
+index 7cdb4cd..d1bf196 100644
+--- a/docs/getting-started-guides/mesos/OWNERS
++++ b/docs/getting-started-guides/mesos/OWNERS
+@@ -1,3 +1,3 @@
+-assignees:
+-  - jdef
+-  - karlkfi
++
++reviewers:
++ - eparis
+diff --git a/docs/getting-started-guides/rkt/OWNERS b/docs/getting-started-guides/rkt/OWNERS
+new file mode 100644
+index 0000000..b66e422
+--- /dev/null
++++ b/docs/getting-started-guides/rkt/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - joshix
++ - yifan-gu
++ - david-mcmahon
+diff --git a/docs/images/OWNERS b/docs/images/OWNERS
+new file mode 100644
+index 0000000..105bd9c
+--- /dev/null
++++ b/docs/images/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - david-mcmahon
+diff --git a/docs/man/OWNERS b/docs/man/OWNERS
+new file mode 100644
+index 0000000..f039911
+--- /dev/null
++++ b/docs/man/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - janetkuo
++ - hurf
++ - brendandburns
+diff --git a/docs/man/man1/OWNERS b/docs/man/man1/OWNERS
+new file mode 100644
+index 0000000..f039911
+--- /dev/null
++++ b/docs/man/man1/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - janetkuo
++ - hurf
++ - brendandburns
+diff --git a/docs/proposals/OWNERS b/docs/proposals/OWNERS
+new file mode 100644
+index 0000000..9f845b4
+--- /dev/null
++++ b/docs/proposals/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - derekwaynecarr
++ - pmorie
++ - timstclair
+diff --git a/docs/user-guide/OWNERS b/docs/user-guide/OWNERS
+new file mode 100644
+index 0000000..192f421
+--- /dev/null
++++ b/docs/user-guide/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - janetkuo
++ - feihujiang
++ - erictune
+diff --git a/docs/user-guide/configmap/OWNERS b/docs/user-guide/configmap/OWNERS
+new file mode 100644
+index 0000000..d5c3f24
+--- /dev/null
++++ b/docs/user-guide/configmap/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - eparis
+diff --git a/docs/user-guide/downward-api/OWNERS b/docs/user-guide/downward-api/OWNERS
+new file mode 100644
+index 0000000..c96b1ef
+--- /dev/null
++++ b/docs/user-guide/downward-api/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - dchen1107
++ - caesarxuchao
++ - thockin
++ - sdminonne
++ - joe2far
+diff --git a/docs/user-guide/environment-guide/OWNERS b/docs/user-guide/environment-guide/OWNERS
+new file mode 100644
+index 0000000..2eb7406
+--- /dev/null
++++ b/docs/user-guide/environment-guide/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - dchen1107
++ - pmorie
++ - caesarxuchao
++ - thockin
++ - epc
++ - joe2far
+diff --git a/docs/user-guide/horizontal-pod-autoscaling/OWNERS b/docs/user-guide/horizontal-pod-autoscaling/OWNERS
+new file mode 100644
+index 0000000..e04580b
+--- /dev/null
++++ b/docs/user-guide/horizontal-pod-autoscaling/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - jszczepkowski
++ - david-mcmahon
++ - janetkuo
++ - eparis
+diff --git a/docs/user-guide/kubectl/OWNERS b/docs/user-guide/kubectl/OWNERS
+new file mode 100644
+index 0000000..c3fa195
+--- /dev/null
++++ b/docs/user-guide/kubectl/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - janetkuo
++ - feihujiang
++ - hurf
++ - brendandburns
+diff --git a/docs/user-guide/liveness/OWNERS b/docs/user-guide/liveness/OWNERS
+new file mode 100644
+index 0000000..d5c3f24
+--- /dev/null
++++ b/docs/user-guide/liveness/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - eparis
+diff --git a/docs/user-guide/logging-demo/OWNERS b/docs/user-guide/logging-demo/OWNERS
+new file mode 100644
+index 0000000..d9a7a39
+--- /dev/null
++++ b/docs/user-guide/logging-demo/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - caesarxuchao
++ - thockin
++ - joe2far
++ - dchen1107
++ - pmorie
++ - mamikonyana
+diff --git a/docs/user-guide/node-selection/OWNERS b/docs/user-guide/node-selection/OWNERS
+new file mode 100644
+index 0000000..b925069
+--- /dev/null
++++ b/docs/user-guide/node-selection/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - eparis
++ - david-mcmahon
++ - kevin-wangzefeng
+diff --git a/docs/user-guide/persistent-volumes/OWNERS b/docs/user-guide/persistent-volumes/OWNERS
+new file mode 100644
+index 0000000..a9eb7d7
+--- /dev/null
++++ b/docs/user-guide/persistent-volumes/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - dchen1107
++ - caesarxuchao
++ - thockin
++ - joe2far
++ - goltermann
++ - fabioy
++ - fwalker
+diff --git a/docs/user-guide/replicaset/OWNERS b/docs/user-guide/replicaset/OWNERS
+new file mode 100644
+index 0000000..a493f57
+--- /dev/null
++++ b/docs/user-guide/replicaset/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - madhusudancs
+diff --git a/docs/user-guide/resourcequota/OWNERS b/docs/user-guide/resourcequota/OWNERS
+new file mode 100644
+index 0000000..9b8c42b
+--- /dev/null
++++ b/docs/user-guide/resourcequota/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - derekwaynecarr
++ - eparis
+diff --git a/docs/user-guide/secrets/OWNERS b/docs/user-guide/secrets/OWNERS
+new file mode 100644
+index 0000000..7bdaa89
+--- /dev/null
++++ b/docs/user-guide/secrets/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - caesarxuchao
++ - thockin
++ - joe2far
++ - dchen1107
++ - pmorie
+diff --git a/docs/user-guide/update-demo/OWNERS b/docs/user-guide/update-demo/OWNERS
+new file mode 100644
+index 0000000..8ff8d01
+--- /dev/null
++++ b/docs/user-guide/update-demo/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - eparis
++ - pmorie
++ - caesarxuchao
++ - thockin
++ - janetkuo
++ - joe2far
++ - dchen1107
+diff --git a/docs/user-guide/walkthrough/OWNERS b/docs/user-guide/walkthrough/OWNERS
+new file mode 100644
+index 0000000..a684fa8
+--- /dev/null
++++ b/docs/user-guide/walkthrough/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - eparis
++ - jijun2
++ - david-mcmahon
+diff --git a/docs/yaml/OWNERS b/docs/yaml/OWNERS
+new file mode 100644
+index 0000000..ac6e4ff
+--- /dev/null
++++ b/docs/yaml/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - janetkuo
++ - tyangliu
++ - AdoHe
++ - sttts
++ - brendandburns
+diff --git a/docs/yaml/kubectl/OWNERS b/docs/yaml/kubectl/OWNERS
+new file mode 100644
+index 0000000..d844e76
+--- /dev/null
++++ b/docs/yaml/kubectl/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - janetkuo
++ - AdoHe
++ - tyangliu
++ - sttts
++ - brendandburns
+diff --git a/examples/OWNERS b/examples/OWNERS
+index 3dacd67..4100736 100644
+--- a/examples/OWNERS
++++ b/examples/OWNERS
+@@ -1,5 +1,7 @@
+-assignees:
+-  - bgrant0607
+-  - brendandburns
+-  - thockin
+-  - zmerlynn
++
++reviewers:
++ - nikhiljindal
++ - zmerlynn
++ - chrislovecnm
++ - thockin
++ - caesarxuchao
+diff --git a/examples/apiserver/OWNERS b/examples/apiserver/OWNERS
+new file mode 100644
+index 0000000..8e98303
+--- /dev/null
++++ b/examples/apiserver/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - nikhiljindal
++ - david-mcmahon
++ - smarterclayton
++ - hongchaodeng
+diff --git a/examples/apiserver/rest/OWNERS b/examples/apiserver/rest/OWNERS
+new file mode 100644
+index 0000000..fe2d278
+--- /dev/null
++++ b/examples/apiserver/rest/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - hongchaodeng
++ - caesarxuchao
++ - david-mcmahon
++ - thockin
++ - timothysc
++ - nikhiljindal
++ - wojtek-t
+diff --git a/examples/apiserver/server/OWNERS b/examples/apiserver/server/OWNERS
+new file mode 100644
+index 0000000..1fc10b4
+--- /dev/null
++++ b/examples/apiserver/server/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - nikhiljindal
++ - mksalawa
++ - david-mcmahon
+diff --git a/examples/celery-rabbitmq/OWNERS b/examples/celery-rabbitmq/OWNERS
+new file mode 100644
+index 0000000..cd7d1a6
+--- /dev/null
++++ b/examples/celery-rabbitmq/OWNERS
+@@ -0,0 +1,12 @@
++
++reviewers:
++ - david-mcmahon
++ - luxas
++ - thockin
++ - dchen1107
++ - eosrei
++ - caesarxuchao
++ - clasohm
++ - linzichang
++ - joe2far
++ - pmorie
+diff --git a/examples/celery-rabbitmq/celery-app-add/OWNERS b/examples/celery-rabbitmq/celery-app-add/OWNERS
+new file mode 100644
+index 0000000..43393e9
+--- /dev/null
++++ b/examples/celery-rabbitmq/celery-app-add/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
+diff --git a/examples/celery-rabbitmq/flower/OWNERS b/examples/celery-rabbitmq/flower/OWNERS
+new file mode 100644
+index 0000000..43393e9
+--- /dev/null
++++ b/examples/celery-rabbitmq/flower/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
+diff --git a/examples/cluster-dns/OWNERS b/examples/cluster-dns/OWNERS
+new file mode 100644
+index 0000000..b5d3769
+--- /dev/null
++++ b/examples/cluster-dns/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - sttts
++ - pmorie
+diff --git a/examples/cluster-dns/images/OWNERS b/examples/cluster-dns/images/OWNERS
+new file mode 100644
+index 0000000..e4b8eba
+--- /dev/null
++++ b/examples/cluster-dns/images/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - sttts
++ - david-mcmahon
+diff --git a/examples/cockroachdb/OWNERS b/examples/cockroachdb/OWNERS
+new file mode 100644
+index 0000000..f3a40d2
+--- /dev/null
++++ b/examples/cockroachdb/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - tschottdorf
+diff --git a/examples/elasticsearch/OWNERS b/examples/elasticsearch/OWNERS
+new file mode 100644
+index 0000000..f2d1b41
+--- /dev/null
++++ b/examples/elasticsearch/OWNERS
+@@ -0,0 +1,13 @@
++
++reviewers:
++ - david-mcmahon
++ - tmrts
++ - koep
++ - dchen1107
++ - thockin
++ - linzichang
++ - pires
++ - joe2far
++ - freehan
++ - caesarxuchao
++ - shaunparker
+diff --git a/examples/elasticsearch/production_cluster/OWNERS b/examples/elasticsearch/production_cluster/OWNERS
+new file mode 100644
+index 0000000..eb321f2
+--- /dev/null
++++ b/examples/elasticsearch/production_cluster/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - koep
++ - dchen1107
++ - caesarxuchao
++ - thockin
++ - linzichang
++ - pires
++ - joe2far
+diff --git a/examples/experimental/OWNERS b/examples/experimental/OWNERS
+new file mode 100644
+index 0000000..bfc796d
+--- /dev/null
++++ b/examples/experimental/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - caesarxuchao
++ - david-mcmahon
++ - jsafrane
++ - joe2far
++ - nikhiljindal
++ - foxish
++ - dchen1107
++ - markturansky
++ - jszczepkowski
+diff --git a/examples/experimental/persistent-volume-provisioning/OWNERS b/examples/experimental/persistent-volume-provisioning/OWNERS
+new file mode 100644
+index 0000000..fd990b3
+--- /dev/null
++++ b/examples/experimental/persistent-volume-provisioning/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - david-mcmahon
++ - joe2far
++ - foxish
++ - dchen1107
++ - caesarxuchao
++ - markturansky
++ - jsafrane
+diff --git a/examples/explorer/OWNERS b/examples/explorer/OWNERS
+new file mode 100644
+index 0000000..6f644f5
+--- /dev/null
++++ b/examples/explorer/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - jijun2
+diff --git a/examples/guestbook-go/OWNERS b/examples/guestbook-go/OWNERS
+new file mode 100644
+index 0000000..54fd0c5
+--- /dev/null
++++ b/examples/guestbook-go/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - luebken
++ - david-mcmahon
++ - philips
+diff --git a/examples/guestbook/OWNERS b/examples/guestbook/OWNERS
+new file mode 100644
+index 0000000..191fb75
+--- /dev/null
++++ b/examples/guestbook/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - amygdala
++ - david-mcmahon
++ - linzichang
++ - gertipoppel
+diff --git a/examples/guestbook/all-in-one/OWNERS b/examples/guestbook/all-in-one/OWNERS
+new file mode 100644
+index 0000000..99fe006
+--- /dev/null
++++ b/examples/guestbook/all-in-one/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - janetkuo
++ - fejta
++ - linzichang
++ - amygdala
+diff --git a/examples/guestbook/legacy/OWNERS b/examples/guestbook/legacy/OWNERS
+new file mode 100644
+index 0000000..a1a1671
+--- /dev/null
++++ b/examples/guestbook/legacy/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - janetkuo
+diff --git a/examples/guestbook/php-redis/OWNERS b/examples/guestbook/php-redis/OWNERS
+new file mode 100644
+index 0000000..afe7902
+--- /dev/null
++++ b/examples/guestbook/php-redis/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - amygdala
++ - david-mcmahon
++ - alban
++ - pmorie
+diff --git a/examples/guestbook/redis-slave/OWNERS b/examples/guestbook/redis-slave/OWNERS
+new file mode 100644
+index 0000000..5887970
+--- /dev/null
++++ b/examples/guestbook/redis-slave/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - amygdala
+diff --git a/examples/https-nginx/OWNERS b/examples/https-nginx/OWNERS
+new file mode 100644
+index 0000000..9d8cda2
+--- /dev/null
++++ b/examples/https-nginx/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - david-mcmahon
++ - caesarxuchao
++ - pmorie
++ - thockin
+diff --git a/examples/javaee/OWNERS b/examples/javaee/OWNERS
+new file mode 100644
+index 0000000..e0a263a
+--- /dev/null
++++ b/examples/javaee/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - arun-gupta
++ - joe2far
++ - dchen1107
++ - caesarxuchao
++ - thockin
++ - resouer
++ - eparis
+diff --git a/examples/javaweb-tomcat-sidecar/OWNERS b/examples/javaweb-tomcat-sidecar/OWNERS
+new file mode 100644
+index 0000000..e2af325
+--- /dev/null
++++ b/examples/javaweb-tomcat-sidecar/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - resouer
++ - david-mcmahon
++ - thockin
++ - joe2far
++ - dchen1107
++ - laushinka
++ - caesarxuchao
+diff --git a/examples/job/OWNERS b/examples/job/OWNERS
+new file mode 100644
+index 0000000..4937e40
+--- /dev/null
++++ b/examples/job/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - erictune
++ - david-mcmahon
++ - joe2far
+diff --git a/examples/job/expansions/OWNERS b/examples/job/expansions/OWNERS
+new file mode 100644
+index 0000000..fbe7c15
+--- /dev/null
++++ b/examples/job/expansions/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - erictune
++ - david-mcmahon
++ - joe2far
++ - dchen1107
++ - caesarxuchao
+diff --git a/examples/job/work-queue-1/OWNERS b/examples/job/work-queue-1/OWNERS
+new file mode 100644
+index 0000000..6577032
+--- /dev/null
++++ b/examples/job/work-queue-1/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - erictune
++ - joe2far
+diff --git a/examples/job/work-queue-2/OWNERS b/examples/job/work-queue-2/OWNERS
+new file mode 100644
+index 0000000..8cdb018
+--- /dev/null
++++ b/examples/job/work-queue-2/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - erictune
++ - david-mcmahon
++ - joe2far
++ - dchen1107
++ - laushinka
++ - pmorie
++ - caesarxuchao
++ - ciwang
+diff --git a/examples/k8petstore/OWNERS b/examples/k8petstore/OWNERS
+new file mode 100644
+index 0000000..02eaaa1
+--- /dev/null
++++ b/examples/k8petstore/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - jayunit100
++ - thockin
+diff --git a/examples/k8petstore/bps-data-generator/OWNERS b/examples/k8petstore/bps-data-generator/OWNERS
+new file mode 100644
+index 0000000..370703d
+--- /dev/null
++++ b/examples/k8petstore/bps-data-generator/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - david-mcmahon
++ - joe2far
++ - dchen1107
++ - caesarxuchao
++ - thockin
+diff --git a/examples/k8petstore/redis-master/OWNERS b/examples/k8petstore/redis-master/OWNERS
+new file mode 100644
+index 0000000..a53828a
+--- /dev/null
++++ b/examples/k8petstore/redis-master/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - jeffvance
+diff --git a/examples/k8petstore/redis-slave/OWNERS b/examples/k8petstore/redis-slave/OWNERS
+new file mode 100644
+index 0000000..a53828a
+--- /dev/null
++++ b/examples/k8petstore/redis-slave/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - jeffvance
+diff --git a/examples/k8petstore/redis/OWNERS b/examples/k8petstore/redis/OWNERS
+new file mode 100644
+index 0000000..9cfec16
+--- /dev/null
++++ b/examples/k8petstore/redis/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - jeffvance
++ - david-mcmahon
+diff --git a/examples/k8petstore/web-server/OWNERS b/examples/k8petstore/web-server/OWNERS
+new file mode 100644
+index 0000000..0f1d5c6
+--- /dev/null
++++ b/examples/k8petstore/web-server/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - jayunit100
+diff --git a/examples/kubectl-container/OWNERS b/examples/kubectl-container/OWNERS
+new file mode 100644
+index 0000000..1aef487
+--- /dev/null
++++ b/examples/kubectl-container/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - thockin
++ - pmorie
+diff --git a/examples/meteor/OWNERS b/examples/meteor/OWNERS
+new file mode 100644
+index 0000000..d3ace1b
+--- /dev/null
++++ b/examples/meteor/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - david-mcmahon
++ - joe2far
++ - thockin
++ - dchen1107
++ - pmorie
++ - caesarxuchao
+diff --git a/examples/meteor/dockerbase/OWNERS b/examples/meteor/dockerbase/OWNERS
+new file mode 100644
+index 0000000..5eb038a
+--- /dev/null
++++ b/examples/meteor/dockerbase/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - david-mcmahon
++ - thockin
++ - joe2far
++ - dchen1107
++ - pmorie
++ - caesarxuchao
+diff --git a/examples/mysql-cinder-pd/OWNERS b/examples/mysql-cinder-pd/OWNERS
+new file mode 100644
+index 0000000..e5b1daa
+--- /dev/null
++++ b/examples/mysql-cinder-pd/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - david-mcmahon
++ - spothanis
++ - caesarxuchao
++ - thockin
++ - bprashanth
++ - joe2far
++ - dchen1107
+diff --git a/examples/mysql-wordpress-pd/OWNERS b/examples/mysql-wordpress-pd/OWNERS
+index f4d6cdc..726366c 100644
+--- a/examples/mysql-wordpress-pd/OWNERS
++++ b/examples/mysql-wordpress-pd/OWNERS
+@@ -1,2 +1,12 @@
+-assignees:
+-  - jeffmendoza
++
++reviewers:
++ - david-mcmahon
++ - MikeJeffrey
++ - caesarxuchao
++ - thockin
++ - eparis
++ - joe2far
++ - girishkalele
++ - dchen1107
++ - jeffmendoza
++ - clasohm
+diff --git a/examples/newrelic/OWNERS b/examples/newrelic/OWNERS
+new file mode 100644
+index 0000000..5255c08
+--- /dev/null
++++ b/examples/newrelic/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - david-mcmahon
++ - caesarxuchao
++ - thockin
++ - paralin
++ - joe2far
++ - dchen1107
++ - azell
+diff --git a/examples/nodesjs-mongodb/OWNERS b/examples/nodesjs-mongodb/OWNERS
+new file mode 100644
+index 0000000..401846e
+--- /dev/null
++++ b/examples/nodesjs-mongodb/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - david-mcmahon
++ - dchen1107
++ - caesarxuchao
++ - thockin
++ - epixa
++ - joe2far
+diff --git a/examples/openshift-origin/OWNERS b/examples/openshift-origin/OWNERS
+new file mode 100644
+index 0000000..370703d
+--- /dev/null
++++ b/examples/openshift-origin/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - david-mcmahon
++ - joe2far
++ - dchen1107
++ - caesarxuchao
++ - thockin
+diff --git a/examples/phabricator/OWNERS b/examples/phabricator/OWNERS
+new file mode 100644
+index 0000000..3ecbff1
+--- /dev/null
++++ b/examples/phabricator/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - david-mcmahon
++ - dchen1107
++ - thockin
++ - hurf
++ - clasohm
++ - joe2far
++ - pmorie
++ - caesarxuchao
++ - fgrzadkowski
+diff --git a/examples/phabricator/php-phabricator/OWNERS b/examples/phabricator/php-phabricator/OWNERS
+new file mode 100644
+index 0000000..43393e9
+--- /dev/null
++++ b/examples/phabricator/php-phabricator/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
+diff --git a/examples/runtime-constraints/OWNERS b/examples/runtime-constraints/OWNERS
+new file mode 100644
+index 0000000..6c26bc9
+--- /dev/null
++++ b/examples/runtime-constraints/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - david-mcmahon
++ - dchen1107
++ - caesarxuchao
++ - eosrei
++ - thockin
++ - derekwaynecarr
++ - joe2far
+diff --git a/examples/selenium/OWNERS b/examples/selenium/OWNERS
+new file mode 100644
+index 0000000..29a5130
+--- /dev/null
++++ b/examples/selenium/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - elsonrodriguez
++ - joe2far
+diff --git a/examples/sharing-clusters/OWNERS b/examples/sharing-clusters/OWNERS
+new file mode 100644
+index 0000000..62e025b
+--- /dev/null
++++ b/examples/sharing-clusters/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - david-mcmahon
++ - caesarxuchao
++ - joe2far
++ - dchen1107
++ - smarterclayton
++ - nikhiljindal
++ - thockin
++ - deads2k
+diff --git a/examples/spark/OWNERS b/examples/spark/OWNERS
+new file mode 100644
+index 0000000..a35fd6f
+--- /dev/null
++++ b/examples/spark/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - zmerlynn
++ - mattf
++ - david-mcmahon
+diff --git a/examples/spark/spark-gluster/OWNERS b/examples/spark/spark-gluster/OWNERS
+new file mode 100644
+index 0000000..b427ba8
+--- /dev/null
++++ b/examples/spark/spark-gluster/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - zmerlynn
++ - david-mcmahon
++ - caesarxuchao
++ - copejon
++ - joe2far
++ - ciwang
++ - dchen1107
++ - k82cn
++ - thockin
+diff --git a/examples/storage/OWNERS b/examples/storage/OWNERS
+new file mode 100644
+index 0000000..90e63b0
+--- /dev/null
++++ b/examples/storage/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wfhartford
++ - joe2far
++ - ciwang
+diff --git a/examples/storage/cassandra/OWNERS b/examples/storage/cassandra/OWNERS
+new file mode 100644
+index 0000000..90e63b0
+--- /dev/null
++++ b/examples/storage/cassandra/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wfhartford
++ - joe2far
++ - ciwang
+diff --git a/examples/storage/hazelcast/OWNERS b/examples/storage/hazelcast/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/storage/hazelcast/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/storage/mysql-galera/OWNERS b/examples/storage/mysql-galera/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/storage/mysql-galera/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/storage/redis/OWNERS b/examples/storage/redis/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/storage/redis/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/storage/rethinkdb/OWNERS b/examples/storage/rethinkdb/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/storage/rethinkdb/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/storage/vitess/OWNERS b/examples/storage/vitess/OWNERS
+new file mode 100644
+index 0000000..3e2926d
+--- /dev/null
++++ b/examples/storage/vitess/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - ciwang
++ - joe2far
+diff --git a/examples/storm/OWNERS b/examples/storm/OWNERS
+new file mode 100644
+index 0000000..c16e26e
+--- /dev/null
++++ b/examples/storm/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - david-mcmahon
++ - dchen1107
++ - caesarxuchao
++ - thockin
++ - joe2far
+diff --git a/examples/sysdig-cloud/OWNERS b/examples/sysdig-cloud/OWNERS
+new file mode 100644
+index 0000000..256882b
+--- /dev/null
++++ b/examples/sysdig-cloud/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - 03cranec
+diff --git a/examples/volumes/OWNERS b/examples/volumes/OWNERS
+new file mode 100644
+index 0000000..2237a4d
+--- /dev/null
++++ b/examples/volumes/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - ursuad
++ - ciwang
++ - johscheuer
++ - keegancsmith
++ - joe2far
++ - asalkeld
+diff --git a/examples/volumes/aws_ebs/OWNERS b/examples/volumes/aws_ebs/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/volumes/aws_ebs/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/volumes/azure_file/OWNERS b/examples/volumes/azure_file/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/volumes/azure_file/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/volumes/cephfs/OWNERS b/examples/volumes/cephfs/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/volumes/cephfs/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/volumes/fibre_channel/OWNERS b/examples/volumes/fibre_channel/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/volumes/fibre_channel/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/volumes/flexvolume/OWNERS b/examples/volumes/flexvolume/OWNERS
+new file mode 100644
+index 0000000..c50cd5d
+--- /dev/null
++++ b/examples/volumes/flexvolume/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - joe2far
++ - ciwang
++ - keegancsmith
+diff --git a/examples/volumes/flocker/OWNERS b/examples/volumes/flocker/OWNERS
+new file mode 100644
+index 0000000..3e2926d
+--- /dev/null
++++ b/examples/volumes/flocker/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - ciwang
++ - joe2far
+diff --git a/examples/volumes/glusterfs/OWNERS b/examples/volumes/glusterfs/OWNERS
+new file mode 100644
+index 0000000..9ee921e
+--- /dev/null
++++ b/examples/volumes/glusterfs/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - ciwang
++ - joe2far
++ - ursuad
+diff --git a/examples/volumes/iscsi/OWNERS b/examples/volumes/iscsi/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/volumes/iscsi/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/volumes/nfs/OWNERS b/examples/volumes/nfs/OWNERS
+new file mode 100644
+index 0000000..c80fa46
+--- /dev/null
++++ b/examples/volumes/nfs/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - joe2far
++ - ciwang
+diff --git a/examples/volumes/quobyte/OWNERS b/examples/volumes/quobyte/OWNERS
+new file mode 100644
+index 0000000..860cbe7
+--- /dev/null
++++ b/examples/volumes/quobyte/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - johscheuer
+diff --git a/examples/volumes/rbd/OWNERS b/examples/volumes/rbd/OWNERS
+new file mode 100644
+index 0000000..9b62cdd
+--- /dev/null
++++ b/examples/volumes/rbd/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - joe2far
++ - asalkeld
++ - ciwang
+diff --git a/federation/OWNERS b/federation/OWNERS
+index a3de529..93a4766 100644
+--- a/federation/OWNERS
++++ b/federation/OWNERS
+@@ -1,6 +1,5 @@
+-assignees:
+-  - quinton-hoole
+-  - madhusudancs
+-  - mml
+-  - nikhiljindal
+-  - colhom
++
++reviewers:
++ - nikhiljindal
++ - madhusudancs
++ - mwielgus
+diff --git a/federation/apis/OWNERS b/federation/apis/OWNERS
+new file mode 100644
+index 0000000..219ab39
+--- /dev/null
++++ b/federation/apis/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - nikhiljindal
++ - thockin
++ - jianhuiz
+diff --git a/federation/apis/core/OWNERS b/federation/apis/core/OWNERS
+new file mode 100644
+index 0000000..64927f9
+--- /dev/null
++++ b/federation/apis/core/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - nikhiljindal
++ - thockin
++ - lavalamp
++ - kshafiee
++ - madhusudancs
++ - joe2far
++ - jianhuiz
++ - david-mcmahon
+diff --git a/federation/apis/federation/OWNERS b/federation/apis/federation/OWNERS
+new file mode 100644
+index 0000000..2b47e0e
+--- /dev/null
++++ b/federation/apis/federation/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - thockin
++ - nikhiljindal
++ - jianhuiz
++ - smarterclayton
+diff --git a/federation/apis/swagger-spec/OWNERS b/federation/apis/swagger-spec/OWNERS
+new file mode 100644
+index 0000000..28d0ce8
+--- /dev/null
++++ b/federation/apis/swagger-spec/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - nikhiljindal
+diff --git a/federation/client/OWNERS b/federation/client/OWNERS
+new file mode 100644
+index 0000000..db56fa7
+--- /dev/null
++++ b/federation/client/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - nikhiljindal
++ - caesarxuchao
++ - jianhuiz
+diff --git a/federation/client/cache/OWNERS b/federation/client/cache/OWNERS
+new file mode 100644
+index 0000000..77c6451
+--- /dev/null
++++ b/federation/client/cache/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - mfanjie
++ - huangyuqi
++ - david-mcmahon
++ - nikhiljindal
+diff --git a/federation/cluster/OWNERS b/federation/cluster/OWNERS
+new file mode 100644
+index 0000000..4cab297
+--- /dev/null
++++ b/federation/cluster/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - nikhiljindal
++ - madhusudancs
++ - colhom
+diff --git a/federation/cmd/OWNERS b/federation/cmd/OWNERS
+new file mode 100644
+index 0000000..02df7cb
+--- /dev/null
++++ b/federation/cmd/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - nikhiljindal
++ - jianhuiz
++ - mfanjie
++ - hodovska
+diff --git a/federation/cmd/federation-apiserver/OWNERS b/federation/cmd/federation-apiserver/OWNERS
+index c5bdda2..a567136 100644
+--- a/federation/cmd/federation-apiserver/OWNERS
++++ b/federation/cmd/federation-apiserver/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - lavalamp
+-  - smarterclayton
+-  - nikhiljindal
+-  - krousey
++
++reviewers:
++ - nikhiljindal
++ - hodovska
++ - timothysc
+diff --git a/federation/cmd/federation-controller-manager/OWNERS b/federation/cmd/federation-controller-manager/OWNERS
+index c6b4c5c..75b2994 100644
+--- a/federation/cmd/federation-controller-manager/OWNERS
++++ b/federation/cmd/federation-controller-manager/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - quinton-hoole
+-  - nikhiljindal
+-  - madhusundancs
++
++reviewers:
++ - nikhiljindal
++ - mfanjie
++ - mwielgus
+diff --git a/federation/cmd/genfeddocs/OWNERS b/federation/cmd/genfeddocs/OWNERS
+new file mode 100644
+index 0000000..ecd05d9
+--- /dev/null
++++ b/federation/cmd/genfeddocs/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - nikhiljindal
+diff --git a/federation/manifests/OWNERS b/federation/manifests/OWNERS
+new file mode 100644
+index 0000000..bebb271
+--- /dev/null
++++ b/federation/manifests/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - nikhiljindal
++ - madhusudancs
++ - mml
++ - colhom
+diff --git a/federation/pkg/OWNERS b/federation/pkg/OWNERS
+new file mode 100644
+index 0000000..6be98b2
+--- /dev/null
++++ b/federation/pkg/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - mwielgus
++ - quinton-hoole
++ - mfanjie
+diff --git a/federation/pkg/dnsprovider/OWNERS b/federation/pkg/dnsprovider/OWNERS
+new file mode 100644
+index 0000000..2846704
+--- /dev/null
++++ b/federation/pkg/dnsprovider/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - quinton-hoole
++ - justinsb
++ - mfanjie
+diff --git a/federation/pkg/federation-controller/OWNERS b/federation/pkg/federation-controller/OWNERS
+index 144e50d..0739b0b 100644
+--- a/federation/pkg/federation-controller/OWNERS
++++ b/federation/pkg/federation-controller/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - quinton-hoole
+-  - nikhiljindal
+-  - madhusudancs
++
++reviewers:
++ - mwielgus
++ - mfanjie
++ - quinton-hoole
+diff --git a/federation/registry/OWNERS b/federation/registry/OWNERS
+new file mode 100644
+index 0000000..3a68dd3
+--- /dev/null
++++ b/federation/registry/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - hongchaodeng
++ - jianhuiz
++ - liggitt
+diff --git a/federation/registry/cluster/OWNERS b/federation/registry/cluster/OWNERS
+new file mode 100644
+index 0000000..3a68dd3
+--- /dev/null
++++ b/federation/registry/cluster/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - hongchaodeng
++ - jianhuiz
++ - liggitt
+diff --git a/hack/OWNERS b/hack/OWNERS
+index 24b69e1..eaeaddb 100644
+--- a/hack/OWNERS
++++ b/hack/OWNERS
+@@ -1,7 +1,5 @@
+-assignees:
+-  - eparis
+-  - ihmccreery
+-  - ixdy
+-  - lavalamp
+-  - spxtr
+-  - zmerlynn
++
++reviewers:
++ - spxtr
++ - ixdy
++ - gmarek
+diff --git a/hack/boilerplate/OWNERS b/hack/boilerplate/OWNERS
+new file mode 100644
+index 0000000..eb85474
+--- /dev/null
++++ b/hack/boilerplate/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - pmorie
++ - dlorenc
++ - wojtek-t
++ - ixdy
++ - david-mcmahon
++ - jayunit100
++ - thockin
++ - mikedanese
+diff --git a/hack/cmd/OWNERS b/hack/cmd/OWNERS
+new file mode 100644
+index 0000000..983bb6f
+--- /dev/null
++++ b/hack/cmd/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - madhusudancs
++ - david-mcmahon
+diff --git a/hack/cmd/teststale/OWNERS b/hack/cmd/teststale/OWNERS
+new file mode 100644
+index 0000000..983bb6f
+--- /dev/null
++++ b/hack/cmd/teststale/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - madhusudancs
++ - david-mcmahon
+diff --git a/hack/e2e-internal/OWNERS b/hack/e2e-internal/OWNERS
+new file mode 100644
+index 0000000..a9eeffb
+--- /dev/null
++++ b/hack/e2e-internal/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - spxtr
++ - colhom
++ - fejta
++ - david-mcmahon
++ - madhusudancs
++ - nikhiljindal
++ - mml
++ - quinton-hoole
+diff --git a/hack/gen-swagger-doc/OWNERS b/hack/gen-swagger-doc/OWNERS
+new file mode 100644
+index 0000000..550e8dd
+--- /dev/null
++++ b/hack/gen-swagger-doc/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - caesarxuchao
++ - david-mcmahon
++ - sttts
++ - laushinka
++ - pmorie
++ - wojtek-t
++ - jfrazelle
++ - asalkeld
++ - nikhiljindal
+diff --git a/hack/gen-swagger-doc/example-output/OWNERS b/hack/gen-swagger-doc/example-output/OWNERS
+new file mode 100644
+index 0000000..f1d63f0
+--- /dev/null
++++ b/hack/gen-swagger-doc/example-output/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - asalkeld
++ - laushinka
+diff --git a/hack/jenkins/OWNERS b/hack/jenkins/OWNERS
+index eddffc8..eaeaddb 100644
+--- a/hack/jenkins/OWNERS
++++ b/hack/jenkins/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - fejta
+-  - ixdy
+-  - rmmh
+-  - spxtr
++
++reviewers:
++ - spxtr
++ - ixdy
++ - gmarek
+diff --git a/hack/jenkins/e2e-image/OWNERS b/hack/jenkins/e2e-image/OWNERS
+new file mode 100644
+index 0000000..cc788de
+--- /dev/null
++++ b/hack/jenkins/e2e-image/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - fejta
++ - ixdy
+diff --git a/hack/jenkins/test-image/OWNERS b/hack/jenkins/test-image/OWNERS
+new file mode 100644
+index 0000000..fddd437
+--- /dev/null
++++ b/hack/jenkins/test-image/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - ixdy
++ - jlowdermilk
++ - jfrazelle
+diff --git a/hack/lib/OWNERS b/hack/lib/OWNERS
+new file mode 100644
+index 0000000..da34b72
+--- /dev/null
++++ b/hack/lib/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - ixdy
++ - thockin
++ - luxas
+diff --git a/hack/make-rules/OWNERS b/hack/make-rules/OWNERS
+new file mode 100644
+index 0000000..903bd69
+--- /dev/null
++++ b/hack/make-rules/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - thockin
++ - deads2k
++ - vishh
++ - mnshaw
++ - Random-Liu
+diff --git a/hack/make-rules/helpers/OWNERS b/hack/make-rules/helpers/OWNERS
+new file mode 100644
+index 0000000..6105d8e
+--- /dev/null
++++ b/hack/make-rules/helpers/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - caesarxuchao
++ - thockin
+diff --git a/hack/testdata/OWNERS b/hack/testdata/OWNERS
+new file mode 100644
+index 0000000..3ebb904
+--- /dev/null
++++ b/hack/testdata/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - janetkuo
++ - bprashanth
++ - kargakis
++ - madhusudancs
+diff --git a/hack/testdata/recursive/OWNERS b/hack/testdata/recursive/OWNERS
+new file mode 100644
+index 0000000..bed14c3
+--- /dev/null
++++ b/hack/testdata/recursive/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - metral
+diff --git a/hack/verify-flags/OWNERS b/hack/verify-flags/OWNERS
+new file mode 100644
+index 0000000..b41aa2f
+--- /dev/null
++++ b/hack/verify-flags/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - wojtek-t
++ - pwittrock
++ - caesarxuchao
++ - mikedanese
++ - smarterclayton
++ - gmarek
+diff --git a/hooks/OWNERS b/hooks/OWNERS
+new file mode 100644
+index 0000000..81f135e
+--- /dev/null
++++ b/hooks/OWNERS
+@@ -0,0 +1,12 @@
++
++reviewers:
++ - thockin
++ - lavalamp
++ - wojtek-t
++ - fejta
++ - laushinka
++ - caesarxuchao
++ - andronat
++ - xiangpengzhao
++ - k82cn
++ - karlkfi
+diff --git a/logo/OWNERS b/logo/OWNERS
+index d22a189..ab80103 100644
+--- a/logo/OWNERS
++++ b/logo/OWNERS
+@@ -1,2 +1,3 @@
+-assignees:
+-  - thockin
++
++reviewers:
++ - thockin
+diff --git a/pkg/OWNERS b/pkg/OWNERS
+index c79bb80..c55d6cc 100644
+--- a/pkg/OWNERS
++++ b/pkg/OWNERS
+@@ -1,6 +1,5 @@
+-assignees:
+-  - brendandburns
+-  - dchen1107
+-  - lavalamp
+-  - smarterclayton
+-  - thockin
++
++reviewers:
++ - caesarxuchao
++ - smarterclayton
++ - wojtek-t
+diff --git a/pkg/admission/OWNERS b/pkg/admission/OWNERS
+index 27608d8..3e91956 100644
+--- a/pkg/admission/OWNERS
++++ b/pkg/admission/OWNERS
+@@ -1,6 +1,5 @@
+-assignees:
+-  - davidopp
+-  - derekwaynecarr
+-  - erictune
+-  - lavalamp
+-  - liggitt
++
++reviewers:
++ - deads2k
++ - caesarxuchao
++ - hodovska
+diff --git a/pkg/api/OWNERS b/pkg/api/OWNERS
+index d28472e..06c7343 100644
+--- a/pkg/api/OWNERS
++++ b/pkg/api/OWNERS
+@@ -1,6 +1,5 @@
+-assignees:
+-  - bgrant0607
+-  - erictune
+-  - lavalamp
+-  - smarterclayton
+-  - thockin
++
++reviewers:
++ - smarterclayton
++ - caesarxuchao
++ - thockin
+diff --git a/pkg/api/annotations/OWNERS b/pkg/api/annotations/OWNERS
+new file mode 100644
+index 0000000..7fa2271
+--- /dev/null
++++ b/pkg/api/annotations/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - jianhuiz
+diff --git a/pkg/api/endpoints/OWNERS b/pkg/api/endpoints/OWNERS
+new file mode 100644
+index 0000000..a4031f4
+--- /dev/null
++++ b/pkg/api/endpoints/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - ArtfulCoder
++ - david-mcmahon
++ - tgraf
++ - resouer
++ - smarterclayton
+diff --git a/pkg/api/errors/OWNERS b/pkg/api/errors/OWNERS
+new file mode 100644
+index 0000000..cd4ee09
+--- /dev/null
++++ b/pkg/api/errors/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - thockin
++ - smarterclayton
++ - krousey
++ - timothysc
++ - caesarxuchao
+diff --git a/pkg/api/install/OWNERS b/pkg/api/install/OWNERS
+new file mode 100644
+index 0000000..78ac220
+--- /dev/null
++++ b/pkg/api/install/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - deads2k
++ - caesarxuchao
++ - feihujiang
++ - smarterclayton
+diff --git a/pkg/api/meta/OWNERS b/pkg/api/meta/OWNERS
+new file mode 100644
+index 0000000..8c3ccb8
+--- /dev/null
++++ b/pkg/api/meta/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - deads2k
++ - smarterclayton
++ - wojtek-t
+diff --git a/pkg/api/pod/OWNERS b/pkg/api/pod/OWNERS
+new file mode 100644
+index 0000000..0c4c695
+--- /dev/null
++++ b/pkg/api/pod/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - ArtfulCoder
++ - david-mcmahon
++ - rajdeepd
++ - smarterclayton
++ - kargakis
+diff --git a/pkg/api/resource/OWNERS b/pkg/api/resource/OWNERS
+new file mode 100644
+index 0000000..c9b354f
+--- /dev/null
++++ b/pkg/api/resource/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - smarterclayton
++ - derekwaynecarr
++ - saad-ali
++ - thockin
++ - timstclair
+diff --git a/pkg/api/rest/OWNERS b/pkg/api/rest/OWNERS
+new file mode 100644
+index 0000000..e3be9ec
+--- /dev/null
++++ b/pkg/api/rest/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - caesarxuchao
+diff --git a/pkg/api/service/OWNERS b/pkg/api/service/OWNERS
+new file mode 100644
+index 0000000..9774d7f
+--- /dev/null
++++ b/pkg/api/service/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - freehan
++ - justinsb
++ - luxas
++ - david-mcmahon
+diff --git a/pkg/api/testapi/OWNERS b/pkg/api/testapi/OWNERS
+new file mode 100644
+index 0000000..98bdfbe
+--- /dev/null
++++ b/pkg/api/testapi/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - deads2k
++ - smarterclayton
+diff --git a/pkg/api/testing/OWNERS b/pkg/api/testing/OWNERS
+new file mode 100644
+index 0000000..57af79f
+--- /dev/null
++++ b/pkg/api/testing/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - wojtek-t
++ - soltysh
+diff --git a/pkg/api/unversioned/OWNERS b/pkg/api/unversioned/OWNERS
+new file mode 100644
+index 0000000..0dfaffe
+--- /dev/null
++++ b/pkg/api/unversioned/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - deads2k
++ - smarterclayton
++ - caesarxuchao
+diff --git a/pkg/api/util/OWNERS b/pkg/api/util/OWNERS
+new file mode 100644
+index 0000000..f9dd01d
+--- /dev/null
++++ b/pkg/api/util/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - caesarxuchao
++ - david-mcmahon
+diff --git a/pkg/api/v1/OWNERS b/pkg/api/v1/OWNERS
+new file mode 100644
+index 0000000..b595809
+--- /dev/null
++++ b/pkg/api/v1/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - smarterclayton
++ - thockin
++ - wojtek-t
++ - pmorie
+diff --git a/pkg/api/validation/OWNERS b/pkg/api/validation/OWNERS
+new file mode 100644
+index 0000000..63b052b
+--- /dev/null
++++ b/pkg/api/validation/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - thockin
++ - derekwaynecarr
++ - pmorie
+diff --git a/pkg/apimachinery/OWNERS b/pkg/apimachinery/OWNERS
+new file mode 100644
+index 0000000..05bde11
+--- /dev/null
++++ b/pkg/apimachinery/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - brendandburns
++ - deads2k
++ - nikhiljindal
+diff --git a/pkg/apimachinery/registered/OWNERS b/pkg/apimachinery/registered/OWNERS
+new file mode 100644
+index 0000000..05bde11
+--- /dev/null
++++ b/pkg/apimachinery/registered/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - brendandburns
++ - deads2k
++ - nikhiljindal
+diff --git a/pkg/apis/OWNERS b/pkg/apis/OWNERS
+index d28472e..096bd0d 100644
+--- a/pkg/apis/OWNERS
++++ b/pkg/apis/OWNERS
+@@ -1,6 +1,5 @@
+-assignees:
+-  - bgrant0607
+-  - erictune
+-  - lavalamp
+-  - smarterclayton
+-  - thockin
++
++reviewers:
++ - mikedanese
++ - smarterclayton
++ - caesarxuchao
+diff --git a/pkg/apis/abac/OWNERS b/pkg/apis/abac/OWNERS
+new file mode 100644
+index 0000000..750d04b
+--- /dev/null
++++ b/pkg/apis/abac/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - smarterclayton
++ - liggitt
++ - lavalamp
++ - david-mcmahon
++ - deads2k
+diff --git a/pkg/apis/apps/OWNERS b/pkg/apis/apps/OWNERS
+new file mode 100644
+index 0000000..e93cd72
+--- /dev/null
++++ b/pkg/apis/apps/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - thockin
++ - bprashanth
+diff --git a/pkg/apis/authentication/OWNERS b/pkg/apis/authentication/OWNERS
+new file mode 100644
+index 0000000..b17cccc
+--- /dev/null
++++ b/pkg/apis/authentication/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - deads2k
++ - lavalamp
++ - sttts
++ - timothysc
++ - wojtek-t
+diff --git a/pkg/apis/authorization/OWNERS b/pkg/apis/authorization/OWNERS
+new file mode 100644
+index 0000000..e4ec744
+--- /dev/null
++++ b/pkg/apis/authorization/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - thockin
++ - deads2k
++ - wojtek-t
++ - smarterclayton
+diff --git a/pkg/apis/autoscaling/OWNERS b/pkg/apis/autoscaling/OWNERS
+new file mode 100644
+index 0000000..0082210
+--- /dev/null
++++ b/pkg/apis/autoscaling/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - thockin
++ - piosz
+diff --git a/pkg/apis/batch/OWNERS b/pkg/apis/batch/OWNERS
+new file mode 100644
+index 0000000..a01a085
+--- /dev/null
++++ b/pkg/apis/batch/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - soltysh
++ - smarterclayton
++ - thockin
+diff --git a/pkg/apis/certificates/OWNERS b/pkg/apis/certificates/OWNERS
+new file mode 100644
+index 0000000..b6e56b4
+--- /dev/null
++++ b/pkg/apis/certificates/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - thockin
++ - gtank
++ - lavalamp
++ - sttts
+diff --git a/pkg/apis/componentconfig/OWNERS b/pkg/apis/componentconfig/OWNERS
+new file mode 100644
+index 0000000..76b4ac2
+--- /dev/null
++++ b/pkg/apis/componentconfig/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - mikedanese
++ - deads2k
++ - smarterclayton
+diff --git a/pkg/apis/extensions/OWNERS b/pkg/apis/extensions/OWNERS
+new file mode 100644
+index 0000000..350cdfb
+--- /dev/null
++++ b/pkg/apis/extensions/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - thockin
++ - caesarxuchao
+diff --git a/pkg/apis/imagepolicy/OWNERS b/pkg/apis/imagepolicy/OWNERS
+new file mode 100644
+index 0000000..116b77d
+--- /dev/null
++++ b/pkg/apis/imagepolicy/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - Q-Lee
+diff --git a/pkg/apis/policy/OWNERS b/pkg/apis/policy/OWNERS
+new file mode 100644
+index 0000000..3bde97f
+--- /dev/null
++++ b/pkg/apis/policy/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - thockin
++ - mml
++ - smarterclayton
+diff --git a/pkg/apis/rbac/OWNERS b/pkg/apis/rbac/OWNERS
+new file mode 100644
+index 0000000..44180c6
+--- /dev/null
++++ b/pkg/apis/rbac/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - ericchiang
++ - thockin
++ - olegshaldybin
+diff --git a/pkg/apiserver/OWNERS b/pkg/apiserver/OWNERS
+index 76e1b30..0dfaffe 100644
+--- a/pkg/apiserver/OWNERS
++++ b/pkg/apiserver/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - lavalamp
+-  - nikhiljindal
+-  - smarterclayton
++
++reviewers:
++ - deads2k
++ - smarterclayton
++ - caesarxuchao
+diff --git a/pkg/apiserver/audit/OWNERS b/pkg/apiserver/audit/OWNERS
+new file mode 100644
+index 0000000..f2a397b
+--- /dev/null
++++ b/pkg/apiserver/audit/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - soltysh
+diff --git a/pkg/apiserver/authenticator/OWNERS b/pkg/apiserver/authenticator/OWNERS
+new file mode 100644
+index 0000000..f0be699
+--- /dev/null
++++ b/pkg/apiserver/authenticator/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - ericchiang
++ - smarterclayton
++ - cjcullen
+diff --git a/pkg/apiserver/metrics/OWNERS b/pkg/apiserver/metrics/OWNERS
+new file mode 100644
+index 0000000..fd80c19
+--- /dev/null
++++ b/pkg/apiserver/metrics/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - david-mcmahon
++ - jimmidyson
+diff --git a/pkg/apiserver/testing/OWNERS b/pkg/apiserver/testing/OWNERS
+new file mode 100644
+index 0000000..13d16e4
+--- /dev/null
++++ b/pkg/apiserver/testing/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - wojtek-t
++ - liggitt
++ - caesarxuchao
++ - smarterclayton
++ - timothysc
++ - david-mcmahon
++ - erictune
++ - soltysh
++ - mml
+diff --git a/pkg/auth/OWNERS b/pkg/auth/OWNERS
+index 766c481..2e30f3d 100644
+--- a/pkg/auth/OWNERS
++++ b/pkg/auth/OWNERS
+@@ -1,3 +1,5 @@
+-assignees:
+-  - erictune
+-  - liggitt
++
++reviewers:
++ - deads2k
++ - liggitt
++ - smarterclayton
+diff --git a/pkg/auth/authenticator/OWNERS b/pkg/auth/authenticator/OWNERS
+new file mode 100644
+index 0000000..105bd9c
+--- /dev/null
++++ b/pkg/auth/authenticator/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - david-mcmahon
+diff --git a/pkg/auth/authorizer/OWNERS b/pkg/auth/authorizer/OWNERS
+new file mode 100644
+index 0000000..d5f7050
+--- /dev/null
++++ b/pkg/auth/authorizer/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - liggitt
++ - deads2k
++ - smarterclayton
+diff --git a/pkg/auth/handlers/OWNERS b/pkg/auth/handlers/OWNERS
+new file mode 100644
+index 0000000..8055bb1
+--- /dev/null
++++ b/pkg/auth/handlers/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - cjcullen
+diff --git a/pkg/auth/user/OWNERS b/pkg/auth/user/OWNERS
+new file mode 100644
+index 0000000..f7fd663
+--- /dev/null
++++ b/pkg/auth/user/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - deads2k
+diff --git a/pkg/capabilities/OWNERS b/pkg/capabilities/OWNERS
+new file mode 100644
+index 0000000..b1f7aad
+--- /dev/null
++++ b/pkg/capabilities/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - liubin
++ - pweil-
++ - dims
++ - joe2far
++ - david-mcmahon
++ - simon3z
+diff --git a/pkg/client/OWNERS b/pkg/client/OWNERS
+index e3fcb22..9d0bcdf 100644
+--- a/pkg/client/OWNERS
++++ b/pkg/client/OWNERS
+@@ -1,6 +1,5 @@
+-assignees:
+-  - caesarxuchao
+-  - deads2k
+-  - krousey
+-  - lavalamp
+-  - smarterclayton
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - deads2k
+diff --git a/pkg/client/cache/OWNERS b/pkg/client/cache/OWNERS
+new file mode 100644
+index 0000000..33899e3
+--- /dev/null
++++ b/pkg/client/cache/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - wojtek-t
++ - mqliang
++ - caesarxuchao
++ - lavalamp
++ - madhusudancs
+diff --git a/pkg/client/chaosclient/OWNERS b/pkg/client/chaosclient/OWNERS
+new file mode 100644
+index 0000000..2e7d321
+--- /dev/null
++++ b/pkg/client/chaosclient/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - david-mcmahon
++ - zhouhaibing089
++ - resouer
++ - davidopp
++ - liggitt
+diff --git a/pkg/client/leaderelection/OWNERS b/pkg/client/leaderelection/OWNERS
+index 7ff5b3e..f3c0a9b 100644
+--- a/pkg/client/leaderelection/OWNERS
++++ b/pkg/client/leaderelection/OWNERS
+@@ -1,3 +1,13 @@
+-assignees:
+-  - mikedanese
+-  - timothysc
++
++reviewers:
++ - mikedanese
++ - laushinka
++ - ingvagabund
++ - resouer
++ - eparis
++ - david-mcmahon
++ - aaronlevy
++ - goltermann
++ - gmarek
++ - deads2k
++ - timothysc
+diff --git a/pkg/client/metrics/OWNERS b/pkg/client/metrics/OWNERS
+new file mode 100644
+index 0000000..dc795f3
+--- /dev/null
++++ b/pkg/client/metrics/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - jayunit100
++ - tmrts
+diff --git a/pkg/client/record/OWNERS b/pkg/client/record/OWNERS
+new file mode 100644
+index 0000000..12d1f4a
+--- /dev/null
++++ b/pkg/client/record/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - caesarxuchao
++ - resouer
++ - lavalamp
++ - aveshagarwal
++ - krousey
+diff --git a/pkg/client/restclient/OWNERS b/pkg/client/restclient/OWNERS
+new file mode 100644
+index 0000000..24d0f73
+--- /dev/null
++++ b/pkg/client/restclient/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - resouer
++ - smarterclayton
+diff --git a/pkg/client/testing/OWNERS b/pkg/client/testing/OWNERS
+new file mode 100644
+index 0000000..39cb9e1
+--- /dev/null
++++ b/pkg/client/testing/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - olegshaldybin
++ - smarterclayton
+diff --git a/pkg/client/transport/OWNERS b/pkg/client/transport/OWNERS
+new file mode 100644
+index 0000000..2470d34
+--- /dev/null
++++ b/pkg/client/transport/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - krousey
++ - wojtek-t
++ - victorgp
++ - deads2k
+diff --git a/pkg/client/typed/OWNERS b/pkg/client/typed/OWNERS
+new file mode 100644
+index 0000000..51ac02c
+--- /dev/null
++++ b/pkg/client/typed/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - krousey
++ - smarterclayton
+diff --git a/pkg/client/unversioned/OWNERS b/pkg/client/unversioned/OWNERS
+new file mode 100644
+index 0000000..1254024
+--- /dev/null
++++ b/pkg/client/unversioned/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - deads2k
++ - wojtek-t
+diff --git a/pkg/cloudprovider/OWNERS b/pkg/cloudprovider/OWNERS
+index ac1004e..c3c2db4 100644
+--- a/pkg/cloudprovider/OWNERS
++++ b/pkg/cloudprovider/OWNERS
+@@ -1,2 +1,5 @@
+-assignees:
+-  - mikedanese
++
++reviewers:
++ - justinsb
++ - therc
++ - jsafrane
+diff --git a/pkg/cloudprovider/providers/OWNERS b/pkg/cloudprovider/providers/OWNERS
+new file mode 100644
+index 0000000..f79a521
+--- /dev/null
++++ b/pkg/cloudprovider/providers/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - justinsb
++ - therc
++ - bprashanth
++ - jsafrane
+diff --git a/pkg/controller/OWNERS b/pkg/controller/OWNERS
+index ac83016..51bb19c 100644
+--- a/pkg/controller/OWNERS
++++ b/pkg/controller/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - bprashanth
+-  - derekwaynecarr
+-  - mikedanese
++
++reviewers:
++ - jsafrane
++ - janetkuo
++ - mikedanese
+diff --git a/pkg/controller/certificates/OWNERS b/pkg/controller/certificates/OWNERS
+new file mode 100644
+index 0000000..250d58e
+--- /dev/null
++++ b/pkg/controller/certificates/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - gtank
+diff --git a/pkg/controller/daemon/OWNERS b/pkg/controller/daemon/OWNERS
+new file mode 100644
+index 0000000..cbbecf1
+--- /dev/null
++++ b/pkg/controller/daemon/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - mikedanese
++ - wojtek-t
++ - caesarxuchao
+diff --git a/pkg/controller/deployment/OWNERS b/pkg/controller/deployment/OWNERS
+new file mode 100644
+index 0000000..e16680a
+--- /dev/null
++++ b/pkg/controller/deployment/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - janetkuo
++ - caesarxuchao
++ - kargakis
++ - mqliang
+diff --git a/pkg/controller/disruption/OWNERS b/pkg/controller/disruption/OWNERS
+new file mode 100644
+index 0000000..275ba7a
+--- /dev/null
++++ b/pkg/controller/disruption/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - wojtek-t
++ - mml
+diff --git a/pkg/controller/endpoint/OWNERS b/pkg/controller/endpoint/OWNERS
+new file mode 100644
+index 0000000..4a2c869
+--- /dev/null
++++ b/pkg/controller/endpoint/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - girishkalele
++ - smarterclayton
+diff --git a/pkg/controller/framework/OWNERS b/pkg/controller/framework/OWNERS
+new file mode 100644
+index 0000000..1c76724
+--- /dev/null
++++ b/pkg/controller/framework/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - deads2k
++ - wojtek-t
++ - hodovska
++ - mvdan
+diff --git a/pkg/controller/garbagecollector/OWNERS b/pkg/controller/garbagecollector/OWNERS
+new file mode 100644
+index 0000000..22c768c
+--- /dev/null
++++ b/pkg/controller/garbagecollector/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - caesarxuchao
++ - deads2k
++ - matttproud
++ - lixiaobing10051267
++ - wojtek-t
++ - david-mcmahon
++ - timothysc
+diff --git a/pkg/controller/job/OWNERS b/pkg/controller/job/OWNERS
+new file mode 100644
+index 0000000..3635072
+--- /dev/null
++++ b/pkg/controller/job/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - mikedanese
+diff --git a/pkg/controller/namespace/OWNERS b/pkg/controller/namespace/OWNERS
+new file mode 100644
+index 0000000..27d3e0c
+--- /dev/null
++++ b/pkg/controller/namespace/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - derekwaynecarr
+diff --git a/pkg/controller/node/OWNERS b/pkg/controller/node/OWNERS
+new file mode 100644
+index 0000000..9bf71bc
+--- /dev/null
++++ b/pkg/controller/node/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - gmarek
++ - caesarxuchao
++ - wojtek-t
++ - mikedanese
+diff --git a/pkg/controller/petset/OWNERS b/pkg/controller/petset/OWNERS
+new file mode 100644
+index 0000000..6bd7f29
+--- /dev/null
++++ b/pkg/controller/petset/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - bprashanth
++ - lixiaobing10051267
+diff --git a/pkg/controller/podautoscaler/OWNERS b/pkg/controller/podautoscaler/OWNERS
+new file mode 100644
+index 0000000..b156e49
+--- /dev/null
++++ b/pkg/controller/podautoscaler/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - mwielgus
++ - jszczepkowski
+diff --git a/pkg/controller/podgc/OWNERS b/pkg/controller/podgc/OWNERS
+new file mode 100644
+index 0000000..5d53c16
+--- /dev/null
++++ b/pkg/controller/podgc/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - caesarxuchao
+diff --git a/pkg/controller/replicaset/OWNERS b/pkg/controller/replicaset/OWNERS
+new file mode 100644
+index 0000000..1584f2b
+--- /dev/null
++++ b/pkg/controller/replicaset/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - mqliang
++ - bprashanth
+diff --git a/pkg/controller/replication/OWNERS b/pkg/controller/replication/OWNERS
+new file mode 100644
+index 0000000..5d69dc8
+--- /dev/null
++++ b/pkg/controller/replication/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - mqliang
+diff --git a/pkg/controller/resourcequota/OWNERS b/pkg/controller/resourcequota/OWNERS
+new file mode 100644
+index 0000000..98a1f3c
+--- /dev/null
++++ b/pkg/controller/resourcequota/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - derekwaynecarr
++ - caesarxuchao
++ - wojtek-t
+diff --git a/pkg/controller/route/OWNERS b/pkg/controller/route/OWNERS
+new file mode 100644
+index 0000000..0879d46
+--- /dev/null
++++ b/pkg/controller/route/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - gmarek
+diff --git a/pkg/controller/scheduledjob/OWNERS b/pkg/controller/scheduledjob/OWNERS
+new file mode 100644
+index 0000000..f2fdd41
+--- /dev/null
++++ b/pkg/controller/scheduledjob/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - janetkuo
++ - soltysh
++ - erictune
+diff --git a/pkg/controller/service/OWNERS b/pkg/controller/service/OWNERS
+new file mode 100644
+index 0000000..26d6d33
+--- /dev/null
++++ b/pkg/controller/service/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - zhengguoyong
+diff --git a/pkg/controller/serviceaccount/OWNERS b/pkg/controller/serviceaccount/OWNERS
+new file mode 100644
+index 0000000..5f99f6f
+--- /dev/null
++++ b/pkg/controller/serviceaccount/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - liggitt
+diff --git a/pkg/controller/volume/OWNERS b/pkg/controller/volume/OWNERS
+new file mode 100644
+index 0000000..7664d2b
+--- /dev/null
++++ b/pkg/controller/volume/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - saad-ali
++ - jsafrane
++ - pmorie
+diff --git a/pkg/conversion/OWNERS b/pkg/conversion/OWNERS
+index a046efc..8f47af6 100644
+--- a/pkg/conversion/OWNERS
++++ b/pkg/conversion/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - derekwaynecarr
+-  - lavalamp
+-  - smarterclayton
+-  - wojtek-t
++
++reviewers:
++ - smarterclayton
++ - wojtek-t
++ - deads2k
+diff --git a/pkg/conversion/queryparams/OWNERS b/pkg/conversion/queryparams/OWNERS
+new file mode 100644
+index 0000000..586bdc5
+--- /dev/null
++++ b/pkg/conversion/queryparams/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - kargakis
++ - smarterclayton
++ - caesarxuchao
++ - dims
++ - david-mcmahon
++ - liggitt
++ - wojtek-t
+diff --git a/pkg/credentialprovider/OWNERS b/pkg/credentialprovider/OWNERS
+index 766c481..9537961 100644
+--- a/pkg/credentialprovider/OWNERS
++++ b/pkg/credentialprovider/OWNERS
+@@ -1,3 +1,6 @@
+-assignees:
+-  - erictune
+-  - liggitt
++
++reviewers:
++ - therc
++ - smarterclayton
++ - yujuhong
++ - vishh
+diff --git a/pkg/credentialprovider/aws/OWNERS b/pkg/credentialprovider/aws/OWNERS
+new file mode 100644
+index 0000000..d554763
+--- /dev/null
++++ b/pkg/credentialprovider/aws/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - therc
++ - justinsb
++ - david-mcmahon
++ - goltermann
+diff --git a/pkg/credentialprovider/gcp/OWNERS b/pkg/credentialprovider/gcp/OWNERS
+new file mode 100644
+index 0000000..9385831
+--- /dev/null
++++ b/pkg/credentialprovider/gcp/OWNERS
+@@ -0,0 +1,12 @@
++
++reviewers:
++ - vishh
++ - yujuhong
++ - dims
++ - deads2k
++ - davidopp
++ - derekwaynecarr
++ - david-mcmahon
++ - therc
++ - zhouhaibing089
++ - ivant
+diff --git a/pkg/dns/OWNERS b/pkg/dns/OWNERS
+new file mode 100644
+index 0000000..f53626e
+--- /dev/null
++++ b/pkg/dns/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - madhusudancs
++ - mml
++ - ArtfulCoder
+diff --git a/pkg/fieldpath/OWNERS b/pkg/fieldpath/OWNERS
+new file mode 100644
+index 0000000..53ac65b
+--- /dev/null
++++ b/pkg/fieldpath/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - aveshagarwal
++ - piosz
++ - tmrts
++ - derekwaynecarr
++ - vishh
++ - smarterclayton
++ - sdminonne
++ - dims
++ - david-mcmahon
+diff --git a/pkg/fields/OWNERS b/pkg/fields/OWNERS
+new file mode 100644
+index 0000000..dd033fe
+--- /dev/null
++++ b/pkg/fields/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - hongchaodeng
++ - dims
++ - david-mcmahon
++ - mqliang
+diff --git a/pkg/genericapiserver/OWNERS b/pkg/genericapiserver/OWNERS
+index 76e1b30..1e357ac 100644
+--- a/pkg/genericapiserver/OWNERS
++++ b/pkg/genericapiserver/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - lavalamp
+-  - nikhiljindal
+-  - smarterclayton
++
++reviewers:
++ - nikhiljindal
++ - smarterclayton
++ - deads2k
+diff --git a/pkg/genericapiserver/openapi/OWNERS b/pkg/genericapiserver/openapi/OWNERS
+new file mode 100644
+index 0000000..9218e43
+--- /dev/null
++++ b/pkg/genericapiserver/openapi/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mbohlool
+diff --git a/pkg/genericapiserver/options/OWNERS b/pkg/genericapiserver/options/OWNERS
+new file mode 100644
+index 0000000..5106200
+--- /dev/null
++++ b/pkg/genericapiserver/options/OWNERS
+@@ -0,0 +1,14 @@
++
++reviewers:
++ - smarterclayton
++ - jlowdermilk
++ - soltysh
++ - olegshaldybin
++ - ericchiang
++ - cjcullen
++ - xiangpengzhao
++ - mksalawa
++ - wojtek-t
++ - ping035627
++ - dims
++ - david-mcmahon
+diff --git a/pkg/genericapiserver/validation/OWNERS b/pkg/genericapiserver/validation/OWNERS
+new file mode 100644
+index 0000000..e749fbd
+--- /dev/null
++++ b/pkg/genericapiserver/validation/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mksalawa
+diff --git a/pkg/healthz/OWNERS b/pkg/healthz/OWNERS
+new file mode 100644
+index 0000000..dc31662
+--- /dev/null
++++ b/pkg/healthz/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - zhouhaibing089
++ - dims
++ - david-mcmahon
+diff --git a/pkg/httplog/OWNERS b/pkg/httplog/OWNERS
+new file mode 100644
+index 0000000..e3a600f
+--- /dev/null
++++ b/pkg/httplog/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - smarterclayton
++ - krousey
++ - dims
++ - wojtek-t
++ - david-mcmahon
++ - euank
+diff --git a/pkg/hyperkube/OWNERS b/pkg/hyperkube/OWNERS
+new file mode 100644
+index 0000000..3a70979
+--- /dev/null
++++ b/pkg/hyperkube/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - dims
+diff --git a/pkg/kubectl/OWNERS b/pkg/kubectl/OWNERS
+index 26e3e75..08419ed 100644
+--- a/pkg/kubectl/OWNERS
++++ b/pkg/kubectl/OWNERS
+@@ -1,7 +1,5 @@
+-assignees:
+-  - brendandburns
+-  - deads2k
+-  - janetkuo
+-  - jlowdermilk
+-  - pwittrock
+-  - smarterclayton
++
++reviewers:
++ - janetkuo
++ - deads2k
++ - smarterclayton
+diff --git a/pkg/kubectl/cmd/OWNERS b/pkg/kubectl/cmd/OWNERS
+new file mode 100644
+index 0000000..8c7f6e1
+--- /dev/null
++++ b/pkg/kubectl/cmd/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - janetkuo
++ - deads2k
++ - kargakis
+diff --git a/pkg/kubectl/metricsutil/OWNERS b/pkg/kubectl/metricsutil/OWNERS
+new file mode 100644
+index 0000000..e749fbd
+--- /dev/null
++++ b/pkg/kubectl/metricsutil/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mksalawa
+diff --git a/pkg/kubectl/resource/OWNERS b/pkg/kubectl/resource/OWNERS
+new file mode 100644
+index 0000000..98bdfbe
+--- /dev/null
++++ b/pkg/kubectl/resource/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - deads2k
++ - smarterclayton
+diff --git a/pkg/kubectl/testing/OWNERS b/pkg/kubectl/testing/OWNERS
+new file mode 100644
+index 0000000..79989a7
+--- /dev/null
++++ b/pkg/kubectl/testing/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - wojtek-t
++ - liggitt
++ - timothysc
++ - mml
++ - erictune
++ - soltysh
++ - smarterclayton
++ - david-mcmahon
+diff --git a/pkg/kubelet/OWNERS b/pkg/kubelet/OWNERS
+index c0b8d3a..d4a8b4a 100644
+--- a/pkg/kubelet/OWNERS
++++ b/pkg/kubelet/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - dchen1107
+-  - vishh
+-  - yujuhong
++
++reviewers:
++ - yujuhong
++ - Random-Liu
++ - yifan-gu
+diff --git a/pkg/kubelet/api/OWNERS b/pkg/kubelet/api/OWNERS
+new file mode 100644
+index 0000000..c3835ab
+--- /dev/null
++++ b/pkg/kubelet/api/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - yujuhong
++ - tmrts
++ - feiskyer
+diff --git a/pkg/kubelet/cadvisor/OWNERS b/pkg/kubelet/cadvisor/OWNERS
+new file mode 100644
+index 0000000..1efaab6
+--- /dev/null
++++ b/pkg/kubelet/cadvisor/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - timstclair
++ - jimmidyson
++ - vishh
+diff --git a/pkg/kubelet/client/OWNERS b/pkg/kubelet/client/OWNERS
+new file mode 100644
+index 0000000..22b9bc8
+--- /dev/null
++++ b/pkg/kubelet/client/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - resouer
++ - thockin
++ - davidopp
++ - liggitt
++ - gmarek
++ - david-mcmahon
++ - krousey
++ - zhouhaibing089
++ - timothysc
+diff --git a/pkg/kubelet/cm/OWNERS b/pkg/kubelet/cm/OWNERS
+new file mode 100644
+index 0000000..b99f221
+--- /dev/null
++++ b/pkg/kubelet/cm/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - vishh
++ - jimmidyson
++ - derekwaynecarr
++ - ingvagabund
++ - dims
+diff --git a/pkg/kubelet/config/OWNERS b/pkg/kubelet/config/OWNERS
+new file mode 100644
+index 0000000..c9f430a
+--- /dev/null
++++ b/pkg/kubelet/config/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - yujuhong
++ - caesarxuchao
++ - thockin
+diff --git a/pkg/kubelet/container/OWNERS b/pkg/kubelet/container/OWNERS
+new file mode 100644
+index 0000000..d4a8b4a
+--- /dev/null
++++ b/pkg/kubelet/container/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - yujuhong
++ - Random-Liu
++ - yifan-gu
+diff --git a/pkg/kubelet/custommetrics/OWNERS b/pkg/kubelet/custommetrics/OWNERS
+new file mode 100644
+index 0000000..8bf9eab
+--- /dev/null
++++ b/pkg/kubelet/custommetrics/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - laushinka
++ - mwielgus
+diff --git a/pkg/kubelet/dockershim/OWNERS b/pkg/kubelet/dockershim/OWNERS
+new file mode 100644
+index 0000000..486a506
+--- /dev/null
++++ b/pkg/kubelet/dockershim/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - yujuhong
++ - andreykurilin
+diff --git a/pkg/kubelet/dockertools/OWNERS b/pkg/kubelet/dockertools/OWNERS
+new file mode 100644
+index 0000000..41658f1
+--- /dev/null
++++ b/pkg/kubelet/dockertools/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - Random-Liu
++ - yujuhong
++ - resouer
+diff --git a/pkg/kubelet/envvars/OWNERS b/pkg/kubelet/envvars/OWNERS
+new file mode 100644
+index 0000000..9dbc635
+--- /dev/null
++++ b/pkg/kubelet/envvars/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - smarterclayton
+diff --git a/pkg/kubelet/events/OWNERS b/pkg/kubelet/events/OWNERS
+new file mode 100644
+index 0000000..7d31b17
+--- /dev/null
++++ b/pkg/kubelet/events/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - screeley44
++ - ronnielai
+diff --git a/pkg/kubelet/eviction/OWNERS b/pkg/kubelet/eviction/OWNERS
+index 86df6b7..c6e7cb0 100644
+--- a/pkg/kubelet/eviction/OWNERS
++++ b/pkg/kubelet/eviction/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - derekwaynecarr
+-  - vishh
+-  - dchen1107
++
++reviewers:
++ - derekwaynecarr
++ - ronnielai
++ - smarterclayton
+diff --git a/pkg/kubelet/images/OWNERS b/pkg/kubelet/images/OWNERS
+new file mode 100644
+index 0000000..a6603fd
+--- /dev/null
++++ b/pkg/kubelet/images/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - ronnielai
++ - resouer
++ - tmrts
++ - jfrazelle
++ - andreykurilin
+diff --git a/pkg/kubelet/kuberuntime/OWNERS b/pkg/kubelet/kuberuntime/OWNERS
+new file mode 100644
+index 0000000..a4ebacd
+--- /dev/null
++++ b/pkg/kubelet/kuberuntime/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - feiskyer
+diff --git a/pkg/kubelet/leaky/OWNERS b/pkg/kubelet/leaky/OWNERS
+new file mode 100644
+index 0000000..105bd9c
+--- /dev/null
++++ b/pkg/kubelet/leaky/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - david-mcmahon
+diff --git a/pkg/kubelet/lifecycle/OWNERS b/pkg/kubelet/lifecycle/OWNERS
+new file mode 100644
+index 0000000..2f12fe3
+--- /dev/null
++++ b/pkg/kubelet/lifecycle/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - Random-Liu
++ - vishh
+diff --git a/pkg/kubelet/metrics/OWNERS b/pkg/kubelet/metrics/OWNERS
+new file mode 100644
+index 0000000..1a308ed
+--- /dev/null
++++ b/pkg/kubelet/metrics/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - pwittrock
++ - david-mcmahon
++ - Random-Liu
++ - yujuhong
+diff --git a/pkg/kubelet/network/OWNERS b/pkg/kubelet/network/OWNERS
+new file mode 100644
+index 0000000..1f1a0dd
+--- /dev/null
++++ b/pkg/kubelet/network/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dcbw
++ - freehan
++ - euank
+diff --git a/pkg/kubelet/pleg/OWNERS b/pkg/kubelet/pleg/OWNERS
+new file mode 100644
+index 0000000..b3df45d
+--- /dev/null
++++ b/pkg/kubelet/pleg/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - yujuhong
++ - Random-Liu
++ - resouer
+diff --git a/pkg/kubelet/pod/OWNERS b/pkg/kubelet/pod/OWNERS
+new file mode 100644
+index 0000000..9e5ee6c
+--- /dev/null
++++ b/pkg/kubelet/pod/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - yujuhong
++ - timstclair
++ - caesarxuchao
+diff --git a/pkg/kubelet/prober/OWNERS b/pkg/kubelet/prober/OWNERS
+new file mode 100644
+index 0000000..f8860f8
+--- /dev/null
++++ b/pkg/kubelet/prober/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - timstclair
++ - smarterclayton
++ - ncdc
+diff --git a/pkg/kubelet/qos/OWNERS b/pkg/kubelet/qos/OWNERS
+new file mode 100644
+index 0000000..000e412
+--- /dev/null
++++ b/pkg/kubelet/qos/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - janetkuo
++ - derekwaynecarr
++ - vishh
+diff --git a/pkg/kubelet/remote/OWNERS b/pkg/kubelet/remote/OWNERS
+new file mode 100644
+index 0000000..334d9d1
+--- /dev/null
++++ b/pkg/kubelet/remote/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - yujuhong
++ - feiskyer
+diff --git a/pkg/kubelet/rkt/OWNERS b/pkg/kubelet/rkt/OWNERS
+new file mode 100644
+index 0000000..cd30a01
+--- /dev/null
++++ b/pkg/kubelet/rkt/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - yifan-gu
++ - euank
++ - Random-Liu
+diff --git a/pkg/kubelet/rktshim/OWNERS b/pkg/kubelet/rktshim/OWNERS
+new file mode 100644
+index 0000000..474c746
+--- /dev/null
++++ b/pkg/kubelet/rktshim/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - tmrts
+diff --git a/pkg/kubelet/server/OWNERS b/pkg/kubelet/server/OWNERS
+new file mode 100644
+index 0000000..283d22f
+--- /dev/null
++++ b/pkg/kubelet/server/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - timstclair
++ - derekwaynecarr
++ - pwittrock
++ - smarterclayton
+diff --git a/pkg/kubelet/status/OWNERS b/pkg/kubelet/status/OWNERS
+new file mode 100644
+index 0000000..fb968b1
+--- /dev/null
++++ b/pkg/kubelet/status/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - timstclair
++ - yujuhong
++ - Random-Liu
++ - caesarxuchao
+diff --git a/pkg/kubelet/types/OWNERS b/pkg/kubelet/types/OWNERS
+new file mode 100644
+index 0000000..6c8ea67
+--- /dev/null
++++ b/pkg/kubelet/types/OWNERS
+@@ -0,0 +1,13 @@
++
++reviewers:
++ - yujuhong
++ - timstclair
++ - Random-Liu
++ - smarterclayton
++ - david-mcmahon
++ - sjpotter
++ - derekwaynecarr
++ - luxas
++ - dims
++ - resouer
++ - lukaszo
+diff --git a/pkg/kubelet/util/OWNERS b/pkg/kubelet/util/OWNERS
+new file mode 100644
+index 0000000..fc0edc4
+--- /dev/null
++++ b/pkg/kubelet/util/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - yujuhong
++ - resouer
++ - feiskyer
+diff --git a/pkg/kubelet/volumemanager/OWNERS b/pkg/kubelet/volumemanager/OWNERS
+index 73ab6a2..851a269 100644
+--- a/pkg/kubelet/volumemanager/OWNERS
++++ b/pkg/kubelet/volumemanager/OWNERS
+@@ -1,2 +1,10 @@
+-assignees:
+-  - saad-ali
++
++reviewers:
++ - saad-ali
++ - wongma7
++ - lavalamp
++ - screeley44
++ - jingxu97
++ - andreykurilin
++ - pmorie
++ - ciwang
+diff --git a/pkg/kubemark/OWNERS b/pkg/kubemark/OWNERS
+new file mode 100644
+index 0000000..4064a5c
+--- /dev/null
++++ b/pkg/kubemark/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - gmarek
++ - caesarxuchao
++ - smarterclayton
++ - thockin
++ - ArtfulCoder
+diff --git a/pkg/labels/OWNERS b/pkg/labels/OWNERS
+new file mode 100644
+index 0000000..1e6067d
+--- /dev/null
++++ b/pkg/labels/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - thockin
++ - tummychow
++ - wojtek-t
++ - liubin
++ - hongchaodeng
++ - madhusudancs
+diff --git a/pkg/master/OWNERS b/pkg/master/OWNERS
+index 89f31a6..9d0bcdf 100644
+--- a/pkg/master/OWNERS
++++ b/pkg/master/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - derekwaynecarr
+-  - lavalamp
+-  - mikedanese
+-  - nikhiljindal
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - deads2k
+diff --git a/pkg/master/ports/OWNERS b/pkg/master/ports/OWNERS
+new file mode 100644
+index 0000000..1c4769f
+--- /dev/null
++++ b/pkg/master/ports/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - errm
++ - gmarek
++ - bprashanth
+diff --git a/pkg/metrics/OWNERS b/pkg/metrics/OWNERS
+new file mode 100644
+index 0000000..f3e24e1
+--- /dev/null
++++ b/pkg/metrics/OWNERS
+@@ -0,0 +1,15 @@
++
++reviewers:
++ - gmarek
++ - cjcullen
++ - therc
++ - vishh
++ - david-mcmahon
++ - thockin
++ - smarterclayton
++ - wojtek-t
++ - Random-Liu
++ - goltermann
++ - ixdy
++ - krousey
++ - yujuhong
+diff --git a/pkg/probe/OWNERS b/pkg/probe/OWNERS
+new file mode 100644
+index 0000000..a2942c0
+--- /dev/null
++++ b/pkg/probe/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - mvdan
++ - zhouhaibing089
++ - spxtr
++ - hongchaodeng
+diff --git a/pkg/probe/exec/OWNERS b/pkg/probe/exec/OWNERS
+new file mode 100644
+index 0000000..ce653c8
+--- /dev/null
++++ b/pkg/probe/exec/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - brendandburns
++ - david-mcmahon
++ - 7ing
+diff --git a/pkg/probe/http/OWNERS b/pkg/probe/http/OWNERS
+new file mode 100644
+index 0000000..ab9261c
+--- /dev/null
++++ b/pkg/probe/http/OWNERS
+@@ -0,0 +1,14 @@
++
++reviewers:
++ - david-mcmahon
++ - deads2k
++ - davidopp
++ - yujuhong
++ - ericchiang
++ - zhouhaibing089
++ - errm
++ - spxtr
++ - bprashanth
++ - therc
++ - jiangyaoguo
++ - mvdan
+diff --git a/pkg/probe/tcp/OWNERS b/pkg/probe/tcp/OWNERS
+new file mode 100644
+index 0000000..737b942
+--- /dev/null
++++ b/pkg/probe/tcp/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - hongchaodeng
++ - mvdan
++ - david-mcmahon
++ - zhouhaibing089
++ - spxtr
++ - thockin
++ - davidopp
+diff --git a/pkg/proxy/OWNERS b/pkg/proxy/OWNERS
+index 3e9886c..9bab838 100644
+--- a/pkg/proxy/OWNERS
++++ b/pkg/proxy/OWNERS
+@@ -1,3 +1,6 @@
+-assignees:
+-  - ArtfulCoder
+-  - thockin
++
++reviewers:
++ - thockin
++ - freehan
++ - ArtfulCoder
++ - lavalamp
+diff --git a/pkg/proxy/config/OWNERS b/pkg/proxy/config/OWNERS
+new file mode 100644
+index 0000000..33214a3
+--- /dev/null
++++ b/pkg/proxy/config/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - bprashanth
++ - lavalamp
+diff --git a/pkg/proxy/iptables/OWNERS b/pkg/proxy/iptables/OWNERS
+new file mode 100644
+index 0000000..3ade753
+--- /dev/null
++++ b/pkg/proxy/iptables/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - thockin
++ - freehan
++ - goltermann
++ - danwinship
+diff --git a/pkg/proxy/userspace/OWNERS b/pkg/proxy/userspace/OWNERS
+new file mode 100644
+index 0000000..6ab550a
+--- /dev/null
++++ b/pkg/proxy/userspace/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - thockin
++ - ArtfulCoder
++ - lavalamp
+diff --git a/pkg/quota/OWNERS b/pkg/quota/OWNERS
+index 286f236..6817c86 100644
+--- a/pkg/quota/OWNERS
++++ b/pkg/quota/OWNERS
+@@ -1,3 +1,6 @@
+-assignees:
+- - derekwaynecarr 
+- - vishh
++
++reviewers:
++ - derekwaynecarr
++ - smarterclayton
++ - sdminonne
++ - deads2k
+diff --git a/pkg/quota/evaluator/OWNERS b/pkg/quota/evaluator/OWNERS
+new file mode 100644
+index 0000000..4366772
+--- /dev/null
++++ b/pkg/quota/evaluator/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - derekwaynecarr
++ - sdminonne
++ - david-mcmahon
++ - pmorie
++ - 249043822
++ - smarterclayton
++ - dims
+diff --git a/pkg/quota/generic/OWNERS b/pkg/quota/generic/OWNERS
+new file mode 100644
+index 0000000..a864d11
+--- /dev/null
++++ b/pkg/quota/generic/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - smarterclayton
++ - david-mcmahon
++ - huang195
++ - goltermann
++ - derekwaynecarr
+diff --git a/pkg/quota/install/OWNERS b/pkg/quota/install/OWNERS
+new file mode 100644
+index 0000000..a5299ee
+--- /dev/null
++++ b/pkg/quota/install/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - derekwaynecarr
+diff --git a/pkg/registry/OWNERS b/pkg/registry/OWNERS
+index f9b7bd6..02e9366 100644
+--- a/pkg/registry/OWNERS
++++ b/pkg/registry/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - lavalamp
+-  - smarterclayton
+-  - wojtek-t
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - smarterclayton
+diff --git a/pkg/registry/authorization/OWNERS b/pkg/registry/authorization/OWNERS
+new file mode 100644
+index 0000000..c5c2fcf
+--- /dev/null
++++ b/pkg/registry/authorization/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - deads2k
+diff --git a/pkg/registry/cachesize/OWNERS b/pkg/registry/cachesize/OWNERS
+new file mode 100644
+index 0000000..bf8fd64
+--- /dev/null
++++ b/pkg/registry/cachesize/OWNERS
+@@ -0,0 +1,12 @@
++
++reviewers:
++ - wojtek-t
++ - david-mcmahon
++ - gtank
++ - soltysh
++ - mml
++ - bprashanth
++ - ericchiang
++ - caseydavenport
++ - madhusudancs
++ - magicwang-cn
+diff --git a/pkg/registry/certificates/OWNERS b/pkg/registry/certificates/OWNERS
+new file mode 100644
+index 0000000..8be866e
+--- /dev/null
++++ b/pkg/registry/certificates/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - hongchaodeng
++ - liggitt
++ - mikedanese
++ - dims
++ - wojtek-t
++ - david-mcmahon
++ - gtank
+diff --git a/pkg/registry/clusterrole/OWNERS b/pkg/registry/clusterrole/OWNERS
+new file mode 100644
+index 0000000..93ae178
+--- /dev/null
++++ b/pkg/registry/clusterrole/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - hongchaodeng
++ - wojtek-t
++ - dims
++ - david-mcmahon
++ - ericchiang
++ - liggitt
++ - deads2k
+diff --git a/pkg/registry/clusterrolebinding/OWNERS b/pkg/registry/clusterrolebinding/OWNERS
+new file mode 100644
+index 0000000..f006395
+--- /dev/null
++++ b/pkg/registry/clusterrolebinding/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - hongchaodeng
++ - wojtek-t
++ - david-mcmahon
++ - ericchiang
++ - liggitt
++ - deads2k
++ - dims
+diff --git a/pkg/registry/componentstatus/OWNERS b/pkg/registry/componentstatus/OWNERS
+new file mode 100644
+index 0000000..d829b69
+--- /dev/null
++++ b/pkg/registry/componentstatus/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - wojtek-t
++ - mqliang
++ - therc
++ - hongchaodeng
++ - luxas
++ - dims
++ - david-mcmahon
++ - resouer
+diff --git a/pkg/registry/configmap/OWNERS b/pkg/registry/configmap/OWNERS
+new file mode 100644
+index 0000000..2ff69c6
+--- /dev/null
++++ b/pkg/registry/configmap/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - wojtek-t
++ - hongchaodeng
++ - deads2k
++ - caesarxuchao
++ - liggitt
+diff --git a/pkg/registry/controller/OWNERS b/pkg/registry/controller/OWNERS
+new file mode 100644
+index 0000000..452de3a
+--- /dev/null
++++ b/pkg/registry/controller/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - thockin
+diff --git a/pkg/registry/daemonset/OWNERS b/pkg/registry/daemonset/OWNERS
+new file mode 100644
+index 0000000..61eca8d
+--- /dev/null
++++ b/pkg/registry/daemonset/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - thockin
++ - madhusudancs
+diff --git a/pkg/registry/deployment/OWNERS b/pkg/registry/deployment/OWNERS
+new file mode 100644
+index 0000000..e9b6abf
+--- /dev/null
++++ b/pkg/registry/deployment/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - madhusudancs
+diff --git a/pkg/registry/endpoint/OWNERS b/pkg/registry/endpoint/OWNERS
+new file mode 100644
+index 0000000..eb8527e
+--- /dev/null
++++ b/pkg/registry/endpoint/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - hongchaodeng
++ - caesarxuchao
+diff --git a/pkg/registry/event/OWNERS b/pkg/registry/event/OWNERS
+new file mode 100644
+index 0000000..d3f54f6
+--- /dev/null
++++ b/pkg/registry/event/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - hongchaodeng
++ - deads2k
+diff --git a/pkg/registry/experimental/OWNERS b/pkg/registry/experimental/OWNERS
+new file mode 100644
+index 0000000..8a5e5a9
+--- /dev/null
++++ b/pkg/registry/experimental/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - madhusudancs
++ - deads2k
+diff --git a/pkg/registry/generic/OWNERS b/pkg/registry/generic/OWNERS
+new file mode 100644
+index 0000000..5f99f6f
+--- /dev/null
++++ b/pkg/registry/generic/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - liggitt
+diff --git a/pkg/registry/horizontalpodautoscaler/OWNERS b/pkg/registry/horizontalpodautoscaler/OWNERS
+new file mode 100644
+index 0000000..b87eb88
+--- /dev/null
++++ b/pkg/registry/horizontalpodautoscaler/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - hongchaodeng
+diff --git a/pkg/registry/ingress/OWNERS b/pkg/registry/ingress/OWNERS
+new file mode 100644
+index 0000000..d3ffa6a
+--- /dev/null
++++ b/pkg/registry/ingress/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - thockin
+diff --git a/pkg/registry/job/OWNERS b/pkg/registry/job/OWNERS
+new file mode 100644
+index 0000000..392988c
+--- /dev/null
++++ b/pkg/registry/job/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - soltysh
++ - thockin
+diff --git a/pkg/registry/limitrange/OWNERS b/pkg/registry/limitrange/OWNERS
+new file mode 100644
+index 0000000..4639eee
+--- /dev/null
++++ b/pkg/registry/limitrange/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - hongchaodeng
+diff --git a/pkg/registry/namespace/OWNERS b/pkg/registry/namespace/OWNERS
+new file mode 100644
+index 0000000..656aecf
+--- /dev/null
++++ b/pkg/registry/namespace/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - liggitt
++ - thockin
++ - caesarxuchao
+diff --git a/pkg/registry/networkpolicy/OWNERS b/pkg/registry/networkpolicy/OWNERS
+new file mode 100644
+index 0000000..e5f5e8a
+--- /dev/null
++++ b/pkg/registry/networkpolicy/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caseydavenport
++ - hongchaodeng
++ - wojtek-t
+diff --git a/pkg/registry/node/OWNERS b/pkg/registry/node/OWNERS
+new file mode 100644
+index 0000000..fb8fe65
+--- /dev/null
++++ b/pkg/registry/node/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - liggitt
++ - thockin
+diff --git a/pkg/registry/persistentvolume/OWNERS b/pkg/registry/persistentvolume/OWNERS
+new file mode 100644
+index 0000000..e3be9ec
+--- /dev/null
++++ b/pkg/registry/persistentvolume/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - caesarxuchao
+diff --git a/pkg/registry/persistentvolumeclaim/OWNERS b/pkg/registry/persistentvolumeclaim/OWNERS
+new file mode 100644
+index 0000000..452de3a
+--- /dev/null
++++ b/pkg/registry/persistentvolumeclaim/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - thockin
+diff --git a/pkg/registry/petset/OWNERS b/pkg/registry/petset/OWNERS
+new file mode 100644
+index 0000000..4becd99
+--- /dev/null
++++ b/pkg/registry/petset/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - bprashanth
++ - wojtek-t
++ - liggitt
++ - hongchaodeng
+diff --git a/pkg/registry/pod/OWNERS b/pkg/registry/pod/OWNERS
+new file mode 100644
+index 0000000..e6a1472
+--- /dev/null
++++ b/pkg/registry/pod/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - feihujiang
+diff --git a/pkg/registry/poddisruptionbudget/OWNERS b/pkg/registry/poddisruptionbudget/OWNERS
+new file mode 100644
+index 0000000..3b1fe2a
+--- /dev/null
++++ b/pkg/registry/poddisruptionbudget/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - hongchaodeng
++ - liggitt
++ - wojtek-t
+diff --git a/pkg/registry/podsecuritypolicy/OWNERS b/pkg/registry/podsecuritypolicy/OWNERS
+new file mode 100644
+index 0000000..915083d
+--- /dev/null
++++ b/pkg/registry/podsecuritypolicy/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - pweil-
++ - hongchaodeng
+diff --git a/pkg/registry/podtemplate/OWNERS b/pkg/registry/podtemplate/OWNERS
+new file mode 100644
+index 0000000..b2e0ab9
+--- /dev/null
++++ b/pkg/registry/podtemplate/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - hongchaodeng
++ - thockin
+diff --git a/pkg/registry/rangeallocation/OWNERS b/pkg/registry/rangeallocation/OWNERS
+new file mode 100644
+index 0000000..ac3815c
+--- /dev/null
++++ b/pkg/registry/rangeallocation/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - AdoHe
+diff --git a/pkg/registry/registrytest/OWNERS b/pkg/registry/registrytest/OWNERS
+new file mode 100644
+index 0000000..c6c64ef
+--- /dev/null
++++ b/pkg/registry/registrytest/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - wojtek-t
++ - deads2k
++ - liggitt
++ - timothysc
++ - smarterclayton
++ - caesarxuchao
+diff --git a/pkg/registry/replicaset/OWNERS b/pkg/registry/replicaset/OWNERS
+new file mode 100644
+index 0000000..2803134
+--- /dev/null
++++ b/pkg/registry/replicaset/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - wojtek-t
++ - madhusudancs
++ - liggitt
++ - caesarxuchao
++ - hongchaodeng
+diff --git a/pkg/registry/resourcequota/OWNERS b/pkg/registry/resourcequota/OWNERS
+new file mode 100644
+index 0000000..e3be9ec
+--- /dev/null
++++ b/pkg/registry/resourcequota/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - caesarxuchao
+diff --git a/pkg/registry/role/OWNERS b/pkg/registry/role/OWNERS
+new file mode 100644
+index 0000000..27e89a2
+--- /dev/null
++++ b/pkg/registry/role/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - hongchaodeng
++ - wojtek-t
++ - ericchiang
++ - liggitt
++ - deads2k
++ - dims
++ - david-mcmahon
+diff --git a/pkg/registry/rolebinding/OWNERS b/pkg/registry/rolebinding/OWNERS
+new file mode 100644
+index 0000000..27e89a2
+--- /dev/null
++++ b/pkg/registry/rolebinding/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - hongchaodeng
++ - wojtek-t
++ - ericchiang
++ - liggitt
++ - deads2k
++ - dims
++ - david-mcmahon
+diff --git a/pkg/registry/scheduledjob/OWNERS b/pkg/registry/scheduledjob/OWNERS
+new file mode 100644
+index 0000000..77f3274
+--- /dev/null
++++ b/pkg/registry/scheduledjob/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - soltysh
++ - hongchaodeng
++ - liggitt
++ - deads2k
++ - dims
++ - wojtek-t
++ - caesarxuchao
++ - david-mcmahon
++ - mikedanese
+diff --git a/pkg/registry/secret/OWNERS b/pkg/registry/secret/OWNERS
+new file mode 100644
+index 0000000..eb8527e
+--- /dev/null
++++ b/pkg/registry/secret/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - hongchaodeng
++ - caesarxuchao
+diff --git a/pkg/registry/service/OWNERS b/pkg/registry/service/OWNERS
+new file mode 100644
+index 0000000..ef4fb49
+--- /dev/null
++++ b/pkg/registry/service/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - liggitt
+diff --git a/pkg/registry/serviceaccount/OWNERS b/pkg/registry/serviceaccount/OWNERS
+new file mode 100644
+index 0000000..b921ad6
+--- /dev/null
++++ b/pkg/registry/serviceaccount/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - caesarxuchao
++ - hongchaodeng
+diff --git a/pkg/registry/storageclass/OWNERS b/pkg/registry/storageclass/OWNERS
+new file mode 100644
+index 0000000..384423c
+--- /dev/null
++++ b/pkg/registry/storageclass/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - hongchaodeng
++ - wojtek-t
++ - liggitt
++ - childsb
+diff --git a/pkg/registry/thirdpartyresource/OWNERS b/pkg/registry/thirdpartyresource/OWNERS
+new file mode 100644
+index 0000000..b6923cc
+--- /dev/null
++++ b/pkg/registry/thirdpartyresource/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - caesarxuchao
++ - thockin
++ - hongchaodeng
+diff --git a/pkg/registry/thirdpartyresourcedata/OWNERS b/pkg/registry/thirdpartyresourcedata/OWNERS
+new file mode 100644
+index 0000000..39e988b
+--- /dev/null
++++ b/pkg/registry/thirdpartyresourcedata/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - brendandburns
++ - smarterclayton
+diff --git a/pkg/registry/tokenreview/OWNERS b/pkg/registry/tokenreview/OWNERS
+new file mode 100644
+index 0000000..e9b1d94
+--- /dev/null
++++ b/pkg/registry/tokenreview/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - deads2k
++ - wojtek-t
+diff --git a/pkg/runtime/OWNERS b/pkg/runtime/OWNERS
+index d038b5e..8f47af6 100644
+--- a/pkg/runtime/OWNERS
++++ b/pkg/runtime/OWNERS
+@@ -1,5 +1,5 @@
+-assignees:
+-  - caesarxuchao
+-  - deads2k
+-  - lavalamp
+-  - smarterclayton
++
++reviewers:
++ - smarterclayton
++ - wojtek-t
++ - deads2k
+diff --git a/pkg/runtime/serializer/OWNERS b/pkg/runtime/serializer/OWNERS
+new file mode 100644
+index 0000000..baa3c1d
+--- /dev/null
++++ b/pkg/runtime/serializer/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - wojtek-t
++ - goltermann
+diff --git a/pkg/security/OWNERS b/pkg/security/OWNERS
+new file mode 100644
+index 0000000..93533f4
+--- /dev/null
++++ b/pkg/security/OWNERS
+@@ -0,0 +1,12 @@
++
++reviewers:
++ - timstclair
++ - jfrazelle
++ - luxas
++ - johscheuer
++ - smarterclayton
++ - dims
++ - david-mcmahon
++ - abithap
++ - pweil-
++ - pmorie
+diff --git a/pkg/security/apparmor/OWNERS b/pkg/security/apparmor/OWNERS
+new file mode 100644
+index 0000000..b5e1332
+--- /dev/null
++++ b/pkg/security/apparmor/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - timstclair
+diff --git a/pkg/security/podsecuritypolicy/OWNERS b/pkg/security/podsecuritypolicy/OWNERS
+new file mode 100644
+index 0000000..cc18a8f
+--- /dev/null
++++ b/pkg/security/podsecuritypolicy/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - johscheuer
++ - david-mcmahon
++ - pweil-
++ - timstclair
++ - jfrazelle
++ - luxas
++ - pmorie
++ - smarterclayton
++ - abithap
+diff --git a/pkg/securitycontext/OWNERS b/pkg/securitycontext/OWNERS
+new file mode 100644
+index 0000000..e2da9cb
+--- /dev/null
++++ b/pkg/securitycontext/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - Random-Liu
++ - wongma7
+diff --git a/pkg/selection/OWNERS b/pkg/selection/OWNERS
+new file mode 100644
+index 0000000..abd0a9a
+--- /dev/null
++++ b/pkg/selection/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - hongchaodeng
+diff --git a/pkg/serviceaccount/OWNERS b/pkg/serviceaccount/OWNERS
+new file mode 100644
+index 0000000..a7407fb
+--- /dev/null
++++ b/pkg/serviceaccount/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - caesarxuchao
++ - liggitt
++ - xiangpengzhao
++ - smarterclayton
++ - krousey
++ - colemickens
++ - david-mcmahon
++ - thockin
+diff --git a/pkg/ssh/OWNERS b/pkg/ssh/OWNERS
+new file mode 100644
+index 0000000..ee4807a
+--- /dev/null
++++ b/pkg/ssh/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - cjcullen
++ - wojtek-t
++ - caesarxuchao
++ - david-mcmahon
++ - timstclair
++ - ingvagabund
++ - spxtr
+diff --git a/pkg/storage/OWNERS b/pkg/storage/OWNERS
+index a57ded7..0efbc48 100644
+--- a/pkg/storage/OWNERS
++++ b/pkg/storage/OWNERS
+@@ -1,6 +1,5 @@
+-assignees:
+-  - lavalamp
+-  - liggitt
+-  - timothysc
+-  - wojtek-t
+-  - xiang90
++
++reviewers:
++ - wojtek-t
++ - hongchaodeng
++ - timothysc
+diff --git a/pkg/storage/etcd/OWNERS b/pkg/storage/etcd/OWNERS
+new file mode 100644
+index 0000000..0efbc48
+--- /dev/null
++++ b/pkg/storage/etcd/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - hongchaodeng
++ - timothysc
+diff --git a/pkg/storage/etcd3/OWNERS b/pkg/storage/etcd3/OWNERS
+new file mode 100644
+index 0000000..a11557a
+--- /dev/null
++++ b/pkg/storage/etcd3/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - hongchaodeng
++ - wojtek-t
++ - timothysc
++ - david-mcmahon
++ - gyuho
+diff --git a/pkg/storage/storagebackend/OWNERS b/pkg/storage/storagebackend/OWNERS
+new file mode 100644
+index 0000000..de11025
+--- /dev/null
++++ b/pkg/storage/storagebackend/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - hongchaodeng
++ - david-mcmahon
++ - smarterclayton
+diff --git a/pkg/storage/testing/OWNERS b/pkg/storage/testing/OWNERS
+new file mode 100644
+index 0000000..bf88848
+--- /dev/null
++++ b/pkg/storage/testing/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - timothysc
++ - liggitt
+diff --git a/pkg/types/OWNERS b/pkg/types/OWNERS
+new file mode 100644
+index 0000000..e636152
+--- /dev/null
++++ b/pkg/types/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - swagiaal
+diff --git a/pkg/ui/OWNERS b/pkg/ui/OWNERS
+new file mode 100644
+index 0000000..e83dabb
+--- /dev/null
++++ b/pkg/ui/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - nikhiljindal
++ - david-mcmahon
++ - bryk
++ - mamikonyana
++ - dims
+diff --git a/pkg/ui/data/OWNERS b/pkg/ui/data/OWNERS
+new file mode 100644
+index 0000000..4536257
+--- /dev/null
++++ b/pkg/ui/data/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - nikhiljindal
++ - david-mcmahon
++ - mamikonyana
+diff --git a/pkg/util/OWNERS b/pkg/util/OWNERS
+new file mode 100644
+index 0000000..474517c
+--- /dev/null
++++ b/pkg/util/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - janetkuo
++ - thockin
++ - smarterclayton
+diff --git a/pkg/util/async/OWNERS b/pkg/util/async/OWNERS
+new file mode 100644
+index 0000000..10b82d0
+--- /dev/null
++++ b/pkg/util/async/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - resouer
+diff --git a/pkg/util/bandwidth/OWNERS b/pkg/util/bandwidth/OWNERS
+new file mode 100644
+index 0000000..fb9a30c
+--- /dev/null
++++ b/pkg/util/bandwidth/OWNERS
+@@ -0,0 +1,13 @@
++
++reviewers:
++ - smarterclayton
++ - dims
++ - atombender
++ - tummychow
++ - markturansky
++ - brendandburns
++ - pmorie
++ - david-mcmahon
++ - laushinka
++ - dcbw
++ - therc
+diff --git a/pkg/util/cache/OWNERS b/pkg/util/cache/OWNERS
+new file mode 100644
+index 0000000..ee55fdb
+--- /dev/null
++++ b/pkg/util/cache/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - david-mcmahon
++ - cjcullen
++ - sjenning
++ - resouer
+diff --git a/pkg/util/certificates/OWNERS b/pkg/util/certificates/OWNERS
+new file mode 100644
+index 0000000..48fa789
+--- /dev/null
++++ b/pkg/util/certificates/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - gtank
+diff --git a/pkg/util/chmod/OWNERS b/pkg/util/chmod/OWNERS
+new file mode 100644
+index 0000000..8a1570c
+--- /dev/null
++++ b/pkg/util/chmod/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - pmorie
+diff --git a/pkg/util/chown/OWNERS b/pkg/util/chown/OWNERS
+new file mode 100644
+index 0000000..7af6216
+--- /dev/null
++++ b/pkg/util/chown/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - dims
++ - david-mcmahon
+diff --git a/pkg/util/clock/OWNERS b/pkg/util/clock/OWNERS
+new file mode 100644
+index 0000000..10b82d0
+--- /dev/null
++++ b/pkg/util/clock/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - resouer
+diff --git a/pkg/util/codeinspector/OWNERS b/pkg/util/codeinspector/OWNERS
+new file mode 100644
+index 0000000..7b717f7
+--- /dev/null
++++ b/pkg/util/codeinspector/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - resouer
++ - wojtek-t
++ - david-mcmahon
+diff --git a/pkg/util/config/OWNERS b/pkg/util/config/OWNERS
+new file mode 100644
+index 0000000..07196ef
+--- /dev/null
++++ b/pkg/util/config/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - resouer
++ - ingvagabund
++ - invenfantasy
++ - jlowdermilk
+diff --git a/pkg/util/configz/OWNERS b/pkg/util/configz/OWNERS
+new file mode 100644
+index 0000000..db648bd
+--- /dev/null
++++ b/pkg/util/configz/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - zhouhaibing089
++ - mikedanese
+diff --git a/pkg/util/crlf/OWNERS b/pkg/util/crlf/OWNERS
+new file mode 100644
+index 0000000..6e9c61f
+--- /dev/null
++++ b/pkg/util/crlf/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - resouer
+diff --git a/pkg/util/crypto/OWNERS b/pkg/util/crypto/OWNERS
+new file mode 100644
+index 0000000..dce4265
+--- /dev/null
++++ b/pkg/util/crypto/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - AdoHe
++ - resouer
+diff --git a/pkg/util/dbus/OWNERS b/pkg/util/dbus/OWNERS
+new file mode 100644
+index 0000000..8d6c1ea
+--- /dev/null
++++ b/pkg/util/dbus/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - goltermann
++ - jimmidyson
++ - danwinship
+diff --git a/pkg/util/diff/OWNERS b/pkg/util/diff/OWNERS
+new file mode 100644
+index 0000000..ccdf207
+--- /dev/null
++++ b/pkg/util/diff/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - david-mcmahon
++ - resouer
+diff --git a/pkg/util/env/OWNERS b/pkg/util/env/OWNERS
+new file mode 100644
+index 0000000..92e07a8
+--- /dev/null
++++ b/pkg/util/env/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - asalkeld
++ - david-mcmahon
++ - resouer
+diff --git a/pkg/util/errors/OWNERS b/pkg/util/errors/OWNERS
+new file mode 100644
+index 0000000..c49a2c6
+--- /dev/null
++++ b/pkg/util/errors/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - janetkuo
+diff --git a/pkg/util/exec/OWNERS b/pkg/util/exec/OWNERS
+new file mode 100644
+index 0000000..ac441af
+--- /dev/null
++++ b/pkg/util/exec/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - swagiaal
++ - tmrts
++ - dims
++ - david-mcmahon
++ - 7ing
++ - brendandburns
+diff --git a/pkg/util/flag/OWNERS b/pkg/util/flag/OWNERS
+new file mode 100644
+index 0000000..36c0e34
+--- /dev/null
++++ b/pkg/util/flag/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - resouer
++ - david-mcmahon
+diff --git a/pkg/util/flock/OWNERS b/pkg/util/flock/OWNERS
+new file mode 100644
+index 0000000..028e31b
+--- /dev/null
++++ b/pkg/util/flock/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - mikedanese
++ - david-mcmahon
+diff --git a/pkg/util/flowcontrol/OWNERS b/pkg/util/flowcontrol/OWNERS
+new file mode 100644
+index 0000000..f7c6a5c
+--- /dev/null
++++ b/pkg/util/flowcontrol/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - resouer
++ - goltermann
++ - jfrazelle
++ - luxas
++ - gmarek
++ - david-mcmahon
+diff --git a/pkg/util/flushwriter/OWNERS b/pkg/util/flushwriter/OWNERS
+new file mode 100644
+index 0000000..6d192ea
+--- /dev/null
++++ b/pkg/util/flushwriter/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
+diff --git a/pkg/util/framer/OWNERS b/pkg/util/framer/OWNERS
+new file mode 100644
+index 0000000..3452dee
+--- /dev/null
++++ b/pkg/util/framer/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - wojtek-t
++ - david-mcmahon
+diff --git a/pkg/util/goroutinemap/OWNERS b/pkg/util/goroutinemap/OWNERS
+index 73ab6a2..2f7d455 100644
+--- a/pkg/util/goroutinemap/OWNERS
++++ b/pkg/util/goroutinemap/OWNERS
+@@ -1,2 +1,5 @@
+-assignees:
+-  - saad-ali
++
++reviewers:
++ - saad-ali
++ - jsafrane
++ - matttproud
+diff --git a/pkg/util/hash/OWNERS b/pkg/util/hash/OWNERS
+new file mode 100644
+index 0000000..6e9c61f
+--- /dev/null
++++ b/pkg/util/hash/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - resouer
+diff --git a/pkg/util/homedir/OWNERS b/pkg/util/homedir/OWNERS
+new file mode 100644
+index 0000000..4ff0be3
+--- /dev/null
++++ b/pkg/util/homedir/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - fabianofranz
++ - david-mcmahon
+diff --git a/pkg/util/httpstream/OWNERS b/pkg/util/httpstream/OWNERS
+new file mode 100644
+index 0000000..225baa8
+--- /dev/null
++++ b/pkg/util/httpstream/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - ncdc
++ - fabianofranz
++ - goltermann
++ - liggitt
++ - smarterclayton
++ - thockin
+diff --git a/pkg/util/integer/OWNERS b/pkg/util/integer/OWNERS
+new file mode 100644
+index 0000000..ff2c162
+--- /dev/null
++++ b/pkg/util/integer/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - kargakis
++ - mqliang
++ - david-mcmahon
+diff --git a/pkg/util/interrupt/OWNERS b/pkg/util/interrupt/OWNERS
+new file mode 100644
+index 0000000..1515a2f
+--- /dev/null
++++ b/pkg/util/interrupt/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - smarterclayton
++ - david-mcmahon
++ - bparees
++ - rhcarvalho
+diff --git a/pkg/util/intstr/OWNERS b/pkg/util/intstr/OWNERS
+new file mode 100644
+index 0000000..9ed8385
+--- /dev/null
++++ b/pkg/util/intstr/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - mqliang
++ - thockin
+diff --git a/pkg/util/io/OWNERS b/pkg/util/io/OWNERS
+new file mode 100644
+index 0000000..32e09f7
+--- /dev/null
++++ b/pkg/util/io/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - markturansky
++ - smarterclayton
++ - nikhiljindal
++ - deads2k
++ - mvdan
++ - fgrzadkowski
++ - fabioy
++ - david-mcmahon
+diff --git a/pkg/util/iptables/OWNERS b/pkg/util/iptables/OWNERS
+new file mode 100644
+index 0000000..0b627e9
+--- /dev/null
++++ b/pkg/util/iptables/OWNERS
+@@ -0,0 +1,13 @@
++
++reviewers:
++ - danwinship
++ - thockin
++ - david-mcmahon
++ - hw-qiaolei
++ - 7ing
++ - freehan
++ - joe2far
++ - marun
++ - gmarek
++ - dims
++ - tummychow
+diff --git a/pkg/util/json/OWNERS b/pkg/util/json/OWNERS
+new file mode 100644
+index 0000000..4d78d7c
+--- /dev/null
++++ b/pkg/util/json/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - liggitt
+diff --git a/pkg/util/jsonpath/OWNERS b/pkg/util/jsonpath/OWNERS
+new file mode 100644
+index 0000000..4acacd3
+--- /dev/null
++++ b/pkg/util/jsonpath/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - daizuozhuo
++ - thockin
++ - smarterclayton
+diff --git a/pkg/util/keymutex/OWNERS b/pkg/util/keymutex/OWNERS
+new file mode 100644
+index 0000000..39e7a31
+--- /dev/null
++++ b/pkg/util/keymutex/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - markturansky
++ - saad-ali
++ - luxas
++ - david-mcmahon
++ - laushinka
+diff --git a/pkg/util/labels/OWNERS b/pkg/util/labels/OWNERS
+new file mode 100644
+index 0000000..4e0b127
+--- /dev/null
++++ b/pkg/util/labels/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - madhusudancs
++ - janetkuo
++ - asalkeld
++ - david-mcmahon
++ - jpiccari
++ - laushinka
++ - dims
+diff --git a/pkg/util/limitwriter/OWNERS b/pkg/util/limitwriter/OWNERS
+new file mode 100644
+index 0000000..a842bf0
+--- /dev/null
++++ b/pkg/util/limitwriter/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - smarterclayton
++ - dims
+diff --git a/pkg/util/logs/OWNERS b/pkg/util/logs/OWNERS
+new file mode 100644
+index 0000000..a3cf388
+--- /dev/null
++++ b/pkg/util/logs/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - caesarxuchao
+diff --git a/pkg/util/maps/OWNERS b/pkg/util/maps/OWNERS
+new file mode 100644
+index 0000000..b5e1332
+--- /dev/null
++++ b/pkg/util/maps/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - timstclair
+diff --git a/pkg/util/metrics/OWNERS b/pkg/util/metrics/OWNERS
+new file mode 100644
+index 0000000..ce842ed
+--- /dev/null
++++ b/pkg/util/metrics/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - gmarek
+diff --git a/pkg/util/mount/OWNERS b/pkg/util/mount/OWNERS
+new file mode 100644
+index 0000000..6f4491b
+--- /dev/null
++++ b/pkg/util/mount/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - swagiaal
++ - jingxu97
++ - jsafrane
++ - rootfs
+diff --git a/pkg/util/net/OWNERS b/pkg/util/net/OWNERS
+new file mode 100644
+index 0000000..fdaf42b
+--- /dev/null
++++ b/pkg/util/net/OWNERS
+@@ -0,0 +1,14 @@
++
++reviewers:
++ - timothysc
++ - caesarxuchao
++ - soltysh
++ - thockin
++ - david-mcmahon
++ - xiangpengzhao
++ - freehan
++ - deads2k
++ - justinsb
++ - nikhiljindal
++ - mikedanese
++ - resouer
+diff --git a/pkg/util/node/OWNERS b/pkg/util/node/OWNERS
+new file mode 100644
+index 0000000..be39e21
+--- /dev/null
++++ b/pkg/util/node/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - david-mcmahon
++ - dims
++ - Random-Liu
++ - gmarek
+diff --git a/pkg/util/oom/OWNERS b/pkg/util/oom/OWNERS
+new file mode 100644
+index 0000000..44a8e4b
+--- /dev/null
++++ b/pkg/util/oom/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - vishh
++ - jimmidyson
++ - xiangpengzhao
++ - dims
++ - david-mcmahon
++ - goltermann
++ - gmarek
+diff --git a/pkg/util/parsers/OWNERS b/pkg/util/parsers/OWNERS
+new file mode 100644
+index 0000000..36203d0
+--- /dev/null
++++ b/pkg/util/parsers/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - stefwalter
++ - resouer
++ - david-mcmahon
++ - Random-Liu
+diff --git a/pkg/util/pod/OWNERS b/pkg/util/pod/OWNERS
+new file mode 100644
+index 0000000..88a93ff
+--- /dev/null
++++ b/pkg/util/pod/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - janetkuo
++ - nhlfr
++ - dims
++ - david-mcmahon
++ - caesarxuchao
++ - madhusudancs
+diff --git a/pkg/util/procfs/OWNERS b/pkg/util/procfs/OWNERS
+new file mode 100644
+index 0000000..a78dbf1
+--- /dev/null
++++ b/pkg/util/procfs/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - dims
++ - vishh
++ - johscheuer
++ - yujuhong
++ - david-mcmahon
++ - brendandburns
+diff --git a/pkg/util/proxy/OWNERS b/pkg/util/proxy/OWNERS
+new file mode 100644
+index 0000000..eeac66f
+--- /dev/null
++++ b/pkg/util/proxy/OWNERS
+@@ -0,0 +1,13 @@
++
++reviewers:
++ - thockin
++ - dims
++ - zhouhaibing089
++ - davidopp
++ - liggitt
++ - jfrazelle
++ - david-mcmahon
++ - resouer
++ - csrwng
++ - vishh
++ - tummychow
+diff --git a/pkg/util/rand/OWNERS b/pkg/util/rand/OWNERS
+new file mode 100644
+index 0000000..b63ffee
+--- /dev/null
++++ b/pkg/util/rand/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - zmerlynn
++ - david-mcmahon
++ - resouer
++ - jayunit100
++ - ArtfulCoder
+diff --git a/pkg/util/replicaset/OWNERS b/pkg/util/replicaset/OWNERS
+new file mode 100644
+index 0000000..883c210
+--- /dev/null
++++ b/pkg/util/replicaset/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - janetkuo
++ - nhlfr
++ - kargakis
++ - david-mcmahon
++ - caesarxuchao
+diff --git a/pkg/util/resourcecontainer/OWNERS b/pkg/util/resourcecontainer/OWNERS
+new file mode 100644
+index 0000000..10b82d0
+--- /dev/null
++++ b/pkg/util/resourcecontainer/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - resouer
+diff --git a/pkg/util/rlimit/OWNERS b/pkg/util/rlimit/OWNERS
+new file mode 100644
+index 0000000..10b82d0
+--- /dev/null
++++ b/pkg/util/rlimit/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - resouer
+diff --git a/pkg/util/runtime/OWNERS b/pkg/util/runtime/OWNERS
+new file mode 100644
+index 0000000..b83fda1
+--- /dev/null
++++ b/pkg/util/runtime/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - resouer
++ - saad-ali
++ - lavalamp
++ - david-mcmahon
++ - deads2k
++ - bprashanth
+diff --git a/pkg/util/selinux/OWNERS b/pkg/util/selinux/OWNERS
+new file mode 100644
+index 0000000..6743c57
+--- /dev/null
++++ b/pkg/util/selinux/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - dims
++ - david-mcmahon
++ - yifan-gu
++ - jimmidyson
++ - swagiaal
+diff --git a/pkg/util/sets/OWNERS b/pkg/util/sets/OWNERS
+new file mode 100644
+index 0000000..dfecbaf
+--- /dev/null
++++ b/pkg/util/sets/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - lavalamp
++ - wojtek-t
++ - tummychow
++ - david-mcmahon
++ - smarterclayton
++ - justinsb
++ - eparis
+diff --git a/pkg/util/slice/OWNERS b/pkg/util/slice/OWNERS
+new file mode 100644
+index 0000000..5cde90b
+--- /dev/null
++++ b/pkg/util/slice/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - david-mcmahon
++ - dshulyak
++ - mvdan
++ - ArtfulCoder
+diff --git a/pkg/util/strategicpatch/OWNERS b/pkg/util/strategicpatch/OWNERS
+new file mode 100644
+index 0000000..4afe003
+--- /dev/null
++++ b/pkg/util/strategicpatch/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - jackgr
++ - AdoHe
++ - jhadvig
++ - feihujiang
++ - david-mcmahon
++ - thockin
++ - liggitt
++ - goltermann
++ - deads2k
+diff --git a/pkg/util/strings/OWNERS b/pkg/util/strings/OWNERS
+new file mode 100644
+index 0000000..8e1a730
+--- /dev/null
++++ b/pkg/util/strings/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - resouer
++ - asalkeld
++ - david-mcmahon
+diff --git a/pkg/util/sysctl/OWNERS b/pkg/util/sysctl/OWNERS
+new file mode 100644
+index 0000000..dfb82e2
+--- /dev/null
++++ b/pkg/util/sysctl/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - derekwaynecarr
++ - david-mcmahon
++ - brendandburns
+diff --git a/pkg/util/system/OWNERS b/pkg/util/system/OWNERS
+new file mode 100644
+index 0000000..ce842ed
+--- /dev/null
++++ b/pkg/util/system/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - gmarek
+diff --git a/pkg/util/term/OWNERS b/pkg/util/term/OWNERS
+new file mode 100644
+index 0000000..c457522
+--- /dev/null
++++ b/pkg/util/term/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - ncdc
++ - Random-Liu
++ - david-mcmahon
++ - smarterclayton
+diff --git a/pkg/util/testing/OWNERS b/pkg/util/testing/OWNERS
+new file mode 100644
+index 0000000..b948553
+--- /dev/null
++++ b/pkg/util/testing/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - wojtek-t
++ - david-mcmahon
++ - zhouhaibing089
++ - fabioy
++ - mikedanese
++ - resouer
+diff --git a/pkg/util/threading/OWNERS b/pkg/util/threading/OWNERS
+new file mode 100644
+index 0000000..6e9c61f
+--- /dev/null
++++ b/pkg/util/threading/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - resouer
+diff --git a/pkg/util/uuid/OWNERS b/pkg/util/uuid/OWNERS
+new file mode 100644
+index 0000000..10b82d0
+--- /dev/null
++++ b/pkg/util/uuid/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - resouer
+diff --git a/pkg/util/validation/OWNERS b/pkg/util/validation/OWNERS
+new file mode 100644
+index 0000000..3e1665a
+--- /dev/null
++++ b/pkg/util/validation/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - thockin
++ - aledbf
++ - fraenkel
++ - errm
++ - aanm
++ - mdshuai
++ - david-mcmahon
++ - therc
++ - tummychow
+diff --git a/pkg/util/wait/OWNERS b/pkg/util/wait/OWNERS
+new file mode 100644
+index 0000000..bb60653
+--- /dev/null
++++ b/pkg/util/wait/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - wojtek-t
++ - ingvagabund
++ - liubin
++ - ncdc
+diff --git a/pkg/util/workqueue/OWNERS b/pkg/util/workqueue/OWNERS
+new file mode 100644
+index 0000000..1d5beab
+--- /dev/null
++++ b/pkg/util/workqueue/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - deads2k
++ - caesarxuchao
++ - liggitt
+diff --git a/pkg/util/wsstream/OWNERS b/pkg/util/wsstream/OWNERS
+new file mode 100644
+index 0000000..bd49826
+--- /dev/null
++++ b/pkg/util/wsstream/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - smarterclayton
++ - davidopp
++ - liggitt
++ - dims
++ - david-mcmahon
++ - zhouhaibing089
++ - resouer
++ - goltermann
+diff --git a/pkg/util/yaml/OWNERS b/pkg/util/yaml/OWNERS
+new file mode 100644
+index 0000000..3aed3a7
+--- /dev/null
++++ b/pkg/util/yaml/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - smarterclayton
++ - wojtek-t
++ - mlafeldt
++ - ncdc
++ - AdoHe
++ - david-mcmahon
++ - mfojtik
+diff --git a/pkg/version/OWNERS b/pkg/version/OWNERS
+new file mode 100644
+index 0000000..1245c65
+--- /dev/null
++++ b/pkg/version/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - joe2far
++ - david-mcmahon
++ - ixdy
++ - mamikonyana
++ - caesarxuchao
++ - mikedanese
++ - jimmidyson
++ - dims
+diff --git a/pkg/version/verflag/OWNERS b/pkg/version/verflag/OWNERS
+new file mode 100644
+index 0000000..051615a
+--- /dev/null
++++ b/pkg/version/verflag/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - caesarxuchao
+diff --git a/pkg/volume/OWNERS b/pkg/volume/OWNERS
+index 164cfea..c7570b9 100644
+--- a/pkg/volume/OWNERS
++++ b/pkg/volume/OWNERS
+@@ -1,4 +1,6 @@
+-assignees:
+-  - saad-ali
+-  - thockin
+-  - pmorie
++
++reviewers:
++ - saad-ali
++ - jsafrane
++ - swagiaal
++ - pmorie
+diff --git a/pkg/volume/aws_ebs/OWNERS b/pkg/volume/aws_ebs/OWNERS
+index 4e05cdd..ee35806 100644
+--- a/pkg/volume/aws_ebs/OWNERS
++++ b/pkg/volume/aws_ebs/OWNERS
+@@ -1,3 +1,5 @@
+-maintainers:
+-- jsafrane
+-- justinsb
++
++reviewers:
++ - justinsb
++ - saad-ali
++ - jsafrane
+diff --git a/pkg/volume/azure_file/OWNERS b/pkg/volume/azure_file/OWNERS
+index a333fdc..d8753c6 100644
+--- a/pkg/volume/azure_file/OWNERS
++++ b/pkg/volume/azure_file/OWNERS
+@@ -1,2 +1,11 @@
+-maintainers:
+-- rootfs
++
++reviewers:
++ - saad-ali
++ - thockin
++ - dims
++ - vishh
++ - timstclair
++ - david-mcmahon
++ - jingxu97
++ - caesarxuchao
++ - rootfs
+diff --git a/pkg/volume/cephfs/OWNERS b/pkg/volume/cephfs/OWNERS
+index a333fdc..4fb48d9 100644
+--- a/pkg/volume/cephfs/OWNERS
++++ b/pkg/volume/cephfs/OWNERS
+@@ -1,2 +1,7 @@
+-maintainers:
+-- rootfs
++
++reviewers:
++ - saad-ali
++ - swagiaal
++ - caesarxuchao
++ - pmorie
++ - thockin
+diff --git a/pkg/volume/cinder/OWNERS b/pkg/volume/cinder/OWNERS
+index 1849a03..e865dc5 100644
+--- a/pkg/volume/cinder/OWNERS
++++ b/pkg/volume/cinder/OWNERS
+@@ -1,3 +1,5 @@
+-maintainers:
+-- jsafrane
+-- spothanis
++
++reviewers:
++ - jsafrane
++ - saad-ali
++ - swagiaal
+diff --git a/pkg/volume/configmap/OWNERS b/pkg/volume/configmap/OWNERS
+index 87269d7..2237b57 100644
+--- a/pkg/volume/configmap/OWNERS
++++ b/pkg/volume/configmap/OWNERS
+@@ -1,2 +1,16 @@
+-maintainers:
+-- pmorie
++
++reviewers:
++ - saad-ali
++ - pmorie
++ - olegshaldybin
++ - jingxu97
++ - david-mcmahon
++ - caesarxuchao
++ - goltermann
++ - sjenning
++ - ivan4th
++ - dims
++ - asalkeld
++ - thockin
++ - timstclair
++ - rata
+diff --git a/pkg/volume/downwardapi/OWNERS b/pkg/volume/downwardapi/OWNERS
+index 85285e5..4e61b24 100644
+--- a/pkg/volume/downwardapi/OWNERS
++++ b/pkg/volume/downwardapi/OWNERS
+@@ -1,3 +1,8 @@
+-maintainers:
+-- pmorie
+-- sdminonne
++
++reviewers:
++ - caesarxuchao
++ - swagiaal
++ - aveshagarwal
++ - saad-ali
++ - resouer
++ - pmorie
+diff --git a/pkg/volume/empty_dir/OWNERS b/pkg/volume/empty_dir/OWNERS
+index b4ae5e6..92eb73f 100644
+--- a/pkg/volume/empty_dir/OWNERS
++++ b/pkg/volume/empty_dir/OWNERS
+@@ -1,4 +1,5 @@
+-maintainers:
+-- pmorie
+-- saad-ali
+-- thockin
++
++reviewers:
++ - swagiaal
++ - pmorie
++ - saad-ali
+diff --git a/pkg/volume/fc/OWNERS b/pkg/volume/fc/OWNERS
+index a333fdc..d8ee047 100644
+--- a/pkg/volume/fc/OWNERS
++++ b/pkg/volume/fc/OWNERS
+@@ -1,2 +1,8 @@
+-maintainers:
+-- rootfs
++
++reviewers:
++ - swagiaal
++ - saad-ali
++ - pmorie
++ - thockin
++ - caesarxuchao
++ - smarterclayton
+diff --git a/pkg/volume/flexvolume/OWNERS b/pkg/volume/flexvolume/OWNERS
+index b29ad9f..e35ba99 100644
+--- a/pkg/volume/flexvolume/OWNERS
++++ b/pkg/volume/flexvolume/OWNERS
+@@ -1,2 +1,6 @@
+-maintainers:
+-- nelcy
++
++reviewers:
++ - saad-ali
++ - caesarxuchao
++ - chakri-nelluri
++ - swagiaal
+diff --git a/pkg/volume/flocker/OWNERS b/pkg/volume/flocker/OWNERS
+index 95c6d0d..9041f40 100644
+--- a/pkg/volume/flocker/OWNERS
++++ b/pkg/volume/flocker/OWNERS
+@@ -1,3 +1,7 @@
+-maintainers:
+-- agonzalezro
+-- simonswine
++
++reviewers:
++ - saad-ali
++ - swagiaal
++ - resouer
++ - pmorie
++ - simonswine
+diff --git a/pkg/volume/gce_pd/OWNERS b/pkg/volume/gce_pd/OWNERS
+index 4a34648..5618ef0 100644
+--- a/pkg/volume/gce_pd/OWNERS
++++ b/pkg/volume/gce_pd/OWNERS
+@@ -1,3 +1,5 @@
+-maintainers:
+-- saad-ali
+-- thockin
++
++reviewers:
++ - saad-ali
++ - jsafrane
++ - swagiaal
+diff --git a/pkg/volume/git_repo/OWNERS b/pkg/volume/git_repo/OWNERS
+index 0d97d12..df1dd41 100644
+--- a/pkg/volume/git_repo/OWNERS
++++ b/pkg/volume/git_repo/OWNERS
+@@ -1,2 +1,6 @@
+-maintainers:
+-- thockin
++
++reviewers:
++ - resouer
++ - swagiaal
++ - pmorie
++ - saad-ali
+diff --git a/pkg/volume/glusterfs/OWNERS b/pkg/volume/glusterfs/OWNERS
+index a333fdc..47167c6 100644
+--- a/pkg/volume/glusterfs/OWNERS
++++ b/pkg/volume/glusterfs/OWNERS
+@@ -1,2 +1,5 @@
+-maintainers:
+-- rootfs
++
++reviewers:
++ - caesarxuchao
++ - saad-ali
++ - swagiaal
+diff --git a/pkg/volume/host_path/OWNERS b/pkg/volume/host_path/OWNERS
+index 4a34648..69b7ed1 100644
+--- a/pkg/volume/host_path/OWNERS
++++ b/pkg/volume/host_path/OWNERS
+@@ -1,3 +1,5 @@
+-maintainers:
+-- saad-ali
+-- thockin
++
++reviewers:
++ - markturansky
++ - caesarxuchao
++ - pmorie
+diff --git a/pkg/volume/iscsi/OWNERS b/pkg/volume/iscsi/OWNERS
+index a333fdc..5416497 100644
+--- a/pkg/volume/iscsi/OWNERS
++++ b/pkg/volume/iscsi/OWNERS
+@@ -1,2 +1,6 @@
+-maintainers:
+-- rootfs
++
++reviewers:
++ - swagiaal
++ - rootfs
++ - caesarxuchao
++ - anish
+diff --git a/pkg/volume/nfs/OWNERS b/pkg/volume/nfs/OWNERS
+index a333fdc..efbf8c2 100644
+--- a/pkg/volume/nfs/OWNERS
++++ b/pkg/volume/nfs/OWNERS
+@@ -1,2 +1,6 @@
+-maintainers:
+-- rootfs
++
++reviewers:
++ - caesarxuchao
++ - markturansky
++ - swagiaal
++ - saad-ali
+diff --git a/pkg/volume/quobyte/OWNERS b/pkg/volume/quobyte/OWNERS
+index 3b914ad..860cbe7 100644
+--- a/pkg/volume/quobyte/OWNERS
++++ b/pkg/volume/quobyte/OWNERS
+@@ -1,3 +1,3 @@
+-maintainers:
+-- johscheuer
+-- quofelix
++
++reviewers:
++ - johscheuer
+diff --git a/pkg/volume/rbd/OWNERS b/pkg/volume/rbd/OWNERS
+index a333fdc..0ec747c 100644
+--- a/pkg/volume/rbd/OWNERS
++++ b/pkg/volume/rbd/OWNERS
+@@ -1,2 +1,6 @@
+-maintainers:
+-- rootfs
++
++reviewers:
++ - swagiaal
++ - caesarxuchao
++ - saad-ali
++ - rootfs
+diff --git a/pkg/volume/secret/OWNERS b/pkg/volume/secret/OWNERS
+index 87269d7..1a452e2 100644
+--- a/pkg/volume/secret/OWNERS
++++ b/pkg/volume/secret/OWNERS
+@@ -1,2 +1,7 @@
+-maintainers:
+-- pmorie
++
++reviewers:
++ - caesarxuchao
++ - swagiaal
++ - resouer
++ - pwittrock
++ - saad-ali
+diff --git a/pkg/volume/testing/OWNERS b/pkg/volume/testing/OWNERS
+new file mode 100644
+index 0000000..4763673
+--- /dev/null
++++ b/pkg/volume/testing/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - saad-ali
++ - swagiaal
++ - jingxu97
++ - jsafrane
+diff --git a/pkg/volume/util/OWNERS b/pkg/volume/util/OWNERS
+new file mode 100644
+index 0000000..3e71b3e
+--- /dev/null
++++ b/pkg/volume/util/OWNERS
+@@ -0,0 +1,8 @@
++
++reviewers:
++ - saad-ali
++ - pmorie
++ - liubin
++ - pwittrock
++ - jingxu97
++ - matttproud
+diff --git a/pkg/volume/vsphere_volume/OWNERS b/pkg/volume/vsphere_volume/OWNERS
+new file mode 100644
+index 0000000..9fd65c9
+--- /dev/null
++++ b/pkg/volume/vsphere_volume/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - abithap
++ - saad-ali
++ - david-mcmahon
++ - jingxu97
++ - abrarshivani
+diff --git a/pkg/watch/OWNERS b/pkg/watch/OWNERS
+new file mode 100644
+index 0000000..f696900
+--- /dev/null
++++ b/pkg/watch/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - smarterclayton
++ - resouer
++ - wojtek-t
+diff --git a/pkg/watch/json/OWNERS b/pkg/watch/json/OWNERS
+new file mode 100644
+index 0000000..c994b9a
+--- /dev/null
++++ b/pkg/watch/json/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - smarterclayton
++ - wojtek-t
++ - caesarxuchao
++ - dims
++ - david-mcmahon
++ - ingvagabund
++ - brendandburns
+diff --git a/pkg/watch/versioned/OWNERS b/pkg/watch/versioned/OWNERS
+new file mode 100644
+index 0000000..97f523c
+--- /dev/null
++++ b/pkg/watch/versioned/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - smarterclayton
++ - timothysc
++ - david-mcmahon
++ - wojtek-t
+diff --git a/plugin/OWNERS b/plugin/OWNERS
+index 2c7bcde..741f415 100644
+--- a/plugin/OWNERS
++++ b/plugin/OWNERS
+@@ -1,6 +1,6 @@
+-assignees:
+-  - brendandburns
+-  - davidopp
+-  - dchen1107
+-  - lavalamp
+-  - thockin
++
++reviewers:
++ - wojtek-t
++ - deads2k
++ - hongchaodeng
++ - derekwaynecarr
+diff --git a/plugin/cmd/OWNERS b/plugin/cmd/OWNERS
+new file mode 100644
+index 0000000..2bd09d7
+--- /dev/null
++++ b/plugin/cmd/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - mikedanese
++ - smarterclayton
++ - wojtek-t
++ - gmarek
+diff --git a/plugin/cmd/kube-scheduler/OWNERS b/plugin/cmd/kube-scheduler/OWNERS
+index 44bd78a..2bd09d7 100644
+--- a/plugin/cmd/kube-scheduler/OWNERS
++++ b/plugin/cmd/kube-scheduler/OWNERS
+@@ -1,2 +1,6 @@
+-assignees:
+-  - davidopp
++
++reviewers:
++ - mikedanese
++ - smarterclayton
++ - wojtek-t
++ - gmarek
+diff --git a/plugin/pkg/OWNERS b/plugin/pkg/OWNERS
+new file mode 100644
+index 0000000..988d423
+--- /dev/null
++++ b/plugin/pkg/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - deads2k
++ - derekwaynecarr
+diff --git a/plugin/pkg/admission/OWNERS b/plugin/pkg/admission/OWNERS
+index 6b9dd4b..574a0f4 100644
+--- a/plugin/pkg/admission/OWNERS
++++ b/plugin/pkg/admission/OWNERS
+@@ -1,2 +1,5 @@
+-assignees:
+-  - derekwaynecarr
++
++reviewers:
++ - derekwaynecarr
++ - deads2k
++ - wojtek-t
+diff --git a/plugin/pkg/auth/OWNERS b/plugin/pkg/auth/OWNERS
+index 766c481..ec961d2 100644
+--- a/plugin/pkg/auth/OWNERS
++++ b/plugin/pkg/auth/OWNERS
+@@ -1,3 +1,6 @@
+-assignees:
+-  - erictune
+-  - liggitt
++
++reviewers:
++ - ericchiang
++ - cjcullen
++ - deads2k
++ - yifan-gu
+diff --git a/plugin/pkg/client/OWNERS b/plugin/pkg/client/OWNERS
+new file mode 100644
+index 0000000..e1338eb
+--- /dev/null
++++ b/plugin/pkg/client/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - bobbyrullo
++ - ericchiang
++ - cjcullen
+diff --git a/plugin/pkg/scheduler/OWNERS b/plugin/pkg/scheduler/OWNERS
+index 44bd78a..a2ed713 100644
+--- a/plugin/pkg/scheduler/OWNERS
++++ b/plugin/pkg/scheduler/OWNERS
+@@ -1,2 +1,5 @@
+-assignees:
+-  - davidopp
++
++reviewers:
++ - wojtek-t
++ - hongchaodeng
++ - ping035627
+diff --git a/plugin/pkg/webhook/OWNERS b/plugin/pkg/webhook/OWNERS
+new file mode 100644
+index 0000000..7e50e19
+--- /dev/null
++++ b/plugin/pkg/webhook/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - cjcullen
++ - lixiaobing10051267
++ - david-mcmahon
+diff --git a/release/OWNERS b/release/OWNERS
+index beec279..5d5c21a 100644
+--- a/release/OWNERS
++++ b/release/OWNERS
+@@ -1,2 +1,6 @@
+-assignees:
+-  - ihmccreery
++
++reviewers:
++ - fgrzadkowski
++ - david-mcmahon
++ - eparis
++ - tmrts
+diff --git a/test/OWNERS b/test/OWNERS
+index 0cd4be1..a4c203c 100644
+--- a/test/OWNERS
++++ b/test/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - fejta
+-  - ixdy
+-  - spxtr
++
++reviewers:
++ - gmarek
++ - wojtek-t
++ - caesarxuchao
+diff --git a/test/component/OWNERS b/test/component/OWNERS
+new file mode 100644
+index 0000000..a7efeda
+--- /dev/null
++++ b/test/component/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - hongchaodeng
++ - wojtek-t
++ - smarterclayton
++ - zhouhaibing089
+diff --git a/test/component/scheduler/OWNERS b/test/component/scheduler/OWNERS
+new file mode 100644
+index 0000000..7996188
+--- /dev/null
++++ b/test/component/scheduler/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - hongchaodeng
++ - zhouhaibing089
++ - smarterclayton
++ - wojtek-t
+diff --git a/test/e2e/OWNERS b/test/e2e/OWNERS
+new file mode 100644
+index 0000000..62c262b
+--- /dev/null
++++ b/test/e2e/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - gmarek
++ - wojtek-t
++ - janetkuo
+diff --git a/test/e2e/chaosmonkey/OWNERS b/test/e2e/chaosmonkey/OWNERS
+new file mode 100644
+index 0000000..105bd9c
+--- /dev/null
++++ b/test/e2e/chaosmonkey/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - david-mcmahon
+diff --git a/test/e2e/cleanup/OWNERS b/test/e2e/cleanup/OWNERS
+new file mode 100644
+index 0000000..86daaac
+--- /dev/null
++++ b/test/e2e/cleanup/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - bprashanth
++ - colhom
++ - david-mcmahon
+diff --git a/test/e2e/common/OWNERS b/test/e2e/common/OWNERS
+new file mode 100644
+index 0000000..50d7246
+--- /dev/null
++++ b/test/e2e/common/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - Random-Liu
++ - rata
++ - aveshagarwal
++ - resouer
+diff --git a/test/e2e/framework/OWNERS b/test/e2e/framework/OWNERS
+new file mode 100644
+index 0000000..5cf01c4
+--- /dev/null
++++ b/test/e2e/framework/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - Random-Liu
++ - wojtek-t
++ - gmarek
+diff --git a/test/e2e/generated/OWNERS b/test/e2e/generated/OWNERS
+new file mode 100644
+index 0000000..c9cb55b
+--- /dev/null
++++ b/test/e2e/generated/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - janetkuo
++ - jayunit100
++ - luxas
++ - dims
++ - pwittrock
+diff --git a/test/e2e/perftype/OWNERS b/test/e2e/perftype/OWNERS
+new file mode 100644
+index 0000000..169075e
+--- /dev/null
++++ b/test/e2e/perftype/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - Random-Liu
++ - coufon
++ - david-mcmahon
+diff --git a/test/e2e/testing-manifests/OWNERS b/test/e2e/testing-manifests/OWNERS
+new file mode 100644
+index 0000000..dbe7f9c
+--- /dev/null
++++ b/test/e2e/testing-manifests/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - bprashanth
++ - aledbf
++ - maisem
+diff --git a/test/e2e_node/OWNERS b/test/e2e_node/OWNERS
+index d5187a9..fd3b486 100644
+--- a/test/e2e_node/OWNERS
++++ b/test/e2e_node/OWNERS
+@@ -1,4 +1,5 @@
+-assignees:
+-  - vishh
+-  - timstclair
+-  - Random-Liu 
++
++reviewers:
++ - pwittrock
++ - Random-Liu
++ - vishh
+diff --git a/test/e2e_node/environment/OWNERS b/test/e2e_node/environment/OWNERS
+new file mode 100644
+index 0000000..5504ace
+--- /dev/null
++++ b/test/e2e_node/environment/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - pwittrock
++ - timothysc
++ - euank
++ - vishh
++ - derekwaynecarr
++ - sjpotter
++ - yujuhong
++ - david-mcmahon
+diff --git a/test/e2e_node/jenkins/OWNERS b/test/e2e_node/jenkins/OWNERS
+new file mode 100644
+index 0000000..b0c1b69
+--- /dev/null
++++ b/test/e2e_node/jenkins/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - vishh
++ - pwittrock
++ - Random-Liu
+diff --git a/test/e2e_node/runner/OWNERS b/test/e2e_node/runner/OWNERS
+new file mode 100644
+index 0000000..db4cf67
+--- /dev/null
++++ b/test/e2e_node/runner/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pwittrock
++ - vishh
++ - Random-Liu
+diff --git a/test/fixtures/OWNERS b/test/fixtures/OWNERS
+new file mode 100644
+index 0000000..cca9e21
+--- /dev/null
++++ b/test/fixtures/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - deads2k
++ - wojtek-t
++ - ghodss
+diff --git a/test/fixtures/pkg/OWNERS b/test/fixtures/pkg/OWNERS
+new file mode 100644
+index 0000000..cca9e21
+--- /dev/null
++++ b/test/fixtures/pkg/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - deads2k
++ - wojtek-t
++ - ghodss
+diff --git a/test/images/OWNERS b/test/images/OWNERS
+new file mode 100644
+index 0000000..9dc0894
+--- /dev/null
++++ b/test/images/OWNERS
+@@ -0,0 +1,10 @@
++
++reviewers:
++ - jsafrane
++ - bprashanth
++ - ashcrow
++ - pmorie
++ - liggitt
++ - jszczepkowski
++ - freehan
++ - pwittrock
+diff --git a/test/images/clusterapi-tester/OWNERS b/test/images/clusterapi-tester/OWNERS
+new file mode 100644
+index 0000000..542156e
+--- /dev/null
++++ b/test/images/clusterapi-tester/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - david-mcmahon
++ - colhom
++ - thockin
++ - bprashanth
+diff --git a/test/images/dnsutils/OWNERS b/test/images/dnsutils/OWNERS
+new file mode 100644
+index 0000000..dad0cb6
+--- /dev/null
++++ b/test/images/dnsutils/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - ashcrow
++ - david-mcmahon
+diff --git a/test/images/entrypoint-tester/OWNERS b/test/images/entrypoint-tester/OWNERS
+new file mode 100644
+index 0000000..0711e89
+--- /dev/null
++++ b/test/images/entrypoint-tester/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - david-mcmahon
++ - ashcrow
+diff --git a/test/images/fakegitserver/OWNERS b/test/images/fakegitserver/OWNERS
+new file mode 100644
+index 0000000..f347284
+--- /dev/null
++++ b/test/images/fakegitserver/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - david-mcmahon
++ - pmorie
++ - resouer
+diff --git a/test/images/goproxy/OWNERS b/test/images/goproxy/OWNERS
+new file mode 100644
+index 0000000..c10b2a6
+--- /dev/null
++++ b/test/images/goproxy/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - pmorie
++ - ashcrow
++ - ncdc
++ - david-mcmahon
++ - freehan
+diff --git a/test/images/hostexec/OWNERS b/test/images/hostexec/OWNERS
+new file mode 100644
+index 0000000..e4b8eba
+--- /dev/null
++++ b/test/images/hostexec/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - sttts
++ - david-mcmahon
+diff --git a/test/images/iperf/OWNERS b/test/images/iperf/OWNERS
+new file mode 100644
+index 0000000..f08e978
+--- /dev/null
++++ b/test/images/iperf/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - david-mcmahon
++ - aledbf
++ - fejta
++ - jayunit100
+diff --git a/test/images/jessie-dnsutils/OWNERS b/test/images/jessie-dnsutils/OWNERS
+new file mode 100644
+index 0000000..dad0cb6
+--- /dev/null
++++ b/test/images/jessie-dnsutils/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - ashcrow
++ - david-mcmahon
+diff --git a/test/images/mount-tester-user/OWNERS b/test/images/mount-tester-user/OWNERS
+new file mode 100644
+index 0000000..cee2da5
+--- /dev/null
++++ b/test/images/mount-tester-user/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - pmorie
++ - david-mcmahon
++ - sdminonne
++ - ashcrow
+diff --git a/test/images/mount-tester/OWNERS b/test/images/mount-tester/OWNERS
+new file mode 100644
+index 0000000..16097bc
+--- /dev/null
++++ b/test/images/mount-tester/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - pmorie
++ - ingvagabund
++ - sdminonne
++ - ashcrow
++ - david-mcmahon
+diff --git a/test/images/n-way-http/OWNERS b/test/images/n-way-http/OWNERS
+new file mode 100644
+index 0000000..f51e704
+--- /dev/null
++++ b/test/images/n-way-http/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - pmorie
++ - thockin
++ - bprashanth
++ - david-mcmahon
+diff --git a/test/images/netexec/OWNERS b/test/images/netexec/OWNERS
+new file mode 100644
+index 0000000..55a9c80
+--- /dev/null
++++ b/test/images/netexec/OWNERS
+@@ -0,0 +1,9 @@
++
++reviewers:
++ - ashcrow
++ - pmorie
++ - goltermann
++ - deads2k
++ - bprashanth
++ - thockin
++ - david-mcmahon
+diff --git a/test/images/network-tester/OWNERS b/test/images/network-tester/OWNERS
+new file mode 100644
+index 0000000..dc3abdb
+--- /dev/null
++++ b/test/images/network-tester/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - pmorie
++ - freehan
++ - ixdy
+diff --git a/test/images/pets/OWNERS b/test/images/pets/OWNERS
+new file mode 100644
+index 0000000..3a3a9bc
+--- /dev/null
++++ b/test/images/pets/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - CodeJuan
++ - david-mcmahon
++ - bprashanth
+diff --git a/test/images/port-forward-tester/OWNERS b/test/images/port-forward-tester/OWNERS
+new file mode 100644
+index 0000000..20ee3d4
+--- /dev/null
++++ b/test/images/port-forward-tester/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - ashcrow
++ - ncdc
++ - david-mcmahon
++ - pmorie
+diff --git a/test/images/porter/OWNERS b/test/images/porter/OWNERS
+new file mode 100644
+index 0000000..754827d
+--- /dev/null
++++ b/test/images/porter/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - liggitt
++ - pmorie
++ - david-mcmahon
++ - ashcrow
++ - fgrzadkowski
+diff --git a/test/images/resource-consumer/OWNERS b/test/images/resource-consumer/OWNERS
+new file mode 100644
+index 0000000..80474b3
+--- /dev/null
++++ b/test/images/resource-consumer/OWNERS
+@@ -0,0 +1,12 @@
++
++reviewers:
++ - jszczepkowski
++ - pmorie
++ - pwittrock
++ - derekwaynecarr
++ - david-mcmahon
++ - goltermann
++ - xelalexv
++ - ashcrow
++ - piosz
++ - thockin
+diff --git a/test/images/serve_hostname/OWNERS b/test/images/serve_hostname/OWNERS
+new file mode 100644
+index 0000000..2600af5
+--- /dev/null
++++ b/test/images/serve_hostname/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - pwittrock
++ - david-mcmahon
+diff --git a/test/images/volumes-tester/OWNERS b/test/images/volumes-tester/OWNERS
+new file mode 100644
+index 0000000..7c7327d
+--- /dev/null
++++ b/test/images/volumes-tester/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - jsafrane
++ - pmorie
++ - zmerlynn
++ - tmrts
++ - wongma7
++ - rootfs
++ - david-mcmahon
++ - ashcrow
++ - humblec
+diff --git a/test/integration/OWNERS b/test/integration/OWNERS
+new file mode 100644
+index 0000000..9d0bcdf
+--- /dev/null
++++ b/test/integration/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - deads2k
+diff --git a/test/integration/auth/OWNERS b/test/integration/auth/OWNERS
+new file mode 100644
+index 0000000..5d14fe6
+--- /dev/null
++++ b/test/integration/auth/OWNERS
+@@ -0,0 +1,7 @@
++
++reviewers:
++ - deads2k
++ - hongchaodeng
++ - wojtek-t
++ - nhlfr
++ - mikedanese
+diff --git a/test/integration/client/OWNERS b/test/integration/client/OWNERS
+new file mode 100644
+index 0000000..a6dc6a9
+--- /dev/null
++++ b/test/integration/client/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - caesarxuchao
++ - mikedanese
+diff --git a/test/integration/configmap/OWNERS b/test/integration/configmap/OWNERS
+new file mode 100644
+index 0000000..2f283b3
+--- /dev/null
++++ b/test/integration/configmap/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mikedanese
+diff --git a/test/integration/discoverysummarizer/OWNERS b/test/integration/discoverysummarizer/OWNERS
+new file mode 100644
+index 0000000..9fc4e63
+--- /dev/null
++++ b/test/integration/discoverysummarizer/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - timothysc
+diff --git a/test/integration/examples/OWNERS b/test/integration/examples/OWNERS
+new file mode 100644
+index 0000000..9fc4e63
+--- /dev/null
++++ b/test/integration/examples/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - timothysc
+diff --git a/test/integration/federation/OWNERS b/test/integration/federation/OWNERS
+new file mode 100644
+index 0000000..9fc4e63
+--- /dev/null
++++ b/test/integration/federation/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - timothysc
+diff --git a/test/integration/framework/OWNERS b/test/integration/framework/OWNERS
+new file mode 100644
+index 0000000..9d0bcdf
+--- /dev/null
++++ b/test/integration/framework/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - deads2k
+diff --git a/test/integration/garbagecollector/OWNERS b/test/integration/garbagecollector/OWNERS
+new file mode 100644
+index 0000000..a6dc6a9
+--- /dev/null
++++ b/test/integration/garbagecollector/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - caesarxuchao
++ - mikedanese
+diff --git a/test/integration/kubectl/OWNERS b/test/integration/kubectl/OWNERS
+new file mode 100644
+index 0000000..2f283b3
+--- /dev/null
++++ b/test/integration/kubectl/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mikedanese
+diff --git a/test/integration/master/OWNERS b/test/integration/master/OWNERS
+new file mode 100644
+index 0000000..fc4708b
+--- /dev/null
++++ b/test/integration/master/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - mikedanese
++ - sttts
+diff --git a/test/integration/metrics/OWNERS b/test/integration/metrics/OWNERS
+new file mode 100644
+index 0000000..2f283b3
+--- /dev/null
++++ b/test/integration/metrics/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mikedanese
+diff --git a/test/integration/openshift/OWNERS b/test/integration/openshift/OWNERS
+new file mode 100644
+index 0000000..2f283b3
+--- /dev/null
++++ b/test/integration/openshift/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mikedanese
+diff --git a/test/integration/persistentvolumes/OWNERS b/test/integration/persistentvolumes/OWNERS
+new file mode 100644
+index 0000000..6fdc0cc
+--- /dev/null
++++ b/test/integration/persistentvolumes/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - jsafrane
++ - mikedanese
++ - dims
+diff --git a/test/integration/pods/OWNERS b/test/integration/pods/OWNERS
+new file mode 100644
+index 0000000..2f283b3
+--- /dev/null
++++ b/test/integration/pods/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mikedanese
+diff --git a/test/integration/quota/OWNERS b/test/integration/quota/OWNERS
+new file mode 100644
+index 0000000..2f283b3
+--- /dev/null
++++ b/test/integration/quota/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mikedanese
+diff --git a/test/integration/replicaset/OWNERS b/test/integration/replicaset/OWNERS
+new file mode 100644
+index 0000000..0372255
+--- /dev/null
++++ b/test/integration/replicaset/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - caesarxuchao
++ - wojtek-t
++ - hodovska
+diff --git a/test/integration/replicationcontroller/OWNERS b/test/integration/replicationcontroller/OWNERS
+new file mode 100644
+index 0000000..96ed83c
+--- /dev/null
++++ b/test/integration/replicationcontroller/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - hodovska
++ - caesarxuchao
++ - wojtek-t
+diff --git a/test/integration/scheduler/OWNERS b/test/integration/scheduler/OWNERS
+new file mode 100644
+index 0000000..fb84399
+--- /dev/null
++++ b/test/integration/scheduler/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - ping035627
++ - mikedanese
+diff --git a/test/integration/secrets/OWNERS b/test/integration/secrets/OWNERS
+new file mode 100644
+index 0000000..2f283b3
+--- /dev/null
++++ b/test/integration/secrets/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - mikedanese
+diff --git a/test/integration/serviceaccount/OWNERS b/test/integration/serviceaccount/OWNERS
+new file mode 100644
+index 0000000..c4290c6
+--- /dev/null
++++ b/test/integration/serviceaccount/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - rata
++ - nhlfr
++ - deads2k
++ - mikedanese
+diff --git a/test/integration/storageclasses/OWNERS b/test/integration/storageclasses/OWNERS
+new file mode 100644
+index 0000000..24ee861
+--- /dev/null
++++ b/test/integration/storageclasses/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - childsb
+diff --git a/test/kubemark/OWNERS b/test/kubemark/OWNERS
+new file mode 100644
+index 0000000..0006adf
+--- /dev/null
++++ b/test/kubemark/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - gmarek
++ - wojtek-t
++ - timothysc
++ - hongchaodeng
+diff --git a/test/kubemark/resources/OWNERS b/test/kubemark/resources/OWNERS
+new file mode 100644
+index 0000000..ad745cc
+--- /dev/null
++++ b/test/kubemark/resources/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - piosz
++ - gmarek
+diff --git a/test/soak/OWNERS b/test/soak/OWNERS
+new file mode 100644
+index 0000000..86d68cc
+--- /dev/null
++++ b/test/soak/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - pmorie
++ - thockin
+diff --git a/test/soak/cauldron/OWNERS b/test/soak/cauldron/OWNERS
+new file mode 100644
+index 0000000..16cda55
+--- /dev/null
++++ b/test/soak/cauldron/OWNERS
+@@ -0,0 +1,5 @@
++
++reviewers:
++ - wojtek-t
++ - thockin
++ - pmorie
+diff --git a/test/soak/serve_hostnames/OWNERS b/test/soak/serve_hostnames/OWNERS
+new file mode 100644
+index 0000000..fc5e124
+--- /dev/null
++++ b/test/soak/serve_hostnames/OWNERS
+@@ -0,0 +1,11 @@
++
++reviewers:
++ - wojtek-t
++ - timstclair
++ - pwittrock
++ - feihujiang
++ - thockin
++ - david-mcmahon
++ - pmorie
++ - smarterclayton
++ - krousey
+diff --git a/test/utils/OWNERS b/test/utils/OWNERS
+new file mode 100644
+index 0000000..ce842ed
+--- /dev/null
++++ b/test/utils/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - david-mcmahon
++ - gmarek
+diff --git a/third_party/OWNERS b/third_party/OWNERS
+new file mode 100644
+index 0000000..a8d8ae1
+--- /dev/null
++++ b/third_party/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - thockin
++ - freehan
++ - smarterclayton
++ - nikhiljindal
+diff --git a/third_party/forked/OWNERS b/third_party/forked/OWNERS
+new file mode 100644
+index 0000000..21e3fc2
+--- /dev/null
++++ b/third_party/forked/OWNERS
+@@ -0,0 +1,6 @@
++
++reviewers:
++ - thockin
++ - freehan
++ - jonboulle
++ - deads2k
+diff --git a/third_party/forked/golang/OWNERS b/third_party/forked/golang/OWNERS
+new file mode 100644
+index 0000000..ab80103
+--- /dev/null
++++ b/third_party/forked/golang/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - thockin
+diff --git a/third_party/forked/shell2junit/OWNERS b/third_party/forked/shell2junit/OWNERS
+new file mode 100644
+index 0000000..5173d4b
+--- /dev/null
++++ b/third_party/forked/shell2junit/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - freehan
+diff --git a/third_party/intemp/OWNERS b/third_party/intemp/OWNERS
+new file mode 100644
+index 0000000..dc9c2d8
+--- /dev/null
++++ b/third_party/intemp/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - karlkfi
+diff --git a/third_party/protobuf/OWNERS b/third_party/protobuf/OWNERS
+new file mode 100644
+index 0000000..d0489c3
+--- /dev/null
++++ b/third_party/protobuf/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - smarterclayton
+diff --git a/third_party/protobuf/google/OWNERS b/third_party/protobuf/google/OWNERS
+new file mode 100644
+index 0000000..d0489c3
+--- /dev/null
++++ b/third_party/protobuf/google/OWNERS
+@@ -0,0 +1,3 @@
++
++reviewers:
++ - smarterclayton
+diff --git a/third_party/swagger-ui/OWNERS b/third_party/swagger-ui/OWNERS
+new file mode 100644
+index 0000000..f02d972
+--- /dev/null
++++ b/third_party/swagger-ui/OWNERS
+@@ -0,0 +1,4 @@
++
++reviewers:
++ - nikhiljindal
++ - eparis
