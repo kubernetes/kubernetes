@@ -48,10 +48,16 @@ func (s *DeploymentStatusViewer) Status(namespace, name string) (string, bool, e
 		return "", false, err
 	}
 	if deployment.Generation <= deployment.Status.ObservedGeneration {
-		if deployment.Status.UpdatedReplicas == deployment.Spec.Replicas {
-			return fmt.Sprintf("deployment %s successfully rolled out\n", name), true, nil
+		if deployment.Status.UpdatedReplicas < deployment.Spec.Replicas {
+			return fmt.Sprintf("Waiting for rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Status.UpdatedReplicas, deployment.Spec.Replicas), false, nil
 		}
-		return fmt.Sprintf("Waiting for rollout to finish: %d out of %d new replicas have been updated...\n", deployment.Status.UpdatedReplicas, deployment.Spec.Replicas), false, nil
+		if deployment.Status.Replicas > deployment.Status.UpdatedReplicas {
+			return fmt.Sprintf("Waiting for rollout to finish: %d old replicas are pending termination...\n", deployment.Status.Replicas-deployment.Status.UpdatedReplicas), false, nil
+		}
+		if deployment.Status.AvailableReplicas < deployment.Status.UpdatedReplicas {
+			return fmt.Sprintf("Waiting for rollout to finish: %d of %d updated replicas are available...\n", deployment.Status.AvailableReplicas, deployment.Status.UpdatedReplicas), false, nil
+		}
+		return fmt.Sprintf("deployment %s successfully rolled out\n", name), true, nil
 	}
 	return fmt.Sprintf("Waiting for deployment spec update to be observed...\n"), false, nil
 }
