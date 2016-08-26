@@ -960,7 +960,6 @@ EOF
   fi
 
   env-to-grains "runtime_config"
-  env-to-grains "feature_gates"
   env-to-grains "kube_user"
 }
 
@@ -1004,6 +1003,7 @@ function salt-grains() {
   env-to-grains "docker_opts"
   env-to-grains "docker_root"
   env-to-grains "kubelet_root"
+  env-to-grains "feature_gates"
 }
 
 function configure-salt() {
