@@ -655,14 +655,6 @@ func (dm *DockerManager) runContainer(
 		SecurityOpt: securityOpts,
 	}
 
-	// If current api version is newer than docker 1.10 requested, set OomScoreAdj to HostConfig
-	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
-	if err != nil {
-		glog.Errorf("Failed to check docker api version: %v", err)
-	} else if result >= 0 {
-		hc.OomScoreAdj = oomScoreAdj
-	}
-
 	// Set sysctls if requested
 	sysctls, unsafeSysctls, err := api.SysctlsFromPodAnnotations(pod.Annotations)
 	if err != nil {
