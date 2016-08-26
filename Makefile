@@ -119,11 +119,15 @@ check test: generated_files
 
 # Build and run integration tests.
 #
+# Args:
+#   WHAT: Directory names to test.  All *_test.go files under these
+#     directories will be run.  If not specified, "everything" will be tested.
+#
 # Example:
 #   make test-integration
 .PHONY: test-integration
 test-integration: generated_files
-	hack/make-rules/test-integration.sh
+	hack/make-rules/test-integration.sh $(WHAT)
 
 # Build and run end-to-end tests.
 #
