@@ -261,6 +261,13 @@ type RollingUpdateDeployment struct {
 	// new RC can be scaled up further, ensuring that total number of pods running
 	// at any time during the update is atmost 130% of original pods.
 	MaxSurge intstr.IntOrString `json:"maxSurge,omitempty"`
+
+	// The maximum replica numbers of new RC can be scaled up before the deployment is paused
+	// Value can be an absolute number (ex: 5) or a percentage of total pods at the start of update (ex: 10%).
+	// Absolute number is calculated from percentage by rounding up.
+	// Example: when this is set to 30%, the new RC can be scaled up by at most 30%, then
+	// the deployment will be pause and will not be processed by the deployment controller.
+	PauseWhen *intstr.IntOrString `json:"pauseWhen,omitempty"`
 }
 
 type DeploymentStatus struct {

@@ -491,6 +491,10 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 		return dc.syncStatusOnly(d)
 	}
 
+	if shouldPause := dc.ShouldDeploymentPause(deployment); !deployment.Spec.Paused && shouldPause {
+		return dc.pauseDeployment(deployment)
+	}
+
 	if d.Spec.Paused {
 		return dc.sync(d)
 	}
