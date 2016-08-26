@@ -269,6 +269,10 @@ type GenericAPIServer struct {
 	enableOpenAPISupport   bool
 	openAPIInfo            spec.Info
 	openAPIDefaultResponse spec.Response
+
+	// PostStartHooks is called in a go func after the server go func is launched, but not necessarily after
+	// the server is listening.  It may kill the process with a panic if it wishes to.
+	PostStartHooks []func()
 }
 
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
@@ -769,6 +773,12 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 			time.Sleep(15 * time.Second)
 		}
 	}()
+
+	// launch all PostStartHooks
+	for _, hook := range s.PostStartHooks {
+		go hook()
+	}
+
 	select {}
 }
 

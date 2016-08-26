@@ -165,7 +165,14 @@ type thirdPartyEntry struct {
 type RESTOptionsGetter func(resource unversioned.GroupResource) generic.RESTOptions
 
 type RESTStorageProvider interface {
-	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool)
+	NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (groupInfo genericapiserver.APIGroupInfo, enabled bool)
+}
+
+// RESTStoragePostStartHookProvider is an optional interface in addition to a RESTStorageProvider that can provide a post start hook
+// for the api server
+type RESTStoragePostStartHookProvider interface {
+	RESTStorageProvider
+	PostStartHook(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) func()
 }
 
 // New returns a new instance of Master from the given config.
@@ -300,6 +307,9 @@ func (m *Master) InstallAPIs(c *Config) {
 		apiGroupInfo, enabled := restStorageBuilder.NewRESTStorage(c.APIResourceConfigSource, restOptionsGetter)
 		if !enabled {
 			continue
+		}
+		if postHookProvider, ok := restStorageBuilder.(RESTStoragePostStartHookProvider); ok {
+			m.GenericAPIServer.PostStartHooks = append(m.GenericAPIServer.PostStartHooks, postHookProvider.PostStartHook(c.APIResourceConfigSource, restOptionsGetter))
 		}
 
 		// This is here so that, if the policy group is present, the eviction
