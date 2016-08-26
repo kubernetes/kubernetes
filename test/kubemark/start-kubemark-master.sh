@@ -29,21 +29,23 @@ retry() {
 
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 	# Retry starting etcd to avoid pulling image errors.
-	retry sudo docker run --net=host -v /var/etcd/data-events:/var/etcd/data -d \
-		gcr.io/google_containers/etcd:3.0.4 /usr/local/bin/etcd \
+	retry sudo docker run --net=host \
+		-v /var/etcd/data-events:/var/etcd/data -v /var/log:/var/log -d \
+		gcr.io/google_containers/etcd:3.0.4 /bin/sh -c "/usr/local/bin/etcd \
 		--listen-peer-urls http://127.0.0.1:2381 \
 		--advertise-client-urls=http://127.0.0.1:4002 \
 		--listen-client-urls=http://0.0.0.0:4002 \
-		--data-dir=/var/etcd/data
+		--data-dir=/var/etcd/data 1>> /var/log/etcd-events.log 2>&1"
 fi
 
 # Retry starting etcd to avoid pulling image errors.
-retry sudo docker run --net=host -v /var/etcd/data:/var/etcd/data -d \
-	gcr.io/google_containers/etcd:3.0.4 /usr/local/bin/etcd \
+retry sudo docker run --net=host \
+	-v /var/etcd/data:/var/etcd/data -v /var/log:/var/log -d \
+	gcr.io/google_containers/etcd:3.0.4 /bin/sh -c "/usr/local/bin/etcd \
 	--listen-peer-urls http://127.0.0.1:2380 \
 	--advertise-client-urls=http://127.0.0.1:2379 \
 	--listen-client-urls=http://0.0.0.0:2379 \
-	--data-dir=/var/etcd/data
+	--data-dir=/var/etcd/data 1>> /var/log/etcd.log 2>&1"
 
 # Increase the allowed number of open file descriptors
 ulimit -n 65536
