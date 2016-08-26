@@ -51,9 +51,10 @@ type EtcdTestServer struct {
 	KeyFile         string
 	CAFile          string
 
-	raftHandler http.Handler
-	s           *etcdserver.EtcdServer
-	hss         []*httptest.Server
+	raftHandler     http.Handler
+	s               *etcdserver.EtcdServer
+	hss             []*httptest.Server
+	clientTransport *http.Transport
 }
 
 // newLocalListener opens a port localhost using any port
@@ -89,7 +90,7 @@ func newSecuredLocalListener(t *testing.T, certFile, keyFile, caFile string) net
 	return l
 }
 
-func newHttpTransport(t *testing.T, certFile, keyFile, caFile string) etcd.CancelableTransport {
+func newHttpTransport(t *testing.T, certFile, keyFile, caFile string) *http.Transport {
 	tlsInfo := transport.TLSInfo{
 		CertFile: certFile,
 		KeyFile:  keyFile,
@@ -220,6 +221,7 @@ func (m *EtcdTestServer) waitUntilUp() error {
 // Terminate will shutdown the running etcd server
 func (m *EtcdTestServer) Terminate(t *testing.T) {
 	m.Client = nil
+	m.clientTransport.CloseIdleConnections()
 	m.s.Stop()
 	// TODO: This is a pretty ugly hack to workaround races during closing
 	// in-memory etcd server in unit tests - see #18928 for more details.
@@ -251,9 +253,10 @@ func NewEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 		return nil
 	}
 
+	server.clientTransport = newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile)
 	cfg := etcd.Config{
 		Endpoints: server.ClientURLs.StringSlice(),
-		Transport: newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile),
+		Transport: server.clientTransport,
 	}
 	server.Client, err = etcd.New(cfg)
 	if err != nil {
@@ -277,9 +280,10 @@ func NewUnsecuredEtcdTestClientServer(t *testing.T) *EtcdTestServer {
 		t.Fatalf("Failed to start etcd server error=%v", err)
 		return nil
 	}
+	server.clientTransport = newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile)
 	cfg := etcd.Config{
 		Endpoints: server.ClientURLs.StringSlice(),
-		Transport: newHttpTransport(t, server.CertFile, server.KeyFile, server.CAFile),
+		Transport: server.clientTransport,
 	}
 	server.Client, err = etcd.New(cfg)
 	if err != nil {
