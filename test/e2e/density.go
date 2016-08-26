@@ -88,10 +88,10 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 			schedulerMem = 500 * (1024 * 1024)
 		} else if numNodes <= 500 {
 			apiserverCPU = 2.25
-			apiserverMem = 3300 * (1024 * 1024)
+			apiserverMem = 3400 * (1024 * 1024)
 			controllerCPU = 1.3
 			controllerMem = 1100 * (1024 * 1024)
-			schedulerCPU = 1.0
+			schedulerCPU = 1.5
 			schedulerMem = 500 * (1024 * 1024)
 		} else if numNodes <= 1000 {
 			apiserverCPU = 4
@@ -106,7 +106,7 @@ func density30AddonResourceVerifier(numNodes int) map[string]framework.ResourceC
 			// TODO: Investigate higher apiserver consumption and
 			// potentially revert to 1.5cpu and 1.3GB - see #30871
 			apiserverCPU = 1.8
-			apiserverMem = 2000 * (1024 * 1024)
+			apiserverMem = 2200 * (1024 * 1024)
 			controllerCPU = 0.5
 			controllerMem = 300 * (1024 * 1024)
 			schedulerCPU = 0.4
