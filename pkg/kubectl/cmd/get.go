@@ -275,6 +275,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		return err
 	}
 
+	filter := f.DefaultResourceFilters(cmd, allNamespaces)
 	printer, generic, err := cmdutil.PrinterForCommand(cmd)
 	if err != nil {
 		return err
@@ -299,8 +300,11 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		hiddenObjNum := 0
 
 		for ix := range infos {
-			filter := kubectl.NewResourceFilter(filterOptionsForCommand(cmd, allNamespaces))
-			if isFiltered, _ := filter.Filter(infos[ix].Object); !isFiltered {
+			if isFiltered, err := filter.Filter(infos[ix].Object); !isFiltered {
+				if err != nil {
+					allErrs = append(allErrs, err)
+					continue
+				}
 				hiddenObjNum++
 				if err := printer.PrintObj(infos[ix].Object, out); err != nil {
 					allErrs = append(allErrs, err)
@@ -388,10 +392,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		}
 
 		// filter objects if filter has been defined for current object
-		filter := kubectl.NewResourceFilter(filterOptionsForCommand(cmd, allNamespaces))
-		if isFiltered, _ := filter.Filter(original); isFiltered {
-			hiddenObjNum++
-			continue
+		if isFiltered, err := filter.Filter(original); isFiltered {
+			if err == nil {
+				hiddenObjNum++
+				continue
+			}
+			allErrs = append(allErrs, err)
 		}
 
 		if resourcePrinter, found := printer.(*kubectl.HumanReadablePrinter); found {
@@ -453,24 +459,4 @@ func mustPrintWithKinds(objs []runtime.Object, infos []*resource.Info, sorter *k
 	}
 
 	return false
-}
-
-// filterOptionsForCommand instantiates FilterOptions which makes use of PrintOptions in order
-// implement specific filter handlers for resources before they are printed
-func filterOptionsForCommand(cmd *cobra.Command, withNamespace bool) *kubectl.FilterOptions {
-	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
-	if err != nil {
-		columnLabel = []string{}
-	}
-	return &kubectl.FilterOptions{
-		kubectl.PrintOptions{
-			NoHeaders:          cmdutil.GetFlagBool(cmd, "no-headers"),
-			WithNamespace:      withNamespace,
-			Wide:               cmdutil.GetWideFlag(cmd),
-			ShowAll:            cmdutil.GetFlagBool(cmd, "show-all"),
-			ShowLabels:         cmdutil.GetFlagBool(cmd, "show-labels"),
-			AbsoluteTimestamps: cmdutil.IsWatch(cmd),
-			ColumnLabels:       columnLabel,
-		},
-	}
 }
