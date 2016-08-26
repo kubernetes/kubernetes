@@ -23,6 +23,7 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
+	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 )
 
 // Creates a cacher based given storageConfig.
@@ -33,7 +34,7 @@ func StorageWithCacher(
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object,
-	triggerFunc storage.TriggerPublisherFunc) (storage.Interface, func()) {
+	triggerFunc storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 
 	s, d := generic.NewRawStorage(storageConfig)
 	// TODO: we would change this later to make storage always have cacher and hide low level KV layer inside.

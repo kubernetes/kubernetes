@@ -30,11 +30,12 @@ import (
 	"k8s.io/kubernetes/pkg/storage"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 
 	"golang.org/x/net/context"
 )
 
-func newStorage(t *testing.T) (*etcdtesting.EtcdTestServer, ipallocator.Interface, allocator.Interface, storage.Interface, func()) {
+func newStorage(t *testing.T) (*etcdtesting.EtcdTestServer, ipallocator.Interface, allocator.Interface, storage.Interface, factory.DestroyFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	_, cidr, err := net.ParseCIDR("192.168.1.0/24")
 	if err != nil {
@@ -48,7 +49,11 @@ func newStorage(t *testing.T) (*etcdtesting.EtcdTestServer, ipallocator.Interfac
 		etcd := allocatoretcd.NewEtcd(mem, "/ranges/serviceips", api.Resource("serviceipallocations"), etcdStorage)
 		return etcd
 	})
-	s, destroyFunc := generic.NewRawStorage(etcdStorage)
+	s, d := generic.NewRawStorage(etcdStorage)
+	destroyFunc := func() {
+		d()
+		server.Terminate(t)
+	}
 	return server, storage, backing, s, destroyFunc
 }
 
@@ -65,33 +70,24 @@ func key() string {
 }
 
 func TestEmpty(t *testing.T) {
-	server, storage, _, _, destroyFunc := newStorage(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	_, storage, _, _, destroyFunc := newStorage(t)
+	defer destroyFunc()
 	if err := storage.Allocate(net.ParseIP("192.168.1.2")); !strings.Contains(err.Error(), "cannot allocate resources of type serviceipallocations at this time") {
 		t.Fatal(err)
 	}
 }
 
 func TestErrors(t *testing.T) {
-	server, storage, _, _, destroyFunc := newStorage(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	_, storage, _, _, destroyFunc := newStorage(t)
+	defer destroyFunc()
 	if err := storage.Allocate(net.ParseIP("192.168.0.0")); err != ipallocator.ErrNotInRange {
 		t.Fatal(err)
 	}
 }
 
 func TestStore(t *testing.T) {
-	server, storage, backing, si, destroyFunc := newStorage(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	_, storage, backing, si, destroyFunc := newStorage(t)
+	defer destroyFunc()
 	if err := si.Create(context.TODO(), key(), validNewRangeAllocation(), nil, 0); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

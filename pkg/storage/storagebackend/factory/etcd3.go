@@ -26,7 +26,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func newETCD3Storage(c storagebackend.Config) (storage.Interface, func(), error) {
+func newETCD3Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	tlsInfo := transport.TLSInfo{
 		CertFile: c.CertFile,
 		KeyFile:  c.KeyFile,
