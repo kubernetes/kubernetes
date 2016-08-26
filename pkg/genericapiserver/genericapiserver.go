@@ -269,6 +269,10 @@ type GenericAPIServer struct {
 	enableOpenAPISupport   bool
 	openAPIInfo            spec.Info
 	openAPIDefaultResponse spec.Response
+
+	// PostStartHooks is called in a go func after the server has started listening.
+	// It may kill the process with a panic if it wishes to by returning an error
+	PostStartHooks []func() error
 }
 
 func (s *GenericAPIServer) StorageDecorator() generic.StorageDecorator {
@@ -688,6 +692,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		return time.After(globalTimeout), ""
 	}
 
+	secureStartedCh := make(chan struct{})
 	if secureLocation != "" {
 		handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.Handler), longRunningTimeout)
 		secureServer := &http.Server{
@@ -734,6 +739,8 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 
 		go func() {
 			defer utilruntime.HandleCrash()
+
+			startedOnce := false
 			for {
 				// err == systemd.SdNotifyNoSocket when not running on a systemd system
 				if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
@@ -741,6 +748,9 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 				}
 				if err := secureServer.ListenAndServeTLS(options.TLSCertFile, options.TLSPrivateKeyFile); err != nil {
 					glog.Errorf("Unable to listen for secure (%v); will try again.", err)
+				} else if !startedOnce {
+					startedOnce = true
+					close(secureStartedCh)
 				}
 				time.Sleep(15 * time.Second)
 			}
@@ -750,6 +760,7 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		if err := systemd.SdNotify("READY=1\n"); err != nil && err != systemd.SdNotifyNoSocket {
 			glog.Errorf("Unable to send systemd daemon successful start message: %v\n", err)
 		}
+		close(secureStartedCh)
 	}
 
 	handler := apiserver.TimeoutHandler(apiserver.RecoverPanics(s.InsecureHandler), longRunningTimeout)
@@ -759,16 +770,41 @@ func (s *GenericAPIServer) Run(options *options.ServerRunOptions) {
 		MaxHeaderBytes: 1 << 20,
 	}
 
+	insecureStartedCh := make(chan struct{})
 	glog.Infof("Serving insecurely on %s", insecureLocation)
 	go func() {
 		defer utilruntime.HandleCrash()
+
+		startedOnce := false
 		for {
 			if err := http.ListenAndServe(); err != nil {
 				glog.Errorf("Unable to listen for insecure (%v); will try again.", err)
+			} else if !startedOnce {
+				startedOnce = true
+				close(secureStartedCh)
 			}
 			time.Sleep(15 * time.Second)
 		}
 	}()
+
+	<-secureStartedCh
+	<-insecureStartedCh
+	// launch all PostStartHooks
+	for _, hook := range s.PostStartHooks {
+		go func() {
+			var err error
+			func() {
+				// don't let the hook *accidentally* panic and kill the server
+				defer utilruntime.HandleCrash()
+				err = hook()
+			}()
+			// if the hook intentionally wants to kill server, let it.
+			if err != nil {
+				glog.Fatalf("%v", err)
+			}
+		}()
+	}
+
 	select {}
 }
 

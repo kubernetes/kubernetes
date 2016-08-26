@@ -153,6 +153,13 @@ func startMasterOrDie(masterConfig *master.Config) (*master.Master, *httptest.Se
 		glog.Fatalf("error in bringing up the master: %v", err)
 	}
 
+	// TODO have this start method actually use the normal start sequence for the API server
+	// this method never actually calls the `Run` method for the API server
+	// fire the post hooks ourselves
+	for _, hook := range m.GenericAPIServer.PostStartHooks {
+		go hook()
+	}
+
 	return m, s
 }
 
