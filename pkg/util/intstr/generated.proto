@@ -32,6 +32,7 @@ option go_package = "intstr";
 // 
 // +protobuf=true
 // +protobuf.options.(gogoproto.goproto_stringer)=false
+// +k8s:openapi-gen=true
 message IntOrString {
   optional int64 type = 1;
 
