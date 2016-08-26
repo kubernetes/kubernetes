@@ -2605,6 +2605,14 @@ func (kl *Kubelet) GetKubeletContainerLogs(podFullName, containerName string, lo
 	if err != nil {
 		return err
 	}
+
+	// Do a zero-byte write to stdout before handing off to the container runtime.
+	// This ensures at least one Write call is made to the writer when copying starts,
+	// even if we then block waiting for log output from the container.
+	if _, err := stdout.Write([]byte{}); err != nil {
+		return err
+	}
+
 	return kl.containerRuntime.GetContainerLogs(pod, containerID, logOptions, stdout, stderr)
 }
 
