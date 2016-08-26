@@ -42,7 +42,8 @@ go-bindata -nometadata -prefix "${KUBE_ROOT}" -o ${BINDATA_OUTPUT} -pkg generate
 	"${KUBE_ROOT}/examples/..." \
 	"${KUBE_ROOT}/docs/user-guide/..." \
 	"${KUBE_ROOT}/test/e2e/testing-manifests/..." \
-	"${KUBE_ROOT}/test/images/..."
+	"${KUBE_ROOT}/test/images/..." \
+	"${KUBE_ROOT}/test/fixtures/..."
 
 gofmt -s -w ${BINDATA_OUTPUT}
 

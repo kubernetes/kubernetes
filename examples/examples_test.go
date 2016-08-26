@@ -191,35 +191,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-master-service":    &api.Service{},
 			"redis-slave-service":     &api.Service{},
 		},
-		"../docs/user-guide/walkthrough": {
-			"pod-nginx":                 &api.Pod{},
-			"pod-nginx-with-label":      &api.Pod{},
-			"pod-redis":                 &api.Pod{},
-			"pod-with-http-healthcheck": &api.Pod{},
-			"service":                   &api.Service{},
-			"replication-controller":    &api.ReplicationController{},
-			"podtemplate":               &api.PodTemplate{},
-		},
-		"../docs/user-guide/update-demo": {
-			"kitten-rc":   &api.ReplicationController{},
-			"nautilus-rc": &api.ReplicationController{},
-		},
-		"../docs/user-guide/persistent-volumes/volumes": {
-			"local-01": &api.PersistentVolume{},
-			"local-02": &api.PersistentVolume{},
-			"gce":      &api.PersistentVolume{},
-			"nfs":      &api.PersistentVolume{},
-		},
-		"../docs/user-guide/persistent-volumes/claims": {
-			"claim-01": &api.PersistentVolumeClaim{},
-			"claim-02": &api.PersistentVolumeClaim{},
-			"claim-03": &api.PersistentVolumeClaim{},
-		},
-		"../docs/user-guide/persistent-volumes/simpletest": {
-			"namespace": &api.Namespace{},
-			"pod":       &api.Pod{},
-			"service":   &api.Service{},
-		},
 		"../examples/volumes/iscsi": {
 			"iscsi": &api.Pod{},
 		},
@@ -227,23 +198,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"glusterfs-pod":       &api.Pod{},
 			"glusterfs-endpoints": &api.Endpoints{},
 			"glusterfs-service":   &api.Service{},
-		},
-		"../docs/user-guide/liveness": {
-			"exec-liveness": &api.Pod{},
-			"http-liveness": &api.Pod{},
-		},
-		"../docs/user-guide": {
-			"multi-pod":            nil,
-			"pod":                  &api.Pod{},
-			"job":                  &batch.Job{},
-			"ingress":              &extensions.Ingress{},
-			"nginx-deployment":     &extensions.Deployment{},
-			"new-nginx-deployment": &extensions.Deployment{},
-			"replication":          &api.ReplicationController{},
-			"deployment":           &extensions.Deployment{},
-		},
-		"../docs/admin": {
-			"daemon": &extensions.DaemonSet{},
 		},
 		"../examples": {
 			"scheduler-policy-config":               &schedulerapi.Policy{},
@@ -275,12 +229,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"namespace-dev":       &api.Namespace{},
 			"namespace-prod":      &api.Namespace{},
 		},
-		"../docs/user-guide/downward-api": {
-			"dapi-pod": &api.Pod{},
-		},
-		"../docs/user-guide/downward-api/volume/": {
-			"dapi-volume": &api.Pod{},
-		},
 		"../examples/elasticsearch": {
 			"es-rc":           &api.ReplicationController{},
 			"es-svc":          &api.Service{},
@@ -292,20 +240,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 		"../examples/storage/hazelcast": {
 			"hazelcast-controller": &api.ReplicationController{},
 			"hazelcast-service":    &api.Service{},
-		},
-		"../docs/admin/namespaces": {
-			"namespace-dev":  &api.Namespace{},
-			"namespace-prod": &api.Namespace{},
-		},
-		"../docs/admin/limitrange": {
-			"invalid-pod": &api.Pod{},
-			"limits":      &api.LimitRange{},
-			"namespace":   &api.Namespace{},
-			"valid-pod":   &api.Pod{},
-		},
-		"../docs/user-guide/logging-demo": {
-			"synthetic_0_25lps": &api.Pod{},
-			"synthetic_10lps":   &api.Pod{},
 		},
 		"../examples/meteor": {
 			"meteor-controller": &api.ReplicationController{},
@@ -328,9 +262,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"nfs-web-rc":         &api.ReplicationController{},
 			"nfs-web-service":    &api.Service{},
 		},
-		"../docs/user-guide/node-selection": {
-			"pod": &api.Pod{},
-		},
 		"../examples/openshift-origin": {
 			"openshift-origin-namespace": &api.Namespace{},
 			"openshift-controller":       &api.ReplicationController{},
@@ -352,21 +283,11 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"redis-sentinel-controller": &api.ReplicationController{},
 			"redis-sentinel-service":    &api.Service{},
 		},
-		"../docs/admin/resourcequota": {
-			"namespace": &api.Namespace{},
-			"limits":    &api.LimitRange{},
-			"quota":     &api.ResourceQuota{},
-		},
 		"../examples/storage/rethinkdb": {
 			"admin-pod":      &api.Pod{},
 			"admin-service":  &api.Service{},
 			"driver-service": &api.Service{},
 			"rc":             &api.ReplicationController{},
-		},
-		"../docs/user-guide/secrets": {
-			"secret-pod":     &api.Pod{},
-			"secret":         &api.Secret{},
-			"secret-env-pod": &api.Pod{},
 		},
 		"../examples/spark": {
 			"namespace-spark-cluster": &api.Namespace{},
@@ -480,7 +401,6 @@ func TestReadme(t *testing.T) {
 		expectedType []runtime.Object
 	}{
 		{"../README.md", []runtime.Object{&api.Pod{}}},
-		{"../docs/user-guide/walkthrough/README.md", []runtime.Object{&api.Pod{}}},
 		{"../examples/volumes/iscsi/README.md", []runtime.Object{&api.Pod{}}},
 	}
 
