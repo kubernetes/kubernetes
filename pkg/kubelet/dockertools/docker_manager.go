@@ -488,7 +488,7 @@ func makeEnvList(envs []kubecontainer.EnvVar) (result []string) {
 // '<HostPath>:<ContainerPath>:ro', if the path is read only, or
 // '<HostPath>:<ContainerPath>:Z', if the volume requires SELinux
 // relabeling and the pod provides an SELinux label
-func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (result []string) {
+func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool, dockerSupportPropagation bool) (result []string) {
 	for _, m := range mounts {
 		bind := fmt.Sprintf("%s:%s", m.HostPath, m.ContainerPath)
 		attr := make([]string, 0, 3)
@@ -505,7 +505,7 @@ func makeMountBindings(mounts []kubecontainer.Mount, podHasSELinuxLabel bool) (r
 			attr = append(attr, "Z")
 		}
 		// Propagation
-		if len(m.Propagation) != 0 {
+		if dockerSupportPropagation && len(m.Propagation) != 0 {
 			attr = append(attr, m.Propagation)
 		}
 		if len(attr) > 0 {
@@ -588,6 +588,13 @@ func (dm *DockerManager) runContainer(
 		return kubecontainer.ContainerID{}, err
 	}
 
+	// Check if current api version is newer than docker 1.10 requested
+	dockerNewerThanV110, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
+	if err != nil {
+		glog.Errorf("Failed to check docker api version: %v", err)
+		return kubecontainer.ContainerID{}, err
+	}
+
 	// Pod information is recorded on the container as labels to preserve it in the event the pod is deleted
 	// while the Kubelet is down and there is no information available to recover the pod.
 	// TODO: keep these labels up to date if the pod changes
@@ -630,7 +637,7 @@ func (dm *DockerManager) runContainer(
 		}
 	}
 	podHasSELinuxLabel := pod.Spec.SecurityContext != nil && pod.Spec.SecurityContext.SELinuxOptions != nil
-	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel)
+	binds := makeMountBindings(opts.Mounts, podHasSELinuxLabel, dockerNewerThanV110 >= 0)
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
 	// mount the file before actually starting the container.
@@ -686,10 +693,7 @@ func (dm *DockerManager) runContainer(
 	}
 
 	// If current api version is newer than docker 1.10 requested, set OomScoreAdj to HostConfig
-	result, err := dm.checkDockerAPIVersion(dockerV110APIVersion)
-	if err != nil {
-		glog.Errorf("Failed to check docker api version: %v", err)
-	} else if result >= 0 {
+	if dockerNewerThanV110 >= 0 {
 		hc.OomScoreAdj = oomScoreAdj
 	}
 
