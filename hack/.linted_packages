@@ -162,6 +162,7 @@ pkg/util/logs
 pkg/util/maps
 pkg/util/validation/field
 pkg/util/workqueue
+pkg/version/prometheus
 pkg/volume
 pkg/volume/downwardapi
 pkg/volume/quobyte
