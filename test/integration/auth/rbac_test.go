@@ -29,9 +29,11 @@ import (
 	"net/http/httputil"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/glog"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -41,6 +43,8 @@ import (
 	"k8s.io/kubernetes/pkg/auth/authenticator/bearertoken"
 	"k8s.io/kubernetes/pkg/auth/authorizer"
 	"k8s.io/kubernetes/pkg/auth/user"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
 	"k8s.io/kubernetes/pkg/master"
 	"k8s.io/kubernetes/pkg/registry/clusterrole"
@@ -52,6 +56,7 @@ import (
 	roleetcd "k8s.io/kubernetes/pkg/registry/role/etcd"
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
+	"k8s.io/kubernetes/pkg/watch"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -468,4 +473,47 @@ func TestRBAC(t *testing.T) {
 			}()
 		}
 	}
+}
+
+func TestBootstrapping(t *testing.T) {
+	superUser := "admin"
+
+	masterConfig := framework.NewIntegrationTestMasterConfig()
+	masterConfig.Authorizer = newRBACAuthorizer(t, superUser, masterConfig)
+	masterConfig.Authenticator = newFakeAuthenticator()
+	masterConfig.AuthorizerRBACSuperUser = superUser
+	_, s := framework.RunAMaster(masterConfig)
+	defer s.Close()
+
+	clientset := clientset.NewForConfigOrDie(&restclient.Config{BearerToken: superUser, Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	watcher, err := clientset.Rbac().ClusterRoles().Watch(api.ListOptions{ResourceVersion: "0"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	_, err = watch.Until(30*time.Second, watcher, func(event watch.Event) (bool, error) {
+		if event.Type != watch.Added {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	clusterRoles, err := clientset.Rbac().ClusterRoles().List(api.ListOptions{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(clusterRoles.Items) == 0 {
+		t.Fatalf("missing cluster roles")
+	}
+
+	for _, clusterRole := range clusterRoles.Items {
+		if clusterRole.Name == "cluster-admin" {
+			return
+		}
+	}
+
+	t.Errorf("missing cluster-admin: %v", clusterRoles)
 }
