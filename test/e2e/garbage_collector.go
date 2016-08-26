@@ -174,12 +174,14 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		podClient := clientSet.Core().Pods(f.Namespace.Name)
 		rcName := "simpletest.rc"
 		rc := newOwnerRC(f, rcName)
+		replicas := int32(100)
+		rc.Spec.Replicas = &replicas
 		By("create the rc")
 		rc, err := rcClient.Create(rc)
 		if err != nil {
 			framework.Failf("Failed to create replication controller: %v", err)
 		}
-		// wait for rc to create some pods
+		// wait for rc to create pods
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
 			rc, err := rcClient.Get(rc.Name)
 			if err != nil {
@@ -198,6 +200,19 @@ var _ = framework.KubeDescribe("Garbage collector", func() {
 		deleteOptions.Preconditions = api.NewUIDPreconditions(string(rc.UID))
 		if err := rcClient.Delete(rc.ObjectMeta.Name, deleteOptions); err != nil {
 			framework.Failf("failed to delete the rc: %v", err)
+		}
+		By("wait for the rc to be deleted")
+		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
+			rcs, err := rcClient.List(api.ListOptions{})
+			if err != nil {
+				return false, fmt.Errorf("Failed to list rcs: %v", err)
+			}
+			if len(rcs.Items) != 0 {
+				return false, nil
+			}
+			return true, nil
+		}); err != nil && err != wait.ErrWaitTimeout {
+			framework.Failf("%v", err)
 		}
 		By("wait for 30 seconds to see if the garbage collector mistakenly deletes the pods")
 		if err := wait.Poll(5*time.Second, 30*time.Second, func() (bool, error) {
