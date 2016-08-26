@@ -4,22 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/coreos/pkg/capnslog"
 	"github.com/coreos/pkg/timeutil"
 	"github.com/jonboulle/clockwork"
 
 	phttp "github.com/coreos/go-oidc/http"
 	"github.com/coreos/go-oidc/oauth2"
-)
-
-var (
-	log = capnslog.NewPackageLogger("github.com/coreos/go-oidc", "http")
 )
 
 const (
@@ -69,6 +65,8 @@ type ProviderConfig struct {
 	UserInfoEndpoint     *url.URL
 	KeysEndpoint         *url.URL // Required
 	RegistrationEndpoint *url.URL
+	EndSessionEndpoint   *url.URL
+	CheckSessionIFrame   *url.URL
 
 	// Servers MAY choose not to advertise some supported scope values even when this
 	// parameter is used, although those defined in OpenID Core SHOULD be listed, if supported.
@@ -170,6 +168,8 @@ type encodableProviderConfig struct {
 	UserInfoEndpoint     string `json:"userinfo_endpoint,omitempty"`
 	KeysEndpoint         string `json:"jwks_uri"`
 	RegistrationEndpoint string `json:"registration_endpoint,omitempty"`
+	EndSessionEndpoint   string `json:"end_session_endpoint,omitempty"`
+	CheckSessionIFrame   string `json:"check_session_iframe,omitempty"`
 
 	// Use 'omitempty' for all slices as per OIDC spec:
 	// "Claims that return multiple values are represented as JSON arrays.
@@ -219,6 +219,8 @@ func (cfg ProviderConfig) toEncodableStruct() encodableProviderConfig {
 		UserInfoEndpoint:                           uriToString(cfg.UserInfoEndpoint),
 		KeysEndpoint:                               uriToString(cfg.KeysEndpoint),
 		RegistrationEndpoint:                       uriToString(cfg.RegistrationEndpoint),
+		EndSessionEndpoint:                         uriToString(cfg.EndSessionEndpoint),
+		CheckSessionIFrame:                         uriToString(cfg.CheckSessionIFrame),
 		ScopesSupported:                            cfg.ScopesSupported,
 		ResponseTypesSupported:                     cfg.ResponseTypesSupported,
 		ResponseModesSupported:                     cfg.ResponseModesSupported,
@@ -260,6 +262,8 @@ func (e encodableProviderConfig) toStruct() (ProviderConfig, error) {
 		UserInfoEndpoint:                           p.parseURI(e.UserInfoEndpoint, "userinfo_endpoint"),
 		KeysEndpoint:                               p.parseURI(e.KeysEndpoint, "jwks_uri"),
 		RegistrationEndpoint:                       p.parseURI(e.RegistrationEndpoint, "registration_endpoint"),
+		EndSessionEndpoint:                         p.parseURI(e.EndSessionEndpoint, "end_session_endpoint"),
+		CheckSessionIFrame:                         p.parseURI(e.CheckSessionIFrame, "check_session_iframe"),
 		ScopesSupported:                            e.ScopesSupported,
 		ResponseTypesSupported:                     e.ResponseTypesSupported,
 		ResponseModesSupported:                     e.ResponseModesSupported,
@@ -364,6 +368,8 @@ func (p ProviderConfig) Valid() error {
 		{p.UserInfoEndpoint, "userinfo_endpoint", false},
 		{p.KeysEndpoint, "jwks_uri", true},
 		{p.RegistrationEndpoint, "registration_endpoint", false},
+		{p.EndSessionEndpoint, "end_session_endpoint", false},
+		{p.CheckSessionIFrame, "check_session_iframe", false},
 		{p.ServiceDocs, "service_documentation", false},
 		{p.Policy, "op_policy_uri", false},
 		{p.TermsOfService, "op_tos_uri", false},
@@ -537,8 +543,6 @@ func (s *ProviderConfigSyncer) sync() (time.Duration, error) {
 		s.initialSyncDone = true
 	}
 
-	log.Infof("Updating provider config: config=%#v", cfg)
-
 	return nextSyncAfter(cfg.ExpiresAt, s.clock), nil
 }
 
@@ -561,10 +565,9 @@ func (n *pcsStepNext) step(fn pcsStepFunc) (next pcsStepper) {
 	ttl, err := fn()
 	if err == nil {
 		next = &pcsStepNext{aft: ttl}
-		log.Debugf("Synced provider config, next attempt in %v", next.after())
 	} else {
 		next = &pcsStepRetry{aft: time.Second}
-		log.Errorf("Provider config sync failed, retrying in %v: %v", next.after(), err)
+		log.Printf("go-oidc: provider config sync falied, retyring in %v: %v", next.after(), err)
 	}
 	return
 }
@@ -581,10 +584,9 @@ func (r *pcsStepRetry) step(fn pcsStepFunc) (next pcsStepper) {
 	ttl, err := fn()
 	if err == nil {
 		next = &pcsStepNext{aft: ttl}
-		log.Infof("Provider config sync no longer failing")
 	} else {
 		next = &pcsStepRetry{aft: timeutil.ExpBackoff(r.aft, time.Minute)}
-		log.Errorf("Provider config sync still failing, retrying in %v: %v", next.after(), err)
+		log.Printf("go-oidc: provider config sync falied, retyring in %v: %v", next.after(), err)
 	}
 	return
 }

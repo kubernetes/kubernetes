@@ -161,11 +161,18 @@ func NewJWTVerifier(issuer, clientID string, syncFunc func() error, keysFunc fun
 }
 
 func (v *JWTVerifier) Verify(jwt jose.JWT) error {
+	// Verify claims before verifying the signature. This is an optimization to throw out
+	// tokens we know are invalid without undergoing an expensive signature check and
+	// possibly a re-sync event.
+	if err := VerifyClaims(jwt, v.issuer, v.clientID); err != nil {
+		return fmt.Errorf("oidc: JWT claims invalid: %v", err)
+	}
+
 	ok, err := VerifySignature(jwt, v.keysFunc())
-	if ok {
-		goto SignatureVerified
-	} else if err != nil {
+	if err != nil {
 		return fmt.Errorf("oidc: JWT signature verification failed: %v", err)
+	} else if ok {
+		return nil
 	}
 
 	if err = v.syncFunc(); err != nil {
@@ -177,11 +184,6 @@ func (v *JWTVerifier) Verify(jwt jose.JWT) error {
 		return fmt.Errorf("oidc: JWT signature verification failed: %v", err)
 	} else if !ok {
 		return errors.New("oidc: unable to verify JWT signature: no matching keys")
-	}
-
-SignatureVerified:
-	if err := VerifyClaims(jwt, v.issuer, v.clientID); err != nil {
-		return fmt.Errorf("oidc: JWT claims invalid: %v", err)
 	}
 
 	return nil
