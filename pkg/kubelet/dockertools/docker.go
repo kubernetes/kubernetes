@@ -362,13 +362,13 @@ func getDockerClient(dockerEndpoint string) (*dockerapi.Client, error) {
 	return dockerapi.NewEnvClient()
 }
 
-// ConnectToDockerOrDie creates docker client connecting to docker daemon.
-// If the endpoint passed in is "fake://", a fake docker client
-// will be returned. The program exits if error occurs. The requestTimeout
-// is the timeout for docker requests. If timeout is exceeded, the request
-// will be cancelled and throw out an error. If requestTimeout is 0, a default
-// value will be applied.
-func ConnectToDockerOrDie(dockerEndpoint string, requestTimeout time.Duration) DockerInterface {
+// CreateDockerClientOrDie creates a docker client for connecting to the docker daemon.
+// It does not actually try to connect to the docker daemon!
+// requestTimeout is the timeout for docker requests.
+// If requestTimeout=0, a default value is used instead.
+// Pass dockerEndpoint="fake://" to create a fake docker client.
+// Errors during client creation will cause program termination.
+func CreateDockerClientOrDie(dockerEndpoint string, requestTimeout time.Duration) DockerInterface {
 	if dockerEndpoint == "fake://" {
 		return NewFakeDockerClient()
 	}
