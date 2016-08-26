@@ -73,7 +73,7 @@ type PetSetController struct {
 	blockingPetStore *unhealthyPetTracker
 
 	// Controllers that need to be synced.
-	queue *workqueue.Type
+	queue workqueue.RateLimitingInterface
 
 	// syncHandler handles sync events for petsets.
 	// Abstracted as a func to allow injection for testing.
@@ -94,7 +94,7 @@ func NewPetSetController(podInformer framework.SharedIndexInformer, kubeClient *
 		newSyncer: func(blockingPet *pcb) *petSyncer {
 			return &petSyncer{pc, blockingPet}
 		},
-		queue: workqueue.New(),
+		queue: workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
 	}
 
 	podInformer.AddEventHandler(framework.ResourceEventHandlerFuncs{
@@ -268,7 +268,9 @@ func (psc *PetSetController) worker() {
 			defer psc.queue.Done(key)
 			if errs := psc.syncHandler(key.(string)); len(errs) != 0 {
 				glog.Errorf("Error syncing PetSet %v, requeuing: %v", key.(string), errs)
-				psc.queue.Add(key)
+				psc.queue.AddRateLimited(key)
+			} else {
+				psc.queue.Forget(key)
 			}
 		}()
 	}
