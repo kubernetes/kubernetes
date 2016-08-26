@@ -30,6 +30,7 @@ option go_package = "versioned";
 // Event represents a single event to a watched resource.
 // 
 // +protobuf=true
+// +k8s:openapi-gen=true
 message Event {
   optional string type = 1;
 
