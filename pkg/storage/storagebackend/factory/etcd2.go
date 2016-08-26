@@ -30,7 +30,7 @@ import (
 	utilnet "k8s.io/kubernetes/pkg/util/net"
 )
 
-func newETCD2Storage(c storagebackend.Config) (storage.Interface, func(), error) {
+func newETCD2Storage(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	tr, err := newTransportForETCD2(c.CertFile, c.KeyFile, c.CAFile)
 	if err != nil {
 		return nil, nil, err
