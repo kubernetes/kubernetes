@@ -101,7 +101,7 @@ endif
 
 	# This cross-compiles cni for all architectures
 	# TODO(freehan): Push the latest cni for all arches to storage.googleapis.com so we may just download the binaries
-	docker run -it -v ${TEMP_DIR}/cni-bin:/cnibin golang:1.6 /bin/bash -c "\
+	docker run --rm -v ${TEMP_DIR}/cni-bin:/cnibin golang:1.6 /bin/bash -c "\
 		git clone https://github.com/containernetworking/cni \
 		&& cd cni \
 		&& git checkout $(CNI_RELEASE) \
