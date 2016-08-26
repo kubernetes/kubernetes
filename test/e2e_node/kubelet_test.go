@@ -18,7 +18,10 @@ package e2e_node
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"strings"
 	"time"
 
@@ -115,20 +118,31 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 				volumeNamePrefix := "test-empty-dir"
 				podNames, volumes := createSummaryTestPods(f.PodClient(), podNamePrefix, 2, volumeNamePrefix)
 				By("Returning stats summary")
+				summary := stats.Summary{}
 				Eventually(func() error {
-					summary, err := getNodeSummary()
+					resp, err := http.Get(*kubeletAddress + "/stats/summary")
 					if err != nil {
-						return fmt.Errorf("failed to get node summary: %v", err)
+						return fmt.Errorf("Failed to get /stats/summary - %v", err)
 					}
-					missingPods := podsMissingFromSummary(*summary, podNames)
+					contentsBytes, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						return fmt.Errorf("Failed to read /stats/summary - %+v", resp)
+					}
+					contents := string(contentsBytes)
+					decoder := json.NewDecoder(strings.NewReader(contents))
+					err = decoder.Decode(&summary)
+					if err != nil {
+						return fmt.Errorf("Failed to parse /stats/summary to go struct: %+v", resp)
+					}
+					missingPods := podsMissingFromSummary(summary, podNames)
 					if missingPods.Len() != 0 {
 						return fmt.Errorf("expected pods not found. Following pods are missing - %v", missingPods)
 					}
-					missingVolumes := volumesMissingFromSummary(*summary, volumes)
+					missingVolumes := volumesMissingFromSummary(summary, volumes)
 					if missingVolumes.Len() != 0 {
 						return fmt.Errorf("expected volumes not found. Following volumes are missing - %v", missingVolumes)
 					}
-					if err := testSummaryMetrics(*summary, podNamePrefix); err != nil {
+					if err := testSummaryMetrics(summary, podNamePrefix); err != nil {
 						return err
 					}
 					return nil
