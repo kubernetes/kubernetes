@@ -72,6 +72,29 @@ func NewAlwaysFailAuthorizer() authorizer.Authorizer {
 	return new(alwaysFailAuthorizer)
 }
 
+type privilegedGroupAuthorizer struct {
+	user string
+	uid  string
+}
+
+func (r *privilegedGroupAuthorizer) Authorize(attr authorizer.Attributes) (bool, string, error) {
+	if r.user != "" && attr.GetUser() != nil &&
+		attr.GetUser().GetName() == r.user &&
+		attr.GetUser().GetUID() == r.uid {
+		return true, "", nil
+	}
+	return false, "", errors.New("Not in privileged list.")
+}
+
+// NewTokenAuthorizer is for use in loopback scenarios
+func NewTokenAuthorizer(user string, uid string) *privilegedGroupAuthorizer {
+	authorizer := &privilegedGroupAuthorizer{
+		user: user,
+		uid:  uid,
+	}
+	return authorizer
+}
+
 type AuthorizationConfig struct {
 	// Options for ModeABAC
 
