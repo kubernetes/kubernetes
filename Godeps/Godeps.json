@@ -1395,42 +1395,42 @@
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/client",
+			"ImportPath": "github.com/influxdata/influxdb/client",
 			"Comment": "v0.9.2.1",
 			"Rev": "b237c68bab4756507baf6840023be103853e77db"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/influxql",
+			"ImportPath": "github.com/influxdata/influxdb/influxql",
 			"Comment": "v0.9.2.1",
 			"Rev": "b237c68bab4756507baf6840023be103853e77db"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/meta",
+			"ImportPath": "github.com/influxdata/influxdb/meta",
 			"Comment": "v0.9.2.1",
 			"Rev": "b237c68bab4756507baf6840023be103853e77db"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/meta/internal",
+			"ImportPath": "github.com/influxdata/influxdb/meta/internal",
 			"Comment": "v0.9.2.1",
 			"Rev": "b237c68bab4756507baf6840023be103853e77db"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/snapshot",
+			"ImportPath": "github.com/influxdata/influxdb/snapshot",
 			"Comment": "v0.9.2.1",
 			"Rev": "b237c68bab4756507baf6840023be103853e77db"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/toml",
+			"ImportPath": "github.com/influxdata/influxdb/toml",
 			"Comment": "v0.9.2.1",
 			"Rev": "b237c68bab4756507baf6840023be103853e77db"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/tsdb",
+			"ImportPath": "github.com/influxdata/influxdb/tsdb",
 			"Comment": "v0.9.2.1",
 			"Rev": "b237c68bab4756507baf6840023be103853e77db"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/tsdb/internal",
+			"ImportPath": "github.com/influxdata/influxdb/tsdb/internal",
 			"Comment": "v0.9.2.1",
 			"Rev": "b237c68bab4756507baf6840023be103853e77db"
 		},
