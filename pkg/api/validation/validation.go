@@ -994,6 +994,8 @@ var ValidatePersistentVolumeName = NameIsDNSSubdomain
 
 var supportedAccessModes = sets.NewString(string(api.ReadWriteOnce), string(api.ReadOnlyMany), string(api.ReadWriteMany))
 
+var supportedReclaimPolicy = sets.NewString(string(api.PersistentVolumeReclaimDelete), string(api.PersistentVolumeReclaimRecycle), string(api.PersistentVolumeReclaimRetain))
+
 func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	allErrs := ValidateObjectMeta(&pv.ObjectMeta, false, ValidatePersistentVolumeName, field.NewPath("metadata"))
 
@@ -1017,6 +1019,11 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	capPath := specPath.Child("capacity")
 	for r, qty := range pv.Spec.Capacity {
 		allErrs = append(allErrs, validateBasicResource(qty, capPath.Key(string(r)))...)
+	}
+	if len(string(pv.Spec.PersistentVolumeReclaimPolicy)) > 0 {
+		if !supportedReclaimPolicy.Has(string(pv.Spec.PersistentVolumeReclaimPolicy)) {
+			allErrs = append(allErrs, field.NotSupported(specPath.Child("persistentVolumeReclaimPolicy"), pv.Spec.PersistentVolumeReclaimPolicy, supportedReclaimPolicy.List()))
+		}
 	}
 
 	numVolumes := 0
