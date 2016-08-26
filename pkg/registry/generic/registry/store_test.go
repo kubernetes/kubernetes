@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/selection"
 	"k8s.io/kubernetes/pkg/storage"
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
-	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
 	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
@@ -1197,13 +1196,14 @@ func TestStoreWatch(t *testing.T) {
 
 func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
-	server := etcdtesting.NewEtcdTestClientServer(t)
+	server, sc := etcdtesting.NewUnsecuredEtcd3TestClientServer(t)
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 
-	codec := testapi.Default.StorageCodec()
-	s := etcdstorage.NewEtcdStorage(server.Client, codec, etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-	destroyFunc := func() {
-		server.Terminate(t)
+	sc.Codec = testapi.Default.StorageCodec()
+	destroyFunc := func() {}
+	s, err := factory.Create(*sc)
+	if err != nil {
+		t.Fatalf("Error creating storage: %v", err)
 	}
 	if hasCacheEnabled {
 		config := storage.CacherConfig{
@@ -1214,7 +1214,7 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.De
 			ResourcePrefix: podPrefix,
 			KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NoNamespaceKeyFunc(podPrefix, obj) },
 			NewListFunc:    func() runtime.Object { return &api.PodList{} },
-			Codec:          codec,
+			Codec:          sc.Codec,
 		}
 		cacher := storage.NewCacherFromConfig(config)
 		d := destroyFunc
