@@ -37,10 +37,10 @@ for namespaced kernel parameters (sysctls) set for each pod.
 ### v1.4
 
 - [ ] initial implementation for v1.4 https://github.com/kubernetes/kubernetes/pull/27180
-  + node-level whitelist: `kernel.shm_rmid_forced`, `net.ipv4.ip_local_port_range`, `net.ipv4.tcp_max_syn_backlog`, `net.ipv4.tcp_syncookies`
-  + greylist: `kernel.msgmax`, `kernel.msgmnb`, `kernel.msgmni`, `kernel.sem`, `kernel.shm_rmid_forced`, `fs.mqueue.*`, `net.*`
+  + node-level whitelist for safe sysctls: `kernel.shm_rmid_forced`, `net.ipv4.ip_local_port_range`, `net.ipv4.tcp_max_syn_backlog`, `net.ipv4.tcp_syncookies`
+  + (disabled by-default) unsafe sysctls: `kernel.msg*`, `kernel.sem`, `kernel.shm*`, `fs.mqueue.*`, `net.*`
+  + new kubelet flag: `--experimental-allowed-unsafe-sysctls`
   + PSP default: `*`
-  + new kubelet flag: `--experimental-sysctl-whitelist`
 - [ ] document node-level whitelist with kubectl flags and taints/tolerations
 - [ ] document host-level sysctls with daemon sets + taints/tolerations
 - in parallel: kernel upstream patches to fix ipc accounting for 4.5+
@@ -199,7 +199,7 @@ As an administrator I want to set customizable kernel parameters for a container
 ## Constraints and Assumptions
 
 * Only namespaced kernel parameters can be modified
-* Resource isolation is ensured.
+* Resource isolation is ensured for all safe sysctls. Sysctl with unclear, weak or not existing isolation are called unsafe sysctls. The later are disabled by default.
 * Built on-top of the existing security context work
 * Be container-runtime agnostic
   - on the API level
@@ -320,6 +320,19 @@ Issues:
 - One could imagine to offer certain non-namespaced sysctls as well which
   taint a host such that only containers with compatible sysctls settings are
   scheduled there. This is considered *out of scope* to schedule pods with certain sysctls onto certain hosts according to some given rules. This must be done manually by the admin, e.g. by using taints and tolerations.
+
+- (Next to namespacing) *isolation* is the key requirement for a sysctl to be unconditionally allowed in a pod spec. There are the following alternatives:
+
+  1. allow only namespaced **and** isolated sysctls (= safe) in the API
+  2. allow only namespaced **and** isolated sysctls **by-default** and make all other namespaced sysctls with unclear or weak isolation (= unsafe) opt-in by the cluster admin.
+
+  For v1.4 only a handful of *safe* sysctls are defined. There are known, non-edge-case use-cases (see above) for a number of further sysctls. Some of them (especially the ipc sysctls) will probably be promoted onto the whitelist of safe sysctls in the near future when Kubernetes implements better resource isolation.
+
+  On the other hand, especially in the `net.*` hierarchy there are a number of very low-level knobs to tune the network stack. They might be necessary for classes of applications requiring high-performance or realtime behavior. It is hard to forsee which knobs will be necessary in the future. At the same time the `net.*` hierarchy is huge making deep analysis on a 1-on-1 basis hard. If there is no way to use them at-your-own-risk, those users are forced into the use of privileged containers. This might be a security threat and a no-go for certain environments. Sysctls in the API (even if unsafe) in contrast allow finegrained control by the cluster admin without essentially opening up root access to the cluster nodes for some users.
+
+  This requirement for a large number of accessible sysctls must be balanced though with the desire to have a minimal API surface: removing certain (unsafe) sysctls from an official API in a later version (e.g. because they turned out to be problematic for the node health) is problematic.
+
+  To balance those two desires the API can be split in half: one official way to declare *safe* sysctls in a pod spec (this one will be promoted to beta and stable some day) and an alternative way to define *unsafe* sysctls. Possibly the second way will stay alpha forever to make it clear that unsafe sysctls are not a stable API of Kubernetes. Moreover, for all *unsafe* sysctls an opt-in policy is desirable, only controllable by the cluster admin, not by each cluster user.
 
 ## Analysis of Sysctls of Interest
 
@@ -446,17 +459,21 @@ Footnote:
 
 Sysctls in pods and `PodSecurityPolicy` are first introduced as an alpha feature for Kubernetes 1.4. This means that the API will model these as annotations, with the plan to turn those in first class citizens in a later release when the feature is promoted to beta.
 
-It is proposed to use a syntactical validation in the apiserver **and** a node-level whitelist in the kubelet. The whitelist shall be customizable and is checked against a greylist of known-to-be-namespaced sysctls. The following rules apply:
+It is proposed to use a syntactical validation in the apiserver **and** a node-level whitelist of *safe sysctls* in the kubelet. The whitelist shall be fixed per version and might grow in the future when better resource isolation is in place in the kubelet. In addition a list of *allowed unsafe sysctls* will be configured per node by the cluster admin, with an empty list as the default.
 
-- only sysctls shall be greylisted
-  + that are properly namespaced by the container or the pod (e.g. in the ipc or net namespace)
-- only sysctls shall be whitelisted in the kubelet
+The following rules apply:
+
+- Only sysctls shall be whitelisted in the kubelet
   + that are properly namespaced by the container or the pod (e.g. in the ipc or net namespace)
   + **and** that cannot lead to resource consumption outside of the limits of the container or the pod.
+  These are called *safe*.
+- The cluster admin shall only be able to manually enable sysctls in the kubelet
+  + that are properly namespaced by the container or the pod (e.g. in the ipc or net namespace).
+  These are call *unsafe*.
 
-This means that sysctls that are not namespaced must be set by the admin on host level on his own risk, e.g. by running a *privileged daemonset*, possibly limited to a restricted, special-purpose set of nodes, if necessary with the host network namespace. This is considered out-of-scope of this proposal and out-of-scope of what the kubelet will do for the admin. A section is going to be added to the documentation describing this.
+This means that sysctls that are not namespaced must be set by the admin on host level at his own risk, e.g. by running a *privileged daemonset*, possibly limited to a restricted, special-purpose set of nodes, if necessary with the host network namespace. This is considered out-of-scope of this proposal and out-of-scope of what the kubelet will do for the admin. A section is going to be added to the documentation describing this.
 
-The node-level whitelist will be extensible via flags of the kubelet.
+The *allowed unsafe sysctls* will be configurable on the node via a flag of the kubelet.
 
 ### Pod API Changes
 
@@ -469,6 +486,8 @@ type Sysctl struct {
 	Name string `json:"name"`
 	// Value of a property to set
 	Value string `json:"value"`
+  // Must be true for unsafe sysctls.
+  Unsafe bool `json:"unsafe,omitempty"
 }
 
 // PodSecurityContext holds pod-level security attributes and common container settings.
@@ -485,10 +504,15 @@ type PodSecurityContext struct {
 During alpha the extension of `PodSecurityContext` is modeled with annotations:
 
 ```
-security.alpha.kubernetes.io/sysctls: kernel.shmmax=4,kernel.msgmax=1 2 3`
+security.alpha.kubernetes.io/sysctls: kernel.shm_rmid_forced=1`
+security.alpha.kubernetes.io/unsafe-sysctls: net.ipv4.route.min_pmtu=1000,kernel.msgmax=1 2 3`
 ```
 
 The value is a comma separated list of key-value pairs separated by `=`.
+
+*Safe* sysctls may be declared with `unsafe: true` (or in the respective annotation), while for *unsafe* sysctls `unsafe: true` is mandatory. This guarantees backwards-compatibility in future versions when sysctls have been promoted to the whitelist: old pod specs will still work.
+
+Possibly, the `security.alpha.kubernetes.io/unsafe-sysctls` annotation will stay as an alpha API (replacing the `Unsafe bool` field) even when `security.alpha.kubernetes.io/sysctls` has been promoted to beta or stable. This helps to make clear that unsafe sysctls are not a stable feature.
 
 **Note**: none of the whitelisted (and in general none with the exceptions of descriptive plain text ones) sysctls use anything else than numbers, possibly separated with spaces.
 
@@ -498,7 +522,7 @@ The value is a comma separated list of key-value pairs separated by `=`.
 
 #### In the Apiserver
 
-The name of each sysctl in `PodSecurityContext.Sysctls[*].Name` (or the `annotation security.alpha.kubernetes.io/sysctls` during alpha) is validated by the apiserver against:
+The name of each sysctl in `PodSecurityContext.Sysctls[*].Name` (or the `annotation security.alpha.kubernetes.io/[unsafe-]sysctls` during alpha) is validated by the apiserver against:
 
 - 253 characters in length
 - it matches `sysctlRegexp`:
@@ -511,14 +535,11 @@ var sysctlRegexp = regexp.MustCompile("^" + SysctlFmt + "$")
 
 #### In the Kubelet
 
-The name of each sysctl in `PodSecurityContext.Sysctls[*].Name` (or the `annotation security.alpha.kubernetes.io/sysctls` during alpha) is checked by the kubelet against a static node-level *whitelist* of
+The name of each sysctl in `PodSecurityContext.Sysctls[*].Name` (or the `annotation security.alpha.kubernetes.io/[unsafe-]sysctls` during alpha) is checked by the kubelet against a static *whitelist*.
 
-- specific sysctls
-- and a list of sysctl prefixes,
+The whitelist is defined under `pkg/kubelet` and to be maintained by the nodes team.
 
-These are defined under `pkg/kubelet` and to be maintained by the nodes team.
-
-The initial node-level whitelist will be:
+The initial whitelist of safe sysctls will be:
 
 ```go
 var whitelist = []string{
@@ -529,42 +550,41 @@ var whitelist = []string{
 }
 ```
 
-In parallel a greylist is maintained of all known namespaced sysctls, being initially:
+In parallel a namespace list is maintained with all sysctls and their respective, known kernel namespaces. This is initially derived from Docker's internal sysctl whitelist:
 
 ```go
-var greylist = map[string]string{
-    "kernel.shm_rmid_forced":       "ipc",
-    "kernel.msgmax":                "ipc",
-    "kernel.msgmnb":                "ipc",
-    "kernel.msgmni":                "ipc",
-    "kernel.sem":                   "ipc",
+var namespaces = map[string]string{
+    "kernel.sem": "ipc",
 }
 
-var greylistPrefixes = map[string]string{
+var prefixNamespaces = map[string]string{
+    "kernel.msg": "ipc",
+    "kenrel.shm": "ipc",
     "fs.mqueue.": "ipc",
     "net.":       "net",
 }
 ```
 
-**Note**: the `kernel.shm*` sysctls are not on the greylist intentionally as they have basically unlimited (`kernel.shmmax`, `kernel.shmall`) or very high values (`kernel.shmmni`) by default on today's kernel. `kernel.shmmni` will be reconsidered for 1.5 when proper isolation is in place, whether to offer that in the API by then or to set even higher values by default for every pod.
-
-The value of these two maps is the kernel namespace that must be enabled. If a pod is created with host ipc or network namespace, the respective sysctls are forbidden.
+If a pod is created with host ipc or host network namespace, the respective sysctls are forbidden.
 
 ### Error behavior
 
-Pods that do not comply with the greylist will be rejected by the apiserver. Pods that do not comply with the whitelist will fail to launch. An event will be created by the kubelet to notify the user.
+Pods that do not comply with the syntactical sysctl format will be rejected by the apiserver. Pods that do not comply with the whitelist (or are not manually enabled as *allowed unsafe sysctls* for a node by the cluster admin) will fail to launch. An event will be created by the kubelet to notify the user.
 
 ### Kubelet Flags to Extend the Whitelist
 
 The kubelet will get a new flag:
 
 ```
---experimental-sysctl-whitelist     Comma-separated whitelist of sysctls or sysctl patterns (ending in *).
+--experimental-allowed-unsafe-sysctls  Comma-separated whitelist of unsafe
+                                       sysctls or unsafe sysctl patterns
+                                       (ending in *). Use these at your own
+                                       risk.
 ```
 
-It defaults to the node-level whitelist.
+It defaults to the empty list.
 
-During kubelet launch the given value is checked against the greylist and refused if non-namespaced sysctls are passed.
+During kubelet launch the given value is checked against the list of known namespaces for sysctls or sysctl prefixes. If a namespace is not known, the kubelet will terminate with an error.
 
 ### SecurityContext Enforcement
 
@@ -585,9 +605,11 @@ type PodSecurityPolicySpec struct {
 
 The `simpleProvider` in `pkg.security.podsecuritypolicy` will validate the value of `PodSecurityPolicySpec.Sysctls` with the sysctls of a given pod in `ValidatePodSecurityContext`.
 
-The default policy will be `*`, i.e. all greylisted (and therefore known-to-be-namespaced) sysctls are allowed.
+The default policy will be `*`, i.e. all syntactly correct sysctls are admitted by the `PodSecurityPolicySpec`.
 
-During alpha the following annotations will be used:
+The `PodSecurityPolicySpec` applies to safe and unsafe sysctls in the same way.
+
+During alpha the following annotation will be used:
 
 ```
 security.alpha.kubernetes.io/sysctls: kernel.shmmax,kernel.msgmax,fs.mqueue.*`
@@ -595,7 +617,7 @@ security.alpha.kubernetes.io/sysctls: kernel.shmmax,kernel.msgmax,fs.mqueue.*`
 
 on `PodSecurityPolicy` objects to customize the allowed sysctls.
 
-**Note**: This does not override the whitelist on the nodes. They still apply. This only changes admission of pods in the apiserver.
+**Note**: This does not override the whitelist or the *allowed unsafe sysctls* on the nodes. They still apply. This only changes admission of pods in the apiserver. Pods can still fail to launch due to failed admission on the kubelet.
 
 #### Alternative 2: SysctlPolicy
 
@@ -628,7 +650,7 @@ type PodSecurityPolicySpec struct {
 }
 ```
 
-During alpha the following annotations will be used:
+During alpha the following annotation will be used:
 
 ```
 security.alpha.kubernetes.io/sysctls: kernel.shmmax,kernel.msgmax=max:10:min:1,kernel.msgmni=values:1000 2000 3000`
@@ -649,7 +671,7 @@ In a later implementation of a container runtime interface (compare https://gith
 
 ### Use in a pod
 
-Here is an example of a pod that has `net.ipv4.ip_local_port_range` set to `512`:
+Here is an example of a pod that has the safe sysctl `net.ipv4.ip_local_port_range` set to `1024 65535` and the unsafe sysctl `net.ipv4.route.min_pmtu` to `1000`.
 
 ```yaml
 apiVersion: v1
@@ -668,6 +690,9 @@ spec:
     sysctls:
     - name: net.ipv4.ip_local_port_range
       value: "1024 65535"
+    - name: net.ipv4.route.min_pmtu
+      value: 1000
+      unsafe: true
 ```
 
 ### Allowing only certain sysctls
