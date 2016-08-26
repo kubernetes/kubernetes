@@ -474,7 +474,7 @@ var resourceQuotaColumns = []string{"NAME", "AGE"}
 var namespaceColumns = []string{"NAME", "STATUS", "AGE"}
 var secretColumns = []string{"NAME", "TYPE", "DATA", "AGE"}
 var serviceAccountColumns = []string{"NAME", "SECRETS", "AGE"}
-var persistentVolumeColumns = []string{"NAME", "CAPACITY", "ACCESSMODES", "STATUS", "CLAIM", "REASON", "AGE"}
+var persistentVolumeColumns = []string{"NAME", "CAPACITY", "ACCESSMODES", "RECLAIMPOLICY", "STATUS", "CLAIM", "REASON", "AGE"}
 var persistentVolumeClaimColumns = []string{"NAME", "STATUS", "VOLUME", "CAPACITY", "ACCESSMODES", "AGE"}
 var componentStatusColumns = []string{"NAME", "STATUS", "MESSAGE", "ERROR"}
 var thirdPartyResourceColumns = []string{"NAME", "DESCRIPTION", "VERSION(S)"}
@@ -1513,13 +1513,14 @@ func printPersistentVolume(pv *api.PersistentVolume, w io.Writer, options PrintO
 	}
 
 	modesStr := api.GetAccessModesAsString(pv.Spec.AccessModes)
+	reclaimPolicyStr := string(pv.Spec.PersistentVolumeReclaimPolicy)
 
 	aQty := pv.Spec.Capacity[api.ResourceStorage]
 	aSize := aQty.String()
 
-	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s",
+	if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",
 		name,
-		aSize, modesStr,
+		aSize, modesStr, reclaimPolicyStr,
 		pv.Status.Phase,
 		claimRefUID,
 		pv.Status.Reason,
