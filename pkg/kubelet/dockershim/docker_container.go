@@ -62,7 +62,8 @@ func (ds *dockerService) ListContainers(filter *runtimeApi.ContainerFilter) ([]*
 	}
 	// Convert docker to runtime api containers.
 	result := []*runtimeApi.Container{}
-	for _, c := range containers {
+	for i := range containers {
+		c := containers[i]
 		if len(filter.GetName()) > 0 {
 			_, _, _, containerName, _, err := parseContainerName(c.Names[0])
 			if err != nil || containerName != filter.GetName() {
