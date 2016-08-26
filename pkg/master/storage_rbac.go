@@ -17,8 +17,12 @@ limitations under the License.
 package master
 
 import (
+	"fmt"
 	"sync"
 
+	"github.com/golang/glog"
+
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapiv1alpha1 "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
@@ -36,15 +40,20 @@ import (
 	"k8s.io/kubernetes/pkg/registry/rolebinding"
 	rolebindingetcd "k8s.io/kubernetes/pkg/registry/rolebinding/etcd"
 	rolebindingpolicybased "k8s.io/kubernetes/pkg/registry/rolebinding/policybased"
+	utilruntime "k8s.io/kubernetes/pkg/util/runtime"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )
 
 type RBACRESTStorageProvider struct {
 	AuthorizerRBACSuperUser string
+
+	postStartHook genericapiserver.PostStartHookFunc
 }
 
 var _ RESTStorageProvider = &RBACRESTStorageProvider{}
+var _ PostStartHookProvider = &RBACRESTStorageProvider{}
 
-func (p RBACRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p *RBACRESTStorageProvider) NewRESTStorage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName)
 
 	if apiResourceConfigSource.AnyResourcesForVersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
@@ -55,7 +64,7 @@ func (p RBACRESTStorageProvider) NewRESTStorage(apiResourceConfigSource generica
 	return apiGroupInfo, true
 }
 
-func (p RBACRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
+func (p *RBACRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource genericapiserver.APIResourceConfigSource, restOptionsGetter RESTOptionsGetter) map[string]rest.Storage {
 	version := rbacapiv1alpha1.SchemeGroupVersion
 
 	once := new(sync.Once)
@@ -84,10 +93,44 @@ func (p RBACRESTStorageProvider) v1alpha1Storage(apiResourceConfigSource generic
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterroles")) {
 		clusterRolesStorage := clusterroleetcd.NewREST(restOptionsGetter(rbac.Resource("clusterroles")))
 		storage["clusterroles"] = clusterrolepolicybased.NewStorage(clusterRolesStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
+
+		p.postStartHook = newPostStartHook(clusterRolesStorage)
 	}
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("clusterrolebindings")) {
 		clusterRoleBindingsStorage := clusterrolebindingetcd.NewREST(restOptionsGetter(rbac.Resource("clusterrolebindings")))
 		storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, newRuleValidator(), p.AuthorizerRBACSuperUser)
 	}
 	return storage
+}
+
+func (p *RBACRESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {
+	return "rbac/bootstrap-roles", p.postStartHook, nil
+}
+
+func newPostStartHook(directClusterRoleAccess *clusterroleetcd.REST) genericapiserver.PostStartHookFunc {
+	return func(genericapiserver.PostStartHookContext) error {
+		ctx := api.NewContext()
+
+		existingClusterRoles, err := directClusterRoleAccess.List(ctx, &api.ListOptions{})
+		if err != nil {
+			utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+			return nil
+		}
+		// if clusterroles already exist, then assume we don't have work to do because we've already
+		// initialized or another API server has started this task
+		if len(existingClusterRoles.(*rbac.ClusterRoleList).Items) > 0 {
+			return nil
+		}
+
+		for _, clusterRole := range bootstrappolicy.ClusterRoles() {
+			if _, err := directClusterRoleAccess.Create(ctx, &clusterRole); err != nil {
+				// don't fail on failures, try to create as many as you can
+				utilruntime.HandleError(fmt.Errorf("unable to initialize clusterroles: %v", err))
+				continue
+			}
+			glog.Infof("Created clusterrole.%s/%s", rbac.GroupName, clusterRole.Name)
+		}
+
+		return nil
+	}
 }

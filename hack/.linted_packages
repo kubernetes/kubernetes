@@ -199,6 +199,7 @@ plugin/pkg/auth/authenticator/password/allow
 plugin/pkg/auth/authenticator/request/basicauth
 plugin/pkg/auth/authenticator/request/union
 plugin/pkg/auth/authorizer
+plugin/pkg/auth/authorizer/rbac/bootstrappolicy
 plugin/pkg/client/auth
 plugin/pkg/client/auth/gcp
 test/e2e/cleanup
