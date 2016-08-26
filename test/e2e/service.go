@@ -724,6 +724,53 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 	})
 
+	It("should use same NodePort with same port but different protocols", func() {
+		serviceName := "nodeports"
+		ns := f.Namespace.Name
+
+		t := NewServerTest(c, ns, serviceName)
+		defer func() {
+			defer GinkgoRecover()
+			errs := t.Cleanup()
+			if len(errs) != 0 {
+				framework.Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		By("creating service " + serviceName + " with same NodePort but different protocols in namespace " + ns)
+		service := &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name:      t.ServiceName,
+				Namespace: t.Namespace,
+			},
+			Spec: api.ServiceSpec{
+				Selector: t.Labels,
+				Type:     api.ServiceTypeNodePort,
+				Ports: []api.ServicePort{
+					{
+						Name:     "tcp-port",
+						Port:     53,
+						Protocol: api.ProtocolTCP,
+					},
+					{
+						Name:     "udp-port",
+						Port:     53,
+						Protocol: api.ProtocolUDP,
+					},
+				},
+			},
+		}
+		result, err := t.CreateService(service)
+		Expect(err).NotTo(HaveOccurred())
+
+		if len(result.Spec.Ports) != 2 {
+			framework.Failf("got unexpected len(Spec.Ports) for new service: %v", result)
+		}
+		if result.Spec.Ports[0].NodePort != result.Spec.Ports[1].NodePort {
+			framework.Failf("should use same NodePort for new service: %v", result)
+		}
+	})
+
 	It("should prevent NodePort collisions", func() {
 		// TODO: use the ServiceTestJig here
 		baseName := "nodeport-collision-"
