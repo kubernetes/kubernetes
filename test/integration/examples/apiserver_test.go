@@ -17,6 +17,7 @@ limitations under the License.
 package apiserver
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -26,12 +27,11 @@ import (
 
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/test_apis/testgroup.k8s.io/v1"
 
+	"github.com/golang/glog"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/kubernetes/examples/apiserver"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 )
-
-var serverIP = fmt.Sprintf("http://localhost:%d", apiserver.InsecurePort)
 
 var groupVersion = v1.SchemeGroupVersion
 
@@ -40,24 +40,49 @@ var groupVersionForDiscovery = unversioned.GroupVersionForDiscovery{
 	Version:      groupVersion.Version,
 }
 
-func TestRun(t *testing.T) {
+func TestRunServer(t *testing.T) {
+	serverIP := fmt.Sprintf("http://localhost:%d", apiserver.InsecurePort)
 	go func() {
 		if err := apiserver.Run(apiserver.NewServerRunOptions()); err != nil {
 			t.Fatalf("Error in bringing up the server: %v", err)
 		}
 	}()
-	if err := waitForApiserverUp(); err != nil {
+	if err := waitForApiserverUp(serverIP); err != nil {
 		t.Fatalf("%v", err)
 	}
-	testSwaggerSpec(t)
-	testAPIGroupList(t)
-	testAPIGroup(t)
-	testAPIResourceList(t)
+	testSwaggerSpec(t, serverIP)
+	testAPIGroupList(t, serverIP)
+	testAPIGroup(t, serverIP)
+	testAPIResourceList(t, serverIP)
 }
 
-func waitForApiserverUp() error {
+func TestRunSecureServer(t *testing.T) {
+	serverIP := fmt.Sprintf("https://localhost:%d", apiserver.SecurePort)
+	go func() {
+		options := apiserver.NewServerRunOptions()
+		options.InsecurePort = 0
+		options.SecurePort = apiserver.SecurePort
+		if err := apiserver.Run(options); err != nil {
+			t.Fatalf("Error in bringing up the server: %v", err)
+		}
+	}()
+	if err := waitForApiserverUp(serverIP); err != nil {
+		t.Fatalf("%v", err)
+	}
+	testSwaggerSpec(t, serverIP)
+	testAPIGroupList(t, serverIP)
+	testAPIGroup(t, serverIP)
+	testAPIResourceList(t, serverIP)
+}
+
+func waitForApiserverUp(serverIP string) error {
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		_, err := http.Get(serverIP)
+		glog.Errorf("Waiting for : %#v", serverIP)
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client := &http.Client{Transport: tr}
+		_, err := client.Get(serverIP)
 		if err == nil {
 			return nil
 		}
@@ -66,11 +91,17 @@ func waitForApiserverUp() error {
 }
 
 func readResponse(serverURL string) ([]byte, error) {
-	response, err := http.Get(serverURL)
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	response, err := client.Get(serverURL)
 	if err != nil {
+		glog.Errorf("http get err code : %#v", err)
 		return nil, fmt.Errorf("Error in fetching %s: %v", serverURL, err)
 	}
 	defer response.Body.Close()
+	glog.Errorf("http get response code : %#v", response.StatusCode)
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status: %d for URL: %s, expected status: %d", response.StatusCode, serverURL, http.StatusOK)
 	}
@@ -81,7 +112,7 @@ func readResponse(serverURL string) ([]byte, error) {
 	return contents, nil
 }
 
-func testSwaggerSpec(t *testing.T) {
+func testSwaggerSpec(t *testing.T, serverIP string) {
 	serverURL := serverIP + "/swaggerapi"
 	_, err := readResponse(serverURL)
 	if err != nil {
@@ -89,7 +120,7 @@ func testSwaggerSpec(t *testing.T) {
 	}
 }
 
-func testAPIGroupList(t *testing.T) {
+func testAPIGroupList(t *testing.T, serverIP string) {
 	serverURL := serverIP + "/apis"
 	contents, err := readResponse(serverURL)
 	if err != nil {
@@ -107,7 +138,7 @@ func testAPIGroupList(t *testing.T) {
 	assert.Equal(t, apiGroupList.Groups[0].PreferredVersion, groupVersionForDiscovery)
 }
 
-func testAPIGroup(t *testing.T) {
+func testAPIGroup(t *testing.T, serverIP string) {
 	serverURL := serverIP + "/apis/testgroup.k8s.io"
 	contents, err := readResponse(serverURL)
 	if err != nil {
@@ -126,7 +157,7 @@ func testAPIGroup(t *testing.T) {
 	assert.Equal(t, apiGroup.Versions[0], apiGroup.PreferredVersion)
 }
 
-func testAPIResourceList(t *testing.T) {
+func testAPIResourceList(t *testing.T, serverIP string) {
 	serverURL := serverIP + "/apis/testgroup.k8s.io/v1"
 	contents, err := readResponse(serverURL)
 	if err != nil {

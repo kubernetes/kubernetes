@@ -72,6 +72,28 @@ func NewAlwaysFailAuthorizer() authorizer.Authorizer {
 	return new(alwaysFailAuthorizer)
 }
 
+type privilegedGroupAuthorizer struct {
+	groups []string
+}
+
+func (r *privilegedGroupAuthorizer) Authorize(attr authorizer.Attributes) (bool, string, error) {
+	for attr_group := range attr.GetUser().GetGroups() {
+		for priv_group := range r.groups {
+			if priv_group == attr_group {
+				return true, "", nil
+			}
+		}
+	}
+	return false, "Not in privileged list.", nil
+}
+
+// NewPrivilegedGroups is for use in loopback scenarios
+func NewPrivilegedGroups(groups ...string) *privilegedGroupAuthorizer {
+	return &privilegedGroupAuthorizer{
+		groups: groups,
+	}
+}
+
 type AuthorizationConfig struct {
 	// Options for ModeABAC
 
