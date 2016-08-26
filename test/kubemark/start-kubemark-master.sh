@@ -19,8 +19,17 @@
 EVENT_STORE_IP=$1
 EVENT_STORE_URL="http://${EVENT_STORE_IP}:4002"
 NUM_NODES=$2
+
+retry() {
+	for i in {1..4}; do
+		"$@" && return 0 || sleep $i
+	done
+	"$@"
+}
+
 if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
-	sudo docker run --net=host -v /var/etcd/data-events:/var/etcd/data -d \
+	# Retry starting etcd to avoid pulling image errors.
+	retry sudo docker run --net=host -v /var/etcd/data-events:/var/etcd/data -d \
 		gcr.io/google_containers/etcd:3.0.4 /usr/local/bin/etcd \
 		--listen-peer-urls http://127.0.0.1:2381 \
 		--advertise-client-urls=http://127.0.0.1:4002 \
@@ -28,7 +37,8 @@ if [ "${EVENT_STORE_IP}" == "127.0.0.1" ]; then
 		--data-dir=/var/etcd/data
 fi
 
-sudo docker run --net=host -v /var/etcd/data:/var/etcd/data -d \
+# Retry starting etcd to avoid pulling image errors.
+retry sudo docker run --net=host -v /var/etcd/data:/var/etcd/data -d \
 	gcr.io/google_containers/etcd:3.0.4 /usr/local/bin/etcd \
 	--listen-peer-urls http://127.0.0.1:2380 \
 	--advertise-client-urls=http://127.0.0.1:2379 \
