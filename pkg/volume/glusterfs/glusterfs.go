@@ -73,8 +73,9 @@ func (plugin *glusterfsPlugin) GetVolumeName(spec *volume.Spec) (string, error) 
 	}
 
 	return fmt.Sprintf(
-		"%v:%v",
+		"%v:%v:%v",
 		volumeSource.EndpointsName,
+		volumeSource.Servers,
 		volumeSource.Path), nil
 }
 
@@ -102,14 +103,15 @@ func (plugin *glusterfsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode
 func (plugin *glusterfsPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volume.VolumeOptions) (volume.Mounter, error) {
 	source, _ := plugin.getGlusterVolumeSource(spec)
 	ep_name := source.EndpointsName
+	hostlist := source.Servers
 	ns := pod.Namespace
 	ep, err := plugin.host.GetKubeClient().Core().Endpoints(ns).Get(ep_name)
-	if err != nil {
+	if err != nil && len(hostlist) == 0 {
 		glog.Errorf("glusterfs: failed to get endpoints %s[%v]", ep_name, err)
 		return nil, err
 	}
-	glog.V(1).Infof("glusterfs: endpoints %v", ep)
-	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New())
+	glog.V(1).Infof("glusterfs: endpoints %v hostlist %v", ep, hostlist)
+	return plugin.newMounterInternal(spec, ep, pod, plugin.host.GetMounter(), exec.New(), hostlist)
 }
 
 func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.GlusterfsVolumeSource, bool) {
@@ -122,7 +124,7 @@ func (plugin *glusterfsPlugin) getGlusterVolumeSource(spec *volume.Spec) (*api.G
 	}
 }
 
-func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface) (volume.Mounter, error) {
+func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *api.Endpoints, pod *api.Pod, mounter mount.Interface, exe exec.Interface, hostlist string) (volume.Mounter, error) {
 	source, readOnly := plugin.getGlusterVolumeSource(spec)
 	return &glusterfsMounter{
 		glusterfs: &glusterfs{
@@ -132,6 +134,7 @@ func (plugin *glusterfsPlugin) newMounterInternal(spec *volume.Spec, ep *api.End
 			plugin:  plugin,
 		},
 		hosts:    ep,
+		servers:  hostlist,
 		path:     source.Path,
 		readOnly: readOnly,
 		exe:      exe}, nil
@@ -161,6 +164,7 @@ func (plugin *glusterfsPlugin) ConstructVolumeSpec(volumeName, mountPath string)
 		VolumeSource: api.VolumeSource{
 			Glusterfs: &api.GlusterfsVolumeSource{
 				EndpointsName: volumeName,
+				Servers:       volumeName,
 				Path:          volumeName,
 			},
 		},
@@ -180,6 +184,7 @@ type glusterfs struct {
 type glusterfsMounter struct {
 	*glusterfs
 	hosts    *api.Endpoints
+	servers  string
 	path     string
 	readOnly bool
 	exe      exec.Interface
@@ -285,24 +290,29 @@ func (b *glusterfsMounter) setUpAtInternal(dir string) error {
 	log := path.Join(p, b.pod.Name+"-glusterfs.log")
 	options = append(options, "log-level=ERROR")
 	options = append(options, "log-file="+log)
-
-	addr := make(map[string]struct{})
-	for _, s := range b.hosts.Subsets {
-		for _, a := range s.Addresses {
-			addr[a.IP] = struct{}{}
+	var addrlist []string
+	if b.hosts != nil || b.servers != "" {
+		addr := make(map[string]struct{})
+		if b.hosts != nil {
+			for _, s := range b.hosts.Subsets {
+				for _, a := range s.Addresses {
+					addr[a.IP] = struct{}{}
+					addrlist = append(addrlist, a.IP)
+				}
+			}
+		} else {
+			addrlist = dstrings.Split(b.servers, ",")
+		}
+		// Avoid mount storm, pick a host randomly.
+		// Iterate all hosts until mount succeeds.
+		for _, ip := range addrlist {
+			errs = b.mounter.Mount(ip+":"+b.path, dir, "glusterfs", options)
+			if errs == nil {
+				glog.Infof("glusterfs: successfully mounted %s", dir)
+				return nil
+			}
 		}
 	}
-
-	// Avoid mount storm, pick a host randomly.
-	// Iterate all hosts until mount succeeds.
-	for hostIP := range addr {
-		errs = b.mounter.Mount(hostIP+":"+b.path, dir, "glusterfs", options)
-		if errs == nil {
-			glog.Infof("glusterfs: successfully mounted %s", dir)
-			return nil
-		}
-	}
-
 	// Failed mount scenario.
 	// Since gluster does not return eror text
 	// it all goes in a log file, we will read the log file
@@ -474,8 +484,10 @@ func (p *glusterfsVolumeProvisioner) CreateVolume() (r *api.GlusterfsVolumeSourc
 		return nil, 0, fmt.Errorf("error creating volume %v", err)
 	}
 	glog.V(1).Infof("glusterfs: volume with size :%d and name:%s created", volume.Size, volume.Name)
+	dhostlistf := dstrings.Join(volume.Mount.GlusterFS.Hosts[:], ",")
 	return &api.GlusterfsVolumeSource{
 		EndpointsName: p.glusterfsClusterConf.glusterep,
+		Servers:       dhostlistf,
 		Path:          volume.Name,
 		ReadOnly:      false,
 	}, sz, nil
