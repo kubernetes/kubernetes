@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 const (
@@ -96,8 +97,8 @@ func nodeMetricsUrl(name string) (string, error) {
 	return fmt.Sprintf("%s/nodes/%s", metricsRoot, name), nil
 }
 
-func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector string) ([]metrics_api.NodeMetrics, error) {
-	params := map[string]string{"labelSelector": selector}
+func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector labels.Selector) ([]metrics_api.NodeMetrics, error) {
+	params := map[string]string{"labelSelector": selector.String()}
 	path, err := nodeMetricsUrl(nodeName)
 	if err != nil {
 		return []metrics_api.NodeMetrics{}, err
@@ -125,7 +126,7 @@ func (cli *HeapsterMetricsClient) GetNodeMetrics(nodeName string, selector strin
 	return metrics, nil
 }
 
-func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string, allNamespaces bool, selector string) ([]metrics_api.PodMetrics, error) {
+func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string, allNamespaces bool, selector labels.Selector) ([]metrics_api.PodMetrics, error) {
 	if allNamespaces {
 		namespace = api.NamespaceAll
 	}
@@ -133,7 +134,8 @@ func (cli *HeapsterMetricsClient) GetPodMetrics(namespace string, podName string
 	if err != nil {
 		return []metrics_api.PodMetrics{}, err
 	}
-	params := map[string]string{"labelSelector": selector}
+
+	params := map[string]string{"labelSelector": selector.String()}
 	allMetrics := make([]metrics_api.PodMetrics, 0)
 
 	resultRaw, err := GetHeapsterMetrics(cli, path, params)
