@@ -19,10 +19,13 @@ package deployment
 import (
 	"fmt"
 	"reflect"
+	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -79,6 +82,15 @@ func (deploymentStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Obj
 	if !reflect.DeepEqual(newDeployment.Spec, oldDeployment.Spec) ||
 		!reflect.DeepEqual(newDeployment.Annotations, oldDeployment.Annotations) {
 		newDeployment.Generation = oldDeployment.Generation + 1
+	}
+
+	// Records timestamp on selector updates in annotation
+	if !reflect.DeepEqual(newDeployment.Spec.Selector, oldDeployment.Spec.Selector) {
+		if newDeployment.Annotations == nil {
+			newDeployment.Annotations = make(map[string]string)
+		}
+		now := unversioned.Now()
+		newDeployment.Annotations[util.SelectorUpdateAnnotation] = now.Format(time.RFC3339)
 	}
 }
 
