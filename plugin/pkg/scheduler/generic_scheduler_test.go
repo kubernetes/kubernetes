@@ -25,10 +25,14 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
+	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	algorithmpredicates "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	algorithmpriorities "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities"
+	priorityutil "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
@@ -369,6 +373,149 @@ func TestFindFitSomeError(t *testing.T) {
 		}
 		if len(failures) != 1 || failures[0] != algorithmpredicates.ErrFakePredicate {
 			t.Errorf("unexpected failures: %v", failures)
+		}
+	}
+}
+
+func makeNode(node string, milliCPU, memory int64) *api.Node {
+	return &api.Node{
+		ObjectMeta: api.ObjectMeta{Name: node},
+		Status: api.NodeStatus{
+			Capacity: api.ResourceList{
+				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+			},
+			Allocatable: api.ResourceList{
+				"cpu":    *resource.NewMilliQuantity(milliCPU, resource.DecimalSI),
+				"memory": *resource.NewQuantity(memory, resource.BinarySI),
+			},
+		},
+	}
+}
+
+// The point of this test is to show that you:
+// - get the same priority for a zero-request pod as for a pod with the defaults requests,
+//   both when the zero-request pod is already on the machine and when the zero-request pod
+//   is the one being scheduled.
+// - don't get the same score no matter what we schedule.
+func TestZeroRequest(t *testing.T) {
+	// A pod with no resources. We expect spreading to count it as having the default resources.
+	noResources := api.PodSpec{
+		Containers: []api.Container{
+			{},
+		},
+	}
+	noResources1 := noResources
+	noResources1.NodeName = "machine1"
+	// A pod with the same resources as a 0-request pod gets by default as its resources (for spreading).
+	small := api.PodSpec{
+		Containers: []api.Container{
+			{
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						"cpu": resource.MustParse(
+							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest, 10) + "m"),
+						"memory": resource.MustParse(
+							strconv.FormatInt(priorityutil.DefaultMemoryRequest, 10)),
+					},
+				},
+			},
+		},
+	}
+	small2 := small
+	small2.NodeName = "machine2"
+	// A larger pod.
+	large := api.PodSpec{
+		Containers: []api.Container{
+			{
+				Resources: api.ResourceRequirements{
+					Requests: api.ResourceList{
+						"cpu": resource.MustParse(
+							strconv.FormatInt(priorityutil.DefaultMilliCpuRequest*3, 10) + "m"),
+						"memory": resource.MustParse(
+							strconv.FormatInt(priorityutil.DefaultMemoryRequest*3, 10)),
+					},
+				},
+			},
+		},
+	}
+	large1 := large
+	large1.NodeName = "machine1"
+	large2 := large
+	large2.NodeName = "machine2"
+	tests := []struct {
+		pod   *api.Pod
+		pods  []*api.Pod
+		nodes []*api.Node
+		test  string
+	}{
+		// The point of these next two tests is to show you get the same priority for a zero-request pod
+		// as for a pod with the defaults requests, both when the zero-request pod is already on the machine
+		// and when the zero-request pod is the one being scheduled.
+		{
+			pod:   &api.Pod{Spec: noResources},
+			nodes: []*api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
+			test:  "test priority of zero-request pod with machine with zero-request pod",
+			pods: []*api.Pod{
+				{Spec: large1}, {Spec: noResources1},
+				{Spec: large2}, {Spec: small2},
+			},
+		},
+		{
+			pod:   &api.Pod{Spec: small},
+			nodes: []*api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
+			test:  "test priority of nonzero-request pod with machine with zero-request pod",
+			pods: []*api.Pod{
+				{Spec: large1}, {Spec: noResources1},
+				{Spec: large2}, {Spec: small2},
+			},
+		},
+		// The point of this test is to verify that we're not just getting the same score no matter what we schedule.
+		{
+			pod:   &api.Pod{Spec: large},
+			nodes: []*api.Node{makeNode("machine1", 1000, priorityutil.DefaultMemoryRequest*10), makeNode("machine2", 1000, priorityutil.DefaultMemoryRequest*10)},
+			test:  "test priority of larger pod with machine with zero-request pod",
+			pods: []*api.Pod{
+				{Spec: large1}, {Spec: noResources1},
+				{Spec: large2}, {Spec: small2},
+			},
+		},
+	}
+
+	const expectedPriority int = 25
+	for _, test := range tests {
+		// This should match the configuration in defaultPriorities() in
+		// plugin/pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
+		// to test what's actually in production.
+		priorityConfigs := []algorithm.PriorityConfig{
+			{Map: algorithmpriorities.LeastRequestedPriorityMap, Weight: 1},
+			{Function: algorithmpriorities.BalancedResourceAllocation, Weight: 1},
+			{
+				Function: algorithmpriorities.NewSelectorSpreadPriority(
+					algorithm.FakePodLister(test.pods),
+					algorithm.FakeServiceLister([]api.Service{}),
+					algorithm.FakeControllerLister([]api.ReplicationController{}),
+					algorithm.FakeReplicaSetLister([]extensions.ReplicaSet{})),
+				Weight: 1,
+			},
+		}
+		nodeNameToInfo := schedulercache.CreateNodeNameToInfoMap(test.pods, test.nodes)
+		list, err := PrioritizeNodes(
+			test.pod, nodeNameToInfo, priorityConfigs,
+			algorithm.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{})
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+		for _, hp := range list {
+			if test.test == "test priority of larger pod with machine with zero-request pod" {
+				if hp.Score == expectedPriority {
+					t.Errorf("%s: expected non-%d for all priorities, got list %#v", test.test, expectedPriority, list)
+				}
+			} else {
+				if hp.Score != expectedPriority {
+					t.Errorf("%s: expected %d for all priorities, got list %#v", test.test, expectedPriority, list)
+				}
+			}
 		}
 	}
 }
