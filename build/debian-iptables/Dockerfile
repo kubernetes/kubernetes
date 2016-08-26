@@ -22,5 +22,6 @@ CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 # cleanup has no effect.
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y iptables \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y ebtables \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y conntrack \
     && rm -rf /var/lib/apt/lists/*
