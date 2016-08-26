@@ -83,7 +83,7 @@ var _ = framework.KubeDescribe("PetSet [Slow] [Feature:PetSet]", func() {
 
 		BeforeEach(func() {
 			By("creating service " + headlessSvcName + " in namespace " + ns)
-			headlessService := createServiceSpec(headlessSvcName, true, labels)
+			headlessService := createServiceSpec(headlessSvcName, "", true, labels)
 			_, err := c.Services(ns).Create(headlessService)
 			Expect(err).NotTo(HaveOccurred())
 		})
