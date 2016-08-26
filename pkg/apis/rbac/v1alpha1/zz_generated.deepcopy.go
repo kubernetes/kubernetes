@@ -44,6 +44,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleBinding, InType: reflect.TypeOf(&RoleBinding{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleBindingList, InType: reflect.TypeOf(&RoleBindingList{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleList, InType: reflect.TypeOf(&RoleList{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_RoleRef, InType: reflect.TypeOf(&RoleRef{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1alpha1_Subject, InType: reflect.TypeOf(&Subject{})},
 	)
 }
@@ -264,6 +265,17 @@ func DeepCopy_v1alpha1_RoleList(in interface{}, out interface{}, c *conversion.C
 		} else {
 			out.Items = nil
 		}
+		return nil
+	}
+}
+
+func DeepCopy_v1alpha1_RoleRef(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*RoleRef)
+		out := out.(*RoleRef)
+		out.APIGroup = in.APIGroup
+		out.Kind = in.Kind
+		out.Name = in.Name
 		return nil
 	}
 }
