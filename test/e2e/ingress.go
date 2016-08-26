@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -159,7 +160,13 @@ var _ = framework.KubeDescribe("Loadbalancing: L7 [Feature:Ingress]", func() {
 			// but we want to allow easy testing where a user might've hand
 			// configured firewalls.
 			if framework.ProviderIs("gce", "gke") {
-				ExpectNoError(gcloudCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", "e2e"))
+				// TODO: The KUBE_GCE_NETWORK env var is exported for both
+				// gce/gke e2e test runs, pipe it through just like ProjectID.
+				network := os.Getenv("KUBE_GCE_NETWORK")
+				if network == "" {
+					network = "e2e"
+				}
+				ExpectNoError(gcloudCreate("firewall-rules", fmt.Sprintf("ingress-80-443-%v", ns), framework.TestContext.CloudConfig.ProjectID, "--allow", "tcp:80,tcp:443", "--network", network))
 			} else {
 				framework.Logf("WARNING: Not running on GCE/GKE, cannot create firewall rules for :80, :443. Assuming traffic can reach the external ips of all nodes in cluster on those ports.")
 			}
