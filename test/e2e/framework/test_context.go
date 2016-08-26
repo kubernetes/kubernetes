@@ -69,6 +69,8 @@ type TestContextType struct {
 	DumpLogsOnFailure bool
 	// If the garbage collector is enabled in the kube-apiserver and kube-controller-manager.
 	GarbageCollectorEnabled bool
+	// FeatureGates is a set of key=value pairs that describe feature gates for alpha/experimental features.
+	FeatureGates string
 	// Node e2e specific test context
 	NodeTestContextType
 }
@@ -123,6 +125,7 @@ func RegisterCommonFlags() {
 	flag.StringVar(&TestContext.Host, "host", "http://127.0.0.1:8080", "The host, or apiserver, to connect to")
 	flag.StringVar(&TestContext.ReportPrefix, "report-prefix", "", "Optional prefix for JUnit XML reports. Default is empty, which doesn't prepend anything to the default name.")
 	flag.StringVar(&TestContext.ReportDir, "report-dir", "", "Path to the directory where the JUnit XML reports should be saved. Default is empty, which doesn't generate these reports.")
+	flag.StringVar(&TestContext.FeatureGates, "feature-gates", "", "A set of key=value pairs that describe feature gates for alpha/experimental features.")
 }
 
 // Register flags specific to the cluster e2e test suite.
