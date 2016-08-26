@@ -215,13 +215,6 @@ func TestExampleObjectSchemas(t *testing.T) {
 			"cassandra-controller": &api.ReplicationController{},
 			"cassandra-service":    &api.Service{},
 		},
-		"../examples/celery-rabbitmq": {
-			"celery-controller":   &api.ReplicationController{},
-			"flower-controller":   &api.ReplicationController{},
-			"flower-service":      &api.Service{},
-			"rabbitmq-controller": &api.ReplicationController{},
-			"rabbitmq-service":    &api.Service{},
-		},
 		"../examples/cluster-dns": {
 			"dns-backend-rc":      &api.ReplicationController{},
 			"dns-backend-service": &api.Service{},
