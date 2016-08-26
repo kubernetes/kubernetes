@@ -30,9 +30,58 @@ import (
 	"net/url"
 )
 
+func TestTopPodAllNamespacesMetrics(t *testing.T) {
+	initTestErrorHandler(t)
+	metrics := testPodMetricsData()
+	firstTestNamespace := "testnamespace"
+	secondTestNamespace := "secondtestns"
+	thirdTestNamespace := "thirdtestns"
+	metrics.Items[0].Namespace = firstTestNamespace
+	metrics.Items[1].Namespace = secondTestNamespace
+	metrics.Items[2].Namespace = thirdTestNamespace
+
+	expectedPath := fmt.Sprintf("%s/%s/pods", baseMetricsAddress, metricsApiVersion)
+
+	f, tf, _, ns := NewAPIFactory()
+	tf.Printer = &testPrinter{}
+	tf.Client = &fake.RESTClient{
+		NegotiatedSerializer: ns,
+		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
+			switch p, m := req.URL.Path, req.Method; {
+			case p == expectedPath && m == "GET":
+				body, err := marshallBody(metrics)
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				return &http.Response{StatusCode: 200, Header: defaultHeader(), Body: body}, nil
+			default:
+				t.Fatalf("unexpected request: %#v\nGot URL: %#v\nExpected path: %#v", req, req.URL, expectedPath)
+				return nil, nil
+			}
+		}),
+	}
+	tf.Namespace = firstTestNamespace
+	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	buf := bytes.NewBuffer([]byte{})
+
+	cmd := NewCmdTopPod(f, buf)
+	cmd.Flags().Set("all-namespaces", "true")
+	cmd.Run(cmd, []string{})
+
+	// Check the presence of pod names and namespaces in the output.
+	result := buf.String()
+	for _, m := range metrics.Items {
+		if !strings.Contains(result, m.Name) {
+			t.Errorf("missing metrics for %s: \n%s", m.Name, result)
+		}
+		if !strings.Contains(result, m.Namespace) {
+			t.Errorf("missing metrics for %s/%s: \n%s", m.Namespace, m.Name, result)
+		}
+	}
+}
+
 func TestTopPodAllInNamespaceMetrics(t *testing.T) {
 	initTestErrorHandler(t)
-	// TODO(magorzata): refactor to pods/ path after updating heapster version
 	metrics := testPodMetricsData()
 	testNamespace := "testnamespace"
 	nonTestNamespace := "anothernamespace"
@@ -47,7 +96,7 @@ func TestTopPodAllInNamespaceMetrics(t *testing.T) {
 		ListMeta: metrics.ListMeta,
 		Items:    metrics.Items[2:],
 	}
-	for _, m := range expectedMetrics.Items {
+	for _, m := range nonExpectedMetrics.Items {
 		m.Namespace = nonTestNamespace
 	}
 	expectedPath := fmt.Sprintf("%s/%s/namespaces/%s/pods", baseMetricsAddress, metricsApiVersion, testNamespace)
