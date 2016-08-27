@@ -23,8 +23,11 @@ import (
 	"k8s.io/kubernetes/pkg/storage/storagebackend"
 )
 
+// DestroyFunc is to destroy any resources used by the storage returned in Create() together.
+type DestroyFunc func()
+
 // Create creates a storage backend based on given config.
-func Create(c storagebackend.Config) (storage.Interface, func(), error) {
+func Create(c storagebackend.Config) (storage.Interface, DestroyFunc, error) {
 	switch c.Type {
 	case storagebackend.StorageTypeUnset, storagebackend.StorageTypeETCD2:
 		return newETCD2Storage(c)

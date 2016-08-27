@@ -34,7 +34,7 @@ type StorageDecorator func(
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object,
-	trigger storage.TriggerPublisherFunc) (storage.Interface, func())
+	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc)
 
 // Returns given 'storageInterface' without any decoration.
 func UndecoratedStorage(
@@ -44,14 +44,14 @@ func UndecoratedStorage(
 	resourcePrefix string,
 	scopeStrategy rest.NamespaceScopedStrategy,
 	newListFunc func() runtime.Object,
-	trigger storage.TriggerPublisherFunc) (storage.Interface, func()) {
+	trigger storage.TriggerPublisherFunc) (storage.Interface, factory.DestroyFunc) {
 	return NewRawStorage(config)
 }
 
 // NewRawStorage creates the low level kv storage. This is a work-around for current
 // two layer of same storage interface.
 // TODO: Once cacher is enabled on all registries (event registry is special), we will remove this method.
-func NewRawStorage(config *storagebackend.Config) (storage.Interface, func()) {
+func NewRawStorage(config *storagebackend.Config) (storage.Interface, factory.DestroyFunc) {
 	s, d, err := factory.Create(*config)
 	if err != nil {
 		glog.Fatalf("Unable to create storage backend: config (%v), err (%v)", config, err)
