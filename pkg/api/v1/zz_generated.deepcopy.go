@@ -1257,6 +1257,7 @@ func DeepCopy_v1_HostPathVolumeSource(in interface{}, out interface{}, c *conver
 		in := in.(*HostPathVolumeSource)
 		out := out.(*HostPathVolumeSource)
 		out.Path = in.Path
+		out.Shared = in.Shared
 		return nil
 	}
 }
