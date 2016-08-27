@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/batch"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -56,7 +57,7 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 	// multiple jobs running at once
 	It("should schedule multiple jobs concurrently", func() {
 		By("Creating a scheduledjob")
-		scheduledJob := newTestScheduledJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent)
+		scheduledJob := newTestScheduledJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent, true)
 		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -77,7 +78,7 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 	// suspended should not schedule jobs
 	It("should not schedule jobs when suspended", func() {
 		By("Creating a suspended scheduledjob")
-		scheduledJob := newTestScheduledJob("suspended", "*/1 * * * ?", batch.AllowConcurrent)
+		scheduledJob := newTestScheduledJob("suspended", "*/1 * * * ?", batch.AllowConcurrent, true)
 		scheduledJob.Spec.Suspend = newBool(true)
 		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
@@ -99,7 +100,7 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 	// only single active job is allowed for ForbidConcurrent
 	It("should not schedule new jobs when ForbidConcurrent", func() {
 		By("Creating a ForbidConcurrent scheduledjob")
-		scheduledJob := newTestScheduledJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent)
+		scheduledJob := newTestScheduledJob("forbid", "*/1 * * * ?", batch.ForbidConcurrent, true)
 		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -129,7 +130,7 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 	// only single active job is allowed for ReplaceConcurrent
 	It("should replace jobs when ReplaceConcurrent", func() {
 		By("Creating a ReplaceConcurrent scheduledjob")
-		scheduledJob := newTestScheduledJob("replace", "*/1 * * * ?", batch.ReplaceConcurrent)
+		scheduledJob := newTestScheduledJob("replace", "*/1 * * * ?", batch.ReplaceConcurrent, true)
 		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
 		Expect(err).NotTo(HaveOccurred())
 
@@ -155,13 +156,35 @@ var _ = framework.KubeDescribe("ScheduledJob", func() {
 		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
 		Expect(err).NotTo(HaveOccurred())
 	})
+
+	// shouldn't give us unexpected warnings
+	It("should not emit unexpected warnings", func() {
+		By("Creating a scheduledjob")
+		scheduledJob := newTestScheduledJob("concurrent", "*/1 * * * ?", batch.AllowConcurrent, false)
+		scheduledJob, err := createScheduledJob(f.Client, f.Namespace.Name, scheduledJob)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring at least two jobs and at least one finished job exists by listing jobs explicitly")
+		err = waitForJobsAtLeast(f.Client, f.Namespace.Name, 2)
+		Expect(err).NotTo(HaveOccurred())
+		err = waitForAnyFinishedJob(f.Client, f.Namespace.Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Ensuring no unexpected event has happened")
+		err = checkNoUnexpectedEvents(f.Client, f.Namespace.Name, scheduledJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+
+		By("Removing scheduledjob")
+		err = deleteScheduledJob(f.Client, f.Namespace.Name, scheduledJob.Name)
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
 
 // newTestScheduledJob returns a scheduledjob which does one of several testing behaviors.
-func newTestScheduledJob(name, schedule string, concurrencyPolicy batch.ConcurrencyPolicy) *batch.ScheduledJob {
+func newTestScheduledJob(name, schedule string, concurrencyPolicy batch.ConcurrencyPolicy, sleep bool) *batch.ScheduledJob {
 	parallelism := int32(1)
 	completions := int32(1)
-	return &batch.ScheduledJob{
+	sj := &batch.ScheduledJob{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -185,9 +208,8 @@ func newTestScheduledJob(name, schedule string, concurrencyPolicy batch.Concurre
 							},
 							Containers: []api.Container{
 								{
-									Name:    "c",
-									Image:   "gcr.io/google_containers/busybox:1.24",
-									Command: []string{"sleep", "300"},
+									Name:  "c",
+									Image: "gcr.io/google_containers/busybox:1.24",
 									VolumeMounts: []api.VolumeMount{
 										{
 											MountPath: "/data",
@@ -202,6 +224,10 @@ func newTestScheduledJob(name, schedule string, concurrencyPolicy batch.Concurre
 			},
 		},
 	}
+	if sleep {
+		sj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "300"}
+	}
+	return sj
 }
 
 func createScheduledJob(c *client.Client, ns string, scheduledJob *batch.ScheduledJob) (*batch.ScheduledJob, error) {
@@ -251,4 +277,50 @@ func waitForJobReplaced(c *client.Client, ns, previousJobName string) error {
 		}
 		return jobs.Items[0].Name != previousJobName, nil
 	})
+}
+
+// waitForJobsAtLeast waits for at least a number of jobs to appear.
+func waitForJobsAtLeast(c *client.Client, ns string, atLeast int) error {
+	return wait.Poll(framework.Poll, scheduledJobTimeout, func() (bool, error) {
+		jobs, err := c.Batch().Jobs(ns).List(api.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		return len(jobs.Items) >= atLeast, nil
+	})
+}
+
+// waitForAnyFinishedJob waits for any completed job to appear.
+func waitForAnyFinishedJob(c *client.Client, ns string) error {
+	return wait.Poll(framework.Poll, scheduledJobTimeout, func() (bool, error) {
+		jobs, err := c.Batch().Jobs(ns).List(api.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		for i := range jobs.Items {
+			if job.IsJobFinished(&jobs.Items[i]) {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
+}
+
+// checkNoUnexpectedEvents checks unexpected events didn't happen.
+// Currently only "UnexpectedJob" is checked.
+func checkNoUnexpectedEvents(c *client.Client, ns, scheduledJobName string) error {
+	sj, err := c.Batch().ScheduledJobs(ns).Get(scheduledJobName)
+	if err != nil {
+		return fmt.Errorf("error in getting scheduledjob %s/%s: %v", ns, scheduledJobName, err)
+	}
+	events, err := c.Events(ns).Search(sj)
+	if err != nil {
+		return fmt.Errorf("error in listing events: %s", err)
+	}
+	for _, e := range events.Items {
+		if e.Reason == "UnexpectedJob" {
+			return fmt.Errorf("found unexpected event: %#v", e)
+		}
+	}
+	return nil
 }
