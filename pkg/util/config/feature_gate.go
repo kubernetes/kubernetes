@@ -39,9 +39,9 @@ const (
 	//   AllAlpha=true,NewFeature=false  will result in newFeature=false
 	allAlphaGate              = "AllAlpha"
 	externalTrafficLocalOnly  = "AllowExtTrafficLocalEndpoints"
+	appArmor                  = "AppArmor"
 	dynamicKubeletConfig      = "DynamicKubeletConfig"
 	dynamicVolumeProvisioning = "DynamicVolumeProvisioning"
-	// TODO: Define gate/accessor for AppArmor
 )
 
 var (
@@ -50,6 +50,7 @@ var (
 	knownFeatures = map[string]featureSpec{
 		allAlphaGate:              {false, alpha},
 		externalTrafficLocalOnly:  {false, alpha},
+		appArmor:                  {true, alpha},
 		dynamicKubeletConfig:      {false, alpha},
 		dynamicVolumeProvisioning: {true, alpha},
 	}
@@ -90,6 +91,10 @@ type FeatureGate interface {
 	// // owner: @username
 	// // alpha: v1.4
 	// MyFeature() bool
+
+	// owner: @timstclair
+	// alpha: v1.4
+	AppArmor() bool
 
 	// owner: @girishkalele
 	// alpha: v1.4
@@ -173,6 +178,11 @@ func (f *featureGate) Type() string {
 // ExternalTrafficLocalOnly returns value for AllowExtTrafficLocalEndpoints
 func (f *featureGate) ExternalTrafficLocalOnly() bool {
 	return f.lookup(externalTrafficLocalOnly)
+}
+
+// AppArmor returns the value for the AppArmor feature gate.
+func (f *featureGate) AppArmor() bool {
+	return f.lookup(appArmor)
 }
 
 // DynamicKubeletConfig returns value for dynamicKubeletConfig
