@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	utilconfig "k8s.io/kubernetes/pkg/util/config"
 	"k8s.io/kubernetes/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation"
@@ -2132,13 +2133,17 @@ func ValidateAppArmorPodAnnotations(annotations map[string]string, spec *api.Pod
 		if !strings.HasPrefix(k, apparmor.ContainerAnnotationKeyPrefix) {
 			continue
 		}
+		if !utilconfig.DefaultFeatureGate.AppArmor() {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Key(k), "AppArmor is disabled by feature-gate"))
+			continue
+		}
 		containerName := strings.TrimPrefix(k, apparmor.ContainerAnnotationKeyPrefix)
 		if !podSpecHasContainer(spec, containerName) {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child(k), containerName, "container not found"))
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), containerName, "container not found"))
 		}
 
 		if err := apparmor.ValidateProfileFormat(p); err != nil {
-			allErrs = append(allErrs, field.Invalid(fldPath.Child(k), p, err.Error()))
+			allErrs = append(allErrs, field.Invalid(fldPath.Key(k), p, err.Error()))
 		}
 	}
 
