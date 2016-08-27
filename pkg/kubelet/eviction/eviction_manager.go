@@ -98,8 +98,12 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
 
-	// the node has memory pressure, admit if not best-effort
+	// Check the node conditions to identify the resource under pressure.
+	// The resource can only be either disk or memory; set the default to disk.
+	resource := api.ResourceStorage
 	if hasNodeCondition(m.nodeConditions, api.NodeMemoryPressure) {
+		resource = api.ResourceMemory
+		// the node has memory pressure, admit if not best-effort
 		notBestEffort := qos.BestEffort != qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
@@ -107,11 +111,11 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	}
 
 	// reject pods when under memory pressure (if pod is best effort), or if under disk pressure.
-	glog.Warningf("Failed to admit pod %v - %s", format.Pod(attrs.Pod), "node has conditions: %v", m.nodeConditions)
+	glog.Warningf("Failed to admit pod %q - node has conditions: %v", format.Pod(attrs.Pod), m.nodeConditions)
 	return lifecycle.PodAdmitResult{
 		Admit:   false,
 		Reason:  reason,
-		Message: message,
+		Message: getMessage(resource),
 	}
 }
 
@@ -244,6 +248,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 	glog.Infof("eviction manager: pods ranked for eviction: %s", format.Pods(activePods))
 
 	// we kill at most a single pod during each eviction interval
+	message := getMessage(resourceToReclaim)
 	for i := range activePods {
 		pod := activePods[i]
 		status := api.PodStatus{
