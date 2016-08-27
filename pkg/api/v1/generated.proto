@@ -1013,6 +1013,30 @@ message KeyToPath {
   optional int32 mode = 3;
 }
 
+// Represents a volume source backed by storage provider in LibStorage.
+message LibStorageVolumeSource {
+  // The host address for a LibStorage service.
+  optional string host = 1;
+
+  // The name of the storage service that backs this volume.
+  optional string service = 2;
+
+  // Optional additional options used by LibStorage.
+  map<string, string> options = 3;
+
+  // A unique name for the volume managed by the LibStorage service.
+  optional string volumeName = 4;
+
+  // Filesystem type to mount.
+  // Must be a filesystem type supported by the host operating system.
+  // Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+  optional string fsType = 5;
+
+  // Defaults to false (read/write). ReadOnly here will force
+  // the ReadOnly setting in VolumeMounts.
+  optional bool readOnly = 6;
+}
+
 // Lifecycle describes actions that the management system should take in response to container lifecycle
 // events. For the PostStart and PreStop lifecycle handlers, management of the container blocks
 // until the action is complete, unless the container process fails, in which case the handler is aborted.
@@ -1785,6 +1809,9 @@ message PersistentVolumeSource {
 
   // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
   optional AzureDiskVolumeSource azureDisk = 16;
+
+  // LibStorage represents a volume source backed by a storage provider in LibStorage.
+  optional LibStorageVolumeSource libStorage = 17;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -3067,6 +3094,9 @@ message VolumeSource {
 
   // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
   optional AzureDiskVolumeSource azureDisk = 22;
+
+  // LibStorage represents a volume source backed by a storage provider in LibStorage.
+  optional LibStorageVolumeSource libStorage = 23;
 }
 
 // Represents a vSphere volume resource.

@@ -282,6 +282,8 @@ type VolumeSource struct {
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,21,opt,name=quobyte"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
+	//LibStorage represents a volume source backed by a storage provider in LibStorage.
+	LibStorage *LibStorageVolumeSource `json:"libStorage,omitempty" protobuf:"bytes,23,opt,name=libStorage"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -348,6 +350,8 @@ type PersistentVolumeSource struct {
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,15,opt,name=quobyte"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
+	//LibStorage represents a volume source backed by a storage provider in LibStorage.
+	LibStorage *LibStorageVolumeSource `json:"libStorage,omitempty" protobuf:"bytes,17,opt,name=libStorage"`
 }
 
 // +genclient=true
@@ -920,6 +924,25 @@ type AzureDiskVolumeSource struct {
 	// Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly *bool `json:"readOnly,omitempty" protobuf:"varint,5,opt,name=readOnly"`
+}
+
+// Represents a volume source backed by storage provider in LibStorage.
+type LibStorageVolumeSource struct {
+	// The host address for a LibStorage service.
+	Host string `json:"host" protobuf:"bytes,1,opt,name=host"`
+	// The name of the storage service that backs this volume.
+	Service string `json:"service" protobuf:"bytes,2,opt,name=service"`
+	// Optional additional options used by LibStorage.
+	Options map[string]string `json:"options,omitempty" protobuf:"bytes,3,rep,name=options"`
+	// A unique name for the volume managed by the LibStorage service.
+	VolumeName string `json:"volumeName" protobuf:"bytes,4,opt,name=volumeName"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty" protobuf:"bytes,5,opt,name=fsType"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,6,opt,name=readOnly"`
 }
 
 // Adapts a ConfigMap into a volume.

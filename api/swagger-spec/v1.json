@@ -17321,6 +17321,10 @@
       "$ref": "v1.AzureDiskVolumeSource",
       "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
      },
+     "libStorage": {
+      "$ref": "v1.LibStorageVolumeSource",
+      "description": "LibStorage represents a volume source backed by a storage provider in LibStorage."
+     },
      "accessModes": {
       "type": "array",
       "items": {
@@ -17770,6 +17774,41 @@
     "id": "v1.AzureDataDiskCachingMode",
     "properties": {}
    },
+   "v1.LibStorageVolumeSource": {
+    "id": "v1.LibStorageVolumeSource",
+    "description": "Represents a volume source backed by storage provider in LibStorage.",
+    "required": [
+     "host",
+     "service",
+     "volumeName"
+    ],
+    "properties": {
+     "host": {
+      "type": "string",
+      "description": "The host address for a LibStorage service."
+     },
+     "service": {
+      "type": "string",
+      "description": "The name of the storage service that backs this volume."
+     },
+     "options": {
+      "type": "object",
+      "description": "Optional additional options used by LibStorage."
+     },
+     "volumeName": {
+      "type": "string",
+      "description": "A unique name for the volume managed by the LibStorage service."
+     },
+     "fsType": {
+      "type": "string",
+      "description": "Filesystem type to mount. Must be a filesystem type supported by the host operating system. Ex. \"ext4\", \"xfs\", \"ntfs\". Implicitly inferred to be \"ext4\" if unspecified."
+     },
+     "readOnly": {
+      "type": "boolean",
+      "description": "Defaults to false (read/write). ReadOnly here will force the ReadOnly setting in VolumeMounts."
+     }
+    }
+   },
    "v1.PersistentVolumeStatus": {
     "id": "v1.PersistentVolumeStatus",
     "description": "PersistentVolumeStatus is the current status of a persistent volume.",
@@ -18028,6 +18067,10 @@
      "azureDisk": {
       "$ref": "v1.AzureDiskVolumeSource",
       "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
+     },
+     "libStorage": {
+      "$ref": "v1.LibStorageVolumeSource",
+      "description": "LibStorage represents a volume source backed by a storage provider in LibStorage."
      }
     }
    },

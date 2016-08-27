@@ -243,6 +243,8 @@ type VolumeSource struct {
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
+	//LibStorage represents a volume source backed by a storage provider in LibStorage.
+	LibStorage *LibStorageVolumeSource `json:"libStorage,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -287,6 +289,8 @@ type PersistentVolumeSource struct {
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
+	//LibStorage represents a volume source backed by a storage provider in LibStorage.
+	LibStorage *LibStorageVolumeSource `json:"libStorage,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -820,6 +824,25 @@ type AzureDiskVolumeSource struct {
 	// Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly *bool `json:"readOnly,omitempty"`
+}
+
+// Represents a volume source backed by storage provider in LibStorage.
+type LibStorageVolumeSource struct {
+	// The host address for a LibStorage service.
+	Host string `json:"host"`
+	// The name of the storage service that backs this volume.
+	Service string `json:"service"`
+	// Optional additional options used by LibStorage.
+	Options map[string]string `json:"options,omitempty"`
+	// A unique name for the volume managed by the LibStorage service.
+	VolumeName string `json:"volumeName"`
+	// Filesystem type to mount.
+	// Must be a filesystem type supported by the host operating system.
+	// Ex. "ext4", "xfs", "ntfs". Implicitly inferred to be "ext4" if unspecified.
+	FSType string `json:"fsType,omitempty"`
+	// Defaults to false (read/write). ReadOnly here will force
+	// the ReadOnly setting in VolumeMounts.
+	ReadOnly bool `json:"readOnly,omitempty"`
 }
 
 // Adapts a ConfigMap into a volume.
