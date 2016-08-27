@@ -1147,6 +1147,12 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(specPath, "must specify a volume type"))
 	}
+
+	// do not allow hostPath mounts of '/' to have a 'recycle' reclaim policy
+	if pv.Spec.HostPath != nil && path.Clean(pv.Spec.HostPath.Path) == "/" && pv.Spec.PersistentVolumeReclaimPolicy == api.PersistentVolumeReclaimRecycle {
+		allErrs = append(allErrs, field.Forbidden(specPath.Child("persistentVolumeReclaimPolicy"), "may not be 'recycle' for a hostPath mount of '/'"))
+	}
+
 	return allErrs
 }
 
