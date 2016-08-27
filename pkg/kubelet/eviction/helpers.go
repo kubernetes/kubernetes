@@ -37,8 +37,8 @@ const (
 	unsupportedEvictionSignal = "unsupported eviction signal %v"
 	// the reason reported back in status.
 	reason = "Evicted"
-	// the message associated with the reason.
-	message = "The node was low on compute resources."
+	// the message format associated with the reason.
+	messageFmt = "The node was low on %s."
 	// disk, in bytes.  internal to this module, used to account for local disk usage.
 	resourceDisk api.ResourceName = "disk"
 	// inodes, number. internal to this module, used to account for local disk inode consumption.
@@ -887,4 +887,8 @@ func deleteImages(imageGC ImageGC, reportBytesFreed bool) nodeReclaimFunc {
 		}
 		return resource.NewQuantity(reclaimed, resource.BinarySI), nil
 	}
+}
+
+func getMessage(resource api.ResourceName) string {
+	return fmt.Sprintf(messageFmt, resource)
 }
