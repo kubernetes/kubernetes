@@ -40,6 +40,7 @@ import (
 	etcdstorage "k8s.io/kubernetes/pkg/storage/etcd"
 	"k8s.io/kubernetes/pkg/storage/etcd/etcdtest"
 	etcdtesting "k8s.io/kubernetes/pkg/storage/etcd/testing"
+	"k8s.io/kubernetes/pkg/storage/storagebackend/factory"
 	storagetesting "k8s.io/kubernetes/pkg/storage/testing"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/validation/field"
@@ -88,7 +89,7 @@ func (t *testRESTStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Obje
 }
 func (t *testRESTStrategy) Canonicalize(obj runtime.Object) {}
 
-func NewTestGenericStoreRegistry(t *testing.T) (*etcdtesting.EtcdTestServer, func(), *Store) {
+func NewTestGenericStoreRegistry(t *testing.T) (factory.DestroyFunc, *Store) {
 	return newTestGenericStoreRegistry(t, false)
 }
 
@@ -173,7 +174,7 @@ func TestStoreList(t *testing.T) {
 		if item.context != nil {
 			ctx = item.context
 		}
-		server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
+		destroyFunc, registry := NewTestGenericStoreRegistry(t)
 
 		if item.in != nil {
 			if err := storagetesting.CreateList("/pods", registry.Storage, item.in); err != nil {
@@ -192,7 +193,6 @@ func TestStoreList(t *testing.T) {
 			t.Errorf("%v: Expected %#v, got %#v", name, e, a)
 		}
 		destroyFunc()
-		server.Terminate(t)
 	}
 }
 
@@ -209,11 +209,8 @@ func TestStoreListResourceVersion(t *testing.T) {
 	}
 	ctx := api.WithNamespace(api.NewContext(), "test")
 
-	server, destroyFunc, registry := newTestGenericStoreRegistry(t, true)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := newTestGenericStoreRegistry(t, true)
+	defer destroyFunc()
 
 	obj, err := registry.Create(ctx, fooPod)
 	if err != nil {
@@ -274,11 +271,8 @@ func TestStoreCreate(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	// create the object
 	objA, err := registry.Create(testContext, podA)
@@ -337,11 +331,8 @@ func TestStoreUpdate(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	// Test1 try to update a non-existing node
 	_, _, err := registry.Update(testContext, podA.Name, rest.DefaultUpdatedObjectInfo(podA, api.Scheme))
@@ -378,11 +369,8 @@ func TestStoreUpdate(t *testing.T) {
 }
 
 func TestNoOpUpdates(t *testing.T) {
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	newPod := func() *api.Pod {
 		return &api.Pod{
@@ -463,11 +451,8 @@ func TestStoreCustomExport(t *testing.T) {
 		Spec: api.PodSpec{NodeName: "machine"},
 	}
 
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	registry.ExportStrategy = testPodExport{}
 
@@ -512,11 +497,8 @@ func TestStoreBasicExport(t *testing.T) {
 		Status: api.PodStatus{HostIP: "1.2.3.4"},
 	}
 
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
 	registry.UpdateStrategy.(*testRESTStrategy).allowCreateOnUpdate = true
@@ -547,11 +529,8 @@ func TestStoreGet(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	_, err := registry.Get(testContext, podA.Name)
 	if !errors.IsNotFound(err) {
@@ -571,11 +550,8 @@ func TestStoreDelete(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	// test failure condition
 	_, err := registry.Delete(testContext, podA.Name, nil)
@@ -612,11 +588,8 @@ func TestStoreHandleFinalizers(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 	// create pod
 	_, err := registry.Create(testContext, podWithFinalizer)
 	if err != nil {
@@ -911,11 +884,8 @@ func TestStoreDeleteWithOrphanDependents(t *testing.T) {
 	}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	for _, tc := range testcases {
 		registry.DeleteStrategy = tc.strategy
@@ -961,11 +931,8 @@ func TestStoreDeleteCollection(t *testing.T) {
 	podB := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "bar"}}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	if _, err := registry.Create(testContext, podA); err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -993,11 +960,8 @@ func TestStoreDeleteCollection(t *testing.T) {
 }
 
 func TestStoreDeleteCollectionNotFound(t *testing.T) {
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
 
@@ -1042,11 +1006,8 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	podA := &api.Pod{ObjectMeta: api.ObjectMeta{Name: "foo"}}
 
 	testContext := api.WithNamespace(api.NewContext(), "test")
-	server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
-	defer func() {
-		destroyFunc()
-		server.Terminate(t)
-	}()
+	destroyFunc, registry := NewTestGenericStoreRegistry(t)
+	defer destroyFunc()
 
 	objCreated, err := registry.Create(testContext, podA)
 	if err != nil {
@@ -1112,7 +1073,7 @@ func TestStoreWatch(t *testing.T) {
 			Spec: api.PodSpec{NodeName: "machine"},
 		}
 
-		server, destroyFunc, registry := NewTestGenericStoreRegistry(t)
+		destroyFunc, registry := NewTestGenericStoreRegistry(t)
 		wi, err := registry.WatchPredicate(ctx, m.selectPred, "0")
 		if err != nil {
 			t.Errorf("%v: unexpected error: %v", name, err)
@@ -1131,18 +1092,19 @@ func TestStoreWatch(t *testing.T) {
 			wi.Stop()
 		}
 		destroyFunc()
-		server.Terminate(t)
 	}
 }
 
-func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (*etcdtesting.EtcdTestServer, func(), *Store) {
+func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.DestroyFunc, *Store) {
 	podPrefix := "/pods"
 	server := etcdtesting.NewEtcdTestClientServer(t)
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 
 	codec := testapi.Default.StorageCodec()
 	s := etcdstorage.NewEtcdStorage(server.Client, codec, etcdtest.PathPrefix(), false, etcdtest.DeserializationCacheSize)
-	destroyFunc := func() {}
+	destroyFunc := func() {
+		server.Terminate(t)
+	}
 	if hasCacheEnabled {
 		config := storage.CacherConfig{
 			CacheCapacity:  10,
@@ -1155,11 +1117,15 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (*etcdtesti
 			Codec:          codec,
 		}
 		cacher := storage.NewCacherFromConfig(config)
+		d := destroyFunc
 		s = cacher
-		destroyFunc = cacher.Stop
+		destroyFunc = func() {
+			cacher.Stop()
+			d()
+		}
 	}
 
-	return server, destroyFunc, &Store{
+	return destroyFunc, &Store{
 		NewFunc:           func() runtime.Object { return &api.Pod{} },
 		NewListFunc:       func() runtime.Object { return &api.PodList{} },
 		QualifiedResource: api.Resource("pods"),
