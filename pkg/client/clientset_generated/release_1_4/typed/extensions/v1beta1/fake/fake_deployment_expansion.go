@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2014 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,26 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package unversioned
+package fake
 
-type ComponentStatusExpansion interface{}
+import (
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
+	"k8s.io/kubernetes/pkg/client/testing/core"
+)
 
-type ConfigMapExpansion interface{}
+func (c *FakeDeployments) Rollback(deploymentRollback *v1beta1.DeploymentRollback) error {
+	action := core.CreateActionImpl{}
+	action.Verb = "create"
+	action.Resource = deploymentsResource
+	action.Subresource = "rollback"
+	action.Object = deploymentRollback
 
-type EndpointsExpansion interface{}
-
-type LimitRangeExpansion interface{}
-
-type PersistentVolumeExpansion interface{}
-
-type PersistentVolumeClaimExpansion interface{}
-
-type PodTemplateExpansion interface{}
-
-type ReplicationControllerExpansion interface{}
-
-type ResourceQuotaExpansion interface{}
-
-type SecretExpansion interface{}
-
-type ServiceAccountExpansion interface{}
+	_, err := c.Fake.Invokes(action, deploymentRollback)
+	return err
+}
