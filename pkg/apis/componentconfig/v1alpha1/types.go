@@ -483,4 +483,6 @@ type KubeletConfiguration struct {
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *). Use these at your own risk.
 	// Resource isolation might be lacking and pod might influence each other on the same node.
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// EnableTracing enables tracing of kubelet operations. It activates tracing probes inside kubelet.
+	EnableTracing bool `json:"enableTracing"`
 }

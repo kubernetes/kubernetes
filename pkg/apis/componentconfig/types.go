@@ -427,6 +427,8 @@ type KubeletConfiguration struct {
 	IPTablesDropBit int32 `json:"iptablesDropBit"`
 	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
 	AllowedUnsafeSysctls []string `json:"experimentalAllowedUnsafeSysctls,omitempty"`
+	// EnableTracing enables tracing of kubelet operations. It activates tracing probes inside kubelet.
+	EnableTracing bool `json:"enableTracing"`
 }
 
 type KubeSchedulerConfiguration struct {
