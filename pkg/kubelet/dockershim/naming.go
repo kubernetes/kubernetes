@@ -18,86 +18,114 @@ package dockershim
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"strings"
-
-	"github.com/golang/glog"
 
 	runtimeApi "k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/runtime"
 )
 
+// Container "names" are implementation details that do not concern
+// kubelet/CRI. This CRI shim uses names to fulfill the CRI requirement to
+// make sandbox/container creation idempotent. CRI states that there can
+// only exist one sandbox/container with the given metadata. To enforce this,
+// this shim constructs a name using the fields in the metadata so that
+// docker will reject the creation request if the name already exists.
+//
+// Note that changes to naming will likely break the backward compatibility.
+// Code must be added to ensure the shim knows how to recognize and extract
+// information the older containers.
+//
+// TODO: Add code to handle backward compatibility, i.e., making sure we can
+// recognize older containers and extract information from their names if
+// necessary.
+
 const (
 	// kubePrefix is used to identify the containers/sandboxes on the node managed by kubelet
 	kubePrefix = "k8s"
-	// kubeSandboxNamePrefix is used to keep sandbox name consistent with old podInfraContainer name
-	kubeSandboxNamePrefix = "POD"
+	// sandboxContainerName is a string to include in the docker container so
+	// that users can easily identify the sandboxes.
+	sandboxContainerName = "POD"
+	// Delimiter used to construct docker container names.
+	nameDelimiter = "_"
 )
 
-// buildKubeGenericName creates a name which can be reversed to identify container/sandbox name.
-// This function returns the unique name.
-func buildKubeGenericName(sandboxConfig *runtimeApi.PodSandboxConfig, containerName string) string {
-	stableName := fmt.Sprintf("%s_%s_%s_%s_%s",
-		kubePrefix,
-		containerName,
-		sandboxConfig.Metadata.GetName(),
-		sandboxConfig.Metadata.GetNamespace(),
-		sandboxConfig.Metadata.GetUid(),
-	)
-	UID := fmt.Sprintf("%08x", rand.Uint32())
-	return fmt.Sprintf("%s_%s", stableName, UID)
+func makeSandboxName(s *runtimeApi.PodSandboxConfig) string {
+	return strings.Join([]string{
+		kubePrefix,                                 // 0
+		sandboxContainerName,                       // 1
+		s.Metadata.GetName(),                       // 2
+		s.Metadata.GetNamespace(),                  // 3
+		s.Metadata.GetUid(),                        // 4
+		fmt.Sprintf("%d", s.Metadata.GetAttempt()), // 5
+	}, nameDelimiter)
 }
 
-// buildSandboxName creates a name which can be reversed to identify sandbox full name.
-func buildSandboxName(sandboxConfig *runtimeApi.PodSandboxConfig) string {
-	sandboxName := fmt.Sprintf("%s.%d", kubeSandboxNamePrefix, sandboxConfig.Metadata.GetAttempt())
-	return buildKubeGenericName(sandboxConfig, sandboxName)
+func makeContainerName(s *runtimeApi.PodSandboxConfig, c *runtimeApi.ContainerConfig) string {
+	return strings.Join([]string{
+		kubePrefix,                                 // 0
+		c.Metadata.GetName(),                       // 1:
+		s.Metadata.GetName(),                       // 2: sandbox name
+		s.Metadata.GetNamespace(),                  // 3: sandbox namesapce
+		s.Metadata.GetUid(),                        // 4  sandbox uid
+		fmt.Sprintf("%d", c.Metadata.GetAttempt()), // 5
+	}, nameDelimiter)
+
 }
 
-// parseSandboxName unpacks a sandbox full name, returning the pod name, namespace, uid and attempt.
-func parseSandboxName(name string) (string, string, string, uint32, error) {
-	podName, podNamespace, podUID, _, attempt, err := parseContainerName(name)
+func parseUint32(s string) (uint32, error) {
+	n, err := strconv.ParseUint(s, 10, 32)
 	if err != nil {
-		return "", "", "", 0, err
+		return 0, err
 	}
-
-	return podName, podNamespace, podUID, attempt, nil
+	return uint32(n), nil
 }
 
-// buildContainerName creates a name which can be reversed to identify container name.
-// This function returns stable name, unique name and an unique id.
-func buildContainerName(sandboxConfig *runtimeApi.PodSandboxConfig, containerConfig *runtimeApi.ContainerConfig) string {
-	containerName := fmt.Sprintf("%s.%d", containerConfig.Metadata.GetName(), containerConfig.Metadata.GetAttempt())
-	return buildKubeGenericName(sandboxConfig, containerName)
-}
-
-// parseContainerName unpacks a container name, returning the pod name, namespace, UID,
-// container name and attempt.
-func parseContainerName(name string) (podName, podNamespace, podUID, containerName string, attempt uint32, err error) {
+// TODO: Evaluate whether we should rely on labels completely.
+func parseSandboxName(name string) (*runtimeApi.PodSandboxMetadata, error) {
 	// Docker adds a "/" prefix to names. so trim it.
 	name = strings.TrimPrefix(name, "/")
 
-	parts := strings.Split(name, "_")
-	if len(parts) == 0 || parts[0] != kubePrefix {
-		err = fmt.Errorf("failed to parse container name %q into parts", name)
-		return "", "", "", "", 0, err
+	parts := strings.Split(name, nameDelimiter)
+	if len(parts) != 6 {
+		return nil, fmt.Errorf("failed to parse the sandbox name: %q", name)
 	}
-	if len(parts) < 6 {
-		glog.Warningf("Found a container with the %q prefix, but too few fields (%d): %q", kubePrefix, len(parts), name)
-		err = fmt.Errorf("container name %q has fewer parts than expected %v", name, parts)
-		return "", "", "", "", 0, err
+	if parts[0] != kubePrefix {
+		return nil, fmt.Errorf("container is not managed by kubernetes: %q", name)
 	}
 
-	nameParts := strings.Split(parts[1], ".")
-	containerName = nameParts[0]
-	if len(nameParts) > 1 {
-		attemptNumber, err := strconv.ParseUint(nameParts[1], 10, 32)
-		if err != nil {
-			glog.Warningf("invalid container attempt %q in container %q", nameParts[1], name)
-		}
-
-		attempt = uint32(attemptNumber)
+	attempt, err := parseUint32(parts[5])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse the sandbox name %q: %v", name, err)
 	}
 
-	return parts[2], parts[3], parts[4], containerName, attempt, nil
+	return &runtimeApi.PodSandboxMetadata{
+		Name:      &parts[2],
+		Namespace: &parts[3],
+		Uid:       &parts[4],
+		Attempt:   &attempt,
+	}, nil
+}
+
+// TODO: Evaluate whether we should rely on labels completely.
+func parseContainerName(name string) (*runtimeApi.ContainerMetadata, error) {
+	// Docker adds a "/" prefix to names. so trim it.
+	name = strings.TrimPrefix(name, "/")
+
+	parts := strings.Split(name, nameDelimiter)
+	if len(parts) != 6 {
+		return nil, fmt.Errorf("failed to parse the container name: %q", name)
+	}
+	if parts[0] != kubePrefix {
+		return nil, fmt.Errorf("container is not managed by kubernetes: %q", name)
+	}
+
+	attempt, err := parseUint32(parts[5])
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse the container name %q: %v", name, err)
+	}
+
+	return &runtimeApi.ContainerMetadata{
+		Name:    &parts[1],
+		Attempt: &attempt,
+	}, nil
 }
