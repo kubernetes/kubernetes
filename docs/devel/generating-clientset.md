@@ -62,12 +62,16 @@ will generate a clientset named "my_release" which includes clients for api/v1
 objects and extensions/v1beta1 objects. You can run `$ client-gen --help` to see
 other command line arguments.
 
-- Adding expansion methods: client-gen only generates the common methods, such
-as `Create()` and `Delete()`. You can manually add additional methods through
-the expansion interface. For example, this
-[file](../../pkg/client/clientset_generated/release_1_2/typed/core/v1/pod_expansion.go)
-adds additional methods to Pod's client. As a convention, we put the expansion
-interface and its methods in file ${TYPE}_expansion.go.
+- ***Adding expansion methods***: client-gen only generates the common methods,
+  such as `Create()` and `Delete()`. You can manually add additional methods
+  through the expansion interface. For example, this
+  [file](../../pkg/client/clientset_generated/release_1_4/typed/core/v1/pod_expansion.go)
+  adds additional methods to Pod's client. As a convention, we put the expansion
+  interface and its methods in file ${TYPE}_expansion.go. In most cases, you
+  don't want to remove existing expansion files. So to make life easier,
+  instead of creating a new clientset from scratch, ***you can copy and rename an
+  existing clientset (so that all the expansion files are copied)***, and then run
+  client-gen.
 
 - Generating fake clients for testing purposes: client-gen will generate a fake
 clientset if the command line argument `--fake-clientset` is set. The fake

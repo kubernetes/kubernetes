@@ -16,24 +16,20 @@ limitations under the License.
 
 package unversioned
 
-type ComponentStatusExpansion interface{}
+import (
+	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
+)
 
-type ConfigMapExpansion interface{}
+type TokenReviewExpansion interface {
+	Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error)
+}
 
-type EndpointsExpansion interface{}
-
-type LimitRangeExpansion interface{}
-
-type PersistentVolumeExpansion interface{}
-
-type PersistentVolumeClaimExpansion interface{}
-
-type PodTemplateExpansion interface{}
-
-type ReplicationControllerExpansion interface{}
-
-type ResourceQuotaExpansion interface{}
-
-type SecretExpansion interface{}
-
-type ServiceAccountExpansion interface{}
+func (c *tokenReviews) Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
+	result = &authenticationapi.TokenReview{}
+	err = c.client.Post().
+		Resource("tokenreviews").
+		Body(tokenReview).
+		Do().
+		Into(result)
+	return
+}
