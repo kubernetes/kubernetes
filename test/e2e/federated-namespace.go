@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			}
 		})
 
-		It("should be created and deleted successfully", func() {
+		PIt("should be created and deleted successfully", func() {
 			framework.SkipUnlessFederated(f.Client)
 
 			ns := api_v1.Namespace{
