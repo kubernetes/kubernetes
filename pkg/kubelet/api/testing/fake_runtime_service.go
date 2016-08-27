@@ -188,9 +188,6 @@ func (r *FakeRuntimeService) ListPodSandbox(filter *runtimeApi.PodSandboxFilter)
 			if filter.Id != nil && filter.GetId() != id {
 				continue
 			}
-			if filter.Name != nil && filter.GetName() != s.Metadata.GetName() {
-				continue
-			}
 			if filter.State != nil && filter.GetState() != s.GetState() {
 				continue
 			}
@@ -302,9 +299,6 @@ func (r *FakeRuntimeService) ListContainers(filter *runtimeApi.ContainerFilter) 
 	for _, s := range r.Containers {
 		if filter != nil {
 			if filter.Id != nil && filter.GetId() != s.GetId() {
-				continue
-			}
-			if filter.Name != nil && filter.GetName() != s.Metadata.GetName() {
 				continue
 			}
 			if filter.PodSandboxId != nil && filter.GetPodSandboxId() != s.SandboxID {
