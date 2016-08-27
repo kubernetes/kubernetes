@@ -195,7 +195,7 @@ const iptablesForwardRegexStr = `Chain FORWARD \(policy DROP\)`
 func firewall() error {
 	out, err := exec.Command("iptables", "-L", "INPUT").CombinedOutput()
 	if err != nil {
-		return printSuccess("Firewall Iptables Check %s: Could not run iptables", skipped)
+		return printSuccess("Firewall IPTables Check %s: Could not run iptables", skipped)
 	}
 	inputRegex, err := regexp.Compile(iptablesInputRegexStr)
 	if err != nil {
@@ -203,13 +203,13 @@ func firewall() error {
 		panic(err)
 	}
 	if inputRegex.Match(out) {
-		return printError("Firewall Iptables Check %s: Found INPUT rule matching %s", failed, iptablesInputRegexStr)
+		return printError("Firewall IPTables Check %s: Found INPUT rule matching %s", failed, iptablesInputRegexStr)
 	}
 
 	// Check GCE forward rules
 	out, err = exec.Command("iptables", "-L", "FORWARD").CombinedOutput()
 	if err != nil {
-		return printSuccess("Firewall Iptables Check %s: Could not run iptables", skipped)
+		return printSuccess("Firewall IPTables Check %s: Could not run iptables", skipped)
 	}
 	forwardRegex, err := regexp.Compile(iptablesForwardRegexStr)
 	if err != nil {
@@ -217,10 +217,10 @@ func firewall() error {
 		panic(err)
 	}
 	if forwardRegex.Match(out) {
-		return printError("Firewall Iptables Check %s: Found FORWARD rule matching %s", failed, iptablesInputRegexStr)
+		return printError("Firewall IPTables Check %s: Found FORWARD rule matching %s", failed, iptablesInputRegexStr)
 	}
 
-	return printSuccess("Firewall Iptables Check %s", success)
+	return printSuccess("Firewall IPTables Check %s", success)
 }
 
 // daemons checks that the required node programs are running: kubelet, kube-proxy, and docker

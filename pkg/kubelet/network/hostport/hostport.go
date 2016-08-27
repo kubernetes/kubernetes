@@ -162,7 +162,7 @@ func writeLine(buf *bytes.Buffer, words ...string) {
 //hostportChainName takes containerPort for a pod and returns associated iptables chain.
 // This is computed by hashing (sha256)
 // then encoding to base32 and truncating with the prefix "KUBE-SVC-".  We do
-// this because Iptables Chain Names must be <= 28 chars long, and the longer
+// this because IPTables Chain Names must be <= 28 chars long, and the longer
 // they are the harder they are to read.
 func hostportChainName(cp api.ContainerPort, podFullName string) utiliptables.Chain {
 	hash := sha256.Sum256([]byte(string(cp.HostPort) + string(cp.Protocol) + podFullName))
@@ -293,7 +293,7 @@ func (h *handler) SyncHostports(natInterfaceName string, runningPods []*RunningP
 		writeLine(natRules, args...)
 
 		// Create hostport chain to DNAT traffic to final destination
-		// Iptables will maintained the stats for this chain
+		// IPTables will maintained the stats for this chain
 		args = []string{
 			"-A", string(hostportChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, containerPort.HostPort),
