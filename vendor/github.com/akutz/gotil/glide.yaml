@@ -1,0 +1,13 @@
+package: github.com/akutz/gotil
+import:
+  - package: github.com/akutz/goof
+    ref:     master
+    repo:    https://github.com/akutz/goof.git
+    vcs:     git
+  - package: github.com/kardianos/osext
+    ref:     master
+    repo:    https://github.com/kardianos/osext.git
+    vcs:     git
+  - package: github.com/stretchr/testify
+    repo:    https://github.com/stretchr/testify.git
+    vcs:     git

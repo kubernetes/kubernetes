@@ -21,6 +21,13 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/volume"
+
+	"github.com/akutz/gofig"
+	"github.com/golang/glog"
+
+	lsctx "github.com/emccode/libstorage/api/context"
+	lstypes "github.com/emccode/libstorage/api/types"
+	lsclient "github.com/emccode/libstorage/client"
 )
 
 const (
@@ -29,68 +36,13 @@ const (
 
 type lsPlugin struct {
 	host volume.VolumeHost
+
+	lsHost  string
+	service string
+	client  lstypes.Client
+	ctx     lstypes.Context
+	cfg     gofig.Config
 }
-
-// func ProbeVolumePlugins(opts string) []volume.VolumePlugin {
-// 	p := &lsPlugin{
-// 		host: nil,
-// 	}
-// 	return []volume.VolumePlugin{p}
-// }
-
-func (p *lsPlugin) Init(host volume.VolumeHost) error {
-	p.host = host
-	return nil
-}
-
-func (p *lsPlugin) GetPluginName() string {
-	return lsPluginName
-}
-
-func (p *lsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
-	source, err := p.getLibStorageSource(spec)
-	if err != nil {
-		return "", err
-	}
-	return source.VolumeName, nil
-}
-
-func (p *lsPlugin) CanSupport(spec *volume.Spec) bool {
-	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.LibStorage != nil) ||
-		(spec.Volume != nil && spec.Volume.LibStorage != nil)
-}
-
-func (plugin *lsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
-	lsVolumeSpec := &api.Volume{
-		Name: volumeName,
-		VolumeSource: api.VolumeSource{
-			LibStorage: &api.LibStorageVolumeSource{
-				VolumeName: volumeName,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(lsVolumeSpec), nil
-}
-
-// func (p *lsPlugin) NewMounter(
-// 	spec *volume.Spec,
-// 	pod *api.Pod,
-// 	_ volume.VolumeOptions) (volume.Mounter, error) {
-// 	lsVol, err := p.getLibStorageSource(spec)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	volName := lsVol.VolumeName
-//
-// 	return &lsVolume{
-// 		volName:  lsVol.VolumeName,
-// 		podUID:   pod.UID,
-// 		mounter:  mount.New(),
-// 		plugin:   p,
-// 		readOnly: spec.ReadOnly,
-// 		k8mtx:    keymutex.NewKeyMutex(),
-// 	}, nil
-// }
 
 // Helper methods
 
@@ -104,4 +56,27 @@ func (p *lsPlugin) getLibStorageSource(spec *volume.Spec) (*api.LibStorageVolume
 	}
 
 	return nil, fmt.Errorf("LibStorage is not found in spec")
+}
+
+func (p *lsPlugin) initLibStorage(lsHost, service string) error {
+	glog.V(4).Infoln("LibStorage init")
+	cfg := gofig.New()
+	ctx := lsctx.Background()
+	ctx = ctx.WithValue(lsctx.ServiceKey, service)
+	p.ctx = ctx
+	p.cfg = cfg
+	return nil
+}
+
+func (p *lsPlugin) getClient() (lstypes.Client, error) {
+	if p.client == nil {
+		client, err := lsclient.New(p.ctx, p.cfg)
+		if err != nil {
+			glog.Errorf("LibStorage client initialization failed: %s\n", err)
+			return nil, err
+		}
+		p.client = client
+		return p.client, nil
+	}
+	return p.client, nil
 }

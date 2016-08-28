@@ -93,6 +93,24 @@
 			"Rev": "c0ef4539dfab4d21c8ef20ba2924f9fc6f186d35"
 		},
 		{
+			"ImportPath": "github.com/akutz/gofig",
+			"Comment": "v0.1.4",
+			"Rev": "04fe8587dffc767d2fea3042f8f673cc9c7a1e0a"
+		},
+		{
+			"ImportPath": "github.com/akutz/golf",
+			"Comment": "v0.1.1",
+			"Rev": "e26bdd995cb746e431d42ea303ebe7622389d29f"
+		},
+		{
+			"ImportPath": "github.com/akutz/goof",
+			"Rev": "ea06624ca980bae80c1b615b8417723436d235ab"
+		},
+		{
+			"ImportPath": "github.com/akutz/gotil",
+			"Rev": "6fa2e80bd3ac40f15788cfc3d12ebba49a0add92"
+		},
+		{
 			"ImportPath": "github.com/appc/spec/schema",
 			"Comment": "v0.8.1-6-gab50d12",
 			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
@@ -871,6 +889,71 @@
 			"Rev": "07b16b6e30fcac0ad8c0435548e743bcf2ca7e92"
 		},
 		{
+			"ImportPath": "github.com/emccode/libstorage/api/client",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/api/context",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/api/registry",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/api/types",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/api/utils",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/api/utils/config",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/client",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/drivers/integration/docker",
+			"Comment": "v0.2.0-15-g5cb6951",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/drivers/os/darwin",
+			"Comment": "v0.2.0-15-g5cb6951",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/drivers/os/linux",
+			"Comment": "v0.2.0-15-g5cb6951",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/drivers/storage/libstorage",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/drivers/storage/vfs",
+			"Comment": "v0.2.0-15-g5cb6951",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/drivers/storage/vfs/client",
+			"Comment": "v0.2.0-15-g5cb6951",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/imports/config",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
+			"ImportPath": "github.com/emccode/libstorage/imports/local",
+			"Rev": "5cb6951986873260e1c20b1211cc09e4f08bd8e3"
+		},
+		{
 			"ImportPath": "github.com/emicklei/go-restful",
 			"Comment": "v1.2-79-g89ef8af",
 			"Rev": "89ef8af493ab468a45a42bb0d89a06fccdd2fb22"
@@ -1473,9 +1556,18 @@
 			"Rev": "2788f0dbd16903de03cb8186e5c7d97b69ad387b"
 		},
 		{
+			"ImportPath": "github.com/kr/pretty",
+			"Comment": "go.weekly.2011-12-22-29-gadd1dbc",
+			"Rev": "add1dbc86daf0f983cd4a48ceb39deb95c729b67"
+		},
+		{
 			"ImportPath": "github.com/kr/pty",
 			"Comment": "release.r56-29-gf7ee69f",
 			"Rev": "f7ee69f31298ecbe5d2b349c711e2547a617d398"
+		},
+		{
+			"ImportPath": "github.com/kr/text",
+			"Rev": "7cafcd837844e784b526369c9bce262804aebc60"
 		},
 		{
 			"ImportPath": "github.com/lpabon/godbc",
@@ -1906,10 +1998,6 @@
 		{
 			"ImportPath": "github.com/prometheus/procfs",
 			"Rev": "454a56f35412459b5e684fd5ec0f9211b94f002a"
-		},
-		{
-			"ImportPath": "github.com/quobyte/api",
-			"Rev": "bf713b5a4333f44504fa1ce63690de45cfed6413"
 		},
 		{
 			"ImportPath": "github.com/rackspace/gophercloud",
@@ -2556,6 +2644,11 @@
 			"ImportPath": "google.golang.org/grpc/transport",
 			"Comment": "v1.0.0-183-g231b4cf",
 			"Rev": "231b4cfea0e79843053a33f5fe90bd4d84b23cd3"
+		},
+		{
+			"ImportPath": "gopkg.in/fsnotify.v1",
+			"Comment": "v1.3.0",
+			"Rev": "30411dbcefb7a1da7e84f75530ad3abe4011b4f8"
 		},
 		{
 			"ImportPath": "gopkg.in/gcfg.v1",

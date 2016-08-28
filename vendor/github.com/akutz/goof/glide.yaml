@@ -1,0 +1,7 @@
+package: github.com/akutz/goof
+import:
+  - package: github.com/Sirupsen/logrus
+    ref:     feature/logrus-aware-types
+    repo:    https://github.com/akutz/logrus
+  - package: gopkg.in/gemnasium/logrus-airbrake-hook.v2
+  - package: github.com/stretchr/testify
