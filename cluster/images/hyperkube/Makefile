@@ -98,15 +98,8 @@ else
 	docker run --rm --privileged multiarch/qemu-user-static:register --reset
 	curl -sSL --retry 5 https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-${QEMUARCH}-static.tar.xz | tar -xJ -C ${TEMP_DIR}
 endif
-
-	# This cross-compiles cni for all architectures
-	# TODO(freehan): Push the latest cni for all arches to storage.googleapis.com so we may just download the binaries
-	docker run -it -v ${TEMP_DIR}/cni-bin:/cnibin golang:1.6 /bin/bash -c "\
-		git clone https://github.com/containernetworking/cni \
-		&& cd cni \
-		&& git checkout $(CNI_RELEASE) \
-		&& GOARCH=$(ARCH) ./build \
-		&& cp bin/* /cnibin"
+	# Download CNI
+	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
 
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
