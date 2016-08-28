@@ -33,9 +33,9 @@ images=${IMAGES:-""}
 hosts=${HOSTS:-""}
 metadata=${INSTANCE_METADATA:-""}
 gubernator=${GUBERNATOR:-"false"}
-gci_image=$(gcloud compute images list --project google-containers \
-    --no-standard-images --regexp="gci-dev.*" --format="table[no-heading](name)")
 if [[ $hosts == "" && $images == "" ]]; then
+  gci_image=$(gcloud compute images list --project google-containers \
+    --no-standard-images --regexp="gci-dev.*" --format="table[no-heading](name)")
   images=$gci_image
   metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml"
 fi
