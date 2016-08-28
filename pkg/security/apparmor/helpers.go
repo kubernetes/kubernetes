@@ -25,11 +25,11 @@ import (
 // TODO: Move these values into the API package.
 const (
 	// The prefix to an annotation key specifying a container profile.
-	ContainerAnnotationKeyPrefix = "container.apparmor.security.alpha.kubernetes.io/"
+	ContainerAnnotationKeyPrefix = "container.apparmor.security.beta.kubernetes.io/"
 	// The annotation key specifying the default AppArmor profile.
-	DefaultProfileAnnotationKey = "apparmor.security.alpha.kubernetes.io/defaultProfileName"
+	DefaultProfileAnnotationKey = "apparmor.security.beta.kubernetes.io/defaultProfileName"
 	// The annotation key specifying the allowed AppArmor profiles.
-	AllowedProfilesAnnotationKey = "apparmor.security.alpha.kubernetes.io/allowedProfileNames"
+	AllowedProfilesAnnotationKey = "apparmor.security.beta.kubernetes.io/allowedProfileNames"
 
 	// The profile specifying the runtime default.
 	ProfileRuntimeDefault = "runtime/default"

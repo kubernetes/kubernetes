@@ -53,12 +53,12 @@ func testAppArmorNode() {
 		f := framework.NewDefaultFramework("apparmor-test")
 
 		It("should reject an unloaded profile", func() {
-			status := runAppArmorTest(f, "localhost/"+"non-existant-profile")
+			status := runAppArmorTest(f, apparmor.ProfileNamePrefix+"non-existant-profile")
 			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
 			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
 		})
 		It("should enforce a profile blocking writes", func() {
-			status := runAppArmorTest(f, "localhost/"+apparmorProfilePrefix+"deny-write")
+			status := runAppArmorTest(f, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"deny-write")
 			if len(status.ContainerStatuses) == 0 {
 				framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 				return
@@ -68,7 +68,7 @@ func testAppArmorNode() {
 
 		})
 		It("should enforce a permissive profile", func() {
-			status := runAppArmorTest(f, "localhost/"+apparmorProfilePrefix+"audit-write")
+			status := runAppArmorTest(f, apparmor.ProfileNamePrefix+apparmorProfilePrefix+"audit-write")
 			if len(status.ContainerStatuses) == 0 {
 				framework.Failf("Unexpected pod status: %s", spew.Sdump(status))
 				return
@@ -84,7 +84,7 @@ func testNonAppArmorNode() {
 		f := framework.NewDefaultFramework("apparmor-test")
 
 		It("should reject a pod with an AppArmor profile", func() {
-			status := runAppArmorTest(f, "runtime/default")
+			status := runAppArmorTest(f, apparmor.ProfileRuntimeDefault)
 			Expect(status.Phase).To(Equal(api.PodFailed), "PodStatus: %+v", status)
 			Expect(status.Reason).To(Equal("AppArmor"), "PodStatus: %+v", status)
 		})
@@ -159,7 +159,7 @@ func createPodWithAppArmor(f *framework.Framework, profile string) *api.Pod {
 		ObjectMeta: api.ObjectMeta{
 			Name: fmt.Sprintf("test-apparmor-%s", strings.Replace(profile, "/", "-", -1)),
 			Annotations: map[string]string{
-				"container.apparmor.security.alpha.kubernetes.io/test": profile,
+				apparmor.ContainerAnnotationKeyPrefix + "test": profile,
 			},
 		},
 		Spec: api.PodSpec{
