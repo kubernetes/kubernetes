@@ -2851,37 +2851,48 @@ func RemoveLabelOffNode(c *client.Client, nodeName string, labelKey string) {
 }
 
 func AddOrUpdateTaintOnNode(c *client.Client, nodeName string, taint api.Taint) {
-	node, err := c.Nodes().Get(nodeName)
-	ExpectNoError(err)
+	for attempt := 0; attempt < UpdateRetries; attempt++ {
+		node, err := c.Nodes().Get(nodeName)
+		ExpectNoError(err)
 
-	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
-	ExpectNoError(err)
+		nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+		ExpectNoError(err)
 
-	var newTaints []api.Taint
-	updated := false
-	for _, existingTaint := range nodeTaints {
-		if existingTaint.Key == taint.Key {
-			newTaints = append(newTaints, taint)
-			updated = true
-			continue
+		var newTaints []api.Taint
+		updated := false
+		for _, existingTaint := range nodeTaints {
+			if existingTaint.Key == taint.Key {
+				newTaints = append(newTaints, taint)
+				updated = true
+				continue
+			}
+
+			newTaints = append(newTaints, existingTaint)
 		}
 
-		newTaints = append(newTaints, existingTaint)
-	}
+		if !updated {
+			newTaints = append(newTaints, taint)
+		}
 
-	if !updated {
-		newTaints = append(newTaints, taint)
-	}
+		taintsData, err := json.Marshal(newTaints)
+		ExpectNoError(err)
 
-	taintsData, err := json.Marshal(newTaints)
-	ExpectNoError(err)
-
-	if node.Annotations == nil {
-		node.Annotations = make(map[string]string)
+		if node.Annotations == nil {
+			node.Annotations = make(map[string]string)
+		}
+		node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
+		_, err = c.Nodes().Update(node)
+		if err != nil {
+			if !apierrs.IsConflict(err) {
+				ExpectNoError(err)
+			} else {
+				Logf("Conflict when trying to add/update taint %v to %v", taint, nodeName)
+			}
+		} else {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
-	node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
-	_, err = c.Nodes().Update(node)
-	ExpectNoError(err)
 }
 
 func taintExists(taints []api.Taint, taintKey string) bool {
@@ -2927,28 +2938,41 @@ func deleteTaintByKey(taints []api.Taint, taintKey string) ([]api.Taint, error) 
 // won't fail if target taint doesn't exist or has been removed.
 func RemoveTaintOffNode(c *client.Client, nodeName string, taintKey string) {
 	By("removing the taint " + taintKey + " off the node " + nodeName)
-	node, err := c.Nodes().Get(nodeName)
-	ExpectNoError(err)
+	for attempt := 0; attempt < UpdateRetries; attempt++ {
+		node, err := c.Nodes().Get(nodeName)
+		ExpectNoError(err)
 
-	nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
-	ExpectNoError(err)
-	if len(nodeTaints) == 0 {
-		return
+		nodeTaints, err := api.GetTaintsFromNodeAnnotations(node.Annotations)
+		ExpectNoError(err)
+		if len(nodeTaints) == 0 {
+			return
+		}
+
+		if !taintExists(nodeTaints, taintKey) {
+			return
+		}
+
+		newTaints, err := deleteTaintByKey(nodeTaints, taintKey)
+		ExpectNoError(err)
+
+		taintsData, err := json.Marshal(newTaints)
+		ExpectNoError(err)
+		node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
+		_, err = c.Nodes().Update(node)
+		if err != nil {
+			if !apierrs.IsConflict(err) {
+				ExpectNoError(err)
+			} else {
+				Logf("Conflict when trying to add/update taint %v to %v", taintKey, nodeName)
+			}
+		} else {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
 
-	if !taintExists(nodeTaints, taintKey) {
-		return
-	}
-
-	newTaints, err := deleteTaintByKey(nodeTaints, taintKey)
+	nodeUpdated, err := c.Nodes().Get(nodeName)
 	ExpectNoError(err)
-
-	taintsData, err := json.Marshal(newTaints)
-	ExpectNoError(err)
-	node.Annotations[api.TaintsAnnotationKey] = string(taintsData)
-	nodeUpdated, err := c.Nodes().Update(node)
-	ExpectNoError(err)
-
 	By("verifying the node doesn't have the taint " + taintKey)
 	taintsGot, err := api.GetTaintsFromNodeAnnotations(nodeUpdated.Annotations)
 	ExpectNoError(err)
