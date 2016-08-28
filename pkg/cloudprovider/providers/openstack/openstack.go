@@ -109,6 +109,7 @@ type Config struct {
 		DomainId   string `gcfg:"domain-id"`
 		DomainName string `gcfg:"domain-name"`
 		Region     string
+		TrustId    string `gcfg:"trust-id"`
 	}
 	LoadBalancer LoadBalancerOpts
 }
@@ -134,6 +135,7 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 		TenantName:       cfg.Global.TenantName,
 		DomainID:         cfg.Global.DomainId,
 		DomainName:       cfg.Global.DomainName,
+		TrustID:          cfg.Global.TrustId,
 
 		// Persistent service, so we need to be able to renew tokens.
 		AllowReauth: true,
