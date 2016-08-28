@@ -263,10 +263,11 @@ kube::golang::create_gopath_tree() {
   local go_pkg_basedir=$(dirname "${go_pkg_dir}")
 
   mkdir -p "${go_pkg_basedir}"
-  rm -f "${go_pkg_dir}"
 
   # TODO: This symlink should be relative.
-  ln -s "${KUBE_ROOT}" "${go_pkg_dir}"
+  if [[ ! -e "${go_pkg_dir}" || "$(readlink ${go_pkg_dir})" != "${KUBE_ROOT}" ]]; then
+    ln -sTf "${KUBE_ROOT}" "${go_pkg_dir}"
+  fi
 }
 
 # Ensure the godep tool exists and is a viable version.
