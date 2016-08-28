@@ -54,7 +54,7 @@ KUBE_SERVICE_ADDRESSES="--service-cluster-ip-range=${SERVICE_CLUSTER_IP_RANGE}"
 # --admission-control="AlwaysAdmit": Ordered list of plug-ins 
 # to do admission control of resources into cluster. 
 # Comma-delimited list of: 
-#   LimitRanger, AlwaysDeny, SecurityContextDeny, 
+#   LimitRanger, AlwaysDeny, SecurityContextDeny, NamespaceExists, 
 #   NamespaceLifecycle, NamespaceAutoProvision,
 #   AlwaysAdmit, ServiceAccount, ResourceQuota, DefaultStorageClass
 KUBE_ADMISSION_CONTROL="--admission-control=${ADMISSION_CONTROL}"
