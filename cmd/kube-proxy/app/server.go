@@ -356,7 +356,7 @@ func getProxyMode(proxyMode string, client nodeGetter, hostname string, iptver i
 	} else if proxyMode == proxyModeIptables {
 		return tryIptablesProxy(iptver, kcompat)
 	} else if proxyMode != "" {
-		glog.V(1).Infof("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+		glog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
 		return tryIptablesProxy(iptver, kcompat)
 	}
 	// proxyMode == "" - choose the best option.
