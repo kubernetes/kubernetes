@@ -22,6 +22,7 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	release_1_4 "k8s.io/client-go/1.4/kubernetes"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -35,9 +36,11 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 	f := framework.NewDefaultFramework("disruption")
 	var ns string
 	var c *client.Client
+	var cs *release_1_4.Clientset
 
 	BeforeEach(func() {
 		c = f.Client
+		cs = f.StagingClient
 		ns = f.Namespace.Name
 	})
 
