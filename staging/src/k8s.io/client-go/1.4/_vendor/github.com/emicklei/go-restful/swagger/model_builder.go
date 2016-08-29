@@ -51,6 +51,14 @@ func (b modelBuilder) addModel(st reflect.Type, nameOverride string) *Model {
 	if b.isPrimitiveType(modelName) {
 		return nil
 	}
+	// golang encoding/json packages says array and slice values encode as
+	// JSON arrays, except that []byte encodes as a base64-encoded string.
+	// If we see a []byte here, treat it at as a primitive type (string)
+	// and deal with it in buildArrayTypeProperty.
+	if (st.Kind() == reflect.Slice || st.Kind() == reflect.Array) &&
+		st.Elem().Kind() == reflect.Uint8 {
+		return nil
+	}
 	// see if we already have visited this model
 	if _, ok := b.Models.At(modelName); ok {
 		return nil
@@ -276,6 +284,11 @@ func (b modelBuilder) buildArrayTypeProperty(field reflect.StructField, jsonName
 		return jsonName, prop
 	}
 	fieldType := field.Type
+	if fieldType.Elem().Kind() == reflect.Uint8 {
+		stringt := "string"
+		prop.Type = &stringt
+		return jsonName, prop
+	}
 	var pType = "array"
 	prop.Type = &pType
 	isPrimitive := b.isPrimitiveType(fieldType.Elem().Name())

@@ -30,6 +30,8 @@ import (
 	fakev1core "k8s.io/client-go/1.4/kubernetes/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/client-go/1.4/kubernetes/typed/extensions/v1beta1"
 	fakev1beta1extensions "k8s.io/client-go/1.4/kubernetes/typed/extensions/v1beta1/fake"
+	v1alpha1policy "k8s.io/client-go/1.4/kubernetes/typed/policy/v1alpha1"
+	fakev1alpha1policy "k8s.io/client-go/1.4/kubernetes/typed/policy/v1alpha1/fake"
 	"k8s.io/client-go/1.4/pkg/api"
 	"k8s.io/client-go/1.4/pkg/apimachinery/registered"
 	"k8s.io/client-go/1.4/pkg/runtime"
@@ -93,4 +95,9 @@ func (c *Clientset) Batch() v1batch.BatchInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return &fakev1beta1extensions.FakeExtensions{Fake: &c.Fake}
+}
+
+// Policy retrieves the PolicyClient
+func (c *Clientset) Policy() v1alpha1policy.PolicyInterface {
+	return &fakev1alpha1policy.FakePolicy{Fake: &c.Fake}
 }

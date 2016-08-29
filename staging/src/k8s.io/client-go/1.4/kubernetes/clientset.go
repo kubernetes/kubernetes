@@ -24,6 +24,7 @@ import (
 	v1batch "k8s.io/client-go/1.4/kubernetes/typed/batch/v1"
 	v1core "k8s.io/client-go/1.4/kubernetes/typed/core/v1"
 	v1beta1extensions "k8s.io/client-go/1.4/kubernetes/typed/extensions/v1beta1"
+	v1alpha1policy "k8s.io/client-go/1.4/kubernetes/typed/policy/v1alpha1"
 	"k8s.io/client-go/1.4/pkg/util/flowcontrol"
 	rest "k8s.io/client-go/1.4/rest"
 )
@@ -35,6 +36,7 @@ type Interface interface {
 	Autoscaling() v1autoscaling.AutoscalingInterface
 	Batch() v1batch.BatchInterface
 	Extensions() v1beta1extensions.ExtensionsInterface
+	Policy() v1alpha1policy.PolicyInterface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
@@ -46,6 +48,7 @@ type Clientset struct {
 	*v1autoscaling.AutoscalingClient
 	*v1batch.BatchClient
 	*v1beta1extensions.ExtensionsClient
+	*v1alpha1policy.PolicyClient
 }
 
 // Core retrieves the CoreClient
@@ -88,6 +91,14 @@ func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return c.ExtensionsClient
 }
 
+// Policy retrieves the PolicyClient
+func (c *Clientset) Policy() v1alpha1policy.PolicyInterface {
+	if c == nil {
+		return nil
+	}
+	return c.PolicyClient
+}
+
 // Discovery retrieves the DiscoveryClient
 func (c *Clientset) Discovery() discovery.DiscoveryInterface {
 	return c.DiscoveryClient
@@ -121,6 +132,10 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	if err != nil {
 		return nil, err
 	}
+	clientset.PolicyClient, err = v1alpha1policy.NewForConfig(&configShallowCopy)
+	if err != nil {
+		return nil, err
+	}
 
 	clientset.DiscoveryClient, err = discovery.NewDiscoveryClientForConfig(&configShallowCopy)
 	if err != nil {
@@ -139,6 +154,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 	clientset.AutoscalingClient = v1autoscaling.NewForConfigOrDie(c)
 	clientset.BatchClient = v1batch.NewForConfigOrDie(c)
 	clientset.ExtensionsClient = v1beta1extensions.NewForConfigOrDie(c)
+	clientset.PolicyClient = v1alpha1policy.NewForConfigOrDie(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &clientset
@@ -152,6 +168,7 @@ func New(c *rest.RESTClient) *Clientset {
 	clientset.AutoscalingClient = v1autoscaling.New(c)
 	clientset.BatchClient = v1batch.New(c)
 	clientset.ExtensionsClient = v1beta1extensions.New(c)
+	clientset.PolicyClient = v1alpha1policy.New(c)
 
 	clientset.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &clientset

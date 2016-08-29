@@ -30,12 +30,23 @@ const (
 	APIVersionInternal = "__internal"
 )
 
+// GroupVersioner refines a set of possible conversion targets into a single option.
+type GroupVersioner interface {
+	// KindForGroupVersionKinds returns a desired target group version kind for the given input, or returns ok false if no
+	// target is known. In general, if the return target is not in the input list, the caller is expected to invoke
+	// Scheme.New(target) and then perform a conversion between the current Go type and the destination Go type.
+	// Sophisticated implementations may use additional information about the input kinds to pick a destination kind.
+	KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (target unversioned.GroupVersionKind, ok bool)
+}
+
+// Encoders write objects to a serialized form
 type Encoder interface {
 	// Encode writes an object to a stream. Implementations may return errors if the versions are
 	// incompatible, or if no conversion is defined.
 	Encode(obj Object, w io.Writer) error
 }
 
+// Decoders attempt to load an object from data.
 type Decoder interface {
 	// Decode attempts to deserialize the provided data using either the innate typing of the scheme or the
 	// default kind, group, and version provided. It returns a decoded object as well as the kind, group, and
@@ -117,12 +128,10 @@ type NegotiatedSerializer interface {
 
 	// EncoderForVersion returns an encoder that ensures objects being written to the provided
 	// serializer are in the provided group version.
-	// TODO: take multiple group versions
-	EncoderForVersion(serializer Encoder, gv unversioned.GroupVersion) Encoder
+	EncoderForVersion(serializer Encoder, gv GroupVersioner) Encoder
 	// DecoderForVersion returns a decoder that ensures objects being read by the provided
 	// serializer are in the provided group version by default.
-	// TODO: take multiple group versions
-	DecoderToVersion(serializer Decoder, gv unversioned.GroupVersion) Decoder
+	DecoderToVersion(serializer Decoder, gv GroupVersioner) Decoder
 }
 
 // StorageSerializer is an interface used for obtaining encoders, decoders, and serializers
@@ -139,29 +148,41 @@ type StorageSerializer interface {
 
 	// EncoderForVersion returns an encoder that ensures objects being written to the provided
 	// serializer are in the provided group version.
-	// TODO: take multiple group versions
-	EncoderForVersion(serializer Encoder, gv unversioned.GroupVersion) Encoder
+	EncoderForVersion(serializer Encoder, gv GroupVersioner) Encoder
 	// DecoderForVersion returns a decoder that ensures objects being read by the provided
 	// serializer are in the provided group version by default.
-	// TODO: take multiple group versions
-	DecoderToVersion(serializer Decoder, gv unversioned.GroupVersion) Decoder
+	DecoderToVersion(serializer Decoder, gv GroupVersioner) Decoder
+}
+
+// NestedObjectEncoder is an optional interface that objects may implement to be given
+// an opportunity to encode any nested Objects / RawExtensions during serialization.
+type NestedObjectEncoder interface {
+	EncodeNestedObjects(e Encoder) error
+}
+
+// NestedObjectDecoder is an optional interface that objects may implement to be given
+// an opportunity to decode any nested Objects / RawExtensions during serialization.
+type NestedObjectDecoder interface {
+	DecodeNestedObjects(d Decoder) error
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 // Non-codec interfaces
 
 type ObjectVersioner interface {
-	ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (out Object, err error)
+	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
 }
 
 // ObjectConvertor converts an object to a different version.
 type ObjectConvertor interface {
 	// Convert attempts to convert one object into another, or returns an error. This method does
-	// not guarantee the in object is not mutated.
-	Convert(in, out interface{}) error
+	// not guarantee the in object is not mutated. The context argument will be passed to
+	// all nested conversions.
+	Convert(in, out, context interface{}) error
 	// ConvertToVersion takes the provided object and converts it the provided version. This
-	// method does not guarantee that the in object is not mutated.
-	ConvertToVersion(in Object, outVersion unversioned.GroupVersion) (out Object, err error)
+	// method does not guarantee that the in object is not mutated. This method is similar to
+	// Convert() but handles specific details of choosing the correct output version.
+	ConvertToVersion(in Object, gv GroupVersioner) (out Object, err error)
 	ConvertFieldLabel(version, kind, label, value string) (string, string, error)
 }
 

@@ -35,6 +35,13 @@ import (
 	"k8s.io/client-go/1.4/pkg/util/intstr"
 )
 
+const (
+	// SysctlsPodSecurityPolicyAnnotationKey represents the key of a whitelist of
+	// allowed safe and unsafe sysctls in a pod spec. It's a comma-separated list of plain sysctl
+	// names or sysctl patterns (which end in *). The string "*" matches all sysctls.
+	SysctlsPodSecurityPolicyAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
+)
+
 // describes the attributes of a scale subresource
 type ScaleSpec struct {
 	// desired number of instances for the scaled object.
@@ -550,7 +557,7 @@ type HTTPIngressRuleValue struct {
 // HTTPIngressPath associates a path regex with a backend. Incoming urls matching
 // the path are forwarded to the backend.
 type HTTPIngressPath struct {
-	// Path is a extended POSIX regex as defined by IEEE Std 1003.1,
+	// Path is an extended POSIX regex as defined by IEEE Std 1003.1,
 	// (i.e this follows the egrep/unix syntax, not the perl syntax)
 	// matched against the path of an incoming request. Currently it can
 	// contain characters disallowed from the conventional "path"
@@ -621,6 +628,9 @@ type ReplicaSetStatus struct {
 
 	// The number of pods that have labels matching the labels of the pod template of the replicaset.
 	FullyLabeledReplicas int32 `json:"fullyLabeledReplicas,omitempty"`
+
+	// The number of ready replicas for this replica set.
+	ReadyReplicas int32 `json:"readyReplicas,omitempty"`
 
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
@@ -714,6 +724,8 @@ var (
 	FC                    FSType = "fc"
 	ConfigMap             FSType = "configMap"
 	VsphereVolume         FSType = "vsphereVolume"
+	Quobyte               FSType = "quobyte"
+	AzureDisk             FSType = "azureDisk"
 	All                   FSType = "*"
 )
 

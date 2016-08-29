@@ -17,50 +17,11 @@ limitations under the License.
 package versioning
 
 import (
-	"fmt"
 	"io"
 
 	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/runtime"
 )
-
-// EnableCrossGroupDecoding modifies the given decoder in place, if it is a codec
-// from this package. It allows objects from one group to be auto-decoded into
-// another group. 'destGroup' must already exist in the codec.
-// TODO: this is an encapsulation violation and should be refactored
-func EnableCrossGroupDecoding(d runtime.Decoder, sourceGroup, destGroup string) error {
-	internal, ok := d.(*codec)
-	if !ok {
-		return fmt.Errorf("unsupported decoder type")
-	}
-
-	dest, ok := internal.decodeVersion[destGroup]
-	if !ok {
-		return fmt.Errorf("group %q is not a possible destination group in the given codec", destGroup)
-	}
-	internal.decodeVersion[sourceGroup] = dest
-
-	return nil
-}
-
-// EnableCrossGroupEncoding modifies the given encoder in place, if it is a codec
-// from this package. It allows objects from one group to be auto-decoded into
-// another group. 'destGroup' must already exist in the codec.
-// TODO: this is an encapsulation violation and should be refactored
-func EnableCrossGroupEncoding(e runtime.Encoder, sourceGroup, destGroup string) error {
-	internal, ok := e.(*codec)
-	if !ok {
-		return fmt.Errorf("unsupported encoder type")
-	}
-
-	dest, ok := internal.encodeVersion[destGroup]
-	if !ok {
-		return fmt.Errorf("group %q is not a possible destination group in the given codec", destGroup)
-	}
-	internal.encodeVersion[sourceGroup] = dest
-
-	return nil
-}
 
 // NewCodecForScheme is a convenience method for callers that are using a scheme.
 func NewCodecForScheme(
@@ -68,8 +29,8 @@ func NewCodecForScheme(
 	scheme *runtime.Scheme,
 	encoder runtime.Encoder,
 	decoder runtime.Decoder,
-	encodeVersion []unversioned.GroupVersion,
-	decodeVersion []unversioned.GroupVersion,
+	encodeVersion runtime.GroupVersioner,
+	decodeVersion runtime.GroupVersioner,
 ) runtime.Codec {
 	return NewCodec(encoder, decoder, runtime.UnsafeObjectConvertor(scheme), scheme, scheme, scheme, encodeVersion, decodeVersion)
 }
@@ -84,8 +45,8 @@ func NewCodec(
 	creater runtime.ObjectCreater,
 	copier runtime.ObjectCopier,
 	typer runtime.ObjectTyper,
-	encodeVersion []unversioned.GroupVersion,
-	decodeVersion []unversioned.GroupVersion,
+	encodeVersion runtime.GroupVersioner,
+	decodeVersion runtime.GroupVersioner,
 ) runtime.Codec {
 	internal := &codec{
 		encoder:   encoder,
@@ -94,33 +55,10 @@ func NewCodec(
 		creater:   creater,
 		copier:    copier,
 		typer:     typer,
-	}
-	if encodeVersion != nil {
-		internal.encodeVersion = make(map[string]unversioned.GroupVersion)
-		for _, v := range encodeVersion {
-			// first one for a group wins.  This is consistent with best to worst order throughout the codebase
-			if _, ok := internal.encodeVersion[v.Group]; ok {
-				continue
-			}
-			internal.encodeVersion[v.Group] = v
-		}
-		if len(internal.encodeVersion) == 1 {
-			for _, v := range internal.encodeVersion {
-				internal.preferredEncodeVersion = []unversioned.GroupVersion{v}
-			}
-		}
-	}
-	if decodeVersion != nil {
-		internal.decodeVersion = make(map[string]unversioned.GroupVersion)
-		for _, v := range decodeVersion {
-			// first one for a group wins.  This is consistent with best to worst order throughout the codebase
-			if _, ok := internal.decodeVersion[v.Group]; ok {
-				continue
-			}
-			internal.decodeVersion[v.Group] = v
-		}
-	}
 
+		encodeVersion: encodeVersion,
+		decodeVersion: decodeVersion,
+	}
 	return internal
 }
 
@@ -132,10 +70,8 @@ type codec struct {
 	copier    runtime.ObjectCopier
 	typer     runtime.ObjectTyper
 
-	encodeVersion map[string]unversioned.GroupVersion
-	decodeVersion map[string]unversioned.GroupVersion
-
-	preferredEncodeVersion []unversioned.GroupVersion
+	encodeVersion runtime.GroupVersioner
+	decodeVersion runtime.GroupVersioner
 }
 
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
@@ -152,6 +88,12 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		return nil, gvk, err
 	}
 
+	if d, ok := obj.(runtime.NestedObjectDecoder); ok {
+		if err := d.DecodeNestedObjects(DirectDecoder{c.decoder}); err != nil {
+			return nil, gvk, err
+		}
+	}
+
 	// if we specify a target, use generic conversion.
 	if into != nil {
 		if into == obj {
@@ -160,7 +102,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 			}
 			return into, gvk, nil
 		}
-		if err := c.convertor.Convert(obj, into); err != nil {
+		if err := c.convertor.Convert(obj, into, c.decodeVersion); err != nil {
 			return nil, gvk, err
 		}
 		if isVersioned {
@@ -170,37 +112,7 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		return into, gvk, nil
 	}
 
-	// invoke a version conversion
-	group := gvk.Group
-	if defaultGVK != nil {
-		group = defaultGVK.Group
-	}
-	var targetGV unversioned.GroupVersion
-	if c.decodeVersion == nil {
-		// convert to internal by default
-		targetGV.Group = group
-		targetGV.Version = runtime.APIVersionInternal
-	} else {
-		gv, ok := c.decodeVersion[group]
-		if !ok {
-			// unknown objects are left in their original version
-			if isVersioned {
-				versioned.Objects = []runtime.Object{obj}
-				return versioned, gvk, nil
-			}
-			return obj, gvk, nil
-		}
-		targetGV = gv
-	}
-
-	if gvk.GroupVersion() == targetGV {
-		if isVersioned {
-			versioned.Objects = []runtime.Object{obj}
-			return versioned, gvk, nil
-		}
-		return obj, gvk, nil
-	}
-
+	// Convert if needed.
 	if isVersioned {
 		// create a copy, because ConvertToVersion does not guarantee non-mutation of objects
 		copied, err := c.copier.Copy(obj)
@@ -209,14 +121,14 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 		}
 		versioned.Objects = []runtime.Object{copied}
 	}
-
-	// Convert if needed.
-	out, err := c.convertor.ConvertToVersion(obj, targetGV)
+	out, err := c.convertor.ConvertToVersion(obj, c.decodeVersion)
 	if err != nil {
 		return nil, gvk, err
 	}
 	if isVersioned {
-		versioned.Objects = append(versioned.Objects, out)
+		if versioned.Last() != out {
+			versioned.Objects = append(versioned.Objects, out)
+		}
 		return versioned, gvk, nil
 	}
 	return out, gvk, nil
@@ -225,51 +137,86 @@ func (c *codec) Decode(data []byte, defaultGVK *unversioned.GroupVersionKind, in
 // Encode ensures the provided object is output in the appropriate group and version, invoking
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
-	if _, ok := obj.(*runtime.Unknown); ok {
+	switch obj.(type) {
+	case *runtime.Unknown, *runtime.Unstructured, *runtime.UnstructuredList:
 		return c.encoder.Encode(obj, w)
 	}
+
 	gvks, isUnversioned, err := c.typer.ObjectKinds(obj)
 	if err != nil {
 		return err
 	}
-	gvk := gvks[0]
 
 	if c.encodeVersion == nil || isUnversioned {
+		if e, ok := obj.(runtime.NestedObjectEncoder); ok {
+			if err := e.EncodeNestedObjects(DirectEncoder{Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
+				return err
+			}
+		}
 		objectKind := obj.GetObjectKind()
 		old := objectKind.GroupVersionKind()
-		objectKind.SetGroupVersionKind(gvk)
+		objectKind.SetGroupVersionKind(gvks[0])
 		err = c.encoder.Encode(obj, w)
 		objectKind.SetGroupVersionKind(old)
 		return err
 	}
 
-	targetGV, ok := c.encodeVersion[gvk.Group]
-
-	// attempt a conversion to the sole encode version
-	if !ok && c.preferredEncodeVersion != nil {
-		ok = true
-		targetGV = c.preferredEncodeVersion[0]
-	}
-
-	// if no fallback is available, error
-	if !ok {
-		return fmt.Errorf("the codec does not recognize group %q for kind %q and cannot encode it", gvk.Group, gvk.Kind)
-	}
-
 	// Perform a conversion if necessary
 	objectKind := obj.GetObjectKind()
 	old := objectKind.GroupVersionKind()
-	out, err := c.convertor.ConvertToVersion(obj, targetGV)
+	out, err := c.convertor.ConvertToVersion(obj, c.encodeVersion)
 	if err != nil {
-		if ok {
+		return err
+	}
+
+	if e, ok := out.(runtime.NestedObjectEncoder); ok {
+		if err := e.EncodeNestedObjects(DirectEncoder{Encoder: c.encoder, ObjectTyper: c.typer}); err != nil {
 			return err
 		}
-	} else {
-		obj = out
 	}
+
 	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
-	err = c.encoder.Encode(obj, w)
+	err = c.encoder.Encode(out, w)
 	// restore the old GVK, in case conversion returned the same object
 	objectKind.SetGroupVersionKind(old)
 	return err
+}
+
+// DirectEncoder serializes an object and ensures the GVK is set.
+type DirectEncoder struct {
+	runtime.Encoder
+	runtime.ObjectTyper
+}
+
+// Encode does not do conversion. It sets the gvk during serialization.
+func (e DirectEncoder) Encode(obj runtime.Object, stream io.Writer) error {
+	gvks, _, err := e.ObjectTyper.ObjectKinds(obj)
+	if err != nil {
+		if runtime.IsNotRegisteredError(err) {
+			return e.Encoder.Encode(obj, stream)
+		}
+		return err
+	}
+	kind := obj.GetObjectKind()
+	oldGVK := kind.GroupVersionKind()
+	kind.SetGroupVersionKind(gvks[0])
+	err = e.Encoder.Encode(obj, stream)
+	kind.SetGroupVersionKind(oldGVK)
+	return err
+}
+
+// DirectDecoder clears the group version kind of a deserialized object.
+type DirectDecoder struct {
+	runtime.Decoder
+}
+
+// Decode does not do conversion. It removes the gvk during deserialization.
+func (d DirectDecoder) Decode(data []byte, defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
+	obj, gvk, err := d.Decoder.Decode(data, defaults, into)
+	if obj != nil {
+		kind := obj.GetObjectKind()
+		// clearing the gvk is just a convention of a codec
+		kind.SetGroupVersionKind(unversioned.GroupVersionKind{})
+	}
+	return obj, gvk, err
 }

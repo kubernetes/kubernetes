@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/client-go/1.4/pkg/labels"
+	"k8s.io/client-go/1.4/pkg/selection"
 	"k8s.io/client-go/1.4/pkg/util/sets"
 )
 
@@ -35,23 +36,23 @@ func LabelSelectorAsSelector(ps *LabelSelector) (labels.Selector, error) {
 	}
 	selector := labels.NewSelector()
 	for k, v := range ps.MatchLabels {
-		r, err := labels.NewRequirement(k, labels.EqualsOperator, sets.NewString(v))
+		r, err := labels.NewRequirement(k, selection.Equals, sets.NewString(v))
 		if err != nil {
 			return nil, err
 		}
 		selector = selector.Add(*r)
 	}
 	for _, expr := range ps.MatchExpressions {
-		var op labels.Operator
+		var op selection.Operator
 		switch expr.Operator {
 		case LabelSelectorOpIn:
-			op = labels.InOperator
+			op = selection.In
 		case LabelSelectorOpNotIn:
-			op = labels.NotInOperator
+			op = selection.NotIn
 		case LabelSelectorOpExists:
-			op = labels.ExistsOperator
+			op = selection.Exists
 		case LabelSelectorOpDoesNotExist:
-			op = labels.DoesNotExistOperator
+			op = selection.DoesNotExist
 		default:
 			return nil, fmt.Errorf("%q is not a valid pod selector operator", expr.Operator)
 		}
@@ -108,7 +109,7 @@ func ParseToLabelSelector(selector string) (*LabelSelector, error) {
 	for _, req := range reqs {
 		var op LabelSelectorOperator
 		switch req.Operator() {
-		case labels.EqualsOperator, labels.DoubleEqualsOperator:
+		case selection.Equals, selection.DoubleEquals:
 			vals := req.Values()
 			if vals.Len() != 1 {
 				return nil, fmt.Errorf("equals operator must have exactly one value")
@@ -119,15 +120,15 @@ func ParseToLabelSelector(selector string) (*LabelSelector, error) {
 			}
 			labelSelector.MatchLabels[req.Key()] = val
 			continue
-		case labels.InOperator:
+		case selection.In:
 			op = LabelSelectorOpIn
-		case labels.NotInOperator:
+		case selection.NotIn:
 			op = LabelSelectorOpNotIn
-		case labels.ExistsOperator:
+		case selection.Exists:
 			op = LabelSelectorOpExists
-		case labels.DoesNotExistOperator:
+		case selection.DoesNotExist:
 			op = LabelSelectorOpDoesNotExist
-		case labels.GreaterThanOperator, labels.LessThanOperator:
+		case selection.GreaterThan, selection.LessThan:
 			// Adding a separate case for these operators to indicate that this is deliberate
 			return nil, fmt.Errorf("%q isn't supported in label selectors", req.Operator())
 		default:
