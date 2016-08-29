@@ -50,7 +50,7 @@ var (
 	knownFeatures = map[string]featureSpec{
 		allAlphaGate:              {false, alpha},
 		externalTrafficLocalOnly:  {false, alpha},
-		appArmor:                  {true, alpha},
+		appArmor:                  {true, beta},
 		dynamicKubeletConfig:      {false, alpha},
 		dynamicVolumeProvisioning: {true, alpha},
 	}
@@ -93,7 +93,7 @@ type FeatureGate interface {
 	// MyFeature() bool
 
 	// owner: @timstclair
-	// alpha: v1.4
+	// beta: v1.4
 	AppArmor() bool
 
 	// owner: @girishkalele
