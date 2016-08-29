@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
 	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
@@ -62,6 +63,7 @@ type Framework struct {
 	Clientset_1_2 *release_1_2.Clientset
 	Clientset_1_3 *release_1_3.Clientset
 	StagingClient *release_1_4.Clientset
+	ClientPool    dynamic.ClientPool
 
 	Namespace                *api.Namespace   // Every test has at least one namespace
 	namespacesToDelete       []*api.Namespace // Some tests have more than one.
@@ -192,6 +194,7 @@ func (f *Framework) BeforeEach() {
 		clientRepoConfig := getClientRepoConfig(config)
 		f.StagingClient, err = release_1_4.NewForConfig(clientRepoConfig)
 		Expect(err).NotTo(HaveOccurred())
+		f.ClientPool = dynamic.NewClientPool(config, dynamic.LegacyAPIPathResolverFunc)
 	}
 
 	if f.federated {
@@ -295,30 +298,27 @@ func (f *Framework) AfterEach() {
 	// DeleteNamespace at the very end in defer, to avoid any
 	// expectation failures preventing deleting the namespace.
 	defer func() {
+		nsDeletionErrors := map[string]error{}
 		if TestContext.DeleteNamespace {
 			for _, ns := range f.namespacesToDelete {
 				By(fmt.Sprintf("Destroying namespace %q for this suite.", ns.Name))
-
 				timeout := 5 * time.Minute
 				if f.NamespaceDeletionTimeout != 0 {
 					timeout = f.NamespaceDeletionTimeout
 				}
-				if err := deleteNS(f.Client, ns.Name, timeout); err != nil {
+				if err := deleteNS(f.Client, f.ClientPool, ns.Name, timeout); err != nil {
 					if !apierrs.IsNotFound(err) {
-						Failf("Couldn't delete ns %q: %s", ns.Name, err)
+						nsDeletionErrors[ns.Name] = err
 					} else {
 						Logf("Namespace %v was already deleted", ns.Name)
 					}
 				}
 			}
-			f.namespacesToDelete = nil
-
 			// Delete the federation namespace.
 			// TODO(nikhiljindal): Uncomment this, once https://github.com/kubernetes/kubernetes/issues/31077 is fixed.
 			// In the meantime, we will have these extra namespaces in all clusters.
 			// Note: this will not cause any failure since we create a new namespace for each test in BeforeEach().
 			// f.deleteFederationNs()
-
 		} else {
 			Logf("Found DeleteNamespace=false, skipping namespace deletion!")
 		}
@@ -327,6 +327,16 @@ func (f *Framework) AfterEach() {
 		f.Namespace = nil
 		f.FederationNamespace = nil
 		f.Client = nil
+		f.namespacesToDelete = nil
+
+		// if we had errors deleting, report them now.
+		if len(nsDeletionErrors) != 0 {
+			messages := []string{}
+			for namespaceKey, namespaceErr := range nsDeletionErrors {
+				messages = append(messages, fmt.Sprintf("Couldn't delete ns: %q: %s", namespaceKey, namespaceErr))
+			}
+			Failf(strings.Join(messages, ","))
+		}
 	}()
 
 	if f.federated {
