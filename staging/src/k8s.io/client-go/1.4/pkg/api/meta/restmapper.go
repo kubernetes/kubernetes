@@ -189,7 +189,7 @@ func (m *DefaultRESTMapper) ResourceSingularizer(resourceType string) (string, e
 		}
 
 		if currSingular.Resource != singular.Resource {
-			return resourceType, fmt.Errorf("multiple possibile singular resources (%v) found for %v", resources, resourceType)
+			return resourceType, fmt.Errorf("multiple possible singular resources (%v) found for %v", resources, resourceType)
 		}
 	}
 

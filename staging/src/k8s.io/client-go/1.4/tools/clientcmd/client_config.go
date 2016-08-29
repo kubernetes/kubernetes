@@ -329,7 +329,7 @@ func (config *DirectClientConfig) getCluster() clientcmdapi.Cluster {
 	clusterInfoName := config.getClusterName()
 
 	var mergedClusterInfo clientcmdapi.Cluster
-	mergo.Merge(&mergedClusterInfo, DefaultCluster)
+	mergo.Merge(&mergedClusterInfo, config.overrides.ClusterDefaults)
 	mergo.Merge(&mergedClusterInfo, EnvVarCluster)
 	if configClusterInfo, exists := clusterInfos[clusterInfoName]; exists {
 		mergo.Merge(&mergedClusterInfo, configClusterInfo)
