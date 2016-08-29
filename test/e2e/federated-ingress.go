@@ -39,20 +39,20 @@ import (
 )
 
 const (
+	MaxRetriesOnFederatedApiserver = 3
 	FederatedIngressTimeout        = 60 * time.Second
 	FederatedIngressName           = "federated-ingress"
 	FederatedIngressServiceName    = "federated-ingress-service"
 	FederatedIngressServicePodName = "federated-ingress-service-test-pod"
 )
 
-var _ = framework.KubeDescribe("Federation ingresses [Feature:Federation]", func() {
+var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-ingress")
 
 	// Create/delete ingress api objects
 	// Validate federation apiserver, does not rely on underlying clusters or federation ingress controller.
 	Describe("Ingress objects", func() {
 		AfterEach(func() {
-			framework.SkipUnlessFederated(f.Client)
 
 			nsName := f.FederationNamespace.Name
 			// Delete registered ingresses.
@@ -102,7 +102,6 @@ var _ = framework.KubeDescribe("Federation ingresses [Feature:Federation]", func
 		})
 
 		It("should create and update matching ingresses in underlying clusters", func() {
-			framework.SkipUnlessFederated(f.Client)
 			ingress := createIngressOrFail(f.FederationClientset_1_4, f.Namespace.Name)
 			defer func() { // Cleanup
 				By(fmt.Sprintf("Deleting ingress %q in namespace %q", ingress.Name, f.Namespace.Name))
@@ -136,7 +135,6 @@ var _ = framework.KubeDescribe("Federation ingresses [Feature:Federation]", func
 			})
 
 			AfterEach(func() {
-				framework.SkipUnlessFederated(f.Client)
 				deleteBackendPodsOrFail(clusters, f.Namespace.Name)
 				if service != nil {
 					deleteServiceOrFail(f.FederationClientset_1_4, f.Namespace.Name, service.Name)
@@ -153,7 +151,6 @@ var _ = framework.KubeDescribe("Federation ingresses [Feature:Federation]", func
 			})
 
 			PIt("should be able to discover a federated ingress service", func() {
-				framework.SkipUnlessFederated(f.Client)
 				// we are about the ingress name
 				svcDNSNames := []string{
 					fmt.Sprintf("%s.%s", FederatedIngressServiceName, f.Namespace.Name),
@@ -177,8 +174,7 @@ var _ = framework.KubeDescribe("Federation ingresses [Feature:Federation]", func
 })
 
 /*
-   equivalent returns true if the two ingresss are equivalent.  Fields which are expected to differ between
-   federated ingresss and the underlying cluster ingresss (e.g. ClusterIP, LoadBalancerIP etc) are ignored.
+   equivalent returns true if the two ingress spec are equivalent.
 */
 func equivalentIngress(federatedIngress, clusterIngress v1beta1.Ingress) bool {
 	return reflect.DeepEqual(clusterIngress.Spec, federatedIngress.Spec)
@@ -222,7 +218,7 @@ func waitForIngressShardsOrFail(namespace string, ingress *v1beta1.Ingress, clus
 }
 
 /*
-   waitForIngressShardsOrFail waits for the ingress to appear in all clusters
+   waitForIngressShardsUpdatedOrFail waits for the ingress to be updated in all clusters
 */
 func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingress, clusters map[string]*cluster) {
 	framework.Logf("Waiting for ingress %q in %d clusters", ingress.Name, len(clusters))
@@ -232,8 +228,8 @@ func waitForIngressShardsUpdatedOrFail(namespace string, ingress *v1beta1.Ingres
 }
 
 /*
-   waitForIngressOrFail waits until a ingress is either present or absent in the cluster specified by clientset.
-   If the condition is not met within timout, it fails the calling test.
+   waitForIngressUpdateOrFail waits until a ingress is updated in the specified cluster with same spec of federated ingress.
+   If the condition is not met within timeout, it fails the calling test.
 */
 func waitForIngressUpdateOrFail(clientset *release_1_3.Clientset, namespace string, ingress *v1beta1.Ingress, timeout time.Duration) {
 	By(fmt.Sprintf("Fetching a federated ingress shard of ingress %q in namespace %q from cluster", ingress.Name, namespace))
@@ -312,7 +308,7 @@ func updateIngressOrFail(clientset *federation_release_1_4.Clientset, namespace 
 		},
 	}
 
-	for i := 0; i < 3; i++ {
+	for MaxRetriesOnFederatedApiserver := 0; MaxRetriesOnFederatedApiserver < 3; MaxRetriesOnFederatedApiserver++ {
 		_, err = clientset.Extensions().Ingresses(namespace).Get(FederatedIngressName)
 		if err != nil {
 			framework.Failf("failed to get ingress %q: %v", FederatedIngressName, err)
