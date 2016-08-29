@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -75,6 +76,8 @@ type Builder struct {
 
 	export bool
 
+	validateNamespaces bool
+
 	schema validation.Schema
 }
 
@@ -86,14 +89,19 @@ type resourceTuple struct {
 // NewBuilder creates a builder that operates on generic objects.
 func NewBuilder(mapper meta.RESTMapper, typer runtime.ObjectTyper, clientMapper ClientMapper, decoder runtime.Decoder) *Builder {
 	return &Builder{
-		mapper:        &Mapper{typer, mapper, clientMapper, decoder},
-		requireObject: true,
+		mapper:             &Mapper{typer, mapper, clientMapper, decoder},
+		requireObject:      true,
+		validateNamespaces: true,
 	}
 }
 
 func (b *Builder) Schema(schema validation.Schema) *Builder {
 	b.schema = schema
 	return b
+}
+
+func (b *Builder) ValidateNamespaces(enable bool) {
+	b.validateNamespaces = enable
 }
 
 // FilenameParam groups input in two categories: URLs and files (files, directories, STDIN)
@@ -539,17 +547,21 @@ func (b *Builder) visitorResult() *Result {
 		if err != nil {
 			return &Result{err: err}
 		}
-
 		visitors := []Visitor{}
 		for _, mapping := range mappings {
 			client, err := b.mapper.ClientForMapping(mapping)
 			if err != nil {
 				return &Result{err: err}
 			}
+
 			selectorNamespace := b.namespace
 			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 				selectorNamespace = ""
 			}
+			if err := b.validateNamespace(client, selectorNamespace); err != nil {
+				return &Result{err: err}
+			}
+
 			visitors = append(visitors, NewSelector(client, mapping, selectorNamespace, b.selector, b.export))
 		}
 		if b.continueOnError {
@@ -603,7 +615,6 @@ func (b *Builder) visitorResult() *Result {
 			if !ok {
 				return &Result{singular: isSingular, err: fmt.Errorf("could not find a client for resource %q", tuple.Resource)}
 			}
-
 			selectorNamespace := b.namespace
 			if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 				selectorNamespace = ""
@@ -611,6 +622,9 @@ func (b *Builder) visitorResult() *Result {
 				if len(b.namespace) == 0 {
 					return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
 				}
+			}
+			if err := b.validateNamespace(client, selectorNamespace); err != nil {
+				return &Result{err: err}
 			}
 
 			info := NewInfo(client, mapping, selectorNamespace, tuple.Name, b.export)
@@ -658,6 +672,9 @@ func (b *Builder) visitorResult() *Result {
 			if len(b.namespace) == 0 {
 				return &Result{singular: isSingular, err: fmt.Errorf("namespace may not be empty when retrieving a resource by name")}
 			}
+		}
+		if err := b.validateNamespace(client, selectorNamespace); err != nil {
+			return &Result{err: err}
 		}
 
 		visitors := []Visitor{}
@@ -756,4 +773,18 @@ func HasNames(args []string) (bool, error) {
 		return false, err
 	}
 	return hasCombinedTypes || len(args) > 1, nil
+}
+
+func (b *Builder) validateNamespace(c RESTClient, namespace string) error {
+	if !b.validateNamespaces {
+		return nil
+	}
+	if namespace == api.NamespaceDefault || namespace == api.NamespaceAll {
+		return nil
+	}
+	err := c.Get().AbsPath("api", "v1", "namespaces", namespace).Do().Error()
+	if err != nil && errors.IsNotFound(err) {
+		return fmt.Errorf("The namespace %s for the request was not found", namespace)
+	}
+	return err
 }

@@ -82,8 +82,12 @@ func fakeClientWith(testName string, t *testing.T, data map[string]string) Clien
 				}
 				header := http.Header{}
 				header.Set("Content-Type", runtime.ContentTypeJSON)
+				statusCode := http.StatusOK
+				if len(body) == 0 {
+					statusCode = http.StatusNotFound
+				}
 				return &http.Response{
-					StatusCode: http.StatusOK,
+					StatusCode: statusCode,
 					Header:     header,
 					Body:       stringBody(body),
 				}, nil
@@ -533,9 +537,25 @@ func TestURLBuilderRequireNamespace(t *testing.T) {
 	}
 }
 
+func TestResourceByNameNoNamespace(t *testing.T) {
+	pods, _ := testData()
+	// This client is missing the namespace resource, we expect the namespace lookup to fail
+	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":   "", // This should cause a 404
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
+	}), testapi.Default.Codec()).
+		NamespaceParam("test").
+		ResourceTypeOrNameArgs(true, "pods", "foo")
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+}
+
 func TestResourceByName(t *testing.T) {
 	pods, _ := testData()
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":   runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 	}), testapi.Default.Codec()).
 		NamespaceParam("test")
@@ -569,6 +589,7 @@ func TestResourceByName(t *testing.T) {
 func TestMultipleResourceByTheSameName(t *testing.T) {
 	pods, svcs := testData()
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":       runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 		"/namespaces/test/pods/baz":     runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[1]),
 		"/namespaces/test/services/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &svcs.Items[0]),
@@ -601,6 +622,7 @@ func TestMultipleResourceByTheSameName(t *testing.T) {
 func TestResourceNames(t *testing.T) {
 	pods, svc := testData()
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":       runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(testapi.Default.Codec(), &svc.Items[0]),
 	}), testapi.Default.Codec()).
@@ -629,6 +651,7 @@ func TestResourceNames(t *testing.T) {
 func TestResourceNamesWithoutResource(t *testing.T) {
 	pods, svc := testData()
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":       runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 		"/namespaces/test/pods/foo":     runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 		"/namespaces/test/services/baz": runtime.EncodeOrDie(testapi.Default.Codec(), &svc.Items[0]),
 	}), testapi.Default.Codec()).
@@ -649,7 +672,9 @@ func TestResourceNamesWithoutResource(t *testing.T) {
 }
 
 func TestResourceByNameWithoutRequireObject(t *testing.T) {
-	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{}), testapi.Default.Codec()).
+	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test": runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
+	}), testapi.Default.Codec()).
 		NamespaceParam("test")
 
 	test := &testVisitor{}
@@ -684,6 +709,7 @@ func TestResourceByNameWithoutRequireObject(t *testing.T) {
 func TestResourceByNameAndEmptySelector(t *testing.T) {
 	pods, _ := testData()
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":   runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 		"/namespaces/test/pods/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 	}), testapi.Default.Codec()).
 		NamespaceParam("test").
@@ -712,6 +738,7 @@ func TestSelector(t *testing.T) {
 	pods, svc := testData()
 	labelKey := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":                          runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
 	}), testapi.Default.Codec()).
@@ -813,10 +840,13 @@ func TestResourceTuple(t *testing.T) {
 	}
 	for k, testCase := range testCases {
 		for _, requireObject := range []bool{true, false} {
-			expectedRequests := map[string]string{}
+			expectedRequests := map[string]string{
+				"/api/v1/namespaces/test": runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
+			}
 			if requireObject {
 				pods, _ := testData()
 				expectedRequests = map[string]string{
+					"/api/v1/namespaces/test":   runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 					"/namespaces/test/pods/foo": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 					"/namespaces/test/pods/bar": runtime.EncodeOrDie(testapi.Default.Codec(), &pods.Items[0]),
 					"/nodes/foo":                runtime.EncodeOrDie(testapi.Default.Codec(), &api.Node{ObjectMeta: api.ObjectMeta{Name: "foo"}}),
@@ -1007,6 +1037,7 @@ func TestListObject(t *testing.T) {
 	pods, _ := testData()
 	labelKey := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
 	b := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":                      runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 		"/namespaces/test/pods?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 	}), testapi.Default.Codec()).
 		SelectorParam("a=b").
@@ -1040,6 +1071,7 @@ func TestListObjectWithDifferentVersions(t *testing.T) {
 	pods, svc := testData()
 	labelKey := unversioned.LabelSelectorQueryParam(testapi.Default.GroupVersion().String())
 	obj, err := NewBuilder(testapi.Default.RESTMapper(), api.Scheme, fakeClientWith("", t, map[string]string{
+		"/api/v1/namespaces/test":                          runtime.EncodeOrDie(testapi.Default.Codec(), &api.Namespace{}),
 		"/namespaces/test/pods?" + labelKey + "=a%3Db":     runtime.EncodeOrDie(testapi.Default.Codec(), pods),
 		"/namespaces/test/services?" + labelKey + "=a%3Db": runtime.EncodeOrDie(testapi.Default.Codec(), svc),
 	}), testapi.Default.Codec()).
