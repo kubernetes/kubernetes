@@ -125,6 +125,8 @@ var annotationsToSkip = map[string]bool{
 	RevisionAnnotation:                      true,
 	DesiredReplicasAnnotation:               true,
 	MaxReplicasAnnotation:                   true,
+	OverlapAnnotation:                       true,
+	SelectorUpdateAnnotation:                true,
 }
 
 // skipCopyAnnotation returns true if we should skip copying the annotation with the given annotation key
