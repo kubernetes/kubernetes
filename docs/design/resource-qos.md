@@ -120,8 +120,8 @@ containers:
 				cpu: 100m
 				memory: 100Mi
 			requests:
-				cpu: 10m
-				memory: 1Gi
+				cpu: 100m
+				memory: 100Mi
 ```
 
 - If `requests` and optionally `limits` are set (not equal to `0`) for one or more resources across one or more containers, and they are *not equal*, then the pod is classified as **Burstable**.
