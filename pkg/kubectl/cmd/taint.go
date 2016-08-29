@@ -282,8 +282,15 @@ func (o *TaintOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Co
 // Validate checks to the TaintOptions to see if there is sufficient information run the command.
 func (o TaintOptions) Validate(args []string) error {
 	resourceType := strings.ToLower(o.resources[0])
-	if resourceType != "node" && resourceType != "nodes" {
-		return fmt.Errorf("invalid resource type %s, only node(s) is supported", o.resources[0])
+	validResources, isValidResource := append(kubectl.ResourceAliases([]string{"node"}), "node"), false
+	for _, validResource := range validResources {
+		if resourceType == validResource {
+			isValidResource = true
+			break
+		}
+	}
+	if !isValidResource {
+		return fmt.Errorf("invalid resource type %s, only %q are supported", o.resources[0], validResources)
 	}
 
 	// check the format of taint args and checks removed taints aren't in the new taints list
