@@ -259,7 +259,7 @@ function dind::step {
   fi
   GREEN="${1}"
   shift
-  echo -e ${OPTS} "\e[97m* \e[92m${GREEN}\e[39m $*" 1>&2
+  echo -e ${OPTS} "\x1B[97m* \x1B[92m${GREEN}\x1B[39m $*" 1>&2
 }
 
 if [ $(basename "$0") = dind-up-cluster.sh ]; then
