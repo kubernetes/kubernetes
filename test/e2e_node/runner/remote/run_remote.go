@@ -272,7 +272,7 @@ func main() {
 
 	// Set the exit code if there were failures
 	if !exitOk {
-		fmt.Printf("Failure: %d errors encountered.", errCount)
+		fmt.Printf("Failure: %d errors encountered.\n", errCount)
 		callGubernator(*gubernator)
 		os.Exit(1)
 	}
