@@ -3,15 +3,15 @@ package dockertools
 import dockertypes "github.com/docker/engine-api/types"
 
 func getContainerIP(container *dockertypes.ContainerJSON) string {
+	result := ""
 	if container.NetworkSettings != nil {
-		result := container.NetworkSettings.IPAddress
+		result = container.NetworkSettings.IPAddress
 
 		// Fall back to IPv6 address if no IPv4 address is present
 		if result == "" {
 			result = container.NetworkSettings.GlobalIPv6Address
 		}
 	}
-
 	return result
 }
 
