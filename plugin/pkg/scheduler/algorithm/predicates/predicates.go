@@ -1093,7 +1093,7 @@ func PodToleratesNodeTaints(pod *api.Pod, meta interface{}, nodeInfo *schedulerc
 // tolerationsToleratesTaints checks if given tolerations can live with given taints.
 // It returns:
 // 1. whether tolerated or not;
-// 2. whether kubelet should be aware of (1).
+// 2. whether kubelet should be aware if it's unfit.
 func tolerationsToleratesTaints(tolerations []api.Toleration, taints []api.Taint) (bool, bool) {
 	// If the taint list is nil/empty, it is tolerated by all tolerations by default.
 	if len(taints) == 0 {
