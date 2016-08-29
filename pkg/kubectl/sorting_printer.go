@@ -40,7 +40,7 @@ type SortingPrinter struct {
 	Decoder   runtime.Decoder
 }
 
-func (s *SortingPrinter) FinishPrint(w io.Writer, res string, hiddenObjNum int) error {
+func (s *SortingPrinter) FinishPrint(w io.Writer, res string) error {
 	return nil
 }
 

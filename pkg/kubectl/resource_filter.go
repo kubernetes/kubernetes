@@ -2,6 +2,7 @@ package kubectl
 
 import (
 	"fmt"
+	"io"
 	"reflect"
 
 	"github.com/golang/glog"
@@ -10,8 +11,9 @@ import (
 )
 
 type FilterOptions struct {
-	filterMap map[reflect.Type]reflect.Value
-	options   PrintOptions
+	filterMap    map[reflect.Type]reflect.Value
+	options      PrintOptions
+	hiddenObjNum int
 }
 
 func NewResourceFilter(opts *PrintOptions) *FilterOptions {
@@ -79,13 +81,30 @@ func filterPods(pod *api.Pod, options PrintOptions) bool {
 	return false
 }
 
+// PrintFilterCount prints an info message indicating the amount of resources
+// that were skipped as a result of being filtered, and resets this count
+func (f *FilterOptions) PrintFilterCount(output io.Writer, res string) error {
+	hiddenObjNum := f.hiddenObjNum
+	f.hiddenObjNum = 0
+
+	if !f.options.NoHeaders && !f.options.ShowAll && hiddenObjNum > 0 {
+		_, err := fmt.Fprintf(output, "  info: %d completed object(s) was(were) not shown in %s list. Pass --show-all to see all objects.\n\n", hiddenObjNum, res)
+		return err
+	}
+	return nil
+}
+
 // Filter extracts the filter handler, if one exists, for the given resource
 func (f *FilterOptions) Filter(obj runtime.Object) (bool, error) {
 	t := reflect.TypeOf(obj)
 	if filter, ok := f.filterMap[t]; ok {
 		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(f.options)}
 		resultValue := filter.Call(args)[0]
-		return resultValue.Interface().(bool), nil
+		isFiltered := resultValue.Interface().(bool)
+		if isFiltered {
+			f.hiddenObjNum++
+		}
+		return isFiltered, nil
 	}
 
 	return false, fmt.Errorf("error: no filter for type %#v", t)

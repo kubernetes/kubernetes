@@ -156,6 +156,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
+	filter := f.DefaultResourceFilters(cmd, allNamespaces)
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -235,7 +236,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			if err := printer.PrintObj(obj, out); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
-			printer.FinishPrint(errOut, mapping.Resource, 0)
+			filter.PrintFilterCount(errOut, mapping.Resource)
 		}
 
 		// print watched changes
@@ -253,7 +254,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			err := printer.PrintObj(e.Object, out)
 			if err == nil {
-				printer.FinishPrint(errOut, mapping.Resource, 0)
+				filter.PrintFilterCount(errOut, mapping.Resource)
 			}
 			return err
 		})
@@ -275,7 +276,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		return err
 	}
 
-	filter := f.DefaultResourceFilters(cmd, allNamespaces)
 	printer, generic, err := cmdutil.PrinterForCommand(cmd)
 	if err != nil {
 		return err
@@ -297,22 +297,19 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			res = infos[0].ResourceMapping().Resource
 		}
 
-		hiddenObjNum := 0
-
 		for ix := range infos {
 			if isFiltered, err := filter.Filter(infos[ix].Object); !isFiltered {
 				if err != nil {
 					allErrs = append(allErrs, err)
 					continue
 				}
-				hiddenObjNum++
 				if err := printer.PrintObj(infos[ix].Object, out); err != nil {
 					allErrs = append(allErrs, err)
 				}
 			}
 		}
 
-		printer.FinishPrint(errOut, res, hiddenObjNum)
+		filter.PrintFilterCount(errOut, res)
 		return utilerrors.NewAggregate(allErrs)
 	}
 
@@ -361,7 +358,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	printer = nil
 	var lastMapping *meta.RESTMapping
 	w := kubectl.GetNewTabWriter(out)
-	hiddenObjNum := 0
 
 	if mustPrintWithKinds(objs, infos, sorter) {
 		showKind = true
@@ -380,8 +376,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
 			if printer != nil {
 				w.Flush()
-				printer.FinishPrint(errOut, lastMapping.Resource, hiddenObjNum)
-				hiddenObjNum = 0
+				filter.PrintFilterCount(errOut, lastMapping.Resource)
 			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
@@ -394,7 +389,6 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		// filter objects if filter has been defined for current object
 		if isFiltered, err := filter.Filter(original); isFiltered {
 			if err == nil {
-				hiddenObjNum++
 				continue
 			}
 			allErrs = append(allErrs, err)
@@ -431,7 +425,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 	w.Flush()
 	if printer != nil {
-		printer.FinishPrint(errOut, lastMapping.Resource, hiddenObjNum)
+		filter.PrintFilterCount(errOut, lastMapping.Resource)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }

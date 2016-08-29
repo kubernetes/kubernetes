@@ -155,7 +155,7 @@ type CustomColumnsPrinter struct {
 	NoHeaders bool
 }
 
-func (s *CustomColumnsPrinter) FinishPrint(w io.Writer, res string, hiddenObjectsNum int) error {
+func (s *CustomColumnsPrinter) FinishPrint(w io.Writer, res string) error {
 	return nil
 }
 
