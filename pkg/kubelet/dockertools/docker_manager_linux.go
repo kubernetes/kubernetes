@@ -1,5 +1,7 @@
 package dockertools
 
+import dockertypes "github.com/docker/engine-api/types"
+
 func getContainerIP(container *dockertypes.ContainerJSON) string {
 	if container.NetworkSettings != nil {
 		result = container.NetworkSettings.IPAddress
