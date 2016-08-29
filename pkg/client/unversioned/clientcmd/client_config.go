@@ -294,8 +294,13 @@ func (config *DirectClientConfig) ConfirmUsable() error {
 }
 
 func (config *DirectClientConfig) getContextName() (string, bool) {
+	requireCurrentContext := true
+	if config.overrides.IgnoreMissingContext {
+		requireCurrentContext = false
+	}
+
 	if len(config.overrides.CurrentContext) != 0 {
-		return config.overrides.CurrentContext, true
+		return config.overrides.CurrentContext, requireCurrentContext
 	}
 	if len(config.contextName) != 0 {
 		return config.contextName, false

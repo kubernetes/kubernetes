@@ -52,9 +52,10 @@ func TestKubectlValidation(t *testing.T) {
 	cluster.Server = components.ApiServer.URL
 	cluster.InsecureSkipTLSVerify = true
 	overrides := clientcmd.ConfigOverrides{
-		ClusterInfo:    *cluster,
-		Context:        *ctx,
-		CurrentContext: "test",
+		ClusterInfo:          *cluster,
+		Context:              *ctx,
+		CurrentContext:       "test",
+		IgnoreMissingContext: true,
 	}
 	cmdConfig := clientcmd.NewNonInteractiveClientConfig(*cfg, "test", &overrides, nil)
 	factory := util.NewFactory(cmdConfig)
