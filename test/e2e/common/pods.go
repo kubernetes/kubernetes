@@ -530,17 +530,13 @@ var _ = framework.KubeDescribe("Pods", func() {
 					{
 						Name:    "main",
 						Image:   "gcr.io/google_containers/busybox:1.24",
-						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 600"},
+						Command: []string{"/bin/sh", "-c", "echo container is alive; sleep 10000"},
 					},
 				},
 			},
 		}
 
 		By("submitting the pod to kubernetes")
-		defer func() {
-			By("deleting the pod")
-			podClient.Delete(pod.Name, api.NewDeleteOptions(0))
-		}()
 		podClient.CreateSync(pod)
 
 		req := f.Client.Get().
@@ -566,7 +562,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 				}
 				framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
 			}
-			if len(msg) == 0 {
+			if len(strings.TrimSpace(string(msg))) == 0 {
 				continue
 			}
 			buf.Write(msg)
