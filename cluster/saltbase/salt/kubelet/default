@@ -33,7 +33,7 @@
     # running on the master.
     {% if grains.kubelet_api_servers is defined -%}
       {% set api_servers_with_port = "--api-servers=https://" + grains.kubelet_api_servers -%}
-      {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false" -%}
+      {% set master_kubelet_args = master_kubelet_args + "--register-schedulable=false --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule" -%}
     {% else -%}
       {% set api_servers_with_port = "" -%}
     {% endif -%}

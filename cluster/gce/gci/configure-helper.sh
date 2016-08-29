@@ -507,6 +507,7 @@ function start-kubelet {
     if [[ ! -z "${KUBELET_APISERVER:-}" && ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
       flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
+      flags+=" --register-with-taints=node.alpha.kubernetes.io/ismaster=:NoSchedule"
     else
       # Standalone mode (not widely used?)
       flags+=" --pod-cidr=${MASTER_IP_RANGE}"
