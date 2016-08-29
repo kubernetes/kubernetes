@@ -140,6 +140,7 @@ enable-hostpath-provisioner
 enable-server
 enable-swagger-ui
 enable-garbage-collector
+etcd-address
 etcd-cafile
 etcd-certfile
 etcd-config
@@ -289,6 +290,7 @@ leader-elect
 leader-elect-lease-duration
 leader-elect-renew-deadline
 leader-elect-retry-period
+lease-duration
 leave-stdin-open
 limit-bytes
 load-balancer-ip
@@ -501,6 +503,7 @@ tls-cert-file
 tls-private-key-file
 to-version
 token-auth-file
+ttl-keys-prefix
 ttl-secs
 type-src
 udp-port
