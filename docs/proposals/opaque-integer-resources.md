@@ -19,9 +19,10 @@
       * [Implementation](#implementation)
         * [Notable consequences](#notable-consequences)
     * [Related issues](#related-issues)
-    * [Usage Example](#usage-example)
+    * [Usage Summary](#usage-summary)
       * [Advertising Opaque Integer Resources](#advertising-opaque-integer-resources)
       * [Consuming Opaque Integer Resources](#consuming-opaque-integer-resources)
+    * [Example](#usage-example)
 
 # Accounting and Consuming Opaque Node-Level Integer Resources
 
@@ -74,18 +75,12 @@ Kubelet assumes that it controls node status. After updating the NodeStatus obje
 Initially, it looks like there are two main approaches to resolving this. The first is to impose ordering such that NodeStatus updates are read by the Kubelet before validating any more pods. The second is to maintain the single-writer pattern by providing a way to tell Kubelet to update the NodeStatus.
 
 Options:
+
 1. When updating NodeStatus from the API server, we could also set some condition or taint that prevents pods from being scheduled there until it is cleared on the next sync.
 2. Update the Kubelet first and let it advertise the new resources in NodeStatus when it syncs.
-3. Since in Kubelet allocatable defaults to capacity on sync, and the scheduler looks at the Status.Allocatable field to make scheduling decisions, we could do the following.
-	- Note: this doesn’t support the case where some opaque integer resource is being used outside of k8s, and that usage needs to be accounted in delta between allocatable and capacity. A simple workaround could be to only advertise the allocatable amount. That seems like a bit of a hack so maybe this option is only useful as the basis for a PoC.
+3. Since in Kubelet allocatable defaults to capacity on sync, and the scheduler looks at the Status.Allocatable field to make scheduling decisions, we could do the following. First, advertise the resource in `Status.Capacity` only using `PATCH`. On sync, Kubelet updates `Status.Allocatable` for the opaque integer resource, setting it equal to `Status.Capacity`. Finally, the scheduler is able to bind pods there. _Note: this doesn’t support the case where some opaque integer resource is being used outside of k8s, and that usage needs to be accounted in delta between allocatable and capacity. A simple workaround could be to only advertise the allocatable amount. That seems like a bit of a hack so maybe this option is only useful as the basis for a PoC._
 
-	- A PoC implementation of this approach is here: https://github.com/intelsdi-x/kubernetes/pull/2
-
-		- Advertise resource in `Status.Capacity` only using `PATCH`. 
-		- On sync, Kubelet updates `Status.Allocatable` for the opaque integer resource, setting it equal to `Status.Capacity`. 
-		- Scheduler is able to bind pods there. 
-
-## PoC implementation - detailed changes 
+## PoC implementation (option 3) - detailed changes
 
 ### Changes to Kubelet
 Edit the Kubelet node status update code to avoid overwriting advertised opaque integer resource capacity.
@@ -100,16 +95,16 @@ Edit function PodFitsResources in the file `plugin/pkg/scheduler/algorithm/predi
 #### Notable consequences
 - The Kubelet shares similar logic (actually it uses the same validation code). We need to be aware of potential failures that can arise due to the distributed nature of capacity with this proposal. Opaque resource discovery happens before scheduling any pod that requires that opaque integer resource.
 - After opaque integer resource availability is advertised, users can require them in pods right away and the vanilla scheduler takes care of accounting and feasibility.
-- Low computational overhead in scheduler (expected to be roughly linear in number of opaque integer resource types in request, and we are not expecting 100’s of opaque integer resources requested by each pod but rather 1’s. E.g., 1 FPGA/GPU, 1 Flash card, some queue here and there.) 
+- Low computational overhead in scheduler (expected to be roughly linear in number of opaque integer resource types in request, and we are not expecting 100’s of opaque integer resources requested by each pod but rather 1’s. E.g., 1 FPGA/GPU, 1 Flash card, some queue here and there.)
 
 ## Related issues
 1. Accounting and feasibility for custom integer resources in the API server and scheduler. ([#28312][gh-issue-28312])
 2. Create an opaque integer resource. ([#19082][gh-issue-19082]).
 
-## Usage Example
+## Usage Summary
 
 ### Advertising Opaque Integer Resources
-Opaque integer resources are advertised by patching the node capcity via the api server. The following example shows an example script used for patching the node capacity via the api server. 
+Opaque integer resources are advertised by patching the node capcity via the api server. The following example shows an example script used for patching the node capacity via the api server.
 
 ```sh
 #!/bin/bash
@@ -122,19 +117,19 @@ curl --header "Content-Type:application/json-patch+json" \
 where,
 
 - `<resource-name>` is the name of the opaque integer resource being advertised. 
-- `<integer-value>` is the number of the opaque integer resource available on the node. This value must be an integer. 
-- `<apiserver-host>` is the hostname or the IP of the kube-apiserver. 
-- `<apiserver-port>` is the port on which the kube-apiserver is listening. 
+- `<integer-value>` is the number of the opaque integer resource available on the node. This value must be an integer.
+- `<apiserver-host>` is the hostname or the IP of the kube-apiserver.
+- `<apiserver-port>` is the port on which the kube-apiserver is listening.
 - `<node-name>` is the name of the node for which we want to update the capacity.
 
-With appropriate changes, the above script will update the capacity of the node. In the next sync with the api server, the kubelet corresponding to the node will update its own `capacity` and `allocatable`. Subsequently, the scheduler on its next sync with the api server updates the value of allocatable resource in its own cache. 
+With appropriate changes, the above script will update the capacity of the node. In the next sync with the api server, the kubelet corresponding to the node will update its own `capacity` and `allocatable`. Subsequently, the scheduler on its next sync with the api server updates the value of allocatable resource in its own cache.
 
 
 ### Consuming Opaque Integer Resources
 
-After the advertisement of the opaque integer resource as explained above, it is ready to be consumed like a regular resource (e.g., CPU or memory). The following spec shows how to configure a pod to consume an opaque integer resource called `resource1`. Assuming that there are enough resources available to be allocated, the scheduler will bind this pod to the appropriate node in the Kubernetes cluster. 
+After the advertisement of the opaque integer resource as explained above, it is ready to be consumed like a regular resource (e.g., CPU or memory). The following spec shows how to configure a pod to consume an opaque integer resource called `resource1`. Assuming that there are enough resources available to be allocated, the scheduler will bind this pod to the appropriate node in the Kubernetes cluster.
 
-```yaml 
+```yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -156,5 +151,227 @@ spec:
           opaque-int.alpha.kubernetes.io/resource1: "6"
  ```
 
-[gh-issue-28312]: https://github.com/kubernetes/kubernetes/issues/28312 
+## Usage Example
+
+```sh
+$ echo '[{"op": "add", "path":
+"/status/capacity/opaque-int.alpha.kubernetes.io~1bananas", "value":
+"555"}]' | \
+> http PATCH
+> http://localhost:8080/api/v1/nodes/localhost.localdomain/status \
+> Content-Type:application/json-patch+json
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+Date: Thu, 11 Aug 2016 16:44:55 GMT
+Transfer-Encoding: chunked
+
+{
+    "apiVersion": "v1",
+    "kind": "Node",
+    "metadata": {
+        "annotations": {
+            "volumes.kubernetes.io/controller-managed-attach-detach": "true"
+        },
+        "creationTimestamp": "2016-07-12T04:07:43Z",
+        "labels": {
+            "beta.kubernetes.io/arch": "amd64",
+            "beta.kubernetes.io/os": "linux",
+            "kubernetes.io/hostname": "localhost.localdomain"
+        },
+        "name": "localhost.localdomain",
+        "resourceVersion": "12837",
+        "selfLink": "/api/v1/nodes/localhost.localdomain/status",
+        "uid": "2ee9ea1c-47e6-11e6-9fb4-525400659b2e"
+    },
+    "spec": {
+        "externalID": "localhost.localdomain"
+    },
+    "status": {
+        "addresses": [
+            {
+                "address": "10.0.2.15",
+                "type": "LegacyHostIP"
+            },
+            {
+                "address": "10.0.2.15",
+                "type": "InternalIP"
+            }
+        ],
+        "allocatable": {
+            "alpha.kubernetes.io/nvidia-gpu": "0",
+            "cpu": "2",
+            "memory": "8175808Ki",
+            "pods": "110"
+        },
+        "capacity": {
+            "alpha.kubernetes.io/nvidia-gpu": "0",
+            "opaque-int.alpha.kubernetes.io/bananas": "555",
+            "cpu": "2",
+            "memory": "8175808Ki",
+            "pods": "110"
+        },
+        "conditions": [
+            {
+                "lastHeartbeatTime": "2016-08-11T16:44:47Z",
+                "lastTransitionTime": "2016-07-12T04:07:43Z",
+                "message": "kubelet has sufficient disk space available",
+                "reason": "KubeletHasSufficientDisk",
+                "status": "False",
+                "type": "OutOfDisk"
+            },
+            {
+                "lastHeartbeatTime": "2016-08-11T16:44:47Z",
+                "lastTransitionTime": "2016-07-12T04:07:43Z",
+                "message": "kubelet has sufficient memory available",
+                "reason": "KubeletHasSufficientMemory",
+                "status": "False",
+                "type": "MemoryPressure"
+            },
+            {
+                "lastHeartbeatTime": "2016-08-11T16:44:47Z",
+                "lastTransitionTime": "2016-08-10T06:27:11Z",
+                "message": "kubelet is posting ready status",
+                "reason": "KubeletReady",
+                "status": "True",
+                "type": "Ready"
+            },
+            {
+                "lastHeartbeatTime": "2016-08-11T16:44:47Z",
+                "lastTransitionTime": "2016-08-10T06:27:01Z",
+                "message": "kubelet has no disk pressure",
+                "reason": "KubeletHasNoDiskPressure",
+                "status": "False",
+                "type": "DiskPressure"
+            }
+        ],
+        "daemonEndpoints": {
+            "kubeletEndpoint": {
+                "Port": 10250
+            }
+        },
+        "images": [],
+        "nodeInfo": {
+            "architecture": "amd64",
+            "bootID": "1f7e95ca-a4c2-490e-8ca2-6621ae1eb5f0",
+            "containerRuntimeVersion": "docker://1.10.3",
+            "kernelVersion": "4.5.7-202.fc23.x86_64",
+            "kubeProxyVersion": "v1.3.0-alpha.4.4285+7e4b86c96110d3-dirty",
+            "kubeletVersion": "v1.3.0-alpha.4.4285+7e4b86c96110d3-dirty",
+            "machineID": "cac4063395254bc89d06af5d05322453",
+            "operatingSystem": "linux",
+            "osImage": "Fedora 23 (Cloud Edition)",
+            "systemUUID": "D6EE0782-5DEB-4465-B35D-E54190C5EE96"
+        }
+    }
+}
+```
+
+After patching, the kubelet's next sync fills in allocatable:
+
+```
+$ kubectl get node localhost.localdomain -o json | jq .status.allocatable
+```
+
+```json
+{
+  "alpha.kubernetes.io/nvidia-gpu": "0",
+  "opaque-int.alpha.kubernetes.io/bananas": "555",
+  "cpu": "2",
+  "memory": "8175808Ki",
+  "pods": "110"
+}
+```
+
+Create two pods, one that needs a single banana and another that needs a
+truck load:
+
+```
+$ kubectl create -f chimp.yaml
+$ kubectl create -f superchimp.yaml
+```
+
+Inspect the scheduler result and pod status:
+
+```
+$ kubectl describe pods chimp
+Name:           chimp
+Namespace:      default
+Node:           localhost.localdomain/10.0.2.15
+Start Time:     Thu, 11 Aug 2016 19:58:46 +0000
+Labels:         <none>
+Status:         Running
+IP:             172.17.0.2
+Controllers:    <none>
+Containers:
+  nginx:
+    Container ID:       docker://46ff268f2f9217c59cc49f97cc4f0f085d5ac0e251f508cc08938601117c0cec
+    Image:              nginx:1.10
+    Image ID:           docker://sha256:82e97a2b0390a20107ab1310dea17f539ff6034438099384998fd91fc540b128
+    Port:               80/TCP
+    Limits:
+      cpu:                                      500m
+      memory:                                   64Mi
+      opaque-int.alpha.kubernetes.io/bananas:   3
+    Requests:
+      cpu:                                      250m
+      memory:                                   32Mi
+      opaque-int.alpha.kubernetes.io/bananas:   1
+    State:                                      Running
+      Started:                                  Thu, 11 Aug 2016 19:58:51 +0000
+    Ready:                                      True
+    Restart Count:                              0
+    Volume Mounts:                              <none>
+    Environment Variables:                      <none>
+Conditions:
+  Type          Status
+  Initialized   True
+  Ready         True
+  PodScheduled  True
+No volumes.
+QoS Class:      Burstable
+Events:
+  FirstSeen     LastSeen        Count   From SubobjectPath              Type                    Reason                  Message
+  ---------     --------        -----   ---- -------------              --------                ------                  -------
+  9m            9m              1       {default-scheduler }            Normal                  Scheduled               Successfully assigned chimp to localhost.localdomain
+  9m            9m              2       {kubelet localhost.localdomain} Warning                 MissingClusterDNS       kubelet does not have ClusterDNS IP configured and cannot create Pod using "ClusterFirst" policy. Falling back to DNSDefault policy.
+  9m            9m              1       {kubelet localhost.localdomain} spec.containers{nginx}  Normal                  Pulled Container image "nginx:1.10" already present on machine
+  9m            9m              1       {kubelet localhost.localdomain} spec.containers{nginx}  Normal                  Created container with docker id 46ff268f2f92
+  9m            9m              1       {kubelet localhost.localdomain} spec.containers{nginx}  Normal                  Started container with docker id 46ff268f2f92
+```
+
+```
+$ kubectl describe pods superchimp
+Name:           superchimp
+Namespace:      default
+Node:           /
+Labels:         <none>
+Status:         Pending
+IP:
+Controllers:    <none>
+Containers:
+  nginx:
+    Image:      nginx:1.10
+    Port:       80/TCP
+    Requests:
+      cpu:                                      250m
+      memory:                                   32Mi
+      opaque-int.alpha.kubernetes.io/bananas:   10Ki
+    Volume Mounts:                              <none>
+    Environment Variables:                      <none>
+Conditions:
+  Type          Status
+  PodScheduled  False
+No volumes.
+QoS Class:      Burstable
+Events:
+  FirstSeen     LastSeen        Count   From SubobjectPath   Type            Reason                  Message
+  ---------     --------        -----   ---- -------------   --------        ------                  -------
+  3m            1s              15      {default-scheduler } Warning         FailedScheduling        pod (superchimp) failed to fit in any node
+fit failure on node (localhost.localdomain): Insufficient opaque-int.alpha.kubernetes.io/bananas
+```
+
+[gh-issue-28312]: https://github.com/kubernetes/kubernetes/issues/28312
 [gh-issue-19082]: https://github.com/kubernetes/kubernetes/issues/19082
