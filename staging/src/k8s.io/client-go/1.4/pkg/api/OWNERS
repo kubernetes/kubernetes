@@ -1,6 +1,7 @@
-reviewers:
+approvers:
 - bgrant0607
 - erictune
 - lavalamp
 - smarterclayton
 - thockin
+reviewers: []

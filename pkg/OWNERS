@@ -1,6 +1,7 @@
-reviewers:
+approvers:
 - brendandburns
 - dchen1107
 - lavalamp
 - smarterclayton
 - thockin
+reviewers: []

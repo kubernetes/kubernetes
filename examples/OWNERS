@@ -1,5 +1,6 @@
-reviewers:
+approvers:
 - bgrant0607
 - brendandburns
 - thockin
 - zmerlynn
+reviewers: []
