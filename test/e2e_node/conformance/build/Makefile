@@ -28,9 +28,10 @@ TEMP_DIR:=$(shell mktemp -d)
 UNAME_S:=$(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
 	SED_CMD?=sed -i ""
-endif
-ifeq ($(UNAME_S),Linux)
+else ifeq ($(UNAME_S),Linux)
 	SED_CMD?=sed -i
+else
+$(error Unsupported operating system - $(UNAME_S))
 endif
 
 ifeq ($(ARCH),amd64)
@@ -38,15 +39,12 @@ ifeq ($(ARCH),amd64)
 endif
 ifeq ($(ARCH),arm)
 	BASEIMAGE?=armel/debian:jessie
-	QEMUARCH=arm
 endif
 ifeq ($(ARCH),arm64)
 	BASEIMAGE?=aarch64/debian:jessie
-	QEMUARCH=aarch64
 endif
 ifeq ($(ARCH),ppc64le)
 	BASEIMAGE?=ppc64le/debian:jessie
-	QEMUARCH=ppc64le
 endif
 
 all: build
@@ -61,7 +59,6 @@ endif
 	cp ${BIN_DIR}/ginkgo ${TEMP_DIR}
 	cp ${BIN_DIR}/e2e_node.test ${TEMP_DIR}
 
-	cd ${TEMP_DIR} && sed -i.back "s|ARCH|${QEMUARCH}|g" Dockerfile
 	cd ${TEMP_DIR} && sed -i.back "s|BASEIMAGE|${BASEIMAGE}|g" Dockerfile
 
 	# Make scripts executable before they are copied into the Docker image. If we make them executable later, in another layer
@@ -70,25 +67,9 @@ endif
 		e2e_node.test \
 		ginkgo
 
-ifeq ($(ARCH),amd64)
-	# When building "normally" for amd64, remove the whole line, it has no part in the amd64 image
-	cd ${TEMP_DIR} && ${SED_CMD} "/CROSS_BUILD_/d" Dockerfile
-else
-	cd ${TEMP_DIR} && ${SED_CMD} "s/CROSS_BUILD_//g" Dockerfile
-
-	# When cross-building, only the placeholder "CROSS_BUILD_" should be removed
-	# Register /usr/bin/qemu-ARCH-static as the handler for ARM binaries in the kernel
-	docker run --rm --privileged multiarch/qemu-user-static:register --reset
-	curl -sSL --retry 5 https://github.com/multiarch/qemu-user-static/releases/download/v2.5.0/x86_64_qemu-${QEMUARCH}-static.tar.xz | tar -xJ -C ${TEMP_DIR}
-endif
-
 	docker build -t ${REGISTRY}/node-test-${ARCH}:${VERSION} ${TEMP_DIR}
 
 push: build
 	gcloud docker push ${REGISTRY}/node-test-${ARCH}:${VERSION}
-ifeq ($(ARCH),amd64)
-	docker tag -f ${REGISTRY}/node-test-${ARCH}:${VERSION} ${REGISTRY}/node-test:${VERSION}
-	gcloud docker push ${REGISTRY}/node-test:${VERSION}
-endif
 
 .PHONY: all

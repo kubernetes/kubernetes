@@ -43,14 +43,6 @@ import (
 // TODO(random-liu): Move this file to a separate package.
 var serverStartTimeout = flag.Duration("server-start-timeout", time.Second*120, "Time to wait for each server to become healthy.")
 
-// TODO(random-liu): Move kubelet start logic out of the test.
-// TODO(random-liu): Move log fetch logic out of the test.
-// There are different ways to start kubelet (systemd, initd, docker, rkt, manually started etc.)
-// and manage logs (journald, upstart etc.).
-// For different situation we need to mount different things into the container, run different commands.
-// It is hard and unnecessary to deal with the complexity inside the test suite.
-var containerize = flag.Bool("containerize", false, "If true, the test suite will not start kubelet, and fetch system log (kernel, docker, kubelet log etc.) to the report directory.")
-
 // E2EServices starts and stops e2e services in a separate process. The test uses it to start and
 // stop all e2e services.
 type E2EServices struct {
@@ -71,7 +63,7 @@ const servicesLogFile = "services.log"
 // services-mode to start e2e services in another process.
 func (e *E2EServices) Start() error {
 	var err error
-	if !*containerize {
+	if !framework.TestContext.NodeConformance {
 		// Create the manifest path for kubelet.
 		// TODO(random-liu): Remove related logic when we move kubelet starting logic out of the test.
 		framework.TestContext.ManifestPath, err = ioutil.TempDir("", "node-e2e-pod")
@@ -89,7 +81,7 @@ func (e *E2EServices) Start() error {
 		"--report-dir", framework.TestContext.ReportDir,
 		// TODO(random-liu): Remove the following flags after we move kubelet starting logic
 		// out of the test.
-		"--containerize="+strconv.FormatBool(*containerize),
+		"--conformance="+strconv.FormatBool(framework.TestContext.NodeConformance),
 		"--node-name", framework.TestContext.NodeName,
 		"--disable-kubenet="+strconv.FormatBool(framework.TestContext.DisableKubenet),
 		// TODO: enable when flag is introduced in 1.5
@@ -106,7 +98,7 @@ func (e *E2EServices) Start() error {
 // Stop stops the e2e services.
 func (e *E2EServices) Stop() error {
 	defer func() {
-		if !*containerize {
+		if !framework.TestContext.NodeConformance {
 			// Cleanup the manifest path for kubelet.
 			manifestPath := framework.TestContext.ManifestPath
 			if manifestPath != "" {
@@ -219,7 +211,7 @@ func (es *e2eService) start() error {
 		return err
 	}
 
-	if !*containerize {
+	if !framework.TestContext.NodeConformance {
 		s, err := es.startKubeletServer()
 		if err != nil {
 			return err
@@ -294,7 +286,7 @@ func isJournaldAvailable() bool {
 
 func (es *e2eService) stop() {
 	glog.Info("Stopping e2e services...")
-	if !*containerize {
+	if !framework.TestContext.NodeConformance {
 		es.getLogFiles()
 	}
 	// TODO(random-liu): Use a loop to stop all services after introducing service interface.

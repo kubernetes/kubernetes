@@ -13,9 +13,6 @@
 # limitations under the License.
 
 FROM BASEIMAGE
-# If we're building for another architecture than amd64, the CROSS_BUILD_ placeholder is removed so e.g. CROSS_BUILD_COPY turns into COPY
-# If we're building normally, for amd64, CROSS_BUILD lines are removed
-CROSS_BUILD_COPY qemu-ARCH-static /usr/bin/
 
 COPY ginkgo /usr/local/bin/
 COPY e2e_node.test /usr/local/bin
@@ -28,4 +25,4 @@ COPY e2e_node.test /usr/local/bin
 # MANIFEST_PATH is the kubelet manifest path in the container.
 ENV FOCUS="\[Conformance\]" SKIP="" PARALLELISM=8 REPORT_PATH="/var/result" MANIFEST_PATH="/etc/manifest"
 
-ENTRYPOINT ginkgo --focus="$FOCUS" --skip="$SKIP" --nodes=$PARALLELISM /usr/local/bin/e2e_node.test -- --containerize=true --prepull-images=false --manifest-path=$MANIFEST_PATH --report-dir=$REPORT_PATH
+ENTRYPOINT ginkgo --focus="$FOCUS" --skip="$SKIP" --nodes=$PARALLELISM /usr/local/bin/e2e_node.test -- --conformance=true --prepull-images=false --manifest-path=$MANIFEST_PATH --report-dir=$REPORT_PATH
