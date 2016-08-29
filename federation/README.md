@@ -17,23 +17,42 @@ as explained in that guide, you also need to install [`jq`](https://stedolan.git
      which this workflow depends, so we are giving an exception to jq
      for now. -->
 
-Building cluster federation should be as simple as running:
+Building cluster federation artifacts should be as simple as running:
 
 ```shell
-make build do=gen
+make build
 ```
 
-To deploy clusters and install federation components, edit the
-`config.default.json` file to describe your clusters and run
+You can specify the docker registry to tag the image using the
+KUBE_REGISTRY environment variable. Please make sure that you use
+the same value in all the subsequent commands.
+
+To push the built docker images to the registry, run:
 
 ```shell
-make build do=deploy
+make push
+```
+
+To initialize the deployment run:
+
+(This pull the installer images)
+
+```shell
+make init
+```
+
+To deploy the clusters and install the federation components, edit the
+`${KUBE_ROOT}/_output/federation/config.json` file to describe your
+clusters and run:
+
+```shell
+make deploy
 ```
 
 To turn down the federation components and tear down the clusters run:
 
 ```shell
-make build do=destroy
+make destroy
 ```
 
 # Ideas for improvement
