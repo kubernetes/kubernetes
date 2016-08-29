@@ -164,6 +164,7 @@ root access if you cannot run docker containers as non-root. In many Linux or OS
 ```sh
 cd kubernetes
 make
+# Only on Mac: KUBE_BUILD_PLATFORMS=linux/amd64 make
 hack/dind-up-cluster.sh
 ```
 

@@ -41,11 +41,8 @@ find-binary() {
 
 hyperkube_path=$(find-binary hyperkube linux/amd64)
 if [ -z "$hyperkube_path" ]; then
-  hyperkube_path=$(find-binary hyperkube darwin/amd64)
-  if [ -z "$hyperkube_path" ]; then
-    echo "Failed to find hyperkube binary" 1>&2
-    exit 1
-  fi
+  echo "Failed to find hyperkube binary for linux/amd64" 1>&2
+  exit 1
 fi
 kube_bin_path=$(dirname ${hyperkube_path})
 
