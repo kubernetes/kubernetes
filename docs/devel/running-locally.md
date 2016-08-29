@@ -148,6 +148,53 @@ cluster/kubectl.sh create -f test/fixtures/doc-yaml/user-guide/pod.yaml
 
 Congratulations!
 
+### Optional: Running a local cluster with multiple nodes
+
+The local cluster described above only consists of one node. Many end-to-end tests require more than one node.
+The easiest way to launch a local multi-node cluster is with the docker-in-docker `hack/dind-up-cluster.sh` script. You will
+need:
+
+- docker-compose 1.5.0 or later
+- either `overlay` or `aufs` (often on Ubuntu) support in your kernel. Try `sudo modprobe overlay` or
+  `sudo modprobe aufs` if the following commands complains about it.
+
+To start up the docker-in-docker cluster, type the following in a terminal. Note that you only might need
+root access if you cannot run docker containers as non-root. In many Linux or OSX setups root is not necessary though:
+
+```sh
+cd kubernetes
+make
+# only on Mac: build/run.sh make WHAT=cmd/hyperkube
+hack/dind-up-cluster.sh
+```
+
+As before you can use `cluster/kubectl.sh`, e.g.:
+
+```sh
+cluster/kubectl.sh create -f docs/user-guide/pod.yaml
+```
+
+Note that kube-dns and the kubernetes-dashboard are deployed. The `dind-up-cluster.sh` command above will print the URLs to
+access the Dashboard (user  `admin`, password `admin`) at the end of its run.
+
+To stop your cluster:
+
+```sh
+hack/dind-down-cluster.sh
+```
+
+In `hack/dind/config.sh` you will find a number of options to customized.
+
+If you use boot2docker, `APISERVER_ADDRESS=boot2docker` will let kubectl access the cluster not via `localhost` (the default), but through the docker VM.
+
+You can run e2e tests like this:
+
+```sh
+_output/local/bin/<OS>/<ARCH>/e2e.test --provider=dind \
+  --kubeconfig ~/.kube/config -ginkgo.v=true \
+  --host=https://localhost:6443 -ginkgo.focus="some.e2e.describe.pattern"
+```
+
 ### Troubleshooting
 
 #### I cannot reach service IPs on the network.
