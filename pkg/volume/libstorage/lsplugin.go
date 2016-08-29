@@ -17,17 +17,13 @@ limitations under the License.
 package libstorage
 
 import (
-	"fmt"
-
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/types"
+	"k8s.io/kubernetes/pkg/util/keymutex"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 
-	"github.com/akutz/gofig"
 	"github.com/golang/glog"
-
-	lsctx "github.com/emccode/libstorage/api/context"
-	lstypes "github.com/emccode/libstorage/api/types"
-	lsclient "github.com/emccode/libstorage/client"
 )
 
 const (
@@ -36,47 +32,192 @@ const (
 
 type lsPlugin struct {
 	host volume.VolumeHost
-
-	lsHost  string
-	service string
-	client  lstypes.Client
-	ctx     lstypes.Context
-	cfg     gofig.Config
+	lsMgr
 }
 
-// Helper methods
-
-func (p *lsPlugin) getLibStorageSource(spec *volume.Spec) (*api.LibStorageVolumeSource, error) {
-	if spec.Volume != nil && spec.Volume.LibStorage != nil {
-		return spec.Volume.LibStorage, nil
+func ProbeVolumePlugins() []volume.VolumePlugin {
+	p := &lsPlugin{
+		host: nil,
 	}
-	if spec.PersistentVolume != nil &&
-		spec.PersistentVolume.Spec.LibStorage != nil {
-		return spec.PersistentVolume.Spec.LibStorage, nil
-	}
-
-	return nil, fmt.Errorf("LibStorage is not found in spec")
+	return []volume.VolumePlugin{p}
 }
 
-func (p *lsPlugin) initLibStorage(lsHost, service string) error {
-	glog.V(4).Infoln("LibStorage init")
-	cfg := gofig.New()
-	ctx := lsctx.Background()
-	ctx = ctx.WithValue(lsctx.ServiceKey, service)
-	p.ctx = ctx
-	p.cfg = cfg
+// *******************
+// VolumePlugin Impl
+// *******************
+var _ volume.VolumePlugin = &lsPlugin{}
+
+func (p *lsPlugin) Init(host volume.VolumeHost) error {
+	p.host = host
 	return nil
 }
 
-func (p *lsPlugin) getClient() (lstypes.Client, error) {
-	if p.client == nil {
-		client, err := lsclient.New(p.ctx, p.cfg)
-		if err != nil {
-			glog.Errorf("LibStorage client initialization failed: %s\n", err)
-			return nil, err
-		}
-		p.client = client
-		return p.client, nil
+func (p *lsPlugin) GetPluginName() string {
+	return lsPluginName
+}
+
+func (p *lsPlugin) GetVolumeName(spec *volume.Spec) (string, error) {
+	source, err := getLibStorageSource(spec)
+	if err != nil {
+		return "", err
 	}
-	return p.client, nil
+	return source.VolumeName, nil
+}
+
+func (p *lsPlugin) CanSupport(spec *volume.Spec) bool {
+	return (spec.PersistentVolume != nil && spec.PersistentVolume.Spec.LibStorage != nil) ||
+		(spec.Volume != nil && spec.Volume.LibStorage != nil)
+}
+
+func (p *lsPlugin) RequiresRemount() bool {
+	return false
+}
+
+func (p *lsPlugin) NewMounter(
+	spec *volume.Spec,
+	pod *api.Pod,
+	_ volume.VolumeOptions) (volume.Mounter, error) {
+
+	lsSource, err := getLibStorageSource(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.V(4).Infof("libStorage: creating new Mounter for volume %v", lsSource.VolumeName)
+
+	if p.lsMgr == nil {
+		p.lsMgr = newLibStorageMgr(lsSource.Host, lsSource.Service)
+	}
+
+	return &lsVolume{
+		podUID:   pod.UID,
+		volName:  lsSource.VolumeName,
+		fsType:   lsSource.FSType,
+		mounter:  mount.New(),
+		plugin:   p,
+		readOnly: spec.ReadOnly,
+		k8mtx:    keymutex.NewKeyMutex(),
+	}, nil
+}
+
+func (p *lsPlugin) NewUnmounter(name string, podUID types.UID) (volume.Unmounter, error) {
+	glog.V(4).Infof("libStorage: creating new UnMounter for volume %v\n", name)
+	return &lsVolume{
+		podUID:  podUID,
+		volName: name,
+		plugin:  p,
+		mounter: mount.New(),
+	}, nil
+}
+
+func (p *lsPlugin) ConstructVolumeSpec(volumeName, mountPath string) (*volume.Spec, error) {
+	glog.V(4).Infof("libStorage: ConstructVolumeSpec(volume=%v, mountPath=%v)", volumeName, mountPath)
+	lsVolumeSpec := &api.Volume{
+		Name: volumeName,
+		VolumeSource: api.VolumeSource{
+			LibStorage: &api.LibStorageVolumeSource{
+				Host:       p.lsMgr.getHost(),
+				Service:    p.lsMgr.getService(),
+				VolumeName: volumeName,
+			},
+		},
+	}
+	return volume.NewSpecFromVolume(lsVolumeSpec), nil
+}
+
+//******************************
+// PersistentVolumePlugin Impl
+// *****************************
+var _ volume.PersistentVolumePlugin = &lsPlugin{}
+
+func (p *lsPlugin) GetAccessModes() []api.PersistentVolumeAccessMode {
+	return []api.PersistentVolumeAccessMode{
+		api.ReadWriteOnce,
+	}
+}
+
+//******************************
+// AttachableVolumePlugin Impl
+//******************************
+var _ volume.AttachableVolumePlugin = &lsPlugin{}
+
+func (p *lsPlugin) NewAttacher() (volume.Attacher, error) {
+	return &lsVolume{
+		mounter: p.host.GetMounter(),
+		plugin:  p,
+	}, nil
+}
+
+func (p *lsPlugin) NewDetacher() (volume.Detacher, error) {
+	return &lsVolume{
+		mounter: p.host.GetMounter(),
+		plugin:  p,
+	}, nil
+}
+
+func (p *lsPlugin) GetDeviceMountRefs(deviceMountPath string) ([]string, error) {
+	mounter := p.host.GetMounter()
+	return mount.GetMountRefs(mounter, deviceMountPath)
+}
+
+// ***************************
+// DeletableVolumePlugin Impl
+//****************************
+var _ volume.DeletableVolumePlugin = &lsPlugin{}
+
+func (p *lsPlugin) NewDeleter(spec *volume.Spec) (volume.Deleter, error) {
+	lsSource, err := getLibStorageSource(spec)
+	if err != nil {
+		return nil, err
+	}
+
+	glog.V(4).Infof("libStorage: creating new Deleter for volume %v\n", lsSource.VolumeName)
+
+	if p.lsMgr == nil {
+		p.lsMgr = newLibStorageMgr(lsSource.Host, lsSource.Service)
+	}
+
+	return &lsVolume{
+		volName:  lsSource.VolumeName,
+		fsType:   lsSource.FSType,
+		mounter:  mount.New(),
+		plugin:   p,
+		readOnly: spec.ReadOnly,
+		k8mtx:    keymutex.NewKeyMutex(),
+	}, nil
+}
+
+// *********************************
+// ProvisionableVolumePlugin Impl
+// *********************************
+var _ volume.ProvisionableVolumePlugin = &lsPlugin{}
+
+func (p *lsPlugin) NewProvisioner(options volume.VolumeOptions) (volume.Provisioner, error) {
+	glog.V(4).Info("libStorage: creating Provisioner")
+	if len(options.AccessModes) == 0 {
+		options.AccessModes = p.GetAccessModes()
+	}
+
+	// extract libstorage configs
+	volName := options.Parameters["volumeName"]
+	lsHost := options.Parameters["host"]
+	lsServ := options.Parameters["service"]
+	fsType := options.Parameters["fsType"]
+
+	if p.lsMgr == nil {
+		p.lsMgr = newLibStorageMgr(lsHost, lsServ)
+	}
+
+	return &lsVolume{
+		volName: volName,
+		fsType:  fsType,
+		plugin:  p,
+		options: options,
+	}, nil
+}
+
+func (p *lsPlugin) resetMgr(host, service string) {
+	if p.lsMgr == nil {
+		p.lsMgr = newLibStorageMgr(host, service)
+	}
 }
