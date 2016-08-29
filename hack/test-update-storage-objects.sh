@@ -100,6 +100,7 @@ function cleanup() {
 trap cleanup EXIT SIGINT
 
 make -C "${KUBE_ROOT}" WHAT=cmd/kube-apiserver
+make -C "${KUBE_ROOT}" WHAT=cluster/images/etcd/attachlease
 
 kube::etcd::start
 
@@ -159,7 +160,9 @@ killApiServer
 kube::etcd::stop
 TARGET_STORAGE="etcd3" \
   DATA_DIRECTORY="${ETCD_DIR}" \
+  ETCD=$(which etcd) \
   ETCDCTL=$(which etcdctl) \
+  ATTACHLEASE="${KUBE_OUTPUT_HOSTBIN}/attachlease" \
   ${KUBE_ROOT}/cluster/images/etcd/migrate-if-needed.sh
 kube::etcd::start
 
