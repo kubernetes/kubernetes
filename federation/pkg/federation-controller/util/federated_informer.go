@@ -85,9 +85,9 @@ type FederationView interface {
 	ClustersSynced() bool
 }
 
-// A structure that combines an informer running agains federated api server and listening for cluster updates
+// A structure that combines an informer running against federated api server and listening for cluster updates
 // with multiple Kubernetes API informers (called target informers) running against federation members. Whenever a new
-// cluster is added to the federation an informer is created for it using TargetInformerFactory. Infomrers are stoped
+// cluster is added to the federation an informer is created for it using TargetInformerFactory. Informers are stoped
 // when a cluster is either put offline of deleted. It is assumed that some controller keeps an eye on the cluster list
 // and thus the clusters in ETCD are up to date.
 type FederatedInformer interface {
