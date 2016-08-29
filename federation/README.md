@@ -35,7 +35,7 @@ make push
 
 To initialize the deployment run:
 
-(This pull the installer images)
+(This pulls the installer images)
 
 ```shell
 make init
