@@ -54,6 +54,10 @@ Prerequisites:
   - Or make etcd binary available and executable at `/tmp/etcd`
 - [Install ginkgo](https://github.com/onsi/ginkgo) on your PATH
   - Verify ginkgo is installed correctly by running `which ginkgo`
+- [gcloud](https://cloud.google.com/sdk/) on your PATH
+  - Verify gcloud is installed correctly by running `which gcloud`
+  - Use `gcloud init` to login an account
+  - This will not charge you anything
 
 From the Kubernetes base directory, run:
 
