@@ -18,14 +18,15 @@ package e2e
 
 import (
 	"fmt"
+	"time"
 
 	. "github.com/onsi/ginkgo"
-	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
+	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-
-	. "github.com/onsi/gomega"
 )
 
 const (
@@ -35,19 +36,33 @@ const (
 // Create/delete secret api objects
 var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func() {
 	f := framework.NewDefaultFederatedFramework("federated-secret")
+	clusterClientSet := make(map[string]*release_1_3.Clientset)
 
 	Describe("Secret objects", func() {
+
+		BeforeEach(func() {
+			framework.SkipUnlessFederated(f.Client)
+			clusters := buildClustersOrFail_14(f)
+			for _, cluster := range clusters {
+				if _, found := clusterClientSet[cluster.Name]; !found {
+					clientset := createClientsetForCluster(*cluster, 1, "e2e-test")
+					clusterClientSet[cluster.Name] = clientset
+				}
+			}
+		})
+
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
-
 			nsName := f.FederationNamespace.Name
-			// Delete registered secrets.
-			// This is if a test failed, it should not affect other tests.
-			secretList, err := f.FederationClientset_1_4.Core().Secrets(nsName).List(api.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-			for _, secret := range secretList.Items {
-				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
-				Expect(err).NotTo(HaveOccurred())
+			deleteAllTestSecrets(
+				f.FederationClientset_1_4.Core().Secrets(nsName).List,
+				f.FederationClientset_1_4.Core().Secrets(nsName).Delete,
+				false)
+			for _, clientset := range clusterClientSet {
+				deleteAllTestSecrets(
+					clientset.Core().Secrets(nsName).List,
+					clientset.Core().Secrets(nsName).Delete,
+					false)
 			}
 		})
 
@@ -55,32 +70,77 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 			framework.SkipUnlessFederated(f.Client)
 
 			nsName := f.FederationNamespace.Name
-			secret := createSecretOrFail(f.FederationClientset_1_4, nsName)
+
+			secret := &v1.Secret{
+				ObjectMeta: v1.ObjectMeta{
+					Name: FederatedSecretName,
+				},
+			}
+
+			By(fmt.Sprintf("Creating secret %q in namespace %q", secret.Name, nsName))
+			_, err := f.FederationClientset_1_4.Core().Secrets(nsName).Create(secret)
+			framework.ExpectNoError(err, "Failed to create secret %s", secret.Name)
+
+			// Check subclusters if the secret was created there
+			err = wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
+				for _, client := range clusterClientSet {
+					_, err := client.Core().Secrets(nsName).Get(secret.Name)
+					if err != nil && !errors.IsNotFound(err) {
+						return false, err
+					}
+					if err != nil {
+						return false, nil
+					}
+				}
+				return true, nil
+			})
+			framework.ExpectNoError(err, "Not all secrets created")
+
 			By(fmt.Sprintf("Creation of secret %q in namespace %q succeeded.  Deleting secret.", secret.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
-			framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secret.Name, secret.Namespace)
-			By(fmt.Sprintf("Deletion of secret %q in namespace %q succeeded.", secret.Name, nsName))
+			deleteAllTestSecrets(
+				f.FederationClientset_1_4.Core().Secrets(nsName).List,
+				f.FederationClientset_1_4.Core().Secrets(nsName).Delete,
+				false)
+
 		})
 
 	})
 })
 
-func createSecretOrFail(clientset *federation_release_1_4.Clientset, namespace string) *v1.Secret {
-	if clientset == nil || len(namespace) == 0 {
-		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteSecretOrFail: clientset: %v, namespace: %v", clientset, namespace))
+func deleteAllTestSecrets(lister func(api.ListOptions) (*v1.SecretList, error), deleter func(string, *api.DeleteOptions) error, waitForDeletion bool) {
+	list, err := lister(api.ListOptions{})
+	if err != nil {
+		framework.Failf("Failed to get all secrets: %v", err)
+		return
 	}
-	By(fmt.Sprintf("Creating federated secret %q in namespace %q", FederatedSecretName, namespace))
-
-	secret := &v1.Secret{
-		ObjectMeta: v1.ObjectMeta{
-			Name: FederatedSecretName,
-		},
+	for _, secret := range list.Items {
+		if secret.Name == FederatedSecretName {
+			err := deleter(secret.Name, &api.DeleteOptions{})
+			if err != nil {
+				framework.Failf("Failed to set %s for deletion: %v", secret.Name, err)
+			}
+		}
 	}
+	if waitForDeletion {
+		waitForNoTestSecrets(lister)
+	}
+}
 
-	By(fmt.Sprintf("Trying to create secret %q in namespace %q", secret.Name, namespace))
-	_, err := clientset.Core().Secrets(namespace).Create(secret)
-	framework.ExpectNoError(err, "Creating secret %q in namespace %q", secret.Name, namespace)
-	By(fmt.Sprintf("Successfully created federated secret %q in namespace %q", FederatedSecretName, namespace))
-	return secret
+func waitForNoTestSecrets(lister func(api.ListOptions) (*v1.SecretList, error)) {
+	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
+		list, err := lister(api.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, secret := range list.Items {
+			if secret.Name == FederatedSecretName {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		framework.Failf("Secrets not deleted: %v", err)
+	}
 }
