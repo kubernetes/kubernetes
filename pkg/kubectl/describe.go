@@ -545,7 +545,7 @@ func describePod(pod *api.Pod, events *api.EventList) (string, error) {
 			}
 		}
 		describeVolumes(pod.Spec.Volumes, out, "")
-		fmt.Fprintf(out, "QoS Class:\t%s\n", qos.GetPodQOS(pod))
+		fmt.Fprintf(out, "QoS Tier:\t%s\n", qos.GetPodQOS(pod))
 		printTolerationsInAnnotationMultiline(out, "Tolerations", pod.Annotations)
 		if events != nil {
 			DescribeEvents(events, out)
