@@ -486,6 +486,7 @@ function start-kubelet {
     if [[ ! -z "${KUBELET_APISERVER:-}" && ! -z "${KUBELET_CERT:-}" && ! -z "${KUBELET_KEY:-}" ]]; then
       flags+=" --api-servers=https://${KUBELET_APISERVER}"
       flags+=" --register-schedulable=false"
+      flags+=" --register-with-taints=dedicated=master:NoSchedule"
       # need at least a /29 pod cidr for now due to #32844
       # TODO: determine if we still allow non-hostnetwork pods to run on master, clean up master pod setup
       # WARNING: potential ip range collision with 10.123.45.0/29

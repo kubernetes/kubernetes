@@ -17,6 +17,7 @@ limitations under the License.
 package componentconfig
 
 import (
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	utilconfig "k8s.io/kubernetes/pkg/util/config"
 )
@@ -366,7 +367,12 @@ type KubeletConfiguration struct {
 	ReconcileCIDR bool `json:"reconcileCIDR"`
 	// registerSchedulable tells the kubelet to register the node as
 	// schedulable. Won't have any effect if register-node is false.
+	// DEPRECATED: use registerWithTaints instead
 	RegisterSchedulable bool `json:"registerSchedulable"`
+	// registerWithTaints are an array of taints to add to a node object when
+	// the kubelet registers itself. This only takes effect when registerNode
+	// is true and upon the initial registration of the node.
+	RegisterWithTaints []api.Taint `json:"registerWithTaints"`
 	// contentType is contentType of requests sent to apiserver.
 	ContentType string `json:"contentType"`
 	// kubeAPIQPS is the QPS to use while talking with kubernetes apiserver

@@ -35,6 +35,7 @@ import (
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/util/strategicpatch"
+	utiltaints "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/pkg/util/validation"
 )
 
@@ -171,28 +172,10 @@ func parseTaints(spec []string) ([]api.Taint, []api.Taint, error) {
 
 	for _, taintSpec := range spec {
 		if strings.Index(taintSpec, "=") != -1 && strings.Index(taintSpec, ":") != -1 {
-			parts := strings.Split(taintSpec, "=")
-			if len(parts) != 2 || len(parts[1]) == 0 || len(validation.IsQualifiedName(parts[0])) > 0 {
-				return nil, nil, fmt.Errorf("invalid taint spec: %v", taintSpec)
+			newTaint, err := utiltaints.ParseTaint(taintSpec)
+			if err != nil {
+				return nil, nil, err
 			}
-
-			parts2 := strings.Split(parts[1], ":")
-			errs := validation.IsValidLabelValue(parts2[0])
-			if len(parts2) != 2 || len(errs) != 0 {
-				return nil, nil, fmt.Errorf("invalid taint spec: %v, %s", taintSpec, strings.Join(errs, "; "))
-			}
-
-			if parts2[1] != string(api.TaintEffectNoSchedule) && parts2[1] != string(api.TaintEffectPreferNoSchedule) {
-				return nil, nil, fmt.Errorf("invalid taint spec: %v, unsupported taint effect", taintSpec)
-			}
-
-			effect := api.TaintEffect(parts2[1])
-			newTaint := api.Taint{
-				Key:    parts[0],
-				Value:  parts2[0],
-				Effect: effect,
-			}
-
 			// validate if taint is unique by <key, effect>
 			if len(uniqueTaints[newTaint.Effect]) > 0 && uniqueTaints[newTaint.Effect].Has(newTaint.Key) {
 				return nil, nil, fmt.Errorf("duplicated taints with the same key and effect: %v", newTaint)

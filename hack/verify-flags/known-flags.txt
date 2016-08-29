@@ -451,6 +451,7 @@ reconcile-interval
 register-node
 register-retry-count
 register-schedulable
+register-with-taints
 registry-burst
 registry-qps
 reject-methods
