@@ -2886,7 +2886,7 @@ func TestPodToleratesTaints(t *testing.T) {
 			},
 			fits: false,
 			expectedFailureReasons: []algorithm.PredicateFailureReason{newErrTaintsTolerationsNotMatch(true)},
-			test: "node should aware that a pod which can't be scheduled or start on a dedicated node assgined to user2 with effect NoScheduleNoAdmit",
+			test: "node should aware that a pod which can't be scheduled or start on a dedicated node assigned to user2 with effect NoScheduleNoAdmit",
 		},
 	}
 

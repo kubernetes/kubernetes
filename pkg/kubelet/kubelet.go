@@ -2229,7 +2229,7 @@ func (kl *Kubelet) checkPredicatesFitness(pod *api.Pod, nodeInfo *schedulercache
 		r := reasons[0]
 		switch re := r.(type) {
 		case *predicates.ErrTaintsTolerationsNotMatch:
-			// if kubelet should not care this un-fit, just return true
+			// if kubelet should not care this unfit
 			if !re.SomeUntoleratedTaintIsNoAdmit {
 				return true, "", ""
 			}
