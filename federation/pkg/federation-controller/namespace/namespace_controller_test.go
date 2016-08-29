@@ -75,7 +75,8 @@ func TestNamespaceController(t *testing.T) {
 
 	ns1 := api_v1.Namespace{
 		ObjectMeta: api_v1.ObjectMeta{
-			Name: "test-namespace",
+			Name:     "test-namespace",
+			SelfLink: "/api/v1/namespaces/test-namespace",
 		},
 	}
 
