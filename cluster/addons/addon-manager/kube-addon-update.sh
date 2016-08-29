@@ -491,6 +491,7 @@ function update-addons() {
     reconcile-objects ${addon_path} PersistentVolume "" &
     reconcile-objects ${addon_path} PersistentVolumeClaim "" &
     reconcile-objects ${addon_path} ConfigMap "" &
+    reconcile-objects ${addon_path} StorageClass "" &
 
     wait-for-jobs
     if [[ $? -eq 0 ]]; then

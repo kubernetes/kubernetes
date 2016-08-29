@@ -1,0 +1,11 @@
+apiVersion: extensions/v1beta1
+kind: StorageClass
+metadata:
+  name: default
+  annotations:
+    storage.beta.kubernetes.io/default-class: "true"
+  labels:
+    kubernetes.io/cluster-service: "true"
+provisioner: kubernetes.io/aws-ebs
+parameters:
+  type: gp2
