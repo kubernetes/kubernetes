@@ -378,7 +378,10 @@ function assemble-docker-flags {
     docker_opts+=" --log-level=warn"
   fi
   local use_net_plugin="true"
-  if [[ "${NETWORK_PROVIDER:-}" != "kubenet" && "${NETWORK_PROVIDER:-}" != "cni" ]]; then
+  if [[ "${NETWORK_PROVIDER:-}" == "kubenet" || "${NETWORK_PROVIDER:-}" == "cni" ]]; then
+    # set docker0 cidr to private ip address range to avoid conflict with cbr0 cidr range
+    docker_opts+=" --bip=169.254.123.1/24"
+  else
     use_net_plugin="false"
     docker_opts+=" --bridge=cbr0"
   fi
@@ -540,10 +543,8 @@ ExecStart=${kubelet_bin} \$KUBELET_OPTS
 WantedBy=multi-user.target
 EOF
 
-  # Delete docker0 to avoid interference
+  # Flush iptables nat table
   iptables -t nat -F || true
-  ip link set docker0 down || true
-  brctl delbr docker0 || true
 
   systemctl start kubelet.service
 }
