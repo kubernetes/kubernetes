@@ -373,7 +373,13 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Downward API", func() {
 		It("should create a pod that prints his name and namespace", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "test/fixtures/doc-yaml/user-guide/downward-api", file)
+				dir := filepath.Join(framework.TestContext.RepoRoot, "test/fixtures/doc-yaml/user-guide/downward-api")
+				fileInfo, err := ioutil.ReadDir(dir)
+				Expect(err).NotTo(HaveOccurred())
+				for _, f := range fileInfo {
+					fmt.Fprintln(os.Stderr, "%s", f.Name())
+				}
+				return filepath.Join(dir, file)
 			}
 			podYaml := mkpath("dapi-pod.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
