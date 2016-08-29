@@ -10,6 +10,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+type FilterFunc func(runtime.Object) (bool, error)
+
 type FilterOptions struct {
 	filterMap    map[reflect.Type]reflect.Value
 	options      PrintOptions
@@ -68,17 +70,14 @@ func (f *FilterOptions) validateFilterFunc(filterFunc reflect.Value) error {
 	return nil
 }
 
-// FilterDeletedPods returns true if a pod should be skipped.
+// filterPods returns true if a pod should be skipped.
 // defaults to true for terminated pods
 func filterPods(pod *api.Pod, options PrintOptions) bool {
 	reason := string(pod.Status.Phase)
 	if pod.Status.Reason != "" {
 		reason = pod.Status.Reason
 	}
-	if !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed)) {
-		return true
-	}
-	return false
+	return !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed))
 }
 
 // PrintFilterCount prints an info message indicating the amount of resources

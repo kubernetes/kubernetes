@@ -1234,7 +1234,7 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	return clientConfig
 }
 
-func (f *Factory) DefaultResourceFilters(cmd *cobra.Command, withNamespace bool) *kubectl.FilterOptions {
+func (f *Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace bool) *kubectl.PrintOptions {
 	columnLabel, err := cmd.Flags().GetStringSlice("label-columns")
 	if err != nil {
 		columnLabel = []string{}
@@ -1249,7 +1249,14 @@ func (f *Factory) DefaultResourceFilters(cmd *cobra.Command, withNamespace bool)
 		ColumnLabels:       columnLabel,
 	}
 
-	return kubectl.NewResourceFilter(opts)
+	return opts
+}
+
+// DefaultResourceFilterFunc receives PrintOPpts
+// and returns a default kubectl.FilterFunc
+func (f *Factory) DefaultResourceFilterFunc(opts *kubectl.PrintOptions) (kubectl.FilterFunc, *kubectl.FilterOptions) {
+	resourceFilter := kubectl.NewResourceFilter(opts)
+	return resourceFilter.Filter, resourceFilter
 }
 
 // PrintObject prints an api object given command line flags to modify the output format
