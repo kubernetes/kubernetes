@@ -1,0 +1,29 @@
+{
+  "ignition":{"version": "2.0.0"},
+  "systemd": {
+    "units": [{
+      "name": "update-engine.service",
+      "mask": true
+    },
+    {
+      "name": "locksmithd.service",
+      "mask": true
+    },
+    {
+      "name": "docker.service",
+      "dropins": [{
+        "name": "10-disable-systemd-cgroup-driver.conf",
+        "contents": "[Service]\nCPUAccounting=yes\nMemoryAccounting=yes\nEnvironment=\"DOCKER_CGROUPS=\""
+      }]
+    }]
+  },
+  "passwd": {
+    "users": [{
+      "name": "jenkins",
+      "create": {
+        "groups": ["docker", "sudo"]
+      }
+    }]
+  }
+}
+
