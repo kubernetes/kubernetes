@@ -56,6 +56,7 @@ func TestKubectlValidation(t *testing.T) {
 	cfg.CurrentContext = "test"
 	overrides := clientcmd.ConfigOverrides{
 		ClusterInfo: *cluster,
+		Context:     *ctx,
 	}
 	cmdConfig := clientcmd.NewNonInteractiveClientConfig(*cfg, "test", &overrides, nil)
 	factory := util.NewFactory(cmdConfig)
