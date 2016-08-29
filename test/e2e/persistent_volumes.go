@@ -114,6 +114,29 @@ func deletePVCandValidatePV(c *client.Client, ns string, pvc *api.PersistentVolu
 	return pv, pvc, nil
 }
 
+// Wraps deletePVCandValidatePV() to delete and validate 1:1 PV-PVC pairs
+// Takes the list of pvs and list of pvcs
+// Returns updated pvList, pvcList, and error
+func deleteMultiplePVCandValidatePV(c *client.Client, ns string, pvcList []*api.PersistentVolumeClaim, pvList []*api.PersistentVolume) ([]*api.PersistentVolume, []*api.PersistentVolumeClaim, error) {
+
+	var err error
+
+	for pvi, pv := range pvList {
+		for pvci, pvc := range pvcList {
+			if pvcList[pvci] != nil && len(pvc.Name) > 0 {
+				if pv.Spec.ClaimRef.UID == pvc.UID {
+					pvList[pvi], pvcList[pvci], err = deletePVCandValidatePV(c, ns, pvc, pv)
+					if err != nil {
+						return nil, nil, err
+					}
+					break // Found and deleted the paired PVC, move on to the next PV
+				}
+			}
+		}
+	}
+	return pvList, pvcList, nil
+}
+
 // create the PV resource. Fails test on error.
 func createPV(c *client.Client, pv *api.PersistentVolume) (*api.PersistentVolume, error) {
 
@@ -121,7 +144,6 @@ func createPV(c *client.Client, pv *api.PersistentVolume) (*api.PersistentVolume
 	if err != nil {
 		return pv, fmt.Errorf("Create PersistentVolume %v failed: %v", pv.Name, err)
 	}
-
 	return pv, nil
 }
 
@@ -132,7 +154,6 @@ func createPVC(c *client.Client, ns string, pvc *api.PersistentVolumeClaim) (*ap
 	if err != nil {
 		return pvc, fmt.Errorf("Create PersistentVolumeClaim %v failed: %v", pvc.Name, err)
 	}
-
 	return pvc, nil
 }
 
@@ -272,6 +293,45 @@ func waitAndValidatePVandPVC(c *client.Client, ns string, pv *api.PersistentVolu
 	return pv, pvc, nil
 }
 
+// Validates PVs and PVCs for phase "Bound".  Once all pairs are validated, updates pvList & pvcList data
+// Takes a list of PVs and a list of PVCs
+// Returns a list of PVs, a list of PVCs, and nil (or error)
+func waitAndValidateMultiplePVandPVCPairs(c *client.Client, ns string, pvList []*api.PersistentVolume, pvcList []*api.PersistentVolumeClaim) ([]*api.PersistentVolume, []*api.PersistentVolumeClaim, error) {
+
+	var err error
+
+	// Wait for each PV to hit Bound phase
+	for _, pv := range pvList {
+		err = framework.WaitForPersistentVolumePhase(api.VolumeBound, c, pv.Name, 3*time.Second, 300*time.Second)
+		if err != nil {
+			return nil, nil, fmt.Errorf("PV %v failed to enter Bound phase: %v", pv.Name, err)
+		}
+	}
+	// Wait for each PVC to hit Bound phase
+	for _, pvc := range pvcList {
+		err = framework.WaitForPersistentVolumeClaimPhase(api.ClaimBound, c, ns, pvc.Name, 3*time.Second, 300*time.Second)
+		if err != nil {
+			return nil, nil, fmt.Errorf("PVC %v failed to enter Bound phase: %v", pvc.Name, err)
+		}
+	}
+
+	// Get the latest pvList data
+	for i := range pvList {
+		pvList[i], err = c.PersistentVolumes().Get(pvList[i].Name)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Get pvList[%v] failed: ", i, err)
+		}
+	}
+	// Get the latest pvcList data
+	for i := range pvcList {
+		pvcList[i], err = c.PersistentVolumeClaims(ns).Get(pvcList[i].Name)
+		if err != nil {
+			return nil, nil, fmt.Errorf("Get pvcList[%v] failed: ", i, err)
+		}
+	}
+	return pvList, pvcList, nil
+}
+
 // Test the pod's exitcode to be zero.
 func testPodSuccessOrFail(f *framework.Framework, c *client.Client, ns string, pod *api.Pod) error {
 
@@ -398,6 +458,37 @@ func completeTest(f *framework.Framework, c *client.Client, ns string, pv *api.P
 	return pv, pvc, nil
 }
 
+// Validate sets of PVs and PVCs, create and verify writer pod, delete PV and
+// PVC sets. Ensure each step succeeds.  Return references to PV and PVC sets
+// for AfterEach in the case that there are non-nil PVs or PVCs.
+func completeMultiTest(f *framework.Framework, c *client.Client, ns string, pvList []*api.PersistentVolume, pvcList []*api.PersistentVolumeClaim) ([]*api.PersistentVolume, []*api.PersistentVolumeClaim, error) {
+
+	var err error
+
+	// 1. Verify each PV-PVC pair bonding
+	By("Validating each PV-PVC pair phase")
+	pvList, pvcList, err = waitAndValidateMultiplePVandPVCPairs(c, ns, pvList, pvcList)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Failed to validate multiple PV-PVC pairs: %v", err)
+	}
+
+	// 2. Verify each PV permits write access to a client pod
+	By("Checking pod has write access to PersistentVolumes")
+	for _, pvc := range pvcList {
+		if err = createWaitAndDeletePod(f, c, ns, pvc.Name); err != nil {
+			return nil, nil, err
+		}
+	}
+	// 3.  Delete each PVC, wait for it's bound PV to become "Available"
+	By("Deleting PVCs to invoke recycler")
+	pvList, pvcList, err = deleteMultiplePVCandValidatePV(c, ns, pvcList, pvList)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Failed to delete all PVCs to trigger recycler: %v", err)
+	}
+
+	return pvList, pvcList, nil
+}
+
 var _ = framework.KubeDescribe("PersistentVolumes", func() {
 
 	// global vars for the It() tests below
@@ -407,8 +498,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 	var NFSconfig VolumeTestConfig
 	var serverIP string
 	var nfsServerPod *api.Pod
-	var pv *api.PersistentVolume
-	var pvc *api.PersistentVolumeClaim
 	var err error
 
 	// config for the nfs-server pod in the default namespace
@@ -434,28 +523,6 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		}
 	})
 
-	AfterEach(func() {
-		if c != nil && len(ns) > 0 { // still have client and namespace
-			if pvc != nil && len(pvc.Name) > 0 {
-				// Delete the PersistentVolumeClaim
-				framework.Logf("AfterEach: PVC %v is non-nil, deleting claim", pvc.Name)
-				err := c.PersistentVolumeClaims(ns).Delete(pvc.Name)
-				if err != nil && !apierrs.IsNotFound(err) {
-					framework.Logf("AfterEach: delete of PersistentVolumeClaim %v error: %v", pvc.Name, err)
-				}
-				pvc = nil
-			}
-			if pv != nil && len(pv.Name) > 0 {
-				framework.Logf("AfterEach: PV %v is non-nil, deleting pv", pv.Name)
-				err := c.PersistentVolumes().Delete(pv.Name)
-				if err != nil && !apierrs.IsNotFound(err) {
-					framework.Logf("AfterEach: delete of PersistentVolume %v error: %v", pv.Name, err)
-				}
-				pv = nil
-			}
-		}
-	})
-
 	// Execute after *all* the tests have run
 	AddCleanupAction(func() {
 		if nfsServerPod != nil && c != nil {
@@ -465,78 +532,161 @@ var _ = framework.KubeDescribe("PersistentVolumes", func() {
 		}
 	})
 
-	// Individual tests follow:
-	//
-	// Create an nfs PV, then a claim that matches the PV, and a pod that
-	// contains the claim. Verify that the PV and PVC bind correctly, and
-	// that the pod can write to the nfs volume.
-	It("should create a non-pre-bound PV and PVC: test write access [Flaky]", func() {
+	Context("with Single PV - PVC pairs", func() {
 
-		pv, pvc, err = createPVPVC(c, serverIP, ns, false)
-		if err != nil {
-			framework.Failf("%v", err)
-		}
+		var pv *api.PersistentVolume
+		var pvc *api.PersistentVolumeClaim
+		AfterEach(func() {
+			if c != nil && len(ns) > 0 { // still have client and namespace
+				if pvc != nil && len(pvc.Name) > 0 {
+					// Delete the PersistentVolumeClaim
+					framework.Logf("AfterEach: PVC %v is non-nil, deleting claim", pvc.Name)
+					err := c.PersistentVolumeClaims(ns).Delete(pvc.Name)
+					if err != nil && !apierrs.IsNotFound(err) {
+						framework.Logf("AfterEach: delete of PersistentVolumeClaim %v error: %v", pvc.Name, err)
+					}
+					pvc = nil
+				}
+				if pv != nil && len(pv.Name) > 0 {
+					// Delete the PersistentVolume
+					framework.Logf("AfterEach: PV %v is non-nil, deleting pv", pv.Name)
+					err := c.PersistentVolumes().Delete(pv.Name)
+					if err != nil && !apierrs.IsNotFound(err) {
+						framework.Logf("AfterEach: delete of PersistentVolume %v error: %v", pv.Name, err)
+					}
+					pv = nil
+				}
+			}
+		})
 
-		// validate PV-PVC, create and verify writer pod, delete PVC
-		// and PV
-		pv, pvc, err = completeTest(f, c, ns, pv, pvc)
-		if err != nil {
-			framework.Failf("%v", err)
-		}
+		// Individual tests follow:
+		//
+		// Create an nfs PV, then a claim that matches the PV, and a pod that
+		// contains the claim. Verify that the PV and PVC bind correctly, and
+		// that the pod can write to the nfs volume.
+		It("should create a non-pre-bound PV and PVC: test write access [Flaky]", func() {
+
+			pv, pvc, err = createPVPVC(c, serverIP, ns, false)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+
+			// validate PV-PVC, create and verify writer pod, delete PVC
+			// and PV
+			pv, pvc, err = completeTest(f, c, ns, pv, pvc)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
+		// Create a claim first, then a nfs PV that matches the claim, and a
+		// pod that contains the claim. Verify that the PV and PVC bind
+		// correctly, and that the pod can write to the nfs volume.
+		It("create a PVC and non-pre-bound PV: test write access [Flaky]", func() {
+
+			pv, pvc, err = createPVCPV(c, serverIP, ns, false)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+
+			// validate PV-PVC, create and verify writer pod, delete PVC
+			// and PV
+			pv, pvc, err = completeTest(f, c, ns, pv, pvc)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
+		// Create a claim first, then a pre-bound nfs PV that matches the claim,
+		// and a pod that contains the claim. Verify that the PV and PVC bind
+		// correctly, and that the pod can write to the nfs volume.
+		It("create a PVC and a pre-bound PV: test write access [Flaky]", func() {
+
+			pv, pvc, err = createPVCPV(c, serverIP, ns, true)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+
+			// validate PV-PVC, create and verify writer pod, delete PVC
+			// and PV
+			pv, pvc, err = completeTest(f, c, ns, pv, pvc)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+		})
+
+		// Create a nfs PV first, then a pre-bound PVC that matches the PV,
+		// and a pod that contains the claim. Verify that the PV and PVC bind
+		// correctly, and that the pod can write to the nfs volume.
+		It("create a PV and a pre-bound PVC: test write access [Flaky]", func() {
+
+			pv, pvc, err = createPVPVC(c, serverIP, ns, true)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+
+			// validate PV-PVC, create and verify writer pod, delete PVC
+			// and PV
+			pv, pvc, err = completeTest(f, c, ns, pv, pvc)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+		})
 	})
 
-	// Create a claim first, then a nfs PV that matches the claim, and a
-	// pod that contains the claim. Verify that the PV and PVC bind
-	// correctly, and that the pod can write to the nfs volume.
-	It("create a PVC and non-pre-bound PV: test write access [Flaky]", func() {
+	Context("with multiple PVs and PVCs", func() {
 
-		pv, pvc, err = createPVCPV(c, serverIP, ns, false)
-		if err != nil {
-			framework.Failf("%v", err)
-		}
+		var pvs []*api.PersistentVolume
+		var pvcs []*api.PersistentVolumeClaim
 
-		// validate PV-PVC, create and verify writer pod, delete PVC
-		// and PV
-		pv, pvc, err = completeTest(f, c, ns, pv, pvc)
-		if err != nil {
-			framework.Failf("%v", err)
-		}
-	})
+		AfterEach(func() {
+			if c != nil && len(ns) > 0 {
+				if pvcs != nil && len(pvcs) > 0 {
+					framework.Logf("PVC List is non-nil, deleting all PVCs and destroying list")
+					for _, pvc := range pvcs {
+						if pvc != nil && len(pvc.Name) > 0 {
+							if err := c.PersistentVolumeClaims(ns).Delete(pvc.Name); err != nil {
+								framework.Logf("Delete PVC %v failed: ", err)
+							}
+						}
+						if _, err := c.PersistentVolumeClaims(ns).Get(pvc.Name); err == nil {
+							framework.Failf("Expected PVC to be nil after delete but got non-nil value")
+						}
+					}
+					pvcs = nil
+				}
+				if pvs != nil && len(pvs) > 0 {
+					framework.Logf("PV List is non-nil, deleting all PVs and destroying list")
+					for _, pv := range pvs {
+						if pv != nil && len(pv.Name) > 0 {
+							if err := c.PersistentVolumes().Delete(pv.Name); err != nil {
+								framework.Logf("Delete PV %v failed: %v", err)
+							}
+						}
+						if _, err := c.PersistentVolumes().Get(pv.Name); err == nil {
+							framework.Failf("Expected PV to be nil after delete but got non-nil value")
+						}
+					}
+					pvs = nil
+				}
+			}
+		})
 
-	// Create a claim first, then a pre-bound nfs PV that matches the claim,
-	// and a pod that contains the claim. Verify that the PV and PVC bind
-	// correctly, and that the pod can write to the nfs volume.
-	It("create a PVC and a pre-bound PV: test write access [Flaky]", func() {
+		// Create a group of nfs PVs first, then a group of PVCs
+		// and a pod that contains one claim. Verify that the PVs and PVCs bind
+		// correctly, and that the pod can write to the nfs volume.
+		It("should create 3 PVs and 3 PVCs: test write access[Flaky]", func() {
+			pairs := 3
+			pvs, pvcs, err = createMultiplePVsandPVCs(c, ns, serverIP, pairs)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
 
-		pv, pvc, err = createPVCPV(c, serverIP, ns, true)
-		if err != nil {
-			framework.Failf("%v", err)
-		}
-
-		// validate PV-PVC, create and verify writer pod, delete PVC
-		// and PV
-		pv, pvc, err = completeTest(f, c, ns, pv, pvc)
-		if err != nil {
-			framework.Failf("%v", err)
-		}
-	})
-
-	// Create a nfs PV first, then a pre-bound PVC that matches the PV,
-	// and a pod that contains the claim. Verify that the PV and PVC bind
-	// correctly, and that the pod can write to the nfs volume.
-	It("create a PV and a pre-bound PVC: test write access [Flaky]", func() {
-
-		pv, pvc, err = createPVPVC(c, serverIP, ns, true)
-		if err != nil {
-			framework.Failf("%v", err)
-		}
-
-		// validate PV-PVC, create and verify writer pod, delete PVC
-		// and PV
-		pv, pvc, err = completeTest(f, c, ns, pv, pvc)
-		if err != nil {
-			framework.Failf("%v", err)
-		}
+			pvs, pvcs, err = completeMultiTest(f, c, ns, pvs, pvcs)
+			if err != nil {
+				framework.Failf("%v", err)
+			}
+		})
 	})
 })
 
@@ -661,4 +811,95 @@ func makeWritePod(ns string, pvcName string) *api.Pod {
 			},
 		},
 	}
+}
+
+// Generate a list of PV specs.
+// pvsToCreate should be the number of PVs desired
+// Returns a list of generated PV specs.  This can be passed to createMultiplePVs
+func makeMultiplePersistentVolumes(serverIP string, pvsToCreates int) []*api.PersistentVolume {
+
+	pvSpecs := make([]*api.PersistentVolume, pvsToCreates)
+	if pvSpecs != nil {
+		for i := range pvSpecs {
+			pvSpecs[i] = makePersistentVolume(serverIP, nil)
+		}
+	}
+	return pvSpecs
+}
+
+// Takes a list of Persistent Volume specs defined in createMultiplePersistentVolumes and
+// instantiates them.
+/// Returns list of pointers to instatiated PVs.
+func createMultiplePVs(c *client.Client, pvSpecs []*api.PersistentVolume) ([]*api.PersistentVolume, error) {
+
+	var err error
+	pvList := make([]*api.PersistentVolume, len(pvSpecs))
+	if pvSpecs != nil {
+		for i, spec := range pvSpecs {
+			pvList[i], err = createPV(c, spec)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return pvList, err // err == nil
+}
+
+// Generate a list of PVC specs
+// pvcsToCreate should be the number desired PVCs
+// Returns a list of generated PVC specs
+func makeMultiplePersistentVolumeClaims(ns string, pvcsToCreate int) []*api.PersistentVolumeClaim {
+
+	pvcSpecs := make([]*api.PersistentVolumeClaim, pvcsToCreate)
+	if pvcSpecs != nil {
+		for i := range pvcSpecs {
+			pvcSpecs[i] = makePersistentVolumeClaim(ns)
+		}
+	}
+	return pvcSpecs
+}
+
+// Create a group of PVCs supplied as a list
+// Returns a list of created PVCs
+func createMultiplePVCs(c *client.Client, ns string, pvcSpecs []*api.PersistentVolumeClaim) ([]*api.PersistentVolumeClaim, error) {
+
+	pvcList := make([]*api.PersistentVolumeClaim, len(pvcSpecs))
+	var err error
+
+	if pvcSpecs != nil {
+		for i, spec := range pvcSpecs {
+			pvcList[i], err = createPVC(c, ns, spec)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return pvcList, err // err == nil
+}
+
+// Defines and creates a list of PVs and then a list of PVCs in equal amount
+// Takes an integer number of desired PV-PVC pairs
+// Returns a list of PVs, PVCs, and an error (or nil if none)
+func createMultiplePVsandPVCs(c *client.Client, ns string, serverIP string, pairsToCreate int) ([]*api.PersistentVolume, []*api.PersistentVolumeClaim, error) {
+
+	pvList := makeMultiplePersistentVolumes(serverIP, pairsToCreate)
+	pvcList := makeMultiplePersistentVolumeClaims(ns, pairsToCreate)
+
+	pvList, err := createMultiplePVs(c, pvList)
+	if err != nil {
+		return nil, nil, err
+	}
+	if pvList == nil || len(pvList) < pairsToCreate {
+		return nil, nil, fmt.Errorf("Failed to create all PVs.")
+	}
+
+	pvcList, err = createMultiplePVCs(c, ns, pvcList)
+	if err != nil {
+		return nil, nil, err
+	}
+	if pvcList == nil || len(pvcList) < pairsToCreate {
+		return nil, nil, fmt.Errorf("Failed to create all PVCs")
+	}
+
+	return pvList, pvcList, nil
 }
