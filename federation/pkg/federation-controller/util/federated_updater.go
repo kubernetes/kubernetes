@@ -69,7 +69,11 @@ func NewFederatedUpdater(federation FederationView, add, update, del FederatedOp
 	}
 }
 
-func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation, timeout time.Duration) error {
+func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation, timeout time.Duration, onError func(FederatedOperation, error)) error {
+	fu.UpdateWithOnError(ops, timeout, nil)
+}
+
+func (fu *federatedUpdaterImpl) UpdateWithOnError(ops []FederatedOperation, timeout time.Duration, onError func(FederatedOperation, error)) error {
 	done := make(chan error, len(ops))
 	for _, op := range ops {
 		go func(op FederatedOperation) {
@@ -89,6 +93,9 @@ func (fu *federatedUpdaterImpl) Update(ops []FederatedOperation, timeout time.Du
 				err = fu.updateFunction(clientset, op.Obj)
 			case OperationTypeDelete:
 				err = fu.deleteFunction(clientset, op.Obj)
+			}
+			if err != nil && onError != nil {
+				onError(op, err)
 			}
 			done <- err
 		}(op)
