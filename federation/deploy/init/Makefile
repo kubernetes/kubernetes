@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-IMAGE_NAME?=gcr.io/madhusudancs-containers/federation/init
+IMAGE_NAME?=gcr.kubernetes.io/federation/init
 IMAGE_VERSION?=v0.9.0
 
 .PHONY: all

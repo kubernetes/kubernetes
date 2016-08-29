@@ -16,7 +16,8 @@ limitations under the License.
 
 // This program implements the initialization code required to start a
 // federation API server. This code is intended to be run inside an init
-// container in the federation API server pod.
+// container (http://kubernetes.io/docs/user-guide/production-pods/#handling-initialization)
+// in the federation API server pod.
 //
 // Federation API server is deployed as a Kubernetes Deployment resource and
 // hence the number of Deployment pod replicas can be scaled up and down. This
@@ -91,9 +92,9 @@ var (
 	namespace    = flag.String("namespace", "federation", "namespace of the federation control plane components")
 	secretName   = flag.String("secret", "federation-apiserver-credentials", "name of the secret where the federation API server user credentials are stored")
 	cmSecretName = flag.String("controllermanager-kubeconfig-secret", "federation-controller-manager-kubeconfig", "name of the secret where the federation controller manager kubeconfig is stored")
-	svcName      = flag.String("service", "federation-apiserver", "namespace of the federation control plane components")
+	svcName      = flag.String("service", "federation-apiserver", "name of the federation API server service")
 	timeout      = flag.Duration("timeout", 5*time.Minute, "duration to wait to obtain the federation API server's loadbalancer name/address before timing out")
-	certValidity = flag.Duration("cert-validity", 365*24*time.Hour, "Certificate validity duration")
+	certValidity = flag.Duration("cert-validity", 365*24*time.Hour, "certificate validity duration")
 )
 
 type certKey struct {
