@@ -10,6 +10,8 @@ import (
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
+type FilterFunc func(runtime.Object) (bool, error)
+
 type FilterOptions struct {
 	filterMap    map[reflect.Type]reflect.Value
 	options      PrintOptions
@@ -68,7 +70,7 @@ func (f *FilterOptions) validateFilterFunc(filterFunc reflect.Value) error {
 	return nil
 }
 
-// FilterDeletedPods returns true if a pod should be skipped.
+// filterPods returns true if a pod should be skipped.
 // defaults to true for terminated pods
 func filterPods(pod *api.Pod, options PrintOptions) bool {
 	reason := string(pod.Status.Phase)

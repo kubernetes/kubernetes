@@ -20,8 +20,12 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/golang/glog"
+
 	"github.com/renstrom/dedent"
+
 	"github.com/spf13/cobra"
+
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
@@ -156,7 +160,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	showKind := cmdutil.GetFlagBool(cmd, "show-kind")
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
-	filter := f.DefaultResourceFilters(cmd, allNamespaces)
+	filterFunc, filterOpts := f.DefaultResourceFilterFunc(f.DefaultResourceFilterOptions(cmd, allNamespaces))
 
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
@@ -236,7 +240,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			if err := printer.PrintObj(obj, out); err != nil {
 				return fmt.Errorf("unable to output the provided object: %v", err)
 			}
-			filter.PrintFilterCount(errOut, mapping.Resource)
+			filterOpts.PrintFilterCount(errOut, mapping.Resource)
 		}
 
 		// print watched changes
@@ -254,7 +258,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 			}
 			err := printer.PrintObj(e.Object, out)
 			if err == nil {
-				filter.PrintFilterCount(errOut, mapping.Resource)
+				filterOpts.PrintFilterCount(errOut, mapping.Resource)
 			}
 			return err
 		})
@@ -298,7 +302,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		}
 
 		for ix := range infos {
-			if isFiltered, err := filter.Filter(infos[ix].Object); !isFiltered {
+			if isFiltered, err := filterFunc(infos[ix].Object); !isFiltered {
 				if err != nil {
 					allErrs = append(allErrs, err)
 					continue
@@ -306,10 +310,12 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 				if err := printer.PrintObj(infos[ix].Object, out); err != nil {
 					allErrs = append(allErrs, err)
 				}
+			} else if err != nil {
+				glog.V(2).Infof("Unable to filter resource: %v", err)
 			}
 		}
 
-		filter.PrintFilterCount(errOut, res)
+		filterOpts.PrintFilterCount(errOut, res)
 		return utilerrors.NewAggregate(allErrs)
 	}
 
@@ -376,7 +382,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		if printer == nil || lastMapping == nil || mapping == nil || mapping.Resource != lastMapping.Resource {
 			if printer != nil {
 				w.Flush()
-				filter.PrintFilterCount(errOut, lastMapping.Resource)
+				filterOpts.PrintFilterCount(errOut, lastMapping.Resource)
 			}
 			printer, err = f.PrinterForMapping(cmd, mapping, allNamespaces)
 			if err != nil {
@@ -387,7 +393,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 		}
 
 		// filter objects if filter has been defined for current object
-		if isFiltered, err := filter.Filter(original); isFiltered {
+		if isFiltered, err := filterFunc(original); isFiltered {
 			if err == nil {
 				continue
 			}
@@ -425,7 +431,7 @@ func RunGet(f *cmdutil.Factory, out io.Writer, errOut io.Writer, cmd *cobra.Comm
 	}
 	w.Flush()
 	if printer != nil {
-		filter.PrintFilterCount(errOut, lastMapping.Resource)
+		filterOpts.PrintFilterCount(errOut, lastMapping.Resource)
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
