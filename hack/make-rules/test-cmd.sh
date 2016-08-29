@@ -1541,6 +1541,46 @@ __EOF__
   kubectl delete namespace test-configmaps
 
   ####################
+  # ConfigMap Errors #
+  ####################
+
+  ### Test errors due to invalid config flags
+  # Pre-condition: no POD exists
+  # Command
+  output_message=$(! kubectl get pod --context="" --kubeconfig=missing 2>&1)
+  kube::test::if_has_string "${output_message}" "missing: no such file or directory"
+
+  # test empty flag value with invalid path to config
+  output_message=$(! kubectl get pod --user="" --kubeconfig=missing 2>&1)
+  # Post-condition: Although --user contains a "valid" value, missing config file returns error
+  kube::test::if_has_string "${output_message}" "missing: no such file or directory"
+
+  output_message=$(! kubectl get pod --cluster="" --kubeconfig=missing 2>&1)
+  # Post-condition: Although --cluster contains a "valid" value, missing config file returns error
+  kube::test::if_has_string "${output_message}" "missing: no such file or directory"
+
+  # test missing flag values
+  output_message=$(! kubectl get pod --context="missing-context" 2>&1)
+  kube::test::if_has_string "${output_message}" 'context "missing-context" does not exist'
+
+  output_message=$(! kubectl get pod --cluster="missing-cluster" 2>&1)
+  kube::test::if_has_string "${output_message}" 'cluster "missing-cluster" does not exist'
+
+  output_message=$(! kubectl get pod --user="missing-user" 2>&1)
+  kube::test::if_has_string "${output_message}" 'auth info "missing-user" does not exist'
+
+  # test invalid config
+  kubectl config view | sed -E "s/apiVersion: .*/apiVersion: v-1/g" > /tmp/newconfig.yaml
+  output_message=$(! "${KUBE_OUTPUT_HOSTBIN}/kubectl" get pods --context="" --user="" --kubeconfig=/tmp/newconfig.yaml 2>&1)
+  kube::test::if_has_string "${output_message}" "failed to get client"
+
+  output_message=$(! kubectl get pod --kubeconfig=missing-config 2>&1)
+  kube::test::if_has_string "${output_message}" 'no such file or directory'
+
+  output_message=$(! kubectl get pod --cluster="" --user="" --context="" --server=org 2>&1)
+  kube::test::if_has_string "${output_message}" 'Unable to connect'
+
+  ####################
   # Service Accounts #
   ####################
 
