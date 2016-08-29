@@ -19,8 +19,12 @@ package common
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path"
+	"path/filepath"
 
+	"github.com/golang/glog"
+	"github.com/opencontainers/runc/libcontainer/selinux"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/apimachinery/registered"
@@ -86,12 +90,20 @@ var _ = framework.KubeDescribe("HostPath", func() {
 		subPath := "sub-path"
 		fileName := "test-file"
 		retryDuration := 180
+		hostPath := "/tmp"
 
 		filePathInWriter := path.Join(volumePath, fileName)
 		filePathInReader := path.Join(volumePath, subPath, fileName)
 
+		if selinux.SelinuxEnabled() {
+			filePath := path.Join(hostPath, subPath)
+			if err := relabelPathByChcon(filePath); err != nil {
+				glog.Warningf("%v", err)
+			}
+		}
+
 		source := &api.HostPathVolumeSource{
-			Path: "/tmp",
+			Path: hostPath,
 		}
 		pod := testPodWithHostVol(volumePath, source)
 		// Write the file in the subPath from container 0
@@ -168,4 +180,28 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 			Volumes:       mount(source),
 		},
 	}
+}
+
+// relabelPathByChcon relabels selinux context of the provided path
+func relabelPathByChcon(path string) error {
+	dir, err := filepath.Abs(path)
+	if err != nil {
+		return fmt.Errorf("error converting directory '%s' to an absolute path: %v", path, err)
+	}
+
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("couldn't create directory on host '%s': %s", dir, err)
+		}
+	}
+
+	if chconPath, err := exec.LookPath("chcon"); err != nil {
+		return fmt.Errorf("couldn't locate the command chcon on host: %v", err)
+	} else {
+		c := exec.Command(chconPath, "-Rt", "svirt_sandbox_file_t", dir)
+		if err := c.Run(); err != nil {
+			return fmt.Errorf("error relabelling dir %s: %v", dir, err)
+		}
+	}
+	return nil
 }
