@@ -27,6 +27,86 @@ import (
 	"k8s.io/kubernetes/pkg/watch"
 )
 
+// A structure that distributes eventes to multiple watchers.
+type WatcherDispatcher struct {
+	sync.Mutex
+	watchers    []*watch.FakeWatcher
+	eventsSoFar []*watch.Event
+}
+
+func (wd *WatcherDispatcher) register(watcher *watch.FakeWatcher) {
+	wd.Lock()
+	defer wd.Unlock()
+	wd.watchers = append(wd.watchers, watcher)
+	for _, event := range wd.eventsSoFar {
+		watcher.Action(event.Type, event.Object)
+	}
+}
+
+// Add sends an add event.
+func (wd *WatcherDispatcher) Add(obj runtime.Object) {
+	wd.Lock()
+	defer wd.Unlock()
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Added, Object: obj})
+	for _, watcher := range wd.watchers {
+		if !watcher.IsStopped() {
+			watcher.Add(obj)
+		}
+	}
+}
+
+// Modify sends a modify event.
+func (wd *WatcherDispatcher) Modify(obj runtime.Object) {
+	wd.Lock()
+	defer wd.Unlock()
+	glog.V(4).Infof("->WatcherDispatcher.Modify(%v)", obj)
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Modified, Object: obj})
+	for i, watcher := range wd.watchers {
+		if !watcher.IsStopped() {
+			glog.V(4).Infof("->Watcher(%d).Modify(%v)", i, obj)
+			watcher.Modify(obj)
+		} else {
+			glog.V(4).Infof("->Watcher(%d) is stopped.  Not calling Modify(%v)", i, obj)
+		}
+	}
+}
+
+// Delete sends a delete event.
+func (wd *WatcherDispatcher) Delete(lastValue runtime.Object) {
+	wd.Lock()
+	defer wd.Unlock()
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Deleted, Object: lastValue})
+	for _, watcher := range wd.watchers {
+		if !watcher.IsStopped() {
+			watcher.Delete(lastValue)
+		}
+	}
+}
+
+// Error sends an Error event.
+func (wd *WatcherDispatcher) Error(errValue runtime.Object) {
+	wd.Lock()
+	defer wd.Unlock()
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: watch.Error, Object: errValue})
+	for _, watcher := range wd.watchers {
+		if !watcher.IsStopped() {
+			watcher.Error(errValue)
+		}
+	}
+}
+
+// Action sends an event of the requested type, for table-based testing.
+func (wd *WatcherDispatcher) Action(action watch.EventType, obj runtime.Object) {
+	wd.Lock()
+	defer wd.Unlock()
+	wd.eventsSoFar = append(wd.eventsSoFar, &watch.Event{Type: action, Object: obj})
+	for _, watcher := range wd.watchers {
+		if !watcher.IsStopped() {
+			watcher.Action(action, obj)
+		}
+	}
+}
+
 // RegisterFakeWatch adds a new fake watcher for the specified resource in the given fake client.
 // All subsequent requrest for watch on the client will result in returning this fake watcher.
 func RegisterFakeWatch(resource string, client *core.Fake) *watch.FakeWatcher {
@@ -83,7 +163,8 @@ func GetObjectFromChan(c chan runtime.Object) runtime.Object {
 	select {
 	case obj := <-c:
 		return obj
-	case <-time.After(time.Minute):
+	case <-time.After(20 * time.Second):
+		pprof.Lookup("goroutine").WriteTo(os.Stderr, 1)
 		return nil
 	}
 }

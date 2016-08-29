@@ -20,6 +20,8 @@ import (
 	"sync"
 
 	"k8s.io/kubernetes/pkg/runtime"
+
+	"github.com/golang/glog"
 )
 
 // Interface can be implemented by anything that knows how to watch and report changes.
@@ -94,6 +96,7 @@ func (f *FakeWatcher) Stop() {
 	f.Lock()
 	defer f.Unlock()
 	if !f.Stopped {
+		glog.V(4).Infof("Stopping fake watcher.")
 		close(f.result)
 		f.Stopped = true
 	}
