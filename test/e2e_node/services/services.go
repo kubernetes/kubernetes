@@ -347,7 +347,7 @@ func (es *e2eService) startKubeletServer() (*server, error) {
 		cmdArgs = append(cmdArgs, systemdRun, "--unit="+unitName, "--remain-after-exit", build.GetKubeletServerBin())
 		killCommand = exec.Command("sudo", "systemctl", "kill", unitName)
 		restartCommand = exec.Command("sudo", "systemctl", "restart", unitName)
-		es.logFiles["kubelet.log"] = logFileData{
+		es.logFiles["kubelet-journald.log"] = logFileData{
 			journalctlCommand: []string{"-u", unitName},
 		}
 		framework.TestContext.EvictionHard = adjustConfigForSystemd(framework.TestContext.EvictionHard)
