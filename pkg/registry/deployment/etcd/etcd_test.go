@@ -93,6 +93,7 @@ var validDeployment = *validNewDeployment()
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Deployment.Store)
 	deployment := validNewDeployment()
 	deployment.ObjectMeta = api.ObjectMeta{}
@@ -112,6 +113,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Deployment.Store)
 	test.TestUpdate(
 		// valid
@@ -144,6 +146,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Deployment.Store)
 	test.TestDelete(validNewDeployment())
 }
@@ -151,6 +154,7 @@ func TestDelete(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Deployment.Store)
 	test.TestGet(validNewDeployment())
 }
@@ -158,6 +162,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Deployment.Store)
 	test.TestList(validNewDeployment())
 }
@@ -165,6 +170,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Deployment.Store)
 	test.TestWatch(
 		validNewDeployment(),
@@ -190,7 +196,7 @@ func TestWatch(t *testing.T) {
 func TestScaleGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-
+	defer storage.Deployment.Store.DestroyFunc()
 	var deployment extensions.Deployment
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
@@ -227,7 +233,7 @@ func TestScaleGet(t *testing.T) {
 func TestScaleUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-
+	defer storage.Deployment.Store.DestroyFunc()
 	var deployment extensions.Deployment
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
@@ -265,7 +271,7 @@ func TestScaleUpdate(t *testing.T) {
 func TestStatusUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
-
+	defer storage.Deployment.Store.DestroyFunc()
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 	key := etcdtest.AddPrefix("/deployments/" + namespace + "/" + name)
 	if err := storage.Deployment.Storage.Create(ctx, key, &validDeployment, nil, 0); err != nil {
@@ -348,6 +354,7 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 				t.Errorf("%s: expected: %v, got: %v", k, *d.(*extensions.Deployment).Spec.RollbackTo, test.rollback.RollbackTo)
 			}
 		}
+		storage.Deployment.Store.DestroyFunc()
 		server.Terminate(t)
 	}
 }
@@ -357,6 +364,7 @@ func TestEtcdCreateDeploymentRollback(t *testing.T) {
 func TestEtcdCreateDeploymentRollbackNoDeployment(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Deployment.Store.DestroyFunc()
 	rollbackStorage := storage.Rollback
 	ctx := api.WithNamespace(api.NewContext(), namespace)
 

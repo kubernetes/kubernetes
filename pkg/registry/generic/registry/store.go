@@ -91,6 +91,9 @@ type Store struct {
 	// Returns a matcher corresponding to the provided labels and fields.
 	PredicateFunc func(label labels.Selector, field fields.Selector) *generic.SelectionPredicate
 
+	// Called to cleanup storage clients.
+	DestroyFunc func()
+
 	// DeleteCollectionWorkers is the maximum number of workers in a single
 	// DeleteCollection call.
 	DeleteCollectionWorkers int
