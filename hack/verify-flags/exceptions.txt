@@ -88,6 +88,9 @@ hack/local-up-cluster.sh:        advertise_address="--advertise_address=${API_HO
 hack/local-up-cluster.sh:      runtime_config="--runtime-config=${RUNTIME_CONFIG}"
 hack/local-up-cluster.sh:    advertise_address=""
 hack/local-up-cluster.sh:    runtime_config=""
+hack/make-rules/test-e2e-node.sh:    image_project=${IMAGE_PROJECT:-"google-containers"}
+hack/make-rules/test-e2e-node.sh:  delete_instances=${DELETE_INSTANCES:-"false"}
+hack/make-rules/test-e2e-node.sh:  image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
 hack/test-update-storage-objects.sh:  local storage_backend=${1:-"${STORAGE_BACKEND_ETCD2}"}
 hack/test-update-storage-objects.sh:  local storage_media_type=${3:-""}
 hack/test-update-storage-objects.sh:  local storage_versions=${2:-""}

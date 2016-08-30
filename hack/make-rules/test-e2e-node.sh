@@ -29,28 +29,8 @@ parallelism=${PARALLELISM:-8}
 report=${REPORT:-"/tmp/"}
 artifacts=${ARTIFACTS:-"/tmp/_artifacts"}
 remote=${REMOTE:-"false"}
-images=${IMAGES:-""}
-hosts=${HOSTS:-""}
-metadata=${INSTANCE_METADATA:-""}
-gubernator=${GUBERNATOR:-"false"}
-if [[ $hosts == "" && $images == "" ]]; then
-  gci_image=$(gcloud compute images list --project google-containers \
-    --no-standard-images --regexp="gci-dev.*" --format="table[no-heading](name)")
-  images=$gci_image
-  metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml"
-fi
-image_project=${IMAGE_PROJECT:-"google-containers"}
-instance_prefix=${INSTANCE_PREFIX:-"test"}
-cleanup=${CLEANUP:-"true"}
-delete_instances=${DELETE_INSTANCES:-"false"}
 run_until_failure=${RUN_UNTIL_FAILURE:-"false"}
-list_images=${LIST_IMAGES:-"false"}
 test_args=${TEST_ARGS:-""}
-
-if  [[ $list_images == "true" ]]; then
-  gcloud compute images list --project="${image_project}" | grep "e2e-node"
-  exit 0
-fi
 
 # Parse the flags to pass to ginkgo
 ginkgoflags=""
@@ -72,6 +52,28 @@ fi
 
 
 if [ $remote = true ] ; then
+  # The following options are only valid in remote run.
+  images=${IMAGES:-""}
+  hosts=${HOSTS:-""}
+  image_project=${IMAGE_PROJECT:-"kubernetes-node-e2e-images"}
+  metadata=${INSTANCE_METADATA:-""}
+  list_images=${LIST_IMAGES:-false}
+  if  [[ $list_images == "true" ]]; then
+    gcloud compute images list --project="${image_project}" | grep "e2e-node"
+    exit 0
+  fi
+  gubernator=${GUBERNATOR:-"false"}
+  if [[ $hosts == "" && $images == "" ]]; then
+    image_project=${IMAGE_PROJECT:-"google-containers"}
+    gci_image=$(gcloud compute images list --project $image_project \
+    --no-standard-images --regexp="gci-dev.*" --format="table[no-heading](name)")
+    images=$gci_image
+    metadata="user-data<${KUBE_ROOT}/test/e2e_node/jenkins/gci-init.yaml"
+  fi
+  instance_prefix=${INSTANCE_PREFIX:-"test"}
+  cleanup=${CLEANUP:-"true"}
+  delete_instances=${DELETE_INSTANCES:-"false"}
+
   # Setup the directory to copy test artifacts (logs, junit.xml, etc) from remote host to local host
   if [[ $gubernator = true && -d "${artifacts}" ]]; then
     echo "Removing artifacts directory at ${artifacts}"
