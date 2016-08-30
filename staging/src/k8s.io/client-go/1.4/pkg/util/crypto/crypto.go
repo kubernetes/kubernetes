@@ -33,14 +33,14 @@ import (
 	"time"
 )
 
-// ShouldGenSelfSignedCerts returns false if the certificate or key files already exists,
-// otherwise returns true.
-func ShouldGenSelfSignedCerts(certPath, keyPath string) bool {
+// FoundCertOrKey returns true if the certificate or key files already exists,
+// otherwise returns false.
+func FoundCertOrKey(certPath, keyPath string) bool {
 	if canReadFile(certPath) || canReadFile(keyPath) {
-		return false
+		return true
 	}
 
-	return true
+	return false
 }
 
 // If the file represented by path exists and
@@ -109,21 +109,43 @@ func GenerateSelfSignedCert(host, certPath, keyPath string, alternateIPs []net.I
 	}
 
 	// Write cert
-	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(certPath, certBuffer.Bytes(), os.FileMode(0644)); err != nil {
+	if err := WriteCertToPath(certPath, certBuffer.Bytes()); err != nil {
 		return err
 	}
 
 	// Write key
-	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0755)); err != nil {
-		return err
-	}
-	if err := ioutil.WriteFile(keyPath, keyBuffer.Bytes(), os.FileMode(0600)); err != nil {
+	if err := WriteKeyToPath(keyPath, keyBuffer.Bytes()); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// WriteCertToPath writes the pem-encoded certificate data to certPath.
+// The certificate file will be created with file mode 0644.
+// If the certificate file already exists, it will be overwritten.
+// The parent directory of the certPath will be created as needed with file mode 0755.
+func WriteCertToPath(certPath string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(certPath), os.FileMode(0755)); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(certPath, data, os.FileMode(0644)); err != nil {
+		return err
+	}
+	return nil
+}
+
+// WriteKeyToPath writes the pem-encoded key data to keyPath.
+// The key file will be created with file mode 0600.
+// If the key file already exists, it will be overwritten.
+// The parent directory of the keyPath will be created as needed with file mode 0755.
+func WriteKeyToPath(keyPath string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(keyPath), os.FileMode(0755)); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(keyPath, data, os.FileMode(0600)); err != nil {
+		return err
+	}
 	return nil
 }
 

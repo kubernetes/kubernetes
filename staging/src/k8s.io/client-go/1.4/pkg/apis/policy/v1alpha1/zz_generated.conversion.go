@@ -22,6 +22,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/client-go/1.4/pkg/api"
+	v1 "k8s.io/client-go/1.4/pkg/api/v1"
 	policy "k8s.io/client-go/1.4/pkg/apis/policy"
 	conversion "k8s.io/client-go/1.4/pkg/conversion"
 	runtime "k8s.io/client-go/1.4/pkg/runtime"
@@ -35,6 +36,8 @@ func init() {
 // Public to allow building arbitrary schemes.
 func RegisterConversions(scheme *runtime.Scheme) error {
 	return scheme.AddGeneratedConversionFuncs(
+		Convert_v1alpha1_Eviction_To_policy_Eviction,
+		Convert_policy_Eviction_To_v1alpha1_Eviction,
 		Convert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget,
 		Convert_policy_PodDisruptionBudget_To_v1alpha1_PodDisruptionBudget,
 		Convert_v1alpha1_PodDisruptionBudgetList_To_policy_PodDisruptionBudgetList,
@@ -44,6 +47,56 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_v1alpha1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus,
 		Convert_policy_PodDisruptionBudgetStatus_To_v1alpha1_PodDisruptionBudgetStatus,
 	)
+}
+
+func autoConvert_v1alpha1_Eviction_To_policy_Eviction(in *Eviction, out *policy.Eviction, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if in.DeleteOptions != nil {
+		in, out := &in.DeleteOptions, &out.DeleteOptions
+		*out = new(api.DeleteOptions)
+		// TODO: Inefficient conversion - can we improve it?
+		if err := s.Convert(*in, *out, 0); err != nil {
+			return err
+		}
+	} else {
+		out.DeleteOptions = nil
+	}
+	return nil
+}
+
+func Convert_v1alpha1_Eviction_To_policy_Eviction(in *Eviction, out *policy.Eviction, s conversion.Scope) error {
+	return autoConvert_v1alpha1_Eviction_To_policy_Eviction(in, out, s)
+}
+
+func autoConvert_policy_Eviction_To_v1alpha1_Eviction(in *policy.Eviction, out *Eviction, s conversion.Scope) error {
+	if err := api.Convert_unversioned_TypeMeta_To_unversioned_TypeMeta(&in.TypeMeta, &out.TypeMeta, s); err != nil {
+		return err
+	}
+	// TODO: Inefficient conversion - can we improve it?
+	if err := s.Convert(&in.ObjectMeta, &out.ObjectMeta, 0); err != nil {
+		return err
+	}
+	if in.DeleteOptions != nil {
+		in, out := &in.DeleteOptions, &out.DeleteOptions
+		*out = new(v1.DeleteOptions)
+		// TODO: Inefficient conversion - can we improve it?
+		if err := s.Convert(*in, *out, 0); err != nil {
+			return err
+		}
+	} else {
+		out.DeleteOptions = nil
+	}
+	return nil
+}
+
+func Convert_policy_Eviction_To_v1alpha1_Eviction(in *policy.Eviction, out *Eviction, s conversion.Scope) error {
+	return autoConvert_policy_Eviction_To_v1alpha1_Eviction(in, out, s)
 }
 
 func autoConvert_v1alpha1_PodDisruptionBudget_To_policy_PodDisruptionBudget(in *PodDisruptionBudget, out *policy.PodDisruptionBudget, s conversion.Scope) error {

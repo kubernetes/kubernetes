@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/1.4/pkg/fields"
 	"k8s.io/client-go/1.4/pkg/labels"
 	"k8s.io/client-go/1.4/pkg/runtime"
+	"k8s.io/client-go/1.4/pkg/selection"
 	"k8s.io/client-go/1.4/pkg/types"
 	"k8s.io/client-go/1.4/pkg/util/sets"
 
@@ -222,6 +223,10 @@ func IsServiceIPSet(service *Service) bool {
 
 // this function aims to check if the service's cluster IP is requested or not
 func IsServiceIPRequested(service *Service) bool {
+	// ExternalName services are CNAME aliases to external ones. Ignore the IP.
+	if service.Spec.Type == ServiceTypeExternalName {
+		return false
+	}
 	return service.Spec.ClusterIP == ""
 }
 
@@ -379,20 +384,20 @@ func NodeSelectorRequirementsAsSelector(nsm []NodeSelectorRequirement) (labels.S
 	}
 	selector := labels.NewSelector()
 	for _, expr := range nsm {
-		var op labels.Operator
+		var op selection.Operator
 		switch expr.Operator {
 		case NodeSelectorOpIn:
-			op = labels.InOperator
+			op = selection.In
 		case NodeSelectorOpNotIn:
-			op = labels.NotInOperator
+			op = selection.NotIn
 		case NodeSelectorOpExists:
-			op = labels.ExistsOperator
+			op = selection.Exists
 		case NodeSelectorOpDoesNotExist:
-			op = labels.DoesNotExistOperator
+			op = selection.DoesNotExist
 		case NodeSelectorOpGt:
-			op = labels.GreaterThanOperator
+			op = selection.GreaterThan
 		case NodeSelectorOpLt:
-			op = labels.LessThanOperator
+			op = selection.LessThan
 		default:
 			return nil, fmt.Errorf("%q is not a valid node selector operator", expr.Operator)
 		}
@@ -433,6 +438,20 @@ const (
 	// PreferAvoidPodsAnnotationKey represents the key of preferAvoidPods data (json serialized)
 	// in the Annotations of a Node.
 	PreferAvoidPodsAnnotationKey string = "scheduler.alpha.kubernetes.io/preferAvoidPods"
+
+	// SysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
+	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
+	// key-value pairs. Only a limited set of whitelisted and isolated sysctls is supported by
+	// the kubelet. Pods with other sysctls will fail to launch.
+	SysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/sysctls"
+
+	// UnsafeSysctlsPodAnnotationKey represents the key of sysctls which are set for the infrastructure
+	// container of a pod. The annotation value is a comma separated list of sysctl_name=value
+	// key-value pairs. Unsafe sysctls must be explicitly enabled for a kubelet. They are properly
+	// namespaced to a pod or a container, but their isolation is usually unclear or weak. Their use
+	// is at-your-own-risk. Pods that attempt to set an unsafe sysctl that is not enabled for a kubelet
+	// will fail to launch.
+	UnsafeSysctlsPodAnnotationKey string = "security.alpha.kubernetes.io/unsafe-sysctls"
 )
 
 // GetAffinityFromPod gets the json serialized affinity data from Pod.Annotations
@@ -516,4 +535,52 @@ func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (AvoidPods, 
 		}
 	}
 	return avoidPods, nil
+}
+
+// SysctlsFromPodAnnotations parses the sysctl annotations into a slice of safe Sysctls
+// and a slice of unsafe Sysctls. This is only a convenience wrapper around
+// SysctlsFromPodAnnotation.
+func SysctlsFromPodAnnotations(a map[string]string) ([]Sysctl, []Sysctl, error) {
+	safe, err := SysctlsFromPodAnnotation(a[SysctlsPodAnnotationKey])
+	if err != nil {
+		return nil, nil, err
+	}
+	unsafe, err := SysctlsFromPodAnnotation(a[UnsafeSysctlsPodAnnotationKey])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return safe, unsafe, nil
+}
+
+// SysctlsFromPodAnnotation parses an annotation value into a slice of Sysctls.
+func SysctlsFromPodAnnotation(annotation string) ([]Sysctl, error) {
+	if len(annotation) == 0 {
+		return nil, nil
+	}
+
+	kvs := strings.Split(annotation, ",")
+	sysctls := make([]Sysctl, len(kvs))
+	for i, kv := range kvs {
+		cs := strings.Split(kv, "=")
+		if len(cs) != 2 {
+			return nil, fmt.Errorf("sysctl %q not of the format sysctl_name=value", kv)
+		}
+		sysctls[i].Name = cs[0]
+		sysctls[i].Value = cs[1]
+	}
+	return sysctls, nil
+}
+
+// PodAnnotationsFromSysctls creates an annotation value for a slice of Sysctls.
+func PodAnnotationsFromSysctls(sysctls []Sysctl) string {
+	if len(sysctls) == 0 {
+		return ""
+	}
+
+	kvs := make([]string, len(sysctls))
+	for i := range sysctls {
+		kvs[i] = fmt.Sprintf("%s=%s", sysctls[i].Name, sysctls[i].Value)
+	}
+	return strings.Join(kvs, ",")
 }

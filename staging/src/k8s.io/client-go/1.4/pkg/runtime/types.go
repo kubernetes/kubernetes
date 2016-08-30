@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/golang/glog"
@@ -136,6 +137,21 @@ type Unstructured struct {
 	// Object is a JSON compatible map with string, float, int, []interface{}, or map[string]interface{}
 	// children.
 	Object map[string]interface{}
+}
+
+// MarshalJSON ensures that the unstructured object produces proper
+// JSON when passed to Go's standard JSON library.
+func (u *Unstructured) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	err := UnstructuredJSONScheme.Encode(u, &buf)
+	return buf.Bytes(), err
+}
+
+// UnmarshalJSON ensures that the unstructured object properly decodes
+// JSON when passed to Go's standard JSON library.
+func (u *Unstructured) UnmarshalJSON(b []byte) error {
+	_, _, err := UnstructuredJSONScheme.Decode(b, nil, u)
+	return err
 }
 
 func getNestedField(obj map[string]interface{}, fields ...string) interface{} {
@@ -440,6 +456,14 @@ func (u *Unstructured) SetFinalizers(finalizers []string) {
 	u.setNestedSlice(finalizers, "metadata", "finalizers")
 }
 
+func (u *Unstructured) GetClusterName() string {
+	return getNestedString(u.Object, "metadata", "clusterName")
+}
+
+func (u *Unstructured) SetClusterName(clusterName string) {
+	u.setNestedField(clusterName, "metadata", "clusterName")
+}
+
 // UnstructuredList allows lists that do not have Golang structs
 // registered to be manipulated generically. This can be used to deal
 // with the API lists from a plug-in.
@@ -448,6 +472,21 @@ type UnstructuredList struct {
 
 	// Items is a list of unstructured objects.
 	Items []*Unstructured `json:"items"`
+}
+
+// MarshalJSON ensures that the unstructured list object produces proper
+// JSON when passed to Go's standard JSON library.
+func (u *UnstructuredList) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	err := UnstructuredJSONScheme.Encode(u, &buf)
+	return buf.Bytes(), err
+}
+
+// UnmarshalJSON ensures that the unstructured list object properly
+// decodes JSON when passed to Go's standard JSON library.
+func (u *UnstructuredList) UnmarshalJSON(b []byte) error {
+	_, _, err := UnstructuredJSONScheme.Decode(b, nil, u)
+	return err
 }
 
 func (u *UnstructuredList) setNestedField(value interface{}, fields ...string) {

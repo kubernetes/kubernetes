@@ -57,7 +57,8 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, kind := range []string{"DaemonSet", "Deployment", "Ingress"} {
+	for _, k := range []string{"DaemonSet", "Deployment", "Ingress"} {
+		kind := k // don't close over range variables
 		err = api.Scheme.AddFieldLabelConversionFunc("extensions/v1beta1", kind,
 			func(label, value string) (string, string, error) {
 				switch label {

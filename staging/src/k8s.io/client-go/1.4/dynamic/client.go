@@ -40,11 +40,7 @@ import (
 // Client is a Kubernetes client that allows you to access metadata
 // and manipulate metadata of a Kubernetes API group.
 type Client struct {
-	cl *rest.RESTClient
-}
-
-type ClientWithParameterCodec struct {
-	client         *Client
+	cl             *rest.RESTClient
 	parameterCodec runtime.ParameterCodec
 }
 
@@ -55,9 +51,12 @@ func NewClient(conf *rest.Config) (*Client, error) {
 	confCopy := *conf
 	conf = &confCopy
 
-	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
-	conf.ContentType = runtime.ContentTypeJSON
-	conf.AcceptContentTypes = runtime.ContentTypeJSON
+	contentConfig := ContentConfig()
+	contentConfig.GroupVersion = conf.GroupVersion
+	if conf.NegotiatedSerializer != nil {
+		contentConfig.NegotiatedSerializer = conf.NegotiatedSerializer
+	}
+	conf.ContentConfig = contentConfig
 
 	if conf.APIPath == "" {
 		conf.APIPath = "/api"
@@ -65,10 +64,6 @@ func NewClient(conf *rest.Config) (*Client, error) {
 
 	if len(conf.UserAgent) == 0 {
 		conf.UserAgent = rest.DefaultKubernetesUserAgent()
-	}
-	if conf.NegotiatedSerializer == nil {
-		streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
-		conf.NegotiatedSerializer = serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: dynamicCodec{}}, streamingInfo)
 	}
 
 	cl, err := rest.RESTClientFor(conf)
@@ -86,32 +81,21 @@ func (c *Client) GetRateLimiter() flowcontrol.RateLimiter {
 
 // Resource returns an API interface to the specified resource for this client's
 // group and version. If resource is not a namespaced resource, then namespace
-// is ignored.
+// is ignored. The ResourceClient inherits the parameter codec of c.
 func (c *Client) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
 	return &ResourceClient{
-		cl:       c.cl,
-		resource: resource,
-		ns:       namespace,
-	}
-}
-
-// ParameterCodec wraps a parameterCodec around the Client.
-func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *ClientWithParameterCodec {
-	return &ClientWithParameterCodec{
-		client:         c,
-		parameterCodec: parameterCodec,
-	}
-}
-
-// Resource returns an API interface to the specified resource for this client's
-// group and version. If resource is not a namespaced resource, then namespace
-// is ignored. The ResourceClient inherits the parameter codec of c.
-func (c *ClientWithParameterCodec) Resource(resource *unversioned.APIResource, namespace string) *ResourceClient {
-	return &ResourceClient{
-		cl:             c.client.cl,
+		cl:             c.cl,
 		resource:       resource,
 		ns:             namespace,
 		parameterCodec: c.parameterCodec,
+	}
+}
+
+// ParameterCodec returns a client with the provided parameter codec.
+func (c *Client) ParameterCodec(parameterCodec runtime.ParameterCodec) *Client {
+	return &Client{
+		cl:             c.cl,
+		parameterCodec: parameterCodec,
 	}
 }
 
@@ -253,6 +237,18 @@ func (dynamicCodec) Decode(data []byte, gvk *unversioned.GroupVersionKind, obj r
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
 	return runtime.UnstructuredJSONScheme.Encode(obj, w)
+}
+
+// ContentConfig returns a rest.ContentConfig for dynamic types.
+func ContentConfig() rest.ContentConfig {
+	// TODO: it's questionable that this should be using anything other than unstructured schema and JSON
+	codec := dynamicCodec{}
+	streamingInfo, _ := api.Codecs.StreamingSerializerForMediaType("application/json;stream=watch", nil)
+	return rest.ContentConfig{
+		AcceptContentTypes:   runtime.ContentTypeJSON,
+		ContentType:          runtime.ContentTypeJSON,
+		NegotiatedSerializer: serializer.NegotiatedSerializerWrapper(runtime.SerializerInfo{Serializer: codec}, streamingInfo),
+	}
 }
 
 // paramaterCodec is a codec converts an API object to query
