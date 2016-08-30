@@ -167,6 +167,13 @@ var (
 
 	// For parsing Kubectl version for version-skewed testing.
 	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
+
+	// Slice of regexps for names of pods that have to be running to consider a Node "healthy"
+	requiredPerNodePods = []*regexp.Regexp{
+		regexp.MustCompile(".*kube-proxy.*"),
+		regexp.MustCompile(".*fluentd-elasticsearch.*"),
+		regexp.MustCompile(".*node-problem-detector.*"),
+	}
 )
 
 // GetServerArchitecture fetches the architecture of the cluster's apiserver.
@@ -4003,11 +4010,12 @@ func WaitForNodeToBe(c *client.Client, name string, conditionType api.NodeCondit
 	return false
 }
 
-// checks whether all registered nodes are ready
+// checks whether all registered nodes are ready and all required Pods are running on them.
 func AllNodesReady(c *client.Client, timeout time.Duration) error {
 	Logf("Waiting up to %v for all nodes to be ready", timeout)
 
 	var notReady []api.Node
+	var missingPodsPerNode map[string][]string
 	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
 		notReady = nil
 		// It should be OK to list unschedulable Nodes here.
@@ -4020,7 +4028,38 @@ func AllNodesReady(c *client.Client, timeout time.Duration) error {
 				notReady = append(notReady, node)
 			}
 		}
-		return len(notReady) == 0, nil
+		pods, err := c.Pods(api.NamespaceAll).List(api.ListOptions{ResourceVersion: "0"})
+		if err != nil {
+			return false, err
+		}
+
+		systemPodsPerNode := make(map[string][]string)
+		for _, pod := range pods.Items {
+			if pod.Namespace == api.NamespaceSystem && pod.Status.Phase == api.PodRunning {
+				if pod.Spec.NodeName != "" {
+					systemPodsPerNode[pod.Spec.NodeName] = append(systemPodsPerNode[pod.Spec.NodeName], pod.Name)
+				}
+			}
+		}
+		missingPodsPerNode = make(map[string][]string)
+		for _, node := range nodes.Items {
+			if !system.IsMasterNode(&node) {
+				for _, requiredPod := range requiredPerNodePods {
+					foundRequired := false
+					for _, presentPod := range systemPodsPerNode[node.Name] {
+						if requiredPod.MatchString(presentPod) {
+							foundRequired = true
+							break
+						}
+					}
+					if !foundRequired {
+						missingPodsPerNode[node.Name] = append(missingPodsPerNode[node.Name], requiredPod.String())
+					}
+				}
+			}
+		}
+
+		return len(notReady) == 0 && len(missingPodsPerNode) == 0, nil
 	})
 
 	if err != nil && err != wait.ErrWaitTimeout {
@@ -4029,6 +4068,9 @@ func AllNodesReady(c *client.Client, timeout time.Duration) error {
 
 	if len(notReady) > 0 {
 		return fmt.Errorf("Not ready nodes: %v", notReady)
+	}
+	if len(missingPodsPerNode) > 0 {
+		return fmt.Errorf("Not running system Pods: %v", missingPodsPerNode)
 	}
 	return nil
 }
