@@ -48,7 +48,7 @@ limitations under the License.
 package main
 
 import (
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	"k8s.io/gengo/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/deepcopy-gen/generators"
 
 	"github.com/golang/glog"

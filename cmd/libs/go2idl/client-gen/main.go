@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	"k8s.io/gengo/args"
 	clientgenargs "k8s.io/kubernetes/cmd/libs/go2idl/client-gen/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/client-gen/generators"
 	"k8s.io/kubernetes/pkg/api/unversioned"

@@ -19,7 +19,7 @@ package generators
 import (
 	"testing"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/gengo/types"
 )
 
 func Test_isRootedUnder(t *testing.T) {
