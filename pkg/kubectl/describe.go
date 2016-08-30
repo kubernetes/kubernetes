@@ -612,6 +612,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, out)
 		case volume.VolumeSource.VsphereVolume != nil:
 			printVsphereVolumeSource(volume.VolumeSource.VsphereVolume, out)
+		case volume.VolumeSource.Cinder != nil:
+			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -746,6 +748,13 @@ func printVsphereVolumeSource(vsphere *api.VsphereVirtualDiskVolumeSource, out i
 		"    FSType:\t%v\n",
 		vsphere.VolumePath, vsphere.FSType)
 }
+func printCinderVolumeSource(cinder *api.CinderVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
+		"    VolumeID:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
+}
 
 type PersistentVolumeDescriber struct {
 	client.Interface
@@ -800,6 +809,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printQuobyteVolumeSource(pv.Spec.Quobyte, out)
 		case pv.Spec.VsphereVolume != nil:
 			printVsphereVolumeSource(pv.Spec.VsphereVolume, out)
+		case pv.Spec.Cinder != nil:
+			printCinderVolumeSource(pv.Spec.Cinder, out)
 		}
 
 		if events != nil {
