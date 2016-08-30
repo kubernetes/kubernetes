@@ -26,15 +26,16 @@ IMAGE_TAG=${IMAGE_TAG:-latest}
 script_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
 KUBE_ROOT=$(cd ${script_dir}/../../.. && pwd -P)
 
-# Find a platform specific binary, whether it was cross compiled, locally built, or downloaded.
+# Find a platform specific binary, whether it was cross compiled or locally built (on Linux)
 find-binary() {
   local lookfor="${1}"
   local platform="${2}"
   local locations=(
     "${KUBE_ROOT}/_output/dockerized/bin/${platform}/${lookfor}"
-    "${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
-    "${KUBE_ROOT}/platforms/${platform}/${lookfor}"
   )
+  if [ "$(uname)" = Linux ]; then
+    locations[${#locations[*]}]="${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
+  fi
   local bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
   echo -n "${bin}"
 }
