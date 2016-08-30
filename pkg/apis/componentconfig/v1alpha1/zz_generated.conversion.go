@@ -22,6 +22,7 @@ package v1alpha1
 
 import (
 	api "k8s.io/kubernetes/pkg/api"
+	v1 "k8s.io/kubernetes/pkg/api/v1"
 	componentconfig "k8s.io/kubernetes/pkg/apis/componentconfig"
 	conversion "k8s.io/kubernetes/pkg/conversion"
 	runtime "k8s.io/kubernetes/pkg/runtime"
@@ -277,6 +278,18 @@ func autoConvert_v1alpha1_KubeletConfiguration_To_componentconfig_KubeletConfigu
 	if err := api.Convert_Pointer_bool_To_bool(&in.RegisterSchedulable, &out.RegisterSchedulable, s); err != nil {
 		return err
 	}
+	if in.RegisterWithTaints != nil {
+		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
+		*out = make([]api.Taint, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RegisterWithTaints = nil
+	}
 	out.ContentType = in.ContentType
 	if err := api.Convert_Pointer_int32_To_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
 		return err
@@ -454,6 +467,18 @@ func autoConvert_componentconfig_KubeletConfiguration_To_v1alpha1_KubeletConfigu
 	}
 	if err := api.Convert_bool_To_Pointer_bool(&in.RegisterSchedulable, &out.RegisterSchedulable, s); err != nil {
 		return err
+	}
+	if in.RegisterWithTaints != nil {
+		in, out := &in.RegisterWithTaints, &out.RegisterWithTaints
+		*out = make([]v1.Taint, len(*in))
+		for i := range *in {
+			// TODO: Inefficient conversion - can we improve it?
+			if err := s.Convert(&(*in)[i], &(*out)[i], 0); err != nil {
+				return err
+			}
+		}
+	} else {
+		out.RegisterWithTaints = nil
 	}
 	out.ContentType = in.ContentType
 	if err := api.Convert_int32_To_Pointer_int32(&in.KubeAPIQPS, &out.KubeAPIQPS, s); err != nil {
