@@ -33,7 +33,7 @@ limitations under the License.
 //     {
 //       "SelectorRegexp": "k8s[.]io",
 //       "AllowedPrefixes": [
-//         "k8s.io/kubernetes/cmd/libs/go2idl",
+//         "k8s.io/gengo/examples",
 //         "k8s.io/kubernetes/third_party"
 //       ],
 //       "ForbiddenPrefixes": [
@@ -59,7 +59,7 @@ import (
 	"os"
 
 	"k8s.io/gengo/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/import-boss/generators"
+	"k8s.io/gengo/examples/import-boss/generators"
 
 	"github.com/golang/glog"
 )
