@@ -75,47 +75,6 @@ func AllPtrFieldsNil(obj interface{}) bool {
 	return true
 }
 
-func FileExists(filename string) (bool, error) {
-	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-// borrowed from ioutil.ReadDir
-// ReadDir reads the directory named by dirname and returns
-// a list of directory entries, minus those with lstat errors
-func ReadDirNoExit(dirname string) ([]os.FileInfo, []error, error) {
-	if dirname == "" {
-		dirname = "."
-	}
-
-	f, err := os.Open(dirname)
-	if err != nil {
-		return nil, nil, err
-	}
-	defer f.Close()
-
-	names, err := f.Readdirnames(-1)
-	list := make([]os.FileInfo, 0, len(names))
-	errs := make([]error, 0, len(names))
-	for _, filename := range names {
-		fip, lerr := os.Lstat(dirname + "/" + filename)
-		if os.IsNotExist(lerr) {
-			// File disappeared between readdir + stat.
-			// Just treat it as if it didn't exist.
-			continue
-		}
-
-		list = append(list, fip)
-		errs = append(errs, lerr)
-	}
-
-	return list, errs, nil
-}
-
 // IntPtr returns a pointer to an int
 func IntPtr(i int) *int {
 	o := i
@@ -144,4 +103,13 @@ func Int32PtrDerefOr(ptr *int32, def int32) int32 {
 		return *ptr
 	}
 	return def
+}
+
+func FileExists(filename string) (bool, error) {
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }
