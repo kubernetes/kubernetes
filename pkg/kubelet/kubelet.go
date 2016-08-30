@@ -179,7 +179,7 @@ type Option func(*Kubelet)
 
 // bootstrapping interface for kubelet, targets the initialization protocol
 type KubeletBootstrap interface {
-	GetConfiguration() *componentconfig.KubeletConfiguration
+	GetConfiguration() componentconfig.KubeletConfiguration
 	BirthCry()
 	StartGarbageCollection()
 	ListenAndServe(address net.IP, port uint, tlsOptions *server.TLSOptions, auth server.AuthInterface, enableDebuggingHandlers bool)
@@ -745,7 +745,7 @@ func NewMainKubelet(kubeCfg *componentconfig.KubeletConfiguration, kubeDeps *Kub
 
 	// Finally, put the most recent version of the config on the Kubelet, so
 	// people can see how it was configured.
-	klet.kubeletConfiguration = kubeCfg
+	klet.kubeletConfiguration = *kubeCfg
 	return klet, nil
 }
 
@@ -759,7 +759,7 @@ type nodeLister interface {
 
 // Kubelet is the main kubelet implementation.
 type Kubelet struct {
-	kubeletConfiguration *componentconfig.KubeletConfiguration
+	kubeletConfiguration componentconfig.KubeletConfiguration
 
 	hostname      string
 	nodeName      string
@@ -3043,7 +3043,7 @@ func (kl *Kubelet) PortForward(podFullName string, podUID types.UID, port uint16
 }
 
 // GetConfiguration returns the KubeletConfiguration used to configure the kubelet.
-func (kl *Kubelet) GetConfiguration() *componentconfig.KubeletConfiguration {
+func (kl *Kubelet) GetConfiguration() componentconfig.KubeletConfiguration {
 	return kl.kubeletConfiguration
 }
 
