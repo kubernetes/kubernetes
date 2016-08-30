@@ -43,7 +43,7 @@ func newConsulStorage(c storagebackend.Config) (storage.Interface, func(), error
 			continue
 		}
 
-		clientConfig = getConsulApiConfig(parsed, c.KeyFile, c.CertFile, c.CAFile)
+		clientConfig = getConsulAPIConfig(parsed, c.KeyFile, c.CertFile, c.CAFile)
 		consulClient, err = consulapi.NewClient(clientConfig)
 		if err != nil {
 			continue
@@ -61,7 +61,7 @@ func newConsulStorage(c storagebackend.Config) (storage.Interface, func(), error
 	return consul.NewConsulStorage(*consulClient, c.Codec, c.Prefix, *clientConfig), destroyFunc, nil
 }
 
-func getConsulApiConfig(server *url.URL, KeyFile, CertFile, CAFile string) *consulapi.Config {
+func getConsulAPIConfig(server *url.URL, KeyFile, CertFile, CAFile string) *consulapi.Config {
 	config := consulapi.DefaultConfig()
 
 	customTransport := http.DefaultTransport
