@@ -51,18 +51,16 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		// TODO this needs a volume
 		"etcd": componentPod(api.Container{
 			Command: []string{
-				"/bin/sh", // TODO do we really need the parent shell here?
-				"-c",
-				"/usr/local/bin/etcd --listen-peer-urls http://127.0.0.1:2380 --addr 127.0.0.1:2379 --bind-addr 127.0.0.1:2379 --data-dir /var/etcd/data",
+				"/usr/local/bin/etcd",
+				"--listen-peer-urls=http://127.0.0.1:2380",
+				"--addr=127.0.0.1:2379",
+				"--bind-addr=127.0.0.1:2379",
+				"--data-dir=/var/etcd/data",
 			},
 			Image:         "gcr.io/google_containers/etcd:2.2.1", // TODO parametrise
 			LivenessProbe: componentProbe(2379, "/health"),
 			Name:          "etcd-server",
-			Ports: []api.ContainerPort{
-				{Name: "serverport", ContainerPort: 2380, HostPort: 2380},
-				{Name: "clientport", ContainerPort: 2379, HostPort: 2379},
-			},
-			Resources: componentResources("200m"),
+			Resources:     componentResources("200m"),
 		}),
 		// TODO bind-mount certs in
 		"kube-apiserver": componentPod(api.Container{
@@ -87,11 +85,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 			},
 			VolumeMounts:  []api.VolumeMount{pkiVolumeMount()},
 			LivenessProbe: componentProbe(8080, "/healthz"),
-			Ports: []api.ContainerPort{
-				{Name: "https", ContainerPort: 443, HostPort: 443},
-				{Name: "local", ContainerPort: 8080, HostPort: 8080},
-			},
-			Resources: componentResources("250m"),
+			Resources:     componentResources("250m"),
 		}, pkiVolume(params)),
 		"kube-controller-manager": componentPod(api.Container{
 			Name:  "kube-controller-manager",
