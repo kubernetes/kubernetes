@@ -133,13 +133,16 @@ func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *EditOptions) error {
 	var printer kubectl.ResourcePrinter
 	var ext string
+	var addHeader bool
 	switch format := cmdutil.GetFlagString(cmd, "output"); format {
 	case "json":
 		printer = &kubectl.JSONPrinter{}
 		ext = ".json"
+		addHeader = false
 	case "yaml":
 		printer = &kubectl.YAMLPrinter{}
 		ext = ".yaml"
+		addHeader = true
 	default:
 		return cmdutil.UsageError(cmd, "The flag 'output' must be one of yaml|json")
 	}
@@ -218,7 +221,9 @@ func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args
 				w = crlf.NewCRLFWriter(w)
 			}
 
-			results.header.writeTo(w)
+			if addHeader {
+				results.header.writeTo(w)
+			}
 
 			if !containsError {
 				if err := printer.PrintObj(objToEdit, w); err != nil {
