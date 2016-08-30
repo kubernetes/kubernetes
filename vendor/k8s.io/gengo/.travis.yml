@@ -1,0 +1,12 @@
+language: go
+go:
+  - 1.6
+  - 1.7
+  - tip
+
+go_import_path: k8s.io/gengo
+
+script:
+  - go test -v ./...
+  - go run ./examples/set-gen/main.go -i k8s.io/gengo/examples/set-gen/sets/types -o ./examples/set-gen/sets --verify-only
+  - go run ./examples/import-boss/main.go -i k8s.io/gengo/... --verify-only
