@@ -1215,6 +1215,7 @@ func DeepCopy_v1beta1_ReplicaSetStatus(in interface{}, out interface{}, c *conve
 		out := out.(*ReplicaSetStatus)
 		out.Replicas = in.Replicas
 		out.FullyLabeledReplicas = in.FullyLabeledReplicas
+		out.ReadyReplicas = in.ReadyReplicas
 		out.ObservedGeneration = in.ObservedGeneration
 		return nil
 	}

@@ -15,22 +15,3 @@ limitations under the License.
 */
 
 package v1beta1
-
-import (
-	authorizationapi "k8s.io/client-go/1.4/pkg/apis/authorization/v1beta1"
-)
-
-// The PodExpansion interface allows manually adding extra methods to the PodInterface.
-type SubjectAccessReviewExpansion interface {
-	Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error)
-}
-
-func (c *subjectAccessReviews) Create(sar *authorizationapi.SubjectAccessReview) (result *authorizationapi.SubjectAccessReview, err error) {
-	result = &authorizationapi.SubjectAccessReview{}
-	err = c.client.Post().
-		Resource("subjectaccessreviews").
-		Body(sar).
-		Do().
-		Into(result)
-	return
-}

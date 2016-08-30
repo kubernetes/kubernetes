@@ -29,7 +29,7 @@ package v1alpha1
 // AUTO-GENERATED FUNCTIONS START HERE
 var map_CertificateSigningRequest = map[string]string{
 	"":       "Describes a certificate signing request",
-	"spec":   "The certificate request itself and any additonal information.",
+	"spec":   "The certificate request itself and any additional information.",
 	"status": "Derived information about the request.",
 }
 
