@@ -23,7 +23,6 @@ import (
 	"github.com/spf13/pflag"
 	"k8s.io/kubernetes/contrib/mesos/pkg/executor/service"
 	"k8s.io/kubernetes/contrib/mesos/pkg/hyperkube"
-	"k8s.io/kubernetes/pkg/util"
 	"k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
