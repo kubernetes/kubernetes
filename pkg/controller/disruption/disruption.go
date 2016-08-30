@@ -88,7 +88,7 @@ func NewDisruptionController(podInformer framework.SharedIndexInformer, kubeClie
 	dc := &DisruptionController{
 		kubeClient:    kubeClient,
 		podController: podInformer.GetController(),
-		queue:         workqueue.New(),
+		queue:         workqueue.NewNamed("disruption"),
 		broadcaster:   record.NewBroadcaster(),
 	}
 	dc.recorder = dc.broadcaster.NewRecorder(api.EventSource{Component: "controllermanager"})

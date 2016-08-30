@@ -107,7 +107,7 @@ func NewDeploymentController(client clientset.Interface, resyncPeriod controller
 	dc := &DeploymentController{
 		client:        client,
 		eventRecorder: eventBroadcaster.NewRecorder(api.EventSource{Component: "deployment-controller"}),
-		queue:         workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter()),
+		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 
 	dc.dStore.Indexer, dc.dController = framework.NewIndexerInformer(
