@@ -49,7 +49,7 @@ package main
 
 import (
 	"k8s.io/gengo/args"
-	"k8s.io/kubernetes/cmd/libs/go2idl/deepcopy-gen/generators"
+	"k8s.io/gengo/examples/deepcopy-gen/generators"
 
 	"github.com/golang/glog"
 	"github.com/spf13/pflag"
