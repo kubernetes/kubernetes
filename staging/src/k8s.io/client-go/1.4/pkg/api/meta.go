@@ -131,3 +131,10 @@ func (meta *ObjectMeta) SetOwnerReferences(references []metatypes.OwnerReference
 	}
 	meta.OwnerReferences = newReferences
 }
+
+func (meta *ObjectMeta) GetClusterName() string {
+	return meta.ClusterName
+}
+func (meta *ObjectMeta) SetClusterName(clusterName string) {
+	meta.ClusterName = clusterName
+}

@@ -234,7 +234,7 @@ func (d *DiscoveryClient) ServerVersion() (*version.Info, error) {
 
 // SwaggerSchema retrieves and parses the swagger API schema the server supports.
 func (d *DiscoveryClient) SwaggerSchema(version unversioned.GroupVersion) (*swagger.ApiDeclaration, error) {
-	if version.IsEmpty() {
+	if version.Empty() {
 		return nil, fmt.Errorf("groupVersion cannot be empty")
 	}
 

@@ -145,16 +145,16 @@ func (c *parameterCodec) DecodeParameters(parameters url.Values, from unversione
 	}
 	targetGVK := targetGVKs[0]
 	if targetGVK.GroupVersion() == from {
-		return c.convertor.Convert(&parameters, into)
+		return c.convertor.Convert(&parameters, into, nil)
 	}
 	input, err := c.creator.New(from.WithKind(targetGVK.Kind))
 	if err != nil {
 		return err
 	}
-	if err := c.convertor.Convert(&parameters, input); err != nil {
+	if err := c.convertor.Convert(&parameters, input, nil); err != nil {
 		return err
 	}
-	return c.convertor.Convert(input, into)
+	return c.convertor.Convert(input, into, nil)
 }
 
 // EncodeParameters converts the provided object into the to version, then converts that object to url.Values.
@@ -197,4 +197,84 @@ func (s base64Serializer) Decode(data []byte, defaults *unversioned.GroupVersion
 		return nil, nil, err
 	}
 	return s.Serializer.Decode(out[:n], defaults, into)
+}
+
+var (
+	// InternalGroupVersioner will always prefer the internal version for a given group version kind.
+	InternalGroupVersioner GroupVersioner = internalGroupVersioner{}
+	// DisabledGroupVersioner will reject all kinds passed to it.
+	DisabledGroupVersioner GroupVersioner = disabledGroupVersioner{}
+)
+
+type internalGroupVersioner struct{}
+
+// KindForGroupVersionKinds returns an internal Kind if one is found, or converts the first provided kind to the internal version.
+func (internalGroupVersioner) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
+	for _, kind := range kinds {
+		if kind.Version == APIVersionInternal {
+			return kind, true
+		}
+	}
+	for _, kind := range kinds {
+		return unversioned.GroupVersionKind{Group: kind.Group, Version: APIVersionInternal, Kind: kind.Kind}, true
+	}
+	return unversioned.GroupVersionKind{}, false
+}
+
+type disabledGroupVersioner struct{}
+
+// KindForGroupVersionKinds returns false for any input.
+func (disabledGroupVersioner) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
+	return unversioned.GroupVersionKind{}, false
+}
+
+// GroupVersioners implements GroupVersioner and resolves to the first exact match for any kind.
+type GroupVersioners []GroupVersioner
+
+// KindForGroupVersionKinds returns the first match of any of the group versioners, or false if no match occured.
+func (gvs GroupVersioners) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
+	for _, gv := range gvs {
+		target, ok := gv.KindForGroupVersionKinds(kinds)
+		if !ok {
+			continue
+		}
+		return target, true
+	}
+	return unversioned.GroupVersionKind{}, false
+}
+
+// Assert that unversioned.GroupVersion and GroupVersions implement GroupVersioner
+var _ GroupVersioner = unversioned.GroupVersion{}
+var _ GroupVersioner = unversioned.GroupVersions{}
+var _ GroupVersioner = multiGroupVersioner{}
+
+type multiGroupVersioner struct {
+	target             unversioned.GroupVersion
+	acceptedGroupKinds []unversioned.GroupKind
+}
+
+// NewMultiGroupVersioner returns the provided group version for any kind that matches one of the provided group kinds.
+// Kind may be empty in the provided group kind, in which case any kind will match.
+func NewMultiGroupVersioner(gv unversioned.GroupVersion, groupKinds ...unversioned.GroupKind) GroupVersioner {
+	if len(groupKinds) == 0 || (len(groupKinds) == 1 && groupKinds[0].Group == gv.Group) {
+		return gv
+	}
+	return multiGroupVersioner{target: gv, acceptedGroupKinds: groupKinds}
+}
+
+// KindForGroupVersionKinds returns the target group version if any kind matches any of the original group kinds. It will
+// use the originating kind where possible.
+func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []unversioned.GroupVersionKind) (unversioned.GroupVersionKind, bool) {
+	for _, src := range kinds {
+		for _, kind := range v.acceptedGroupKinds {
+			if kind.Group != src.Group {
+				continue
+			}
+			if len(kind.Kind) > 0 && kind.Kind != src.Kind {
+				continue
+			}
+			return v.target.WithKind(src.Kind), true
+		}
+	}
+	return unversioned.GroupVersionKind{}, false
 }

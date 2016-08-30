@@ -16,9 +16,24 @@ limitations under the License.
 
 package v1alpha1
 
-import "k8s.io/client-go/1.4/pkg/runtime"
+import (
+	"fmt"
+
+	"k8s.io/client-go/1.4/pkg/api"
+	"k8s.io/client-go/1.4/pkg/runtime"
+)
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
 	// Add non-generated conversion functions here. Currently there are none.
-	return nil
+
+	return api.Scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.String(), "CertificateSigningRequest",
+		func(label, value string) (string, string, error) {
+			switch label {
+			case "metadata.name":
+				return label, value, nil
+			default:
+				return "", "", fmt.Errorf("field label not supported: %s", label)
+			}
+		},
+	)
 }

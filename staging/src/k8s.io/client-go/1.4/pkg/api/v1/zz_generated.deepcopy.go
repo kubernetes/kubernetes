@@ -40,6 +40,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Affinity, InType: reflect.TypeOf(&Affinity{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AttachedVolume, InType: reflect.TypeOf(&AttachedVolume{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AvoidPods, InType: reflect.TypeOf(&AvoidPods{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AzureDiskVolumeSource, InType: reflect.TypeOf(&AzureDiskVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_AzureFileVolumeSource, InType: reflect.TypeOf(&AzureFileVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Binding, InType: reflect.TypeOf(&Binding{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Capabilities, InType: reflect.TypeOf(&Capabilities{})},
@@ -153,6 +154,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferAvoidPodsEntry, InType: reflect.TypeOf(&PreferAvoidPodsEntry{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_PreferredSchedulingTerm, InType: reflect.TypeOf(&PreferredSchedulingTerm{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_Probe, InType: reflect.TypeOf(&Probe{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_QuobyteVolumeSource, InType: reflect.TypeOf(&QuobyteVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RBDVolumeSource, InType: reflect.TypeOf(&RBDVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_RangeAllocation, InType: reflect.TypeOf(&RangeAllocation{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_v1_ReplicationController, InType: reflect.TypeOf(&ReplicationController{})},
@@ -262,6 +264,37 @@ func DeepCopy_v1_AvoidPods(in interface{}, out interface{}, c *conversion.Cloner
 			}
 		} else {
 			out.PreferAvoidPods = nil
+		}
+		return nil
+	}
+}
+
+func DeepCopy_v1_AzureDiskVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*AzureDiskVolumeSource)
+		out := out.(*AzureDiskVolumeSource)
+		out.DiskName = in.DiskName
+		out.DataDiskURI = in.DataDiskURI
+		if in.CachingMode != nil {
+			in, out := &in.CachingMode, &out.CachingMode
+			*out = new(AzureDataDiskCachingMode)
+			**out = **in
+		} else {
+			out.CachingMode = nil
+		}
+		if in.FSType != nil {
+			in, out := &in.FSType, &out.FSType
+			*out = new(string)
+			**out = **in
+		} else {
+			out.FSType = nil
+		}
+		if in.ReadOnly != nil {
+			in, out := &in.ReadOnly, &out.ReadOnly
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.ReadOnly = nil
 		}
 		return nil
 	}
@@ -469,10 +502,19 @@ func DeepCopy_v1_ConfigMapVolumeSource(in interface{}, out interface{}, c *conve
 			in, out := &in.Items, &out.Items
 			*out = make([]KeyToPath, len(*in))
 			for i := range *in {
-				(*out)[i] = (*in)[i]
+				if err := DeepCopy_v1_KeyToPath(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		} else {
 			out.Items = nil
+		}
+		if in.DefaultMode != nil {
+			in, out := &in.DefaultMode, &out.DefaultMode
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.DefaultMode = nil
 		}
 		return nil
 	}
@@ -754,6 +796,13 @@ func DeepCopy_v1_DownwardAPIVolumeFile(in interface{}, out interface{}, c *conve
 		} else {
 			out.ResourceFieldRef = nil
 		}
+		if in.Mode != nil {
+			in, out := &in.Mode, &out.Mode
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.Mode = nil
+		}
 		return nil
 	}
 }
@@ -772,6 +821,13 @@ func DeepCopy_v1_DownwardAPIVolumeSource(in interface{}, out interface{}, c *con
 			}
 		} else {
 			out.Items = nil
+		}
+		if in.DefaultMode != nil {
+			in, out := &in.DefaultMode, &out.DefaultMode
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.DefaultMode = nil
 		}
 		return nil
 	}
@@ -1225,6 +1281,13 @@ func DeepCopy_v1_KeyToPath(in interface{}, out interface{}, c *conversion.Cloner
 		out := out.(*KeyToPath)
 		out.Key = in.Key
 		out.Path = in.Path
+		if in.Mode != nil {
+			in, out := &in.Mode, &out.Mode
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.Mode = nil
+		}
 		return nil
 	}
 }
@@ -1858,6 +1921,7 @@ func DeepCopy_v1_ObjectMeta(in interface{}, out interface{}, c *conversion.Clone
 		} else {
 			out.Finalizers = nil
 		}
+		out.ClusterName = in.ClusterName
 		return nil
 	}
 }
@@ -2148,6 +2212,22 @@ func DeepCopy_v1_PersistentVolumeSource(in interface{}, out interface{}, c *conv
 			**out = **in
 		} else {
 			out.VsphereVolume = nil
+		}
+		if in.Quobyte != nil {
+			in, out := &in.Quobyte, &out.Quobyte
+			*out = new(QuobyteVolumeSource)
+			**out = **in
+		} else {
+			out.Quobyte = nil
+		}
+		if in.AzureDisk != nil {
+			in, out := &in.AzureDisk, &out.AzureDisk
+			*out = new(AzureDiskVolumeSource)
+			if err := DeepCopy_v1_AzureDiskVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.AzureDisk = nil
 		}
 		return nil
 	}
@@ -2752,6 +2832,19 @@ func DeepCopy_v1_Probe(in interface{}, out interface{}, c *conversion.Cloner) er
 	}
 }
 
+func DeepCopy_v1_QuobyteVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*QuobyteVolumeSource)
+		out := out.(*QuobyteVolumeSource)
+		out.Registry = in.Registry
+		out.Volume = in.Volume
+		out.ReadOnly = in.ReadOnly
+		out.User = in.User
+		out.Group = in.Group
+		return nil
+	}
+}
+
 func DeepCopy_v1_RBDVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
 	{
 		in := in.(*RBDVolumeSource)
@@ -2876,6 +2969,7 @@ func DeepCopy_v1_ReplicationControllerStatus(in interface{}, out interface{}, c 
 		out := out.(*ReplicationControllerStatus)
 		out.Replicas = in.Replicas
 		out.FullyLabeledReplicas = in.FullyLabeledReplicas
+		out.ReadyReplicas = in.ReadyReplicas
 		out.ObservedGeneration = in.ObservedGeneration
 		return nil
 	}
@@ -3096,10 +3190,19 @@ func DeepCopy_v1_SecretVolumeSource(in interface{}, out interface{}, c *conversi
 			in, out := &in.Items, &out.Items
 			*out = make([]KeyToPath, len(*in))
 			for i := range *in {
-				(*out)[i] = (*in)[i]
+				if err := DeepCopy_v1_KeyToPath(&(*in)[i], &(*out)[i], c); err != nil {
+					return err
+				}
 			}
 		} else {
 			out.Items = nil
+		}
+		if in.DefaultMode != nil {
+			in, out := &in.DefaultMode, &out.DefaultMode
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.DefaultMode = nil
 		}
 		return nil
 	}
@@ -3327,6 +3430,7 @@ func DeepCopy_v1_ServiceSpec(in interface{}, out interface{}, c *conversion.Clon
 		} else {
 			out.LoadBalancerSourceRanges = nil
 		}
+		out.ExternalName = in.ExternalName
 		return nil
 	}
 }
@@ -3555,6 +3659,22 @@ func DeepCopy_v1_VolumeSource(in interface{}, out interface{}, c *conversion.Clo
 			**out = **in
 		} else {
 			out.VsphereVolume = nil
+		}
+		if in.Quobyte != nil {
+			in, out := &in.Quobyte, &out.Quobyte
+			*out = new(QuobyteVolumeSource)
+			**out = **in
+		} else {
+			out.Quobyte = nil
+		}
+		if in.AzureDisk != nil {
+			in, out := &in.AzureDisk, &out.AzureDisk
+			*out = new(AzureDiskVolumeSource)
+			if err := DeepCopy_v1_AzureDiskVolumeSource(*in, *out, c); err != nil {
+				return err
+			}
+		} else {
+			out.AzureDisk = nil
 		}
 		return nil
 	}

@@ -103,6 +103,7 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.ServiceAccountKeyFile = in.ServiceAccountKeyFile
 		out.ClusterSigningCertFile = in.ClusterSigningCertFile
 		out.ClusterSigningKeyFile = in.ClusterSigningKeyFile
+		out.ApproveAllKubeletCSRsForGroup = in.ApproveAllKubeletCSRsForGroup
 		out.EnableProfiling = in.EnableProfiling
 		out.ClusterName = in.ClusterName
 		out.ClusterCIDR = in.ClusterCIDR
@@ -119,6 +120,10 @@ func DeepCopy_componentconfig_KubeControllerManagerConfiguration(in interface{},
 		out.ControllerStartInterval = in.ControllerStartInterval
 		out.EnableGarbageCollector = in.EnableGarbageCollector
 		out.ConcurrentGCSyncs = in.ConcurrentGCSyncs
+		out.NodeEvictionRate = in.NodeEvictionRate
+		out.SecondaryNodeEvictionRate = in.SecondaryNodeEvictionRate
+		out.LargeClusterSizeThreshold = in.LargeClusterSizeThreshold
+		out.UnhealthyZoneThreshold = in.UnhealthyZoneThreshold
 		return nil
 	}
 }
@@ -252,6 +257,7 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.LowDiskSpaceThresholdMB = in.LowDiskSpaceThresholdMB
 		out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 		out.NetworkPluginName = in.NetworkPluginName
+		out.NetworkPluginMTU = in.NetworkPluginMTU
 		out.NetworkPluginDir = in.NetworkPluginDir
 		out.VolumePluginDir = in.VolumePluginDir
 		out.CloudProvider = in.CloudProvider
@@ -262,6 +268,8 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 		out.SystemCgroups = in.SystemCgroups
 		out.CgroupRoot = in.CgroupRoot
 		out.ContainerRuntime = in.ContainerRuntime
+		out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
+		out.RemoteImageEndpoint = in.RemoteImageEndpoint
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
@@ -326,6 +334,16 @@ func DeepCopy_componentconfig_KubeletConfiguration(in interface{}, out interface
 			out.KubeReserved = nil
 		}
 		out.ProtectKernelDefaults = in.ProtectKernelDefaults
+		out.MakeIPTablesUtilChains = in.MakeIPTablesUtilChains
+		out.IPTablesMasqueradeBit = in.IPTablesMasqueradeBit
+		out.IPTablesDropBit = in.IPTablesDropBit
+		if in.AllowedUnsafeSysctls != nil {
+			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.AllowedUnsafeSysctls = nil
+		}
 		return nil
 	}
 }

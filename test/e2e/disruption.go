@@ -22,11 +22,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	client "k8s.io/kubernetes/pkg/client/unversioned"
-	"k8s.io/kubernetes/pkg/util/intstr"
+	release_1_4 "k8s.io/client-go/1.4/kubernetes"
+	"k8s.io/client-go/1.4/pkg/api/unversioned"
+	api "k8s.io/client-go/1.4/pkg/api/v1"
+	policy "k8s.io/client-go/1.4/pkg/apis/policy/v1alpha1"
+	"k8s.io/client-go/1.4/pkg/util/intstr"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -34,10 +34,10 @@ import (
 var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudget]", func() {
 	f := framework.NewDefaultFramework("disruption")
 	var ns string
-	var c *client.Client
+	var cs *release_1_4.Clientset
 
 	BeforeEach(func() {
-		c = f.Client
+		cs = f.StagingClient
 		ns = f.Namespace.Name
 	})
 
@@ -52,7 +52,7 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 				MinAvailable: intstr.FromString("1%"),
 			},
 		}
-		_, err := c.Policy().PodDisruptionBudgets(ns).Create(&pdb)
+		_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 				MinAvailable: intstr.FromInt(2),
 			},
 		}
-		_, err := c.Policy().PodDisruptionBudgets(ns).Create(&pdb)
+		_, err := cs.Policy().PodDisruptionBudgets(ns).Create(&pdb)
 		Expect(err).NotTo(HaveOccurred())
 		for i := 0; i < 2; i++ {
 			pod := &api.Pod{
@@ -87,11 +87,11 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 				},
 			}
 
-			_, err := c.Pods(ns).Create(pod)
+			_, err := cs.Pods(ns).Create(pod)
 			framework.ExpectNoError(err, "Creating pod %q in namespace %q", pod.Name, ns)
 		}
 		err = wait.PollImmediate(framework.Poll, 60*time.Second, func() (bool, error) {
-			pdb, err := c.Policy().PodDisruptionBudgets(ns).Get("foo")
+			pdb, err := cs.Policy().PodDisruptionBudgets(ns).Get("foo")
 			if err != nil {
 				return false, err
 			}

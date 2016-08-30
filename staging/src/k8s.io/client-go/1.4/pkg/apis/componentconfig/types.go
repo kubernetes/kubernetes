@@ -66,7 +66,7 @@ type KubeProxyConfiguration struct {
 	// Must be greater than 0. Only applicable for proxyMode=userspace.
 	UDPIdleTimeout unversioned.Duration `json:"udpTimeoutMilliseconds"`
 	// conntrackMax is the maximum number of NAT connections to track (0 to
-	// leave as-is).  This takes precendence over conntrackMaxPerCore.
+	// leave as-is).  This takes precedence over conntrackMaxPerCore.
 	ConntrackMax int32 `json:"conntrackMax"`
 	// conntrackMaxPerCore is the maximum number of NAT connections to track
 	// per CPU core (0 to leave as-is).  This value is only considered if
@@ -233,7 +233,7 @@ type KubeletConfiguration struct {
 	// status to master. Note: be cautious when changing the constant, it
 	// must work with nodeMonitorGracePeriod in nodecontroller.
 	NodeStatusUpdateFrequency unversioned.Duration `json:"nodeStatusUpdateFrequency"`
-	// imageMinimumGCAge is the minimum age for a unused image before it is
+	// imageMinimumGCAge is the minimum age for an unused image before it is
 	// garbage collected.
 	ImageMinimumGCAge unversioned.Duration `json:"imageMinimumGCAge"`
 	// imageGCHighThresholdPercent is the percent of disk usage after which
@@ -252,6 +252,10 @@ type KubeletConfiguration struct {
 	// networkPluginName is the name of the network plugin to be invoked for
 	// various events in kubelet/pod lifecycle
 	NetworkPluginName string `json:"networkPluginName"`
+	// networkPluginMTU is the MTU to be passed to the network plugin,
+	// and overrides the default MTU for cases where it cannot be automatically
+	// computed (such as IPSEC).
+	NetworkPluginMTU int32 `json:"networkPluginMTU"`
 	// networkPluginDir is the full path of the directory in which to search
 	// for network plugins
 	NetworkPluginDir string `json:"networkPluginDir"`
@@ -279,6 +283,10 @@ type KubeletConfiguration struct {
 	CgroupRoot string `json:"cgroupRoot,omitempty"`
 	// containerRuntime is the container runtime to use.
 	ContainerRuntime string `json:"containerRuntime"`
+	// remoteRuntimeEndpoint is the endpoint of remote runtime service
+	RemoteRuntimeEndpoint string `json:"remoteRuntimeEndpoint"`
+	// remoteImageEndpoint is the endpoint of remote image service
+	RemoteImageEndpoint string `json:"remoteImageEndpoint"`
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout unversioned.Duration `json:"runtimeRequestTimeout,omitempty"`
@@ -399,6 +407,20 @@ type KubeletConfiguration struct {
 	KubeReserved utilconfig.ConfigurationMap `json:"kubeReserved"`
 	// Default behaviour for kernel tuning
 	ProtectKernelDefaults bool `json:"protectKernelDefaults"`
+	// If true, Kubelet ensures a set of iptables rules are present on host.
+	// These rules will serve as utility for various components, e.g. kube-proxy.
+	// The rules will be created based on IPTablesMasqueradeBit and IPTablesDropBit.
+	MakeIPTablesUtilChains bool `json:"makeIPTablesUtilChains"`
+	// iptablesMasqueradeBit is the bit of the iptables fwmark space to use for SNAT
+	// Values must be within the range [0, 31].
+	// Warning: Please match the value of corresponding parameter in kube-proxy
+	// TODO: clean up IPTablesMasqueradeBit in kube-proxy
+	IPTablesMasqueradeBit int32 `json:"iptablesMasqueradeBit"`
+	// iptablesDropBit is the bit of the iptables fwmark space to use for dropping packets. Kubelet will ensure iptables mark and drop rules.
+	// Values must be within the range [0, 31]. Must be different from IPTablesMasqueradeBit
+	IPTablesDropBit int32 `json:"iptablesDropBit"`
+	// Whitelist of unsafe sysctls or sysctl patterns (ending in *).
+	AllowedUnsafeSysctls []string `json:"experimentalAllowedUnsafeSysctls,omitempty"`
 }
 
 type KubeSchedulerConfiguration struct {
@@ -547,7 +569,7 @@ type KubeControllerManagerConfiguration struct {
 	DeploymentControllerSyncPeriod unversioned.Duration `json:"deploymentControllerSyncPeriod"`
 	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
 	PodEvictionTimeout unversioned.Duration `json:"podEvictionTimeout"`
-	// deletingPodsQps is the number of nodes per second on which pods are deleted in
+	// DEPRECATED: deletingPodsQps is the number of nodes per second on which pods are deleted in
 	// case of node failure.
 	DeletingPodsQps float32 `json:"deletingPodsQps"`
 	// DEPRECATED: deletingPodsBurst is the number of nodes on which pods are bursty deleted in
@@ -575,6 +597,12 @@ type KubeControllerManagerConfiguration struct {
 	// clusterSigningCertFile is the filename containing a PEM-encoded
 	// RSA or ECDSA private key used to issue cluster-scoped certificates
 	ClusterSigningKeyFile string `json:"clusterSigningKeyFile"`
+	// approveAllKubeletCSRs tells the CSR controller to approve all CSRs originating
+	// from the kubelet bootstrapping group automatically.
+	// WARNING: this grants all users with access to the certificates API group
+	// the ability to create credentials for any user that has access to the boostrapping
+	// user's credentials.
+	ApproveAllKubeletCSRsForGroup string `json:"approveAllKubeletCSRsForGroup"`
 	// enableProfiling enables profiling via web interface host:port/debug/pprof/
 	EnableProfiling bool `json:"enableProfiling"`
 	// clusterName is the instance prefix for the cluster.
@@ -613,6 +641,15 @@ type KubeControllerManagerConfiguration struct {
 	// concurrentGCSyncs is the number of garbage collector workers that are
 	// allowed to sync concurrently.
 	ConcurrentGCSyncs int32 `json:"concurrentGCSyncs"`
+	// nodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is healthy
+	NodeEvictionRate float32 `json:"nodeEvictionRate"`
+	// secondaryNodeEvictionRate is the number of nodes per second on which pods are deleted in case of node failure when a zone is unhealty
+	SecondaryNodeEvictionRate float32 `json:"secondaryNodeEvictionRate"`
+	// secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
+	LargeClusterSizeThreshold int32 `json:"largeClusterSizeThreshold"`
+	// Zone is treated as unhealthy in nodeEvictionRate and secondaryNodeEvictionRate when at least
+	// unhealthyZoneThreshold (no less than 3) of Nodes in the zone are NotReady
+	UnhealthyZoneThreshold float32 `json:"unhealthyZoneThreshold"`
 }
 
 // VolumeConfiguration contains *all* enumerated flags meant to configure all volume
