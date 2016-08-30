@@ -209,6 +209,7 @@ test/images/serve_hostname
 test/integration/discoverysummarizer
 test/integration/examples
 test/integration/federation
+test/integration/metrics
 test/integration/openshift
 test/soak/cauldron
 test/soak/serve_hostnames
