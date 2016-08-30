@@ -1779,7 +1779,7 @@ func extractCSRStatus(csr *certificates.CertificateSigningRequest) (string, erro
 		case certificates.CertificateDenied:
 			denied = true
 		default:
-			return "", fmt.Errorf("unknown csr conditon %q", c)
+			return "", fmt.Errorf("unknown csr condition %q", c)
 		}
 	}
 	var status string

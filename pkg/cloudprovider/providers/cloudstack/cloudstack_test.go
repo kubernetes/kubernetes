@@ -74,7 +74,7 @@ func configFromEnv() (*CSConfig, bool) {
 	cfg.Global.Zone = os.Getenv("CS_ZONE")
 
 	// It is save to ignore the error here. If the input cannot be parsed SSLNoVerify
-	// will still be a bool with it's zero value (false) which is the expected default.
+	// will still be a bool with its zero value (false) which is the expected default.
 	cfg.Global.SSLNoVerify, _ = strconv.ParseBool(os.Getenv("CS_SSL_NO_VERIFY"))
 
 	// Check if we have the minimum required info to be able to connect to CloudStack.
