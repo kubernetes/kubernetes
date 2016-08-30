@@ -610,6 +610,8 @@ func describeVolumes(volumes []api.Volume, out io.Writer, space string) {
 			printDownwardAPIVolumeSource(volume.VolumeSource.DownwardAPI, out)
 		case volume.VolumeSource.AzureDisk != nil:
 			printAzureDiskVolumeSource(volume.VolumeSource.AzureDisk, out)
+		case volume.VolumeSource.Cinder != nil:
+			printCinderVolumeSource(volume.VolumeSource.Cinder, out)
 		default:
 			fmt.Fprintf(out, "  <unknown>\n")
 		}
@@ -738,6 +740,14 @@ func printAzureDiskVolumeSource(d *api.AzureDiskVolumeSource, out io.Writer) {
 		d.DiskName, d.DataDiskURI, *d.FSType, *d.CachingMode, *d.ReadOnly)
 }
 
+func printCinderVolumeSource(cinder *api.CinderVolumeSource, out io.Writer) {
+	fmt.Fprintf(out, "    Type:\tCinder (a Persistent Disk resource in OpenStack)\n"+
+		"    VolumeID:\t%v\n"+
+		"    FSType:\t%v\n"+
+		"    ReadOnly:\t%v\n",
+		cinder.VolumeID, cinder.FSType, cinder.ReadOnly)
+}
+
 type PersistentVolumeDescriber struct {
 	client.Interface
 }
@@ -789,6 +799,8 @@ func (d *PersistentVolumeDescriber) Describe(namespace, name string, describerSe
 			printRBDVolumeSource(pv.Spec.RBD, out)
 		case pv.Spec.Quobyte != nil:
 			printQuobyteVolumeSource(pv.Spec.Quobyte, out)
+		case pv.Spec.Cinder != nil:
+			printCinderVolumeSource(pv.Spec.Cinder, out)
 		}
 
 		if events != nil {
