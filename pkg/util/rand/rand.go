@@ -25,6 +25,8 @@ import (
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
 var numLetters = len(letters)
+var lettersHex = []rune("abcdef0123456789")
+var numLettersHex = len(lettersHex)
 var rng = struct {
 	sync.Mutex
 	rand *rand.Rand
@@ -78,6 +80,16 @@ func String(length int) string {
 	b := make([]rune, length)
 	for i := range b {
 		b[i] = letters[Intn(numLetters)]
+	}
+	return string(b)
+}
+
+// String generates a random hexadecimal string n characters long.  This will
+// panic if n is less than zero.
+func HexString(length int) string {
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = lettersHex[Intn(numLettersHex)]
 	}
 	return string(b)
 }

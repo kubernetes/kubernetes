@@ -33,7 +33,12 @@ func NewCmdJoin(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Comman
 		Use:   "join",
 		Short: "Run this on other servers to join an existing cluster.",
 		Run: func(cmd *cobra.Command, args []string) {
-			if params.Discovery.BearerToken == "" {
+			ok, err := kubeadmutil.UseGivenTokenIfValid(params)
+			if !ok {
+				if err != nil {
+					out.Write([]byte(fmt.Sprintf("%s (see --help)\n", err)))
+					return
+				}
 				out.Write([]byte(fmt.Sprintf("Must specify --token (see --help)\n")))
 				return
 			}
@@ -69,7 +74,7 @@ func NewCmdJoin(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Comman
 	cmd.PersistentFlags().StringVarP(&params.Discovery.ApiServerURLs, "api-server-urls", "", "",
 		`Comma separated list of API server URLs. Typically this might be just
 		https://<address-of-master>:8080/`)
-	cmd.PersistentFlags().StringVarP(&params.Discovery.BearerToken, "token", "", "",
+	cmd.PersistentFlags().StringVarP(&params.Discovery.GivenToken, "token", "", "",
 		`Shared secret used to secure bootstrap. Must match output of 'init-master'.`)
 
 	return cmd
