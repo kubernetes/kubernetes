@@ -796,7 +796,7 @@ message ExportOptions {
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 message FCVolumeSource {
-  // Required: FC target world wide names (WWNs)
+  // Required: FC target worldwide names (WWNs)
   repeated string targetWWNs = 1;
 
   // Required: FC target lun number
@@ -814,7 +814,7 @@ message FCVolumeSource {
 }
 
 // FlexVolume represents a generic volume resource that is
-// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
+// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
 message FlexVolumeSource {
   // Driver is the name of the driver to use for this volume.
   optional string driver = 1;
@@ -1248,7 +1248,7 @@ message NodeAffinity {
   repeated PreferredSchedulingTerm preferredDuringSchedulingIgnoredDuringExecution = 2;
 }
 
-// NodeCondition contains condition infromation for a node.
+// NodeCondition contains condition information for a node.
 message NodeCondition {
   // Type of node condition.
   optional string type = 1;
@@ -1766,7 +1766,7 @@ message PersistentVolumeSource {
   optional FlockerVolumeSource flocker = 11;
 
   // FlexVolume represents a generic volume resource that is
-  // provisioned/attached using a exec based plugin. This is an
+  // provisioned/attached using an exec based plugin. This is an
   // alpha feature and may change in future.
   optional FlexVolumeSource flexVolume = 12;
 
@@ -1804,7 +1804,7 @@ message PersistentVolumeSpec {
 
   // What happens to a persistent volume when released from its claim.
   // Valid options are Retain (default) and Recycle.
-  // Recyling must be supported by the volume plugin underlying this persistent volume.
+  // Recycling must be supported by the volume plugin underlying this persistent volume.
   // More info: http://releases.k8s.io/HEAD/docs/user-guide/persistent-volumes.md#recycling-policy
   optional string persistentVolumeReclaimPolicy = 5;
 }
@@ -3029,7 +3029,7 @@ message VolumeSource {
   optional RBDVolumeSource rbd = 11;
 
   // FlexVolume represents a generic volume resource that is
-  // provisioned/attached using a exec based plugin. This is an
+  // provisioned/attached using an exec based plugin. This is an
   // alpha feature and may change in future.
   optional FlexVolumeSource flexVolume = 12;
 
