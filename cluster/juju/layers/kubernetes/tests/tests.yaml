@@ -1,1 +1,2 @@
 tests: "*kubernetes*"
+bootstrap: false
