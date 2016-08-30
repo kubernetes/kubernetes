@@ -91,6 +91,7 @@ var validReplicaSet = *validNewReplicaSet()
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 	test := registrytest.New(t, storage.ReplicaSet.Store)
 	rs := validNewReplicaSet()
 	rs.ObjectMeta = api.ObjectMeta{}
@@ -111,6 +112,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestUpdate(
 		// valid
@@ -138,6 +140,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestDelete(validNewReplicaSet())
 }
@@ -145,6 +148,7 @@ func TestDelete(t *testing.T) {
 func TestGenerationNumber(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 	modifiedSno := *validNewReplicaSet()
 	modifiedSno.Generation = 100
 	modifiedSno.Status.ObservedGeneration = 10
@@ -195,6 +199,7 @@ func TestGenerationNumber(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestGet(validNewReplicaSet())
 }
@@ -202,6 +207,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestList(validNewReplicaSet())
 }
@@ -209,6 +215,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 	test := registrytest.New(t, storage.ReplicaSet.Store)
 	test.TestWatch(
 		validNewReplicaSet(),
@@ -241,6 +248,7 @@ func TestWatch(t *testing.T) {
 func TestScaleGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 
 	name := "foo"
 
@@ -280,6 +288,7 @@ func TestScaleGet(t *testing.T) {
 func TestScaleUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 
 	name := "foo"
 
@@ -324,6 +333,7 @@ func TestScaleUpdate(t *testing.T) {
 func TestStatusUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.ReplicaSet.Store.DestroyFunc()
 
 	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
 	key := etcdtest.AddPrefix("/replicasets/" + api.NamespaceDefault + "/foo")

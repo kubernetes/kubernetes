@@ -70,6 +70,7 @@ func TestCreate(t *testing.T) {
 
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	validScheduledJob := validNewScheduledJob()
 	validScheduledJob.ObjectMeta = api.ObjectMeta{}
@@ -91,6 +92,7 @@ func TestUpdate(t *testing.T) {
 
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	schedule := "1 1 1 1 ?"
 	test.TestUpdate(
@@ -119,6 +121,7 @@ func TestDelete(t *testing.T) {
 
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestDelete(validNewScheduledJob())
 }
@@ -131,6 +134,7 @@ func TestGet(t *testing.T) {
 
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestGet(validNewScheduledJob())
 }
@@ -143,6 +147,7 @@ func TestList(t *testing.T) {
 
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestList(validNewScheduledJob())
 }
@@ -155,6 +160,7 @@ func TestWatch(t *testing.T) {
 
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
 		validNewScheduledJob(),

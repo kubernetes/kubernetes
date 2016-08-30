@@ -69,7 +69,7 @@ func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter
 	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &api.NodeList{} }
-	storageInterface, _ := opts.Decorator(
+	storageInterface, dFunc := opts.Decorator(
 		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.Nodes),
 		&api.Node{},
@@ -99,7 +99,8 @@ func NewStorage(opts generic.RESTOptions, connection client.ConnectionInfoGetter
 		DeleteStrategy: node.Strategy,
 		ExportStrategy: node.Strategy,
 
-		Storage: storageInterface,
+		Storage:     storageInterface,
+		DestroyFunc: dFunc,
 	}
 
 	statusStore := *store
