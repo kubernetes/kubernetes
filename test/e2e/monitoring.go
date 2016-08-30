@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	influxdb "github.com/influxdb/influxdb/client"
+	influxdb "github.com/influxdata/influxdb/client"
 	"k8s.io/kubernetes/pkg/api"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -209,12 +209,12 @@ func getInfluxdbData(c *client.Client, query string, tag string) (map[string]boo
 	if len(response.Results[0].Series) != 1 {
 		return nil, fmt.Errorf("expected exactly one series for query %q.", query)
 	}
-	if len(response.Results[0].Series[0].Columns) != 1 {
-		framework.Failf("Expected one column for query %q. Found %v", query, response.Results[0].Series[0].Columns)
+	if len(response.Results[0].Series[0].Columns) != 2 {
+		framework.Failf("Expected two columns for query %q. Found %v", query, response.Results[0].Series[0].Columns)
 	}
 	result := map[string]bool{}
 	for _, value := range response.Results[0].Series[0].Values {
-		name := value[0].(string)
+		name := value[1].(string)
 		result[name] = true
 	}
 	return result, nil

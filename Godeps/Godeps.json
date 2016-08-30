@@ -98,10 +98,6 @@
 			"Rev": "ab50d12e88f57788bf84b83fef2be236eb1fcc0b"
 		},
 		{
-			"ImportPath": "github.com/armon/go-metrics",
-			"Rev": "345426c77237ece5dab0e1605c3e4b35c3f54757"
-		},
-		{
 			"ImportPath": "github.com/asaskevich/govalidator",
 			"Comment": "v4-12-g593d645",
 			"Rev": "593d64559f7600f29581a3ee42177f5dbded27a9"
@@ -1346,24 +1342,12 @@
 			"Rev": "f52d055dc48aec25854ed7d31862f78913cf17d1"
 		},
 		{
-			"ImportPath": "github.com/hashicorp/go-msgpack/codec",
-			"Rev": "fa3f63826f7c23912c15263591e65d54d080b458"
-		},
-		{
 			"ImportPath": "github.com/hashicorp/golang-lru",
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
 		},
 		{
 			"ImportPath": "github.com/hashicorp/golang-lru/simplelru",
 			"Rev": "a0d98a5f288019575c6d1f4bb1573fef2d1fcdc4"
-		},
-		{
-			"ImportPath": "github.com/hashicorp/raft",
-			"Rev": "057b893fd996696719e98b6c44649ea14968c811"
-		},
-		{
-			"ImportPath": "github.com/hashicorp/raft-boltdb",
-			"Rev": "d1e82c1ec3f15ee991f7cc7ffd5b67ff6f5bbaee"
 		},
 		{
 			"ImportPath": "github.com/hawkular/hawkular-client-go/metrics",
@@ -1395,44 +1379,19 @@
 			"Rev": "76626ae9c91c4f2a10f34cad8ce83ea42c93bb75"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/client",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
+			"ImportPath": "github.com/influxdata/influxdb/client",
+			"Comment": "v0.12.2",
+			"Rev": "383332daed5595926c235f250b11433f67229c35"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/influxql",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
+			"ImportPath": "github.com/influxdata/influxdb/models",
+			"Comment": "v0.12.2",
+			"Rev": "383332daed5595926c235f250b11433f67229c35"
 		},
 		{
-			"ImportPath": "github.com/influxdb/influxdb/meta",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdb/influxdb/meta/internal",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdb/influxdb/snapshot",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdb/influxdb/toml",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdb/influxdb/tsdb",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
-		},
-		{
-			"ImportPath": "github.com/influxdb/influxdb/tsdb/internal",
-			"Comment": "v0.9.2.1",
-			"Rev": "b237c68bab4756507baf6840023be103853e77db"
+			"ImportPath": "github.com/influxdata/influxdb/pkg/escape",
+			"Comment": "v0.12.2",
+			"Rev": "383332daed5595926c235f250b11433f67229c35"
 		},
 		{
 			"ImportPath": "github.com/jmespath/go-jmespath",
