@@ -11,7 +11,7 @@ images:
   coreos-alpha:
     image: coreos-alpha-1122-0-0-v20160727
     project: coreos-cloud
-    metadata: "user-data<test/e2e_node/jenkins/coreos-init.yaml"
+    metadata: "user-data<test/e2e_node/jenkins/coreos-init.json"
   containervm:
     image: e2e-node-containervm-v20160321-image
     project: kubernetes-node-e2e-images
