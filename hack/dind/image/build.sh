@@ -55,7 +55,7 @@ fi
 # download nsenter and socat
 overlay_dir=${DOCKER_IN_DOCKER_OVERLAY_DIR:-${script_dir}/overlay}
 mkdir -p "${overlay_dir}"
-! selinuxenabled 2>&1 || sudo chcon -Rt svirt_sandbox_file_t -l s0 "${overlay_dir}"
+! which selinuxenabled &>/dev/null || ! selinuxenabled 2>&1 || sudo chcon -Rt svirt_sandbox_file_t -l s0 "${overlay_dir}"
 docker run --rm -v "${overlay_dir}:/target" jpetazzo/nsenter
 docker run --rm -v "${overlay_dir}:/target" ${SOCAT_IMG}
 

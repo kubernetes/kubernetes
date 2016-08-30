@@ -119,7 +119,7 @@ function dind::init_auth {
 
   dind::step "Creating auth directory:" "${auth_dir}"
   mkdir -p "${auth_dir}"
-  which selinuxenabled &>/dev/null || ! selinuxenabled 2>&1 || sudo chcon -Rt svirt_sandbox_file_t -l s0 "${auth_dir}"
+  ! which selinuxenabled &>/dev/null || ! selinuxenabled 2>&1 || sudo chcon -Rt svirt_sandbox_file_t -l s0 "${auth_dir}"
   rm -rf "${auth_dir}"/*
 
   dind::step "Creating service accounts key:" "${auth_dir}/service-accounts-key.pem"
