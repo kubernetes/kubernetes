@@ -118,6 +118,7 @@ type ApiDeclaration struct {
 	ApiVersion     string          `json:"apiVersion"`
 	BasePath       string          `json:"basePath"`
 	ResourcePath   string          `json:"resourcePath"` // must start with /
+	Info           Info            `json:"info"`
 	Apis           []Api           `json:"apis,omitempty"`
 	Models         ModelList       `json:"models,omitempty"`
 	Produces       []string        `json:"produces,omitempty"`

@@ -283,12 +283,12 @@ func fixedPrefixPath(pathspec string) string {
 }
 
 // ServeHTTP implements net/http.Handler therefore a Container can be a Handler in a http.Server
-func (c Container) ServeHTTP(httpwriter http.ResponseWriter, httpRequest *http.Request) {
+func (c *Container) ServeHTTP(httpwriter http.ResponseWriter, httpRequest *http.Request) {
 	c.ServeMux.ServeHTTP(httpwriter, httpRequest)
 }
 
 // Handle registers the handler for the given pattern. If a handler already exists for pattern, Handle panics.
-func (c Container) Handle(pattern string, handler http.Handler) {
+func (c *Container) Handle(pattern string, handler http.Handler) {
 	c.ServeMux.Handle(pattern, handler)
 }
 
@@ -318,7 +318,7 @@ func (c *Container) Filter(filter FilterFunction) {
 }
 
 // RegisteredWebServices returns the collections of added WebServices
-func (c Container) RegisteredWebServices() []*WebService {
+func (c *Container) RegisteredWebServices() []*WebService {
 	c.webServicesLock.RLock()
 	defer c.webServicesLock.RUnlock()
 	result := make([]*WebService, len(c.webServices))
@@ -329,7 +329,7 @@ func (c Container) RegisteredWebServices() []*WebService {
 }
 
 // computeAllowedMethods returns a list of HTTP methods that are valid for a Request
-func (c Container) computeAllowedMethods(req *Request) []string {
+func (c *Container) computeAllowedMethods(req *Request) []string {
 	// Go through all RegisteredWebServices() and all its Routes to collect the options
 	methods := []string{}
 	requestPath := req.Request.URL.Path

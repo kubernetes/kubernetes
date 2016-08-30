@@ -17,8 +17,6 @@ limitations under the License.
 package serializer
 
 import (
-	"io"
-
 	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/runtime"
 	"k8s.io/client-go/1.4/pkg/runtime/serializer/json"
@@ -188,13 +186,17 @@ func (f CodecFactory) SupportedStreamingMediaTypes() []string {
 	return f.streamingAccepts
 }
 
-// LegacyCodec encodes output to a given API version, and decodes output into the internal form from
-// any recognized source. The returned codec will always encode output to JSON.
+// LegacyCodec encodes output to a given API versions, and decodes output into the internal form from
+// any recognized source. The returned codec will always encode output to JSON. If a type is not
+// found in the list of versions an error will be returned.
 //
 // This method is deprecated - clients and servers should negotiate a serializer by mime-type and
 // invoke CodecForVersions. Callers that need only to read data should use UniversalDecoder().
+//
+// TODO: make this call exist only in pkg/api, and initialize it with the set of default versions.
+//   All other callers will be forced to request a Codec directly.
 func (f CodecFactory) LegacyCodec(version ...unversioned.GroupVersion) runtime.Codec {
-	return versioning.NewCodecForScheme(f.scheme, f.legacySerializer, f.universal, version, nil)
+	return versioning.NewCodecForScheme(f.scheme, f.legacySerializer, f.universal, unversioned.GroupVersions(version), runtime.InternalGroupVersioner)
 }
 
 // UniversalDeserializer can convert any stored data recognized by this factory into a Go object that satisfies
@@ -211,25 +213,39 @@ func (f CodecFactory) UniversalDeserializer() runtime.Decoder {
 // defaulting.
 //
 // TODO: the decoder will eventually be removed in favor of dealing with objects in their versioned form
+// TODO: only accept a group versioner
 func (f CodecFactory) UniversalDecoder(versions ...unversioned.GroupVersion) runtime.Decoder {
-	return f.CodecForVersions(nil, f.universal, nil, versions)
+	var versioner runtime.GroupVersioner
+	if len(versions) == 0 {
+		versioner = runtime.InternalGroupVersioner
+	} else {
+		versioner = unversioned.GroupVersions(versions)
+	}
+	return f.CodecForVersions(nil, f.universal, nil, versioner)
 }
 
 // CodecForVersions creates a codec with the provided serializer. If an object is decoded and its group is not in the list,
 // it will default to runtime.APIVersionInternal. If encode is not specified for an object's group, the object is not
 // converted. If encode or decode are nil, no conversion is performed.
-func (f CodecFactory) CodecForVersions(encoder runtime.Encoder, decoder runtime.Decoder, encode []unversioned.GroupVersion, decode []unversioned.GroupVersion) runtime.Codec {
+func (f CodecFactory) CodecForVersions(encoder runtime.Encoder, decoder runtime.Decoder, encode runtime.GroupVersioner, decode runtime.GroupVersioner) runtime.Codec {
+	// TODO: these are for backcompat, remove them in the future
+	if encode == nil {
+		encode = runtime.DisabledGroupVersioner
+	}
+	if decode == nil {
+		decode = runtime.InternalGroupVersioner
+	}
 	return versioning.NewCodecForScheme(f.scheme, encoder, decoder, encode, decode)
 }
 
 // DecoderToVersion returns a decoder that targets the provided group version.
-func (f CodecFactory) DecoderToVersion(decoder runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
-	return f.CodecForVersions(nil, decoder, nil, []unversioned.GroupVersion{gv})
+func (f CodecFactory) DecoderToVersion(decoder runtime.Decoder, gv runtime.GroupVersioner) runtime.Decoder {
+	return f.CodecForVersions(nil, decoder, nil, gv)
 }
 
 // EncoderForVersion returns an encoder that targets the provided group version.
-func (f CodecFactory) EncoderForVersion(encoder runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
-	return f.CodecForVersions(encoder, nil, []unversioned.GroupVersion{gv}, nil)
+func (f CodecFactory) EncoderForVersion(encoder runtime.Encoder, gv runtime.GroupVersioner) runtime.Encoder {
+	return f.CodecForVersions(encoder, nil, gv, nil)
 }
 
 // SerializerForMediaType returns a serializer that matches the provided RFC2046 mediaType, or false if no such
@@ -317,48 +333,16 @@ type DirectCodecFactory struct {
 }
 
 // EncoderForVersion returns an encoder that does not do conversion. gv is ignored.
-func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, gv unversioned.GroupVersion) runtime.Encoder {
-	return DirectCodec{
-		runtime.NewCodec(serializer, nil),
-		f.CodecFactory.scheme,
+func (f DirectCodecFactory) EncoderForVersion(serializer runtime.Encoder, _ runtime.GroupVersioner) runtime.Encoder {
+	return versioning.DirectEncoder{
+		Encoder:     serializer,
+		ObjectTyper: f.CodecFactory.scheme,
 	}
 }
 
 // DecoderToVersion returns an decoder that does not do conversion. gv is ignored.
-func (f DirectCodecFactory) DecoderToVersion(serializer runtime.Decoder, gv unversioned.GroupVersion) runtime.Decoder {
-	return DirectCodec{
-		runtime.NewCodec(nil, serializer),
-		nil,
+func (f DirectCodecFactory) DecoderToVersion(serializer runtime.Decoder, _ runtime.GroupVersioner) runtime.Decoder {
+	return versioning.DirectDecoder{
+		Decoder: serializer,
 	}
-}
-
-// DirectCodec is a codec that does not do conversion. It sets the gvk during serialization, and removes the gvk during deserialization.
-type DirectCodec struct {
-	runtime.Serializer
-	runtime.ObjectTyper
-}
-
-// EncodeToStream does not do conversion. It sets the gvk during serialization. overrides are ignored.
-func (c DirectCodec) Encode(obj runtime.Object, stream io.Writer) error {
-	gvks, _, err := c.ObjectTyper.ObjectKinds(obj)
-	if err != nil {
-		return err
-	}
-	kind := obj.GetObjectKind()
-	oldGVK := kind.GroupVersionKind()
-	kind.SetGroupVersionKind(gvks[0])
-	err = c.Serializer.Encode(obj, stream)
-	kind.SetGroupVersionKind(oldGVK)
-	return err
-}
-
-// Decode does not do conversion. It removes the gvk during deserialization.
-func (c DirectCodec) Decode(data []byte, defaults *unversioned.GroupVersionKind, into runtime.Object) (runtime.Object, *unversioned.GroupVersionKind, error) {
-	obj, gvk, err := c.Serializer.Decode(data, defaults, into)
-	if obj != nil {
-		kind := obj.GetObjectKind()
-		// clearing the gvk is just a convention of a codec
-		kind.SetGroupVersionKind(unversioned.GroupVersionKind{})
-	}
-	return obj, gvk, err
 }

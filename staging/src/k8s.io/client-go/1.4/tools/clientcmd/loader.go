@@ -85,7 +85,7 @@ func (g *ClientConfigGetter) GetLoadingPrecedence() []string {
 	return nil
 }
 func (g *ClientConfigGetter) GetStartingConfig() (*clientcmdapi.Config, error) {
-	return nil, nil
+	return g.kubeconfigGetter()
 }
 func (g *ClientConfigGetter) GetDefaultFilename() string {
 	return ""
@@ -215,7 +215,6 @@ func (rules *ClientConfigLoadingRules) Load() (*clientcmdapi.Config, error) {
 			errlist = append(errlist, err)
 		}
 	}
-
 	return config, utilerrors.NewAggregate(errlist)
 }
 
@@ -530,7 +529,7 @@ func GetClusterFileReferences(cluster *clientcmdapi.Cluster) []*string {
 }
 
 func GetAuthInfoFileReferences(authInfo *clientcmdapi.AuthInfo) []*string {
-	return []*string{&authInfo.ClientCertificate, &authInfo.ClientKey}
+	return []*string{&authInfo.ClientCertificate, &authInfo.ClientKey, &authInfo.TokenFile}
 }
 
 // ResolvePaths updates the given refs to be absolute paths, relative to the given base directory

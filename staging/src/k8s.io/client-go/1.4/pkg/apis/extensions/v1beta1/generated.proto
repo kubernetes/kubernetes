@@ -248,7 +248,7 @@ message FSGroupStrategyOptions {
 // HTTPIngressPath associates a path regex with a backend. Incoming urls matching
 // the path are forwarded to the backend.
 message HTTPIngressPath {
-  // Path is a extended POSIX regex as defined by IEEE Std 1003.1,
+  // Path is an extended POSIX regex as defined by IEEE Std 1003.1,
   // (i.e this follows the egrep/unix syntax, not the perl syntax)
   // matched against the path of an incoming request. Currently it can
   // contain characters disallowed from the conventional "path"
@@ -846,6 +846,9 @@ message ReplicaSetStatus {
 
   // The number of pods that have labels matching the labels of the pod template of the replicaset.
   optional int32 fullyLabeledReplicas = 2;
+
+  // The number of ready replicas for this replica set.
+  optional int32 readyReplicas = 4;
 
   // ObservedGeneration reflects the generation of the most recently observed ReplicaSet.
   optional int64 observedGeneration = 3;

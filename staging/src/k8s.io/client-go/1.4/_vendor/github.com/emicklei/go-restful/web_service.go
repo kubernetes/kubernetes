@@ -1,7 +1,7 @@
 package restful
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"sync"
 
@@ -51,7 +51,7 @@ func (w *WebService) ApiVersion(apiVersion string) *WebService {
 }
 
 // Version returns the API version for documentation purposes.
-func (w WebService) Version() string { return w.apiVersion }
+func (w *WebService) Version() string { return w.apiVersion }
 
 // Path specifies the root URL template path of the WebService.
 // All Routes will be relative to this path.
@@ -155,7 +155,7 @@ func (w *WebService) Route(builder *RouteBuilder) *WebService {
 // RemoveRoute removes the specified route, looks for something that matches 'path' and 'method'
 func (w *WebService) RemoveRoute(path, method string) error {
 	if !w.dynamicRoutes {
-		return fmt.Errorf("dynamic routes are not enabled.")
+		return errors.New("dynamic routes are not enabled.")
 	}
 	w.routesLock.Lock()
 	defer w.routesLock.Unlock()
@@ -192,7 +192,7 @@ func (w *WebService) Consumes(accepts ...string) *WebService {
 }
 
 // Routes returns the Routes associated with this WebService
-func (w WebService) Routes() []Route {
+func (w *WebService) Routes() []Route {
 	if !w.dynamicRoutes {
 		return w.routes
 	}
@@ -207,12 +207,12 @@ func (w WebService) Routes() []Route {
 }
 
 // RootPath returns the RootPath associated with this WebService. Default "/"
-func (w WebService) RootPath() string {
+func (w *WebService) RootPath() string {
 	return w.rootPath
 }
 
 // PathParameters return the path parameter names for (shared amoung its Routes)
-func (w WebService) PathParameters() []*Parameter {
+func (w *WebService) PathParameters() []*Parameter {
 	return w.pathParameters
 }
 
@@ -229,7 +229,7 @@ func (w *WebService) Doc(plainText string) *WebService {
 }
 
 // Documentation returns it.
-func (w WebService) Documentation() string {
+func (w *WebService) Documentation() string {
 	return w.documentation
 }
 

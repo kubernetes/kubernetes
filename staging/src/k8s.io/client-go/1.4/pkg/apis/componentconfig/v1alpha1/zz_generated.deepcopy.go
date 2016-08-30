@@ -239,6 +239,7 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 		out.VolumeStatsAggPeriod = in.VolumeStatsAggPeriod
 		out.NetworkPluginName = in.NetworkPluginName
 		out.NetworkPluginDir = in.NetworkPluginDir
+		out.NetworkPluginMTU = in.NetworkPluginMTU
 		out.VolumePluginDir = in.VolumePluginDir
 		out.CloudProvider = in.CloudProvider
 		out.CloudConfigFile = in.CloudConfigFile
@@ -254,6 +255,8 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.CgroupsPerQOS = nil
 		}
 		out.ContainerRuntime = in.ContainerRuntime
+		out.RemoteRuntimeEndpoint = in.RemoteRuntimeEndpoint
+		out.RemoteImageEndpoint = in.RemoteImageEndpoint
 		out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
 		out.RktPath = in.RktPath
 		out.RktAPIEndpoint = in.RktAPIEndpoint
@@ -378,6 +381,34 @@ func DeepCopy_v1alpha1_KubeletConfiguration(in interface{}, out interface{}, c *
 			out.KubeReserved = nil
 		}
 		out.ProtectKernelDefaults = in.ProtectKernelDefaults
+		if in.MakeIPTablesUtilChains != nil {
+			in, out := &in.MakeIPTablesUtilChains, &out.MakeIPTablesUtilChains
+			*out = new(bool)
+			**out = **in
+		} else {
+			out.MakeIPTablesUtilChains = nil
+		}
+		if in.IPTablesMasqueradeBit != nil {
+			in, out := &in.IPTablesMasqueradeBit, &out.IPTablesMasqueradeBit
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.IPTablesMasqueradeBit = nil
+		}
+		if in.IPTablesDropBit != nil {
+			in, out := &in.IPTablesDropBit, &out.IPTablesDropBit
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.IPTablesDropBit = nil
+		}
+		if in.AllowedUnsafeSysctls != nil {
+			in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
+			*out = make([]string, len(*in))
+			copy(*out, *in)
+		} else {
+			out.AllowedUnsafeSysctls = nil
+		}
 		return nil
 	}
 }

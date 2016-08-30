@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	"k8s.io/client-go/1.4/pkg/api/unversioned"
-
 	"k8s.io/client-go/1.4/pkg/api/v1"
 	"k8s.io/client-go/1.4/pkg/util/intstr"
 )
@@ -51,7 +50,6 @@ type PodDisruptionBudgetStatus struct {
 }
 
 // +genclient=true
-// +noMethods=true
 
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
@@ -69,4 +67,17 @@ type PodDisruptionBudgetList struct {
 	unversioned.TypeMeta `json:",inline"`
 	unversioned.ListMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	Items                []PodDisruptionBudget `json:"items" protobuf:"bytes,2,rep,name=items"`
+}
+
+// Eviction evicts a pod from its node subject to certain policies and safety constraints.
+// This is a subresource of Pod.  A request to cause such an eviction is
+// created by POSTing to .../pods/foo/evictions.
+type Eviction struct {
+	unversioned.TypeMeta `json:",inline"`
+
+	// ObjectMeta describes the pod that is being evicted.
+	v1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
+
+	// DeleteOptions may be provided
+	DeleteOptions *v1.DeleteOptions `json:"deleteOptions,omitempty" protobuf:"bytes,2,opt,name=deleteOptions"`
 }
