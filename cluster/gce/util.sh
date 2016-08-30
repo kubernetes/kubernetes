@@ -610,7 +610,7 @@ function kube-up() {
   if [[ ${KUBE_USE_EXISTING_MASTER:-} == "true" ]]; then
     parse-master-env
     create-nodes
-  elif [[ ${KUBE_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
+  elif [[ ${KUBE_EXPERIMENTAL_REPLICATE_EXISTING_MASTER:-} == "true" ]]; then
     # TODO(jsz): implement adding replica for other distributions.
     if  [[ "${MASTER_OS_DISTRIBUTION}" != "gci" ]]; then
       echo "Master replication supported only for gci"
@@ -782,7 +782,7 @@ function replicate-master() {
   set-replica-name
   set-existing-master
 
-  echo "Replicating existing master ${EXISTING_MASTER_ZONE}/${EXISTING_MASTER_NAME} as ${ZONE}/${REPLICA_NAME}"
+  echo "Experimental: replicating existing master ${EXISTING_MASTER_ZONE}/${EXISTING_MASTER_NAME} as ${ZONE}/${REPLICA_NAME}"
 
   # Before we do anything else, we should configure etcd to expect more replicas.
   if ! add-replica-to-etcd 4001 2380; then
