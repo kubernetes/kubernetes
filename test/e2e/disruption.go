@@ -61,6 +61,23 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 
 	})
 
+	It("should not allow an eviction", func() {
+		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(1))
+
+		createPodsOrDie(cs, ns, 2)
+	})
+
+	pod, err := cs.Pods(ns).Get("pod-0")
+	Expect(err).NotTo(HaveOccurred())
+
+	e := &policy.Eviction{
+		ObjectMeta: api.ObjectMeta{
+			Name:      pod.Name,
+			Namespace: ns,
+		},
+	}
+
+	cs.Pods(ns).Evict(e)
 })
 
 func createPodDisruptionBudgetOrDie(cs *release_1_4.Clientset, ns string, minAvailable intstr.IntOrString) {
