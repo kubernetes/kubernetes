@@ -79,6 +79,7 @@ func TestIngressController(t *testing.T) {
 		ObjectMeta: api_v1.ObjectMeta{
 			Name:      "test-ingress",
 			Namespace: "mynamespace",
+			SelfLink:  "/api/v1/namespaces/mynamespaces/ingress/test-ingress",
 		},
 	}
 
