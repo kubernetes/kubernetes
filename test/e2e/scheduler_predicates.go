@@ -198,6 +198,7 @@ var _ = framework.KubeDescribe("SchedulerPredicates [Serial]", func() {
 		ns = f.Namespace.Name
 		nodeList = &api.NodeList{}
 
+		framework.WaitForAllNodesHealthy(c, time.Minute)
 		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(c)
 
 		err := framework.CheckTestingNSDeletedExcept(c, ns)
