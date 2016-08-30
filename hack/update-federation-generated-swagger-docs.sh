@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2015 The Kubernetes Authors.
+# Copyright 2016 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,7 +29,11 @@ source "${KUBE_ROOT}/hack/lib/swagger.sh"
 kube::golang::setup_env
 
 GROUP_VERSIONS=(federation/v1beta1)
-GV_DIRS=("federation/apis/federation/v1beta1")
+GV_DIRS=()
+for gv in "${GROUP_VERSIONS[@]}"; do
+  GV_DIRS+=("federation/$(kube::util::group-version-to-pkg-path "${gv}")")
+done
+
 # To avoid compile errors, remove the currently existing files.
 for gv_dir in "${GV_DIRS[@]}"; do
   rm -f "${gv_dir}/types_swagger_doc_generated.go"
