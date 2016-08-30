@@ -61,7 +61,24 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 
 	})
 
-	It("should not allow an eviction", func() {
+	It("should allow an eviction when there is no PDB", func() {
+		createPodsOrDie(cs, ns, 1)
+
+		pod, err := cs.Pods(ns).Get("pod-0")
+		Expect(err).NotTo(HaveOccurred())
+
+		e := &policy.Eviction{
+			ObjectMeta: api.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: ns,
+			},
+		}
+
+		err = cs.Pods(ns).Evict(e)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("should not allow an eviction when too few pods", func() {
 		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(2))
 
 		createPodsOrDie(cs, ns, 1)
@@ -77,6 +94,32 @@ var _ = framework.KubeDescribe("DisruptionController [Feature:PodDisruptionbudge
 		}
 
 		err = cs.Pods(ns).Evict(e)
+		Expect(err).Should(MatchError("Cannot evict pod as it would violate the pod's disruption budget."))
+	})
+
+	It("should allow an eviction when enough pods", func() {
+		createPodDisruptionBudgetOrDie(cs, ns, intstr.FromInt(2))
+
+		createPodsOrDie(cs, ns, 2)
+
+		pod, err := cs.Pods(ns).Get("pod-0")
+		Expect(err).NotTo(HaveOccurred())
+
+		e := &policy.Eviction{
+			ObjectMeta: api.ObjectMeta{
+				Name:      pod.Name,
+				Namespace: ns,
+			},
+		}
+
+		err = wait.PollImmediate(framework.Poll, 60*time.Second, func() (bool, error) {
+			err = cs.Pods(ns).Evict(e)
+			if err != nil {
+				return false, nil
+			} else {
+				return true, nil
+			}
+		})
 		Expect(err).NotTo(HaveOccurred())
 	})
 })
