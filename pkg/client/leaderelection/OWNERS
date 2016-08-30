@@ -1,4 +1,15 @@
 approvers:
 - mikedanese
 - timothysc
-reviewers: []
+reviewers:
+- mikedanese
+- timothysc
+- david-mcmahon
+- eparis
+- gmarek
+- deads2k
+- aaronlevy
+- goltermann
+- laushinka
+- ingvagabund
+- resouer

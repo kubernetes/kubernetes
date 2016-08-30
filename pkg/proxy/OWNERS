@@ -1,4 +1,8 @@
 approvers:
 - ArtfulCoder
 - thockin
-reviewers: []
+reviewers:
+- thockin
+- freehan
+- ArtfulCoder
+- lavalamp

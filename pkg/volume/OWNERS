@@ -2,4 +2,7 @@ approvers:
 - saad-ali
 - thockin
 - pmorie
-reviewers: []
+reviewers:
+- saad-ali
+- jsafrane
+- pmorie

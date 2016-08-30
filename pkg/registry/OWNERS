@@ -2,4 +2,7 @@ approvers:
 - lavalamp
 - smarterclayton
 - wojtek-t
-reviewers: []
+reviewers:
+- wojtek-t
+- caesarxuchao
+- smarterclayton

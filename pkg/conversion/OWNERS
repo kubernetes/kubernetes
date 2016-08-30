@@ -3,4 +3,7 @@ approvers:
 - lavalamp
 - smarterclayton
 - wojtek-t
-reviewers: []
+reviewers:
+- smarterclayton
+- deads2k
+- wojtek-t

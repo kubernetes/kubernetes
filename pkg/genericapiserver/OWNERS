@@ -2,4 +2,7 @@ approvers:
 - lavalamp
 - nikhiljindal
 - smarterclayton
-reviewers: []
+reviewers:
+- nikhiljindal
+- smarterclayton
+- deads2k
