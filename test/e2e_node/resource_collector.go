@@ -20,6 +20,7 @@ package e2e_node
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -36,6 +37,7 @@ import (
 	cadvisorapiv2 "github.com/google/cadvisor/info/v2"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"k8s.io/kubernetes/pkg/api"
+	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/util/runtime"
@@ -43,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 
+	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
 
@@ -292,8 +295,8 @@ func formatCPUSummary(summary framework.ContainersCPUSummary) string {
 }
 
 // createCadvisorPod creates a standalone cadvisor pod for fine-grain resource monitoring.
-func createCadvisorPod(f *framework.Framework) {
-	f.PodClient().CreateSync(&api.Pod{
+func getCadvisorPod() *api.Pod {
+	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: cadvisorPodName,
 		},
@@ -363,28 +366,49 @@ func createCadvisorPod(f *framework.Framework) {
 				},
 			},
 		},
-	})
+	}
 }
 
 // deleteBatchPod deletes a batch of pods (synchronous).
 func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
-	ns := f.Namespace.Name
 	var wg sync.WaitGroup
 	for _, pod := range pods {
 		wg.Add(1)
 		go func(pod *api.Pod) {
 			defer wg.Done()
 
-			err := f.Client.Pods(ns).Delete(pod.ObjectMeta.Name, api.NewDeleteOptions(30))
+			err := f.Client.Pods(f.Namespace.Name).Delete(pod.ObjectMeta.Name, api.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(framework.WaitForPodToDisappear(f.Client, ns, pod.ObjectMeta.Name, labels.Everything(),
+			Expect(framework.WaitForPodToDisappear(f.Client, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
 				30*time.Second, 10*time.Minute)).
 				NotTo(HaveOccurred())
 		}(pod)
 	}
 	wg.Wait()
 	return
+}
+
+// checkPodDeleted checks whether a pod has been successfully deleted
+func checkPodDeleted(f *framework.Framework, podName string) error {
+	_, err := f.Client.Pods(f.Namespace.Name).Get(podName)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return errors.New("Pod Not Deleted")
+}
+
+// cleanupPerfTest deletes all pods created by performance related test which may create a lot of pods.
+// The pods may cause namespace controller times out when it tries to cleanup at the end of test.
+// So we explicitly cleanup here.
+func cleanupPerfTest(f *framework.Framework, pods []*api.Pod) {
+	By("Deleting all pods created by performance related test")
+	Expect(f.Client.Pods(f.Namespace.Name).Delete(cadvisorPodName, api.NewDeleteOptions(30))).NotTo(HaveOccurred())
+
+	deleteBatchPod(f, pods)
+	Eventually(func() error {
+		return checkPodDeleted(f, cadvisorPodName)
+	}, 10*time.Minute, time.Second*5).Should(BeNil())
 }
 
 // newTestPods creates a list of pods (specification) for test.
