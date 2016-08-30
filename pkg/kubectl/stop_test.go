@@ -766,7 +766,7 @@ func TestDeploymentNotFoundError(t *testing.T) {
 		return true, list, nil
 	})
 	fake.AddReactor("get", "replicasets", func(action testclient.Action) (handled bool, ret runtime.Object, err error) {
-		return true, nil, ScaleError{ActualError: errors.NewNotFound(api.Resource("replicaset"), "doesnt-matter")}
+		return true, nil, ScaleError{ActualError: errors.NewNotFound(api.Resource("replicaset"), "doesn't-matter")}
 	})
 
 	reaper := DeploymentReaper{fake, time.Millisecond, time.Millisecond}
