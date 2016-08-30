@@ -47,6 +47,7 @@ func validNewNamespace() *api.Namespace {
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	namespace := validNewNamespace()
 	namespace.ObjectMeta = api.ObjectMeta{GenerateName: "foo"}
@@ -63,6 +64,7 @@ func TestCreate(t *testing.T) {
 func TestCreateSetsFields(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	namespace := validNewNamespace()
 	ctx := api.NewContext()
 	_, err := storage.Create(ctx, namespace)
@@ -89,6 +91,7 @@ func TestCreateSetsFields(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().ReturnDeletedObject()
 	test.TestDelete(validNewNamespace())
 }
@@ -96,6 +99,7 @@ func TestDelete(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestGet(validNewNamespace())
 }
@@ -103,6 +107,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestList(validNewNamespace())
 }
@@ -110,6 +115,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope()
 	test.TestWatch(
 		validNewNamespace(),
@@ -134,6 +140,7 @@ func TestWatch(t *testing.T) {
 func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	key := etcdtest.AddPrefix("namespaces/foo")
 	ctx := api.NewContext()
 	now := unversioned.Now()
@@ -158,6 +165,7 @@ func TestDeleteNamespaceWithIncompleteFinalizers(t *testing.T) {
 func TestDeleteNamespaceWithCompleteFinalizers(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	key := etcdtest.AddPrefix("namespaces/foo")
 	ctx := api.NewContext()
 	now := unversioned.Now()

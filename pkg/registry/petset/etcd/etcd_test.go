@@ -83,6 +83,7 @@ func validNewPetSet() *apps.PetSet {
 func TestCreate(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	ps := validNewPetSet()
 	ps.ObjectMeta = api.ObjectMeta{}
@@ -98,7 +99,7 @@ func TestCreate(t *testing.T) {
 func TestStatusUpdate(t *testing.T) {
 	storage, statusStorage, server := newStorage(t)
 	defer server.Terminate(t)
-
+	defer storage.Store.DestroyFunc()
 	ctx := api.WithNamespace(api.NewContext(), api.NamespaceDefault)
 	key := etcdtest.AddPrefix("/petsets/" + api.NamespaceDefault + "/foo")
 	validPetSet := validNewPetSet()
@@ -135,6 +136,7 @@ func TestStatusUpdate(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestGet(validNewPetSet())
 }
@@ -142,6 +144,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestList(validNewPetSet())
 }
@@ -149,6 +152,7 @@ func TestList(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestDelete(validNewPetSet())
 }
@@ -156,6 +160,7 @@ func TestDelete(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, _, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store)
 	test.TestWatch(
 		validNewPetSet(),

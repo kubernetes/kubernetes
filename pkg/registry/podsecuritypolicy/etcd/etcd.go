@@ -37,7 +37,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 	prefix := "/" + opts.ResourcePrefix
 
 	newListFunc := func() runtime.Object { return &extensions.PodSecurityPolicyList{} }
-	storageInterface, _ := opts.Decorator(
+	storageInterface, dFunc := opts.Decorator(
 		opts.StorageConfig,
 		cachesize.GetWatchCacheSizeByResource(cachesize.PodSecurityPolicies),
 		&extensions.PodSecurityPolicy{},
@@ -68,6 +68,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 		DeleteStrategy:      podsecuritypolicy.Strategy,
 		ReturnDeletedObject: true,
 		Storage:             storageInterface,
+		DestroyFunc:         dFunc,
 	}
 	return &REST{store}
 }
