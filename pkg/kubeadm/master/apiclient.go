@@ -49,21 +49,30 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	count := 0
 
 	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
-		_, err := client.ComponentStatuses().List(api.ListOptions{})
 		count = count + 1
-		return err == nil, nil
+		cs, err := client.ComponentStatuses().List(api.ListOptions{})
+		if err != nil {
+			return false, nil
+		}
+		if len(cs.Items) < 3 {
+			fmt.Println("Not all control plane components had been deployed yet")
+			return false, nil
+		}
+		for _, item := range cs.Items {
+			for _, condition := range item.Conditions {
+				if condition.Type != api.ComponentHealthy {
+					fmt.Printf("Control plane component %q is still unhealthy: %#v\n", item.ObjectMeta.Name, item.Conditions)
+					return false, nil
+				}
+			}
+		}
+
+		fmt.Printf("All control plane components are healthy now (took %v half-seconds)", count)
+		return true, nil
 	})
 
-	fmt.Printf("ok, got API server response after %v half-seconds\n", count)
-
-	cs, err := client.ComponentStatuses().List(api.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Printf("ComponentStatuses: %#v\n", cs.Items)
-
-	// TODO check if len(cs.Items) < 3 (or what is it supposed to be)
-	// TODO check if all components are healthy, and wait if they aren't
+	// TODO may be also check node status
 	return client, nil
 }
+
+func TaintMaster() {}
