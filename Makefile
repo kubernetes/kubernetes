@@ -208,7 +208,7 @@ clean_meta:
 #   make clean_generated
 .PHONY: clean_generated
 clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
+	find . -type f -name $(GENERATED_FILE_PREFIX)\* | grep -v "./staging/*" | xargs rm -f
 
 # Run 'go vet'.
 #
