@@ -144,9 +144,9 @@ func getHttpRespBody(resp *http.Response) string {
 	return ""
 }
 
-func NewAppArmorAdmitHandler(runtime string) PodAdmitHandler {
+func NewAppArmorAdmitHandler(validator apparmor.Validator) PodAdmitHandler {
 	return &appArmorAdmitHandler{
-		Validator: apparmor.NewValidator(runtime),
+		Validator: validator,
 	}
 }
 
