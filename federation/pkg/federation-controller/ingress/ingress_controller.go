@@ -57,13 +57,6 @@ type IngressController struct {
 	// in some member of the federation.
 	ingressDeliverer *util.DelayingDeliverer
 
-	/* TODO REMOVE
-	// For triggering single configmap reconcilation. This is used when there is an
-	// add/update/delete operation on an ingress in the federated API server or
-	// the ingress controller's configmap in some member of the federation.
-	configMapDeliverer *util.DelayingDeliverer
-	*/
-
 	// For triggering reconcilation of cluster ingress controller configmap and
 	// all ingresses. This is used when a new cluster becomes available.
 	clusterDeliverer *util.DelayingDeliverer
@@ -74,7 +67,7 @@ type IngressController struct {
 	configMapFederatedInformer util.FederatedInformer
 	// For updating ingresses in members of federation.
 	federatedIngressUpdater util.FederatedUpdater
-	// For updating ingresses in members of federation.
+	// For updating configmaps in members of federation.
 	federatedConfigMapUpdater util.FederatedUpdater
 	// Definitions of ingresses that should be federated.
 	ingressInformerStore cache.Store
@@ -119,9 +112,6 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 
 	// Build deliverers for triggering reconcilations.
 	ic.ingressDeliverer = util.NewDelayingDeliverer()
-	/* TODO Remove
-	ic.configMapDeliverer = util.NewDelayingDeliverer()
-	*/
 	ic.clusterDeliverer = util.NewDelayingDeliverer()
 
 	// Start informer in federated API servers on ingresses that should be federated.
@@ -262,13 +252,6 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		glog.V(4).Infof("Ingress change delivered, reconciling: %v", ingress)
 		ic.reconcileIngress(ingress)
 	})
-	/* TODO REMOVE
-	ic.configMapDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
-		configMap := item.Value.(types.NamespacedName)
-		glog.V(4).Infof("ConfigMap change delivered, reconciling: %v", configMap)
-		ic.reconcileConfigMap(configMap) // TODO:  Need the cluster too.
-	})
-	*/
 	ic.clusterDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
 		clusterName := item.Value.(string)
 		glog.V(4).Infof("Cluster change delivered for cluster %q, reconciling configmap for that cluster and ingresses for all clusters", clusterName)
@@ -304,26 +287,6 @@ func (ic *IngressController) deliverIngress(ingress types.NamespacedName, delay 
 	ic.ingressDeliverer.DeliverAfter(key, ingress, delay)
 }
 
-/* TODO: Remove
-func (ic *IngressController) deliverConfigMapObj(obj interface{}, delay time.Duration, failed bool) {
-	configMap := obj.(*api.ConfigMap)
-	ic.deliverConfigMap(types.NamespacedName{Namespace: configMap.Namespace, Name: configMap.Name}, delay, failed)
-}
-
-func (ic *IngressController) deliverConfigMap(configMap types.NamespacedName, delay time.Duration, failed bool) {
-	if configMap.Name == uidConfigMapName && configMap.Namespace == uidConfigMapNamespace { // TODO: Rather do this in the list func.
-		glog.V(4).Infof("Delivering configMap: %s", configMap)
-		key := configMap.String()
-		if failed {
-			ic.configMapBackoff.Next(key, time.Now())
-			delay = delay + ic.configMapBackoff.Get(key)
-		} else {
-			ic.configMapBackoff.Reset(key)
-		}
-		ic.configMapDeliverer.DeliverAfter(key, configMap, delay)
-	}
-}
-*/
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
 // synced with the coresponding api server.
 func (ic *IngressController) isSynced() bool {
@@ -383,7 +346,7 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 	configMapObj, found, err := ic.configMapFederatedInformer.GetTargetStore().GetByKey(cluster.Name, uidConfigMapNamespacedName.String())
 	if !found || err != nil {
 		glog.Errorf("Failed to get ConfigMap %q for cluster %q: %v", uidConfigMapNamespacedName, clusterName, err)
-		/* TODO: Remove
+		/* TODO: Remove, but we need another way to ensure that this one gets reconciled.
 		   ic.deliverConfigMap(configMapNamespacedName, ic.configMapRetryDelay, true)
 		*/
 		return
@@ -568,6 +531,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 				// Merge any annotations on the federated ingress onto the underlying cluster ingress,
 				// overwriting duplicates.
 				// TODO: We should probably use a PATCH operation for this instead.
+				// TODO: Add the UID annotation to all federated ingresses, so that it gets propagated to underlying ingresses to make them consistent.
 				for key, val := range baseIngress.ObjectMeta.Annotations {
 					desiredIngress.ObjectMeta.Annotations[key] = val
 				}
