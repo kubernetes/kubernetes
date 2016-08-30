@@ -78,6 +78,21 @@ type Builder struct {
 	schema validation.Schema
 }
 
+var missingResourceError = fmt.Errorf(`You must provide one or more resources by argument or filename.
+Example resource specifications include:
+   '-f rsrc.yaml'
+   '--filename=rsrc.json'
+   'pods my-pod'
+   'services'`)
+
+// TODO: expand this to include other errors.
+func IsUsageError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return err == missingResourceError
+}
+
 type resourceTuple struct {
 	Resource string
 	Name     string
@@ -700,7 +715,7 @@ func (b *Builder) visitorResult() *Result {
 	if len(b.resources) != 0 {
 		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
 	}
-	return &Result{err: fmt.Errorf("you must provide one or more resources by argument or filename (%s)", strings.Join(InputExtensions, "|"))}
+	return &Result{err: missingResourceError}
 }
 
 // Do returns a Result object with a Visitor for the resources identified by the Builder.

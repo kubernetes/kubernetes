@@ -101,11 +101,6 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		printDeprecationWarning("scale", "resize")
 	}
 
-	count := cmdutil.GetFlagInt(cmd, "replicas")
-	if count < 0 {
-		return cmdutil.UsageError(cmd, "--replicas=COUNT is required, and COUNT must be greater than or equal to 0")
-	}
-
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err
@@ -120,8 +115,16 @@ func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []stri
 		Flatten().
 		Do()
 	err = r.Err()
+	if resource.IsUsageError(err) {
+		return cmdutil.UsageError(cmd, err.Error())
+	}
 	if err != nil {
 		return err
+	}
+
+	count := cmdutil.GetFlagInt(cmd, "replicas")
+	if count < 0 {
+		return cmdutil.UsageError(cmd, "The --replicas=<count> flag is required, and <count> must be greater than or equal to 0")
 	}
 
 	infos := []*resource.Info{}
