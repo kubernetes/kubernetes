@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/1.4/pkg/apis/batch"
 	"k8s.io/client-go/1.4/pkg/apis/certificates"
 	"k8s.io/client-go/1.4/pkg/apis/extensions"
+	"k8s.io/client-go/1.4/pkg/apis/imagepolicy"
 	"k8s.io/client-go/1.4/pkg/apis/policy"
 	"k8s.io/client-go/1.4/pkg/apis/rbac"
 	"k8s.io/client-go/1.4/pkg/federation/apis/federation"
@@ -48,6 +49,7 @@ import (
 	_ "k8s.io/client-go/1.4/pkg/apis/certificates/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/componentconfig/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/extensions/install"
+	_ "k8s.io/client-go/1.4/pkg/apis/imagepolicy/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/policy/install"
 	_ "k8s.io/client-go/1.4/pkg/apis/rbac/install"
 	_ "k8s.io/client-go/1.4/pkg/federation/apis/federation/install"
@@ -64,6 +66,7 @@ var (
 	Federation   TestGroup
 	Rbac         TestGroup
 	Certificates TestGroup
+	ImagePolicy  TestGroup
 
 	serializer        runtime.SerializerInfo
 	storageSerializer runtime.SerializerInfo
@@ -225,6 +228,16 @@ func init() {
 		}
 	}
 
+	if _, ok := Groups[imagepolicy.GroupName]; !ok {
+		externalGroupVersion := unversioned.GroupVersion{Group: imagepolicy.GroupName, Version: registered.GroupOrDie(imagepolicy.GroupName).GroupVersion.Version}
+		Groups[imagepolicy.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+			internalGroupVersion: imagepolicy.SchemeGroupVersion,
+			internalTypes:        api.Scheme.KnownTypes(imagepolicy.SchemeGroupVersion),
+			externalTypes:        api.Scheme.KnownTypes(externalGroupVersion),
+		}
+	}
+
 	Default = Groups[api.GroupName]
 	Autoscaling = Groups[autoscaling.GroupName]
 	Batch = Groups[batch.GroupName]
@@ -234,6 +247,7 @@ func init() {
 	Extensions = Groups[extensions.GroupName]
 	Federation = Groups[federation.GroupName]
 	Rbac = Groups[rbac.GroupName]
+	ImagePolicy = Groups[imagepolicy.GroupName]
 }
 
 func (g TestGroup) ContentConfig() (string, *unversioned.GroupVersion, runtime.Codec) {
@@ -267,7 +281,7 @@ func (g TestGroup) Codec() runtime.Codec {
 	if serializer.Serializer == nil {
 		return api.Codecs.LegacyCodec(g.externalGroupVersion)
 	}
-	return api.Codecs.CodecForVersions(serializer, api.Codecs.UniversalDeserializer(), []unversioned.GroupVersion{g.externalGroupVersion}, nil)
+	return api.Codecs.CodecForVersions(serializer, api.Codecs.UniversalDeserializer(), unversioned.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // NegotiatedSerializer returns the negotiated serializer for the server.
@@ -295,7 +309,7 @@ func (g TestGroup) StorageCodec() runtime.Codec {
 	}
 	ds := recognizer.NewDecoder(s, api.Codecs.UniversalDeserializer())
 
-	return api.Codecs.CodecForVersions(s, ds, []unversioned.GroupVersion{g.externalGroupVersion}, nil)
+	return api.Codecs.CodecForVersions(s, ds, unversioned.GroupVersions{g.externalGroupVersion}, nil)
 }
 
 // Converter returns the api.Scheme for the API version to test against, as set by the
@@ -379,7 +393,7 @@ func (g TestGroup) RESTMapper() meta.RESTMapper {
 }
 
 // ExternalGroupVersions returns all external group versions allowed for the server.
-func ExternalGroupVersions() []unversioned.GroupVersion {
+func ExternalGroupVersions() unversioned.GroupVersions {
 	versions := []unversioned.GroupVersion{}
 	for _, g := range Groups {
 		gv := g.GroupVersion()

@@ -58,10 +58,6 @@ var (
 	longThrottleLatency = 50 * time.Millisecond
 )
 
-func init() {
-	metrics.Register()
-}
-
 // HTTPClient is an interface for testing a request object.
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
@@ -339,16 +335,16 @@ func (r resourceTypeToFieldMapping) filterField(resourceType, field, value strin
 
 type versionToResourceToFieldMapping map[unversioned.GroupVersion]resourceTypeToFieldMapping
 
+// filterField transforms the given field/value selector for the given groupVersion and resource
 func (v versionToResourceToFieldMapping) filterField(groupVersion *unversioned.GroupVersion, resourceType, field, value string) (newField, newValue string, err error) {
 	rMapping, ok := v[*groupVersion]
 	if !ok {
-		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", groupVersion, resourceType, field, value)
+		// no groupVersion overrides registered, default to identity mapping
 		return field, value, nil
 	}
 	newField, newValue, err = rMapping.filterField(resourceType, field, value)
 	if err != nil {
-		// This is only a warning until we find and fix all of the client's usages.
-		glog.Warningf("Field selector: %v - %v - %v - %v: need to check if this is versioned correctly.", groupVersion, resourceType, field, value)
+		// no groupVersionResource overrides registered, default to identity mapping
 		return field, value, nil
 	}
 	return newField, newValue, nil
@@ -609,7 +605,7 @@ func (r *Request) URL() *url.URL {
 // underyling object.  This means some useful request info (like the types of field
 // selectors in use) will be lost.
 // TODO: preserve field selector keys
-func (r Request) finalURLTemplate() string {
+func (r Request) finalURLTemplate() url.URL {
 	if len(r.resourceName) != 0 {
 		r.resourceName = "{name}"
 	}
@@ -622,7 +618,8 @@ func (r Request) finalURLTemplate() string {
 		newParams[k] = v
 	}
 	r.params = newParams
-	return r.URL().String()
+	url := r.URL()
+	return *url
 }
 
 func (r *Request) tryThrottle() {
@@ -697,10 +694,10 @@ func updateURLMetrics(req *Request, resp *http.Response, err error) {
 
 	// If we have an error (i.e. apiserver down) we report that as a metric label.
 	if err != nil {
-		metrics.RequestResult.WithLabelValues(err.Error(), req.verb, url).Inc()
+		metrics.RequestResult.Increment(err.Error(), req.verb, url)
 	} else {
 		//Metrics for failure codes
-		metrics.RequestResult.WithLabelValues(strconv.Itoa(resp.StatusCode), req.verb, url).Inc()
+		metrics.RequestResult.Increment(strconv.Itoa(resp.StatusCode), req.verb, url)
 	}
 }
 
@@ -775,7 +772,7 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 	//Metrics for total request latency
 	start := time.Now()
 	defer func() {
-		metrics.RequestLatency.WithLabelValues(r.verb, r.finalURLTemplate()).Observe(metrics.SinceInMicroseconds(start))
+		metrics.RequestLatency.Observe(r.verb, r.finalURLTemplate(), time.Since(start))
 	}()
 
 	if r.err != nil {
@@ -821,9 +818,16 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		}
 
 		done := func() bool {
-			// ensure the response body is closed before we reconnect, so that we reuse the same
-			// TCP connection
-			defer resp.Body.Close()
+			// Ensure the response body is fully read and closed
+			// before we reconnect, so that we reuse the same TCP
+			// connection.
+			defer func() {
+				const maxBodySlurpSize = 2 << 10
+				if resp.ContentLength <= maxBodySlurpSize {
+					io.Copy(ioutil.Discard, &io.LimitedReader{R: resp.Body, N: maxBodySlurpSize})
+				}
+				resp.Body.Close()
+			}()
 
 			retries++
 			if seconds, wait := checkWait(resp); wait && retries < maxRetries {
@@ -877,6 +881,9 @@ func (r *Request) DoRaw() ([]byte, error) {
 	var result Result
 	err := r.request(func(req *http.Request, resp *http.Response) {
 		result.body, result.err = ioutil.ReadAll(resp.Body)
+		if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusPartialContent {
+			result.err = r.transformUnstructuredResponseError(resp, req, result.body)
+		}
 	})
 	if err != nil {
 		return nil, err

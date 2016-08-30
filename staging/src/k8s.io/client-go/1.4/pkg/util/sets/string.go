@@ -174,6 +174,15 @@ func (s String) List() []string {
 	return []string(res)
 }
 
+// UnsortedList returns the slice with contents in random order.
+func (s String) UnsortedList() []string {
+	res := make([]string, 0, len(s))
+	for key := range s {
+		res = append(res, key)
+	}
+	return res
+}
+
 // Returns a single element from the set.
 func (s String) PopAny() (string, bool) {
 	for key := range s {
