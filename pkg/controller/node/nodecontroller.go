@@ -383,7 +383,7 @@ func NewNodeControllerFromClient(
 }
 
 // Run starts an asynchronous loop that monitors the status of cluster nodes.
-func (nc *NodeController) Run(period time.Duration) {
+func (nc *NodeController) Run() {
 	go nc.nodeController.Run(wait.NeverStop)
 	go nc.podController.Run(wait.NeverStop)
 	go nc.daemonSetController.Run(wait.NeverStop)
