@@ -395,9 +395,18 @@ func (os *OpenStack) Zones() (cloudprovider.Zones, bool) {
 	return os, true
 }
 func (os *OpenStack) GetZone() (cloudprovider.Zone, error) {
-	glog.V(1).Infof("Current zone is %v", os.region)
+	md, err := getMetadata()
+	if err != nil {
+		return cloudprovider.Zone{}, err
+	}
 
-	return cloudprovider.Zone{Region: os.region}, nil
+	zone := cloudprovider.Zone{
+		FailureDomain: md.AvailabilityZone,
+		Region:        os.region,
+	}
+	glog.V(1).Infof("Current zone is %v", zone)
+
+	return zone, nil
 }
 
 func (os *OpenStack) Routes() (cloudprovider.Routes, bool) {
