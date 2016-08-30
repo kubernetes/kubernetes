@@ -91,6 +91,10 @@ function federation_action() {
   kube::log::status "Action: ${action} federation components"
   docker run \
     -m 12G \
+    # For non-GKE clusters just mounting kubeconfig is sufficient. But we need
+    # gcloud credentials for GKE clusters, so we pass both kubeconfig and
+    # gcloud credentials
+    -v "${GOOGLE_APPLICATION_CREDENTIALS}:/root/.config/gcloud/application_default_credentials.json:ro" \
     -v "${KUBE_CONFIG}:/root/.kube/config:ro" \
     -v "${FEDERATION_OUTPUT_ROOT}:/_output" \
     "${KUBE_ANYWHERE_FEDERATION_CHARTS_IMAGE}:${KUBE_ANYWHERE_FEDERATION_CHARTS_VERSION}" \
