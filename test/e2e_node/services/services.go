@@ -242,10 +242,14 @@ func (es *e2eService) getLogFiles() {
 			if err != nil {
 				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
+				glog.Infof("target link: %s", targetLink)
+				glog.Infof("kubelet log: %s", out)
 				if err = ioutil.WriteFile(targetLink, out, 0755); err != nil {
 					glog.Errorf("failed to write logs to %q: %v", targetLink, err)
 				}
+				glog.Info("after write file, I'm still here")
 			}
+			glog.Info("Finished writing log file %q", targetFileName)
 			continue
 		}
 		for _, file := range logFileData.files {
