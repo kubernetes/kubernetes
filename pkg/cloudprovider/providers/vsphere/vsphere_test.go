@@ -156,13 +156,13 @@ func TestInstances(t *testing.T) {
 		t.Fatalf("Instances() returned false")
 	}
 
-	srvs, err := i.List("*")
+	srvs, err := vs.list("*")
 	if err != nil {
-		t.Fatalf("Instances.List() failed: %s", err)
+		t.Fatalf("list() failed: %s", err)
 	}
 
 	if len(srvs) == 0 {
-		t.Fatalf("Instances.List() returned zero servers")
+		t.Fatalf("list() returned zero servers")
 	}
 	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
 
@@ -215,17 +215,12 @@ func TestVolumes(t *testing.T) {
 		t.Fatalf("Failed to construct/authenticate vSphere: %s", err)
 	}
 
-	i, ok := vs.Instances()
-	if !ok {
-		t.Fatalf("Instances() returned false")
-	}
-
-	srvs, err := i.List("*")
+	srvs, err := vs.list("*")
 	if err != nil {
-		t.Fatalf("Instances.List() failed: %s", err)
+		t.Fatalf("list() failed: %s", err)
 	}
 	if len(srvs) == 0 {
-		t.Fatalf("Instances.List() returned zero servers")
+		t.Fatalf("list() returned zero servers")
 	}
 
 	volumeOptions := &VolumeOptions{
