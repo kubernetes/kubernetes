@@ -488,7 +488,8 @@ func (kl *Kubelet) setNodeReadyCondition(node *api.Node) {
 
 	// Append AppArmor status if it's enabled.
 	// TODO(timstclair): This is a temporary message until node feature reporting is added.
-	if kl.appArmorValidator.ValidateHost() == nil {
+	if newNodeReadyCondition.Status == api.ConditionTrue &&
+		kl.appArmorValidator != nil && kl.appArmorValidator.ValidateHost() == nil {
 		newNodeReadyCondition.Message = fmt.Sprintf("%s. AppArmor enabled", newNodeReadyCondition.Message)
 	}
 
