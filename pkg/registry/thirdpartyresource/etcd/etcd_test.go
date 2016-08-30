@@ -58,6 +58,7 @@ func namer(i int) string {
 func TestCreate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer).GeneratesName()
 	rsrc := validNewThirdPartyResource("kind.domain.tld")
 	test.TestCreate(
@@ -75,6 +76,7 @@ func TestCreate(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
 	test.TestUpdate(
 		// valid
@@ -91,6 +93,7 @@ func TestUpdate(t *testing.T) {
 func TestDelete(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
 	test.TestDelete(validNewThirdPartyResource("kind.domain.tld"))
 }
@@ -98,6 +101,7 @@ func TestDelete(t *testing.T) {
 func TestGet(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
 	test.TestGet(validNewThirdPartyResource("kind.domain.tld"))
 }
@@ -105,6 +109,7 @@ func TestGet(t *testing.T) {
 func TestList(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
 	test.TestList(validNewThirdPartyResource("kind.domain.tld"))
 }
@@ -112,6 +117,7 @@ func TestList(t *testing.T) {
 func TestWatch(t *testing.T) {
 	storage, server := newStorage(t)
 	defer server.Terminate(t)
+	defer storage.Store.DestroyFunc()
 	test := registrytest.New(t, storage.Store).ClusterScope().Namer(namer)
 	test.TestWatch(
 		validNewThirdPartyResource("kind.domain.tld"),

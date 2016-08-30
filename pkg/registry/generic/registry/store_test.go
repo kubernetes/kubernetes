@@ -1200,10 +1200,13 @@ func newTestGenericStoreRegistry(t *testing.T, hasCacheEnabled bool) (factory.De
 	strategy := &testRESTStrategy{api.Scheme, api.SimpleNameGenerator, true, false, true}
 
 	sc.Codec = testapi.Default.StorageCodec()
-	destroyFunc := func() {}
-	s, err := factory.Create(*sc)
+	s, dFunc, err := factory.Create(*sc)
 	if err != nil {
 		t.Fatalf("Error creating storage: %v", err)
+	}
+	destroyFunc := func() {
+		dFunc()
+		server.Terminate(t)
 	}
 	if hasCacheEnabled {
 		config := storage.CacherConfig{

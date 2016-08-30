@@ -35,7 +35,7 @@ func NewREST(opts generic.RESTOptions) *REST {
 	prefix := "/" + opts.ResourcePrefix
 
 	// We explicitly do NOT do any decoration here yet.
-	storageInterface, _ := generic.NewRawStorage(opts.StorageConfig)
+	storageInterface, dFunc := generic.NewRawStorage(opts.StorageConfig)
 
 	store := &registry.Store{
 		NewFunc:     func() runtime.Object { return &extensions.ThirdPartyResource{} },
@@ -56,7 +56,8 @@ func NewREST(opts generic.RESTOptions) *REST {
 		UpdateStrategy:          thirdpartyresource.Strategy,
 		DeleteStrategy:          thirdpartyresource.Strategy,
 
-		Storage: storageInterface,
+		Storage:     storageInterface,
+		DestroyFunc: dFunc,
 	}
 
 	return &REST{store}
