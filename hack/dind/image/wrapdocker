@@ -149,7 +149,10 @@ if [ "${STORAGE_FS}" != "overlay" -o "${OVERLAY_WORKS}" == false ]; then
   mount -o loop "${STORAGE_FILE}" "${STORAGE_DIR}"
 fi
 
-DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:-} --storage-driver=${STORAGE_FS} -g ${STORAGE_DIR} --log-driver=json-file"
+# bind mount it back to /var/lib/docker
+mount -o bind "${STORAGE_DIR}" /var/lib/docker
+
+DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS:-} --storage-driver=${STORAGE_FS} --log-driver=json-file"
 
 # If a pidfile is still around (for example after a container restart),
 # delete it so that docker can start.
@@ -200,7 +203,7 @@ if [ ! -z "${DOCKER_NETWORK_OFFSET:-}" ]; then
   DOCKER_DAEMON_ARGS="${DOCKER_DAEMON_ARGS} --bip=${IP_CIDR} --fixed-cidr=${FIXED_CIDR}"
 
   # delete incompatible network settings
-  rm -rf "${STORAGE_DIR}/network"
+  rm -rf "/var/lib/docker/network"
 fi
 
 # stop docker daemon on shutdown to avoid loopback leaks
