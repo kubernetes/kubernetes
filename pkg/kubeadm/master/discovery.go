@@ -1,6 +1,7 @@
 package kubemaster
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -105,9 +106,10 @@ func CreateDiscoveryDeploymentAndSecret(params *kubeadmapi.BootstrapParams, clie
 	// if user provides a DNS name, or anything else, we should use that, may be it's really
 	// the list of all SANs (minus internal DNS names and service IP)?
 	endpointList := []string{fmt.Sprintf("https://%s:443", params.Discovery.ListenIP)}
-
-	tokenMap := map[string]string{"todo": params.Discovery.BearerToken} // TODO should use dot-separated tokens
-
+	tokenMap := map[string]string{}
+	fmt.Printf("params.Discovery: %+v", params.Discovery)
+	tokenMap[params.Discovery.TokenID] = hex.EncodeToString(params.Discovery.Token)
+	fmt.Printf("tokenMap: %+v", tokenMap)
 	secretData := map[string][]byte{
 		"ca.pem": []byte(caCert),
 	}

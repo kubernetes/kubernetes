@@ -67,7 +67,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 			}
 		}
 
-		fmt.Printf("All control plane components are healthy now (took %v half-seconds)", count)
+		fmt.Printf("All control plane components are healthy now (took %v half-seconds)\n", count)
 		return true, nil
 	})
 
@@ -75,4 +75,9 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 	return client, nil
 }
 
-func TaintMaster() {}
+func TaintMaster(*clientset.Clientset) error {
+	// TODO
+	annotations := make(map[string]string)
+	annotations[api.TaintsAnnotationKey] = ""
+	return nil
+}

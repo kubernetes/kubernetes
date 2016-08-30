@@ -30,6 +30,12 @@ import (
 	// TODO: cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
+// TODO --token here becomes Discovery.BearerToken and not Discovery.GivenToken
+// may be we should make it the same and ask user to pass dot-separated tokens
+// in any of the modes; we could also enable discovery API in the manual mode just
+// as well, there is no reason we shouldn't let user mix and match modes, unless
+// it is too difficult to support
+
 func NewCmdManual(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "manual",
