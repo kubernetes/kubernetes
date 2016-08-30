@@ -61,10 +61,19 @@ var _ = framework.KubeDescribe("HostPath", func() {
 	// This test requires mounting a folder into a container with write privileges.
 	It("should support r/w", func() {
 		volumePath := "/test-volume"
+		hostPath := "/tmp"
 		filePath := path.Join(volumePath, "test-file")
 		retryDuration := 180
+
+		if selinux.SelinuxEnabled() {
+			filePath := path.Join(hostPath, "test-file")
+			if err := relabelPathByChcon(filePath, false); err != nil {
+				framework.Logf("%v", err)
+			}
+		}
+
 		source := &api.HostPathVolumeSource{
-			Path: "/tmp",
+			Path: hostPath,
 		}
 		pod := testPodWithHostVol(volumePath, source)
 
