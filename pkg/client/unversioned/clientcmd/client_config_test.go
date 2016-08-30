@@ -33,7 +33,7 @@ func TestOldMergoLib(t *testing.T) {
 	}
 	dst := T{X: "one"}
 	src := T{X: "two"}
-	mergo.Merge(&dst, &src)
+	mergo.MergeWithOverwrite(&dst, &src)
 	if dst.X != "two" {
 		// mergo.Merge changed in an incompatible way with
 		//

@@ -448,22 +448,16 @@ func Example_mergingSomeWithConflict() {
 	WriteToFile(testConfigAlfa, commandLineFile.Name())
 	WriteToFile(testConfigConflictAlfa, envVarFile.Name())
 
+	printConfig(&testConfigAlfa)
+	printConfig(&testConfigConflictAlfa)
+
 	loadingRules := ClientConfigLoadingRules{
 		Precedence: []string{commandLineFile.Name(), envVarFile.Name()},
 	}
 
-	mergedConfig, err := loadingRules.Load()
+	mergedConfig, _ := loadingRules.Load()
 
-	json, err := runtime.Encode(clientcmdlatest.Codec, mergedConfig)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
-	}
-	output, err := yaml.JSONToYAML(json)
-	if err != nil {
-		fmt.Printf("Unexpected error: %v", err)
-	}
-
-	fmt.Printf("%v", string(output))
+	printConfig(mergedConfig)
 	// Output:
 	// apiVersion: v1
 	// clusters:
