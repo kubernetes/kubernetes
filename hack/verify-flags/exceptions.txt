@@ -27,11 +27,14 @@ cluster/gce/gci/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{ *storage_backend *}}@${STORAGE_BACKEND:-}@g" "${temp_file}"
 cluster/gce/trusty/configure-helper.sh:  sed -i -e "s@{{pillar\['allow_privileged'\]}}@true@g" "${src_file}"
 cluster/gce/util.sh:    local node_ip=$(gcloud compute instances describe --project "${PROJECT}" --zone "${ZONE}" \
-cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, cluster_name, server, ca)))
-cluster/juju/layers/kubernetes/reactive/k8s.py:    check_call(split(cmd.format(kubeconfig, context, cluster_name, user)))
-cluster/juju/layers/kubernetes/reactive/k8s.py:    client_key = '/srv/kubernetes/client.key'
-cluster/juju/layers/kubernetes/reactive/k8s.py:    cluster_name = 'kubernetes'
-cluster/juju/layers/kubernetes/reactive/k8s.py:    tlslib.client_key(None, client_key, user='ubuntu', group='ubuntu')
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:            context['pillar'] = {'num_nodes': get_node_count()}
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    cluster_dns.set_dns_info(53, hookenv.config('dns_domain'), dns_ip)
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:    ip = service_cidr().split('/')[0]
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def send_cluster_dns_detail(cluster_dns):
+cluster/juju/layers/kubernetes-master/reactive/kubernetes_master.py:def service_cidr():
+cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:    context.update({'kube_api_endpoint': ','.join(api_servers),
+cluster/juju/layers/kubernetes-worker/reactive/kubernetes_worker.py:def render_init_scripts(api_servers):
 cluster/lib/logging.sh:      local source_file=${BASH_SOURCE[$frame_no]}
 cluster/lib/logging.sh:    local source_file=${BASH_SOURCE[$stack_skip]}
 cluster/log-dump.sh:    local -r node_name="${1}"
