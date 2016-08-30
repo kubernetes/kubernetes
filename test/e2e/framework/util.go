@@ -4689,7 +4689,18 @@ func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, timeo
 		return err
 	}
 	defer podClient.Delete(podName, nil)
-	return WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+	err = WaitForPodSuccessInNamespace(f.Client, podName, contName, f.Namespace.Name)
+
+	if err != nil {
+		logs, logErr := GetPodLogs(f.Client, f.Namespace.Name, pod.Name, contName)
+		if logErr != nil {
+			Logf("Warning: Failed to get logs from pod %q: %v", pod.Name, logErr)
+		} else {
+			Logf("pod %s/%s \"wget\" logs:\n%s", f.Namespace.Name, pod.Name, logs)
+		}
+	}
+
+	return err
 }
 
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
