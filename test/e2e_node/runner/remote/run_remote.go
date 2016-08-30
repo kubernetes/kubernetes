@@ -280,8 +280,8 @@ func main() {
 }
 
 func callGubernator(gubernator bool) {
-	fmt.Println("Running gubernator.sh")
 	if gubernator {
+		fmt.Println("Running gubernator.sh")
 		output, err := exec.Command("./test/e2e_node/gubernator.sh", "y").Output()
 
 		if err != nil {
