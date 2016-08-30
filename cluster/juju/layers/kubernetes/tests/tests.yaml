@@ -1,5 +1,0 @@
-tests: "*kubernetes*"
-bootstrap: false
-reset: false
-python_packages:
-  - tox
