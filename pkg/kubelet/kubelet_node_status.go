@@ -129,7 +129,10 @@ func (kl *Kubelet) initialNodeStatus() (*api.Node, error) {
 			node.Annotations = make(map[string]string)
 		}
 
+		glog.Infof("Setting node annotation to enable volume controller attach/detach")
 		node.Annotations[volumehelper.ControllerManagedAttachAnnotation] = "true"
+	} else {
+		glog.Infof("Controller attach/detach is disabled for this node; Kubelet will attach and detach volumes")
 	}
 
 	// @question: should this be place after the call to the cloud provider? which also applies labels
