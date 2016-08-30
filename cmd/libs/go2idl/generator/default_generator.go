@@ -50,6 +50,7 @@ func (d DefaultGen) PackageConsts(*Context) []string                     { retur
 func (d DefaultGen) GenerateType(*Context, *types.Type, io.Writer) error { return nil }
 func (d DefaultGen) Filename() string                                    { return d.OptionalName + ".go" }
 func (d DefaultGen) FileType() string                                    { return GolangFileType }
+func (d DefaultGen) Finalize(*Context, io.Writer) error                  { return nil }
 
 func (d DefaultGen) Init(c *Context, w io.Writer) error {
 	_, err := w.Write(d.OptionalBody)
