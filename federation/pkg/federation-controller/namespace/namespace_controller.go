@@ -17,16 +17,19 @@ limitations under the License.
 package namespace
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
@@ -66,6 +69,9 @@ type NamespaceController struct {
 	// Backoff manager for namespaces
 	namespaceBackoff *flowcontrol.Backoff
 
+	// For events
+	eventRecorder record.EventRecorder
+
 	namespaceReviewDelay  time.Duration
 	clusterAvailableDelay time.Duration
 	smallDelay            time.Duration
@@ -74,6 +80,10 @@ type NamespaceController struct {
 
 // NewNamespaceController returns a new namespace controller
 func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceController {
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-namespace-controller"})
+
 	nc := &NamespaceController{
 		federatedApiClient:    client,
 		namespaceReviewDelay:  time.Second * 10,
@@ -81,6 +91,7 @@ func NewNamespaceController(client federation_release_1_4.Interface) *NamespaceC
 		smallDelay:            time.Second * 3,
 		updateTimeout:         time.Second * 30,
 		namespaceBackoff:      flowcontrol.NewBackOff(5*time.Second, time.Minute),
+		eventRecorder:         recorder,
 	}
 
 	// Build delivereres for triggering reconcilations.
@@ -264,6 +275,9 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		}
 
 		if !found {
+			nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "CreateInCluster",
+				"Creating namespace in cluster %s", cluster.Name)
+
 			operations = append(operations, util.FederatedOperation{
 				Type:        util.OperationTypeAdd,
 				Obj:         desiredNamespace,
@@ -275,6 +289,9 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 			// Update existing namespace, if needed.
 			if !util.ObjectMetaEquivalent(desiredNamespace.ObjectMeta, clusterNamespace.ObjectMeta) ||
 				!reflect.DeepEqual(desiredNamespace.Spec, clusterNamespace.Spec) {
+				nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "UpdateCluster",
+					"Updating namespace in cluster %s", cluster.Name)
+
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
 					Obj:         desiredNamespace,
@@ -288,7 +305,10 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		// Everything is in order
 		return
 	}
-	err = nc.federatedUpdater.Update(operations, nc.updateTimeout)
+	err = nc.federatedUpdater.UpdateWithOnError(operations, nc.updateTimeout, func(op util.FederatedOperation, operror error) {
+		nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "FailedClusterUpdate",
+			"Update namespace in cluster %s failed: %v", op.ClusterName, operror)
+	})
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", namespace, err)
 		nc.deliverNamespace(namespace, 0, true)
@@ -309,6 +329,7 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) {
 		},
 	}
 	if namespace.Status.Phase != api_v1.NamespaceTerminating {
+		nc.eventRecorder.Event(namespace, api.EventTypeNormal, "DeleteNamespace", fmt.Sprintf("Marking for deletion"))
 		_, err := nc.federatedApiClient.Core().Namespaces().Update(updatedNamespace)
 		if err != nil {
 			glog.Errorf("Failed to update namespace %s: %v", updatedNamespace.Name, err)
