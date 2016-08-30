@@ -84,12 +84,12 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				podsNr:   10,
 				interval: 0 * time.Millisecond,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.20, 0.95: 0.30},
+					stats.SystemContainerKubelet: {0.50: 0.25, 0.95: 0.40},
 					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
 				},
 				// percentile limit of single pod startup latency
 				podStartupLimits: framework.LatencyMetric{
@@ -182,17 +182,17 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 				podsNr:   10,
 				bgPodsNr: 50,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.20, 0.95: 0.25},
+					stats.SystemContainerKubelet: {0.50: 0.25, 0.95: 0.40},
 					stats.SystemContainerRuntime: {0.50: 0.40, 0.95: 0.60},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 100 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 400 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 500 * 1024 * 1024},
 				},
 				podStartupLimits: framework.LatencyMetric{
-					Perc50: 3000 * time.Millisecond,
-					Perc90: 4000 * time.Millisecond,
-					Perc99: 5000 * time.Millisecond,
+					Perc50: 5000 * time.Millisecond,
+					Perc90: 9000 * time.Millisecond,
+					Perc99: 10000 * time.Millisecond,
 				},
 			},
 		}
