@@ -266,7 +266,7 @@ kube::golang::create_gopath_tree() {
 
   # TODO: This symlink should be relative.
   if [[ ! -e "${go_pkg_dir}" || "$(readlink ${go_pkg_dir})" != "${KUBE_ROOT}" ]]; then
-    ln -sTf "${KUBE_ROOT}" "${go_pkg_dir}"
+    ln -snf "${KUBE_ROOT}" "${go_pkg_dir}"
   fi
 }
 
