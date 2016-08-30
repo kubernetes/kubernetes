@@ -30,6 +30,8 @@ import (
 	fakev1core "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/core/v1/fake"
 	v1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/extensions/v1beta1"
 	fakev1beta1extensions "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/extensions/v1beta1/fake"
+	v1alpha1imagepolicy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/imagepolicy/v1alpha1"
+	fakev1alpha1imagepolicy "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4/typed/imagepolicy/v1alpha1/fake"
 	"k8s.io/kubernetes/pkg/client/testing/core"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	fakediscovery "k8s.io/kubernetes/pkg/client/typed/discovery/fake"
@@ -93,4 +95,9 @@ func (c *Clientset) Batch() v1batch.BatchInterface {
 // Extensions retrieves the ExtensionsClient
 func (c *Clientset) Extensions() v1beta1extensions.ExtensionsInterface {
 	return &fakev1beta1extensions.FakeExtensions{Fake: &c.Fake}
+}
+
+// Imagepolicy retrieves the ImagepolicyClient
+func (c *Clientset) Imagepolicy() v1alpha1imagepolicy.ImagepolicyInterface {
+	return &fakev1alpha1imagepolicy.FakeImagepolicy{Fake: &c.Fake}
 }
