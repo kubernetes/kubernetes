@@ -621,6 +621,8 @@ type HostPathVolumeSource struct {
 	// Path of the directory on the host.
 	// More info: http://kubernetes.io/docs/user-guide/volumes#hostpath
 	Path string `json:"path" protobuf:"bytes,1,opt,name=path"`
+	// Mount the host path with propagation shared. Docker only.
+	Shared bool `json:"shared,omitempty" protobuf:"bool,2,opt,name=shared"`
 }
 
 // Represents an empty directory for a pod.

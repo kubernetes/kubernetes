@@ -536,6 +536,8 @@ const (
 // Host path volumes do not support ownership management or SELinux relabeling.
 type HostPathVolumeSource struct {
 	Path string `json:"path"`
+	// Mount the host path with propagation shared. Docker only.
+	Shared bool `json:"shared,omitempty"`
 }
 
 // Represents an empty directory for a pod.

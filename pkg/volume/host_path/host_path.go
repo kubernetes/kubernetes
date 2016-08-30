@@ -93,9 +93,14 @@ func (plugin *hostPathPlugin) NewMounter(spec *volume.Spec, pod *api.Pod, _ volu
 	if err != nil {
 		return nil, err
 	}
+	var propagation string
+	if hostPathVolumeSource.Shared {
+		propagation = "shared"
+	}
 	return &hostPathMounter{
-		hostPath: &hostPath{path: hostPathVolumeSource.Path},
-		readOnly: readOnly,
+		hostPath:    &hostPath{path: hostPathVolumeSource.Path},
+		readOnly:    readOnly,
+		propagation: propagation,
 	}, nil
 }
 
@@ -173,7 +178,8 @@ func (hp *hostPath) GetPath() string {
 
 type hostPathMounter struct {
 	*hostPath
-	readOnly bool
+	readOnly    bool
+	propagation string
 }
 
 var _ volume.Mounter = &hostPathMounter{}
@@ -183,7 +189,7 @@ func (b *hostPathMounter) GetAttributes() volume.Attributes {
 		ReadOnly:        b.readOnly,
 		Managed:         false,
 		SupportsSELinux: false,
-		Propagation:     "shared",
+		Propagation:     b.propagation,
 	}
 }
 
