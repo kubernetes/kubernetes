@@ -441,9 +441,14 @@ func getAddressByName(client *gophercloud.ServiceClient, name string) (string, e
 	return addrs[0].Address, nil
 }
 
-// Implementation of Instances.CurrentNodeName
+// Implementation of Instances.CurrentNodeName.
+// Note this is *not* necessarily the same as hostname.
 func (i *Instances) CurrentNodeName(hostname string) (string, error) {
-	return hostname, nil
+	md, err := getMetadata()
+	if err != nil {
+		return "", err
+	}
+	return md.Name, nil
 }
 
 func (i *Instances) AddSSHKeyToAllInstances(user string, keyData []byte) error {
