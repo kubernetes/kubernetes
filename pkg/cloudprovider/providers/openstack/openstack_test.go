@@ -252,6 +252,9 @@ func TestLoadBalancerV2(t *testing.T) {
 }
 
 func TestZones(t *testing.T) {
+	SetMetadataFixture(&FakeMetadata)
+	defer ClearMetadata()
+
 	os := OpenStack{
 		provider: &gophercloud.ProviderClient{
 			IdentityBase: "http://auth.url/",
@@ -271,6 +274,10 @@ func TestZones(t *testing.T) {
 
 	if zone.Region != "myRegion" {
 		t.Fatalf("GetZone() returned wrong region (%s)", zone.Region)
+	}
+
+	if zone.FailureDomain != "nova" {
+		t.Fatalf("GetZone() returned wrong failure domain (%s)", zone.FailureDomain)
 	}
 }
 
