@@ -189,7 +189,7 @@ func (kl *Kubelet) GetRuntime() kubecontainer.Runtime {
 // GetNode returns the node info for the configured node name of this Kubelet.
 func (kl *Kubelet) GetNode() (*api.Node, error) {
 	if kl.standaloneMode {
-		return kl.initialNodeStatus()
+		return kl.initialNode()
 	}
 	return kl.nodeInfo.GetNodeInfo(kl.nodeName)
 }
@@ -205,7 +205,7 @@ func (kl *Kubelet) getNodeAnyWay() (*api.Node, error) {
 			return n, nil
 		}
 	}
-	return kl.initialNodeStatus()
+	return kl.initialNode()
 }
 
 // GetNodeConfig returns the container manager node config.
@@ -222,7 +222,8 @@ func (kl *Kubelet) GetHostIP() (net.IP, error) {
 	return nodeutil.GetNodeHostIP(node)
 }
 
-// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or the initialNodeStatus
+// getHostIPAnyway attempts to return the host IP from kubelet's nodeInfo, or
+// the initialNode.
 func (kl *Kubelet) getHostIPAnyWay() (net.IP, error) {
 	node, err := kl.getNodeAnyWay()
 	if err != nil {
