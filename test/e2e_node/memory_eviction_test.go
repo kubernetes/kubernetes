@@ -145,7 +145,7 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 
 			// Finally, try starting a new pod and wait for it to be scheduled and running.
 			// This is the final check to try to prevent interference with subsequent tests.
-			podName := "admitBestEffortPod"
+			podName := "admit-best-effort-pod"
 			f.PodClient().CreateSync(&api.Pod{
 				ObjectMeta: api.ObjectMeta{
 					Name: podName,
