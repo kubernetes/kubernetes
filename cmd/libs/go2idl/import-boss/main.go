@@ -58,7 +58,7 @@ package main
 import (
 	"os"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/args"
+	"k8s.io/gengo/args"
 	"k8s.io/kubernetes/cmd/libs/go2idl/import-boss/generators"
 
 	"github.com/golang/glog"
