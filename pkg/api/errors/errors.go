@@ -325,7 +325,7 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource unversion
 	default:
 		if code >= 500 {
 			reason = unversioned.StatusReasonInternalError
-			message = "an error on the server has prevented the request from succeeding"
+			message = fmt.Sprintf("an error on the server (%q) has prevented the request from succeeding", serverMessage)
 		}
 	}
 	switch {
