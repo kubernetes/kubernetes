@@ -292,8 +292,8 @@ func formatCPUSummary(summary framework.ContainersCPUSummary) string {
 }
 
 // createCadvisorPod creates a standalone cadvisor pod for fine-grain resource monitoring.
-func createCadvisorPod(f *framework.Framework) {
-	f.PodClient().CreateSync(&api.Pod{
+func getCadvisorPod() *api.Pod {
+	return &api.Pod{
 		ObjectMeta: api.ObjectMeta{
 			Name: cadvisorPodName,
 		},
@@ -363,24 +363,22 @@ func createCadvisorPod(f *framework.Framework) {
 				},
 			},
 		},
-	})
+	}
 }
 
-// deleteBatchPod deletes a batch of pods (synchronous).
-func deleteBatchPod(f *framework.Framework, pods []*api.Pod) {
-	ns := f.Namespace.Name
+// deletePodsSync deletes a list of pods and block until pods disappear.
+func deletePodsSync(f *framework.Framework, pods []*api.Pod) {
 	var wg sync.WaitGroup
 	for _, pod := range pods {
 		wg.Add(1)
 		go func(pod *api.Pod) {
 			defer wg.Done()
 
-			err := f.Client.Pods(ns).Delete(pod.ObjectMeta.Name, api.NewDeleteOptions(30))
+			err := f.PodClient().Delete(pod.ObjectMeta.Name, api.NewDeleteOptions(30))
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(framework.WaitForPodToDisappear(f.Client, ns, pod.ObjectMeta.Name, labels.Everything(),
-				30*time.Second, 10*time.Minute)).
-				NotTo(HaveOccurred())
+			Expect(framework.WaitForPodToDisappear(f.Client, f.Namespace.Name, pod.ObjectMeta.Name, labels.Everything(),
+				30*time.Second, 10*time.Minute)).NotTo(HaveOccurred())
 		}(pod)
 	}
 	wg.Wait()
