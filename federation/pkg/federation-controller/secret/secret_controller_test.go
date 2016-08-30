@@ -78,7 +78,8 @@ func TestSecretController(t *testing.T) {
 	secret1 := api_v1.Secret{
 		ObjectMeta: api_v1.ObjectMeta{
 			Name:      "test-secret",
-			Namespace: "mynamespace",
+			Namespace: "ns",
+			SelfLink:  "/api/v1/namespaces/ns/secrets/test-secret",
 		},
 		Data: map[string][]byte{
 			"A": []byte("ala ma kota"),
@@ -93,7 +94,7 @@ func TestSecretController(t *testing.T) {
 	assert.NotNil(t, createdSecret)
 	assert.Equal(t, secret1.Namespace, createdSecret.Namespace)
 	assert.Equal(t, secret1.Name, createdSecret.Name)
-	assert.True(t, reflect.DeepEqual(&secret1, createdSecret))
+	assert.True(t, secretsEqual(secret1, *createdSecret))
 
 	// Test update federated secret.
 	secret1.Annotations = map[string]string{
@@ -104,7 +105,7 @@ func TestSecretController(t *testing.T) {
 	assert.NotNil(t, updatedSecret)
 	assert.Equal(t, secret1.Name, updatedSecret.Name)
 	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
-	assert.True(t, reflect.DeepEqual(&secret1, updatedSecret))
+	assert.True(t, secretsEqual(secret1, *updatedSecret))
 
 	// Test update federated secret.
 	secret1.Data = map[string][]byte{
@@ -115,7 +116,7 @@ func TestSecretController(t *testing.T) {
 	assert.NotNil(t, updatedSecret)
 	assert.Equal(t, secret1.Name, updatedSecret.Name)
 	assert.Equal(t, secret1.Namespace, updatedSecret.Namespace)
-	assert.True(t, reflect.DeepEqual(&secret1, updatedSecret2))
+	assert.True(t, secretsEqual(secret1, *updatedSecret2))
 
 	// Test add cluster
 	clusterWatch.Add(cluster2)
@@ -123,9 +124,15 @@ func TestSecretController(t *testing.T) {
 	assert.NotNil(t, createdSecret2)
 	assert.Equal(t, secret1.Name, createdSecret2.Name)
 	assert.Equal(t, secret1.Namespace, createdSecret2.Namespace)
-	assert.True(t, reflect.DeepEqual(&secret1, createdSecret2))
+	assert.True(t, secretsEqual(secret1, *createdSecret2))
 
 	close(stop)
+}
+
+func secretsEqual(a, b api_v1.Secret) bool {
+	a.SelfLink = ""
+	b.SelfLink = ""
+	return reflect.DeepEqual(a, b)
 }
 
 func GetSecretFromChan(c chan runtime.Object) *api_v1.Secret {
