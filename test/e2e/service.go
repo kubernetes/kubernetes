@@ -1016,7 +1016,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		}
 	})
 
-	It("should be able to create services of type LoadBalancer and externalTraffic=localOnly [Slow][Feature:externalTrafficLocalOnly]", func() {
+	It("should be able to create services of type LoadBalancer and externalTraffic=localOnly [Slow][Feature:ExternalTrafficLocalOnly]", func() {
 		// requires cloud load-balancer support - this feature currently supported only on GCE/GKE
 		framework.SkipUnlessProviderIs("gce", "gke")
 		loadBalancerCreateTimeout := loadBalancerCreateTimeoutDefault
