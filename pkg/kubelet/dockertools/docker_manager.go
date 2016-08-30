@@ -335,16 +335,7 @@ var (
 // that the container passed is the infrastructure container of a pod and the responsibility
 // of the caller to ensure that the correct container is passed.
 func (dm *DockerManager) determineContainerIP(podNamespace, podName string, container *dockertypes.ContainerJSON) (string, error) {
-	result := ""
-
-	if container.NetworkSettings != nil {
-		result = container.NetworkSettings.IPAddress
-
-		// Fall back to IPv6 address if no IPv4 address is present
-		if result == "" {
-			result = container.NetworkSettings.GlobalIPv6Address
-		}
-	}
+	result := getContainerIP(container)
 
 	networkMode := getDockerNetworkMode(container)
 	isHostNetwork := networkMode == namespaceModeHost
@@ -410,13 +401,11 @@ func (dm *DockerManager) inspectContainer(id string, podName, podNamespace strin
 		// Container that are running, restarting and paused
 		status.State = kubecontainer.ContainerStateRunning
 		status.StartedAt = startedAt
-		if containerName == PodInfraContainerName {
-			ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
-			// Kubelet doesn't handle the network error scenario
-			if err != nil {
-				status.State = kubecontainer.ContainerStateUnknown
-				status.Message = fmt.Sprintf("Network error: %#v", err)
-			}
+		ip, err = dm.determineContainerIP(podNamespace, podName, iResult)
+		// Kubelet doesn't handle the network error scenario
+		if err != nil {
+			status.State = kubecontainer.ContainerStateUnknown
+			status.Message = fmt.Sprintf("Network error: %#v", err)
 		}
 		return &status, ip, nil
 	}
@@ -2243,7 +2232,14 @@ func (dm *DockerManager) tryContainerStart(container *api.Container, pod *api.Po
 		restartCount = containerStatus.RestartCount + 1
 	}
 
-	_, err = dm.runContainerInPod(pod, container, namespaceMode, namespaceMode, pidMode, podIP, restartCount)
+	// Allow override of networking mode for specific platforms (e.g. Windows)
+	netMode := getNetworkingMode()
+	if netMode == "" {
+		// If not overriden, use the namespace mode
+		netMode = namespaceMode
+	}
+
+	_, err = dm.runContainerInPod(pod, container, netMode, namespaceMode, pidMode, podIP, restartCount)
 	if err != nil {
 		// TODO(bburns) : Perhaps blacklist a container after N failures?
 		return kubecontainer.ErrRunContainer, err.Error()
@@ -2533,7 +2529,7 @@ func (dm *DockerManager) GetPodStatus(uid kubetypes.UID, name, namespace string)
 			}
 		}
 		containerStatuses = append(containerStatuses, result)
-		if ip != "" {
+		if containerProvidesPodIP(dockerName) && ip != "" {
 			podStatus.IP = ip
 		}
 	}
