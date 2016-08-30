@@ -71,26 +71,6 @@ func (az *Cloud) InstanceType(name types.NodeName) (string, error) {
 	return string(machine.HardwareProfile.VMSize), nil
 }
 
-// List lists instances that match 'filter' which is a regular expression which must match the entire instance name (fqdn)
-func (az *Cloud) List(filter string) ([]types.NodeName, error) {
-	allNodes, err := az.listAllNodesInResourceGroup()
-	if err != nil {
-		return nil, err
-	}
-
-	filteredNodes, err := filterNodes(allNodes, filter)
-	if err != nil {
-		return nil, err
-	}
-
-	nodeNames := make([]types.NodeName, len(filteredNodes))
-	for i, v := range filteredNodes {
-		nodeNames[i] = types.NodeName(*v.Name)
-	}
-
-	return nodeNames, nil
-}
-
 // AddSSHKeyToAllInstances adds an SSH public key as a legal identity for all instances
 // expected format for the key is standard ssh-keygen format: <protocol> <blob>
 func (az *Cloud) AddSSHKeyToAllInstances(user string, keyData []byte) error {

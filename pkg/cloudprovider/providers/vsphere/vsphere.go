@@ -450,11 +450,11 @@ func (vs *VSphere) Instances() (cloudprovider.Instances, bool) {
 }
 
 // List returns names of VMs (inside vm folder) by applying filter and which are currently running.
-func (i *Instances) List(filter string) ([]k8stypes.NodeName, error) {
+func (vs *VSphere) list(filter string) ([]k8stypes.NodeName, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	vmList, err := getInstances(ctx, i.cfg, i.client, filter)
+	vmList, err := getInstances(ctx, vs.cfg, vs.client, filter)
 	if err != nil {
 		return nil, err
 	}

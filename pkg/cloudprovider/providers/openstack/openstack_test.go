@@ -272,50 +272,6 @@ func TestNewOpenStack(t *testing.T) {
 	}
 }
 
-func TestInstances(t *testing.T) {
-	cfg, ok := configFromEnv()
-	if !ok {
-		t.Skipf("No config found in environment")
-	}
-
-	os, err := newOpenStack(cfg)
-	if err != nil {
-		t.Fatalf("Failed to construct/authenticate OpenStack: %s", err)
-	}
-
-	i, ok := os.Instances()
-	if !ok {
-		t.Fatalf("Instances() returned false")
-	}
-
-	srvs, err := i.List(".")
-	if err != nil {
-		t.Fatalf("Instances.List() failed: %s", err)
-	}
-	if len(srvs) == 0 {
-		t.Fatalf("Instances.List() returned zero servers")
-	}
-	t.Logf("Found servers (%d): %s\n", len(srvs), srvs)
-
-	srvExternalId, err := i.ExternalID(srvs[0])
-	if err != nil {
-		t.Fatalf("Instances.ExternalId(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found server (%s), with external id: %s\n", srvs[0], srvExternalId)
-
-	srvInstanceId, err := i.InstanceID(srvs[0])
-	if err != nil {
-		t.Fatalf("Instance.InstanceId(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found server (%s), with instance id: %s\n", srvs[0], srvInstanceId)
-
-	addrs, err := i.NodeAddresses(srvs[0])
-	if err != nil {
-		t.Fatalf("Instances.NodeAddresses(%s) failed: %s", srvs[0], err)
-	}
-	t.Logf("Found NodeAddresses(%s) = %s\n", srvs[0], addrs)
-}
-
 func TestLoadBalancer(t *testing.T) {
 	cfg, ok := configFromEnv()
 	if !ok {
