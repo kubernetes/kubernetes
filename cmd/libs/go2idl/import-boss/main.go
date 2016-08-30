@@ -57,6 +57,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/examples/import-boss/generators"
@@ -74,6 +75,7 @@ func main() {
 		"k8s.io/kubernetes/cmd/...",
 		"k8s.io/kubernetes/plugin/...",
 	}
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 	// arguments.VerifyOnly = true
 
 	if err := arguments.Execute(
