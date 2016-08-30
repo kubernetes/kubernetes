@@ -29,7 +29,7 @@ type CertificateSigningRequest struct {
 	unversioned.TypeMeta `json:",inline"`
 	api.ObjectMeta       `json:"metadata,omitempty"`
 
-	// The certificate request itself and any additonal information.
+	// The certificate request itself and any additional information.
 	Spec CertificateSigningRequestSpec `json:"spec,omitempty"`
 
 	// Derived information about the request.

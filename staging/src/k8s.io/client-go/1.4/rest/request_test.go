@@ -331,7 +331,8 @@ func TestURLTemplate(t *testing.T) {
 	if full.String() != "http://localhost/pre1/namespaces/ns/r1/nm?p0=v0" {
 		t.Errorf("unexpected initial URL: %s", full)
 	}
-	actual := r.finalURLTemplate()
+	actualURL := r.finalURLTemplate()
+	actual := actualURL.String()
 	expected := "http://localhost/pre1/namespaces/%7Bnamespace%7D/r1/%7Bname%7D?p0=%7Bvalue%7D"
 	if actual != expected {
 		t.Errorf("unexpected URL template: %s %s", actual, expected)

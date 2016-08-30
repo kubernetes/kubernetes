@@ -36,6 +36,8 @@ type Info interface {
 	// This is a map[string][]string because it needs to be serializeable into
 	// a SubjectAccessReviewSpec.authorization.k8s.io for proper authorization
 	// delegation flows
+	// In order to faithfully round-trip through an impersonation flow, these keys
+	// MUST be lowercase.
 	GetExtra() map[string][]string
 }
 

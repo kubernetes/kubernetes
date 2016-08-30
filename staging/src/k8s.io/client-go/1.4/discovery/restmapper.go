@@ -80,6 +80,8 @@ func NewRESTMapper(groupResources []*APIGroupResources, versionInterfaces meta.V
 				// TODO only do this if it supports listing
 				versionMapper.Add(gv.WithKind(resource.Kind+"List"), scope)
 			}
+			// TODO why is this type not in discovery (at least for "v1")
+			versionMapper.Add(gv.WithKind("List"), meta.RESTScopeRoot)
 			unionMapper = append(unionMapper, versionMapper)
 		}
 	}

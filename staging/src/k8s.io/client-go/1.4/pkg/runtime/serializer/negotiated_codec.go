@@ -17,7 +17,6 @@ limitations under the License.
 package serializer
 
 import (
-	"k8s.io/client-go/1.4/pkg/api/unversioned"
 	"k8s.io/client-go/1.4/pkg/runtime"
 )
 
@@ -48,10 +47,10 @@ func (n *negotiatedSerializerWrapper) StreamingSerializerForMediaType(mediaType 
 	return n.streamInfo, true
 }
 
-func (n *negotiatedSerializerWrapper) EncoderForVersion(e runtime.Encoder, _ unversioned.GroupVersion) runtime.Encoder {
+func (n *negotiatedSerializerWrapper) EncoderForVersion(e runtime.Encoder, _ runtime.GroupVersioner) runtime.Encoder {
 	return e
 }
 
-func (n *negotiatedSerializerWrapper) DecoderToVersion(d runtime.Decoder, _gv unversioned.GroupVersion) runtime.Decoder {
+func (n *negotiatedSerializerWrapper) DecoderToVersion(d runtime.Decoder, _gv runtime.GroupVersioner) runtime.Decoder {
 	return d
 }

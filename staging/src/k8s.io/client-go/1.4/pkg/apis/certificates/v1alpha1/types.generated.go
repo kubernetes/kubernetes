@@ -1869,7 +1869,7 @@ func (x codecSelfer1234) decSliceCertificateSigningRequest(v *[]CertificateSigni
 
 			yyrg152 := len(yyv152) > 0
 			yyv2152 := yyv152
-			yyrl152, yyrt152 = z.DecInferLen(yyl152, z.DecBasicHandle().MaxInitLen, 368)
+			yyrl152, yyrt152 = z.DecInferLen(yyl152, z.DecBasicHandle().MaxInitLen, 384)
 			if yyrt152 {
 				if yyrl152 <= cap(yyv152) {
 					yyv152 = yyv152[:yyrl152]

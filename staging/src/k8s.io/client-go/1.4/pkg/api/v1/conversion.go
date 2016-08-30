@@ -164,7 +164,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	}
 
 	// Add field label conversions for kinds having selectable nothing but ObjectMeta fields.
-	for _, kind := range []string{
+	for _, k := range []string{
 		"Endpoints",
 		"ResourceQuota",
 		"PersistentVolumeClaim",
@@ -172,6 +172,7 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 		"ServiceAccount",
 		"ConfigMap",
 	} {
+		kind := k // don't close over range variables
 		err = scheme.AddFieldLabelConversionFunc("v1", kind,
 			func(label, value string) (string, string, error) {
 				switch label {
@@ -192,14 +193,15 @@ func addConversionFuncs(scheme *runtime.Scheme) error {
 	err = scheme.AddFieldLabelConversionFunc("v1", "Pod",
 		func(label, value string) (string, string, error) {
 			switch label {
-			case "metadata.name",
-				"metadata.namespace",
+			case "metadata.annotations",
 				"metadata.labels",
-				"metadata.annotations",
-				"status.phase",
-				"status.podIP",
+				"metadata.name",
+				"metadata.namespace",
 				"spec.nodeName",
-				"spec.restartPolicy":
+				"spec.restartPolicy",
+				"spec.serviceAccountName",
+				"status.phase",
+				"status.podIP":
 				return label, value, nil
 				// This is for backwards compatibility with old v1 clients which send spec.host
 			case "spec.host":
@@ -419,7 +421,7 @@ func Convert_api_PodStatusResult_To_v1_PodStatusResult(in *api.PodStatusResult, 
 }
 
 func Convert_v1_PodStatusResult_To_api_PodStatusResult(in *PodStatusResult, out *api.PodStatusResult, s conversion.Scope) error {
-	// TODO: when we move init container to beta, remove these conversions
+	// TODO: sometime after we move init container to stable, remove these conversions
 	if value, ok := in.Annotations[PodInitContainerStatusesAnnotationKey]; ok {
 		var values []ContainerStatus
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
@@ -453,7 +455,7 @@ func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, 
 		return err
 	}
 
-	// TODO: when we move init container to beta, remove these conversions
+	// TODO: sometime after we move init container to stable, remove these conversions.
 	if old := out.Annotations; old != nil {
 		out.Annotations = make(map[string]string, len(old))
 		for k, v := range old {
@@ -469,14 +471,22 @@ func Convert_api_PodTemplateSpec_To_v1_PodTemplateSpec(in *api.PodTemplateSpec, 
 			return err
 		}
 		out.Annotations[PodInitContainersAnnotationKey] = string(value)
+		out.Annotations[PodInitContainersBetaAnnotationKey] = string(value)
 	} else {
 		delete(out.Annotations, PodInitContainersAnnotationKey)
+		delete(out.Annotations, PodInitContainersBetaAnnotationKey)
 	}
 	return nil
 }
 
 func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out *api.PodTemplateSpec, s conversion.Scope) error {
-	// TODO: when we move init container to beta, remove these conversions
+	// TODO: sometime after we move init container to stable, remove these conversions
+	// If there is a beta annotation, copy to alpha key.
+	// See commit log for PR #31026 for why we do this.
+	if valueBeta, okBeta := in.Annotations[PodInitContainersBetaAnnotationKey]; okBeta {
+		in.Annotations[PodInitContainersAnnotationKey] = valueBeta
+	}
+	// Move the annotation to the internal repr. field
 	if value, ok := in.Annotations[PodInitContainersAnnotationKey]; ok {
 		var values []Container
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
@@ -501,6 +511,7 @@ func Convert_v1_PodTemplateSpec_To_api_PodTemplateSpec(in *PodTemplateSpec, out 
 			out.Annotations[k] = v
 		}
 		delete(out.Annotations, PodInitContainersAnnotationKey)
+		delete(out.Annotations, PodInitContainersBetaAnnotationKey)
 	}
 	return nil
 }
@@ -554,7 +565,7 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 		return err
 	}
 
-	// TODO: when we move init container to beta, remove these conversions
+	// TODO: sometime after we move init container to stable, remove these conversions
 	if len(out.Spec.InitContainers) > 0 || len(out.Status.InitContainerStatuses) > 0 {
 		old := out.Annotations
 		out.Annotations = make(map[string]string, len(old))
@@ -562,6 +573,7 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 			out.Annotations[k] = v
 		}
 		delete(out.Annotations, PodInitContainersAnnotationKey)
+		delete(out.Annotations, PodInitContainersBetaAnnotationKey)
 		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
 	}
 	if len(out.Spec.InitContainers) > 0 {
@@ -570,6 +582,7 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 			return err
 		}
 		out.Annotations[PodInitContainersAnnotationKey] = string(value)
+		out.Annotations[PodInitContainersBetaAnnotationKey] = string(value)
 	}
 	if len(out.Status.InitContainerStatuses) > 0 {
 		value, err := json.Marshal(out.Status.InitContainerStatuses)
@@ -594,7 +607,13 @@ func Convert_api_Pod_To_v1_Pod(in *api.Pod, out *Pod, s conversion.Scope) error 
 }
 
 func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error {
-	// TODO: when we move init container to beta, remove these conversions
+	// If there is a beta annotation, copy to alpha key.
+	// See commit log for PR #31026 for why we do this.
+	if valueBeta, okBeta := in.Annotations[PodInitContainersBetaAnnotationKey]; okBeta {
+		in.Annotations[PodInitContainersAnnotationKey] = valueBeta
+	}
+	// TODO: sometime after we move init container to stable, remove these conversions
+	// Move the annotation to the internal repr. field
 	if value, ok := in.Annotations[PodInitContainersAnnotationKey]; ok {
 		var values []Container
 		if err := json.Unmarshal([]byte(value), &values); err != nil {
@@ -632,6 +651,7 @@ func Convert_v1_Pod_To_api_Pod(in *Pod, out *api.Pod, s conversion.Scope) error 
 			out.Annotations[k] = v
 		}
 		delete(out.Annotations, PodInitContainersAnnotationKey)
+		delete(out.Annotations, PodInitContainersBetaAnnotationKey)
 		delete(out.Annotations, PodInitContainerStatusesAnnotationKey)
 	}
 	return nil
