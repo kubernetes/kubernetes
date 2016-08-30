@@ -33,6 +33,7 @@ import (
 	"time"
 
 	"github.com/emicklei/go-restful/swagger"
+	"github.com/imdario/mergo"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -1219,6 +1220,9 @@ func DefaultClientConfig(flags *pflag.FlagSet) clientcmd.ClientConfig {
 	flags.StringVar(&loadingRules.ExplicitPath, "kubeconfig", "", "Path to the kubeconfig file to use for CLI requests.")
 
 	overrides := &clientcmd.ConfigOverrides{}
+	// use the standard defaults for this client config
+	mergo.Merge(&overrides.ClusterDefaults, clientcmd.DefaultCluster)
+
 	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
 	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
 	flagNames.ClusterOverrideFlags.APIServer.ShortName = "s"
