@@ -164,7 +164,7 @@ func (s *CMServer) Run(_ []string) error {
 	if err != nil {
 		glog.Fatalf("Failed to initialize nodecontroller: %v", err)
 	}
-	nodeController.Run(s.NodeSyncPeriod.Duration)
+	nodeController.Run()
 
 	nodeStatusUpdaterController := node.NewStatusUpdater(clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "node-status-controller")), s.NodeMonitorPeriod.Duration, time.Now)
 	if err := nodeStatusUpdaterController.Run(wait.NeverStop); err != nil {
