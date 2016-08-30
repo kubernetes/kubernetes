@@ -391,6 +391,13 @@ function assemble-docker-flags {
   fi
 
   echo "DOCKER_OPTS=\"${docker_opts} ${EXTRA_DOCKER_OPTS:-}\"" > /etc/default/docker
+  
+  # Delete docker0 to avoid interference. This has to be done here
+  # because kubelet won't restart docker if using a NETWORK_PROVIDER.
+  iptables -t nat -F || true
+  ip link set docker0 down || true
+  brctl delbr docker0 || true
+
   # If using a network plugin, we need to explicitly restart docker daemon, because
   # kubelet will not do it.
   if [[ "${use_net_plugin}" == "true" ]]; then
@@ -539,11 +546,6 @@ ExecStart=${kubelet_bin} \$KUBELET_OPTS
 [Install]
 WantedBy=multi-user.target
 EOF
-
-  # Delete docker0 to avoid interference
-  iptables -t nat -F || true
-  ip link set docker0 down || true
-  brctl delbr docker0 || true
 
   systemctl start kubelet.service
 }
