@@ -1,2 +1,10 @@
 maintainers:
 - rootfs
+
+reviewers:
+ - swagiaal
+ - saad-ali
+ - pmorie
+ - thockin
+ - caesarxuchao
+ - smarterclayton
