@@ -20,9 +20,9 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 		return nil, err
 	}
 
-	host, port := strings.Split(apiServerURL.Host, ":")[0], 8081
+	host, port := strings.Split(apiServerURL.Host, ":")[0], 9898
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/api/v1alpha1/testclusterinfo", host, port), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/cluster-info/v1/?token-id=%s", host, port, params.Discovery.TokenID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 		return nil, err
 	}
 
-	output, err := object.Verify([]byte(params.Discovery.BearerToken))
+	output, err := object.Verify(params.Discovery.Token)
 	if err != nil {
 		return nil, err
 	}
