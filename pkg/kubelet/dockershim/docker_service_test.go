@@ -17,10 +17,14 @@ limitations under the License.
 package dockershim
 
 import (
+	"time"
+
 	"k8s.io/kubernetes/pkg/kubelet/dockertools"
+	"k8s.io/kubernetes/pkg/util/clock"
 )
 
-func newTestDockerSevice() (*dockerService, *dockertools.FakeDockerClient) {
+func newTestDockerSevice() (*dockerService, *dockertools.FakeDockerClient, *clock.FakeClock) {
 	c := dockertools.NewFakeDockerClient()
-	return &dockerService{client: c}, c
+	fakeClock := clock.NewFakeClock(time.Time{})
+	return &dockerService{client: c}, c, fakeClock
 }
