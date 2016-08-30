@@ -153,7 +153,7 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 				})
 				By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.address, pathToFail)
-				ExpectNoError(jig.pollURL(route, updateURLMapHost, lbCleanupTimeout, &http.Client{Timeout: reqTimeout}, true))
+				ExpectNoError(pollURL(route, updateURLMapHost, lbCleanupTimeout, &http.Client{Timeout: reqTimeout}, true))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
@@ -162,7 +162,7 @@ func createComformanceTests(jig *testJig, ns string) []conformanceTests {
 
 // pollURL polls till the url responds with a healthy http code. If
 // expectUnreachable is true, it breaks on first non-healthy http code instead.
-func (j *testJig) pollURL(route, host string, timeout time.Duration, httpClient *http.Client, expectUnreachable bool) error {
+func pollURL(route, host string, timeout time.Duration, httpClient *http.Client, expectUnreachable bool) error {
 	var lastBody string
 	pollErr := wait.PollImmediate(lbPollInterval, timeout, func() (bool, error) {
 		var err error
@@ -648,7 +648,7 @@ func (j *testJig) waitForIngress() {
 			j.curlServiceNodePort(j.ing.Namespace, p.Backend.ServiceName, int(p.Backend.ServicePort.IntVal))
 			route := fmt.Sprintf("%v://%v%v", proto, address, p.Path)
 			framework.Logf("Testing route %v host %v with simple GET", route, rules.Host)
-			ExpectNoError(j.pollURL(route, rules.Host, lbPollTimeout, timeoutClient, false))
+			ExpectNoError(pollURL(route, rules.Host, lbPollTimeout, timeoutClient, false))
 		}
 	}
 }
@@ -672,7 +672,7 @@ func (j *testJig) curlServiceNodePort(ns, name string, port int) {
 	// TODO: Curl all nodes?
 	u, err := framework.GetNodePortURL(j.client, ns, name, port)
 	ExpectNoError(err)
-	ExpectNoError(j.pollURL(u, "", 30*time.Second, &http.Client{Timeout: reqTimeout}, false))
+	ExpectNoError(pollURL(u, "", 30*time.Second, &http.Client{Timeout: reqTimeout}, false))
 }
 
 // ingFromManifest reads a .json/yaml file and returns the rc in it.
