@@ -69,7 +69,7 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 			{
 				podsNr: 10,
 				cpuLimits: framework.ContainersCPUSummary{
-					stats.SystemContainerKubelet: {0.50: 0.25, 0.95: 0.30},
+					stats.SystemContainerKubelet: {0.50: 0.30, 0.95: 0.35},
 					stats.SystemContainerRuntime: {0.50: 0.30, 0.95: 0.40},
 				},
 				memLimits: framework.ResourceUsagePerContainer{
