@@ -25,8 +25,8 @@ import (
 	"strings"
 	"unicode"
 
-	go2idlparser "k8s.io/kubernetes/cmd/libs/go2idl/parser"
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	go2idlparser "k8s.io/gengo/parser"
+	"k8s.io/gengo/types"
 )
 
 // GetPublicFunctions lists all public functions (not methods) from a golang source file.

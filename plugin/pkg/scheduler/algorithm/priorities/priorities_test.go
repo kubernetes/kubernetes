@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"testing"
 
-	"k8s.io/kubernetes/cmd/libs/go2idl/types"
+	"k8s.io/gengo/types"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
