@@ -206,13 +206,14 @@ clean: clean_meta
 clean_meta:
 	rm -rf $(META_DIR)
 
-# Remove all auto-generated artifacts.
+# Remove all auto-generated artifacts. Generated artifacts in staging folder should not be removed as they are not
+# generated using generated_files.
 #
 # Example:
 #   make clean_generated
 .PHONY: clean_generated
 clean_generated:
-	find . -type f -name $(GENERATED_FILE_PREFIX)\* | xargs rm -f
+	find . -type f -name $(GENERATED_FILE_PREFIX)\* | grep -v "[.]/staging/.*" | xargs rm -f
 
 # Run 'go vet'.
 #
