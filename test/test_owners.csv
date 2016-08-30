@@ -159,13 +159,13 @@ Garbage collector should orphan pods created by rc if deleteOptions.OrphanDepend
 "Generated release_1_2 clientset should create pods, delete pods, watch pods",ncdc,1
 "Generated release_1_3 clientset should create pods, delete pods, watch pods",krousey,1
 Hazelcast should create and scale hazelcast,mikedanese,1
-Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jlowdermilk,1
+Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability,jszczepkowski,0
-Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,bgrant0607,1
+Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) Deployment Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability,jszczepkowski,0
-Horizontal pod autoscaling (scale resource: CPU) ReplicaSet Should scale from 1 pod to 3 pods and from 3 to 5,ghodss,1
+Horizontal pod autoscaling (scale resource: CPU) ReplicaSet Should scale from 1 pod to 3 pods and from 3 to 5,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) ReplicaSet Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability,jszczepkowski,0
-Horizontal pod autoscaling (scale resource: CPU) ReplicaSet Should scale from 5 pods to 3 pods and from 3 to 1,davidopp,1
+Horizontal pod autoscaling (scale resource: CPU) ReplicaSet Should scale from 5 pods to 3 pods and from 3 to 1,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) ReplicaSet Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) ReplicationController Should scale from 1 pod to 3 pods and from 3 to 5 and verify decision stability,jszczepkowski,0
 Horizontal pod autoscaling (scale resource: CPU) ReplicationController Should scale from 5 pods to 3 pods and from 3 to 1 and verify decision stability,jszczepkowski,0
