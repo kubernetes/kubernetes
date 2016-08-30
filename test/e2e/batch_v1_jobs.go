@@ -188,7 +188,7 @@ var _ = framework.KubeDescribe("V1Job", func() {
 		Expect(errors.IsNotFound(err)).To(BeTrue())
 	})
 
-	It("should fail a job", func() {
+	It("should fail a job [Slow]", func() {
 		By("Creating a job")
 		job := newTestV1Job("notTerminate", "foo", api.RestartPolicyNever, parallelism, completions)
 		activeDeadlineSeconds := int64(10)
