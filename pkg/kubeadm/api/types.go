@@ -27,7 +27,10 @@ type OutOfBandDiscovery struct {
 	// 'join-node' side
 	ApiServerURLs string // comma separated
 	CaCertFile    string
-	BearerToken   string // optional on master side, will be generated if not specified
+	GivenToken    string // dot-separated `<TokenID>.<Token>` set by the user
+	TokenID       string // optional on master side, will be generated if not specified
+	Token         []byte // optional on master side, will be generated if not specified
+	BearerToken   string // set based on Token
 	// 'init-master' side
 	ApiServerDNSName string // optional, used in master bootstrap
 	ListenIP         string // optional IP for master to listen on, rather than autodetect

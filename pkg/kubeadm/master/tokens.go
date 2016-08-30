@@ -17,26 +17,25 @@ package kubemaster
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"fmt"
 	"os"
 	"path"
 
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
-	"k8s.io/kubernetes/pkg/kubeadm/tlsutil"
+	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
 	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
 func generateTokenIfNeeded(params *kubeadmapi.BootstrapParams) error {
-	if params.Discovery.BearerToken == "" {
-		key, err := tlsutil.NewPrivateKey()
+	ok, err := kubeadmutil.UseGivenTokenIfValid(params)
+	if !ok {
 		if err != nil {
 			return err
 		}
-		token := sha1.Sum(tlsutil.EncodePrivateKeyPEM(key))
-		params.Discovery.BearerToken = fmt.Sprintf("%x", token)
+		return kubeadmutil.GenerateToken(params)
 	}
+
 	return nil
 }
 

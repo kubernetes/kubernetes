@@ -75,7 +75,7 @@ func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Comman
 
 	cmd.PersistentFlags().StringVarP(&params.Discovery.ListenIP, "listen-ip", "", "",
 		`(optional) IP address to listen on, in case autodetection fails.`)
-	cmd.PersistentFlags().StringVarP(&params.Discovery.BearerToken, "token", "", "",
+	cmd.PersistentFlags().StringVarP(&params.Discovery.GivenToken, "token", "", "",
 		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`)
 
 	return cmd
