@@ -222,12 +222,7 @@ func (psc *PetSetController) getPodsForPetSet(ps *apps.PetSet) ([]*api.Pod, erro
 	if err != nil {
 		return []*api.Pod{}, err
 	}
-	// TODO: Do we need to copy?
-	result := make([]*api.Pod, 0, len(pods))
-	for i := range pods {
-		result = append(result, &(*pods[i]))
-	}
-	return result, nil
+	return pods, nil
 }
 
 // getPetSetForPod returns the pet set managing the given pod.
