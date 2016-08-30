@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	"k8s.io/kubernetes/pkg/client/unversioned/fake"
 )
@@ -37,6 +38,8 @@ func TestReplaceObject(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodDelete:
 				deleted = true
 				fallthrough
@@ -92,6 +95,8 @@ func TestReplaceMultipleObject(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && m == http.MethodDelete:
 				redisMasterDeleted = true
 				fallthrough
@@ -159,6 +164,8 @@ func TestReplaceDirectory(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
 			case strings.HasPrefix(p, "/namespaces/test/replicationcontrollers/") && m == http.MethodPut:
 				created[p] = true
 				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
@@ -213,6 +220,8 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
+			case p == "/api/v1/namespaces/test" && m == http.MethodGet:
+				return &http.Response{StatusCode: http.StatusOK, Header: defaultHeader(), Body: objBody(codec, &api.Namespace{})}, nil
 			case p == "/namespaces/test/replicationcontrollers/redis-master" && (m == http.MethodGet || m == http.MethodDelete):
 				return &http.Response{StatusCode: http.StatusNotFound, Header: defaultHeader(), Body: stringBody("")}, nil
 			case p == "/namespaces/test/replicationcontrollers" && m == http.MethodPost:

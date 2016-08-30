@@ -26,6 +26,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/validation"
@@ -110,6 +112,12 @@ func (i *Info) Visit(fn VisitorFunc) error {
 func (i *Info) Get() (err error) {
 	obj, err := NewHelper(i.Client, i.Mapping).Get(i.Namespace, i.Name, i.Export)
 	if err != nil {
+		if errors.IsNotFound(err) && len(i.Namespace) > 0 && i.Namespace != api.NamespaceDefault && i.Namespace != api.NamespaceAll {
+			err2 := i.Client.Get().AbsPath("api", "v1", "namespaces", i.Namespace).Do().Error()
+			if err2 != nil && errors.IsNotFound(err2) {
+				return err2
+			}
+		}
 		return err
 	}
 	i.Object = obj
