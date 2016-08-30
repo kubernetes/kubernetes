@@ -219,7 +219,7 @@ type VolumeSource struct {
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty"`
 
 	// FlexVolume represents a generic volume resource that is
-	// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
+	// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
 	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty"`
 
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
@@ -271,7 +271,7 @@ type PersistentVolumeSource struct {
 	// kubelet's host machine and then exposed to the pod.
 	ISCSI *ISCSIVolumeSource `json:"iscsi,omitempty"`
 	// FlexVolume represents a generic volume resource that is
-	// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
+	// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
 	FlexVolume *FlexVolumeSource `json:"flexVolume,omitempty"`
 	// Cinder represents a cinder volume attached and mounted on kubelets host machine
 	Cinder *CinderVolumeSource `json:"cinder,omitempty"`
@@ -530,7 +530,7 @@ type ISCSIVolumeSource struct {
 // Fibre Channel volumes can only be mounted as read/write once.
 // Fibre Channel volumes support ownership management and SELinux relabeling.
 type FCVolumeSource struct {
-	// Required: FC target world wide names (WWNs)
+	// Required: FC target worldwide names (WWNs)
 	TargetWWNs []string `json:"targetWWNs"`
 	// Required: FC target lun number
 	Lun *int32 `json:"lun"`
@@ -545,7 +545,7 @@ type FCVolumeSource struct {
 }
 
 // FlexVolume represents a generic volume resource that is
-// provisioned/attached using a exec based plugin. This is an alpha feature and may change in future.
+// provisioned/attached using an exec based plugin. This is an alpha feature and may change in future.
 type FlexVolumeSource struct {
 	// Driver is the name of the driver to use for this volume.
 	Driver string `json:"driver"`
@@ -569,7 +569,7 @@ type FlexVolumeSource struct {
 // Represents a Persistent Disk resource in AWS.
 //
 // An AWS EBS disk must exist before mounting to a container. The disk
-// must also be in the same AWS zone as the kubelet. A AWS EBS disk
+// must also be in the same AWS zone as the kubelet. An AWS EBS disk
 // can only be mounted as read/write once. AWS EBS volumes support
 // ownership management and SELinux relabeling.
 type AWSElasticBlockStoreVolumeSource struct {
