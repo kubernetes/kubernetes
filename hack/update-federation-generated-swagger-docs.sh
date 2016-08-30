@@ -28,11 +28,12 @@ source "${KUBE_ROOT}/hack/lib/swagger.sh"
 
 kube::golang::setup_env
 
-GROUP_VERSIONS=(unversioned v1 authentication/v1beta1 authorization/v1beta1 autoscaling/v1 batch/v1 batch/v2alpha1 extensions/v1beta1 apps/v1alpha1 policy/v1alpha1 rbac/v1alpha1 certificates/v1alpha1)
+GROUP_VERSIONS=(federation/v1beta1)
+GV_DIRS=("federation/apis/federation/v1beta1")
 # To avoid compile errors, remove the currently existing files.
-for group_version in "${GROUP_VERSIONS[@]}"; do
-  rm -f "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")/types_swagger_doc_generated.go"
+for gv_dir in "${GV_DIRS[@]}"; do
+  rm -f "${gv_dir}/types_swagger_doc_generated.go"
 done
-for group_version in "${GROUP_VERSIONS[@]}"; do
-  kube::swagger::gen_types_swagger_doc "${group_version}" "pkg/$(kube::util::group-version-to-pkg-path "${group_version}")"
+for i in "${!GROUP_VERSIONS[@]}"; do
+  kube::swagger::gen_types_swagger_doc "${GROUP_VERSIONS[i]}" "${GV_DIRS[i]}"
 done
