@@ -28,6 +28,9 @@ import (
 // from false to true).
 type ConditionFunc func(event Event) (bool, error)
 
+// max time.Duration value, around 290 years
+const Forever time.Duration = 1<<63 - 1
+
 // Until reads items from the watch until each provided condition succeeds, and then returns the last watch
 // encountered. The first condition that returns an error terminates the watch (and the event is also returned).
 // If no event has been received, the returned event will be nil.

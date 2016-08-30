@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
 	uexec "k8s.io/kubernetes/pkg/util/exec"
+	"k8s.io/kubernetes/pkg/util/interrupt"
 	"k8s.io/kubernetes/pkg/watch"
 )
 
@@ -408,15 +409,21 @@ func waitForPod(c *client.Client, ns, name string, exitCondition watch.Condition
 		}
 	}()
 
-	const forever time.Duration = 1<<63 - 1 // max time.Duration value, around 290 years
-	ev, err := watch.Until(forever, w, func(ev watch.Event) (bool, error) {
-		c, err := exitCondition(ev)
-		if c == false && err == nil {
-			pods <- ev.Object.(*api.Pod) // send to ticker
-		}
-		return c, err
+	intr := interrupt.New(nil, w.Stop)
+	defer intr.Close()
+	var result *api.Pod
+	intr.Run(func() error {
+		ev, err := watch.Until(watch.Forever, w, func(ev watch.Event) (bool, error) {
+			c, err := exitCondition(ev)
+			if c == false && err == nil {
+				pods <- ev.Object.(*api.Pod) // send to ticker
+			}
+			return c, err
+		})
+		result = ev.Object.(*api.Pod)
+		return err
 	})
-	return ev.Object.(*api.Pod), err
+	return result, err
 }
 
 func waitForPodRunning(c *client.Client, ns, name string, out io.Writer, quiet bool) (*api.Pod, error) {
