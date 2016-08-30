@@ -19,7 +19,6 @@ limitations under the License.
 package e2e_node
 
 import (
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -27,7 +26,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
-	apierrors "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/client/cache"
 	controllerframework "k8s.io/kubernetes/pkg/controller/framework"
@@ -67,13 +65,10 @@ var _ = framework.KubeDescribe("Density [Serial] [Slow]", func() {
 		ns = f.Namespace.Name
 		nodeName = framework.TestContext.NodeName
 		// Start a standalone cadvisor pod using 'createSync', the pod is running when it returns
-		createCadvisorPod(f)
+		f.PodClient().CreateSync(getCadvisorPod())
 		// Resource collector monitors fine-grain CPU/memory usage by a standalone Cadvisor with
 		// 1s housingkeeping interval
 		rc = NewResourceCollector(containerStatsPollingPeriod)
-	})
-
-	AfterEach(func() {
 	})
 
 	Context("create a batch of pods", func() {
@@ -296,6 +291,8 @@ func runDensityBatchTest(f *framework.Framework, rc *ResourceCollector, testArg 
 	time.Sleep(sleepBeforeCreatePods)
 
 	rc.Start()
+	// Explicitly delete pods to prevent namespace controller cleanning up timeout
+	defer deletePodsSync(f, append(pods, getCadvisorPod()))
 	defer rc.Stop()
 
 	By("Creating a batch of pods")
@@ -371,6 +368,8 @@ func runDensitySeqTest(f *framework.Framework, rc *ResourceCollector, testArg de
 	time.Sleep(sleepBeforeCreatePods)
 
 	rc.Start()
+	// Explicitly delete pods to prevent namespace controller cleanning up timeout
+	defer deletePodsSync(f, append(bgPods, append(testPods, getCadvisorPod())...))
 	defer rc.Stop()
 
 	// Create pods sequentially (back-to-back). e2eLags have been sorted.
@@ -392,16 +391,6 @@ func createBatchPodWithRateControl(f *framework.Framework, pods []*api.Pod, inte
 		time.Sleep(interval)
 	}
 	return createTimes
-}
-
-// checkPodDeleted checks whether a pod has been successfully deleted
-func checkPodDeleted(f *framework.Framework, podName string) error {
-	ns := f.Namespace.Name
-	_, err := f.Client.Pods(ns).Get(podName)
-	if apierrors.IsNotFound(err) {
-		return nil
-	}
-	return errors.New("Pod Not Deleted")
 }
 
 // getPodStartLatency gets prometheus metric 'pod start latency' from kubelet

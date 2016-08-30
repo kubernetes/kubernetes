@@ -52,7 +52,7 @@ var _ = framework.KubeDescribe("Resource-usage [Serial] [Slow]", func() {
 		// The Cadvsior of Kubelet has a housekeeping interval of 10s, which is too long to
 		// show the resource usage spikes. But changing its interval increases the overhead
 		// of kubelet. Hence we use a Cadvisor pod.
-		createCadvisorPod(f)
+		f.PodClient().CreateSync(getCadvisorPod())
 		rc = NewResourceCollector(containerStatsPollingPeriod)
 	})
 
@@ -135,12 +135,14 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 		// sleep for an interval here to measure steady data
 		sleepAfterCreatePods = 10 * time.Second
 	)
+	pods := newTestPods(testArg.podsNr, ImageRegistry[pauseImage], "test_pod")
 
 	rc.Start()
+	// Explicitly delete pods to prevent namespace controller cleanning up timeout
+	defer deletePodsSync(f, append(pods, getCadvisorPod()))
 	defer rc.Stop()
 
 	By("Creating a batch of Pods")
-	pods := newTestPods(testArg.podsNr, ImageRegistry[pauseImage], "test_pod")
 	f.PodClient().CreateBatch(pods)
 
 	// wait for a while to let the node be steady
