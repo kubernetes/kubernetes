@@ -39,7 +39,6 @@ const (
 	SERVICE_CLUSTER_IP_RANGE = "--service-cluster-ip-range=10.16.0.0/12"
 	CLUSTER_NAME             = "--cluster-name=kubernetes"
 	MASTER                   = "--master=127.0.0.1:8080"
-	HYPERKUBE_IMAGE          = "errordeveloper/hyperquick:master"
 )
 
 // TODO look into what this really means, scheduler prints it for some reason
@@ -65,7 +64,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		// TODO bind-mount certs in
 		"kube-apiserver": componentPod(api.Container{
 			Name:  "kube-apiserver",
-			Image: HYPERKUBE_IMAGE,
+			Image: params.EnvParams["hyperkube_image"],
 			Command: []string{
 				"/hyperkube",
 				"apiserver",
@@ -89,7 +88,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		}, pkiVolume(params)),
 		"kube-controller-manager": componentPod(api.Container{
 			Name:  "kube-controller-manager",
-			Image: HYPERKUBE_IMAGE,
+			Image: params.EnvParams["hyperkube_image"],
 			Command: []string{
 				"/hyperkube",
 				"controller-manager",
@@ -108,7 +107,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		}, pkiVolume(params)),
 		"kube-scheduler": componentPod(api.Container{
 			Name:  "kube-scheduler",
-			Image: HYPERKUBE_IMAGE,
+			Image: params.EnvParams["hyperkube_image"],
 			Command: []string{
 				"/hyperkube",
 				"scheduler",
