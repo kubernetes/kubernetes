@@ -457,7 +457,7 @@ func TestResourceErrors(t *testing.T) {
 	}{
 		"no args": {
 			args:  []string{},
-			errFn: func(err error) bool { return strings.Contains(err.Error(), "you must provide one or more resources") },
+			errFn: func(err error) bool { return strings.Contains(err.Error(), "You must provide one or more resources") },
 		},
 		"resources but no selectors": {
 			args: []string{"pods"},
