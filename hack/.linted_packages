@@ -210,6 +210,7 @@ test/integration/discoverysummarizer
 test/integration/examples
 test/integration/federation
 test/integration/metrics
+test/integration/objectmeta
 test/integration/openshift
 test/soak/cauldron
 test/soak/serve_hostnames
