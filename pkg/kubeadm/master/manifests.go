@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	api "k8s.io/kubernetes/pkg/api/v1"
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/intstr"
 )
 
@@ -129,7 +129,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		if err != nil {
 			return err
 		}
-		if err := util.DumpReaderToFile(bytes.NewReader(serialized), path.Join(manifestsPath, name+".json")); err != nil {
+		if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), path.Join(manifestsPath, name+".json")); err != nil {
 			return err
 		}
 	}
