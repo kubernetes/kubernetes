@@ -1168,6 +1168,9 @@ func hasRemainingContent(c *client.Client, clientPool dynamic.ClientPool, namesp
 		return false, err
 	}
 
+	// TODO: temporary hack for https://github.com/kubernetes/kubernetes/issues/31798
+	ignoredResources := sets.NewString("bindings")
+
 	contentRemaining := false
 
 	// dump how many of resource type is on the server in a log.
@@ -1181,6 +1184,11 @@ func hasRemainingContent(c *client.Client, clientPool dynamic.ClientPool, namesp
 		}
 		// get the api resource
 		apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+		// TODO: temporary hack for https://github.com/kubernetes/kubernetes/issues/31798
+		if ignoredResources.Has(apiResource.Name) {
+			Logf("namespace: %s, resource: %s, ignored listing per whitelist", namespace, apiResource.Name)
+			continue
+		}
 		obj, err := dynamicClient.Resource(&apiResource, namespace).List(&v1.ListOptions{})
 		if err != nil {
 			// not all resources support list, so we ignore those
