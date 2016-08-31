@@ -120,6 +120,14 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 		return forceReplace(f, out, cmd, args, shortOutput, options)
 	}
 
+	if cmdutil.GetFlagInt(cmd, "grace-period") >= 0 {
+		return fmt.Errorf("--grace-period must have --force specified")
+	}
+
+	if cmdutil.GetFlagDuration(cmd, "timeout") != 0 {
+		return fmt.Errorf("--timeout must have --force specified")
+	}
+
 	mapper, typer := f.Object(cmdutil.GetIncludeThirdPartyAPIs(cmd))
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		Schema(schema).
