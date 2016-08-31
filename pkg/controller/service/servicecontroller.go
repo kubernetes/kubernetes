@@ -422,10 +422,15 @@ func (s *serviceCache) delete(serviceName string) {
 }
 
 func (s *ServiceController) needsUpdate(oldService *api.Service, newService *api.Service) bool {
-	if !wantsLoadBalancer(oldService) && !wantsLoadBalancer(newService) {
+	oldServiceNeedsLoadBalancer := wantsLoadBalancer(oldService)
+	newServiceNeedsLoadBalancer := wantsLoadBalancer(newService)
+	if oldServiceNeedsLoadBalancer || newServiceNeedsLoadBalancer {
+		return true
+	}
+	if !oldServiceNeedsLoadBalancer && !newServiceNeedsLoadBalancer {
 		return false
 	}
-	if wantsLoadBalancer(oldService) != wantsLoadBalancer(newService) {
+	if oldServiceNeedsLoadBalancer != newServiceNeedsLoadBalancer {
 		s.eventRecorder.Eventf(newService, api.EventTypeNormal, "Type", "%v -> %v",
 			oldService.Spec.Type, newService.Spec.Type)
 		return true
