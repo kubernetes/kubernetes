@@ -491,28 +491,31 @@ var _ = framework.KubeDescribe("Pods", func() {
 		defer ws.Close()
 
 		buf := &bytes.Buffer{}
-		for {
-			var msg []byte
-			if err := websocket.Message.Receive(ws, &msg); err != nil {
-				if err == io.EOF {
-					break
+		Eventually(func() error {
+			for {
+				var msg []byte
+				if err := websocket.Message.Receive(ws, &msg); err != nil {
+					if err == io.EOF {
+						break
+					}
+					framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
 				}
-				framework.Failf("Failed to read completely from websocket %s: %v", url.String(), err)
+				if len(msg) == 0 {
+					continue
+				}
+				if msg[0] != 1 {
+					framework.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
+				}
+				buf.Write(msg[1:])
 			}
-			if len(msg) == 0 {
-				continue
+			if buf.Len() == 0 {
+				return fmt.Errorf("Unexpected output from server")
 			}
-			if msg[0] != 1 {
-				framework.Failf("Got message from server that didn't start with channel 1 (STDOUT): %v", msg)
+			if !strings.Contains(buf.String(), "nameserver") {
+				return fmt.Errorf("Expected to find 'nameserver' in %q", buf.String())
 			}
-			buf.Write(msg[1:])
-		}
-		if buf.Len() == 0 {
-			framework.Failf("Unexpected output from server")
-		}
-		if !strings.Contains(buf.String(), "nameserver") {
-			framework.Failf("Expected to find 'nameserver' in %q", buf.String())
-		}
+			return nil
+		}, time.Minute, 10*time.Second).Should(BeNil())
 	})
 
 	It("should support retrieving logs from the container over websockets", func() {
