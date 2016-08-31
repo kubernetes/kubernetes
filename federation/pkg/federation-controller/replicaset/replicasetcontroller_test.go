@@ -74,11 +74,6 @@ func TestReplicaSetController(t *testing.T) {
 	flag.Set("v", "5")
 	flag.Parse()
 
-	replicaSetReviewDelay = 10 * time.Millisecond
-	clusterAvailableDelay = 20 * time.Millisecond
-	clusterUnavailableDelay = 60 * time.Millisecond
-	allReplicaSetReviewDelay = 120 * time.Millisecond
-
 	fedclientset := fedclientfake.NewSimpleClientset()
 	fedrswatch := watch.NewFake()
 	fedclientset.PrependWatchReactor("replicasets", core.DefaultWatchReactor(fedrswatch, nil))
@@ -107,7 +102,11 @@ func TestReplicaSetController(t *testing.T) {
 			return nil, fmt.Errorf("Unknown cluster: %v", cluster.Name)
 		}
 	}
-	replicaSetController := NewReplicaSetController(fedclientset)
+	replicaSetController := NewReplicaSetController(fedclientset, "10,20,60,120")
+	replicaSetReviewDelay = 10 * time.Millisecond
+	clusterAvailableDelay = 20 * time.Millisecond
+	clusterUnavailableDelay = 60 * time.Millisecond
+	allReplicaSetReviewDelay = 120 * time.Millisecond
 	rsFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.fedReplicaSetInformer)
 	rsFedinformer.SetClientFactory(fedInformerClientFactory)
 	podFedinformer := testutil.ToFederatedInformerForTestOnly(replicaSetController.fedPodInformer)

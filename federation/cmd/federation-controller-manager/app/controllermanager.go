@@ -174,7 +174,7 @@ func StartControllers(s *options.CMServer, restClientCfg *restclient.Config) err
 	daemonsetcontroller.Run(wait.NeverStop)
 
 	replicaSetClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, replicasetcontroller.UserAgentName))
-	replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset)
+	replicaSetController := replicasetcontroller.NewReplicaSetController(replicaSetClientset, s.ReplicaSetProcessDelays)
 	go replicaSetController.Run(s.ConcurrentReplicaSetSyncs, wait.NeverStop)
 
 	deploymentClientset := federationclientset.NewForConfigOrDie(restclient.AddUserAgent(restClientCfg, deploymentcontroller.UserAgentName))

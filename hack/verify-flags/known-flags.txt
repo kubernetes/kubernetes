@@ -472,6 +472,7 @@ reject-methods
 reject-paths
 repair-malformed-updates
 replicaset-lookup-cache-size
+replicaset-process-delays
 replication-controller-lookup-cache-size
 repo-root
 report-dir
