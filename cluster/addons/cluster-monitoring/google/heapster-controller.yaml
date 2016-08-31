@@ -78,7 +78,7 @@ spec:
             - name: ssl-certs
               mountPath: /etc/ssl/certs
               readOnly: true
-        - image: gcr.io/google_containers/addon-resizer:1.3
+        - image: gcr.io/google_containers/addon-resizer:1.5
           name: heapster-nanny
           resources:
             limits:
@@ -107,7 +107,7 @@ spec:
             - --container=heapster
             - --poll-period=300000
             - --estimator=exponential
-        - image: gcr.io/google_containers/addon-resizer:1.3
+        - image: gcr.io/google_containers/addon-resizer:1.5
           name: eventer-nanny
           resources:
             limits:
