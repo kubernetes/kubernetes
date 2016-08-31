@@ -1936,9 +1936,10 @@ func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interf
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = fn()
-		if err != nil {
-			Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
+		if err == nil {
+			return
 		}
+		Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
 	}
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
 }
