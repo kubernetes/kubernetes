@@ -166,6 +166,7 @@ func newReplicaSetWithReplicas(name string, replicas int32) *extensionsv1.Replic
 		ObjectMeta: apiv1.ObjectMeta{
 			Name:      name,
 			Namespace: apiv1.NamespaceDefault,
+			SelfLink:  "/api/v1/namespaces/default/replicasets/name",
 		},
 		Spec: extensionsv1.ReplicaSetSpec{
 			Replicas: &replicas,
