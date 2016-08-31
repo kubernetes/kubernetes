@@ -38,7 +38,7 @@ import (
 
 type DrainOptions struct {
 	client             *client.Client
-	factory            *cmdutil.Factory
+	factory            cmdutil.Factory
 	Force              bool
 	GracePeriodSeconds int
 	IgnoreDaemonsets   bool
@@ -78,7 +78,7 @@ var (
 		`)
 )
 
-func NewCmdCordon(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdCordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{factory: f, out: out}
 
 	cmd := &cobra.Command{
@@ -104,7 +104,7 @@ var (
 		`)
 )
 
-func NewCmdUncordon(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdUncordon(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{factory: f, out: out}
 
 	cmd := &cobra.Command{
@@ -149,7 +149,7 @@ var (
 		`)
 )
 
-func NewCmdDrain(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdDrain(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &DrainOptions{factory: f, out: out}
 
 	cmd := &cobra.Command{

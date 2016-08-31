@@ -47,7 +47,7 @@ type TaintOptions struct {
 	selector       string
 	overwrite      bool
 	all            bool
-	f              *cmdutil.Factory
+	f              cmdutil.Factory
 	out            io.Writer
 	cmd            *cobra.Command
 }
@@ -73,7 +73,7 @@ var (
 		kubectl taint nodes foo dedicated-`)
 )
 
-func NewCmdTaint(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdTaint(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TaintOptions{}
 
 	validArgs := []string{"node"}
@@ -220,7 +220,7 @@ func parseTaints(spec []string) ([]api.Taint, []api.Taint, error) {
 }
 
 // Complete adapts from the command line args and factory to the data required.
-func (o *TaintOptions) Complete(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
+func (o *TaintOptions) Complete(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string) (err error) {
 	namespace, _, err := f.DefaultNamespace()
 	if err != nil {
 		return err

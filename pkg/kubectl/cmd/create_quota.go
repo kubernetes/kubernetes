@@ -38,7 +38,7 @@ Create a resourcequota with the specified name, hard limits and optional scopes`
 )
 
 // NewCmdCreateQuota is a macro command to create a new quota
-func NewCmdCreateQuota(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateQuota(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "quota NAME [--hard=key1=value1,key2=value2] [--scopes=Scope1,Scope2] [--dry-run=bool]",
 		Aliases: []string{"resourcequota"},
@@ -61,7 +61,7 @@ func NewCmdCreateQuota(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 }
 
 // CreateQuota implements the behavior to run the create quota command
-func CreateQuota(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateQuota(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err

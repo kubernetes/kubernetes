@@ -51,7 +51,7 @@ var (
 		  kubectl top node NODE_NAME`)
 )
 
-func NewCmdTopNode(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdTopNode(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TopNodeOptions{}
 
 	cmd := &cobra.Command{
@@ -76,7 +76,7 @@ func NewCmdTopNode(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *TopNodeOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+func (o *TopNodeOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
 	var err error
 	if len(args) == 1 {
 		o.ResourceName = args[0]

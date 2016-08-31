@@ -72,7 +72,7 @@ var (
 		kubectl label pods foo bar-`)
 )
 
-func NewCmdLabel(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdLabel(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &LabelOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -180,7 +180,7 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 	return nil
 }
 
-func RunLabel(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *LabelOptions) error {
+func RunLabel(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *LabelOptions) error {
 	resources, labelArgs, err := cmdutil.GetResourcesAndPairs(args, "label")
 	if err != nil {
 		return err
