@@ -143,6 +143,12 @@ var _ = framework.KubeDescribe("MemoryEviction [Slow] [Serial] [Disruptive]", fu
 				return fmt.Errorf("current available memory is: %d bytes. Expected at least %d bytes available.", avail, halflimit)
 			}, 5*time.Minute, 15*time.Second).Should(BeNil())
 
+			// TODO(mtaufen): 5 minute wait to stop flaky test bleeding while we figure out what is actually going on.
+			//                If related to pressure transition period in eviction manager, probably only need to wait
+			//                just over 30s becasue that is the transition period set for node e2e tests. But since we
+			//                know 5 min works and we don't know if transition period is the problem, wait 5 min for now.
+			time.Sleep(5 * time.Minute)
+
 			// Finally, try starting a new pod and wait for it to be scheduled and running.
 			// This is the final check to try to prevent interference with subsequent tests.
 			podName := "admit-best-effort-pod"
