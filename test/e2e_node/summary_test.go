@@ -18,77 +18,219 @@ package e2e_node
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/kubelet/api/v1alpha1/stats"
-	"k8s.io/kubernetes/pkg/util"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	m "k8s.io/kubernetes/test/matchers"
 
-	"github.com/davecgh/go-spew/spew"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/types"
 )
 
 var _ = framework.KubeDescribe("Summary API", func() {
 	f := framework.NewDefaultFramework("summary-test")
 	Context("when querying /stats/summary", func() {
 		It("it should report resource usage through the stats api", func() {
-			podNamePrefix := "stats-busybox-" + string(util.NewUUID())
-			volumeNamePrefix := "test-empty-dir"
-			podNames, volumes := createSummaryTestPods(f.PodClient(), podNamePrefix, 2, volumeNamePrefix)
-			By("Returning stats summary")
-			Eventually(func() error {
+			const pod0 = "stats-busybox-0"
+			const pod1 = "stats-busybox-1"
+
+			By("Creating test pods")
+			createSummaryTestPods(f, pod0, pod1)
+			// Wait for cAdvisor to collect 2 stats points
+			time.Sleep(15 * time.Second)
+
+			// Setup expectations.
+			const (
+				kb = 1000
+				mb = 1000 * kb
+				gb = 1000 * mb
+				tb = 1000 * gb
+
+				maxStartAge = time.Hour * 24 * 365 // 1 year
+				maxStatsAge = time.Minute
+			)
+			fsCapacityBounds := bounded(100*mb, 100*gb)
+			// Expectations for system containers.
+			sysContExpectations := m.StrictStruct(m.Fields{
+				"Name":      m.Ignore(),
+				"StartTime": m.Recent(maxStartAge),
+				"CPU": structP(m.Fields{
+					"Time":                 m.Recent(maxStatsAge),
+					"UsageNanoCores":       bounded(100000, 2E9),
+					"UsageCoreNanoSeconds": bounded(10000000, 1E15),
+				}),
+				"Memory": structP(m.Fields{
+					"Time":            m.Recent(maxStatsAge),
+					"AvailableBytes":  m.NilOr(bounded(100*mb, 100*gb)),
+					"UsageBytes":      bounded(10*mb, 1*gb),
+					"WorkingSetBytes": bounded(10*mb, 1*gb),
+					"RSSBytes":        bounded(10*mb, 1*gb),
+					"PageFaults":      bounded(100000, 1E9),
+					"MajorPageFaults": bounded(0, 100000),
+				}),
+				"Rootfs": structP(m.Fields{
+					"AvailableBytes": fsCapacityBounds,
+					"CapacityBytes":  fsCapacityBounds,
+					"UsedBytes":      m.NilOr(bounded(0, 10*gb)),
+					"InodesFree":     bounded(1E4, 1E8),
+				}),
+				"Logs": structP(m.Fields{
+					"AvailableBytes": fsCapacityBounds,
+					"CapacityBytes":  fsCapacityBounds,
+					"UsedBytes":      m.NilOr(bounded(kb, 10*gb)),
+					"InodesFree":     bounded(1E4, 1E8),
+				}),
+				"UserDefinedMetrics": BeEmpty(),
+			})
+			// Expectations for pods.
+			podExpectations := m.StrictStruct(m.Fields{
+				"PodRef":    m.Ignore(),
+				"StartTime": m.Recent(maxStartAge),
+				"Containers": m.StrictSlice(summaryObjectID, m.Elements{
+					"busybox-container": m.StrictStruct(m.Fields{
+						"Name":      Equal("busybox-container"),
+						"StartTime": m.Recent(maxStartAge),
+						"CPU": structP(m.Fields{
+							"Time":                 m.Recent(maxStatsAge),
+							"UsageNanoCores":       bounded(100000, 100000000),
+							"UsageCoreNanoSeconds": bounded(10000000, 1000000000),
+						}),
+						"Memory": structP(m.Fields{
+							"Time":            m.Recent(maxStatsAge),
+							"AvailableBytes":  bounded(1*mb, 10*mb),
+							"UsageBytes":      bounded(10*kb, mb),
+							"WorkingSetBytes": bounded(10*kb, mb),
+							"RSSBytes":        bounded(1*kb, mb),
+							"PageFaults":      bounded(100, 100000),
+							"MajorPageFaults": bounded(0, 10),
+						}),
+						"Rootfs": structP(m.Fields{
+							"AvailableBytes": fsCapacityBounds,
+							"CapacityBytes":  fsCapacityBounds,
+							"UsedBytes":      bounded(kb, 10*mb),
+							"InodesFree":     bounded(1E4, 1E8),
+						}),
+						"Logs": structP(m.Fields{
+							"AvailableBytes": fsCapacityBounds,
+							"CapacityBytes":  fsCapacityBounds,
+							"UsedBytes":      bounded(kb, 10*mb),
+							"InodesFree":     bounded(1E4, 1E8),
+						}),
+						"UserDefinedMetrics": BeEmpty(),
+					}),
+				}),
+				"Network": structP(m.Fields{
+					"Time":     m.Recent(maxStatsAge),
+					"RxBytes":  bounded(10, 10*mb),
+					"RxErrors": bounded(0, 1000),
+					"TxBytes":  bounded(10, 10*mb),
+					"TxErrors": bounded(0, 1000),
+				}),
+				"VolumeStats": m.StrictSlice(summaryObjectID, m.Elements{
+					"test-empty-dir": m.StrictStruct(m.Fields{
+						"Name": Equal("test-empty-dir"),
+						"FsStats": m.StrictStruct(m.Fields{
+							"AvailableBytes": fsCapacityBounds,
+							"CapacityBytes":  fsCapacityBounds,
+							"UsedBytes":      bounded(kb, 1*mb),
+							"InodesFree":     BeNil(),
+						}),
+					}),
+				}),
+			})
+			matchExpectations := structP(m.Fields{
+				"Node": m.StrictStruct(m.Fields{
+					"NodeName":  m.Ignore(),
+					"StartTime": m.Recent(maxStartAge),
+					"SystemContainers": m.StrictSlice(summaryObjectID, m.Elements{
+						"kubelet": sysContExpectations,
+						"runtime": sysContExpectations,
+					}),
+					"CPU": structP(m.Fields{
+						"Time":                 m.Recent(maxStatsAge),
+						"UsageNanoCores":       bounded(100E3, 2E9),
+						"UsageCoreNanoSeconds": bounded(1E9, 1E15),
+					}),
+					"Memory": structP(m.Fields{
+						"Time":            m.Recent(maxStatsAge),
+						"AvailableBytes":  bounded(100*mb, 100*gb),
+						"UsageBytes":      bounded(10*mb, 10*gb),
+						"WorkingSetBytes": bounded(10*mb, 1*gb),
+						"RSSBytes":        bounded(1*mb, 1*gb),
+						"PageFaults":      bounded(1000, 1E9),
+						"MajorPageFaults": bounded(0, 100000),
+					}),
+					// TODO(#28407): Handle non-eth0 network interface names.
+					"Network": m.NilOr(
+						structP(m.Fields{
+							"Time":     m.Recent(maxStatsAge),
+							"RxBytes":  bounded(1*mb, 100*gb),
+							"RxErrors": bounded(0, 100000),
+							"TxBytes":  bounded(10*kb, 10*gb),
+							"TxErrors": bounded(0, 100000),
+						}),
+					),
+					"Fs": structP(m.Fields{
+						"AvailableBytes": fsCapacityBounds,
+						"CapacityBytes":  fsCapacityBounds,
+						"UsedBytes":      bounded(kb, 10*gb),
+						"InodesFree":     bounded(1E4, 1E8),
+					}),
+					"Runtime": structP(m.Fields{
+						"ImageFs": structP(m.Fields{
+							"AvailableBytes": fsCapacityBounds,
+							"CapacityBytes":  fsCapacityBounds,
+							"UsedBytes":      bounded(kb, 10*gb),
+							"InodesFree":     bounded(1E4, 1E8),
+						}),
+					}),
+				}),
+				"Pods": m.StrictSlice(summaryObjectID, m.Elements{
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod0): podExpectations,
+					fmt.Sprintf("%s::%s", f.Namespace.Name, pod1): podExpectations,
+				}),
+			})
+
+			By("Validating /stats/summary")
+			Eventually(func() *stats.Summary {
 				summary, err := getNodeSummary()
 				if err != nil {
-					return err
+					framework.Logf("Error retrieving /stats/summary: %v", err)
+					return nil
 				}
-				missingPods := podsMissingFromSummary(*summary, podNames)
-				if missingPods.Len() != 0 {
-					return fmt.Errorf("expected pods not found. Following pods are missing - %v", missingPods)
-				}
-				missingVolumes := volumesMissingFromSummary(*summary, volumes)
-				if missingVolumes.Len() != 0 {
-					return fmt.Errorf("expected volumes not found. Following volumes are missing - %v", missingVolumes)
-				}
-				if err := testSummaryMetrics(*summary, podNamePrefix); err != nil {
-					return err
-				}
-				return nil
-			}, 5*time.Minute, time.Second*4).Should(BeNil())
+				return summary
+			}, 1*time.Minute, time.Second*15).Should(matchExpectations)
 		})
 	})
 })
 
-const (
-	containerSuffix = "-c"
-)
-
-func createSummaryTestPods(podClient *framework.PodClient, podNamePrefix string, count int, volumeNamePrefix string) (sets.String, sets.String) {
-	podNames := sets.NewString()
-	volumes := sets.NewString(volumeNamePrefix)
-	for i := 0; i < count; i++ {
-		podNames.Insert(fmt.Sprintf("%s%v", podNamePrefix, i))
-	}
-
-	var pods []*api.Pod
-	for _, podName := range podNames.List() {
+func createSummaryTestPods(f *framework.Framework, names ...string) {
+	pods := make([]*api.Pod, 0, len(names))
+	for _, name := range names {
 		pods = append(pods, &api.Pod{
 			ObjectMeta: api.ObjectMeta{
-				Name: podName,
+				Name: name,
 			},
 			Spec: api.PodSpec{
 				// Don't restart the Pod since it is expected to exit
 				RestartPolicy: api.RestartPolicyNever,
 				Containers: []api.Container{
 					{
+						Name:    "busybox-container",
 						Image:   ImageRegistry[busyBoxImage],
 						Command: []string{"sh", "-c", "while true; do echo 'hello world' | tee /test-empty-dir-mnt/file ; sleep 1; done"},
-						Name:    podName + containerSuffix,
+						Resources: api.ResourceRequirements{
+							Limits: api.ResourceList{
+								// Must set memory limit to get MemoryStats.AvailableBytes
+								api.ResourceMemory: resource.MustParse("10M"),
+							},
+						},
 						VolumeMounts: []api.VolumeMount{
-							{MountPath: "/test-empty-dir-mnt", Name: volumeNamePrefix},
+							{MountPath: "/test-empty-dir-mnt", Name: "test-empty-dir"},
 						},
 					},
 				},
@@ -98,245 +240,37 @@ func createSummaryTestPods(podClient *framework.PodClient, podNamePrefix string,
 					},
 				},
 				Volumes: []api.Volume{
-					// TODO: Test secret volumes
-					// TODO: Test hostpath volumes
-					{Name: volumeNamePrefix, VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
+					// TODO(#28393): Test secret volumes
+					// TODO(#28394): Test hostpath volumes
+					{Name: "test-empty-dir", VolumeSource: api.VolumeSource{EmptyDir: &api.EmptyDirVolumeSource{}}},
 				},
 			},
 		})
 	}
-	podClient.CreateBatch(pods)
-
-	return podNames, volumes
+	f.PodClient().CreateBatch(pods)
 }
 
-// Returns pods missing from summary.
-func podsMissingFromSummary(s stats.Summary, expectedPods sets.String) sets.String {
-	expectedPods = sets.StringKeySet(expectedPods)
-	for _, pod := range s.Pods {
-		if expectedPods.Has(pod.PodRef.Name) {
-			expectedPods.Delete(pod.PodRef.Name)
-		}
+func summaryObjectID(element interface{}) string {
+	switch el := element.(type) {
+	case stats.PodStats:
+		return fmt.Sprintf("%s::%s", el.PodRef.Namespace, el.PodRef.Name)
+	case stats.ContainerStats:
+		return el.Name
+	case stats.VolumeStats:
+		return el.Name
+	case stats.UserDefinedMetric:
+		return el.Name
+	default:
+		framework.Failf("Unknown type: %T", el)
+		return "???"
 	}
-	return expectedPods
 }
 
-// Returns volumes missing from summary.
-func volumesMissingFromSummary(s stats.Summary, expectedVolumes sets.String) sets.String {
-	for _, pod := range s.Pods {
-		expectedPodVolumes := sets.StringKeySet(expectedVolumes)
-		for _, vs := range pod.VolumeStats {
-			if expectedPodVolumes.Has(vs.Name) {
-				expectedPodVolumes.Delete(vs.Name)
-			}
-		}
-		if expectedPodVolumes.Len() != 0 {
-			return expectedPodVolumes
-		}
-	}
-	return sets.NewString()
+// Convenience functions for common matcher combinations.
+func structP(fields m.Fields) types.GomegaMatcher {
+	return m.Ptr(m.StrictStruct(fields))
 }
 
-func testSummaryMetrics(s stats.Summary, podNamePrefix string) error {
-	const (
-		nonNilValue  = "expected %q to not be nil"
-		nonZeroValue = "expected %q to not be zero"
-	)
-	if s.Node.NodeName != framework.TestContext.NodeName {
-		return fmt.Errorf("unexpected node name - %q", s.Node.NodeName)
-	}
-	if s.Node.CPU.UsageCoreNanoSeconds == nil {
-		return fmt.Errorf(nonNilValue, "cpu instantaneous")
-	}
-	if *s.Node.CPU.UsageCoreNanoSeconds == 0 {
-		return fmt.Errorf(nonZeroValue, "cpu instantaneous")
-	}
-	if s.Node.Memory.UsageBytes == nil {
-		return fmt.Errorf(nonNilValue, "memory")
-	}
-	if *s.Node.Memory.UsageBytes == 0 {
-		return fmt.Errorf(nonZeroValue, "memory")
-	}
-	if s.Node.Memory.WorkingSetBytes == nil {
-		return fmt.Errorf(nonNilValue, "memory working set")
-	}
-	if *s.Node.Memory.WorkingSetBytes == 0 {
-		return fmt.Errorf(nonZeroValue, "memory working set")
-	}
-	if s.Node.Fs.AvailableBytes == nil {
-		return fmt.Errorf(nonNilValue, "memory working set")
-	}
-	if *s.Node.Fs.AvailableBytes == 0 {
-		return fmt.Errorf(nonZeroValue, "node Fs available")
-	}
-	if s.Node.Fs.CapacityBytes == nil {
-		return fmt.Errorf(nonNilValue, "node fs capacity")
-	}
-	if *s.Node.Fs.CapacityBytes == 0 {
-		return fmt.Errorf(nonZeroValue, "node fs capacity")
-	}
-	if s.Node.Fs.UsedBytes == nil {
-		return fmt.Errorf(nonNilValue, "node fs used")
-	}
-	if *s.Node.Fs.UsedBytes == 0 {
-		return fmt.Errorf(nonZeroValue, "node fs used")
-	}
-
-	if s.Node.Runtime == nil {
-		return fmt.Errorf(nonNilValue, "node runtime")
-	}
-	if s.Node.Runtime.ImageFs == nil {
-		return fmt.Errorf(nonNilValue, "runtime image Fs")
-	}
-	if s.Node.Runtime.ImageFs.AvailableBytes == nil {
-		return fmt.Errorf(nonNilValue, "runtime image Fs available")
-	}
-	if *s.Node.Runtime.ImageFs.AvailableBytes == 0 {
-		return fmt.Errorf(nonZeroValue, "runtime image Fs available")
-	}
-	if s.Node.Runtime.ImageFs.CapacityBytes == nil {
-		return fmt.Errorf(nonNilValue, "runtime image Fs capacity")
-	}
-	if *s.Node.Runtime.ImageFs.CapacityBytes == 0 {
-		return fmt.Errorf(nonZeroValue, "runtime image Fs capacity")
-	}
-	if s.Node.Runtime.ImageFs.UsedBytes == nil {
-		return fmt.Errorf(nonNilValue, "runtime image Fs usage")
-	}
-	if *s.Node.Runtime.ImageFs.UsedBytes == 0 {
-		return fmt.Errorf(nonZeroValue, "runtime image Fs usage")
-	}
-	sysContainers := map[string]stats.ContainerStats{}
-	for _, container := range s.Node.SystemContainers {
-		sysContainers[container.Name] = container
-		if err := expectContainerStatsNotEmpty(&container); err != nil {
-			return err
-		}
-	}
-	if _, exists := sysContainers["kubelet"]; !exists {
-		return fmt.Errorf("expected metrics for kubelet")
-	}
-	if _, exists := sysContainers["runtime"]; !exists {
-		return fmt.Errorf("expected metrics for runtime")
-	}
-	// Verify Pods Stats are present
-	podsList := []string{}
-	By("Having resources for pods")
-	for _, pod := range s.Pods {
-		if !strings.HasPrefix(pod.PodRef.Name, podNamePrefix) {
-			// Ignore pods created outside this test
-			continue
-		}
-
-		podsList = append(podsList, pod.PodRef.Name)
-
-		if len(pod.Containers) != 1 {
-			return fmt.Errorf("expected only one container")
-		}
-		container := pod.Containers[0]
-
-		if container.Name != (pod.PodRef.Name + containerSuffix) {
-			return fmt.Errorf("unexpected container name - %q", container.Name)
-		}
-
-		if err := expectContainerStatsNotEmpty(&container); err != nil {
-			return err
-		}
-
-		// emptydir volume
-		foundExpectedVolume := false
-		for _, vs := range pod.VolumeStats {
-			if *vs.CapacityBytes == 0 {
-				return fmt.Errorf(nonZeroValue, "volume capacity")
-			}
-			if *vs.AvailableBytes == 0 {
-				return fmt.Errorf(nonZeroValue, "volume available")
-			}
-			if *vs.UsedBytes == 0 {
-				return fmt.Errorf(nonZeroValue, "volume used")
-			}
-			if vs.Name == "test-empty-dir" {
-				foundExpectedVolume = true
-			}
-		}
-		if !foundExpectedVolume {
-			return fmt.Errorf("expected 'test-empty-dir' volume")
-		}
-
-		// fs usage (not for system containers)
-		if container.Rootfs == nil {
-			return fmt.Errorf(nonNilValue+" - "+spew.Sdump(container), "container root fs")
-		}
-		if container.Rootfs.AvailableBytes == nil {
-			return fmt.Errorf(nonNilValue+" - "+spew.Sdump(container), "container root fs available")
-		}
-		if *container.Rootfs.AvailableBytes == 0 {
-			return fmt.Errorf(nonZeroValue+" - "+spew.Sdump(container), "container root fs available")
-		}
-		if container.Rootfs.CapacityBytes == nil {
-			return fmt.Errorf(nonNilValue+" - "+spew.Sdump(container), "container root fs capacity")
-		}
-		if *container.Rootfs.CapacityBytes == 0 {
-			return fmt.Errorf(nonZeroValue+" - "+spew.Sdump(container), "container root fs capacity")
-		}
-		if container.Rootfs.UsedBytes == nil {
-			return fmt.Errorf(nonNilValue+" - "+spew.Sdump(container), "container root fs usage")
-		}
-		if *container.Rootfs.UsedBytes == 0 {
-			return fmt.Errorf(nonZeroValue+" - "+spew.Sdump(container), "container root fs usage")
-		}
-		if container.Logs == nil {
-			return fmt.Errorf(nonNilValue+" - "+spew.Sdump(container), "container logs")
-		}
-		if container.Logs.AvailableBytes == nil {
-			return fmt.Errorf(nonNilValue+" - "+spew.Sdump(container), "container logs available")
-		}
-		if *container.Logs.AvailableBytes == 0 {
-			return fmt.Errorf(nonZeroValue+" - "+spew.Sdump(container), "container logs available")
-		}
-		if container.Logs.CapacityBytes == nil {
-			return fmt.Errorf(nonNilValue+" - "+spew.Sdump(container), "container logs capacity")
-		}
-		if *container.Logs.CapacityBytes == 0 {
-			return fmt.Errorf(nonZeroValue+" - "+spew.Sdump(container), "container logs capacity")
-		}
-		if container.Logs.UsedBytes == nil {
-			return fmt.Errorf(nonNilValue+" - "+spew.Sdump(container), "container logs usage")
-		}
-		if *container.Logs.UsedBytes == 0 {
-			return fmt.Errorf(nonZeroValue+" - "+spew.Sdump(container), "container logs usage")
-		}
-	}
-	return nil
-}
-
-func expectContainerStatsNotEmpty(container *stats.ContainerStats) error {
-	// TODO: Test Network
-
-	if container.CPU == nil {
-		return fmt.Errorf("expected container cpu to be not nil - %q", spew.Sdump(container))
-	}
-	if container.CPU.UsageCoreNanoSeconds == nil {
-		return fmt.Errorf("expected container cpu instantaneous usage to be not nil - %q", spew.Sdump(container))
-	}
-	if *container.CPU.UsageCoreNanoSeconds == 0 {
-		return fmt.Errorf("expected container cpu instantaneous usage to be non zero - %q", spew.Sdump(container))
-	}
-
-	if container.Memory == nil {
-		return fmt.Errorf("expected container memory to be not nil - %q", spew.Sdump(container))
-	}
-	if container.Memory.UsageBytes == nil {
-		return fmt.Errorf("expected container memory usage to be not nil - %q", spew.Sdump(container))
-	}
-	if *container.Memory.UsageBytes == 0 {
-		return fmt.Errorf("expected container memory usage to be non zero - %q", spew.Sdump(container))
-	}
-	if container.Memory.WorkingSetBytes == nil {
-		return fmt.Errorf("expected container memory working set to be not nil - %q", spew.Sdump(container))
-	}
-	if *container.Memory.WorkingSetBytes == 0 {
-		return fmt.Errorf("expected container memory working set to be non zero - %q", spew.Sdump(container))
-	}
-	return nil
+func bounded(lower, upper interface{}) types.GomegaMatcher {
+	return m.Ptr(m.InRange(lower, upper))
 }
