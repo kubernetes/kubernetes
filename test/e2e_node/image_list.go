@@ -58,8 +58,6 @@ var ImageRegistry = map[int]string{
 	epTestImage:        "gcr.io/google_containers/eptest:0.1",
 	hostExecImage:      "gcr.io/google_containers/hostexec:1.2",
 	livenessImage:      "gcr.io/google_containers/liveness:e2e",
-	mountTestImage5:    "gcr.io/google_containers/mounttest:0.5",
-	mountTestImage6:    "gcr.io/google_containers/mounttest:0.6",
 	mountTestImage7:    "gcr.io/google_containers/mounttest:0.7",
 	mountTestUserImage: "gcr.io/google_containers/mounttest-user:0.3",
 	netExecImage:       "gcr.io/google_containers/netexec:1.4",
