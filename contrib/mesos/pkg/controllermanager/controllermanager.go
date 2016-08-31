@@ -185,7 +185,7 @@ func (s *CMServer) Run(_ []string) error {
 			glog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		} else {
 			routeController := routecontroller.New(routes, clientset.NewForConfigOrDie(restclient.AddUserAgent(kubeconfig, "route-controller")), s.ClusterName, clusterCIDR)
-			routeController.Run(s.NodeSyncPeriod.Duration)
+			routeController.Run(s.RouteReconciliationPeriod.Duration)
 			time.Sleep(wait.Jitter(s.ControllerStartInterval.Duration, ControllerStartJitter))
 		}
 	} else {
