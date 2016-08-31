@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -74,6 +76,34 @@ func parseFederationReplicaSetReference(frs *extensionsv1.ReplicaSet) (*fed.Fede
 	return &frsPref, nil
 }
 
+func initReplicaSetProcessDelays(replicaSetProcessDelays string) {
+	errorString := "Incorrect format of replicaset-process-delays. expected: \"replicasetReviewDelay,clusterAvailableDelay,clusterUnavailableDelay,allReplicaSetReviewDealy\", got: %v\n"
+	delays := strings.Split(replicaSetProcessDelays, ",")
+	if len(delays) != 4 {
+		glog.Fatalf(errorString, replicaSetProcessDelays)
+	}
+	replicaSetReviewDelaySec, err := strconv.ParseUint(delays[0], 10, 32)
+	if err != nil {
+		glog.Fatalf(errorString, replicaSetProcessDelays)
+	}
+	clusterAvailableDelaySec, err := strconv.ParseUint(delays[1], 10, 32)
+	if err != nil {
+		glog.Fatalf(errorString, replicaSetProcessDelays)
+	}
+	clusterUnavailableDelaySec, err := strconv.ParseUint(delays[2], 10, 32)
+	if err != nil {
+		glog.Fatalf(errorString, replicaSetProcessDelays)
+	}
+	allReplicaSetReviewDelaySec, err := strconv.ParseUint(delays[3], 10, 32)
+	if err != nil {
+		glog.Fatalf(errorString, replicaSetProcessDelays)
+	}
+	replicaSetReviewDelay = time.Duration(replicaSetReviewDelaySec) * time.Second
+	clusterAvailableDelay = time.Duration(clusterAvailableDelaySec) * time.Second
+	clusterUnavailableDelay = time.Duration(clusterUnavailableDelaySec) * time.Second
+	allReplicaSetReviewDelay = time.Duration(allReplicaSetReviewDelaySec) * time.Second
+}
+
 type ReplicaSetController struct {
 	fedClient fedclientset.Interface
 
@@ -95,7 +125,9 @@ type ReplicaSetController struct {
 }
 
 // NewclusterController returns a new cluster controller
-func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSetController {
+func NewReplicaSetController(federationClient fedclientset.Interface, replicaSetProcessDelays string) *ReplicaSetController {
+	initReplicaSetProcessDelays(replicaSetProcessDelays)
+
 	frsc := &ReplicaSetController{
 		fedClient:           federationClient,
 		replicasetDeliverer: fedutil.NewDelayingDeliverer(),
