@@ -44,11 +44,13 @@ import (
 	apierrs "k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/unversioned"
+	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
+	"k8s.io/kubernetes/pkg/client/typed/dynamic"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
@@ -1033,11 +1035,12 @@ func CheckTestingNSDeletedExcept(c *client.Client, skip string) error {
 
 // deleteNS deletes the provided namespace, waits for it to be completely deleted, and then checks
 // whether there are any pods remaining in a non-terminating state.
-func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
+func deleteNS(c *client.Client, clientPool dynamic.ClientPool, namespace string, timeout time.Duration) error {
 	if err := c.Namespaces().Delete(namespace); err != nil {
 		return err
 	}
 
+	// wait for namespace to delete or timeout.
 	err := wait.PollImmediate(5*time.Second, timeout, func() (bool, error) {
 		if _, err := c.Namespaces().Get(namespace); err != nil {
 			if apierrs.IsNotFound(err) {
@@ -1049,38 +1052,161 @@ func deleteNS(c *client.Client, namespace string, timeout time.Duration) error {
 		return false, nil
 	})
 
-	// check for pods that were not deleted
-	remaining := []string{}
-	remainingPods := []api.Pod{}
-	missingTimestamp := false
-	if pods, perr := c.Pods(namespace).List(api.ListOptions{}); perr == nil {
-		for _, pod := range pods.Items {
-			Logf("Pod %s %s on node %s remains, has deletion timestamp %s", namespace, pod.Name, pod.Spec.NodeName, pod.DeletionTimestamp)
-			remaining = append(remaining, fmt.Sprintf("%s{Reason=%s}", pod.Name, pod.Status.Reason))
-			remainingPods = append(remainingPods, pod)
-			if pod.DeletionTimestamp == nil {
-				missingTimestamp = true
-			}
-		}
+	// verify there is no more remaining content in the namespace
+	remainingContent, cerr := hasRemainingContent(c, clientPool, namespace)
+	if cerr != nil {
+		return cerr
 	}
 
-	// log pod status
-	if len(remainingPods) > 0 {
-		logPodStates(remainingPods)
+	// if content remains, let's dump information about the namespace, and system for flake debugging.
+	remainingPods := 0
+	missingTimestamp := 0
+	if remainingContent {
+		// log information about namespace, and set of namespaces in api server to help flake detection
+		logNamespace(c, namespace)
+		logNamespaces(c, namespace)
+
+		// if we can, check if there were pods remaining with no timestamp.
+		remainingPods, missingTimestamp, _ = countRemainingPods(c, namespace)
 	}
 
-	// a timeout occurred
+	// a timeout waiting for namespace deletion happened!
 	if err != nil {
-		if missingTimestamp {
-			return fmt.Errorf("namespace %s was not deleted within limit: %v, some pods were not marked with a deletion timestamp, pods remaining: %v", namespace, err, remaining)
+		// some content remains in the namespace
+		if remainingContent {
+			// pods remain
+			if remainingPods > 0 {
+				// but they were all undergoing deletion (kubelet is probably culprit)
+				if missingTimestamp == 0 {
+					return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v, pods missing deletion timestamp: %v", namespace, err, remainingPods, missingTimestamp)
+				}
+				// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
+				return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v", namespace, err, remainingPods)
+			}
+			// other content remains (namespace controller is probably screwed up)
+			return fmt.Errorf("namespace %v was not deleted with limit: %v, namespaced content other than pods remain", namespace, err)
 		}
-		return fmt.Errorf("namespace %s was not deleted within limit: %v, pods remaining: %v", namespace, err, remaining)
-	}
-	// pods were not deleted but the namespace was deleted
-	if len(remaining) > 0 {
-		return fmt.Errorf("pods remained within namespace %s after deletion: %v", namespace, remaining)
+		// no remaining content, but namespace was not deleted (namespace controller is probably wedged)
+		return fmt.Errorf("namespace %v was not deleted with limit: %v, namespace is empty but is not yet removed", namespace, err)
 	}
 	return nil
+}
+
+// logNamespaces logs the number of namespaces by phase
+// namespace is the namespace the test was operating against that failed to delete so it can be grepped in logs
+func logNamespaces(c *client.Client, namespace string) {
+	namespaceList, err := c.Namespaces().List(api.ListOptions{})
+	if err != nil {
+		Logf("namespace: %v, unable to list namespaces: %v", namespace, err)
+		return
+	}
+
+	numActive := 0
+	numTerminating := 0
+	for _, namespace := range namespaceList.Items {
+		if namespace.Status.Phase == api.NamespaceActive {
+			numActive++
+		} else {
+			numTerminating++
+		}
+	}
+	Logf("namespace: %v, total namespaces: %v, active: %v, terminating: %v", namespace, len(namespaceList.Items), numActive, numTerminating)
+}
+
+// logNamespace logs detail about a namespace
+func logNamespace(c *client.Client, namespace string) {
+	ns, err := c.Namespaces().Get(namespace)
+	if err != nil {
+		if apierrs.IsNotFound(err) {
+			Logf("namespace: %v no longer exists", namespace)
+			return
+		}
+		Logf("namespace: %v, unable to get namespace due to error: %v", namespace, err)
+		return
+	}
+	Logf("namespace: %v, DeletionTimetamp: %v, Finalizers: %v, Phase: %v", ns.Name, ns.DeletionTimestamp, ns.Spec.Finalizers, ns.Status.Phase)
+}
+
+// countRemainingPods queries the server to count number of remaining pods, and number of pods that had a missing deletion timestamp.
+func countRemainingPods(c *client.Client, namespace string) (int, int, error) {
+	// check for remaining pods
+	pods, err := c.Pods(namespace).List(api.ListOptions{})
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// nothing remains!
+	if len(pods.Items) == 0 {
+		return 0, 0, nil
+	}
+
+	// stuff remains, log about it
+	logPodStates(pods.Items)
+
+	// check if there were any pods with missing deletion timestamp
+	numPods := len(pods.Items)
+	missingTimestamp := 0
+	for _, pod := range pods.Items {
+		if pod.DeletionTimestamp == nil {
+			missingTimestamp++
+		}
+	}
+	return numPods, missingTimestamp, nil
+}
+
+// hasRemainingContent checks if there is remaining content in the namespace via API discovery
+func hasRemainingContent(c *client.Client, clientPool dynamic.ClientPool, namespace string) (bool, error) {
+	// some tests generate their own framework.Client rather than the default
+	// TODO: ensure every test call has a configured clientPool
+	if clientPool == nil {
+		return false, nil
+	}
+
+	// find out what content is supported on the server
+	groupVersionResources, err := c.Discovery().ServerPreferredNamespacedResources()
+	if err != nil {
+		return false, err
+	}
+
+	// TODO: temporary hack for https://github.com/kubernetes/kubernetes/issues/31798
+	ignoredResources := sets.NewString("bindings")
+
+	contentRemaining := false
+
+	// dump how many of resource type is on the server in a log.
+	for _, gvr := range groupVersionResources {
+		// get a client for this group version...
+		dynamicClient, err := clientPool.ClientForGroupVersion(gvr.GroupVersion())
+		if err != nil {
+			// not all resource types support list, so some errors here are normal depending on the resource type.
+			Logf("namespace: %s, unable to get client - gvr: %v, error: %v", namespace, gvr, err)
+			continue
+		}
+		// get the api resource
+		apiResource := unversioned.APIResource{Name: gvr.Resource, Namespaced: true}
+		// TODO: temporary hack for https://github.com/kubernetes/kubernetes/issues/31798
+		if ignoredResources.Has(apiResource.Name) {
+			Logf("namespace: %s, resource: %s, ignored listing per whitelist", namespace, apiResource.Name)
+			continue
+		}
+		obj, err := dynamicClient.Resource(&apiResource, namespace).List(&v1.ListOptions{})
+		if err != nil {
+			// not all resources support list, so we ignore those
+			if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
+				continue
+			}
+			return false, err
+		}
+		unstructuredList, ok := obj.(*runtime.UnstructuredList)
+		if !ok {
+			return false, fmt.Errorf("namespace: %s, resource: %s, expected *runtime.UnstructuredList, got %#v", namespace, apiResource.Name, obj)
+		}
+		if len(unstructuredList.Items) > 0 {
+			Logf("namespace: %s, resource: %s, items remaining: %v", namespace, apiResource.Name, len(unstructuredList.Items))
+			contentRemaining = true
+		}
+	}
+	return contentRemaining, nil
 }
 
 func ContainerInitInvariant(older, newer runtime.Object) error {
