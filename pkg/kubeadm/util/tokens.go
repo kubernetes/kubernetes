@@ -51,7 +51,7 @@ func UseGivenTokenIfValid(params *kubeadmapi.BootstrapParams) (bool, error) {
 	givenToken := strings.Split(strings.ToLower(params.Discovery.GivenToken), ".")
 	// TODO print desired format
 	// TODO could also print more specific messages in each case
-	invalidErr := "Error: provided token is invalid (%s)"
+	invalidErr := "provided token is invalid (%s)"
 	if len(givenToken) != 2 {
 		return false, fmt.Errorf(invalidErr, "not in 2-part dot-separated format")
 	}

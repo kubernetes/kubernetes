@@ -17,16 +17,14 @@ limitations under the License.
 package kubemaster
 
 import (
-	"bytes"
 	"crypto/rsa"
 	"crypto/x509"
 	"net"
-	"os"
 	"path"
 
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 	"k8s.io/kubernetes/pkg/kubeadm/tlsutil"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/crypto"
 )
 
 func newCertificateAuthority() (*rsa.PrivateKey, *x509.Certificate, error) {
@@ -87,13 +85,12 @@ func newClientKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*rsa.
 }
 
 func writeKeysAndCert(pkiPath string, name string, key *rsa.PrivateKey, cert *x509.Certificate) error {
-	// TODO: user crypto.WriteKeyToPath
 	if key != nil {
-		if err := util.DumpReaderToFile(bytes.NewReader(tlsutil.EncodePrivateKeyPEM(key)), path.Join(pkiPath, name+"-key.pem")); err != nil {
+		if err := crypto.WriteKeyToPath(path.Join(pkiPath, name+"-key.pem"), tlsutil.EncodePrivateKeyPEM(key)); err != nil {
 			return err
 		}
 		if pubKey, err := tlsutil.EncodePublicKeyPEM(&key.PublicKey); err == nil {
-			if err := util.DumpReaderToFile(bytes.NewReader(pubKey), path.Join(pkiPath, name+"-pub.pem")); err != nil {
+			if err := crypto.WriteKeyToPath(path.Join(pkiPath, name+"-pub.pem"), pubKey); err != nil {
 				return err
 			}
 		} else {
@@ -102,7 +99,7 @@ func writeKeysAndCert(pkiPath string, name string, key *rsa.PrivateKey, cert *x5
 	}
 
 	if cert != nil {
-		if err := util.DumpReaderToFile(bytes.NewReader(tlsutil.EncodeCertificatePEM(cert)), path.Join(pkiPath, name+".pem")); err != nil {
+		if err := crypto.WriteCertToPath(path.Join(pkiPath, name+".pem"), tlsutil.EncodeCertificatePEM(cert)); err != nil {
 			return err
 		}
 	}
@@ -133,9 +130,6 @@ func CreatePKIAssets(params *kubeadmapi.BootstrapParams) (*rsa.PrivateKey, *x509
 	}
 
 	pkiPath := path.Join(params.EnvParams["host_pki_path"])
-	if err := os.MkdirAll(pkiPath, 0700); err != nil {
-		return nil, nil, err
-	}
 
 	caKey, caCert, err := newCertificateAuthority()
 	if err != nil {

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubecmd
+package cmd
 
 import (
 	"fmt"
@@ -28,6 +28,25 @@ import (
 	kubenode "k8s.io/kubernetes/pkg/kubeadm/node"
 	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
 	// TODO: cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+)
+
+var (
+	manual_done_msgf = dedent.Dedent(`
+		Master initialization complete:
+
+		* Static pods written and kubelet's kubeconfig written.
+		* Kubelet should start soon.  Try 'systemctl restart kubelet'
+		  or equivalent if it doesn't.
+
+		CA cert is written to:
+		    /etc/kubernetes/pki/ca.pem.
+
+		**Please copy this file (scp, rsync or through other means) to
+		all your nodes and then run on them**:
+
+		kubeadm manual bootstrap join-node --ca-cert-file <path-to-ca-cert> \
+		    --token %s --api-server-urls https://%s:443/
+		`)
 )
 
 // TODO --token here becomes Discovery.BearerToken and not Discovery.GivenToken
@@ -101,25 +120,11 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 				}
 			}
 
-			out.Write([]byte(fmt.Sprintf(dedent.Dedent(`
-				Master initialization complete:
-
-				* Static pods written and kubelet's kubeconfig written.
-				* Kubelet should start soon.  Try 'systemctl restart kubelet'
-				  or equivalent if it doesn't.
-
-				CA cert is written to:
-				    /etc/kubernetes/pki/ca.pem.
-
-				**Please copy this file (scp, rsync or through other means) to
-				all your nodes and then run on them**:
-
-				kubeadm manual bootstrap join-node --ca-cert-file <path-to-ca-cert> \
-				    --token %s --api-server-urls https://%s:443/
-
-			`),
-				params.Discovery.BearerToken, params.Discovery.ListenIP,
-			)))
+			// TODO use templates to reference struct fields directly as order of args is fragile
+			fmt.Fprintf(out, manual_done_msgf,
+				params.Discovery.BearerToken,
+				params.Discovery.ListenIP,
+			)
 
 			return nil
 		},

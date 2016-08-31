@@ -14,21 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubeadm
+package cmd
 
 import (
-	//"fmt"
 	"io"
 
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
-	kubecmd "k8s.io/kubernetes/pkg/kubeadm/cmd"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
-func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, envParams map[string]string) *cobra.Command {
+func NewKubeadmCommand(in io.Reader, out, err io.Writer, envParams map[string]string) *cobra.Command {
 	cmds := &cobra.Command{
 		Use:   "kubeadm",
 		Short: "kubeadm: bootstrap a secure kubernetes cluster easily.",
@@ -94,14 +91,16 @@ func NewKubeadmCommand(f *cmdutil.Factory, in io.Reader, out, err io.Writer, env
 	// be useful for testing
 
 	bootstrapParams := &kubeadmapi.BootstrapParams{
-		Discovery: &kubeadmapi.OutOfBandDiscovery{},
+		Discovery: &kubeadmapi.OutOfBandDiscovery{
+		// TODO this type no longer makes sense here
+		},
 		EnvParams: envParams,
 	}
-	//fmt.Printf("env: %#v\n", bootstrapParams.EnvParams)
-	cmds.AddCommand(kubecmd.NewCmdInit(out, bootstrapParams))
-	cmds.AddCommand(kubecmd.NewCmdJoin(out, bootstrapParams))
-	cmds.AddCommand(kubecmd.NewCmdUser(out, bootstrapParams))
-	cmds.AddCommand(kubecmd.NewCmdManual(out, bootstrapParams))
+
+	cmds.AddCommand(NewCmdInit(out, bootstrapParams))
+	cmds.AddCommand(NewCmdJoin(out, bootstrapParams))
+	cmds.AddCommand(NewCmdUser(out, bootstrapParams))
+	cmds.AddCommand(NewCmdManual(out, bootstrapParams))
 
 	return cmds
 }
