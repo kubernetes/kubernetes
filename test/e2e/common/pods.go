@@ -434,6 +434,8 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 
+		// It's possible for the Pod to be created before the Kubelet is updated with the new
+		// service. In that case, we just retry.
 		const maxRetries = 3
 		expectedVars := []string{
 			"FOOSERVICE_SERVICE_HOST=",
