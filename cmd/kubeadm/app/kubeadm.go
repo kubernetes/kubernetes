@@ -35,8 +35,10 @@ func getEnvParams() map[string]string {
 	}
 
 	envParams := map[string]string{
-		"prefix":        globalPrefix,
-		"host_pki_path": path.Join(globalPrefix, "pki"),
+		"prefix":          globalPrefix,
+		"host_pki_path":   path.Join(globalPrefix, "pki"),
+		"hyperkube_image": "gcr.io/google_containers/hyperkube:v1.4.0-alpha.3",
+		"discovery_image": "dgoodwin/kubediscovery:latest",
 	}
 
 	for k, _ := range envParams {
