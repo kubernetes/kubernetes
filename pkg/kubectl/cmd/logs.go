@@ -54,7 +54,7 @@ var (
 )
 
 const (
-	logsUsageStr = "expected 'exec <pod-name> [container-name]'.\n<pod-name> is a required parameter for the logs command"
+	logsUsageStr = "expected 'logs POD_NAME [CONTAINER_NAME]'.\nPOD_NAME is a required argument for the logs command"
 )
 
 type LogsOptions struct {

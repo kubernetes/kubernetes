@@ -49,7 +49,7 @@ var (
 )
 
 const (
-	execUsageStr = "expected 'exec <pod-name> <command> [arg1] [arg2] ... [argN]'.\n<pod-name> and <command> are required parameter for the exec command"
+	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the exec command"
 )
 
 func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
@@ -142,7 +142,7 @@ func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []
 		return cmdutil.UsageError(cmd, execUsageStr)
 	}
 	if len(p.PodName) != 0 {
-		printDeprecationWarning("exec <pod-name>", "-p <pod-name>")
+		printDeprecationWarning("exec POD_NAME", "-p POD_NAME")
 		if len(argsIn) < 1 {
 			return cmdutil.UsageError(cmd, execUsageStr)
 		}
