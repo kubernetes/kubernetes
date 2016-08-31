@@ -1971,6 +1971,11 @@
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
 		},
 		{
+			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers",
+			"Comment": "v1.0.0-1012-ge00690e",
+			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
+		},
+		{
 			"ImportPath": "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/lbaas/members",
 			"Comment": "v1.0.0-1012-ge00690e",
 			"Rev": "e00690e87603abe613e9f02c816c7c4bef82e063"
