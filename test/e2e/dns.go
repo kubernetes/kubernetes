@@ -42,7 +42,7 @@ var dnsServiceLabelSelector = labels.Set{
 	"kubernetes.io/cluster-service": "true",
 }.AsSelector()
 
-func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotation bool) *api.Pod {
+func createDNSPod(namespace, probeCmd string, useAnnotation bool) *api.Pod {
 	dnsPod := &api.Pod{
 		TypeMeta: unversioned.TypeMeta{
 			Kind:       "Pod",
@@ -81,19 +81,8 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd string, useAnnotatio
 				},
 				{
 					Name:    "querier",
-					Image:   "gcr.io/google_containers/dnsutils:e2e",
-					Command: []string{"sh", "-c", wheezyProbeCmd},
-					VolumeMounts: []api.VolumeMount{
-						{
-							Name:      "results",
-							MountPath: "/results",
-						},
-					},
-				},
-				{
-					Name:    "jessie-querier",
-					Image:   "gcr.io/google_containers/jessie-dnsutils:e2e",
-					Command: []string{"sh", "-c", jessieProbeCmd},
+					Image:   "gcr.io/google_containers/dnsutils:1.0-alpine", // FIXME: remove "alpine"
+					Command: []string{"sh", "-c", probeCmd},
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      "results",
@@ -340,15 +329,13 @@ var _ = framework.KubeDescribe("DNS", func() {
 		}
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		probeCmd, fileNames := createProbeCommand(namesToResolve, hostEntries, "", "probe", f.Namespace.Name)
+		By("Running these commands: " + probeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		pod := createDNSPod(f.Namespace.Name, probeCmd, true)
+		validateDNSResults(f, pod, fileNames)
 	})
 
 	It("should provide DNS for services [Conformance]", func() {
@@ -386,17 +373,15 @@ var _ = framework.KubeDescribe("DNS", func() {
 			fmt.Sprintf("_http._tcp.%s.%s.svc", regularService.Name, f.Namespace.Name),
 		}
 
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		probeCmd, fileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "probe", f.Namespace.Name)
+		By("Running these commands: " + probeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, false)
+		pod := createDNSPod(f.Namespace.Name, probeCmd, false)
 		pod.ObjectMeta.Labels = testServiceSelector
 
-		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(f, pod, fileNames)
 	})
 
 	It("should provide DNS for pods for Hostname and Subdomain Annotation", func() {
@@ -419,21 +404,19 @@ var _ = framework.KubeDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.cluster.local", podHostname, serviceName, f.Namespace.Name)
 		hostNames := []string{hostFQDN, podHostname}
 		namesToResolve := []string{hostFQDN}
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostNames, "", "wheezy", f.Namespace.Name)
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostNames, "", "jessie", f.Namespace.Name)
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		probeCmd, fileNames := createProbeCommand(namesToResolve, hostNames, "", "probe", f.Namespace.Name)
+		By("Running these commands: " + probeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod1 := createDNSPod(f.Namespace.Name, probeCmd, true)
 		pod1.ObjectMeta.Labels = testServiceSelector
 		pod1.ObjectMeta.Annotations = map[string]string{
 			pod.PodHostnameAnnotation:  podHostname,
 			pod.PodSubdomainAnnotation: serviceName,
 		}
 
-		validateDNSResults(f, pod1, append(wheezyFileNames, jessieFileNames...))
+		validateDNSResults(f, pod1, fileNames)
 	})
 
 	It("should provide DNS for ExternalName services", func() {
@@ -450,16 +433,14 @@ var _ = framework.KubeDescribe("DNS", func() {
 		}()
 
 		hostFQDN := fmt.Sprintf("%s.%s.svc.cluster.local", serviceName, f.Namespace.Name)
-		wheezyProbeCmd, wheezyFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "wheezy")
-		jessieProbeCmd, jessieFileName := createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		probeCmd, fileName := createTargetedProbeCommand(hostFQDN, "CNAME", "probe")
+		By("Running these commands: " + probeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a pod to probe DNS")
-		pod1 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod1 := createDNSPod(f.Namespace.Name, probeCmd, true)
 
-		validateTargetedProbeOutput(f, pod1, []string{wheezyFileName, jessieFileName}, "foo.example.com.")
+		validateTargetedProbeOutput(f, pod1, []string{fileName}, "foo.example.com.")
 
 		// Test changing the externalName field
 		By("changing the externalName to bar.example.com")
@@ -467,16 +448,14 @@ var _ = framework.KubeDescribe("DNS", func() {
 			s.Spec.ExternalName = "bar.example.com"
 		})
 		Expect(err).NotTo(HaveOccurred())
-		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "wheezy")
-		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "CNAME", "jessie")
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		probeCmd, fileName = createTargetedProbeCommand(hostFQDN, "CNAME", "probe")
+		By("Running these commands: " + probeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a second pod to probe DNS")
-		pod2 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod2 := createDNSPod(f.Namespace.Name, probeCmd, true)
 
-		validateTargetedProbeOutput(f, pod2, []string{wheezyFileName, jessieFileName}, "bar.example.com.")
+		validateTargetedProbeOutput(f, pod2, []string{fileName}, "bar.example.com.")
 
 		// Test changing type from ExternalName to ClusterIP
 		By("changing the service to type=ClusterIP")
@@ -488,15 +467,13 @@ var _ = framework.KubeDescribe("DNS", func() {
 			}
 		})
 		Expect(err).NotTo(HaveOccurred())
-		wheezyProbeCmd, wheezyFileName = createTargetedProbeCommand(hostFQDN, "A", "wheezy")
-		jessieProbeCmd, jessieFileName = createTargetedProbeCommand(hostFQDN, "A", "jessie")
-		By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
-		By("Running these commands on jessie: " + jessieProbeCmd + "\n")
+		probeCmd, fileName = createTargetedProbeCommand(hostFQDN, "A", "probe")
+		By("Running these commands: " + probeCmd + "\n")
 
 		// Run a pod which probes DNS and exposes the results by HTTP.
 		By("creating a third pod to probe DNS")
-		pod3 := createDNSPod(f.Namespace.Name, wheezyProbeCmd, jessieProbeCmd, true)
+		pod3 := createDNSPod(f.Namespace.Name, probeCmd, true)
 
-		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, "127.1.2.3")
+		validateTargetedProbeOutput(f, pod3, []string{fileName}, "127.1.2.3")
 	})
 })

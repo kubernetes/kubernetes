@@ -12,16 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This image does not tag
-#TAG =
+TAG = 1.0-alpine #FIXME: remove "alpine" once it works
 PREFIX = gcr.io/google_containers
 
-all: push
+all: image
 
 image:
-	docker build -t $(PREFIX)/dnsutils .
+	docker build -t $(PREFIX)/dnsutils:$(TAG) .
 
 push: image
-	gcloud docker push $(PREFIX)/dnsutils
+	gcloud docker push $(PREFIX)/dnsutils:$(TAG)
 
 clean:
