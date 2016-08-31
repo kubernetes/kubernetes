@@ -24,10 +24,12 @@ import (
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	federation_release_1_4 "k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
+	"k8s.io/kubernetes/federation/pkg/federation-controller/util/eventsink"
 	"k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/cache"
 	kube_release_1_4 "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
+	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/framework"
 	pkg_runtime "k8s.io/kubernetes/pkg/runtime"
@@ -66,6 +68,9 @@ type SecretController struct {
 	// Backoff manager for secrets
 	secretBackoff *flowcontrol.Backoff
 
+	// For events
+	eventRecorder record.EventRecorder
+
 	secretReviewDelay     time.Duration
 	clusterAvailableDelay time.Duration
 	smallDelay            time.Duration
@@ -74,6 +79,10 @@ type SecretController struct {
 
 // NewSecretController returns a new secret controller
 func NewSecretController(client federation_release_1_4.Interface) *SecretController {
+	broadcaster := record.NewBroadcaster()
+	broadcaster.StartRecordingToSink(eventsink.NewFederatedEventSink(client))
+	recorder := broadcaster.NewRecorder(api.EventSource{Component: "federated-secrets-controller"})
+
 	secretcontroller := &SecretController{
 		federatedApiClient:    client,
 		secretReviewDelay:     time.Second * 10,
@@ -81,6 +90,7 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 		smallDelay:            time.Second * 3,
 		updateTimeout:         time.Second * 30,
 		secretBackoff:         flowcontrol.NewBackOff(5*time.Second, time.Minute),
+		eventRecorder:         recorder,
 	}
 
 	// Build delivereres for triggering reconcilations.
@@ -278,6 +288,9 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 		}
 
 		if !found {
+			secretcontroller.eventRecorder.Eventf(baseSecret, api.EventTypeNormal, "CreateInCluster",
+				"Creating secret in cluster %s", cluster.Name)
+
 			operations = append(operations, util.FederatedOperation{
 				Type:        util.OperationTypeAdd,
 				Obj:         desiredSecret,
@@ -290,6 +303,9 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 			if !util.ObjectMetaEquivalent(desiredSecret.ObjectMeta, clusterSecret.ObjectMeta) ||
 				!reflect.DeepEqual(desiredSecret.Data, clusterSecret.Data) ||
 				!reflect.DeepEqual(desiredSecret.Type, clusterSecret.Type) {
+
+				secretcontroller.eventRecorder.Eventf(baseSecret, api.EventTypeNormal, "UpdateInCluster",
+					"Updating secret in cluster %s", cluster.Name)
 				operations = append(operations, util.FederatedOperation{
 					Type:        util.OperationTypeUpdate,
 					Obj:         desiredSecret,
@@ -303,7 +319,12 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 		// Everything is in order
 		return
 	}
-	err = secretcontroller.federatedUpdater.Update(operations, secretcontroller.updateTimeout)
+	err = secretcontroller.federatedUpdater.UpdateWithOnError(operations, secretcontroller.updateTimeout,
+		func(op util.FederatedOperation, operror error) {
+			secretcontroller.eventRecorder.Eventf(baseSecret, api.EventTypeNormal, "FailedUpdateInCluster",
+				"Update secret in cluster %s failed: %v", op.ClusterName, operror)
+		})
+
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", key, err)
 		secretcontroller.deliverSecret(namespace, secretName, 0, true)
