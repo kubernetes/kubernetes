@@ -3,6 +3,10 @@
   "apiVersion": "",
   "basePath": "https://10.10.10.10:6443",
   "resourcePath": "/version",
+  "info": {
+   "title": "",
+   "description": ""
+  },
   "apis": [
    {
     "path": "/version",

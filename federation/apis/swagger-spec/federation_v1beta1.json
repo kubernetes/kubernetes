@@ -3,6 +3,10 @@
   "apiVersion": "federation/v1beta1",
   "basePath": "https://10.10.10.10:6443",
   "resourcePath": "/apis/federation/v1beta1",
+  "info": {
+   "title": "",
+   "description": ""
+  },
   "apis": [
    {
     "path": "/apis/federation/v1beta1/clusters",
@@ -639,6 +643,7 @@
   "models": {
    "v1beta1.ClusterList": {
     "id": "v1beta1.ClusterList",
+    "description": "A list of all the kubernetes clusters registered to the federation",
     "required": [
      "items"
     ],
@@ -652,13 +657,15 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "unversioned.ListMeta"
+      "$ref": "unversioned.ListMeta",
+      "description": "Standard list metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#types-kinds"
      },
      "items": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.Cluster"
-      }
+      },
+      "description": "List of Cluster objects."
      }
     }
    },
@@ -678,6 +685,7 @@
    },
    "v1beta1.Cluster": {
     "id": "v1beta1.Cluster",
+    "description": "Information about a registered cluster in a federated kubernetes setup. Clusters are not namespaced and have unique names in the federation.",
     "properties": {
      "kind": {
       "type": "string",
@@ -688,13 +696,16 @@
       "description": "APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#resources"
      },
      "metadata": {
-      "$ref": "v1.ObjectMeta"
+      "$ref": "v1.ObjectMeta",
+      "description": "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata"
      },
      "spec": {
-      "$ref": "v1beta1.ClusterSpec"
+      "$ref": "v1beta1.ClusterSpec",
+      "description": "Spec defines the behavior of the Cluster."
      },
      "status": {
-      "$ref": "v1beta1.ClusterStatus"
+      "$ref": "v1beta1.ClusterStatus",
+      "description": "Status describes the current status of a Cluster"
      }
     }
    },
@@ -767,6 +778,10 @@
        "type": "string"
       },
       "description": "Must be empty before the object is deleted from the registry. Each entry is an identifier for the responsible component that will remove the entry from the list. If the deletionTimestamp of the object is non-nil, entries in this list can only be removed."
+     },
+     "clusterName": {
+      "type": "string",
+      "description": "The name of the cluster which the object belongs to. This is used to distinguish resources with same name and namespace in different clusters. This field is not set anywhere right now and apiserver is going to ignore it if set in create or update request."
      }
     }
    },
@@ -804,6 +819,7 @@
    },
    "v1beta1.ClusterSpec": {
     "id": "v1beta1.ClusterSpec",
+    "description": "ClusterSpec describes the attributes of a kubernetes cluster.",
     "required": [
      "serverAddressByClientCIDRs"
     ],
@@ -812,25 +828,30 @@
       "type": "array",
       "items": {
        "$ref": "v1beta1.ServerAddressByClientCIDR"
-      }
+      },
+      "description": "A map of client CIDR to server address. This is to help clients reach servers in the most network-efficient way possible. Clients can use the appropriate server address as per the CIDR that they match. In case of multiple matches, clients should use the longest matching CIDR."
      },
      "secretRef": {
-      "$ref": "v1.LocalObjectReference"
+      "$ref": "v1.LocalObjectReference",
+      "description": "Name of the secret containing kubeconfig to access this cluster. The secret is read from the kubernetes cluster that is hosting federation control plane. Admin needs to ensure that the required secret exists. Secret should be in the same namespace where federation control plane is hosted and it should have kubeconfig in its data with key \"kubeconfig\". This will later be changed to a reference to secret in federation control plane when the federation control plane supports secrets. This can be left empty if the cluster allows insecure access."
      }
     }
    },
    "v1beta1.ServerAddressByClientCIDR": {
     "id": "v1beta1.ServerAddressByClientCIDR",
+    "description": "ServerAddressByClientCIDR helps the client to determine the server address that they should use, depending on the clientCIDR that they match.",
     "required": [
      "clientCIDR",
      "serverAddress"
     ],
     "properties": {
      "clientCIDR": {
-      "type": "string"
+      "type": "string",
+      "description": "The CIDR with which clients can match their IP to figure out the server address that they should use."
      },
      "serverAddress": {
-      "type": "string"
+      "type": "string",
+      "description": "Address of this server, suitable for a client that matches the above CIDR. This can be a hostname, hostname:port, IP or IP:port."
      }
     }
    },
@@ -846,50 +867,61 @@
    },
    "v1beta1.ClusterStatus": {
     "id": "v1beta1.ClusterStatus",
+    "description": "ClusterStatus is information about the current status of a cluster updated by cluster controller peridocally.",
     "properties": {
      "conditions": {
       "type": "array",
       "items": {
        "$ref": "v1beta1.ClusterCondition"
-      }
+      },
+      "description": "Conditions is an array of current cluster conditions."
      },
      "zones": {
       "type": "array",
       "items": {
        "type": "string"
-      }
+      },
+      "description": "Zones is the list of avaliability zones in which the nodes of the cluster exist, e.g. 'us-east1-a'. These will always be in the same region."
      },
      "region": {
-      "type": "string"
+      "type": "string",
+      "description": "Region is the name of the region in which all of the nodes in the cluster exist.  e.g. 'us-east1'."
      }
     }
    },
    "v1beta1.ClusterCondition": {
     "id": "v1beta1.ClusterCondition",
+    "description": "ClusterCondition describes current state of a cluster.",
     "required": [
      "type",
      "status"
     ],
     "properties": {
      "type": {
-      "type": "string"
+      "type": "string",
+      "description": "Type of cluster condition, Complete or Failed."
      },
      "status": {
-      "type": "string"
+      "type": "string",
+      "description": "Status of the condition, one of True, False, Unknown."
      },
      "lastProbeTime": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "description": "Last time the condition was checked."
      },
      "lastTransitionTime": {
       "type": "string",
-      "format": "date-time"
+      "format": "date-time",
+      "description": "Last time the condition transit from one status to another."
      },
      "reason": {
-      "type": "string"
+      "type": "string",
+      "description": "(brief) reason for the condition's last transition."
      },
      "message": {
-      "type": "string"
+      "type": "string",
+      "description": "Human readable message indicating details about last transition."
      }
     }
    },

@@ -24,7 +24,8 @@ set -o pipefail
 cat << __EOF__
 Note: This assumes that the 'types_swagger_doc_generated.go' file has been
 updated for all API group versions. If you are unsure, please run
-hack/update-generated-swagger-docs.sh first.
+hack/update-generated-swagger-docs.sh and
+hack/update-federation-generated-swagger-docs.sh first.
 __EOF__
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
