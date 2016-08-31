@@ -71,8 +71,7 @@ func (gc *podGCInfo) removeEvictableSandboxes() {
 			continue
 		}
 
-		err := gc.client.RemovePodSandbox(sandboxID)
-		if err != nil {
+		if err := gc.client.RemovePodSandbox(sandboxID); err != nil {
 			glog.Warningf("Failed to remove dead sandbox %q: %v", sandboxID, err)
 		}
 	}
@@ -90,8 +89,7 @@ func (gc *podGCInfo) removeContainer(containerID string) int {
 	}
 
 	if containerIndex != -1 {
-		err := gc.client.RemoveContainer(containerID)
-		if err != nil {
+		if err := gc.client.RemoveContainer(containerID); err != nil {
 			glog.Warningf("Failed to remove dead container %q: %v", containerID, err)
 		}
 	}
@@ -131,7 +129,7 @@ func toContainerGCInfo(podUID, sandboxID string, c *kubecontainer.ContainerStatu
 }
 
 // getEvictablePods gets evictable pods.
-// Evictable pods include sandboxes and containers which are not active and created more than MinAge ago).
+// Evictable pods contain sandboxes and containers which are not active and created more than MinAge ago.
 func (m *kubeGenericRuntimeManager) getEvictablePods(minAge time.Duration) (map[string]*podGCInfo, error) {
 	sandboxes, err := m.getKubeletSandboxes(true)
 	if err != nil {
@@ -179,30 +177,37 @@ func (m *kubeGenericRuntimeManager) getEvictablePods(minAge time.Duration) (map[
 	return evictablePods, nil
 }
 
+// enforceMaxPerPodContainer enforces max number of dead containers of each pod and
+// returns the number of total evictable containers.
+func enforceMaxPerPodContainer(evictablePods map[string]*podGCInfo, maxPerPodContainer int) int {
+	totalEvictableContainers := 0
+	for _, pod := range evictablePods {
+		if maxPerPodContainer > 0 {
+			pod.removeOldestNContainers(pod.containersNum() - maxPerPodContainer)
+		}
+		totalEvictableContainers += pod.containersNum()
+	}
+
+	return totalEvictableContainers
+}
+
 // GarbageCollect removes dead containers using the specified container gc policy.
-// It :
-// * gets evictable pods with belonging containers and sandboxes which are not active and created more than MinAge ago.
-// * remove oldest dead containers for each Pod by enforcing MaxPerPodContainer
-// * remove oldest dead containers by enforcing MaxContainers
-// * remove dead sandboxes with zero containers.
+// It consists of following steps:
+// * gets evictable pods with belonging containers and sandboxes which are not active and created more than gcPolicy.MinAge ago.
+// * removes oldest dead containers for each pod by enforcing gcPolicy.MaxPerPodContainer.
+// * removes oldest dead containers by enforcing gcPolicy.MaxContainers.
+// * removes dead sandboxes with zero containers.
 func (m *kubeGenericRuntimeManager) GarbageCollect(gcPolicy kubecontainer.ContainerGCPolicy, allSourcesReady bool) error {
 	evictablePods, err := m.getEvictablePods(gcPolicy.MinAge)
 	if err != nil {
-		glog.Warningf("Get evictable pods failed: %v", err)
+		glog.Warningf("getEvictablePods failed: %v", err)
 		return err
 	}
 
 	glog.V(4).Infof("GarbageCollect gets pods %q for evicting", evictablePods)
 
-	// Enforce max number of dead containers/sandboxes of each pod
-	totalEvictableContainers := 0
-	for _, pod := range evictablePods {
-		if gcPolicy.MaxPerPodContainer > 0 {
-			pod.removeOldestNContainers(pod.containersNum() - gcPolicy.MaxPerPodContainer)
-		}
-		totalEvictableContainers += pod.containersNum()
-	}
-
+	// Enforce max number of dead containers of each pod
+	totalEvictableContainers := enforceMaxPerPodContainer(evictablePods, gcPolicy.MaxPerPodContainer)
 	// Enforce max number of containers
 	if gcPolicy.MaxContainers > 0 && totalEvictableContainers > gcPolicy.MaxContainers {
 		// sort all evitable containers by createdAt (newest first)
