@@ -63,7 +63,7 @@ func createSpec(deploymentName string, secretName string, secretData map[string]
 		SecurityContext: &api.PodSecurityContext{HostNetwork: true},
 		Containers: []api.Container{{
 			Name:    deploymentName,
-			Image:   HYPERKUBE_IMAGE,
+			Image:   params.EnvParams["discovery_image"],
 			Command: []string{"/usr/bin/kube-discovery"},
 			VolumeMounts: []api.VolumeMount{{
 				Name:      secretName,
