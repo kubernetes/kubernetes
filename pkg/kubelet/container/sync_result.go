@@ -40,6 +40,7 @@ var (
 	ErrVerifyNonRoot    = errors.New("VerifyNonRootError")
 	ErrRunInitContainer = errors.New("RunInitContainerError")
 	ErrCreatePodSandbox = errors.New("CreatePodSandboxError")
+	ErrConfigPodSandbox = errors.New("ConfigPodSandboxError")
 	ErrKillPodSandbox   = errors.New("KillPodSandboxError")
 )
 
@@ -59,6 +60,7 @@ const (
 	TeardownNetwork  SyncAction = "TeardownNetwork"
 	InitContainer    SyncAction = "InitContainer"
 	CreatePodSandbox SyncAction = "CreatePodSandbox"
+	ConfigPodSandbox SyncAction = "ConfigPodSandbox"
 	KillPodSandbox   SyncAction = "KillPodSandbox"
 )
 
