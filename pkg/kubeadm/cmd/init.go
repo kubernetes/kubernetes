@@ -14,62 +14,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kubecmd
+package cmd
 
 import (
 	"fmt"
 	"io"
 
+	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 	kubemaster "k8s.io/kubernetes/pkg/kubeadm/master"
-	"k8s.io/kubernetes/pkg/kubeadm/tlsutil"
 	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+)
+
+var (
+	init_done_msgf = dedent.Dedent(`
+		Kubernetes master initialised successfully!
+
+		You can connect any number of nodes by running:
+
+		kubeadm join --token %s %s
+		`)
 )
 
 func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "init",
+		Use:   "init --token <secret> [--listen-ip <addr>]",
 		Short: "Run this on the first server you deploy onto.",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if params.Discovery.ListenIP == "" {
-				ip, err := kubeadmutil.GetDefaultHostIP()
-				if err != nil {
-					return err
-				}
-				params.Discovery.ListenIP = ip
-			}
-			if err := kubemaster.CreateTokenAuthFile(params); err != nil {
-				return err
-			}
-			if err := kubemaster.WriteStaticPodManifests(params); err != nil {
-				return err
-			}
-			caKey, caCert, err := kubemaster.CreatePKIAssets(params)
-			if err != nil {
-				return err
-			}
-			kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(params, []string{"kubelet", "admin"}, caKey, caCert)
-			if err != nil {
-				return err
-			}
-			for name, kubeconfig := range kubeconfigs {
-				if err := kubeadmutil.WriteKubeconfigIfNotExists(params, name, kubeconfig); err != nil {
-					out.Write([]byte(fmt.Sprintf("Unable to write admin for master:\n%s\n", err)))
-					return nil
-				}
-			}
-
-			client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
-			if err != nil {
-				return err
-			}
-
-			//kubemaster.NewDiscoveryEndpoint(params, string(tlsutil.EncodeCertificatePEM(caCert)))
-			kubemaster.CreateDiscoveryDeploymentAndSecret(params, client, string(tlsutil.EncodeCertificatePEM(caCert)))
-
-			return nil
+		Run: func(cmd *cobra.Command, args []string) {
+			err := RunInit(out, cmd, args, params)
+			cmdutil.CheckErr(err)
 		},
 	}
 
@@ -79,4 +55,49 @@ func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Comman
 		`(optional) Shared secret used to secure bootstrap. Will be generated and displayed if not provided.`)
 
 	return cmd
+}
+
+func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
+	if params.Discovery.ListenIP == "" {
+		ip, err := kubeadmutil.GetDefaultHostIP()
+		if err != nil {
+			return err
+		}
+		params.Discovery.ListenIP = ip
+	}
+	if err := kubemaster.CreateTokenAuthFile(params); err != nil {
+		return err
+	}
+	if err := kubemaster.WriteStaticPodManifests(params); err != nil {
+		return err
+	}
+	caKey, caCert, err := kubemaster.CreatePKIAssets(params)
+	if err != nil {
+		return err
+	}
+	kubeconfigs, err := kubemaster.CreateCertsAndConfigForClients(params, []string{"kubelet", "admin"}, caKey, caCert)
+	if err != nil {
+		return err
+	}
+	for name, kubeconfig := range kubeconfigs {
+		if err := kubeadmutil.WriteKubeconfigIfNotExists(params, name, kubeconfig); err != nil {
+			//fmt.Fprintf(out, "Unable to write kubeconfig file:\n%s\n", err)
+			return err
+		}
+	}
+
+	client, err := kubemaster.CreateClientAndWaitForAPI(kubeconfigs["admin"])
+	if err != nil {
+		return err
+	}
+
+	kubemaster.CreateDiscoveryDeploymentAndSecret(params, client, caCert)
+
+	// TODO use templates to reference struct fields directly as order of args is fragile
+	fmt.Fprintf(out, init_done_msgf,
+		params.Discovery.GivenToken,
+		params.Discovery.ListenIP,
+	)
+
+	return nil
 }

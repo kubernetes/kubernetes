@@ -90,12 +90,12 @@ func WriteKubeconfigIfNotExists(params *kubeadmapi.BootstrapParams, name string,
 		0600,
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create %q, it already exists [%s]", filename, err)
 	}
 	f.Close()
 
 	if err := clientcmd.WriteToFile(*kubeconfig, filename); err != nil {
-		return err
+		return fmt.Errorf("failed to write to %q [%s]", filename, err)
 	}
 	return nil
 }
