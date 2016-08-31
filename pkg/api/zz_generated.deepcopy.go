@@ -47,6 +47,7 @@ func RegisterDeepCopies(scheme *runtime.Scheme) error {
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Binding, InType: reflect.TypeOf(&Binding{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_Capabilities, InType: reflect.TypeOf(&Capabilities{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_CephFSVolumeSource, InType: reflect.TypeOf(&CephFSVolumeSource{})},
+		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_CinderLocalVolumeSource, InType: reflect.TypeOf(&CinderLocalVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_CinderVolumeSource, InType: reflect.TypeOf(&CinderVolumeSource{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ComponentCondition, InType: reflect.TypeOf(&ComponentCondition{})},
 		conversion.GeneratedDeepCopyFunc{Fn: DeepCopy_api_ComponentStatus, InType: reflect.TypeOf(&ComponentStatus{})},
@@ -377,6 +378,16 @@ func DeepCopy_api_CephFSVolumeSource(in interface{}, out interface{}, c *convers
 			out.SecretRef = nil
 		}
 		out.ReadOnly = in.ReadOnly
+		return nil
+	}
+}
+
+func DeepCopy_api_CinderLocalVolumeSource(in interface{}, out interface{}, c *conversion.Cloner) error {
+	{
+		in := in.(*CinderLocalVolumeSource)
+		out := out.(*CinderLocalVolumeSource)
+		out.CinderVolumeSource = in.CinderVolumeSource
+		out.SecretRef = in.SecretRef
 		return nil
 	}
 }
@@ -2289,6 +2300,13 @@ func DeepCopy_api_PersistentVolumeSource(in interface{}, out interface{}, c *con
 		} else {
 			out.AzureDisk = nil
 		}
+		if in.CinderLocal != nil {
+			in, out := &in.CinderLocal, &out.CinderLocal
+			*out = new(CinderLocalVolumeSource)
+			**out = **in
+		} else {
+			out.CinderLocal = nil
+		}
 		return nil
 	}
 }
@@ -3724,6 +3742,13 @@ func DeepCopy_api_VolumeSource(in interface{}, out interface{}, c *conversion.Cl
 			}
 		} else {
 			out.AzureDisk = nil
+		}
+		if in.CinderLocal != nil {
+			in, out := &in.CinderLocal, &out.CinderLocal
+			*out = new(CinderLocalVolumeSource)
+			**out = **in
+		} else {
+			out.CinderLocal = nil
 		}
 		return nil
 	}

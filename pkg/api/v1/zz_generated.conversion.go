@@ -54,6 +54,8 @@ func RegisterConversions(scheme *runtime.Scheme) error {
 		Convert_api_Capabilities_To_v1_Capabilities,
 		Convert_v1_CephFSVolumeSource_To_api_CephFSVolumeSource,
 		Convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource,
+		Convert_v1_CinderLocalVolumeSource_To_api_CinderLocalVolumeSource,
+		Convert_api_CinderLocalVolumeSource_To_v1_CinderLocalVolumeSource,
 		Convert_v1_CinderVolumeSource_To_api_CinderVolumeSource,
 		Convert_api_CinderVolumeSource_To_v1_CinderVolumeSource,
 		Convert_v1_ComponentCondition_To_api_ComponentCondition,
@@ -688,6 +690,30 @@ func autoConvert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in *api.CephFSV
 
 func Convert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in *api.CephFSVolumeSource, out *CephFSVolumeSource, s conversion.Scope) error {
 	return autoConvert_api_CephFSVolumeSource_To_v1_CephFSVolumeSource(in, out, s)
+}
+
+func autoConvert_v1_CinderLocalVolumeSource_To_api_CinderLocalVolumeSource(in *CinderLocalVolumeSource, out *api.CinderLocalVolumeSource, s conversion.Scope) error {
+	if err := Convert_v1_CinderVolumeSource_To_api_CinderVolumeSource(&in.CinderVolumeSource, &out.CinderVolumeSource, s); err != nil {
+		return err
+	}
+	out.SecretRef = in.SecretRef
+	return nil
+}
+
+func Convert_v1_CinderLocalVolumeSource_To_api_CinderLocalVolumeSource(in *CinderLocalVolumeSource, out *api.CinderLocalVolumeSource, s conversion.Scope) error {
+	return autoConvert_v1_CinderLocalVolumeSource_To_api_CinderLocalVolumeSource(in, out, s)
+}
+
+func autoConvert_api_CinderLocalVolumeSource_To_v1_CinderLocalVolumeSource(in *api.CinderLocalVolumeSource, out *CinderLocalVolumeSource, s conversion.Scope) error {
+	if err := Convert_api_CinderVolumeSource_To_v1_CinderVolumeSource(&in.CinderVolumeSource, &out.CinderVolumeSource, s); err != nil {
+		return err
+	}
+	out.SecretRef = in.SecretRef
+	return nil
+}
+
+func Convert_api_CinderLocalVolumeSource_To_v1_CinderLocalVolumeSource(in *api.CinderLocalVolumeSource, out *CinderLocalVolumeSource, s conversion.Scope) error {
+	return autoConvert_api_CinderLocalVolumeSource_To_v1_CinderLocalVolumeSource(in, out, s)
 }
 
 func autoConvert_v1_CinderVolumeSource_To_api_CinderVolumeSource(in *CinderVolumeSource, out *api.CinderVolumeSource, s conversion.Scope) error {
@@ -4262,6 +4288,15 @@ func autoConvert_v1_PersistentVolumeSource_To_api_PersistentVolumeSource(in *Per
 	} else {
 		out.AzureDisk = nil
 	}
+	if in.CinderLocal != nil {
+		in, out := &in.CinderLocal, &out.CinderLocal
+		*out = new(api.CinderLocalVolumeSource)
+		if err := Convert_v1_CinderLocalVolumeSource_To_api_CinderLocalVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.CinderLocal = nil
+	}
 	return nil
 }
 
@@ -4413,6 +4448,15 @@ func autoConvert_api_PersistentVolumeSource_To_v1_PersistentVolumeSource(in *api
 		}
 	} else {
 		out.AzureDisk = nil
+	}
+	if in.CinderLocal != nil {
+		in, out := &in.CinderLocal, &out.CinderLocal
+		*out = new(CinderLocalVolumeSource)
+		if err := Convert_api_CinderLocalVolumeSource_To_v1_CinderLocalVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.CinderLocal = nil
 	}
 	return nil
 }
@@ -6886,6 +6930,15 @@ func autoConvert_v1_VolumeSource_To_api_VolumeSource(in *VolumeSource, out *api.
 	} else {
 		out.AzureDisk = nil
 	}
+	if in.CinderLocal != nil {
+		in, out := &in.CinderLocal, &out.CinderLocal
+		*out = new(api.CinderLocalVolumeSource)
+		if err := Convert_v1_CinderLocalVolumeSource_To_api_CinderLocalVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.CinderLocal = nil
+	}
 	return nil
 }
 
@@ -7091,6 +7144,15 @@ func autoConvert_api_VolumeSource_To_v1_VolumeSource(in *api.VolumeSource, out *
 		}
 	} else {
 		out.AzureDisk = nil
+	}
+	if in.CinderLocal != nil {
+		in, out := &in.CinderLocal, &out.CinderLocal
+		*out = new(CinderLocalVolumeSource)
+		if err := Convert_api_CinderLocalVolumeSource_To_v1_CinderLocalVolumeSource(*in, *out, s); err != nil {
+			return err
+		}
+	} else {
+		out.CinderLocal = nil
 	}
 	return nil
 }

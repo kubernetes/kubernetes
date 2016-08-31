@@ -669,6 +669,14 @@ func validateVolumeSource(source *api.VolumeSource, fldPath *field.Path) field.E
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(source.AzureDisk, fldPath.Child("azureDisk"))...)
 	}
+	if source.CinderLocal != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(fldPath.Child("cinderLocal"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateCinderLocalVolumeSource(source.CinderLocal, fldPath.Child("cinderLocal"))...)
+		}
+	}
 
 	if numVolumes == 0 {
 		allErrs = append(allErrs, field.Required(fldPath, "must specify a volume type"))
@@ -957,6 +965,14 @@ func validateCinderVolumeSource(cd *api.CinderVolumeSource, fldPath *field.Path)
 	return allErrs
 }
 
+func validateCinderLocalVolumeSource(cd *api.CinderLocalVolumeSource, fldPath *field.Path) field.ErrorList {
+	allErrs := validateCinderVolumeSource(&cd.CinderVolumeSource, fldPath)
+	if len(cd.SecretRef) == 0 {
+		allErrs = append(allErrs, field.Required(fldPath.Child("secretRef"), ""))
+	}
+	return allErrs
+}
+
 func validateCephFSVolumeSource(cephfs *api.CephFSVolumeSource, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(cephfs.Monitors) == 0 {
@@ -1162,6 +1178,14 @@ func ValidatePersistentVolume(pv *api.PersistentVolume) field.ErrorList {
 	if pv.Spec.AzureDisk != nil {
 		numVolumes++
 		allErrs = append(allErrs, validateAzureDisk(pv.Spec.AzureDisk, specPath.Child("azureDisk"))...)
+	}
+	if pv.Spec.CinderLocal != nil {
+		if numVolumes > 0 {
+			allErrs = append(allErrs, field.Forbidden(specPath.Child("cinderLocal"), "may not specify more than 1 volume type"))
+		} else {
+			numVolumes++
+			allErrs = append(allErrs, validateCinderLocalVolumeSource(pv.Spec.CinderLocal, specPath.Child("cinderLocal"))...)
+		}
 	}
 
 	if numVolumes == 0 {

@@ -40,6 +40,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/aws_ebs"
 	"k8s.io/kubernetes/pkg/volume/azure_dd"
 	"k8s.io/kubernetes/pkg/volume/cinder"
+	"k8s.io/kubernetes/pkg/volume/cinder_local"
 	"k8s.io/kubernetes/pkg/volume/flexvolume"
 	"k8s.io/kubernetes/pkg/volume/flocker"
 	"k8s.io/kubernetes/pkg/volume/gce_pd"
@@ -110,6 +111,8 @@ func ProbeControllerVolumePlugins(cloud cloudprovider.Interface, config componen
 	allPlugins = append(allPlugins, quobyte.ProbeVolumePlugins()...)
 
 	allPlugins = append(allPlugins, flocker.ProbeVolumePlugins()...)
+
+	allPlugins = append(allPlugins, cinder_local.ProbeVolumePlugins()...)
 
 	if cloud != nil {
 		switch {

@@ -243,6 +243,8 @@ type VolumeSource struct {
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
+	// CinderLocal represents a cinder volume attached and mounted on kubelets host machine without involing the cloud-provider.
+	CinderLocal *CinderLocalVolumeSource `json:"cinderLocal,omitempty"`
 }
 
 // Similar to VolumeSource but meant for the administrator who creates PVs.
@@ -287,6 +289,8 @@ type PersistentVolumeSource struct {
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty"`
+	// CinderLocal represents a cinder volume attached and mounted on kubelets host machine without involing the cloud-provider.
+	CinderLocal *CinderLocalVolumeSource `json:"cinderLocal,omitempty"`
 }
 
 type PersistentVolumeClaimVolumeSource struct {
@@ -720,6 +724,15 @@ type CinderVolumeSource struct {
 	// Optional: Defaults to false (read/write). ReadOnly here will force
 	// the ReadOnly setting in VolumeMounts.
 	ReadOnly bool `json:"readOnly,omitempty"`
+}
+
+// Represents a cinder local volume
+// A Cinder volume must exist before mounting to a container.
+// Cinder volumes support ownership management and SELinux relabeling.
+type CinderLocalVolumeSource struct {
+	CinderVolumeSource
+	// SecretRef specifies the secret name that contains Cinder credentials
+	SecretRef string `json:"secretRef"`
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod

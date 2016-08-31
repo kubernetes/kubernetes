@@ -171,6 +171,16 @@ message CephFSVolumeSource {
   optional bool readOnly = 6;
 }
 
+// Represents a cinder local volume
+// A Cinder volume must exist before mounting to a container.
+// Cinder volumes support ownership management and SELinux relabeling.
+message CinderLocalVolumeSource {
+  optional CinderVolumeSource cinderVolumeSource = 1;
+
+  // SecretRef specifies the secret name that contains Cinder credentials
+  optional string secretRef = 2;
+}
+
 // Represents a cinder volume resource in Openstack.
 // A Cinder volume must exist before mounting to a container.
 // The volume must also be in the same region as the kubelet.
@@ -1790,6 +1800,9 @@ message PersistentVolumeSource {
 
   // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
   optional AzureDiskVolumeSource azureDisk = 16;
+
+  // Cinder represents a cinder volume attached and mounted on kubelets host machine without contacting OpenStack provider
+  optional CinderLocalVolumeSource cinderLocal = 17;
 }
 
 // PersistentVolumeSpec is the specification of a persistent volume.
@@ -3080,6 +3093,9 @@ message VolumeSource {
 
   // AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
   optional AzureDiskVolumeSource azureDisk = 22;
+
+  // CinderLocal represents a cinder volume attached and mounted on kubelets host machine without contacting OpenStack provider
+  optional CinderLocalVolumeSource cinderLocal = 23;
 }
 
 // Represents a vSphere volume resource.

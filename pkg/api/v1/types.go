@@ -282,6 +282,8 @@ type VolumeSource struct {
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,21,opt,name=quobyte"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
+	// CinderLocal represents a cinder volume attached and mounted on kubelets host machine without contacting OpenStack provider
+	CinderLocal *CinderLocalVolumeSource `json:"cinderLocal,omitempty" protobuf:"bytes,23,opt,name=cinderLocal"`
 }
 
 // PersistentVolumeClaimVolumeSource references the user's PVC in the same namespace.
@@ -348,6 +350,8 @@ type PersistentVolumeSource struct {
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,15,opt,name=quobyte"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
+	// Cinder represents a cinder volume attached and mounted on kubelets host machine without contacting OpenStack provider
+	CinderLocal *CinderLocalVolumeSource `json:"cinderLocal,omitempty" protobuf:"bytes,17,opt,name=cinderLocal"`
 }
 
 // +genclient=true
@@ -622,6 +626,15 @@ type CinderVolumeSource struct {
 	// the ReadOnly setting in VolumeMounts.
 	// More info: http://releases.k8s.io/HEAD/examples/mysql-cinder-pd/README.md
 	ReadOnly bool `json:"readOnly,omitempty" protobuf:"varint,3,opt,name=readOnly"`
+}
+
+// Represents a cinder local volume
+// A Cinder volume must exist before mounting to a container.
+// Cinder volumes support ownership management and SELinux relabeling.
+type CinderLocalVolumeSource struct {
+	CinderVolumeSource `protobuf:"bytes,1,opt,name=cinderVolumeSource"`
+	// SecretRef specifies the secret name that contains Cinder credentials
+	SecretRef string `json:"secretRef" protobuf:"bytes,2,opt,name=secretRef"`
 }
 
 // Represents a Ceph Filesystem mount that lasts the lifetime of a pod
