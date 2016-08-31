@@ -65,7 +65,7 @@ var _ = framework.KubeDescribe("Summary API", func() {
 				}),
 				"Memory": structP(m.Fields{
 					"Time":            m.Recent(maxStatsAge),
-					"AvailableBytes":  m.NilOr(bounded(100*mb, 100*gb)),
+					"AvailableBytes":  bounded(100*mb, 100*gb),
 					"UsageBytes":      bounded(10*mb, 1*gb),
 					"WorkingSetBytes": bounded(10*mb, 1*gb),
 					"RSSBytes":        bounded(10*mb, 1*gb),
@@ -75,13 +75,13 @@ var _ = framework.KubeDescribe("Summary API", func() {
 				"Rootfs": structP(m.Fields{
 					"AvailableBytes": fsCapacityBounds,
 					"CapacityBytes":  fsCapacityBounds,
-					"UsedBytes":      m.NilOr(bounded(0, 10*gb)),
+					"UsedBytes":      bounded(0, 10*gb),
 					"InodesFree":     bounded(1E4, 1E8),
 				}),
 				"Logs": structP(m.Fields{
 					"AvailableBytes": fsCapacityBounds,
 					"CapacityBytes":  fsCapacityBounds,
-					"UsedBytes":      m.NilOr(bounded(kb, 10*gb)),
+					"UsedBytes":      bounded(kb, 10*gb),
 					"InodesFree":     bounded(1E4, 1E8),
 				}),
 				"UserDefinedMetrics": BeEmpty(),
