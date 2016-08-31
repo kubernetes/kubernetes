@@ -168,7 +168,7 @@ else
   # Test using the host the script was run on
   # Provided for backwards compatibility
   go run test/e2e_node/runner/local/run_local.go --ginkgo-flags="$ginkgoflags" \
-    --test-flags="--alsologtostderr --v 2 --report-dir=${report} --node-name $(hostname) \
-    --start-services=true --stop-services=true $test_args" --build-dependencies=true
+    --test-flags="--alsologtostderr --v 4 --report-dir=${report} --node-name $(hostname) \
+    $test_args" --build-dependencies=true
   exit $?
 fi

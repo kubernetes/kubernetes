@@ -195,8 +195,8 @@ func RunRemote(archive string, host string, cleanup bool, junitFilePrefix string
 	// Run the tests
 	cmd = getSshCommand(" && ",
 		fmt.Sprintf("cd %s", tmp),
-		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 2 --stop-services=%t --node-name=%s --report-dir=%s/results --report-prefix=%s %s",
-			testTimeoutSeconds.Seconds(), ginkgoFlags, cleanup, host, tmp, junitFilePrefix, testArgs),
+		fmt.Sprintf("timeout -k 30s %fs ./ginkgo %s ./e2e_node.test -- --logtostderr --v 4 --node-name=%s --report-dir=%s/results --report-prefix=%s %s",
+			testTimeoutSeconds.Seconds(), ginkgoFlags, host, tmp, junitFilePrefix, testArgs),
 	)
 	aggErrs := []error{}
 
