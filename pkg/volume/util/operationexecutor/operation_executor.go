@@ -168,6 +168,12 @@ type VolumeToAttach struct {
 	// NodeName is the identifier for the node that the volume should be
 	// attached to.
 	NodeName string
+
+	// scheduledPods is a map containing the set of pods that reference this
+	// volume and are scheduled to the underlying node. The key in the map is
+	// the name of the pod and the value is a pod object containing more
+	// information about the pod.
+	ScheduledPods []*api.Pod
 }
 
 // VolumeToMount represents a volume that should be attached to this node and
@@ -483,12 +489,15 @@ func (oe *operationExecutor) generateAttachVolumeFunc(
 
 		if attachErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return fmt.Errorf(
-				"AttachVolume.Attach failed for volume %q (spec.Name: %q) from node %q with: %v",
-				volumeToAttach.VolumeName,
+			err := fmt.Errorf(
+				"Failed to attach volume %q on node %q with: %v",
 				volumeToAttach.VolumeSpec.Name(),
 				volumeToAttach.NodeName,
 				attachErr)
+			for _, pod := range volumeToAttach.ScheduledPods {
+				oe.recorder.Eventf(pod, api.EventTypeWarning, kevents.FailedMountVolume, err.Error())
+			}
+			return err
 		}
 
 		glog.Infof(
