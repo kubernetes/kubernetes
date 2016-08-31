@@ -65,6 +65,10 @@ type Config struct {
 	// stale while they sit in a channel.
 	NextPod func() *api.Pod
 
+    // ReEnqueuPod adds the pod back into the cache. Used when a pod fails
+    // to schedule
+	ReEnqueuePod func(*api.Pod) error
+
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*api.Pod, error)
@@ -105,6 +109,8 @@ func (s *Scheduler) scheduleOne() {
 			Status: api.ConditionFalse,
 			Reason: "Unschedulable",
 		})
+        s.config.ReEnqueuePod(pod)
+        time.Sleep(time.Second * 2) //this is a total hack until I can figure out how to use the backoff properly
 		return
 	}
 	metrics.SchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))

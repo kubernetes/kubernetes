@@ -338,6 +338,7 @@ func (f *ConfigFactory) CreateFromKeys(predicateKeys, priorityKeys sets.String, 
 		NextPod: func() *api.Pod {
 			return f.getNextPod()
 		},
+		ReEnqueuePod:   f.reEnqueuePod,
 		Error:          f.makeDefaultErrorFunc(&podBackoff, f.PodQueue),
 		StopEverything: f.StopEverything,
 	}, nil
@@ -423,6 +424,10 @@ func (f *ConfigFactory) getNextPod() *api.Pod {
 			return pod
 		}
 	}
+}
+
+func (f *ConfigFactory) reEnqueuePod(pod *api.Pod) error {
+		return f.PodQueue.AddIfNotPresent(pod)
 }
 
 func (f *ConfigFactory) responsibleForPod(pod *api.Pod) bool {

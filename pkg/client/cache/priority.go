@@ -19,12 +19,12 @@ package cache
 import (
 	"sync"
 
-	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/util/sets"
 	"container/heap"
 	"errors"
 	"fmt"
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/meta"
+	"k8s.io/kubernetes/pkg/util/sets"
 	"strconv"
 )
 
@@ -235,7 +235,10 @@ func (p *Priority) Delete(obj interface{}) error {
 	pq := p.queue
 	delete(pq.items, key)
 	i, err := pq.GetPlaceInQueue(key)
-	pq.queue = append(pq.queue[:i], pq.queue[i+1:]...)
+
+	if i != -1 {
+		pq.queue = append(pq.queue[:i], pq.queue[i+1:]...)
+	}
 
 	return err
 }
