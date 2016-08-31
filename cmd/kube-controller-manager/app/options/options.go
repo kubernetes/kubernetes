@@ -60,7 +60,7 @@ func NewCMServer() *CMServer {
 			LookupCacheSizeForRS:              4096,
 			LookupCacheSizeForDaemonSet:       1024,
 			ServiceSyncPeriod:                 unversioned.Duration{Duration: 5 * time.Minute},
-			NodeSyncPeriod:                    unversioned.Duration{Duration: 10 * time.Second},
+			RouteReconciliationPeriod:         unversioned.Duration{Duration: 10 * time.Second},
 			ResourceQuotaSyncPeriod:           unversioned.Duration{Duration: 5 * time.Minute},
 			NamespaceSyncPeriod:               unversioned.Duration{Duration: 5 * time.Minute},
 			PVClaimBinderSyncPeriod:           unversioned.Duration{Duration: 15 * time.Second},
@@ -121,9 +121,11 @@ func (s *CMServer) AddFlags(fs *pflag.FlagSet) {
 	fs.Int32Var(&s.LookupCacheSizeForRS, "replicaset-lookup-cache-size", s.LookupCacheSizeForRS, "The the size of lookup cache for replicatsets. Larger number = more responsive replica management, but more MEM load.")
 	fs.Int32Var(&s.LookupCacheSizeForDaemonSet, "daemonset-lookup-cache-size", s.LookupCacheSizeForDaemonSet, "The the size of lookup cache for daemonsets. Larger number = more responsive daemonsets, but more MEM load.")
 	fs.DurationVar(&s.ServiceSyncPeriod.Duration, "service-sync-period", s.ServiceSyncPeriod.Duration, "The period for syncing services with their external load balancers")
-	fs.DurationVar(&s.NodeSyncPeriod.Duration, "node-sync-period", s.NodeSyncPeriod.Duration, ""+
-		"The period for syncing nodes from cloudprovider. Longer periods will result in "+
-		"fewer calls to cloud provider, but may delay addition of new nodes to cluster.")
+	fs.DurationVar(&s.NodeSyncPeriod.Duration, "node-sync-period", 0, ""+
+		"This flag is deprecated and will be removed in future releases. See node-monitor-period for Node health checking or "+
+		"route-reconciliation-period for cloud provider's route configuration settings.")
+	fs.MarkDeprecated("node-sync-period", "This flag is currently no-op and will be deleted.")
+	fs.DurationVar(&s.RouteReconciliationPeriod.Duration, "route-reconciliation-period", s.RouteReconciliationPeriod.Duration, "The period for reconciling routes created for Nodes by cloud provider.")
 	fs.DurationVar(&s.ResourceQuotaSyncPeriod.Duration, "resource-quota-sync-period", s.ResourceQuotaSyncPeriod.Duration, "The period for syncing quota usage status in the system")
 	fs.DurationVar(&s.NamespaceSyncPeriod.Duration, "namespace-sync-period", s.NamespaceSyncPeriod.Duration, "The period for syncing namespace life-cycle updates")
 	fs.DurationVar(&s.PVClaimBinderSyncPeriod.Duration, "pvclaimbinder-sync-period", s.PVClaimBinderSyncPeriod.Duration, "The period for syncing persistent volumes and persistent volume claims")

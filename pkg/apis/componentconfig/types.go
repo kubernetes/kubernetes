@@ -552,6 +552,8 @@ type KubeControllerManagerConfiguration struct {
 	// periods will result in fewer calls to cloud provider, but may delay addition
 	// of new nodes to cluster.
 	NodeSyncPeriod unversioned.Duration `json:"nodeSyncPeriod"`
+	// routeReconciliationPeriod is the period for reconciling routes created for Nodes by cloud provider..
+	RouteReconciliationPeriod unversioned.Duration `json:"routeReconciliationPeriod"`
 	// resourceQuotaSyncPeriod is the period for syncing quota usage status
 	// in the system.
 	ResourceQuotaSyncPeriod unversioned.Duration `json:"resourceQuotaSyncPeriod"`
