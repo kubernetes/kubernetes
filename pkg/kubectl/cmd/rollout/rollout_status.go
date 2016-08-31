@@ -44,7 +44,7 @@ var (
 		kubectl rollout status deployment/nginx`)
 )
 
-func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRolloutStatus(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &StatusOptions{}
 
 	validArgs := []string{"deployment"}
@@ -68,7 +68,7 @@ func NewCmdRolloutStatus(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunStatus(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *StatusOptions) error {
+func RunStatus(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *StatusOptions) error {
 	if len(args) == 0 && len(options.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}

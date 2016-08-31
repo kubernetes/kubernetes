@@ -80,7 +80,7 @@ var (
 	pollInterval, _ = time.ParseDuration("3s")
 )
 
-func NewCmdRollingUpdate(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRollingUpdate(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &RollingUpdateOptions{}
 
 	cmd := &cobra.Command{
@@ -147,7 +147,7 @@ func validateArguments(cmd *cobra.Command, filenames, args []string) error {
 	return utilerrors.NewAggregate(errors)
 }
 
-func RunRollingUpdate(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *RollingUpdateOptions) error {
+func RunRollingUpdate(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *RollingUpdateOptions) error {
 	if len(os.Args) > 1 && os.Args[1] == "rollingupdate" {
 		printDeprecationWarning("rolling-update", "rollingupdate")
 	}

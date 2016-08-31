@@ -65,7 +65,7 @@ var (
 		kubectl replace --force -f ./pod.json`)
 )
 
-func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdReplace(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ReplaceOptions{}
 
 	cmd := &cobra.Command{
@@ -98,7 +98,7 @@ func NewCmdReplace(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *ReplaceOptions) error {
+func RunReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *ReplaceOptions) error {
 	if len(os.Args) > 1 && os.Args[1] == "update" {
 		printDeprecationWarning("replace", "update")
 	}
@@ -171,7 +171,7 @@ func RunReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []st
 	})
 }
 
-func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *ReplaceOptions) error {
+func forceReplace(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *ReplaceOptions) error {
 	schema, err := f.Validator(cmdutil.GetFlagBool(cmd, "validate"), cmdutil.GetFlagString(cmd, "schema-cache-dir"))
 	if err != nil {
 		return err

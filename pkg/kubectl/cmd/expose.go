@@ -80,7 +80,7 @@ var (
 		kubectl expose deployment nginx --port=80 --target-port=8000`)
 )
 
-func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdExposeService(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ExposeOptions{}
 
 	validArgs, argAliases := []string{}, []string{}
@@ -131,7 +131,7 @@ func NewCmdExposeService(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunExpose(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *ExposeOptions) error {
+func RunExpose(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *ExposeOptions) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

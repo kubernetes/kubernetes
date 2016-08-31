@@ -63,7 +63,7 @@ var (
 )
 
 // NewCmdScale returns a cobra command with the appropriate configuration and flags to run scale
-func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdScale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &ScaleOptions{}
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller", "job"}
@@ -101,7 +101,7 @@ func NewCmdScale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 }
 
 // RunScale executes the scaling
-func RunScale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *ScaleOptions) error {
+func RunScale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, shortOutput bool, options *ScaleOptions) error {
 	if len(os.Args) > 1 && os.Args[1] == "resize" {
 		printDeprecationWarning("scale", "resize")
 	}

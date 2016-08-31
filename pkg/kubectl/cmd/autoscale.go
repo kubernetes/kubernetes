@@ -52,7 +52,7 @@ var (
 		kubectl autoscale rc foo --max=5 --cpu-percent=80`)
 )
 
-func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdAutoscale(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &AutoscaleOptions{}
 
 	validArgs := []string{"deployment", "replicaset", "replicationcontroller"}
@@ -87,7 +87,7 @@ func NewCmdAutoscale(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunAutoscale(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *AutoscaleOptions) error {
+func RunAutoscale(f cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []string, options *AutoscaleOptions) error {
 	namespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

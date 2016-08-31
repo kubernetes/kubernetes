@@ -47,6 +47,10 @@ type ClientCache struct {
 	matchVersion  bool
 }
 
+func (c *ClientCache) Loader() clientcmd.ClientConfig {
+	return c.loader
+}
+
 // ClientConfigForVersion returns the correct config for a server
 func (c *ClientCache) ClientConfigForVersion(version *unversioned.GroupVersion) (*restclient.Config, error) {
 	if c.defaultConfig == nil {

@@ -59,7 +59,7 @@ var (
 		kubectl rollout undo --dry-run=true deployment/abc`)
 )
 
-func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRolloutUndo(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	opts := &UndoOptions{}
 
 	validArgs := []string{"deployment"}
@@ -94,7 +94,7 @@ func NewCmdRolloutUndo(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *UndoOptions) CompleteUndo(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
+func (o *UndoOptions) CompleteUndo(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string) error {
 	if len(args) == 0 && len(o.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}

@@ -87,7 +87,7 @@ type EditOptions struct {
 
 var errExit = fmt.Errorf("exit directly")
 
-func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
+func NewCmdEdit(f cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	options := &EditOptions{}
 
 	// retrieve a list of handled resources from printer as valid args
@@ -129,7 +129,7 @@ func NewCmdEdit(f *cmdutil.Factory, out, errOut io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunEdit(f *cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *EditOptions) error {
+func RunEdit(f cmdutil.Factory, out, errOut io.Writer, cmd *cobra.Command, args []string, options *EditOptions) error {
 	var printer kubectl.ResourcePrinter
 	var ext string
 	var addHeader bool

@@ -69,7 +69,7 @@ var (
 		  kubectl top pod -l name=myLabel`)
 )
 
-func NewCmdTopPod(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdTopPod(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &TopPodOptions{}
 
 	cmd := &cobra.Command{
@@ -93,7 +93,8 @@ func NewCmdTopPod(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func (o *TopPodOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
+// Complete completes all the required options for top.
+func (o *TopPodOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer) error {
 	var err error
 	if len(args) == 1 {
 		o.ResourceName = args[0]
