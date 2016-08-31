@@ -125,7 +125,7 @@ type podStorage struct {
 	updates    chan<- kubetypes.PodUpdate
 
 	// contains the set of all sources that have sent at least one SET
-	sourcesSeenLock sync.Mutex
+	sourcesSeenLock sync.RWMutex
 	sourcesSeen     sets.String
 
 	// the EventRecorder to use
@@ -314,8 +314,8 @@ func (s *podStorage) markSourceSet(source string) {
 }
 
 func (s *podStorage) seenSources(sources ...string) bool {
-	s.sourcesSeenLock.Lock()
-	defer s.sourcesSeenLock.Unlock()
+	s.sourcesSeenLock.RLock()
+	defer s.sourcesSeenLock.RUnlock()
 	return s.sourcesSeen.HasAll(sources...)
 }
 
