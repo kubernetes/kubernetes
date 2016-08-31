@@ -119,13 +119,19 @@ func getPodsScheduled(pods *api.PodList) (scheduledPods, notScheduledPods []api.
 		if !masterNodes.Has(pod.Spec.NodeName) {
 			if pod.Spec.NodeName != "" {
 				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
-				Expect(scheduledCondition != nil).To(Equal(true))
-				Expect(scheduledCondition.Status).To(Equal(api.ConditionTrue))
+				// We can't assume that the scheduledCondition is always set if Pod is assigned to Node,
+				// as e.g. DaemonController doesn't set it when assigning Pod to a Node. Currently
+				// Kubelet sets this condition when it gets a Pod without it, but if we were expecting
+				// that it would always be not nil, this would cause a rare race condition.
+				if scheduledCondition != nil {
+					Expect(scheduledCondition.Status).To(Equal(api.ConditionTrue))
+				}
 				scheduledPods = append(scheduledPods, pod)
 			} else {
 				_, scheduledCondition := api.GetPodCondition(&pod.Status, api.PodScheduled)
-				Expect(scheduledCondition != nil).To(Equal(true))
-				Expect(scheduledCondition.Status).To(Equal(api.ConditionFalse))
+				if scheduledCondition != nil {
+					Expect(scheduledCondition.Status).To(Equal(api.ConditionFalse))
+				}
 				if scheduledCondition.Reason == "Unschedulable" {
 					notScheduledPods = append(notScheduledPods, pod)
 				}
