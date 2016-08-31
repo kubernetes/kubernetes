@@ -11757,6 +11757,21 @@ go_library(
 )
 
 go_library(
+    name = "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers",
+    srcs = [
+        "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers/requests.go",
+        "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers/results.go",
+        "github.com/rackspace/gophercloud/openstack/networking/v2/extensions/layer3/routers/urls.go",
+    ],
+    tags = ["automanaged"],
+    deps = [
+        "//vendor:github.com/mitchellh/mapstructure",
+        "//vendor:github.com/rackspace/gophercloud",
+        "//vendor:github.com/rackspace/gophercloud/pagination",
+    ],
+)
+
+go_library(
     name = "k8s.io/client-go/pkg/apis/meta/v1",
     srcs = [
         "k8s.io/client-go/pkg/apis/meta/v1/doc.go",
