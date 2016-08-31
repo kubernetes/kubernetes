@@ -238,7 +238,7 @@ func (es *e2eService) getLogFiles() {
 			if err != nil {
 				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
 			} else {
-				if err = ioutil.WriteFile(targetLink, out, 0755); err != nil {
+				if err = ioutil.WriteFile(targetLink, out, 0666); err != nil {
 					glog.Errorf("failed to write logs to %q: %v", targetLink, err)
 				}
 			}
