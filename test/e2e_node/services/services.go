@@ -87,6 +87,7 @@ func (e *E2EServices) Start() error {
 		// "--cgroups-per-qos="+strconv.FormatBool(framework.TestContext.CgroupsPerQOS),
 		"--manifest-path", framework.TestContext.ManifestPath,
 		"--eviction-hard", framework.TestContext.EvictionHard,
+		"--logtostderr",
 	)
 	e.services = newServer("services", startCmd, nil, nil, getHealthCheckURLs(), servicesLogFile, false)
 	return e.services.start()
@@ -195,6 +196,7 @@ func (es *e2eService) run() error {
 }
 
 func (es *e2eService) start() error {
+	glog.Info("Starting e2e services...")
 	err := es.startEtcd()
 	if err != nil {
 		return err
@@ -215,7 +217,7 @@ func (es *e2eService) start() error {
 	if err != nil {
 		return nil
 	}
-
+	glog.Info("E2E services started.")
 	return nil
 }
 
@@ -226,6 +228,7 @@ func (es *e2eService) getLogFiles() {
 	if framework.TestContext.ReportDir == "" {
 		return
 	}
+	glog.Info("Fetching log files...")
 	journaldFound := isJournaldAvailable()
 	for targetFileName, logFileData := range es.logFiles {
 		targetLink := path.Join(framework.TestContext.ReportDir, targetFileName)
@@ -234,6 +237,7 @@ func (es *e2eService) getLogFiles() {
 			if len(logFileData.journalctlCommand) == 0 {
 				continue
 			}
+			glog.Infof("Get log file %q with journalctl command %v.", targetFileName, logFileData.journalctlCommand)
 			out, err := exec.Command("sudo", append([]string{"journalctl"}, logFileData.journalctlCommand...)...).CombinedOutput()
 			if err != nil {
 				glog.Errorf("failed to get %q from journald: %v, %v", targetFileName, string(out), err)
@@ -275,6 +279,7 @@ func isJournaldAvailable() bool {
 }
 
 func (es *e2eService) stop() {
+	glog.Info("Stopping e2e services...")
 	es.getLogFiles()
 	// TODO(random-liu): Use a loop to stop all services after introducing service interface.
 	// Stop namespace controller
@@ -306,6 +311,7 @@ func (es *e2eService) stop() {
 			glog.Errorf("Failed to delete directory %s.\n%v", d, err)
 		}
 	}
+	glog.Info("E2E services stopped.")
 }
 
 func (es *e2eService) startEtcd() error {
@@ -496,6 +502,7 @@ func readinessCheck(urls []string, errCh <-chan error) error {
 
 // Note: restartOnExit == true requires len(s.healthCheckUrls) > 0 to work properly.
 func (s *server) start() error {
+	glog.Infof("Start server %q with command %q", s.name, commandToString(s.startCommand))
 	errCh := make(chan error)
 
 	var stopRestartingCh, ackStopRestartingCh chan bool
@@ -634,6 +641,7 @@ func (s *server) start() error {
 }
 
 func (s *server) kill() error {
+	glog.Infof("Kill server %q", s.name)
 	name := s.name
 	cmd := s.startCommand
 
