@@ -145,7 +145,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 			Containers: []api.Container{
 				{
 					Name:  containerName1,
-					Image: "gcr.io/google_containers/mounttest:0.6",
+					Image: "gcr.io/google_containers/mounttest:0.7",
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,
@@ -155,7 +155,7 @@ func testPodWithHostVol(path string, source *api.HostPathVolumeSource) *api.Pod 
 				},
 				{
 					Name:  containerName2,
-					Image: "gcr.io/google_containers/mounttest:0.6",
+					Image: "gcr.io/google_containers/mounttest:0.7",
 					VolumeMounts: []api.VolumeMount{
 						{
 							Name:      volumeName,
