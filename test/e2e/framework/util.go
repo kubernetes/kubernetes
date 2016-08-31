@@ -1932,6 +1932,18 @@ func ExpectNoError(err error, explain ...interface{}) {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
 }
 
+func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = fn()
+		if err == nil {
+			return
+		}
+		Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
+	}
+	ExpectWithOffset(1, err).NotTo(HaveOccurred(), explain...)
+}
+
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
 func Cleanup(filePath, ns string, selectors ...string) {
 	By("using delete to clean up resources")
@@ -2203,53 +2215,60 @@ func (f *Framework) testContainerOutputMatcher(scenarioName string,
 	expectedOutput []string,
 	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) {
 	By(fmt.Sprintf("Creating a pod to test %v", scenarioName))
+	if containerIndex < 0 || containerIndex >= len(pod.Spec.Containers) {
+		Failf("Invalid container index: %d", containerIndex)
+	}
+	ExpectNoError(f.MatchContainerOutput(pod, pod.Spec.Containers[containerIndex].Name, expectedOutput, matcher))
+}
+
+// MatchContainerOutput creates a pod and waits for all it's containers to exit with success.
+// It then tests that the matcher with each expectedOutput matches the output of the specified container.
+func (f *Framework) MatchContainerOutput(
+	pod *api.Pod,
+	containerName string,
+	expectedOutput []string,
+	matcher func(string, ...interface{}) gomegatypes.GomegaMatcher) error {
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
 
 	defer podClient.Delete(pod.Name, api.NewDeleteOptions(0))
 	podClient.Create(pod)
 
-	// Wait for client pod to complete.
-	var containerName string
-	for id, container := range pod.Spec.Containers {
-		ExpectNoError(WaitForPodSuccessInNamespace(f.Client, pod.Name, container.Name, ns))
-		if id == containerIndex {
-			containerName = container.Name
+	// Wait for client pod to complete. All containers should succeed.
+	for _, container := range pod.Spec.Containers {
+		if err := WaitForPodSuccessInNamespace(f.Client, pod.Name, container.Name, ns); err != nil {
+			return fmt.Errorf("expected container %s success: %v", container.Name, err)
 		}
-	}
-	if containerName == "" {
-		Failf("Invalid container index: %d", containerIndex)
 	}
 
 	// Grab its logs.  Get host first.
 	podStatus, err := podClient.Get(pod.Name)
 	if err != nil {
-		Failf("Failed to get pod status: %v", err)
+		return fmt.Errorf("failed to get pod status: %v", err)
 	}
 
-	By(fmt.Sprintf("Trying to get logs from node %s pod %s container %s: %v",
-		podStatus.Spec.NodeName, podStatus.Name, containerName, err))
-	var logs string
-	start := time.Now()
+	Logf("Trying to get logs from node %s pod %s container %s: %v",
+		podStatus.Spec.NodeName, podStatus.Name, containerName, err)
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	for time.Now().Sub(start) < (60 * time.Second) {
-		err = nil
-		logs, err = GetPodLogs(f.Client, ns, pod.Name, containerName)
+	logs, err := GetPodLogs(f.Client, ns, pod.Name, containerName)
+	if err != nil {
+		Logf("Failed to get logs from node %q pod %q container %q. %v",
+			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
+		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
+	}
+
+	for _, expected := range expectedOutput {
+		m := matcher(expected)
+		matches, err := m.Match(logs)
 		if err != nil {
-			By(fmt.Sprintf("Warning: Failed to get logs from node %q pod %q container %q. %v",
-				podStatus.Spec.NodeName, podStatus.Name, containerName, err))
-			time.Sleep(5 * time.Second)
-			continue
-
+			return fmt.Errorf("expected %q in container output: %v", expected, err)
+		} else if !matches {
+			return fmt.Errorf("expected %q in container output: %s", expected, m.FailureMessage(logs))
 		}
-		By(fmt.Sprintf("Successfully fetched pod logs:%v\n", logs))
-		break
 	}
 
-	for _, m := range expectedOutput {
-		Expect(logs).To(matcher(m), "%q in container output", m)
-	}
+	return nil
 }
 
 // podInfo contains pod information useful for debugging e2e tests.
