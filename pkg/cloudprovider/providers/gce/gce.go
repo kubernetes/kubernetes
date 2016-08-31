@@ -151,6 +151,9 @@ type Disks interface {
 	// GetSnapshot gets the snapshot with the specified name
 	GetSnapshot(snapshotName string) (*compute.Snapshot, error)
 
+	// DeleteSnapshot deletes the snapshot with the specified name
+	DeleteSnapshot(snapshotName string) error
+
 	// SnapshotExists checks if a snapshot with the specified name exists
 	SnapshotExists(snapshotName string) (bool, error)
 }
@@ -2562,6 +2565,15 @@ func (gce *GCECloud) GetSnapshot(snapshotName string) (*compute.Snapshot, error)
 	}
 
 	return snapshot, nil
+}
+
+func (gce *GCECloud) DeleteSnapshot(snapshotName string) error {
+	deleteOp, err := gce.service.Snapshots.Delete(gce.projectID, snapshotName).Do()
+	if err != nil {
+		return err
+	}
+
+	return gce.waitForGlobalOp(deleteOp)
 }
 
 func (gce *GCECloud) SnapshotExists(snapshotName string) (bool, error) {

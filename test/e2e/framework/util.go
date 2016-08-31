@@ -956,6 +956,26 @@ func WaitForPersistentVolumeClaimPhase(phase api.PersistentVolumeClaimPhase, c *
 	return fmt.Errorf("PersistentVolumeClaim %s not in phase %s within %v", pvcName, phase, timeout)
 }
 
+// WaitForSnapshotCreated waits for an annotation with the specified snapshot to appear on a PersistentVolumeClaim or until timeout occurs, whichever comes first.
+func WaitForSnapshotCreated(c *client.Client, ns, pvcName, snapshotName string, Poll, timeout time.Duration) error {
+	Logf("Waiting up to %v for snapshot %s to be created", timeout, snapshotName)
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
+		pvc, err := c.PersistentVolumeClaims(ns).Get(pvcName)
+		if err != nil {
+			Logf("Get persistent volume claim %s in failed, ignoring for %v: %v", pvcName, Poll, err)
+			continue
+		} else {
+			if snapshotTimestamp, exists := pvc.Annotations[snapshotName]; exists {
+				Logf("Snapshot %s found and timestamp=%s (%v)", snapshotName, snapshotTimestamp, time.Since(start))
+				return nil
+			} else {
+				Logf("Snapshot %s not found.", snapshotName)
+			}
+		}
+	}
+	return fmt.Errorf("Snapshot %s not created for PersistentVolumeClaim %s within %v", snapshotName, pvcName, timeout)
+}
+
 // CreateTestingNS should be used by every test, note that we append a common prefix to the provided test name.
 // Please see NewFramework instead of using this directly.
 func CreateTestingNS(baseName string, c *client.Client, labels map[string]string) (*api.Namespace, error) {
