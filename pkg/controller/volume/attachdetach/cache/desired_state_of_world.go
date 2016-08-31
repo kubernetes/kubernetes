@@ -322,13 +322,23 @@ func (dsw *desiredStateOfWorld) GetVolumesToAttach() []VolumeToAttach {
 			volumesToAttach = append(volumesToAttach,
 				VolumeToAttach{
 					VolumeToAttach: operationexecutor.VolumeToAttach{
-						VolumeName: volumeName,
-						VolumeSpec: volumeObj.spec,
-						NodeName:   nodeName}})
+						VolumeName:    volumeName,
+						VolumeSpec:    volumeObj.spec,
+						NodeName:      nodeName,
+						ScheduledPods: getPodsFromMap(volumeObj.scheduledPods),
+					}})
 		}
 	}
 
 	return volumesToAttach
+}
+
+func getPodsFromMap(podMap map[types.UniquePodName]pod) []*api.Pod {
+	pods := make([]*api.Pod, 0, len(podMap))
+	for _, pod := range podMap {
+		pods = append(pods, pod.podObj)
+	}
+	return pods
 }
 
 func (dsw *desiredStateOfWorld) GetPodToAdd() map[types.UniquePodName]PodToAdd {
