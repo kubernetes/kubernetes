@@ -312,7 +312,7 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames2, svc2IP, servicePort))
 
-		By("Restarting kube-proxy")
+		By(fmt.Sprintf("Restarting kube-proxy on %v", host))
 		if err := framework.RestartKubeProxy(host); err != nil {
 			framework.Failf("error restarting kube-proxy: %v", err)
 		}
@@ -353,9 +353,11 @@ var _ = framework.KubeDescribe("Services", func() {
 		framework.ExpectNoError(verifyServeHostnameServiceUp(c, ns, host, podNames1, svc1IP, servicePort))
 
 		// Restart apiserver
+		By("Restarting apiserver")
 		if err := framework.RestartApiserver(c); err != nil {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
+		By("Waiting for apiserver to come up by polling /healthz")
 		if err := framework.WaitForApiserverUp(c); err != nil {
 			framework.Failf("error while waiting for apiserver up: %v", err)
 		}
