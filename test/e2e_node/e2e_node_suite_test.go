@@ -131,8 +131,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 
 // Tear down the kubelet on the node
 var _ = SynchronizedAfterSuite(func() {}, func() {
+	// TODO(random-liu): Before we move out the kubelet start logic, move the kubelet start/stop
+	// logic to the test suite process, so that we can collect log here.
 	if e2es != nil {
-		if *startServices && *stopServices {
+		if *startServices {
 			glog.Infof("Stopping node services...")
 			e2es.Stop()
 		}

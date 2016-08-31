@@ -31,7 +31,6 @@ import (
 var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "Host and port of the kubelet")
 
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
-var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 
 func getNodeSummary() (*stats.Summary, error) {
 	req, err := http.NewRequest("GET", *kubeletAddress+"/stats/summary", nil)

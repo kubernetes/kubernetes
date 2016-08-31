@@ -481,7 +481,6 @@ ssh-user
 start-services
 static-pods-config
 stats-port
-stop-services
 storage-backend
 storage-media-type
 storage-version
