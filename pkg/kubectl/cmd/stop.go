@@ -57,7 +57,7 @@ var (
 		kubectl stop -f path/to/resources`)
 )
 
-func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdStop(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &StopOptions{}
 
 	cmd := &cobra.Command{
@@ -84,7 +84,7 @@ func NewCmdStop(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunStop(f *cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer, options *StopOptions) error {
+func RunStop(f cmdutil.Factory, cmd *cobra.Command, args []string, out io.Writer, options *StopOptions) error {
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
 	if err != nil {
 		return err

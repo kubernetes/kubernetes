@@ -26,7 +26,7 @@ import (
 func TestCreateDeployment(t *testing.T) {
 	depName := "jonny-dep"
 	f, tf, _, _ := NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.MockPrinter = &testPrinter{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateDeployment(f, buf)
@@ -43,7 +43,7 @@ func TestCreateDeployment(t *testing.T) {
 func TestCreateDeploymentNoImage(t *testing.T) {
 	depName := "jonny-dep"
 	f, tf, _, _ := NewAPIFactory()
-	tf.Printer = &testPrinter{}
+	tf.MockPrinter = &testPrinter{}
 	tf.Namespace = "test"
 	buf := bytes.NewBuffer([]byte{})
 	cmd := NewCmdCreateDeployment(f, buf)

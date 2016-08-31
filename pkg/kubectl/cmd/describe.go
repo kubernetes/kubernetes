@@ -74,7 +74,7 @@ var (
 		kubectl describe pods frontend`)
 )
 
-func NewCmdDescribe(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
+func NewCmdDescribe(f cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	options := &DescribeOptions{}
 	describerSettings := &kubectl.DescriberSettings{}
 
@@ -103,7 +103,7 @@ func NewCmdDescribe(f *cmdutil.Factory, out, cmdErr io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunDescribe(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string, options *DescribeOptions, describerSettings *kubectl.DescriberSettings) error {
+func RunDescribe(f cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, args []string, options *DescribeOptions, describerSettings *kubectl.DescriberSettings) error {
 	selector := cmdutil.GetFlagString(cmd, "selector")
 	allNamespaces := cmdutil.GetFlagBool(cmd, "all-namespaces")
 	cmdNamespace, enforceNamespace, err := f.DefaultNamespace()
@@ -165,7 +165,7 @@ func RunDescribe(f *cmdutil.Factory, out, cmdErr io.Writer, cmd *cobra.Command, 
 	return utilerrors.NewAggregate(allErrs)
 }
 
-func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, f *cmdutil.Factory, namespace, rsrc, prefix string, describerSettings *kubectl.DescriberSettings, out io.Writer, originalError error) error {
+func DescribeMatchingResources(mapper meta.RESTMapper, typer runtime.ObjectTyper, f cmdutil.Factory, namespace, rsrc, prefix string, describerSettings *kubectl.DescriberSettings, out io.Writer, originalError error) error {
 	r := resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.ClientForMapping), f.Decoder(true)).
 		NamespaceParam(namespace).DefaultNamespace().
 		ResourceTypeOrNameArgs(true, rsrc).

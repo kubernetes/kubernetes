@@ -256,7 +256,7 @@ func TestTaint(t *testing.T) {
 		tainted := false
 		f, tf, codec, ns := NewAPIFactory()
 
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
@@ -283,7 +283,7 @@ func TestTaint(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.MockClientConfig = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdTaint(f, buf)

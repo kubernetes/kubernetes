@@ -69,7 +69,7 @@ func TestCordon(t *testing.T) {
 		description string
 		node        *api.Node
 		expected    *api.Node
-		cmd         func(*cmdutil.Factory, io.Writer) *cobra.Command
+		cmd         func(cmdutil.Factory, io.Writer) *cobra.Command
 		arg         string
 		expectFatal bool
 	}{
@@ -135,7 +135,7 @@ func TestCordon(t *testing.T) {
 		f, tf, codec, ns := NewAPIFactory()
 		new_node := &api.Node{}
 		updated := false
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
@@ -164,7 +164,7 @@ func TestCordon(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.MockClientConfig = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := test.cmd(f, buf)
@@ -458,7 +458,7 @@ func TestDrain(t *testing.T) {
 		deleted := false
 		f, tf, codec, ns := NewAPIFactory()
 
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				m := &MyReq{req}
@@ -508,7 +508,7 @@ func TestDrain(t *testing.T) {
 				}
 			}),
 		}
-		tf.ClientConfig = defaultClientConfig()
+		tf.MockClientConfig = defaultClientConfig()
 
 		buf := bytes.NewBuffer([]byte{})
 		cmd := NewCmdDrain(f, buf)

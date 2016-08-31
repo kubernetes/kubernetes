@@ -31,8 +31,8 @@ func TestReplaceObject(t *testing.T) {
 
 	f, tf, codec, _ := NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -75,8 +75,8 @@ func TestReplaceMultipleObject(t *testing.T) {
 
 	f, tf, codec, _ := NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -123,8 +123,8 @@ func TestReplaceDirectory(t *testing.T) {
 
 	f, tf, codec, _ := NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -167,8 +167,8 @@ func TestForceReplaceObjectNotFound(t *testing.T) {
 
 	f, tf, codec, _ := NewAPIFactory()
 	ns := dynamic.ContentConfig().NegotiatedSerializer
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

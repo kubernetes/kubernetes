@@ -29,8 +29,8 @@ func TestCreateService(t *testing.T) {
 	service := &api.Service{}
 	service.Name = "my-service"
 	f, tf, codec, negSer := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: negSer,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

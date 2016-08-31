@@ -46,7 +46,7 @@ var (
 		kubectl rollout history deployment/abc --revision=3`)
 )
 
-func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
+func NewCmdRolloutHistory(f cmdutil.Factory, out io.Writer) *cobra.Command {
 	options := &HistoryOptions{}
 
 	validArgs := []string{"deployment"}
@@ -71,7 +71,7 @@ func NewCmdRolloutHistory(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	return cmd
 }
 
-func RunHistory(f *cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *HistoryOptions) error {
+func RunHistory(f cmdutil.Factory, cmd *cobra.Command, out io.Writer, args []string, options *HistoryOptions) error {
 	if len(args) == 0 && len(options.Filenames) == 0 {
 		return cmdutil.UsageError(cmd, "Required resource not specified.")
 	}

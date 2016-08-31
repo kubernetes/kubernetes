@@ -29,7 +29,7 @@ import (
 )
 
 // NewCmdCreateService is a macro command to create a new namespace
-func NewCmdCreateService(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateService(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "service",
 		Short: "Create a service using specified subcommand.",
@@ -62,7 +62,7 @@ func addPortFlags(cmd *cobra.Command) {
 }
 
 // NewCmdCreateServiceClusterIP is a command to create generic secrets from files, directories, or literal values
-func NewCmdCreateServiceClusterIP(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "clusterip NAME [--tcp=<port>:<targetPort>] [--dry-run]",
 		Short:   "Create a clusterIP service.",
@@ -83,7 +83,7 @@ func NewCmdCreateServiceClusterIP(f *cmdutil.Factory, cmdOut io.Writer) *cobra.C
 }
 
 // CreateServiceClusterIP implements the behavior to run the create namespace command
-func CreateServiceClusterIP(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateServiceClusterIP(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -118,7 +118,7 @@ var (
 )
 
 // NewCmdCreateServiceNodePort is a macro command for creating secrets to work with Docker registries
-func NewCmdCreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "nodeport NAME [--tcp=port:targetPort] [--dry-run]",
 		Short:   "Create a NodePort service.",
@@ -138,7 +138,7 @@ func NewCmdCreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Co
 }
 
 // CreateServiceNodePort is the implementation of the create secret docker-registry command
-func CreateServiceNodePort(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateServiceNodePort(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err
@@ -173,7 +173,7 @@ var (
 )
 
 // NewCmdCreateServiceLoadBalancer is a macro command for creating secrets to work with Docker registries
-func NewCmdCreateServiceLoadBalancer(f *cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
+func NewCmdCreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "loadbalancer NAME [--tcp=port:targetPort] [--dry-run]",
 		Short:   "Create a LoadBalancer service.",
@@ -193,7 +193,7 @@ func NewCmdCreateServiceLoadBalancer(f *cmdutil.Factory, cmdOut io.Writer) *cobr
 }
 
 // CreateServiceLoadBalancer is the implementation of the create secret tls command
-func CreateServiceLoadBalancer(f *cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
+func CreateServiceLoadBalancer(f cmdutil.Factory, cmdOut io.Writer, cmd *cobra.Command, args []string) error {
 	name, err := NameFromCommandArgs(cmd, args)
 	if err != nil {
 		return err

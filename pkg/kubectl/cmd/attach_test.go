@@ -97,12 +97,12 @@ func TestPodAndContainerAttach(t *testing.T) {
 
 	for _, test := range tests {
 		f, tf, _, ns := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client:               fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) { return nil, nil }),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{}
+		tf.MockClientConfig = &restclient.Config{}
 
 		cmd := &cobra.Command{}
 		options := test.p
@@ -163,7 +163,7 @@ func TestAttach(t *testing.T) {
 	}
 	for _, test := range tests {
 		f, tf, codec, ns := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -178,7 +178,7 @@ func TestAttach(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})
@@ -243,7 +243,7 @@ func TestAttachWarnings(t *testing.T) {
 	}
 	for _, test := range tests {
 		f, tf, codec, ns := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -257,7 +257,7 @@ func TestAttachWarnings(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		bufOut := bytes.NewBuffer([]byte{})
 		bufErr := bytes.NewBuffer([]byte{})
 		bufIn := bytes.NewBuffer([]byte{})

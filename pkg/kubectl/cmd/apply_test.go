@@ -183,8 +183,8 @@ func TestApplyObject(t *testing.T) {
 	pathRC := "/namespaces/test/replicationcontrollers/" + nameRC
 
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -225,8 +225,8 @@ func TestApplyRetry(t *testing.T) {
 	retry := false
 	getCount := 0
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -277,8 +277,8 @@ func TestApplyNonExistObject(t *testing.T) {
 	pathNameRC := pathRC + "/" + nameRC
 
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -324,8 +324,8 @@ func testApplyMultipleObjects(t *testing.T, asList bool) {
 	pathSVC := "/namespaces/test/services/" + nameSVC
 
 	f, tf, _, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {

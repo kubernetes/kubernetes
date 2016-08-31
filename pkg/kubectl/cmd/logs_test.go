@@ -48,7 +48,7 @@ func TestLog(t *testing.T) {
 	for _, test := range tests {
 		logContent := "test log content"
 		f, tf, codec, ns := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -66,7 +66,7 @@ func TestLog(t *testing.T) {
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
+		tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: test.version}}}
 		buf := bytes.NewBuffer([]byte{})
 
 		cmd := NewCmdLogs(f, buf)

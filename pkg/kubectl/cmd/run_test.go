@@ -150,14 +150,14 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 	}
 	for _, test := range tests {
 		f, tf, codec, ns := NewAPIFactory()
-		tf.Client = &fake.RESTClient{
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: 201, Header: defaultHeader(), Body: objBody(codec, &rc.Items[0])}, nil
 			}),
 		}
 		tf.Namespace = "test"
-		tf.ClientConfig = &restclient.Config{}
+		tf.MockClientConfig = &restclient.Config{}
 		cmd := NewCmdRun(f, os.Stdin, os.Stdout, os.Stderr)
 		cmd.Flags().Set("image", "nginx")
 		cmd.Flags().Set("generator", "run/v1")
@@ -265,9 +265,9 @@ func TestGenerateService(t *testing.T) {
 	for _, test := range tests {
 		sawPOST := false
 		f, tf, codec, ns := NewAPIFactory()
-		tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
-		tf.Printer = &testPrinter{}
-		tf.Client = &fake.RESTClient{
+		tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}}
+		tf.MockPrinter = &testPrinter{}
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {

@@ -43,8 +43,8 @@ func TestTopNodeAllMetrics(t *testing.T) {
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
 	f, tf, codec, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -63,7 +63,7 @@ func TestTopNodeAllMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, buf)
@@ -91,8 +91,8 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes/%s", apiPrefix, apiVersion, expectedMetrics.Name)
 
 	f, tf, codec, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m := req.URL.Path, req.Method; {
@@ -111,7 +111,7 @@ func TestTopNodeWithNameMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, buf)
@@ -150,8 +150,8 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 	expectedNodePath := fmt.Sprintf("/%s/%s/nodes", apiPrefix, apiVersion)
 
 	f, tf, codec, ns := NewAPIFactory()
-	tf.Printer = &testPrinter{}
-	tf.Client = &fake.RESTClient{
+	tf.MockPrinter = &testPrinter{}
+	tf.MockClient = &fake.RESTClient{
 		NegotiatedSerializer: ns,
 		Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 			switch p, m, q := req.URL.Path, req.Method, req.URL.RawQuery; {
@@ -170,7 +170,7 @@ func TestTopNodeWithLabelSelectorMetrics(t *testing.T) {
 		}),
 	}
 	tf.Namespace = "test"
-	tf.ClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
+	tf.MockClientConfig = &restclient.Config{ContentConfig: restclient.ContentConfig{GroupVersion: &unversioned.GroupVersion{Version: "v1"}}}
 	buf := bytes.NewBuffer([]byte{})
 
 	cmd := NewCmdTopNode(f, buf)

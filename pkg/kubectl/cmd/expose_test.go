@@ -431,8 +431,8 @@ func TestRunExposeService(t *testing.T) {
 
 	for _, test := range tests {
 		f, tf, codec, ns := NewAPIFactory()
-		tf.Printer = &kubectl.JSONPrinter{}
-		tf.Client = &fake.RESTClient{
+		tf.MockPrinter = &kubectl.JSONPrinter{}
+		tf.MockClient = &fake.RESTClient{
 			NegotiatedSerializer: ns,
 			Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 				switch p, m := req.URL.Path, req.Method; {
@@ -459,7 +459,7 @@ func TestRunExposeService(t *testing.T) {
 		out := buf.String()
 		if _, ok := test.flags["dry-run"]; ok {
 			buf.Reset()
-			if err := tf.Printer.PrintObj(test.output, buf); err != nil {
+			if err := tf.MockPrinter.PrintObj(test.output, buf); err != nil {
 				t.Errorf("%s: Unexpected error: %v", test.name, err)
 				continue
 			}
