@@ -135,6 +135,7 @@ func parseIncludedTypesOverrides() (map[unversioned.GroupVersion][]string, error
 
 func main() {
 	arguments := args.Default()
+	arguments.GoHeaderFilePath = filepath.Join(args.DefaultSourceTree(), "k8s.io/kubernetes/hack/boilerplate/boilerplate.go.txt")
 	flag.Parse()
 	var cmdArgs string
 	flag.VisitAll(func(f *flag.Flag) {
