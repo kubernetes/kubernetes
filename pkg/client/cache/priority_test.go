@@ -251,43 +251,6 @@ func TestPriority_PriorityQueuePop(t *testing.T) {
 	}
 }
 
-////TODO need to assign priority to an object before adding it.
-////this is testing FIFO currently...
-//func TestPriority_basic(t *testing.T) {
-//	p := NewPriority(testPriorityObjectKeyFunc)
-//	const amount = 10
-//	go func() {
-//		for i := 0; i < amount; i++ {
-//			p.Add(mkPriorityObj(string([]rune{'a', rune(i)}), strconv.Itoa(i+1), i*2))
-//		}
-//	}()
-//	go func() {
-//		for u := uint64(0); u < amount; u++ {
-//			f.Add(mkPriorityObj(string([]rune{'b', rune(u)}), strconv.Itoa(u+1), u*2))
-//		}
-//	}()
-//
-//	lastInt := int(0)
-//	lastUint := uint64(0)
-//	for i := 0; i < amount*2; i++ {
-//		switch obj := Pop(f).(testPriorityObject).val.(type) {
-//		case int:
-//			if obj <= lastInt {
-//				t.Errorf("got %v (int) out of order, last was %v", obj, lastInt)
-//			}
-//			lastInt = obj
-//		case uint64:
-//			if obj <= lastUint {
-//				t.Errorf("got %v (uint) out of order, last was %v", obj, lastUint)
-//			} else {
-//				lastUint = obj
-//			}
-//		default:
-//			t.Fatalf("unexpected type %#v", obj)
-//		}
-//	}
-//}
-
 //TODO: convert to array testing?
 func TestPriority_Add(t *testing.T) {
 	p := NewPriority(testPriorityObjectKeyFunc)
@@ -656,70 +619,6 @@ func TestPriority_HasSynced(t *testing.T) {
 	}
 }
 
-////https://github.com/kubernetes/kubernetes/blob/f2ddd60eb9e7e9e29f7a105a9a8fa020042e8e52/pkg/controller/lookup_cache.go#L28
-//func mkTestAPIObjectWithPriority(priority string) interface{} {
-//    p := api.Pod{
-//        TypeMeta: unversioned.TypeMeta{APIVersion: "/a", Kind: "b"},
-//        ObjectMeta: api.ObjectMeta{
-//            Namespace:       "bar",
-//            Name:            "foo",
-//            GenerateName:    "prefix",
-//            UID:             "uid",
-//            ResourceVersion: "1",
-//            SelfLink:        "some/place/only/we/know",
-//            Labels:          map[string]string{"foo": "bar"},
-//            Annotations:     map[string]string{"x": "y", annotationKey: priority},
-//            Finalizers: []string{
-//                "finalizer.1",
-//                "finalizer.2",
-//            },
-//        },
-//    }
-//    return p
-//}
-//
-//func mkTestAPIObjectWithNoPriority() interface{} {
-//    p := &api.Pod{
-//        TypeMeta: unversioned.TypeMeta{APIVersion: "/a", Kind: "b"},
-//        ObjectMeta: api.ObjectMeta{
-//            Namespace:       "bar",
-//            Name:            "foo",
-//            GenerateName:    "prefix",
-//            UID:             "uid",
-//            ResourceVersion: "1",
-//            SelfLink:        "some/place/only/we/know",
-//            Labels:          map[string]string{"foo": "bar"},
-//            Annotations:     map[string]string{"x": "y"},
-//            Finalizers: []string{
-//                "finalizer.1",
-//                "finalizer.2",
-//            },
-//        },
-//    }
-//    return p
-//}
-//
-//func mkTestAPIObjectWithNoAnnotations() interface{} {
-//    p := &api.Pod{
-//        TypeMeta: unversioned.TypeMeta{APIVersion: "/a", Kind: "b"},
-//        ObjectMeta: api.ObjectMeta{
-//            Namespace:       "bar",
-//            Name:            "foo",
-//            GenerateName:    "prefix",
-//            UID:             "uid",
-//            ResourceVersion: "1",
-//            SelfLink:        "some/place/only/we/know",
-//            Labels:          map[string]string{"foo": "bar"},
-//            Finalizers: []string{
-//                "finalizer.1",
-//                "finalizer.2",
-//            },
-//        },
-//    }
-//    return p
-//}
-
-//+1
 func TestPriority_MetaPriorityFunc(t *testing.T) {
 	tests := []struct {
 		input            interface{}

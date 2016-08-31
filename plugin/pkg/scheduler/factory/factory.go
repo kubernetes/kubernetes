@@ -427,7 +427,7 @@ func (f *ConfigFactory) getNextPod() *api.Pod {
 }
 
 func (f *ConfigFactory) reEnqueuePod(pod *api.Pod) error {
-		return f.PodQueue.AddIfNotPresent(pod)
+	return f.PodQueue.AddIfNotPresent(pod)
 }
 
 func (f *ConfigFactory) responsibleForPod(pod *api.Pod) bool {
