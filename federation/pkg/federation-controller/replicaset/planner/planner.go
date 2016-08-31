@@ -18,10 +18,16 @@ package planer
 
 import (
 	"math"
+	"math/rand"
 	"sort"
+	"time"
 
 	fed_api "k8s.io/kubernetes/federation/apis/federation"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // Planner decides how many out of the given replicas should be placed in each of the
 // federated clusters.
@@ -32,6 +38,7 @@ type Planner struct {
 type namedClusterReplicaSetPreferences struct {
 	clusterName string
 	fed_api.ClusterReplicaSetPreferences
+	CurrentReplicas int64
 }
 
 type byWeight []*namedClusterReplicaSetPreferences
@@ -39,9 +46,16 @@ type byWeight []*namedClusterReplicaSetPreferences
 func (a byWeight) Len() int      { return len(a) }
 func (a byWeight) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
-// Preferences are sorted according by decreasing weight and increasing clusterName.
+// Preferences are sorted according by decreasing weight and existing replicas.
 func (a byWeight) Less(i, j int) bool {
-	return (a[i].Weight > a[j].Weight) || (a[i].Weight == a[j].Weight && a[i].clusterName < a[j].clusterName)
+	return (a[i].Weight > a[j].Weight) || (a[i].Weight == a[j].Weight && a[i].CurrentReplicas > a[j].CurrentReplicas)
+}
+
+func shuffle(prefs []*namedClusterReplicaSetPreferences) {
+	for i := range prefs {
+		j := rand.Intn(i + 1)
+		prefs[i], prefs[j] = prefs[j], prefs[i]
+	}
 }
 
 func NewPlanner(preferences *fed_api.FederatedReplicaSetPreferences) *Planner {
@@ -68,25 +82,29 @@ func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, c
 	plan := make(map[string]int64, len(preferences))
 	overflow := make(map[string]int64, len(preferences))
 
-	named := func(name string, pref fed_api.ClusterReplicaSetPreferences) *namedClusterReplicaSetPreferences {
+	named := func(name string, pref fed_api.ClusterReplicaSetPreferences, currentReplicas int64) *namedClusterReplicaSetPreferences {
 		return &namedClusterReplicaSetPreferences{
 			clusterName:                  name,
 			ClusterReplicaSetPreferences: pref,
+			CurrentReplicas:              currentReplicas,
 		}
 	}
 
 	for _, cluster := range availableClusters {
 		if localRSP, found := p.preferences.Clusters[cluster]; found {
-			preferences = append(preferences, named(cluster, localRSP))
+			preferences = append(preferences, named(cluster, localRSP, currentReplicaCount[cluster]))
 		} else {
 			if localRSP, found := p.preferences.Clusters["*"]; found {
-				preferences = append(preferences, named(cluster, localRSP))
+				preferences = append(preferences, named(cluster, localRSP, currentReplicaCount[cluster]))
 			} else {
 				plan[cluster] = int64(0)
 			}
 		}
 	}
-	sort.Sort(byWeight(preferences))
+
+	// shuffle to balance replicas across clusters and sort descending by existing replicas to avoid thrashing
+	shuffle(preferences)
+	sort.Stable(byWeight(preferences))
 
 	remainingReplicas := replicasToDistribute
 
