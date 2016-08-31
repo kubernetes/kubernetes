@@ -259,17 +259,24 @@ func main() {
 	for i := 0; i < running; i++ {
 		tr := <-results
 		host := tr.host
-		fmt.Printf("%s================================================================%s\n", blue, noColour)
+		fmt.Println() // Print an empty line
+		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
+		fmt.Printf("%s>                              START TEST                                >%s\n", blue, noColour)
+		fmt.Printf("%s>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>%s\n", blue, noColour)
+		fmt.Printf("Start Test Suite on Host %s\n", host)
+		fmt.Printf("%s\n", tr.output)
 		if tr.err != nil {
 			errCount++
-			fmt.Printf("Failure Finished Host %s Test Suite\n%s\n%v\n", host, tr.output, tr.err)
+			fmt.Printf("Failure Finished Test Suite on Host %s\n%v\n", host, tr.err)
 		} else {
-			fmt.Printf("Success Finished Host %s Test Suite\n%s\n", host, tr.output)
+			fmt.Printf("Success Finished Test Suite on Host %s\n", host)
 		}
 		exitOk = exitOk && tr.exitOk
-		fmt.Printf("%s================================================================%s\n", blue, noColour)
+		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
+		fmt.Printf("%s<                              FINISH TEST                               <%s\n", blue, noColour)
+		fmt.Printf("%s<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<%s\n", blue, noColour)
+		fmt.Println() // Print an empty line
 	}
-
 	// Set the exit code if there were failures
 	if !exitOk {
 		fmt.Printf("Failure: %d errors encountered.\n", errCount)
