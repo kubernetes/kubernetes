@@ -134,8 +134,9 @@ function install-kube-binary-config {
   if [[ "${NETWORK_PROVIDER:-}" == "kubenet" ]] || \
      [[ "${NETWORK_PROVIDER:-}" == "cni" ]]; then
     #TODO(andyzheng0831): We should make the cni version number as a k8s env variable.
-    local -r cni_tar="cni-9d5e6e60e79491207834ae8439e80c943db65a69.tar.gz"
-    download-or-bust "" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
+    local -r cni_tar="cni-a1802e47123688f6e84d8b297ce5a95ce724ac27.tar.gz
+    local -r cni_sha1="877682fad000e0676254154d29c827e92692d620"
+    download-or-bust "${cni_sha1}" "https://storage.googleapis.com/kubernetes-release/network-plugins/${cni_tar}"
     local -r cni_dir="${KUBE_HOME}/cni"
     mkdir -p "${cni_dir}"
     tar xzf "${KUBE_HOME}/${cni_tar}" -C "${cni_dir}" --overwrite

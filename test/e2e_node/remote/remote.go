@@ -43,7 +43,7 @@ var sshOptionsMap map[string]string
 
 const (
 	archiveName  = "e2e_node_test.tar.gz"
-	CNIRelease   = "9d5e6e60e79491207834ae8439e80c943db65a69"
+	CNIRelease   = "a1802e47123688f6e84d8b297ce5a95ce724ac27"
 	CNIDirectory = "cni"
 )
 
