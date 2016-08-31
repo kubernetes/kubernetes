@@ -345,7 +345,7 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 				for key, val := range baseIngress.ObjectMeta.Annotations {
 					desiredIngress.ObjectMeta.Annotations[key] = val
 				}
-				ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "UpdateCluster",
+				ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "UpdateInCluster",
 					"Updating ingress in cluster %s", cluster.Name)
 
 				operations = append(operations, util.FederatedOperation{
@@ -363,8 +363,8 @@ func (ic *IngressController) reconcileIngress(ingress types.NamespacedName) {
 	}
 	glog.V(4).Infof("Calling federatedUpdater.Update() - operations: %v", operations)
 	err = ic.federatedUpdater.UpdateWithOnError(operations, ic.updateTimeout, func(op util.FederatedOperation, operror error) {
-		ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "FailedClusterUpdate",
-			"Update ingress in cluster %s failed: %v", op.ClusterName, operror)
+		ic.eventRecorder.Eventf(baseIngress, api.EventTypeNormal, "FailedUpdateInCluster",
+			"Ingress update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", ingress, err)

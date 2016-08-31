@@ -289,7 +289,7 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 			// Update existing namespace, if needed.
 			if !util.ObjectMetaEquivalent(desiredNamespace.ObjectMeta, clusterNamespace.ObjectMeta) ||
 				!reflect.DeepEqual(desiredNamespace.Spec, clusterNamespace.Spec) {
-				nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "UpdateCluster",
+				nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "UpdateInCluster",
 					"Updating namespace in cluster %s", cluster.Name)
 
 				operations = append(operations, util.FederatedOperation{
@@ -306,8 +306,8 @@ func (nc *NamespaceController) reconcileNamespace(namespace string) {
 		return
 	}
 	err = nc.federatedUpdater.UpdateWithOnError(operations, nc.updateTimeout, func(op util.FederatedOperation, operror error) {
-		nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "FailedClusterUpdate",
-			"Update namespace in cluster %s failed: %v", op.ClusterName, operror)
+		nc.eventRecorder.Eventf(baseNamespace, api.EventTypeNormal, "UpdateInClusterFailed",
+			"Namespace update in cluster %s failed: %v", op.ClusterName, operror)
 	})
 	if err != nil {
 		glog.Errorf("Failed to execute updates for %s: %v", namespace, err)
