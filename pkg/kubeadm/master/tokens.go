@@ -23,7 +23,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/pkg/kubeadm/api"
 	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/util/uuid"
 )
 
@@ -48,7 +48,7 @@ func CreateTokenAuthFile(params *kubeadmapi.BootstrapParams) error {
 	}
 	// <random-token>,<username>,<uid>,system:kubelet-bootstrap
 	serialized := fmt.Sprintf("%s,kubeadm-node-csr,%s,system:kubelet-bootstrap\n", params.Discovery.BearerToken, uuid.NewUUID())
-	if err := util.DumpReaderToFile(bytes.NewReader([]byte(serialized)), path.Join(params.EnvParams["host_pki_path"], "tokens.csv")); err != nil {
+	if err := cmdutil.DumpReaderToFile(bytes.NewReader([]byte(serialized)), path.Join(params.EnvParams["host_pki_path"], "tokens.csv")); err != nil {
 		return err
 	}
 	return nil

@@ -22,13 +22,14 @@ import (
 	"path"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/kubeadm"
+	"k8s.io/kubernetes/pkg/kubeadm/cmd"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/kubernetes/pkg/util/logs"
 )
 
 // TODO add this to hyperkube?
-func Run() error {
-	// we need some params for testing etc, let's keep these hidden for now
+// we need some params for testing etc, let's keep these hidden for now
+func getEnvParams() map[string]string {
 	globalPrefix := os.Getenv("KUBE_PREFIX_ALL")
 	if globalPrefix == "" {
 		globalPrefix = "/etc/kubernetes"
@@ -45,6 +46,13 @@ func Run() error {
 		}
 	}
 
-	cmd := kubeadm.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, envParams)
+	return envParams
+}
+
+func Run() error {
+	logs.InitLogs()
+	defer logs.FlushLogs()
+
+	cmd := cmd.NewKubeadmCommand(cmdutil.NewFactory(nil), os.Stdin, os.Stdout, os.Stderr, getEnvParams())
 	return cmd.Execute()
 }
