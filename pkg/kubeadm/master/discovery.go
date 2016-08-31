@@ -40,7 +40,7 @@ func encodeSecretData(params *kubeadmapi.BootstrapParams, caCert *x509.Certifica
 	return data
 }
 
-func createSpec(deploymentName string, secretName string, secretData map[string][]byte) kubeDiscovery {
+func createSpec(params *kubeadmapi.BootstrapParams, deploymentName string, secretName string, secretData map[string][]byte) kubeDiscovery {
 	l := map[string]string{"name": deploymentName}
 	kd := kubeDiscovery{
 		Deployment: &extensions.Deployment{
@@ -85,7 +85,7 @@ func createSpec(deploymentName string, secretName string, secretData map[string]
 }
 
 func CreateDiscoveryDeploymentAndSecret(params *kubeadmapi.BootstrapParams, client *clientset.Clientset, caCert *x509.Certificate) error {
-	kd := createSpec("kube-discovery", "clusterinfo", encodeSecretData(params, caCert))
+	kd := createSpec(params, "kube-discovery", "clusterinfo", encodeSecretData(params, caCert))
 
 	if _, err := client.Extensions().Deployments(api.NamespaceSystem).Create(kd.Deployment); err != nil {
 		return err
