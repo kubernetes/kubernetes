@@ -17,6 +17,7 @@ limitations under the License.
 package planer
 
 import (
+	"hash/fnv"
 	"math"
 	"sort"
 
@@ -31,6 +32,7 @@ type Planner struct {
 
 type namedClusterReplicaSetPreferences struct {
 	clusterName string
+	hash        uint32
 	fed_api.ClusterReplicaSetPreferences
 }
 
@@ -41,7 +43,7 @@ func (a byWeight) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 // Preferences are sorted according by decreasing weight and increasing clusterName.
 func (a byWeight) Less(i, j int) bool {
-	return (a[i].Weight > a[j].Weight) || (a[i].Weight == a[j].Weight && a[i].clusterName < a[j].clusterName)
+	return (a[i].Weight > a[j].Weight) || (a[i].Weight == a[j].Weight && a[i].hash < a[j].hash)
 }
 
 func NewPlanner(preferences *fed_api.FederatedReplicaSetPreferences) *Planner {
@@ -56,21 +58,27 @@ func NewPlanner(preferences *fed_api.FederatedReplicaSetPreferences) *Planner {
 // have all of the replicas assigned. In such case a cluster with higher weight has priority over
 // cluster with lower weight (or with lexicographically smaller name in case of draw).
 // It can also use the current replica count and estimated capacity to provide better planning and
-// adhere to rebalance policy.
+// adhere to rebalance policy. To avoid prioritization of clusters with smaller lexiconographical names
+// a semi-random string (like replica set name) can be provided.
 // Two maps are returned:
 // * a map that contains information how many replicas will be possible to run in a cluster.
 // * a map that contains information how many extra replicas would be nice to schedule in a cluster so,
 //   if by chance, they are scheudled we will be closer to the desired replicas layout.
 func (p *Planner) Plan(replicasToDistribute int64, availableClusters []string, currentReplicaCount map[string]int64,
-	estimatedCapacity map[string]int64) (map[string]int64, map[string]int64) {
+	estimatedCapacity map[string]int64, salt string) (map[string]int64, map[string]int64) {
 
 	preferences := make([]*namedClusterReplicaSetPreferences, 0, len(availableClusters))
 	plan := make(map[string]int64, len(preferences))
 	overflow := make(map[string]int64, len(preferences))
 
 	named := func(name string, pref fed_api.ClusterReplicaSetPreferences) *namedClusterReplicaSetPreferences {
+		hasher := fnv.New32()
+		hasher.Write([]byte(name))
+		hasher.Write([]byte(salt))
+
 		return &namedClusterReplicaSetPreferences{
-			clusterName:                  name,
+			clusterName: name,
+			hash:        hasher.Sum32(),
 			ClusterReplicaSetPreferences: pref,
 		}
 	}
