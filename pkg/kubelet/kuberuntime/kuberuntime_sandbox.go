@@ -17,6 +17,7 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"fmt"
 	"sort"
 
 	"github.com/golang/glog"
@@ -25,7 +26,27 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/network"
 	"k8s.io/kubernetes/pkg/kubelet/types"
+	"k8s.io/kubernetes/pkg/kubelet/util/format"
 )
+
+// createPodSandbox creates a pod sandbox and returns (podSandBoxID, message, error).
+func (m *kubeGenericRuntimeManager) createPodSandbox(pod *api.Pod, podIP string, attempt uint32) (string, string, error) {
+	podSandboxConfig, err := m.generatePodSandboxConfig(pod, podIP, attempt)
+	if err != nil {
+		message := fmt.Sprintf("GeneratePodSandboxConfig for pod %q failed: %v", format.Pod(pod), err)
+		glog.Error(message)
+		return "", message, err
+	}
+
+	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig)
+	if err != nil {
+		message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
+		glog.Error(message)
+		return "", message, err
+	}
+
+	return podSandBoxID, "", nil
+}
 
 // generatePodSandboxConfig generates pod sandbox config from api.Pod.
 func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *api.Pod, podIP string, attempt uint32) (*runtimeApi.PodSandboxConfig, error) {
