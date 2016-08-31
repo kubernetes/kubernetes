@@ -2253,17 +2253,11 @@ func (f *Framework) MatchContainerOutput(
 	start := time.Now()
 
 	// Sometimes the actual containers take a second to get started, try to get logs for 60s
-	for time.Now().Sub(start) < (60 * time.Second) {
-		err = nil
-		logs, err = GetPodLogs(f.Client, ns, pod.Name, containerName)
-		if err != nil {
-			Logf("Warning: Failed to get logs from node %q pod %q container %q. %v",
-				podStatus.Spec.NodeName, podStatus.Name, containerName, err)
-			time.Sleep(5 * time.Second)
-		} else {
-			Logf("Successfully fetched pod logs:%v\n", logs)
-			break
-		}
+	logs, err := GetPodLogs(f.Client, ns, pod.Name, containerName)
+	if err != nil {
+		Logf("Failed to get logs from node %q pod %q container %q. %v",
+			podStatus.Spec.NodeName, podStatus.Name, containerName, err)
+		return fmt.Errorf("failed to get logs from %s for %s: %v", podStatus.Name, containerName, err)
 	}
 
 	for _, expected := range expectedOutput {
