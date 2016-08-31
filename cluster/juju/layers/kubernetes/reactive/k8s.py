@@ -468,7 +468,7 @@ def render_files(reldata=None):
 def status_set(level, message):
     '''Output status message with leadership information.'''
     if is_leader():
-        message = '(master) {0}'.format(message)
+        message = '{0} (master) '.format(message)
     hookenv.status_set(level, message)
 
 
