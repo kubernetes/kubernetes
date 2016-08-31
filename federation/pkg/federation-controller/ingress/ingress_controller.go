@@ -61,6 +61,10 @@ type IngressController struct {
 	// all ingresses. This is used when a new cluster becomes available.
 	clusterDeliverer *util.DelayingDeliverer
 
+	// For triggering reconcilation of cluster ingress controller configmap.
+	// This is used when a configmap is updated in the cluster.
+	configMapDeliverer *util.DelayingDeliverer
+
 	// Contains ingresses present in members of federation.
 	ingressFederatedInformer util.FederatedInformer
 	// Contains ingress controller configmaps present in members of federation.
@@ -113,6 +117,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 	// Build deliverers for triggering reconcilations.
 	ic.ingressDeliverer = util.NewDelayingDeliverer()
 	ic.clusterDeliverer = util.NewDelayingDeliverer()
+	ic.configMapDeliverer = util.NewDelayingDeliverer()
 
 	// Start informer in federated API servers on ingresses that should be federated.
 	ic.ingressInformerStore, ic.ingressInformerController = framework.NewInformer(
@@ -171,10 +176,10 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 			return framework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // Todo - we only want to list one by name - need options to reflect that.
+						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Core().ConfigMaps(api.NamespaceSystem).Watch(options) // TODO: As above
+						return targetClient.Core().ConfigMaps(api.NamespaceSystem).Watch(options) // as above
 					},
 				},
 				&api.ConfigMap{},
@@ -183,7 +188,9 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 				// would be just confirmation that the configmap for the ingress controller is correct.
 				util.NewTriggerOnAllChanges(
 					func(obj pkg_runtime.Object) {
-						ic.reconcileConfigMapForCluster(cluster.Name)
+						configMap := obj.(api.ConfigMap)
+						ic.deliverConfigMap(cluster.Name, util.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}, ic.configMapReviewDelay, false)
+						// TODO: Remove ic.reconcileConfigMapForCluster(cluster.Name)
 					},
 				))
 		},
@@ -258,6 +265,11 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 		ic.reconcileConfigMapForCluster(clusterName)
 		ic.reconcileIngressesOnClusterChange()
 	})
+	ic.configMapDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
+		clusterName := item.Value.(string)
+		glog.V(4).Infof("ConfigMap change delivered for cluster %q, reconciling configmap for that cluster", clusterName)
+		ic.reconcileConfigMapForCluster(clusterName)
+	})
 	go func() {
 		select {
 		case <-time.After(time.Minute):
@@ -285,6 +297,23 @@ func (ic *IngressController) deliverIngress(ingress types.NamespacedName, delay 
 		ic.ingressBackoff.Reset(key)
 	}
 	ic.ingressDeliverer.DeliverAfter(key, ingress, delay)
+}
+
+func (ic *IngressController) deliverConfigMapObj(cluster *federation_api.Cluster, obj interface{}, delay time.Duration, failed bool) {
+	configMap := obj.(*extensions_v1beta1.ConfigMap)
+	ic.deliverConfigMap(cluster.Name, types.NamespacedName{Namespace: ingress.Namespace, Name: ingress.Name}, delay, failed)
+}
+
+func (ic *IngressController) deliverConfigMap(cluster string, configMap types.NamespacedName, delay time.Duration, failed bool) {
+	glog.V(4).Infof("Delivering ConfigMap for cluster %q: %s", cluster, configMap)
+	key := cluster
+	if failed {
+		ic.configMapBackoff.Next(key, time.Now())
+		delay = delay + ic.configMapBackoff.Get(key)
+	} else {
+		ic.configMapBackoff.Reset(key)
+	}
+	ic.configMapDeliverer.DeliverAfter(key, configMap, delay)
 }
 
 // Check whether all data stores are in sync. False is returned if any of the informer/stores is not yet
@@ -327,28 +356,26 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 	glog.V(4).Infof("Reconciling ConfigMap for cluster %q", clusterName)
 
 	if !ic.isSynced() {
-		ic.clusterDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay)) // TODO: Do we need this, given that reconcileIngressesOnClusterChange already does it?  Probably need to move to the common caller of both, so that we don't do it twice.
+		ic.configMapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
 		return
 	}
 
 	cluster, found, err := ic.ingressFederatedInformer.GetReadyCluster(clusterName)
 	if err != nil {
 		glog.Errorf("Failed to get ready cluster %q: %v", clusterName, err)
-		ic.clusterDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
+		ic.configMapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
 		return
 	}
 	if !found {
 		glog.Errorf("Internal error: Cluster %q queued for configmap reconciliation, but not found.  Will try again later.", clusterName)
-		ic.clusterDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
+		ic.configmapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
 		return
 	}
 	uidConfigMapNamespacedName := types.NamespacedName{Name: uidConfigMapName, Namespace: uidConfigMapNamespace}
 	configMapObj, found, err := ic.configMapFederatedInformer.GetTargetStore().GetByKey(cluster.Name, uidConfigMapNamespacedName.String())
 	if !found || err != nil {
-		glog.Errorf("Failed to get ConfigMap %q for cluster %q: %v", uidConfigMapNamespacedName, clusterName, err)
-		/* TODO: Remove, but we need another way to ensure that this one gets reconciled.
-		   ic.deliverConfigMap(configMapNamespacedName, ic.configMapRetryDelay, true)
-		*/
+		glog.Errorf("Failed to get ConfigMap %q for cluster %q.  Will try again later: %v", uidConfigMapNamespacedName, clusterName, err)
+		ic.configMapDeliverer.DeliverAt(clusterName, time.Now().Add(ic.configMapRetryDelay))
 		return
 	}
 	ic.reconcileConfigMap(cluster, configMapObj.(v1.ConfigMap))
@@ -389,7 +416,7 @@ func (ic *IngressController) reconcileConfigMap(cluster *federation_api.Cluster,
 		if err != nil {
 			configMapName := types.NamespacedName{Name: configMap.Name, Namespace: configMap.Namespace}
 			glog.Errorf("Failed to execute update of ConfigMap %q on cluster %q: %v", configMapName, cluster.Name, err)
-			// TODO: ic.deliverConfigMap(configMap, ic.configmapReviewDelay, true)
+			ic.configMapDeliverer.DeliverAt(cluster.Name, time.Now().Add(ic.configMapRetryDelay))
 		}
 	}
 }
