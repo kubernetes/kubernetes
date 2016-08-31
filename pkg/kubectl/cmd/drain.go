@@ -345,6 +345,10 @@ func (o *DrainOptions) getPodsForDeletion() (pods []api.Pod, err error) {
 	fs := podStatuses{}
 
 	for _, pod := range podList.Items {
+		if pod.Status.Phase == api.PodSucceeded || pod.Status.Phase == api.PodFailed {
+			continue
+		}
+
 		podOk := true
 		for _, filt := range []podFilter{mirrorPodFilter, o.localStorageFilter, o.unreplicatedFilter, o.daemonsetFilter} {
 			filterOk, w, f := filt(pod)
