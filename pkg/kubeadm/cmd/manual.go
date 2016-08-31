@@ -27,6 +27,7 @@ import (
 	kubemaster "k8s.io/kubernetes/pkg/kubeadm/master"
 	kubenode "k8s.io/kubernetes/pkg/kubeadm/node"
 	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
+	netutil "k8s.io/kubernetes/pkg/util/net"
 	// TODO: cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 )
 
@@ -93,9 +94,9 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if params.Discovery.ListenIP == "" {
-				ip, err := kubeadmutil.GetDefaultHostIP()
+				ip, err := netutil.ChooseHostInterface()
 				if err != nil {
-					return err
+					return fmt.Errorf("Unable to autodetect IP address [%s], please specify with --listen-ip", err)
 				}
 				params.Discovery.ListenIP = ip
 			}

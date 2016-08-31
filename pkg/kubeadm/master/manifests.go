@@ -51,9 +51,8 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 		"etcd": componentPod(api.Container{
 			Command: []string{
 				"/usr/local/bin/etcd",
-				"--listen-peer-urls=http://127.0.0.1:2380",
-				"--addr=127.0.0.1:2379",
-				"--bind-addr=127.0.0.1:2379",
+				"--listen-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
+				"--advertise-client-urls=http://127.0.0.1:2379,http://127.0.0.1:4001",
 				"--data-dir=/var/etcd/data",
 			},
 			Image:         "gcr.io/google_containers/etcd:2.2.1", // TODO parametrise
@@ -71,7 +70,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 				"--address=127.0.0.1",
 				"--etcd-servers=http://127.0.0.1:2379",
 				"--cloud-provider=fake", // TODO parametrise
-				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,ResourceQuota",
+				"--admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,ResourceQuota",
 				SERVICE_CLUSTER_IP_RANGE,
 				"--service-account-key-file=/etc/kubernetes/pki/apiserver-key.pem",
 				"--client-ca-file=/etc/kubernetes/pki/ca.pem",
@@ -92,6 +91,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 			Command: []string{
 				"/hyperkube",
 				"controller-manager",
+				"--leader-elect",
 				MASTER,
 				CLUSTER_NAME,
 				"--root-ca-file=/etc/kubernetes/pki/ca.pem",
@@ -111,6 +111,7 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 			Command: []string{
 				"/hyperkube",
 				"scheduler",
+				"--leader-elect",
 				MASTER,
 				COMPONENT_LOGLEVEL,
 			},
