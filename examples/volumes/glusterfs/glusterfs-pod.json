@@ -22,6 +22,7 @@
                 "name": "glusterfsvol",
                 "glusterfs": {
                     "endpoints": "glusterfs-cluster",
+                    "servers": ["192.168.43.149", "192.168.43.159"],
                     "path": "kube_vol",
                     "readOnly": true
                 }
