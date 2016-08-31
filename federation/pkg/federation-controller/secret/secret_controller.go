@@ -321,8 +321,8 @@ func (secretcontroller *SecretController) reconcileSecret(namespace string, secr
 	}
 	err = secretcontroller.federatedUpdater.UpdateWithOnError(operations, secretcontroller.updateTimeout,
 		func(op util.FederatedOperation, operror error) {
-			secretcontroller.eventRecorder.Eventf(baseSecret, api.EventTypeNormal, "FailedUpdateInCluster",
-				"Update secret in cluster %s failed: %v", op.ClusterName, operror)
+			secretcontroller.eventRecorder.Eventf(baseSecret, api.EventTypeNormal, "UpdateInClusterFailed",
+				"Secret update in cluster %s failed: %v", op.ClusterName, operror)
 		})
 
 	if err != nil {
