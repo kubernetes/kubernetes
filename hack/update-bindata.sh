@@ -46,6 +46,9 @@ go-bindata -nometadata -prefix "${KUBE_ROOT}" -o "${BINDATA_OUTPUT}.tmp" -pkg ge
 
 gofmt -s -w "${BINDATA_OUTPUT}.tmp"
 
+# Here we compare and overwrite only if different to avoid updating the
+# timestamp and triggering a rebuild. The 'cat' redirect trick to preserve file
+# permissions of the target file.
 if ! cmp  "${BINDATA_OUTPUT}.tmp" "${BINDATA_OUTPUT}" ; then
 	cat "${BINDATA_OUTPUT}.tmp" > "${BINDATA_OUTPUT}"
 	V=2 kube::log::info "Generated bindata file : ${BINDATA_OUTPUT} has $(wc -l ${BINDATA_OUTPUT}) lines of lovely automated artifacts"
