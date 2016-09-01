@@ -46,10 +46,8 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 
 	fmt.Println("polling API server forever...")
 
-	count := 0
-
+	start := time.Now()
 	wait.PollInfinite(500*time.Millisecond, func() (bool, error) {
-		count = count + 1
 		cs, err := client.ComponentStatuses().List(api.ListOptions{})
 		if err != nil {
 			return false, nil
@@ -67,7 +65,7 @@ func CreateClientAndWaitForAPI(adminConfig *clientcmdapi.Config) (*clientset.Cli
 			}
 		}
 
-		fmt.Printf("All control plane components are healthy now (took %v half-seconds)\n", count)
+		fmt.Printf("All control plane components are healthy now (took %s seconds)\n", time.Since(start).Seconds())
 		return true, nil
 	})
 
