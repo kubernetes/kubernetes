@@ -122,7 +122,6 @@ shift $((OPTIND - 1))
 
 # Use eval to preserve embedded quoted strings.
 eval "goflags=(${KUBE_GOFLAGS:-})"
-eval "testargs=(${KUBE_TEST_ARGS:-})"
 
 # Used to filter verbose test output.
 go_test_grep_pattern=".*"
@@ -196,7 +195,7 @@ runTests() {
     kube::log::status "Running tests without code coverage"
     go test "${goflags[@]:+${goflags[@]}}" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
-     "${testargs[@]:+${testargs[@]}}" \
+     "${KUBE_TEST_ARGS:+${KUBE_TEST_ARGS}}" \
      | tee ${junit_filename_prefix:+"${junit_filename_prefix}.stdout"} \
      | grep "${go_test_grep_pattern}" && rc=$? || rc=$?
     produceJUnitXMLReport "${junit_filename_prefix}"
@@ -215,22 +214,35 @@ runTests() {
   # To speed things up considerably, we can at least use xargs -P to run multiple
   # 'go test' commands at once.
   # To properly parse the test results if generating a JUnit test report, we
-  # must make sure the output from PARALLEL runs is not mixed. To achieve this,
-  # we spawn a subshell for each PARALLEL process, redirecting the output to
+  # must make sure the output from parallel runs is not mixed. To achieve this,
+  # we spawn a subshell for each parallel process, redirecting the output to
   # separate files.
+  # Added fun: xargs on OSX only allows the command to be 255 characters long
+  # after substitutions. To work around this limitation, put everything in
+  # very short environment variables, and only expand them at the last minute.
+  # See also: https://goo.gl/e4S9Ab
+  C_GF=(${goflags[@]:+${goflags[@]}})
+  C_GF+=(
+    ${KUBE_RACE:-}
+    ${KUBE_TIMEOUT:-}
+    -cover -covermode="${KUBE_COVERMODE}"
+    -coverprofile="${cover_report_dir}/\${_pkg}/${cover_profile}")
+  export C_GF
+
+  export C_KU="${KUBE_GO_PACKAGE}"
+  export C_TA="${KUBE_TEST_ARGS:-}"
+  export C_JU="${junit_filename_prefix:-}"
+  export C_GR="${go_test_grep_pattern}"
+
   # cmd/libs/go2idl/generator is fragile when run under coverage, so ignore it for now.
   # see: https://github.com/kubernetes/kubernetes/issues/24967
-  printf "%s\n" "${@}" | grep -v "cmd/libs/go2idl/generator"| xargs -I{} -n1 -P${KUBE_COVERPROCS} \
-    bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
-        go test ${goflags[@]:+${goflags[@]}} \
-          ${KUBE_RACE} \
-          ${KUBE_TIMEOUT} \
-          -cover -covermode=\"${KUBE_COVERMODE}\" \
-          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
-          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
-          ${testargs[@]:+${testargs[@]}} \
-        | tee ${junit_filename_prefix:+\"${junit_filename_prefix}-\$_pkg_out.stdout\"} \
-        | grep \"${go_test_grep_pattern}\"" \
+  printf "%s\n" "${@}" |\
+    grep -v 'cmd/libs/go2idl/generator' |\
+    xargs -I{} -n1 -P${KUBE_COVERPROCS} \
+    bash -c "set -o pipefail;_p=\"{}\";\
+go test \${C_GF[@]} \$C_KU/\$_p \${C_TA:+\${C_TA}}\
+|tee \${C_JU:+\$C_JU-\${_p//\//_}.stdout}\
+|grep \"\$C_GR\"" \
       && test_result=$? || test_result=$?
 
   produceJUnitXMLReport "${junit_filename_prefix}"
