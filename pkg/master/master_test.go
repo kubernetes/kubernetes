@@ -821,6 +821,16 @@ func decodeResponse(resp *http.Response, obj interface{}) error {
 	return nil
 }
 
+func writeResponseToFile(resp *http.Response, filename string) error {
+	defer resp.Body.Close()
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(filename, data, 0755)
+}
+
 func TestInstallThirdPartyAPIGet(t *testing.T) {
 	for _, version := range versionsToTest {
 		testInstallThirdPartyAPIGetVersion(t, version)
@@ -1228,6 +1238,7 @@ func TestValidOpenAPISpec(t *testing.T) {
 	defer etcdserver.Terminate(t)
 
 	config.EnableOpenAPISupport = true
+	config.EnableIndex = true
 	config.OpenAPIInfo = spec.Info{
 		InfoProps: spec.InfoProps{
 			Title:   "Kubernetes",
@@ -1262,12 +1273,67 @@ func TestValidOpenAPISpec(t *testing.T) {
 		assert.NoError(res.AsError())
 	}
 
+	// TODO(mehdy): The actual validation part of these tests are timing out on jerkin but passing locally. Enable it after debugging timeout issue.
+	disableValidation := true
+
+	// Saving specs to a temporary folder is a good way to debug spec generation without bringing up an actual
+	// api server.
+	saveSwaggerSpecs := false
+
 	// Validate OpenApi spec
 	doc, err := loads.Spec(server.URL + "/swagger.json")
 	if assert.NoError(err) {
-		// TODO(mehdy): This test is timing out on jerkin but passing locally. Enable it after debugging timeout issue.
-		_ = validate.NewSpecValidator(doc.Schema(), strfmt.Default)
-		// res, _ := validator.Validate(doc)
-		// assert.NoError(res.AsError())
+		validator := validate.NewSpecValidator(doc.Schema(), strfmt.Default)
+		if !disableValidation {
+			res, warns := validator.Validate(doc)
+			assert.NoError(res.AsError())
+			if !warns.IsValid() {
+				t.Logf("Open API spec on root has some warnings : %v", warns)
+			}
+		} else {
+			t.Logf("Validation is disabled because it is timing out on jenkins put passing locally.")
+		}
 	}
+
+	// validate specs on each end-point
+	resp, err = http.Get(server.URL)
+	if !assert.NoError(err) {
+		t.Errorf("unexpected error: %v", err)
+	}
+	assert.Equal(http.StatusOK, resp.StatusCode)
+	var list unversioned.RootPaths
+	if assert.NoError(decodeResponse(resp, &list)) {
+		for _, path := range list.Paths {
+			if !strings.HasPrefix(path, "/api") {
+				continue
+			}
+			t.Logf("Validating open API spec on %v ...", path)
+
+			if saveSwaggerSpecs {
+				resp, err = http.Get(server.URL + path + "/swagger.json")
+				if !assert.NoError(err) {
+					t.Errorf("unexpected error: %v", err)
+				}
+				assert.Equal(http.StatusOK, resp.StatusCode)
+				assert.NoError(writeResponseToFile(resp, "/tmp/swagger_"+strings.Replace(path, "/", "_", -1)+".json"))
+			}
+
+			// Validate OpenApi spec on path
+			doc, err := loads.Spec(server.URL + path + "/swagger.json")
+			if assert.NoError(err) {
+				validator := validate.NewSpecValidator(doc.Schema(), strfmt.Default)
+				if !disableValidation {
+					res, warns := validator.Validate(doc)
+					assert.NoError(res.AsError())
+					if !warns.IsValid() {
+						t.Logf("Open API spec on %v has some warnings : %v", path, warns)
+					}
+				} else {
+					t.Logf("Validation is disabled because it is timing out on jenkins put passing locally.")
+				}
+			}
+
+		}
+	}
+
 }
