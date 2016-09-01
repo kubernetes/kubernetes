@@ -266,7 +266,13 @@ func InstallServiceErrorHandler(s runtime.NegotiatedSerializer, container *restf
 }
 
 func serviceErrorHandler(s runtime.NegotiatedSerializer, requestResolver *RequestInfoResolver, apiVersions []string, serviceErr restful.ServiceError, request *restful.Request, response *restful.Response) {
-	errorNegotiated(apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", "", 0, false), s, unversioned.GroupVersion{}, response.ResponseWriter, request.Request)
+	errorNegotiated(
+		apierrors.NewGenericServerResponse(serviceErr.Code, "", api.Resource(""), "", serviceErr.Message, 0, false),
+		s,
+		unversioned.GroupVersion{},
+		response.ResponseWriter,
+		request.Request,
+	)
 }
 
 // Adds a service to return the supported api versions at the legacy /api.

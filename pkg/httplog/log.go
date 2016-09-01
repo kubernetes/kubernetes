@@ -60,6 +60,8 @@ type respLogger struct {
 	addedInfo      string
 	startTime      time.Time
 
+	captureErrorOutput bool
+
 	req *http.Request
 	w   http.ResponseWriter
 
@@ -175,6 +177,9 @@ func (rl *respLogger) Write(b []byte) (int, error) {
 	if !rl.statusRecorded {
 		rl.recordStatus(http.StatusOK) // Default if WriteHeader hasn't been called
 	}
+	if rl.captureErrorOutput {
+		rl.Addf("logging error output: %q\n", string(b))
+	}
 	return rl.w.Write(b)
 }
 
@@ -213,6 +218,7 @@ func (rl *respLogger) recordStatus(status int) {
 		stack := make([]byte, 50*1024)
 		stack = stack[:runtime.Stack(stack, false)]
 		rl.statusStack = "\n" + string(stack)
+		rl.captureErrorOutput = true
 	} else {
 		rl.statusStack = ""
 	}

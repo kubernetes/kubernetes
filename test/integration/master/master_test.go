@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 	"testing"
@@ -412,5 +413,56 @@ func TestMasterService(t *testing.T) {
 	})
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestServiceAlloc(t *testing.T) {
+	cfg := framework.NewIntegrationTestMasterConfig()
+	_, cidr, err := net.ParseCIDR("192.168.0.0/30")
+	if err != nil {
+		t.Fatalf("bad cidr: %v", err)
+	}
+	cfg.ServiceClusterIPRange = cidr
+	_, s := framework.RunAMaster(cfg)
+	defer s.Close()
+
+	client := client.NewOrDie(&restclient.Config{Host: s.URL, ContentConfig: restclient.ContentConfig{GroupVersion: testapi.Default.GroupVersion()}})
+
+	svc := func(i int) *api.Service {
+		return &api.Service{
+			ObjectMeta: api.ObjectMeta{
+				Name: fmt.Sprintf("svc-%v", i),
+			},
+			Spec: api.ServiceSpec{
+				Type: api.ServiceTypeClusterIP,
+				Ports: []api.ServicePort{
+					{Port: 80},
+				},
+			},
+		}
+	}
+
+	// Make a service.
+	if _, err := client.Services(api.NamespaceDefault).Create(svc(1)); err != nil {
+		t.Fatalf("got unexpected error: %v", err)
+	}
+
+	// Make a second service. It will fail because we're out of cluster IPs
+	if _, err := client.Services(api.NamespaceDefault).Create(svc(2)); err != nil {
+		if !strings.Contains(err.Error(), "range is full") {
+			t.Errorf("unexpected error text: %v", err)
+		}
+	} else {
+		t.Fatalf("unexpected sucess")
+	}
+
+	// Delete the first service.
+	if err := client.Services(api.NamespaceDefault).Delete(svc(1).ObjectMeta.Name); err != nil {
+		t.Fatalf("got unexpected error: %v", err)
+	}
+
+	// This time creating the second service should work.
+	if _, err := client.Services(api.NamespaceDefault).Create(svc(2)); err != nil {
+		t.Fatalf("got unexpected error: %v", err)
 	}
 }
