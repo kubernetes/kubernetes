@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/typed/discovery"
 	"k8s.io/kubernetes/pkg/util/sets"
@@ -143,6 +144,15 @@ func New(c *restclient.Config) (*Client, error) {
 		}
 	}
 
+	var storageClient *StorageClient
+	if registered.IsRegistered(storage.GroupName) {
+		storageConfig := *c
+		storageClient, err = NewStorage(&storageConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &Client{
 		RESTClient:           client,
 		AppsClient:           appsClient,
@@ -155,6 +165,7 @@ func New(c *restclient.Config) (*Client, error) {
 		ExtensionsClient:     extensionsClient,
 		PolicyClient:         policyClient,
 		RbacClient:           rbacClient,
+		StorageClient:        storageClient,
 	}, nil
 }
 

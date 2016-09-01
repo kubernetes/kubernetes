@@ -24,12 +24,12 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/conversion"
 )
 
 func TestAdmission(t *testing.T) {
-	defaultClass1 := &extensions.StorageClass{
+	defaultClass1 := &storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -41,7 +41,7 @@ func TestAdmission(t *testing.T) {
 		},
 		Provisioner: "default1",
 	}
-	defaultClass2 := &extensions.StorageClass{
+	defaultClass2 := &storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -54,7 +54,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "default2",
 	}
 	// Class that has explicit default = false
-	classWithFalseDefault := &extensions.StorageClass{
+	classWithFalseDefault := &storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -67,7 +67,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "nondefault1",
 	}
 	// Class with missing default annotation (=non-default)
-	classWithNoDefault := &extensions.StorageClass{
+	classWithNoDefault := &storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -77,7 +77,7 @@ func TestAdmission(t *testing.T) {
 		Provisioner: "nondefault1",
 	}
 	// Class with empty default annotation (=non-default)
-	classWithEmptyDefault := &extensions.StorageClass{
+	classWithEmptyDefault := &storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -126,56 +126,56 @@ func TestAdmission(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		classes           []*extensions.StorageClass
+		classes           []*storage.StorageClass
 		claim             *api.PersistentVolumeClaim
 		expectError       bool
 		expectedClassName string
 	}{
 		{
 			"no default, no modification of PVCs",
-			[]*extensions.StorageClass{classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storage.StorageClass{classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithNoClass,
 			false,
 			"",
 		},
 		{
 			"one default, modify PVC with class=nil",
-			[]*extensions.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storage.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithNoClass,
 			false,
 			"default1",
 		},
 		{
 			"one default, no modification of PVC with class=''",
-			[]*extensions.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storage.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithEmptyClass,
 			false,
 			"",
 		},
 		{
 			"one default, no modification of PVC with class='foo'",
-			[]*extensions.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storage.StorageClass{defaultClass1, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithClass,
 			false,
 			"foo",
 		},
 		{
 			"two defaults, error with PVC with class=nil",
-			[]*extensions.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storage.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithNoClass,
 			true,
 			"",
 		},
 		{
 			"two defaults, no modification of PVC with class=''",
-			[]*extensions.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storage.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithEmptyClass,
 			false,
 			"",
 		},
 		{
 			"two defaults, no modification of PVC with class='foo'",
-			[]*extensions.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
+			[]*storage.StorageClass{defaultClass1, defaultClass2, classWithFalseDefault, classWithNoDefault, classWithEmptyDefault},
 			claimWithClass,
 			false,
 			"foo",

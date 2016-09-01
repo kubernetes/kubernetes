@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/unversioned/testclient/simple"
 )
 
@@ -33,11 +33,11 @@ func TestListStorageClasses(t *testing.T) {
 	c := &simple.Client{
 		Request: simple.Request{
 			Method: "GET",
-			Path:   testapi.Extensions.ResourcePath(getStorageClassResourceName(), "", ""),
+			Path:   testapi.Storage.ResourcePath(getStorageClassResourceName(), "", ""),
 		},
 		Response: simple.Response{StatusCode: 200,
-			Body: &extensions.StorageClassList{
-				Items: []extensions.StorageClass{
+			Body: &storage.StorageClassList{
+				Items: []storage.StorageClass{
 					{
 						ObjectMeta: api.ObjectMeta{
 							Name: "foo",
@@ -52,16 +52,16 @@ func TestListStorageClasses(t *testing.T) {
 			},
 		},
 	}
-	receivedSCList, err := c.Setup(t).Extensions().StorageClasses().List(api.ListOptions{})
+	receivedSCList, err := c.Setup(t).Storage().StorageClasses().List(api.ListOptions{})
 	c.Validate(t, receivedSCList, err)
 }
 
 func TestGetStorageClass(t *testing.T) {
 	c := &simple.Client{
-		Request: simple.Request{Method: "GET", Path: testapi.Extensions.ResourcePath(getStorageClassResourceName(), "", "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "GET", Path: testapi.Storage.ResourcePath(getStorageClassResourceName(), "", "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
-			Body: &extensions.StorageClass{
+			Body: &storage.StorageClass{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -73,13 +73,13 @@ func TestGetStorageClass(t *testing.T) {
 			},
 		},
 	}
-	receivedSC, err := c.Setup(t).Extensions().StorageClasses().Get("foo")
+	receivedSC, err := c.Setup(t).Storage().StorageClasses().Get("foo")
 	c.Validate(t, receivedSC, err)
 }
 
 func TestGetStorageClassWithNoName(t *testing.T) {
 	c := &simple.Client{Error: true}
-	receivedSC, err := c.Setup(t).Extensions().StorageClasses().Get("")
+	receivedSC, err := c.Setup(t).Storage().StorageClasses().Get("")
 	if (err != nil) && (err.Error() != simple.NameRequiredError) {
 		t.Errorf("Expected error: %v, but got %v", simple.NameRequiredError, err)
 	}
@@ -88,15 +88,15 @@ func TestGetStorageClassWithNoName(t *testing.T) {
 }
 
 func TestUpdateStorageClass(t *testing.T) {
-	requestSC := &extensions.StorageClass{
+	requestSC := &storage.StorageClass{
 		ObjectMeta:  api.ObjectMeta{Name: "foo", ResourceVersion: "1"},
 		Provisioner: "aaa",
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "PUT", Path: testapi.Extensions.ResourcePath(getStorageClassResourceName(), "", "foo"), Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "PUT", Path: testapi.Storage.ResourcePath(getStorageClassResourceName(), "", "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
-			Body: &extensions.StorageClass{
+			Body: &storage.StorageClass{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -108,29 +108,29 @@ func TestUpdateStorageClass(t *testing.T) {
 			},
 		},
 	}
-	receivedSC, err := c.Setup(t).Extensions().StorageClasses().Update(requestSC)
+	receivedSC, err := c.Setup(t).Storage().StorageClasses().Update(requestSC)
 	c.Validate(t, receivedSC, err)
 }
 
 func TestDeleteStorageClass(t *testing.T) {
 	c := &simple.Client{
-		Request:  simple.Request{Method: "DELETE", Path: testapi.Extensions.ResourcePath(getStorageClassResourceName(), "", "foo"), Query: simple.BuildQueryValues(nil)},
+		Request:  simple.Request{Method: "DELETE", Path: testapi.Storage.ResourcePath(getStorageClassResourceName(), "", "foo"), Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{StatusCode: 200},
 	}
-	err := c.Setup(t).Extensions().StorageClasses().Delete("foo")
+	err := c.Setup(t).Storage().StorageClasses().Delete("foo")
 	c.Validate(t, nil, err)
 }
 
 func TestCreateStorageClass(t *testing.T) {
-	requestSC := &extensions.StorageClass{
+	requestSC := &storage.StorageClass{
 		ObjectMeta:  api.ObjectMeta{Name: "foo"},
 		Provisioner: "aaa",
 	}
 	c := &simple.Client{
-		Request: simple.Request{Method: "POST", Path: testapi.Extensions.ResourcePath(getStorageClassResourceName(), "", ""), Body: requestSC, Query: simple.BuildQueryValues(nil)},
+		Request: simple.Request{Method: "POST", Path: testapi.Storage.ResourcePath(getStorageClassResourceName(), "", ""), Body: requestSC, Query: simple.BuildQueryValues(nil)},
 		Response: simple.Response{
 			StatusCode: 200,
-			Body: &extensions.StorageClass{
+			Body: &storage.StorageClass{
 				ObjectMeta: api.ObjectMeta{
 					Name: "foo",
 					Labels: map[string]string{
@@ -142,6 +142,6 @@ func TestCreateStorageClass(t *testing.T) {
 			},
 		},
 	}
-	receivedSC, err := c.Setup(t).Extensions().StorageClasses().Create(requestSC)
+	receivedSC, err := c.Setup(t).Storage().StorageClasses().Create(requestSC)
 	c.Validate(t, receivedSC, err)
 }

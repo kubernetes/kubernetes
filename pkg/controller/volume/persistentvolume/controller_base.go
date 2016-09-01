@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/meta"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	unversioned_core "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset/typed/core/unversioned"
@@ -111,10 +111,10 @@ func NewPersistentVolumeController(
 	if classSource == nil {
 		classSource = &cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kubeClient.Extensions().StorageClasses().List(options)
+				return kubeClient.Storage().StorageClasses().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kubeClient.Extensions().StorageClasses().Watch(options)
+				return kubeClient.Storage().StorageClasses().Watch(options)
 			},
 		}
 	}
@@ -147,7 +147,7 @@ func NewPersistentVolumeController(
 	controller.classes = cache.NewStore(framework.DeletionHandlingMetaNamespaceKeyFunc)
 	controller.classReflector = cache.NewReflector(
 		classSource,
-		&extensions.StorageClass{},
+		&storage.StorageClass{},
 		controller.classes,
 		syncPeriod,
 	)

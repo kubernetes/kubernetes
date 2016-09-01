@@ -20,8 +20,8 @@ import (
 	"fmt"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
-	"k8s.io/kubernetes/pkg/apis/extensions/validation"
+	"k8s.io/kubernetes/pkg/apis/storage"
+	"k8s.io/kubernetes/pkg/apis/storage/validation"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -45,11 +45,11 @@ func (storageClassStrategy) NamespaceScoped() bool {
 
 // ResetBeforeCreate clears the Status field which is not allowed to be set by end users on creation.
 func (storageClassStrategy) PrepareForCreate(ctx api.Context, obj runtime.Object) {
-	_ = obj.(*extensions.StorageClass)
+	_ = obj.(*storage.StorageClass)
 }
 
 func (storageClassStrategy) Validate(ctx api.Context, obj runtime.Object) field.ErrorList {
-	storageClass := obj.(*extensions.StorageClass)
+	storageClass := obj.(*storage.StorageClass)
 	return validation.ValidateStorageClass(storageClass)
 }
 
@@ -63,13 +63,13 @@ func (storageClassStrategy) AllowCreateOnUpdate() bool {
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
 func (storageClassStrategy) PrepareForUpdate(ctx api.Context, obj, old runtime.Object) {
-	_ = obj.(*extensions.StorageClass)
-	_ = old.(*extensions.StorageClass)
+	_ = obj.(*storage.StorageClass)
+	_ = old.(*storage.StorageClass)
 }
 
 func (storageClassStrategy) ValidateUpdate(ctx api.Context, obj, old runtime.Object) field.ErrorList {
-	errorList := validation.ValidateStorageClass(obj.(*extensions.StorageClass))
-	return append(errorList, validation.ValidateStorageClassUpdate(obj.(*extensions.StorageClass), old.(*extensions.StorageClass))...)
+	errorList := validation.ValidateStorageClass(obj.(*storage.StorageClass))
+	return append(errorList, validation.ValidateStorageClassUpdate(obj.(*storage.StorageClass), old.(*storage.StorageClass))...)
 }
 
 func (storageClassStrategy) AllowUnconditionalUpdate() bool {
@@ -82,7 +82,7 @@ func MatchStorageClasses(label labels.Selector, field fields.Selector) *generic.
 		Label: label,
 		Field: field,
 		GetAttrs: func(obj runtime.Object) (labels.Set, fields.Set, error) {
-			cls, ok := obj.(*extensions.StorageClass)
+			cls, ok := obj.(*storage.StorageClass)
 			if !ok {
 				return nil, nil, fmt.Errorf("given object is not of type StorageClass")
 			}
@@ -93,6 +93,6 @@ func MatchStorageClasses(label labels.Selector, field fields.Selector) *generic.
 }
 
 // StorageClassToSelectableFields returns a label set that represents the object
-func StorageClassToSelectableFields(storageClass *extensions.StorageClass) fields.Set {
+func StorageClassToSelectableFields(storageClass *storage.StorageClass) fields.Set {
 	return generic.ObjectMetaFieldsSet(&storageClass.ObjectMeta, false)
 }

@@ -25,7 +25,7 @@ import (
 	admission "k8s.io/kubernetes/pkg/admission"
 	api "k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/cache"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/runtime"
@@ -62,13 +62,13 @@ func newPlugin(kclient clientset.Interface) *claimDefaulterPlugin {
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return kclient.Extensions().StorageClasses().List(options)
+				return kclient.Storage().StorageClasses().List(options)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return kclient.Extensions().StorageClasses().Watch(options)
+				return kclient.Storage().StorageClasses().Watch(options)
 			},
 		},
-		&extensions.StorageClass{},
+		&storage.StorageClass{},
 		store,
 		0,
 	)
@@ -147,10 +147,10 @@ func (c *claimDefaulterPlugin) Admit(a admission.Attributes) error {
 }
 
 // getDefaultClass returns the default StorageClass from the store, or nil.
-func getDefaultClass(store cache.Store) (*extensions.StorageClass, error) {
-	defaultClasses := []*extensions.StorageClass{}
+func getDefaultClass(store cache.Store) (*storage.StorageClass, error) {
+	defaultClasses := []*storage.StorageClass{}
 	for _, c := range store.List() {
-		class, ok := c.(*extensions.StorageClass)
+		class, ok := c.(*storage.StorageClass)
 		if !ok {
 			return nil, errors.NewInternalError(fmt.Errorf("error converting stored object to StorageClass: %v", c))
 		}

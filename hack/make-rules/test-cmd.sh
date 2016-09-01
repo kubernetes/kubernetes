@@ -2388,7 +2388,7 @@ __EOF__
   kubectl create -f - "${kube_flags[@]}" << __EOF__
 {
   "kind": "StorageClass",
-  "apiVersion": "extensions/v1beta1",
+  "apiVersion": "storage.k8s.io/v1beta1",
   "metadata": {
     "name": "storage-class-name"
   },
