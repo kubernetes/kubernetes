@@ -301,14 +301,16 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Liveness", func() {
 		It("liveness pods should be automatically restarted", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "test/fixtures/doc-yaml/user-guide/liveness", file)
+				path := filepath.Join("test/fixtures/doc-yaml/user-guide/liveness", file)
+				ExpectNoError(framework.CreateFileForGoBinData(path, path))
+				return path
 			}
 			execYaml := mkpath("exec-liveness.yaml")
 			httpYaml := mkpath("http-liveness.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			framework.RunKubectlOrDie("create", "-f", execYaml, nsFlag)
-			framework.RunKubectlOrDie("create", "-f", httpYaml, nsFlag)
+			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, execYaml), nsFlag)
+			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, httpYaml), nsFlag)
 
 			// Since both containers start rapidly, we can easily run this test in parallel.
 			var wg sync.WaitGroup
@@ -351,16 +353,19 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Secret", func() {
 		It("should create a pod that reads a secret", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "test/fixtures/doc-yaml/user-guide/secrets", file)
+				path := filepath.Join("test/fixtures/doc-yaml/user-guide/secrets", file)
+				ExpectNoError(framework.CreateFileForGoBinData(path, path))
+				return path
 			}
 			secretYaml := mkpath("secret.yaml")
 			podYaml := mkpath("secret-pod.yaml")
+
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podName := "secret-test-pod"
 
 			By("creating secret and pod")
-			framework.RunKubectlOrDie("create", "-f", secretYaml, nsFlag)
-			framework.RunKubectlOrDie("create", "-f", podYaml, nsFlag)
+			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, secretYaml), nsFlag)
+			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, podYaml), nsFlag)
 			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns, "")
 			Expect(err).NotTo(HaveOccurred())
 
@@ -373,14 +378,16 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 	framework.KubeDescribe("Downward API", func() {
 		It("should create a pod that prints his name and namespace", func() {
 			mkpath := func(file string) string {
-				return filepath.Join(framework.TestContext.RepoRoot, "test/fixtures/doc-yaml/user-guide/downward-api", file)
+				path := filepath.Join("test/fixtures/doc-yaml/user-guide/downward-api", file)
+				ExpectNoError(framework.CreateFileForGoBinData(path, path))
+				return path
 			}
 			podYaml := mkpath("dapi-pod.yaml")
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			podName := "dapi-test-pod"
 
 			By("creating the pod")
-			framework.RunKubectlOrDie("create", "-f", podYaml, nsFlag)
+			framework.RunKubectlOrDie("create", "-f", filepath.Join(framework.TestContext.OutputDir, podYaml), nsFlag)
 			err := framework.WaitForPodNoLongerRunningInNamespace(c, podName, ns, "")
 			Expect(err).NotTo(HaveOccurred())
 
