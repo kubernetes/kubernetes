@@ -194,6 +194,12 @@ runTests() {
   # command, which is much faster.
   if [[ ! ${KUBE_COVER} =~ ^[yY]$ ]]; then
     kube::log::status "Running tests without code coverage"
+    # `go test` does not install the things it builds. `go test -i` installs
+    # the build artifacts but doesn't run the tests.  The two together provide
+    # a large speedup for tests that do not need to be rebuilt.
+    go test -i "${goflags[@]:+${goflags[@]}}" \
+      ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
+     "${testargs[@]:+${testargs[@]}}"
     go test "${goflags[@]:+${goflags[@]}}" \
       ${KUBE_RACE} ${KUBE_TIMEOUT} "${@+${@/#/${KUBE_GO_PACKAGE}/}}" \
      "${testargs[@]:+${testargs[@]}}" \
@@ -220,8 +226,19 @@ runTests() {
   # separate files.
   # cmd/libs/go2idl/generator is fragile when run under coverage, so ignore it for now.
   # see: https://github.com/kubernetes/kubernetes/issues/24967
+  #
+  # `go test` does not install the things it builds. `go test -i` installs
+  # the build artifacts but doesn't run the tests.  The two together provide
+  # a large speedup for tests that do not need to be rebuilt.
   printf "%s\n" "${@}" | grep -v "cmd/libs/go2idl/generator"| xargs -I{} -n1 -P${KUBE_COVERPROCS} \
     bash -c "set -o pipefail; _pkg=\"{}\"; _pkg_out=\${_pkg//\//_}; \
+        go test -i ${goflags[@]:+${goflags[@]}} \
+          ${KUBE_RACE} \
+          ${KUBE_TIMEOUT} \
+          -cover -covermode=\"${KUBE_COVERMODE}\" \
+          -coverprofile=\"${cover_report_dir}/\${_pkg}/${cover_profile}\" \
+          \"${KUBE_GO_PACKAGE}/\${_pkg}\" \
+          ${testargs[@]:+${testargs[@]}}
         go test ${goflags[@]:+${goflags[@]}} \
           ${KUBE_RACE} \
           ${KUBE_TIMEOUT} \
