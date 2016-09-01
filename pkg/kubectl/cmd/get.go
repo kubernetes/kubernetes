@@ -21,9 +21,7 @@ import (
 	"io"
 
 	"github.com/golang/glog"
-
 	"github.com/renstrom/dedent"
-
 	"github.com/spf13/cobra"
 
 	"k8s.io/kubernetes/pkg/api/meta"

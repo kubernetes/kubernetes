@@ -1252,9 +1252,8 @@ func (f *Factory) DefaultResourceFilterOptions(cmd *cobra.Command, withNamespace
 	return opts
 }
 
-// DefaultResourceFilterFunc receives PrintOPpts
-// and returns a default kubectl.FilterFunc
-func (f *Factory) DefaultResourceFilterFunc(opts *kubectl.PrintOptions) (kubectl.FilterFunc, *kubectl.FilterOptions) {
+// DefaultResourceFilterFunc receives PrintOPpts and returns a Filter method
+func (f *Factory) DefaultResourceFilterFunc(opts *kubectl.PrintOptions) (func(runtime.Object) (bool, error), kubectl.ResourceFilter) {
 	resourceFilter := kubectl.NewResourceFilter(opts)
 	return resourceFilter.Filter, resourceFilter
 }

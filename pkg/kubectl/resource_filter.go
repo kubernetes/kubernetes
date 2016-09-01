@@ -5,22 +5,34 @@ import (
 	"io"
 	"reflect"
 
-	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/runtime"
 )
 
-type FilterFunc func(runtime.Object) (bool, error)
+// FilterFunc is a function that knows how to filter a specific resource kind.
+// It receives a generic runtime.Object which must be type-checked by the function.
+// Returns a boolean value true if a resource is filtered, or false otherwise.
+type FilterFunc func(runtime.Object, PrintOptions) bool
 
-type FilterOptions struct {
-	filterMap    map[reflect.Type]reflect.Value
+// ResourceFilter filters api resources
+type ResourceFilter interface {
+	Filter(obj runtime.Object) (bool, error)
+	AddFilter(reflect.Type, FilterFunc) error
+	PrintFilterCount(io.Writer, string) error
+}
+
+// filterOptions is an implementation of ResourceFilter which contains
+// a map of FilterFuncs for given resource types, PrintOptions for a
+// resource, and a hiddenObjNum to keep track of the number of filtered resources
+type filterOptions struct {
+	filterMap    map[reflect.Type]FilterFunc
 	options      PrintOptions
 	hiddenObjNum int
 }
 
-func NewResourceFilter(opts *PrintOptions) *FilterOptions {
-	filterOpts := &FilterOptions{
-		filterMap: make(map[reflect.Type]reflect.Value),
+func NewResourceFilter(opts *PrintOptions) ResourceFilter {
+	filterOpts := &filterOptions{
+		filterMap: make(map[reflect.Type]FilterFunc),
 		options:   *opts,
 	}
 
@@ -28,61 +40,32 @@ func NewResourceFilter(opts *PrintOptions) *FilterOptions {
 	return filterOpts
 }
 
-func (f *FilterOptions) addDefaultHandlers() {
-	f.Handler(filterPods)
+func (f *filterOptions) addDefaultHandlers() {
+	f.AddFilter(reflect.TypeOf(&api.Pod{}), filterPods)
 }
 
-// Handler adds a filter handler to a FilterOptions instance.
-// See validateFilterFunc for required method signature.
-func (f *FilterOptions) Handler(handlerFn interface{}) error {
-	handlerFnValue := reflect.ValueOf(handlerFn)
-	if err := f.validateFilterFunc(handlerFnValue); err != nil {
-		glog.Errorf("Unable to add filter handler: %v", err)
-		return err
-	}
-	objType := handlerFnValue.Type().In(0)
-	f.filterMap[objType] = handlerFnValue
-
+func (f *filterOptions) AddFilter(objType reflect.Type, handlerFn FilterFunc) error {
+	f.filterMap[objType] = handlerFn
 	return nil
 }
 
-// validateFilterFunc validates the filter handler signature.
-// filterFunc is the function that will be called to filter an object.
-// It must be of the following type:
-//  func filterFunc(object ObjectType, options PrintOptions) error
-// where ObjectType is the type of the object that will be filtered.
-func (f *FilterOptions) validateFilterFunc(filterFunc reflect.Value) error {
-	if filterFunc.Kind() != reflect.Func {
-		return fmt.Errorf("invalid filter handler. %#v is not a function", filterFunc)
+// filterPods is a FilterFunc type implementation.
+// returns true if a pod should be skipped. Defaults to true for terminated pods
+func filterPods(obj runtime.Object, options PrintOptions) bool {
+	if pod, ok := obj.(*api.Pod); ok {
+		reason := string(pod.Status.Phase)
+		if pod.Status.Reason != "" {
+			reason = pod.Status.Reason
+		}
+		return !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed))
 	}
-	funcType := filterFunc.Type()
-	if funcType.NumIn() != 2 || funcType.NumOut() != 1 {
-		return fmt.Errorf("invalid filter handler."+
-			"Must accept 2 parameters and return 1 value,"+
-			"but instead accepts %v parameter(s) and returns %v value(s)",
-			funcType.NumIn(), funcType.NumOut())
-	}
-	if funcType.In(1) != reflect.TypeOf((*PrintOptions)(nil)).Elem() ||
-		funcType.Out(0) != reflect.TypeOf((*bool)(nil)).Elem() {
-		return fmt.Errorf("invalid filter handler. The expected signature is: "+
-			"func handler(obj %v, options PrintOptions) error", funcType.In(0))
-	}
-	return nil
-}
 
-// filterPods returns true if a pod should be skipped.
-// defaults to true for terminated pods
-func filterPods(pod *api.Pod, options PrintOptions) bool {
-	reason := string(pod.Status.Phase)
-	if pod.Status.Reason != "" {
-		reason = pod.Status.Reason
-	}
-	return !options.ShowAll && (reason == string(api.PodSucceeded) || reason == string(api.PodFailed))
+	return false
 }
 
 // PrintFilterCount prints an info message indicating the amount of resources
 // that were skipped as a result of being filtered, and resets this count
-func (f *FilterOptions) PrintFilterCount(output io.Writer, res string) error {
+func (f *filterOptions) PrintFilterCount(output io.Writer, res string) error {
 	hiddenObjNum := f.hiddenObjNum
 	f.hiddenObjNum = 0
 
@@ -94,11 +77,12 @@ func (f *FilterOptions) PrintFilterCount(output io.Writer, res string) error {
 }
 
 // Filter extracts the filter handler, if one exists, for the given resource
-func (f *FilterOptions) Filter(obj runtime.Object) (bool, error) {
+func (f *filterOptions) Filter(obj runtime.Object) (bool, error) {
 	t := reflect.TypeOf(obj)
 	if filter, ok := f.filterMap[t]; ok {
 		args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(f.options)}
-		resultValue := filter.Call(args)[0]
+		filterFunc := reflect.ValueOf(filter)
+		resultValue := filterFunc.Call(args)[0]
 		isFiltered := resultValue.Interface().(bool)
 		if isFiltered {
 			f.hiddenObjNum++
