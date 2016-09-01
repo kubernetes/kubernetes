@@ -36,7 +36,7 @@ Documentation for other releases can be found at
 
 ### Supported
 
-   * [Go](http://releases.k8s.io/HEAD/pkg/client/)
+   * [Go](https://github.com/kubernetes/client-go)
 
 ### User Contributed
 
