@@ -98,7 +98,7 @@ func NewCmdManualBootstrapInitMaster(out io.Writer, params *kubeadmapi.Bootstrap
 				if err != nil {
 					return fmt.Errorf("Unable to autodetect IP address [%s], please specify with --listen-ip", err)
 				}
-				params.Discovery.ListenIP = ip
+				params.Discovery.ListenIP = ip.String()
 			}
 			if err := kubemaster.CreateTokenAuthFile(params); err != nil {
 				return err
