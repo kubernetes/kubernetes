@@ -50,6 +50,7 @@ func newServerKeyAndCert(caCert *x509.Certificate, caKey *rsa.PrivateKey, altNam
 	if err != nil {
 		return nil, nil, err
 	}
+	// TODO these are all hardcoded for now, but we need to figure out what shall we do here exactly
 	altNames.IPs = append(altNames.IPs, net.ParseIP("10.3.0.1"))
 	altNames.DNSNames = append(altNames.DNSNames,
 		"kubernetes",

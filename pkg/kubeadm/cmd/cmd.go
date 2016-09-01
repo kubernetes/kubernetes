@@ -62,22 +62,7 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer, envParams map[string]st
 
 		`),
 	}
-	// TODO find a way to set master node `Unschedulable`, i.e.
-	// echo "
-	// apiVersion: v1
-	// kind: Node
-	// metadata:
-	//   name: ${HOSTNAME}
-	// spec:
-	//   unschedulable: true
-	// " | kybectl apply -f -
-	// basic test confirms that it's suffiecent to do this once, as kubelets do not
-	// re-register (unless there any enge-cases);
-	// can we put this in `/etc/manifests` or what would be the best time for us to
-	// call this from kubeadm? may be we can do this from the helper pod, which we
-	// we might need to have if we have to do CSR approvals or other things? or may
-	// be we can have this pod simply run until it succeeds, as we might have to
-	// have such pods for the intial addon management and other MVP features?
+	// TODO figure out how to avoid running as root
 	//
 	// TODO also print the alpha warning when running any commands, as well as
 	// in the help text.

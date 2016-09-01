@@ -72,7 +72,8 @@ func RetrieveTrustedClusterInfo(params *kubeadmapi.BootstrapParams) (*clientcmda
 		return nil, fmt.Errorf("Cluster discovery object (ClusterInfo) is invalid")
 	}
 
-	// TODO figure out what we should do when there is a chain of certificates and more then one API endpoint
+	// TODO we need to configure the client to validate the server
+	// if it is signed by any of the returned certificates
 	apiServer := clusterInfo.Endpoints[0]
 	caCert := []byte(clusterInfo.CertificateAuthorities[0])
 
