@@ -125,12 +125,12 @@ func (server *KubeDNSServer) setupHealthzHandlers() {
 }
 
 // setupSignalHandlers runs a goroutine that waits on SIGINT or SIGTERM and logs it
-// before exiting.
+// program will be terminated by SIGKILL when grace period ends.
 func setupSignalHandlers() {
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		glog.Fatalf("Received signal: %s", <-sigChan)
+		glog.Infof("Received signal: %s, will exit when the grace period ends", <-sigChan)
 	}()
 }
 
