@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/record"
 	"k8s.io/kubernetes/pkg/client/restclient"
@@ -209,6 +210,10 @@ func NewMasterConfig() *master.Config {
 		unversioned.GroupResource{Group: certificates.GroupName, Resource: genericapiserver.AllResources},
 		"",
 		NewSingleContentTypeSerializer(api.Scheme, testapi.Certificates.Codec(), runtime.ContentTypeJSON))
+	storageFactory.SetSerializer(
+		unversioned.GroupResource{Group: storage.GroupName, Resource: genericapiserver.AllResources},
+		"",
+		NewSingleContentTypeSerializer(api.Scheme, testapi.Storage.Codec(), runtime.ContentTypeJSON))
 
 	return &master.Config{
 		Config: &genericapiserver.Config{

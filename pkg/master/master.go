@@ -49,6 +49,8 @@ import (
 	policyapiv1alpha1 "k8s.io/kubernetes/pkg/apis/policy/v1alpha1"
 	"k8s.io/kubernetes/pkg/apis/rbac"
 	rbacapi "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1"
+	"k8s.io/kubernetes/pkg/apis/storage"
+	storageapiv1beta1 "k8s.io/kubernetes/pkg/apis/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/apiserver"
 	apiservermetrics "k8s.io/kubernetes/pkg/apiserver/metrics"
 	"k8s.io/kubernetes/pkg/genericapiserver"
@@ -205,6 +207,7 @@ func New(c *Config) (*Master, error) {
 	}
 	c.RESTStorageProviders[policy.GroupName] = PolicyRESTStorageProvider{}
 	c.RESTStorageProviders[rbac.GroupName] = RBACRESTStorageProvider{AuthorizerRBACSuperUser: c.AuthorizerRBACSuperUser}
+	c.RESTStorageProviders[storage.GroupName] = StorageRESTStorageProvider{}
 	c.RESTStorageProviders[authenticationv1beta1.GroupName] = AuthenticationRESTStorageProvider{Authenticator: c.Authenticator}
 	c.RESTStorageProviders[authorization.GroupName] = AuthorizationRESTStorageProvider{Authorizer: c.Authorizer}
 	m.InstallAPIs(c)
@@ -840,6 +843,7 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		appsapi.SchemeGroupVersion,
 		policyapiv1alpha1.SchemeGroupVersion,
 		rbacapi.SchemeGroupVersion,
+		storageapiv1beta1.SchemeGroupVersion,
 		certificatesapiv1alpha1.SchemeGroupVersion,
 		authorizationapiv1beta1.SchemeGroupVersion,
 	)
@@ -854,7 +858,6 @@ func DefaultAPIResourceConfigSource() *genericapiserver.ResourceConfig {
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("networkpolicies"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("replicasets"),
 		extensionsapiv1beta1.SchemeGroupVersion.WithResource("thirdpartyresources"),
-		extensionsapiv1beta1.SchemeGroupVersion.WithResource("storageclasses"),
 	)
 
 	return ret
