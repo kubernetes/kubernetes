@@ -216,6 +216,16 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 		Level: "bar",
 	}
 
+	failHostDirPod := defaultPod()
+	failHostDirPod.Spec.Volumes = []api.Volume{
+		{
+			Name: "bad volume",
+			VolumeSource: api.VolumeSource{
+				HostPath: &api.HostPathVolumeSource{},
+			},
+		},
+	}
+
 	errorCases := map[string]struct {
 		pod           *api.Pod
 		psp           *extensions.PodSecurityPolicy
@@ -265,6 +275,11 @@ func TestValidatePodSecurityContextFailures(t *testing.T) {
 			pod:           failInvalidSELinuxPod,
 			psp:           failSELinuxPSP,
 			expectedError: "does not match required level.  Found bar, wanted foo",
+		},
+		"failHostDirPSP": {
+			pod:           failHostDirPod,
+			psp:           defaultPSP(),
+			expectedError: "hostPath volumes are not allowed to be used",
 		},
 	}
 	for k, v := range errorCases {
@@ -325,16 +340,6 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 		Add: []api.Capability{"foo"},
 	}
 
-	failHostDirPod := defaultPod()
-	failHostDirPod.Spec.Volumes = []api.Volume{
-		{
-			Name: "bad volume",
-			VolumeSource: api.VolumeSource{
-				HostPath: &api.HostPathVolumeSource{},
-			},
-		},
-	}
-
 	failHostPortPod := defaultPod()
 	failHostPortPod.Spec.Containers[0].Ports = []api.ContainerPort{{HostPort: 1}}
 
@@ -379,11 +384,6 @@ func TestValidateContainerSecurityContextFailures(t *testing.T) {
 			pod:           failCapsPod,
 			psp:           defaultPSP(),
 			expectedError: "capability may not be added",
-		},
-		"failHostDirPSP": {
-			pod:           failHostDirPod,
-			psp:           defaultPSP(),
-			expectedError: "hostPath volumes are not allowed to be used",
 		},
 		"failHostPortPSP": {
 			pod:           failHostPortPod,
@@ -832,7 +832,7 @@ func TestValidateAllowedVolumes(t *testing.T) {
 		}
 
 		// expect a denial for this PSP and test the error message to ensure it's related to the volumesource
-		errs := provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+		errs := provider.ValidatePodSecurityContext(pod, field.NewPath(""))
 		if len(errs) != 1 {
 			t.Errorf("expected exactly 1 error for %s but got %v", fieldVal.Name, errs)
 		} else {
@@ -843,14 +843,14 @@ func TestValidateAllowedVolumes(t *testing.T) {
 
 		// now add the fstype directly to the psp and it should validate
 		psp.Spec.Volumes = []extensions.FSType{fsType}
-		errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+		errs = provider.ValidatePodSecurityContext(pod, field.NewPath(""))
 		if len(errs) != 0 {
 			t.Errorf("directly allowing volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}
 
 		// now change the psp to allow any volumes and the pod should still validate
 		psp.Spec.Volumes = []extensions.FSType{extensions.All}
-		errs = provider.ValidateContainerSecurityContext(pod, &pod.Spec.Containers[0], field.NewPath(""))
+		errs = provider.ValidatePodSecurityContext(pod, field.NewPath(""))
 		if len(errs) != 0 {
 			t.Errorf("wildcard volume expected no errors for %s but got %v", fieldVal.Name, errs)
 		}

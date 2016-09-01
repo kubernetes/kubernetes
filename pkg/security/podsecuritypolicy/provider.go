@@ -212,6 +212,25 @@ func (s *simpleProvider) ValidatePodSecurityContext(pod *api.Pod, fldPath *field
 
 	allErrs = append(allErrs, s.strategies.SysctlsStrategy.Validate(pod)...)
 
+	// TODO(timstclair): ValidatePodSecurityContext should be renamed to ValidatePod since its scope
+	// is not limited to the PodSecurityContext.
+	if len(pod.Spec.Volumes) > 0 && !psputil.PSPAllowsAllVolumes(s.psp) {
+		allowedVolumes := psputil.FSTypeToStringSet(s.psp.Spec.Volumes)
+		for i, v := range pod.Spec.Volumes {
+			fsType, err := psputil.GetVolumeFSType(v)
+			if err != nil {
+				allErrs = append(allErrs, field.Invalid(field.NewPath("spec", "volumes").Index(i), string(fsType), err.Error()))
+				continue
+			}
+
+			if !allowedVolumes.Has(string(fsType)) {
+				allErrs = append(allErrs, field.Invalid(
+					field.NewPath("spec", "volumes").Index(i), string(fsType),
+					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
+			}
+		}
+	}
+
 	return allErrs
 }
 
@@ -234,23 +253,6 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 	}
 
 	allErrs = append(allErrs, s.strategies.CapabilitiesStrategy.Validate(pod, container)...)
-
-	if len(pod.Spec.Volumes) > 0 && !psputil.PSPAllowsAllVolumes(s.psp) {
-		allowedVolumes := psputil.FSTypeToStringSet(s.psp.Spec.Volumes)
-		for i, v := range pod.Spec.Volumes {
-			fsType, err := psputil.GetVolumeFSType(v)
-			if err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("volumes").Index(i), string(fsType), err.Error()))
-				continue
-			}
-
-			if !allowedVolumes.Has(string(fsType)) {
-				allErrs = append(allErrs, field.Invalid(
-					fldPath.Child("volumes").Index(i), string(fsType),
-					fmt.Sprintf("%s volumes are not allowed to be used", string(fsType))))
-			}
-		}
-	}
 
 	if !s.psp.Spec.HostNetwork && pod.Spec.SecurityContext.HostNetwork {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("hostNetwork"), pod.Spec.SecurityContext.HostNetwork, "Host network is not allowed to be used"))
