@@ -1,1 +1,1 @@
-dind-up-cluster.sh
+dind/dind-up-cluster.sh

@@ -24,17 +24,16 @@ IMAGE_REPO=${IMAGE_REPO:-k8s.io/kubernetes-dind}
 IMAGE_TAG=${IMAGE_TAG:-latest}
 
 script_dir=$(cd $(dirname "${BASH_SOURCE}") && pwd -P)
-KUBE_ROOT=$(cd ${script_dir}/../../.. && pwd -P)
 
 # Find a platform specific binary, whether it was cross compiled or locally built (on Linux)
 find-binary() {
   local lookfor="${1}"
   local platform="${2}"
   local locations=(
-    "${KUBE_ROOT}/_output/dockerized/bin/${platform}/${lookfor}"
+    "_output/dockerized/bin/${platform}/${lookfor}"
   )
   if [ "$(uname)" = Linux ]; then
-    locations[${#locations[*]}]="${KUBE_ROOT}/_output/local/bin/${platform}/${lookfor}"
+    locations[${#locations[*]}]="_output/local/bin/${platform}/${lookfor}"
   fi
   local bin=$( (ls -t "${locations[@]}" 2>/dev/null || true) | head -1 )
   echo -n "${bin}"
@@ -59,8 +58,6 @@ mkdir -p "${overlay_dir}"
 ! which selinuxenabled &>/dev/null || ! selinuxenabled 2>&1 || sudo chcon -Rt svirt_sandbox_file_t -l s0 "${overlay_dir}"
 docker run --rm -v "${overlay_dir}:/target" jpetazzo/nsenter
 docker run --rm -v "${overlay_dir}:/target" ${SOCAT_IMG}
-
-cd "${KUBE_ROOT}"
 
 # create temp workspace to place compiled binaries with image-specific scripts
 # create temp workspace dir in KUBE_ROOT to avoid permission issues of TMPDIR on mac os x
