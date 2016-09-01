@@ -52,7 +52,7 @@ fi
 
 export IFS=$'\n'
 all_packages=(
-	$(go list -e ./... | egrep -v "/(third_party|vendor|staging|generated|clientset_generated)" | sed 's/k8s.io\/kubernetes\///g')
+	$(go list -e ./... | egrep -v "/(third_party|vendor|staging|generated|clientset_generated)" | sed -r "s/^_${KUBE_ROOT//\//\\/}\///g")
 )
 linted_packages=(
 	$(cat $linted_file)
