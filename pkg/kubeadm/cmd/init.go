@@ -27,6 +27,7 @@ import (
 	kubemaster "k8s.io/kubernetes/pkg/kubeadm/master"
 	kubeadmutil "k8s.io/kubernetes/pkg/kubeadm/util"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	netutil "k8s.io/kubernetes/pkg/util/net"
 )
 
 var (
@@ -59,11 +60,11 @@ func NewCmdInit(out io.Writer, params *kubeadmapi.BootstrapParams) *cobra.Comman
 
 func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmapi.BootstrapParams) error {
 	if params.Discovery.ListenIP == "" {
-		ip, err := kubeadmutil.GetDefaultHostIP()
+		ip, err := netutil.ChooseHostInterface()
 		if err != nil {
 			return err
 		}
-		params.Discovery.ListenIP = ip
+		params.Discovery.ListenIP = ip.String()
 	}
 	if err := kubemaster.CreateTokenAuthFile(params); err != nil {
 		return err
