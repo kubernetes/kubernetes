@@ -27,10 +27,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api/errors"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/kubectl"
 	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 	"k8s.io/kubernetes/pkg/kubectl/resource"
 	"k8s.io/kubernetes/pkg/runtime"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 // ReplaceOptions is the start of the data required to perform the operation.  As new fields are added, add them here instead of
@@ -213,16 +216,37 @@ func forceReplace(f *cmdutil.Factory, out io.Writer, cmd *cobra.Command, args []
 	}
 	//Replace will create a resource if it doesn't exist already, so ignore not found error
 	ignoreNotFound := true
+	timeout := cmdutil.GetFlagDuration(cmd, "timeout")
 	// By default use a reaper to delete all related resources.
 	if cmdutil.GetFlagBool(cmd, "cascade") {
 		glog.Warningf("\"cascade\" is set, kubectl will delete and re-create all resources managed by this resource (e.g. Pods created by a ReplicationController). Consider using \"kubectl rolling-update\" if you want to update a ReplicationController together with its Pods.")
-		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, cmdutil.GetFlagDuration(cmd, "timeout"), cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper, false)
+		err = ReapResult(r, f, out, cmdutil.GetFlagBool(cmd, "cascade"), ignoreNotFound, timeout, cmdutil.GetFlagInt(cmd, "grace-period"), shortOutput, mapper, false)
 	} else {
 		err = DeleteResult(r, out, ignoreNotFound, shortOutput, mapper)
 	}
 	if err != nil {
 		return err
 	}
+
+	if timeout == 0 {
+		timeout = kubectl.Timeout
+	}
+	r.Visit(func(info *resource.Info, err error) error {
+		if err != nil {
+			return err
+		}
+
+		err = wait.PollImmediate(kubectl.Interval, timeout, func() (bool, error) {
+			if err := info.Get(); !errors.IsNotFound(err) {
+				return false, err
+			}
+			return true, nil
+		})
+		if err == wait.ErrWaitTimeout {
+			err = errors.NewNotFound(unversioned.GroupResource{}, info.Name)
+		}
+		return err
+	})
 
 	r = resource.NewBuilder(mapper, typer, resource.ClientMapperFunc(f.UnstructuredClientForMapping), runtime.UnstructuredJSONScheme).
 		Schema(schema).
