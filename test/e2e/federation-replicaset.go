@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -43,10 +42,10 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 
 			// Delete registered replicasets.
 			nsName := f.FederationNamespace.Name
-			replicasetList, err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).List(api.ListOptions{})
+			replicasetList, err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).List(v1beta1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, replicaset := range replicasetList.Items {
-				err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -58,7 +57,7 @@ var _ = framework.KubeDescribe("Federation replicasets [Feature:Federation]", fu
 			replicaset := createReplicaSetOrFail(f.FederationClientset_1_4, nsName)
 			By(fmt.Sprintf("Creation of replicaset %q in namespace %q succeeded.  Deleting replicaset.", replicaset.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_4.Extensions().ReplicaSets(nsName).Delete(replicaset.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting replicaset %q in namespace %q", replicaset.Name, replicaset.Namespace)
 			By(fmt.Sprintf("Deletion of replicaset %q in namespace %q succeeded.", replicaset.Name, nsName))
 		})

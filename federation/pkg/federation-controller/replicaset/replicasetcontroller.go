@@ -122,10 +122,14 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		return framework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := fedutil.VersionizeExtensionsV1Beta1ListOptions(options)
+					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := fedutil.VersionizeExtensionsV1Beta1ListOptions(options)
+					return clientset.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&extensionsv1.ReplicaSet{},
@@ -149,10 +153,14 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		return framework.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).List(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := fedutil.VersionizeV1ListOptions(options)
+					return clientset.Core().Pods(apiv1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := fedutil.VersionizeV1ListOptions(options)
+					return clientset.Core().Pods(apiv1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&apiv1.Pod{},
@@ -169,10 +177,14 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 	frsc.replicaSetStore.Store, frsc.replicaSetController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(options)
+				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+				versionedOptions := fedutil.VersionizeExtensionsV1Beta1ListOptions(options)
+				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(options)
+				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+				versionedOptions := fedutil.VersionizeExtensionsV1Beta1ListOptions(options)
+				return frsc.fedClient.Extensions().ReplicaSets(apiv1.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&extensionsv1.ReplicaSet{},
@@ -195,7 +207,7 @@ func NewReplicaSetController(federationClient fedclientset.Interface) *ReplicaSe
 		},
 		func(client kubeclientset.Interface, obj runtime.Object) error {
 			rs := obj.(*extensionsv1.ReplicaSet)
-			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &api.DeleteOptions{})
+			err := client.Extensions().ReplicaSets(rs.Namespace).Delete(rs.Name, &apiv1.DeleteOptions{})
 			return err
 		})
 

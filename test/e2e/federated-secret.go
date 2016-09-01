@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -43,10 +42,10 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 			nsName := f.FederationNamespace.Name
 			// Delete registered secrets.
 			// This is if a test failed, it should not affect other tests.
-			secretList, err := f.FederationClientset_1_4.Core().Secrets(nsName).List(api.ListOptions{})
+			secretList, err := f.FederationClientset_1_4.Core().Secrets(nsName).List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, secret := range secretList.Items {
-				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -58,7 +57,7 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation]", func()
 			secret := createSecretOrFail(f.FederationClientset_1_4, nsName)
 			By(fmt.Sprintf("Creation of secret %q in namespace %q succeeded.  Deleting secret.", secret.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secret.Name, secret.Namespace)
 			By(fmt.Sprintf("Deletion of secret %q in namespace %q succeeded.", secret.Name, nsName))
 		})

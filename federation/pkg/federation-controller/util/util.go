@@ -19,7 +19,9 @@ package util
 import (
 	"reflect"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
 )
 
 /*
@@ -40,4 +42,40 @@ func ObjectMetaIsEquivalent(m1, m2 v1.ObjectMeta) bool {
 	m2.Finalizers = nil
 
 	return reflect.DeepEqual(m1, m2)
+}
+
+// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+func VersionizeV1ListOptions(in api.ListOptions) (out v1.ListOptions) {
+	if in.LabelSelector != nil {
+		out.LabelSelector = in.LabelSelector.String()
+	} else {
+		out.LabelSelector = ""
+	}
+	if in.FieldSelector != nil {
+		out.FieldSelector = in.FieldSelector.String()
+	} else {
+		out.FieldSelector = ""
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	out.TimeoutSeconds = in.TimeoutSeconds
+	return out
+}
+
+// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+func VersionizeExtensionsV1Beta1ListOptions(in api.ListOptions) (out v1beta1.ListOptions) {
+	if in.LabelSelector != nil {
+		out.LabelSelector = in.LabelSelector.String()
+	} else {
+		out.LabelSelector = ""
+	}
+	if in.FieldSelector != nil {
+		out.FieldSelector = in.FieldSelector.String()
+	} else {
+		out.FieldSelector = ""
+	}
+	out.Watch = in.Watch
+	out.ResourceVersion = in.ResourceVersion
+	out.TimeoutSeconds = in.TimeoutSeconds
+	return out
 }

@@ -101,10 +101,14 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 	secretcontroller.secretInformerStore, secretcontroller.secretInformerController = framework.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return client.Core().Secrets(api_v1.NamespaceAll).List(options)
+				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Core().Secrets(api_v1.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Core().Secrets(api_v1.NamespaceAll).Watch(options)
+				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Core().Secrets(api_v1.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&api_v1.Secret{},
@@ -118,10 +122,14 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 			return framework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Core().Secrets(api_v1.NamespaceAll).List(options)
+						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().Secrets(api_v1.NamespaceAll).List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Core().Secrets(api_v1.NamespaceAll).Watch(options)
+						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().Secrets(api_v1.NamespaceAll).Watch(versionedOptions)
 					},
 				},
 				&api_v1.Secret{},
@@ -157,7 +165,7 @@ func NewSecretController(client federation_release_1_4.Interface) *SecretControl
 		},
 		func(client kube_release_1_4.Interface, obj pkg_runtime.Object) error {
 			secret := obj.(*api_v1.Secret)
-			err := client.Core().Secrets(secret.Namespace).Delete(secret.Name, &api.DeleteOptions{})
+			err := client.Core().Secrets(secret.Namespace).Delete(secret.Name, &api_v1.DeleteOptions{})
 			return err
 		})
 	return secretcontroller
