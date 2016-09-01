@@ -21,6 +21,7 @@ REGISTRY?=gcr.io/google_containers
 ARCH?=amd64
 TEMP_DIR:=$(shell mktemp -d)
 CNI_RELEASE=9d5e6e60e79491207834ae8439e80c943db65a69
+HEAPSTER_RELEASE=1.2.0-beta.2
 
 UNAME_S:=$(shell uname -s)
 ifeq ($(UNAME_S),Darwin)
@@ -100,6 +101,17 @@ else
 endif
 	# Download CNI
 	curl -sSL --retry 5 https://storage.googleapis.com/kubernetes-release/network-plugins/cni-${ARCH}-${CNI_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}/cni-bin
+
+	# Download heapster
+	curl -sSL --retry 5 https://github.com/kubernetes/heapster/archive/v${HEAPSTER_RELEASE}.tar.gz | tar -xz -C ${TEMP_DIR}
+
+	# Build heapster
+	go get github.com/tools/godep
+	mkdir -p ${GOPATH}/src/k8s.io/heapster/
+	rm -rf ${GOPATH}/src/k8s.io/heapster/*
+	cp -R ${TEMP_DIR}/heapster-${HEAPSTER_RELEASE}/* ${GOPATH}/src/k8s.io/heapster/
+	cd ${GOPATH}/src/k8s.io/heapster && godep go build -o heapster -a k8s.io/heapster/metrics
+	cp ${GOPATH}/src/k8s.io/heapster/heapster ${TEMP_DIR}/heapster
 
 	docker build -t ${REGISTRY}/hyperkube-${ARCH}:${VERSION} ${TEMP_DIR}
 	rm -rf "${TEMP_DIR}"
