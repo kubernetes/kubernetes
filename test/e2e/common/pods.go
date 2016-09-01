@@ -416,6 +416,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 
 		// Make a client pod that verifies that it has the service environment variables.
 		podName := "client-envvars-" + string(uuid.NewUUID())
+		const containerName = "env3cont"
 		pod := &api.Pod{
 			ObjectMeta: api.ObjectMeta{
 				Name:   podName,
@@ -424,7 +425,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			Spec: api.PodSpec{
 				Containers: []api.Container{
 					{
-						Name:    "env3cont",
+						Name:    containerName,
 						Image:   "gcr.io/google_containers/busybox:1.24",
 						Command: []string{"sh", "-c", "env"},
 					},
@@ -433,7 +434,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 			},
 		}
 
-		f.TestContainerOutput("service env", pod, 0, []string{
+		// It's possible for the Pod to be created before the Kubelet is updated with the new
+		// service. In that case, we just retry.
+		const maxRetries = 3
+		expectedVars := []string{
 			"FOOSERVICE_SERVICE_HOST=",
 			"FOOSERVICE_SERVICE_PORT=",
 			"FOOSERVICE_PORT=",
@@ -441,7 +445,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 			"FOOSERVICE_PORT_8765_TCP_PROTO=",
 			"FOOSERVICE_PORT_8765_TCP=",
 			"FOOSERVICE_PORT_8765_TCP_ADDR=",
-		})
+		}
+		framework.ExpectNoErrorWithRetries(func() error {
+			return f.MatchContainerOutput(pod, containerName, expectedVars, ContainSubstring)
+		}, maxRetries, "Container should have service environment variables set")
 	})
 
 	It("should support remote command execution over websockets", func() {
