@@ -45,8 +45,13 @@ readonly KUBE_BUILD_IMAGE_REPO=kube-build
 readonly KUBE_BUILD_IMAGE_CROSS_TAG="$(cat ${KUBE_ROOT}/build/build-image/cross/VERSION)"
 # KUBE_DATA_CONTAINER_NAME=kube-build-data-<hash>"
 
-# Increment this version to cause everyone to rebuild images, including the data
-# container.
+# This version number is used to cause everyone to rebuild their data containers
+# and build image.  This is especially useful for automated build systems like
+# Jenkins.
+#
+# Increment/change this number if you change the build image (anything
+# under build/build-image, golang version) or change the set of volumes in the
+# data container.
 readonly KUBE_IMAGE_VERSION=5
 
 # Here we map the output directories across both the local and remote _output
@@ -242,25 +247,23 @@ function kube::build::ensure_docker_in_path() {
 
 function kube::build::ensure_docker_daemon_connectivity {
   if ! "${DOCKER[@]}" info > /dev/null 2>&1 ; then
-    {
-      echo "Can't connect to 'docker' daemon.  please fix and retry."
-      echo
-      echo "Possible causes:"
-      echo "  - On Mac OS X, DOCKER_HOST hasn't been set. You may need to: "
-      echo "    - Set up Docker for Mac (https://docs.docker.com/docker-for-mac/)"
-      echo "    - Or, set up docker-machine"
-      echo "      - Create and start your VM using docker-machine: "
-      echo "        - docker-machine create -d ${DOCKER_MACHINE_DRIVER} ${DOCKER_MACHINE_NAME}"
-      echo "      - Set your environment variables using: "
-      echo "        - eval \$(docker-machine env ${DOCKER_MACHINE_NAME})"
-      echo "      - Update your Docker VM"
-      echo "        - Error Message: 'Error response from daemon: client is newer than server (...)' "
-      echo "        - docker-machine upgrade ${DOCKER_MACHINE_NAME}"
-      echo "  - On Linux, user isn't in 'docker' group.  Add and relogin."
-      echo "    - Something like 'sudo usermod -a -G docker ${USER-user}'"
-      echo "    - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8"
-      echo "  - On Linux, Docker daemon hasn't been started or has crashed."
-    } >&2
+    cat <<'EOF' >&2
+Can't connect to 'docker' daemon.  please fix and retry.
+
+Possible causes:
+  - Docker Daemon not started
+    - Linux: confirm via your init system
+    - macOS w/ docker-machine: run `docker-machine ls` and `docker-machine start <name>`
+    - macOS w/ Docker for Mac: Check the menu bar and start the Docker application
+  - DOCKER_HOST hasn't been set of is set incorrectly
+    - Linux: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
+    - macOS w/ docker-machine: run `eval "$(docker-machine env <name>)"`
+    - macOS w/ Docker for Mac: domain socket is used, DOCKER_* should be unset. In Bash run `unset ${!DOCKER_*}`
+  - Other things to check:
+    - Linux: User isn't in 'docker' group.  Add and relogin.
+      - Something like 'sudo usermod -a -G docker ${USER}'
+      - RHEL7 bug and workaround: https://bugzilla.redhat.com/show_bug.cgi?id=1119282#c8
+EOF
     return 1
   fi
 }

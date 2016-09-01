@@ -14,9 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# This file will set up and run rsyncd in order to sync kubernetes sources back
-# and forth.  It is assumed that rsyncd will be run under the UID and GID that
-# will end up owning all of the files that are written.
+# This script will set up and run rsyncd to allow data to move into and out of
+# our dockerized build system.  This is used for syncing sources and changes of
+# sources into the docker-build-container.  It is also used to transfer built binaries
+# and generated files back out.
+#
+# When run as root (rare) it'll preserve the file ids as sent from the client.
+# Usually it'll be run as non-dockerized UID/GID and end up translating all file
+# ownership to that.
+
 
 set -o errexit
 set -o nounset
