@@ -543,7 +543,7 @@ kube::golang::build_binaries_for_platform() {
         "${testpkg}"
 
     mkdir -p "$(dirname ${outfile})"
-    go test -c \
+    go test -i -c \
       "${goflags[@]:+${goflags[@]}}" \
       -gcflags "${gogcflags}" \
       -ldflags "${goldflags}" \
