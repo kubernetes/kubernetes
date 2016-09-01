@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"math/rand"
 	"net"
@@ -5074,4 +5075,21 @@ func GetMasterAndWorkerNodesOrDie(c *client.Client) (sets.String, *api.NodeList)
 		}
 	}
 	return masters, nodes
+}
+
+func CreateFileForGoBinData(gobindataPath, outputFilename string) error {
+	data := ReadOrDie(gobindataPath)
+	if len(data) == 0 {
+		return fmt.Errorf("Failed to read gobindata from %v", gobindataPath)
+	}
+	fullPath := filepath.Join(TestContext.OutputDir, outputFilename)
+	err := os.MkdirAll(filepath.Dir(fullPath), 0777)
+	if err != nil {
+		return fmt.Errorf("Error while creating directory %v: %v", filepath.Dir(fullPath), err)
+	}
+	err = ioutil.WriteFile(fullPath, data, 0644)
+	if err != nil {
+		return fmt.Errorf("Error while trying to write to file %v: %v", fullPath, err)
+	}
+	return nil
 }
