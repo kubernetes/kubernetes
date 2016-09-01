@@ -1099,6 +1099,89 @@ var _ = framework.KubeDescribe("Services", func() {
 			expectedSuccess := nodes.Items[n].Name == readyHostName
 			jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, "/healthz", expectedSuccess)
 		}
+
+		By("changing ESIPP annotation off and checking behaviour")
+		// Toggle ESIPP annotation off and check client ip and healthchecks
+		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
+			svc.ObjectMeta.Annotations[service.AnnotationExternalTraffic] =
+				service.AnnotationValueExternalTrafficGlobal
+		})
+		success := false
+		for start := time.Now(); time.Since(start) < kubeProxyLagTimeout; time.Sleep(15 * time.Second) {
+			By("reading clientIP using the TCP service's NodePort")
+			content := jig.GetHTTPContent(nodeIP, tcpNodePort, kubeProxyLagTimeout, "/clientip")
+			clientIP := content.String()
+			framework.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
+			By("reading clientIP using the TCP service's service port via its external VIP")
+			content = jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
+			clientIP = content.String()
+			framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
+			By("checking if Source IP is not preserved")
+			if strings.HasPrefix(clientIP, "10.") {
+				framework.Logf("Source IP was (correctly) not preserved when ESIPP annotation was off")
+				success = true
+				break
+			}
+		}
+		if !success {
+			framework.Logf("Source IP was preserved even when the ESIPP annotation was off")
+		}
+		By("checking health check node port annotation is cleared when ESIPP is toggled off")
+		if service.GetServiceHealthCheckNodePort(svc) > 0 {
+			framework.Failf("Service HealthCheck NodePort annotation still present")
+		}
+		By("checking kube-proxy health checks fail on all nodes when ESIPP annotation is off")
+		for n, publicIP := range ips {
+			framework.Logf("Checking health check response for node %s, public IP %s", nodes.Items[n].Name, publicIP)
+			// All nodes should fail the healthcheck on the service healthCheckNodePort
+			jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, "/healthz", false)
+		}
+
+		By("changing ESIPP annotation back on and checking behaviour")
+		// Toggle ESIPP annotation back on and check client ip and healthchecks
+		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *api.Service) {
+			svc.ObjectMeta.Annotations[service.AnnotationExternalTraffic] =
+				service.AnnotationValueExternalTrafficLocal
+			// Request the same healthCheckNodePort as before, to test the user-requested allocation path
+			svc.ObjectMeta.Annotations[service.AnnotationHealthCheckNodePort] =
+				fmt.Sprintf("%d", healthCheckNodePort)
+		})
+		success = false
+		for start := time.Now(); time.Since(start) < kubeProxyLagTimeout; time.Sleep(15 * time.Second) {
+			By("reading clientIP using the TCP service's NodePort")
+			content := jig.GetHTTPContent(nodeIP, tcpNodePort, kubeProxyLagTimeout, "/clientip")
+			clientIP := content.String()
+			framework.Logf("ClientIP detected by target pod using NodePort is %s", clientIP)
+			By("reading clientIP using the TCP service's service port via its external VIP")
+			content = jig.GetHTTPContent(ingressIP, svcTcpPort, kubeProxyLagTimeout, "/clientip")
+			clientIP = content.String()
+			framework.Logf("ClientIP detected by target pod using VIP:SvcPort is %s", clientIP)
+			By("checking if Source IP is correctly preserved")
+			if !strings.HasPrefix(clientIP, "10.") {
+				framework.Logf("Source IP was correctly preserved when ESIPP annotation was on")
+				success = true
+				break
+			}
+		}
+		if !success {
+			framework.Logf("Source IP was not preserved when the ESIPP annotation was on")
+		}
+		By("checking kube-proxy health checks fail on all nodes when ESIPP annotation is off")
+		for n, publicIP := range ips {
+			framework.Logf("Checking health check response for node %s, public IP %s", nodes.Items[n].Name, publicIP)
+			// HealthCheck should pass only on the node where num(endpoints) > 0
+			// All other nodes should fail the healthcheck on the service healthCheckNodePort
+			expectedSuccess := nodes.Items[n].Name == readyHostName
+			jig.TestHTTPHealthCheckNodePort(publicIP, healthCheckNodePort, "/healthz", expectedSuccess)
+		}
+		By("checking health check node port annotation is added when ESIPP is toggled on again")
+		if service.GetServiceHealthCheckNodePort(svc) == 0 {
+			framework.Failf("Service HealthCheck NodePort annotation not present")
+		}
+		By("by deleting original service " + svc.Name)
+		err = jig.Client.Services(svc.Namespace).Delete(svc.Name)
+		Expect(err).NotTo(HaveOccurred())
+
 	})
 })
 
