@@ -747,7 +747,7 @@ func TestPodFitsSelector(t *testing.T) {
 				},
 			},
 			labels: map[string]string{
-				// We use two digit to denote major version and two digit for minior version.
+				// We use two digit to denote major version and two digit for minor version.
 				"kernel-version": "0206",
 			},
 			fits: true,
@@ -2619,7 +2619,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: true,
-			test: "a pod which can be scheduled on a dedicated node assgined to user1 with effect NoSchedule",
+			test: "a pod which can be scheduled on a dedicated node assigned to user1 with effect NoSchedule",
 		},
 		{
 			pod: &api.Pod{
@@ -2652,7 +2652,7 @@ func TestPodToleratesTaints(t *testing.T) {
 				},
 			},
 			fits: false,
-			test: "a pod which can't be scheduled on a dedicated node assgined to user2 with effect NoSchedule",
+			test: "a pod which can't be scheduled on a dedicated node assigned to user2 with effect NoSchedule",
 		},
 		{
 			pod: &api.Pod{
@@ -2826,7 +2826,7 @@ func TestPodToleratesTaints(t *testing.T) {
 			},
 			fits: true,
 			test: "The pod has a toleration that key and value don't match the taint on the node, " +
-				"but the effect of taint on node is PreferNochedule. Pod can be shceduled onto the node",
+				"but the effect of taint on node is PreferNochedule. Pod can be scheduled onto the node",
 		},
 	}
 	expectedFailureReasons := []algorithm.PredicateFailureReason{ErrTaintsTolerationsNotMatch}
