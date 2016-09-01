@@ -833,6 +833,13 @@ func DeepCopy_api_DeprecatedDownwardAPIVolumeFile(in interface{}, out interface{
 		} else {
 			out.ResourceFieldRef = nil
 		}
+		if in.Mode != nil {
+			in, out := &in.Mode, &out.Mode
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.Mode = nil
+		}
 		return nil
 	}
 }
@@ -851,6 +858,13 @@ func DeepCopy_api_DeprecatedDownwardAPIVolumeSource(in interface{}, out interfac
 			}
 		} else {
 			out.Items = nil
+		}
+		if in.DefaultMode != nil {
+			in, out := &in.DefaultMode, &out.DefaultMode
+			*out = new(int32)
+			**out = **in
+		} else {
+			out.DefaultMode = nil
 		}
 		return nil
 	}

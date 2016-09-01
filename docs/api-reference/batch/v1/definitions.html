@@ -1007,6 +1007,61 @@ Examples:<br>
 
 </div>
 <div class="sect2">
+<h3 id="_v1_deprecateddownwardapivolumefile">v1.DeprecatedDownwardAPIVolumeFile</h3>
+<div class="paragraph">
+<p>DeprecatedDownwardAPIVolumeFile represents information to create the file containing the pod field This type is deprecated and should be replaced by use of the downwardAPI volume source.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">name</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Required: Name is the relative path name of the file to be created. Must not be absolute or contain the <em>..</em> path. Must be utf-8 encoded. The first item of the relative path must not start with <em>..</em></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">true</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">string</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">fieldRef</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_objectfieldselector">v1.ObjectFieldSelector</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">resourceFieldRef</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_resourcefieldselector">v1.ResourceFieldSelector</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">mode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_configmapvolumesource">v1.ConfigMapVolumeSource</h3>
 <div class="paragraph">
 <p>Adapts a ConfigMap into a volume.</p>
@@ -3068,6 +3123,47 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 
 </div>
 <div class="sect2">
+<h3 id="_v1_deprecateddownwardapivolumesource">v1.DeprecatedDownwardAPIVolumeSource</h3>
+<div class="paragraph">
+<p>DeprecatedDownwardAPIVolumeSource represents a volume containing downward API info. This type is deprecated and should be replaced by use of the downwardAPI volume source.</p>
+</div>
+<table class="tableblock frame-all grid-all" style="width:100%; ">
+<colgroup>
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;">
+<col style="width:20%;"> 
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Description</th>
+<th class="tableblock halign-left valign-top">Required</th>
+<th class="tableblock halign-left valign-top">Schema</th>
+<th class="tableblock halign-left valign-top">Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">items</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Items is a list of downward API volume file</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_deprecateddownwardapivolumefile">v1.DeprecatedDownwardAPIVolumeFile</a> array</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">defaultMode</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">integer (int32)</p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div class="sect2">
 <h3 id="_v1_jobspec">v1.JobSpec</h3>
 <div class="paragraph">
 <p>JobSpec describes how the job execution will look like.</p>
@@ -3380,6 +3476,13 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 <td class="tableblock halign-left valign-top"><p class="tableblock">AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
 <td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_azurediskvolumesource">v1.AzureDiskVolumeSource</a></p></td>
+<td class="tableblock halign-left valign-top"></td>
+</tr>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock">metadata</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Metadata represents metadata about the pod that should populate this volume Deprecated: Use downwardAPI instead.</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">false</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><a href="#_v1_deprecateddownwardapivolumesource">v1.DeprecatedDownwardAPIVolumeSource</a></p></td>
 <td class="tableblock halign-left valign-top"></td>
 </tr>
 </tbody>
@@ -4287,7 +4390,7 @@ Populated by the system when a graceful deletion is requested. Read-only. More i
 </div>
 <div id="footer">
 <div id="footer-text">
-Last updated 2016-09-01 21:16:16 UTC
+Last updated 2016-09-02 06:38:16 UTC
 </div>
 </div>
 </body>
