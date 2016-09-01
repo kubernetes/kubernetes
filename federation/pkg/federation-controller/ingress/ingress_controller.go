@@ -78,7 +78,8 @@ type IngressController struct {
 	// Definitions of ingresses that should be federated.
 	ingressInformerStore cache.Store
 	// Informer controller for ingresses that should be federated.
-	ingressInformerController framework.ControllerInterface
+	ingressInformerController   framework.ControllerInterface
+	configMapInformerController framework.ControllerInterface
 
 	// Client to federated api server.
 	federatedApiClient federation_release_1_4.Interface
@@ -178,13 +179,18 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 			return framework.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Core().ConfigMaps(uidConfigMapNamespace).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
+						if targetClient == nil {
+							glog.Errorf("targetClient is nil")
+						} else if targetClient.Core() == nil {
+							glog.Errorf("targetClient.Core() returned nil")
+						}
+						return targetClient.Core().ConfigMaps(api.NamespaceAll).List(options) // we only want to list one by name - unfortunately Kubernetes don't have a selector for that.
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Core().ConfigMaps(api.NamespaceSystem).Watch(options) // as above
+						return targetClient.Core().ConfigMaps(api.NamespaceAll).Watch(options) // as above
 					},
 				},
-				&api.ConfigMap{},
+				&v1.ConfigMap{},
 				controller.NoResyncPeriodFunc(),
 				// Trigger reconcilation whenever the ingress controller's configmap in a federated cluster is changed. In most cases it
 				// would be just confirmation that the configmap for the ingress controller is correct.
@@ -198,7 +204,7 @@ func NewIngressController(client federation_release_1_4.Interface) *IngressContr
 
 		&util.ClusterLifecycleHandlerFuncs{
 			ClusterAvailable: func(cluster *federation_api.Cluster) {
-				// Rely on the ingressFederatedInformer above
+				ic.clusterDeliverer.DeliverAt(cluster.Name, cluster, time.Now().Add(ic.clusterAvailableDelay))
 			},
 		},
 	)
@@ -252,8 +258,14 @@ func (ic *IngressController) Run(stopChan <-chan struct{}) {
 	ic.ingressFederatedInformer.Start()
 	go func() {
 		<-stopChan
-		glog.Infof("Stopping Ingress Controller")
+		glog.Infof("Stopping Ingress Informer")
 		ic.ingressFederatedInformer.Stop()
+	}()
+	ic.configMapFederatedInformer.Start()
+	go func() {
+		<-stopChan
+		glog.Infof("Stopping ConfigMap Informer")
+		ic.configMapFederatedInformer.Stop()
 	}()
 	ic.ingressDeliverer.StartWithHandler(func(item *util.DelayingDelivererItem) {
 		ingress := item.Value.(types.NamespacedName)
@@ -325,16 +337,29 @@ func (ic *IngressController) deliverConfigMap(cluster string, configMap types.Na
 // synced with the coresponding api server.
 func (ic *IngressController) isSynced() bool {
 	if !ic.ingressFederatedInformer.ClustersSynced() {
-		glog.V(2).Infof("Cluster list not synced")
+		glog.V(2).Infof("Cluster list not synced for ingress federated informer")
 		return false
 	}
 	clusters, err := ic.ingressFederatedInformer.GetReadyClusters()
 	if err != nil {
-		glog.Errorf("Failed to get ready clusters: %v", err)
+		glog.Errorf("Failed to get ready clusters for ingress federated informer: %v", err)
 		return false
 	}
 	if !ic.ingressFederatedInformer.GetTargetStore().ClustersSynced(clusters) {
-		glog.V(2).Infof("Target store not synced")
+		glog.V(2).Infof("Target store not synced for ingress federated informer")
+		return false
+	}
+	if !ic.configMapFederatedInformer.ClustersSynced() {
+		glog.V(2).Infof("Cluster list not synced for config map federated informer")
+		return false
+	}
+	clusters, err = ic.configMapFederatedInformer.GetReadyClusters()
+	if err != nil {
+		glog.Errorf("Failed to get ready clusters for configmap federated informer: %v", err)
+		return false
+	}
+	if !ic.configMapFederatedInformer.GetTargetStore().ClustersSynced(clusters) {
+		glog.V(2).Infof("Target store not synced for configmap federated informer")
 		return false
 	}
 	/* TODO: Back to V(4) */ glog.Errorf("Cluster list is synced")
@@ -368,18 +393,19 @@ func (ic *IngressController) reconcileConfigMapForCluster(clusterName string) {
 	}
 
 	if clusterName == allClustersKey {
-		clusters, err := ic.ingressFederatedInformer.GetReadyClusters()
+		clusters, err := ic.configMapFederatedInformer.GetReadyClusters()
 		if err != nil {
-			glog.Errorf("Failed to get ready clusters: %v", err)
+			glog.Errorf("Failed to get ready clusters.  redelivering %q: %v", clusterName, err)
 			ic.configMapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
 			return
 		}
 		for _, cluster := range clusters {
+			/* TODO: Back to V(4) */ glog.Errorf("Delivering ConfigMap for cluster(s) %q", clusterName)
 			ic.configMapDeliverer.DeliverAt(cluster.Name, nil, time.Now())
 		}
 		return
 	} else {
-		cluster, found, err := ic.ingressFederatedInformer.GetReadyCluster(clusterName)
+		cluster, found, err := ic.configMapFederatedInformer.GetReadyCluster(clusterName)
 		if !found || err != nil {
 			glog.Errorf("Internal error: Cluster %q queued for configmap reconciliation, but not found.  Will try again later: error = %v", clusterName, err)
 			ic.configMapDeliverer.DeliverAt(clusterName, nil, time.Now().Add(ic.clusterAvailableDelay))
@@ -439,11 +465,11 @@ func (ic *IngressController) reconcileConfigMap(cluster *federation_api.Cluster,
 
 /*
   getMasterCluster returns the cluster which is the elected master w.r.t. ingress UID, and it's ingress UID.
-  if there is no elected master cluster, and error is returned.
+  If there is no elected master cluster, an error is returned.
   All other clusters must use the ingress UID of the elected master.
 */
 func (ic *IngressController) getMasterCluster() (master *federation_api.Cluster, ingressUID string, err error) {
-	clusters, err := ic.ingressFederatedInformer.GetReadyClusters() // TODO, get all clusters, not just ready ones.
+	clusters, err := ic.configMapFederatedInformer.GetReadyClusters() // TODO, get all clusters, not just ready ones.
 	if err != nil {
 		glog.Errorf("Failed to get cluster list: %v", err)
 		return nil, "", err

@@ -291,10 +291,13 @@ func (f *federatedInformerImpl) GetClientsetForCluster(clusterName string) (kube
 
 func (f *federatedInformerImpl) getClientsetForClusterUnlocked(clusterName string) (kube_release_1_4.Interface, error) {
 	// No locking needed. Will happen in f.GetCluster.
+	/* TODO REMOVE */ fmt.Errorf("Getting clientset for cluster %q", clusterName)
 	if cluster, found, err := f.getReadyClusterUnlocked(clusterName); found && err == nil {
+		/* TODO REMOVE */ fmt.Errorf("Got clientset for cluster %q", clusterName)
 		return f.clientFactory(cluster)
 	} else {
 		if err != nil {
+			/* TODO REMOVE */ fmt.Errorf("Error getting clientset for cluster %q: %v", clusterName, err)
 			return nil, err
 		}
 	}
