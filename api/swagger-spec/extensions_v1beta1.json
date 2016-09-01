@@ -709,6 +709,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta1.DaemonSet",
+      "method": "POST",
+      "summary": "create a DaemonSet",
+      "nickname": "createNamespacedDaemonSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.DaemonSet",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.DaemonSet"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -1646,6 +1685,45 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.DeploymentList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.Deployment",
+      "method": "POST",
+      "summary": "create a Deployment",
+      "nickname": "createNamespacedDeployment",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Deployment",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Deployment"
        }
       ],
       "produces": [
@@ -2829,6 +2907,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta1.HorizontalPodAutoscaler",
+      "method": "POST",
+      "summary": "create a HorizontalPodAutoscaler",
+      "nickname": "createNamespacedHorizontalPodAutoscaler",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.HorizontalPodAutoscaler",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.HorizontalPodAutoscaler"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -3766,6 +3883,45 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.IngressList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.Ingress",
+      "method": "POST",
+      "summary": "create a Ingress",
+      "nickname": "createNamespacedIngress",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Ingress",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Ingress"
        }
       ],
       "produces": [
@@ -4723,6 +4879,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta1.Job",
+      "method": "POST",
+      "summary": "create a Job",
+      "nickname": "createNamespacedJob",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.Job",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.Job"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -5670,6 +5865,45 @@
       "consumes": [
        "*/*"
       ]
+     },
+     {
+      "type": "v1beta1.NetworkPolicy",
+      "method": "POST",
+      "summary": "create a NetworkPolicy",
+      "nickname": "createNamespacedNetworkPolicy",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.NetworkPolicy",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.NetworkPolicy"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
      }
     ]
    },
@@ -6442,6 +6676,45 @@
         "code": 200,
         "message": "OK",
         "responseModel": "v1beta1.ReplicaSetList"
+       }
+      ],
+      "produces": [
+       "application/json",
+       "application/yaml",
+       "application/vnd.kubernetes.protobuf"
+      ],
+      "consumes": [
+       "*/*"
+      ]
+     },
+     {
+      "type": "v1beta1.ReplicaSet",
+      "method": "POST",
+      "summary": "create a ReplicaSet",
+      "nickname": "createNamespacedReplicaSet",
+      "parameters": [
+       {
+        "type": "string",
+        "paramType": "query",
+        "name": "pretty",
+        "description": "If 'true', then the output is pretty printed.",
+        "required": false,
+        "allowMultiple": false
+       },
+       {
+        "type": "v1beta1.ReplicaSet",
+        "paramType": "body",
+        "name": "body",
+        "description": "",
+        "required": true,
+        "allowMultiple": false
+       }
+      ],
+      "responseMessages": [
+       {
+        "code": 200,
+        "message": "OK",
+        "responseModel": "v1beta1.ReplicaSet"
        }
       ],
       "produces": [
@@ -8043,6 +8316,10 @@
      "azureDisk": {
       "$ref": "v1.AzureDiskVolumeSource",
       "description": "AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod."
+     },
+     "metadata": {
+      "$ref": "v1.DeprecatedDownwardAPIVolumeSource",
+      "description": "Metadata represents metadata about the pod that should populate this volume Deprecated: Use downwardAPI instead."
      }
     }
    },
@@ -8674,6 +8951,50 @@
    "v1.AzureDataDiskCachingMode": {
     "id": "v1.AzureDataDiskCachingMode",
     "properties": {}
+   },
+   "v1.DeprecatedDownwardAPIVolumeSource": {
+    "id": "v1.DeprecatedDownwardAPIVolumeSource",
+    "description": "DeprecatedDownwardAPIVolumeSource represents a volume containing downward API info. This type is deprecated and should be replaced by use of the downwardAPI volume source.",
+    "properties": {
+     "items": {
+      "type": "array",
+      "items": {
+       "$ref": "v1.DeprecatedDownwardAPIVolumeFile"
+      },
+      "description": "Items is a list of downward API volume file"
+     },
+     "defaultMode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     }
+    }
+   },
+   "v1.DeprecatedDownwardAPIVolumeFile": {
+    "id": "v1.DeprecatedDownwardAPIVolumeFile",
+    "description": "DeprecatedDownwardAPIVolumeFile represents information to create the file containing the pod field This type is deprecated and should be replaced by use of the downwardAPI volume source.",
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Required: Name is the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'"
+     },
+     "fieldRef": {
+      "$ref": "v1.ObjectFieldSelector",
+      "description": "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported."
+     },
+     "resourceFieldRef": {
+      "$ref": "v1.ResourceFieldSelector",
+      "description": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported."
+     },
+     "mode": {
+      "type": "integer",
+      "format": "int32",
+      "description": "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set."
+     }
+    }
    },
    "v1.Container": {
     "id": "v1.Container",
