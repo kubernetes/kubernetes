@@ -69,6 +69,7 @@ const (
 	FailedValidation = "FailedValidation"
 
 	// Lifecycle hooks
-	FailedPostStartHook = "FailedPostStartHook"
-	FailedPreStopHook   = "FailedPreStopHook"
+	FailedPostStartHook    = "FailedPostStartHook"
+	FailedPreStopHook      = "FailedPreStopHook"
+	UncompletedPreStopHook = "UncompletedPreStopHook"
 )

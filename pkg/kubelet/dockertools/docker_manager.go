@@ -1506,6 +1506,8 @@ func (dm *DockerManager) killContainer(containerID kubecontainer.ContainerID, co
 		select {
 		case <-time.After(time.Duration(gracePeriod) * time.Second):
 			glog.V(2).Infof("preStop hook for container %q did not complete in %d seconds", name, gracePeriod)
+			message := fmt.Sprintf("preStop hook for container %q did not complete in %d seconds", name, gracePeriod)
+			dm.generateFailedContainerEvent(containerID, pod.Name, events.UncompletedPreStopHook, message)
 		case <-done:
 			glog.V(4).Infof("preStop hook for container %q completed", name)
 		}
