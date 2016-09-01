@@ -344,6 +344,7 @@ var map_DeprecatedDownwardAPIVolumeFile = map[string]string{
 	"name":             "Required: Name is the relative path name of the file to be created. Must not be absolute or contain the '..' path. Must be utf-8 encoded. The first item of the relative path must not start with '..'",
 	"fieldRef":         "Required: Selects a field of the pod: only annotations, labels, name and namespace are supported.",
 	"resourceFieldRef": "Selects a resource of the container: only resources limits and requests (limits.cpu, limits.memory, requests.cpu and requests.memory) are currently supported.",
+	"mode":             "Optional: mode bits to use on this file, must be a value between 0 and 0777. If not specified, the volume defaultMode will be used. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 }
 
 func (DeprecatedDownwardAPIVolumeFile) SwaggerDoc() map[string]string {
@@ -351,8 +352,9 @@ func (DeprecatedDownwardAPIVolumeFile) SwaggerDoc() map[string]string {
 }
 
 var map_DeprecatedDownwardAPIVolumeSource = map[string]string{
-	"":      "DeprecatedDownwardAPIVolumeSource represents a volume containing downward API info. This type is deprecated and should be replaced by use of the downwardAPI volume source.",
-	"items": "Items is a list of downward API volume file",
+	"":            "DeprecatedDownwardAPIVolumeSource represents a volume containing downward API info. This type is deprecated and should be replaced by use of the downwardAPI volume source.",
+	"items":       "Items is a list of downward API volume file",
+	"defaultMode": "Optional: mode bits to use on created files by default. Must be a value between 0 and 0777. Defaults to 0644. Directories within the path are not affected by this setting. This might be in conflict with other options that affect the file mode, like fsGroup, and the result can be other mode bits set.",
 }
 
 func (DeprecatedDownwardAPIVolumeSource) SwaggerDoc() map[string]string {
@@ -1669,6 +1671,7 @@ func (SecurityContext) SwaggerDoc() map[string]string {
 
 var map_SecurityContextConstraints = map[string]string{
 	"":                         "SecurityContextConstraints governs the ability to make requests that affect the SecurityContext that will be applied to a container.",
+	"metadata":                 "Standard object's metadata. More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
 	"priority":                 "Priority influences the sort order of SCCs when evaluating which SCCs to try first for a given pod request based on access in the Users and Groups fields.  The higher the int, the higher priority.  If scores for multiple SCCs are equal they will be sorted by name.",
 	"allowPrivilegedContainer": "AllowPrivilegedContainer determines if a container can request to be run as privileged.",
 	"defaultAddCapabilities":   "DefaultAddCapabilities is the default set of capabilities that will be added to the container unless the pod spec specifically drops the capability.  You may not list a capabiility in both DefaultAddCapabilities and RequiredDropCapabilities.",
@@ -1695,7 +1698,9 @@ func (SecurityContextConstraints) SwaggerDoc() map[string]string {
 }
 
 var map_SecurityContextConstraintsList = map[string]string{
-	"": "SecurityContextConstraintsList is a list of SecurityContextConstraints objects",
+	"":         "SecurityContextConstraintsList is a list of SecurityContextConstraints objects",
+	"metadata": "More info: http://releases.k8s.io/HEAD/docs/devel/api-conventions.md#metadata",
+	"items":    "List of security context constraints.",
 }
 
 func (SecurityContextConstraintsList) SwaggerDoc() map[string]string {

@@ -1506,6 +1506,7 @@ func autoConvert_v1_DeprecatedDownwardAPIVolumeFile_To_api_DeprecatedDownwardAPI
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	out.Mode = in.Mode
 	return nil
 }
 
@@ -1533,6 +1534,7 @@ func autoConvert_api_DeprecatedDownwardAPIVolumeFile_To_v1_DeprecatedDownwardAPI
 	} else {
 		out.ResourceFieldRef = nil
 	}
+	out.Mode = in.Mode
 	return nil
 }
 
@@ -1552,6 +1554,7 @@ func autoConvert_v1_DeprecatedDownwardAPIVolumeSource_To_api_DeprecatedDownwardA
 	} else {
 		out.Items = nil
 	}
+	out.DefaultMode = in.DefaultMode
 	return nil
 }
 
@@ -1571,6 +1574,7 @@ func autoConvert_api_DeprecatedDownwardAPIVolumeSource_To_v1_DeprecatedDownwardA
 	} else {
 		out.Items = nil
 	}
+	out.DefaultMode = in.DefaultMode
 	return nil
 }
 
