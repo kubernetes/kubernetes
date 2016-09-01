@@ -1002,7 +1002,12 @@ func (r *Request) transformUnstructuredResponseError(resp *http.Response, req *h
 		message = strings.TrimSpace(string(body))
 	}
 	retryAfter, _ := retryAfterSeconds(resp)
+	path := ""
+	if resp.Request != nil {
+		path = resp.Request.URL.Path
+	}
 	return errors.NewGenericServerResponse(
+		path,
 		resp.StatusCode,
 		req.Method,
 		unversioned.GroupResource{

@@ -287,7 +287,7 @@ func NewTimeoutError(message string, retryAfterSeconds int) *StatusError {
 }
 
 // NewGenericServerResponse returns a new error for server responses that are not in a recognizable form.
-func NewGenericServerResponse(code int, verb string, qualifiedResource unversioned.GroupResource, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) *StatusError {
+func NewGenericServerResponse(path string, code int, verb string, qualifiedResource unversioned.GroupResource, name, serverMessage string, retryAfterSeconds int, isUnexpectedResponse bool) *StatusError {
 	reason := unversioned.StatusReasonUnknown
 	message := fmt.Sprintf("the server responded with the status code %d but did not return more information", code)
 	switch code {
@@ -333,6 +333,8 @@ func NewGenericServerResponse(code int, verb string, qualifiedResource unversion
 		message = fmt.Sprintf("%s (%s %s %s)", message, strings.ToLower(verb), qualifiedResource.String(), name)
 	case !qualifiedResource.Empty():
 		message = fmt.Sprintf("%s (%s %s)", message, strings.ToLower(verb), qualifiedResource.String())
+	case len(path) > 0:
+		message = fmt.Sprintf("%s (%s)", message, path)
 	}
 	var causes []unversioned.StatusCause
 	if isUnexpectedResponse {

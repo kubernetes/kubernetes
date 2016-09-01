@@ -112,7 +112,7 @@ func (d *DiscoveryClient) ServerGroups() (apiGroupList *unversioned.APIGroupList
 	if err == nil {
 		apiGroup = apiVersionsToAPIGroup(v)
 	}
-	if err != nil && !errors.IsNotFound(err) && !errors.IsForbidden(err) {
+	if err != nil {
 		return nil, err
 	}
 
