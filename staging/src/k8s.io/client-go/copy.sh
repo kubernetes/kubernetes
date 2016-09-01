@@ -26,6 +26,8 @@ CLIENT_REPO_FROM_SRC="${2:-"k8s.io/client-go/${RELEASE}"}"
 CLIENT_REPO="${MAIN_REPO}/staging/src/${CLIENT_REPO_FROM_SRC}"
 CLIENT_REPO_TEMP="${CLIENT_REPO}"/_tmp
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # working in the ${CLIENT_REPO_TEMP} so 'godep save' won't complain about dirty working tree.
 echo "creating the _tmp directory"
 mkdir -p "${CLIENT_REPO_TEMP}"
@@ -55,10 +57,10 @@ mkcp "/pkg/client/unversioned/portforward" "/pkg/client/unversioned"
 # remove this test because it imports the internal clientset
 rm "${CLIENT_REPO_TEMP}"/pkg/client/unversioned/portforward/portforward_test.go
 
-pushd "${CLIENT_REPO_TEMP}"
+pushd "${CLIENT_REPO_TEMP}" > /dev/null
 echo "generating vendor/"
 GO15VENDOREXPERIMENT=1 godep save ./...
-popd
+popd > /dev/null
 
 echo "move to the client repo"
 # clean the ${CLIENT_REPO}
@@ -75,6 +77,9 @@ mv "${CLIENT_REPO}"/vendor "${CLIENT_REPO}"/_vendor
 # remove the pkg/util/net/sets/README.md to silent hack/verify-munge-docs.sh
 # TODO: probably we should convert the README.md a doc.go
 find ./ -name "README.md" -delete
+
+echo "rewriting Godeps.json"
+go run "${DIR}/godeps-json-updater.go" --godeps-file="${CLIENT_REPO}/Godeps/Godeps.json" --client-go-import-path="${CLIENT_REPO_FROM_SRC}"
 
 echo "rewriting imports"
 grep -Rl "\"${MAIN_REPO_FROM_SRC}" ./ | grep ".go" | grep -v "vendor/" | xargs sed -i "s|\"${MAIN_REPO_FROM_SRC}|\"${CLIENT_REPO_FROM_SRC}|g"
