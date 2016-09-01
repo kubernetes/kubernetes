@@ -57,6 +57,13 @@ function set-federation-zone-vars {
 
 	export KUBE_AWS_ZONE="$zone"
 	export KUBE_AWS_INSTANCE_PREFIX="${USER}-${zone}"
+
+	# WARNING: This is hack
+	# After KUBE_AWS_INSTANCE_PREFIX is changed,
+	# we need to make sure the config-xxx.sh file is
+	# re-sourced so the change propogates to dependent computed values
+	# (eg: MASTER_SG_NAME, NODE_SG_NAME, etc)
+	source "${KUBE_ROOT}/cluster/aws/util.sh"
     else
 	echo "Provider \"${KUBERNETES_PROVIDER}\" is not supported"
 	exit 1
