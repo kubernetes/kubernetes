@@ -413,7 +413,7 @@ func (ctrl *PersistentVolumeController) deleteClaim(obj interface{}) {
 		}
 	}
 
-	if !ok || claim == nil {
+	if claim == nil {
 		return
 	}
 	glog.V(4).Infof("claim %q deleted", claimToClaimKey(claim))
