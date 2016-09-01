@@ -363,7 +363,8 @@ func (frsc *ReplicaSetController) schedule(frs *extensionsv1.ReplicaSet, cluster
 	for _, cluster := range clusters {
 		clusterNames = append(clusterNames, cluster.Name)
 	}
-	scheduleResult, overflow := plnr.Plan(replicas, clusterNames, current, estimatedCapacity)
+	scheduleResult, overflow := plnr.Plan(replicas, clusterNames, current, estimatedCapacity,
+		frs.Namespace+"/"+frs.Name)
 	// make sure the return contains clusters need to zero the replicas
 	result := make(map[string]int64)
 	for clusterName := range current {
