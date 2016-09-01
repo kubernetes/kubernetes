@@ -22,7 +22,6 @@ import (
 	"net/url"
 
 	dockerterm "github.com/docker/docker/pkg/term"
-	"github.com/golang/glog"
 	"github.com/renstrom/dedent"
 	"github.com/spf13/cobra"
 	"k8s.io/kubernetes/pkg/api"
@@ -52,7 +51,7 @@ const (
 	execUsageStr = "expected 'exec POD_NAME COMMAND [ARG1] [ARG2] ... [ARGN]'.\nPOD_NAME and COMMAND are required arguments for the exec command"
 )
 
-func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
+func NewCmdExec(cmdFullName string, f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *cobra.Command {
 	options := &ExecOptions{
 		StreamOptions: StreamOptions{
 			In:  cmdIn,
@@ -60,8 +59,11 @@ func NewCmdExec(f *cmdutil.Factory, cmdIn io.Reader, cmdOut, cmdErr io.Writer) *
 			Err: cmdErr,
 		},
 
+		FullCmdName: cmdFullName,
+
 		Executor: &DefaultRemoteExecutor{},
 	}
+
 	cmd := &cobra.Command{
 		Use:     "exec POD [-c CONTAINER] -- COMMAND [args...]",
 		Short:   "Execute a command in a container",
@@ -128,6 +130,8 @@ type StreamOptions struct {
 type ExecOptions struct {
 	StreamOptions
 
+	FullCmdName string
+
 	Command []string
 
 	Executor RemoteExecutor
@@ -137,6 +141,10 @@ type ExecOptions struct {
 
 // Complete verifies command line arguments and loads data from the command environment
 func (p *ExecOptions) Complete(f *cmdutil.Factory, cmd *cobra.Command, argsIn []string, argsLenAtDash int) error {
+	if len(p.FullCmdName) == 0 {
+		p.FullCmdName = "kubectl"
+	}
+
 	// Let kubectl exec follow rules for `--`, see #13004 issue
 	if len(p.PodName) == 0 && (len(argsIn) == 0 || argsLenAtDash == 0) {
 		return cmdutil.UsageError(cmd, execUsageStr)
@@ -258,7 +266,9 @@ func (p *ExecOptions) Run() error {
 
 	containerName := p.ContainerName
 	if len(containerName) == 0 {
-		glog.V(4).Infof("defaulting container name to %s", pod.Spec.Containers[0].Name)
+		if len(pod.Spec.Containers) > 1 {
+			fmt.Fprintf(p.Err, "defaulting container name to %s, use '%s describe po/%s' cmd to see all containers in this pod", pod.Spec.Containers[0].Name, p.FullCmdName, p.PodName)
+		}
 		containerName = pod.Spec.Containers[0].Name
 	}
 
