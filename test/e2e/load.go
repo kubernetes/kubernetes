@@ -18,6 +18,7 @@ package e2e
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"strconv"
@@ -70,11 +71,21 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 		Expect(highLatencyRequests).NotTo(BeNumerically(">", 0))
 	})
 
+	// We assume a default throughput of 10 pods/second throughput.
+	// We may want to revisit it in the future.
+	// However, this can be overriden by LOAD_TEST_THROUGHPUT env var.
+	throughput := 10
+	if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
+		if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {
+			throughput = newThroughput
+		}
+	}
+
 	// Explicitly put here, to delete namespace at the end of the test
 	// (after measuring latency metrics, etc.).
 	options := framework.FrameworkOptions{
-		ClientQPS:   50,
-		ClientBurst: 100,
+		ClientQPS:   float32(math.Max(50.0, float64(2*throughput))),
+		ClientBurst: int(math.Max(100.0, float64(4*throughput))),
 	}
 	f := framework.NewFramework("load", options, nil)
 	f.NamespaceDeletionTimeout = time.Hour
@@ -140,16 +151,6 @@ var _ = framework.KubeDescribe("Load capacity", func() {
 				}
 			} else {
 				framework.Logf("Skipping service creation")
-			}
-
-			// We assume a default throughput of 10 pods/second throughput.
-			// We may want to revisit it in the future.
-			// However, this can be overriden by LOAD_TEST_THROUGHPUT env var.
-			throughput := 10
-			if throughputEnv := os.Getenv("LOAD_TEST_THROUGHPUT"); throughputEnv != "" {
-				if newThroughput, err := strconv.Atoi(throughputEnv); err == nil {
-					throughput = newThroughput
-				}
 			}
 
 			// Simulate lifetime of RC:
