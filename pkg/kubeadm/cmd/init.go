@@ -91,7 +91,13 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmap
 		return err
 	}
 
-	kubemaster.CreateDiscoveryDeploymentAndSecret(params, client, caCert)
+	if err := kubemaster.CreateDiscoveryDeploymentAndSecret(params, client, caCert); err != nil {
+		return err
+	}
+
+	if err := kubemaster.CreateEssentialAddons(params, client); err != nil {
+		return err
+	}
 
 	// TODO use templates to reference struct fields directly as order of args is fragile
 	fmt.Fprintf(out, init_done_msgf,

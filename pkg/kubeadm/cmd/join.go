@@ -74,7 +74,7 @@ func RunJoin(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmap
 
 	kubeconfig, err := kubenode.RetrieveTrustedClusterInfo(params)
 	if err != nil {
-		return fmt.Errorf("Failed to bootstrap: %s\n", err)
+		return err
 	}
 
 	err = kubeadmutil.WriteKubeconfigIfNotExists(params, "kubelet", kubeconfig)

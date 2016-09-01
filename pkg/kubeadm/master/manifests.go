@@ -19,7 +19,7 @@ package kubemaster
 import (
 	"bytes"
 	"encoding/json"
-	_ "fmt"
+	"fmt"
 	"os"
 	"path"
 
@@ -122,15 +122,16 @@ func WriteStaticPodManifests(params *kubeadmapi.BootstrapParams) error {
 
 	manifestsPath := path.Join(params.EnvParams["prefix"], "manifests")
 	if err := os.MkdirAll(manifestsPath, 0700); err != nil {
-		return err
+		return fmt.Errorf("<master/manifests> failed to create directory %q [%s]", manifestsPath, err)
 	}
 	for name, spec := range staticPodSpecs {
+		filename := path.Join(manifestsPath, name+".json")
 		serialized, err := json.MarshalIndent(spec, "", "  ")
 		if err != nil {
-			return err
+			return fmt.Errorf("<master/manifests> failed to marshall manifest for %q to JSON [%s]", name, err)
 		}
-		if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), path.Join(manifestsPath, name+".json")); err != nil {
-			return err
+		if err := cmdutil.DumpReaderToFile(bytes.NewReader(serialized), filename); err != nil {
+			return fmt.Errorf("<master/manifests> failed to create static pod manifest file for %q (%q) [%s]", name, filename, err)
 		}
 	}
 	return nil

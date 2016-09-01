@@ -51,13 +51,13 @@ func UseGivenTokenIfValid(params *kubeadmapi.BootstrapParams) (bool, error) {
 	givenToken := strings.Split(strings.ToLower(params.Discovery.GivenToken), ".")
 	// TODO print desired format
 	// TODO could also print more specific messages in each case
-	invalidErr := "provided token is invalid (%s)"
+	invalidErr := "<util/tokens> provided token is invalid - %s"
 	if len(givenToken) != 2 {
 		return false, fmt.Errorf(invalidErr, "not in 2-part dot-separated format")
 	}
 	if len(givenToken[0]) != TokenIDLen {
 		return false, fmt.Errorf(invalidErr, fmt.Sprintf(
-			"length of first part is incorrect [%d != %d]",
+			"length of first part is incorrect [%d (given) != %d (expected) ]",
 			len(givenToken[0]), TokenIDLen))
 	}
 	tokenBytes, err := hex.DecodeString(givenToken[1])
