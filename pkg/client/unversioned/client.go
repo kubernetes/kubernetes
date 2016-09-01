@@ -53,6 +53,7 @@ type Interface interface {
 	Rbac() RbacInterface
 	Discovery() discovery.DiscoveryInterface
 	Certificates() CertificatesInterface
+	Storage() StorageInterface
 }
 
 func (c *Client) ReplicationControllers(namespace string) ReplicationControllerInterface {
@@ -131,6 +132,7 @@ type Client struct {
 	*RbacClient
 	*discovery.DiscoveryClient
 	*CertificatesClient
+	*StorageClient
 }
 
 // IsTimeout tests if this is a timeout error in the underlying transport.
@@ -193,4 +195,8 @@ func (c *Client) Discovery() discovery.DiscoveryInterface {
 
 func (c *Client) Certificates() CertificatesInterface {
 	return c.CertificatesClient
+}
+
+func (c *Client) Storage() StorageInterface {
+	return c.StorageClient
 }

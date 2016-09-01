@@ -35,7 +35,6 @@ import (
 	networkpolicyetcd "k8s.io/kubernetes/pkg/registry/networkpolicy/etcd"
 	pspetcd "k8s.io/kubernetes/pkg/registry/podsecuritypolicy/etcd"
 	replicasetetcd "k8s.io/kubernetes/pkg/registry/replicaset/etcd"
-	storageclassetcd "k8s.io/kubernetes/pkg/registry/storageclass/etcd"
 	thirdpartyresourceetcd "k8s.io/kubernetes/pkg/registry/thirdpartyresource/etcd"
 	"k8s.io/kubernetes/pkg/util/wait"
 )
@@ -123,10 +122,6 @@ func (p ExtensionsRESTStorageProvider) v1beta1Storage(apiResourceConfigSource ge
 	if apiResourceConfigSource.ResourceEnabled(version.WithResource("networkpolicies")) {
 		networkExtensionsStorage := networkpolicyetcd.NewREST(restOptionsGetter(extensions.Resource("networkpolicies")))
 		storage["networkpolicies"] = networkExtensionsStorage
-	}
-	if apiResourceConfigSource.ResourceEnabled(version.WithResource("storageclasses")) {
-		storageClassStorage := storageclassetcd.NewREST(restOptionsGetter(extensions.Resource("storageclasses")))
-		storage["storageclasses"] = storageClassStorage
 	}
 
 	return storage

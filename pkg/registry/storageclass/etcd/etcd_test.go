@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	"k8s.io/kubernetes/pkg/api"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	storageapi "k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/fields"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/registry/generic"
@@ -30,14 +30,14 @@ import (
 )
 
 func newStorage(t *testing.T) (*REST, *etcdtesting.EtcdTestServer) {
-	etcdStorage, server := registrytest.NewEtcdStorage(t, extensions.GroupName)
+	etcdStorage, server := registrytest.NewEtcdStorage(t, storageapi.GroupName)
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1}
 	storageClassStorage := NewREST(restOptions)
 	return storageClassStorage, server
 }
 
-func validNewStorageClass(name string) *extensions.StorageClass {
-	return &extensions.StorageClass{
+func validNewStorageClass(name string) *storageapi.StorageClass {
+	return &storageapi.StorageClass{
 		ObjectMeta: api.ObjectMeta{
 			Name: name,
 		},
@@ -48,7 +48,7 @@ func validNewStorageClass(name string) *extensions.StorageClass {
 	}
 }
 
-func validChangedStorageClass() *extensions.StorageClass {
+func validChangedStorageClass() *storageapi.StorageClass {
 	return validNewStorageClass("foo")
 }
 
@@ -62,7 +62,7 @@ func TestCreate(t *testing.T) {
 		// valid
 		storageClass,
 		// invalid
-		&extensions.StorageClass{
+		&storageapi.StorageClass{
 			ObjectMeta: api.ObjectMeta{Name: "*BadName!"},
 		},
 	)
@@ -77,13 +77,13 @@ func TestUpdate(t *testing.T) {
 		validNewStorageClass("foo"),
 		// updateFunc
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.StorageClass)
+			object := obj.(*storageapi.StorageClass)
 			object.Parameters = map[string]string{"foo": "bar"}
 			return object
 		},
 		//invalid update
 		func(obj runtime.Object) runtime.Object {
-			object := obj.(*extensions.StorageClass)
+			object := obj.(*storageapi.StorageClass)
 			object.Parameters = map[string]string{"faz": "bar"}
 			return object
 		},

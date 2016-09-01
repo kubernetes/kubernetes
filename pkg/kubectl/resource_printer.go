@@ -42,6 +42,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/pkg/runtime"
 	utilerrors "k8s.io/kubernetes/pkg/util/errors"
@@ -2068,7 +2069,7 @@ func printNetworkPolicyList(list *extensions.NetworkPolicyList, w io.Writer, opt
 	return nil
 }
 
-func printStorageClass(sc *extensions.StorageClass, w io.Writer, options PrintOptions) error {
+func printStorageClass(sc *storage.StorageClass, w io.Writer, options PrintOptions) error {
 	name := sc.Name
 	provtype := sc.Provisioner
 
@@ -2085,7 +2086,7 @@ func printStorageClass(sc *extensions.StorageClass, w io.Writer, options PrintOp
 	return nil
 }
 
-func printStorageClassList(scList *extensions.StorageClassList, w io.Writer, options PrintOptions) error {
+func printStorageClassList(scList *storage.StorageClassList, w io.Writer, options PrintOptions) error {
 	for _, sc := range scList.Items {
 		if err := printStorageClass(&sc, w, options); err != nil {
 			return err

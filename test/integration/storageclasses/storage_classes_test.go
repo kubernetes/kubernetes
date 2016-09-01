@@ -27,7 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -51,7 +51,7 @@ func TestStorageClasses(t *testing.T) {
 // DoTestStorageClasses tests storage classes for one api version.
 func DoTestStorageClasses(t *testing.T, client *client.Client, ns *api.Namespace) {
 	// Make a storage class object.
-	s := extensions.StorageClass{
+	s := storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -61,7 +61,7 @@ func DoTestStorageClasses(t *testing.T, client *client.Client, ns *api.Namespace
 		Provisioner: provisionerPluginName,
 	}
 
-	if _, err := client.Extensions().StorageClasses().Create(&s); err != nil {
+	if _, err := client.Storage().StorageClasses().Create(&s); err != nil {
 		t.Errorf("unable to create test storage class: %v", err)
 	}
 	defer deleteStorageClassOrErrorf(t, client, s.Namespace, s.Name)
@@ -89,7 +89,7 @@ func DoTestStorageClasses(t *testing.T, client *client.Client, ns *api.Namespace
 }
 
 func deleteStorageClassOrErrorf(t *testing.T, c *client.Client, ns, name string) {
-	if err := c.Extensions().StorageClasses().Delete(name); err != nil {
+	if err := c.Storage().StorageClasses().Delete(name); err != nil {
 		t.Errorf("unable to delete storage class %v: %v", name, err)
 	}
 }

@@ -31,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/api/unversioned"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/kubernetes/pkg/apis/storage"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/internalclientset"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	fake_cloud "k8s.io/kubernetes/pkg/cloudprovider/providers/fake"
@@ -862,9 +862,9 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (PersistenceVolumes and StorageClasses).
 	defer testClient.Core().PersistentVolumes().DeleteCollection(nil, api.ListOptions{})
-	defer testClient.Extensions().StorageClasses().DeleteCollection(nil, api.ListOptions{})
+	defer testClient.Storage().StorageClasses().DeleteCollection(nil, api.ListOptions{})
 
-	storageClass := extensions.StorageClass{
+	storageClass := storage.StorageClass{
 		TypeMeta: unversioned.TypeMeta{
 			Kind: "StorageClass",
 		},
@@ -873,7 +873,7 @@ func TestPersistentVolumeProvisionMultiPVCs(t *testing.T) {
 		},
 		Provisioner: provisionerPluginName,
 	}
-	testClient.Extensions().StorageClasses().Create(&storageClass)
+	testClient.Storage().StorageClasses().Create(&storageClass)
 
 	stopCh := make(chan struct{})
 	binder.Run(stopCh)
