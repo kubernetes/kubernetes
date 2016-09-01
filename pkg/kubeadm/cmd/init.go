@@ -82,7 +82,6 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmap
 	}
 	for name, kubeconfig := range kubeconfigs {
 		if err := kubeadmutil.WriteKubeconfigIfNotExists(params, name, kubeconfig); err != nil {
-			//fmt.Fprintf(out, "Unable to write kubeconfig file:\n%s\n", err)
 			return err
 		}
 	}
