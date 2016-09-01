@@ -27,7 +27,9 @@ import (
 
 	flag "github.com/spf13/pflag"
 
+	"github.com/go-openapi/spec"
 	inf "gopkg.in/inf.v0"
+	"k8s.io/kubernetes/cmd/libs/go2idl/openapi-gen/generators/common"
 )
 
 // Quantity is a fixed-point representation of a number.
@@ -393,6 +395,18 @@ func (q Quantity) DeepCopy() Quantity {
 		q.d.Dec = tmp.Set(q.d.Dec)
 	}
 	return q
+}
+
+// OpenAPIDefinition returns openAPI definition for this type.
+func (_ Quantity) OpenAPIDefinition() common.OpenAPIDefinition {
+	return common.OpenAPIDefinition{
+		Schema: spec.Schema{
+			SchemaProps: spec.SchemaProps{
+				Type:   []string{"string"},
+				Format: "",
+			},
+		},
+	}
 }
 
 // CanonicalizeBytes returns the canonical form of q and its suffix (see comment on Quantity).
