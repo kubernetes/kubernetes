@@ -701,16 +701,18 @@ function add-tag {
 }
 
 # Creates the IAM profile, based on configuration files in templates/iam
+# usage: create-iam-profile kubernetes-master-us-west-1a-chom kubernetes-master
 function create-iam-profile {
   local key=$1
+  local role=$2
 
   local conf_dir=file://${KUBE_ROOT}/cluster/aws/templates/iam
 
   echo "Creating IAM role: ${key}"
-  aws iam create-role --role-name ${key} --assume-role-policy-document ${conf_dir}/${key}-role.json > $LOG
+  aws iam create-role --role-name ${key} --assume-role-policy-document ${conf_dir}/${role}-role.json > $LOG
 
   echo "Creating IAM role-policy: ${key}"
-  aws iam put-role-policy --role-name ${key} --policy-name ${key} --policy-document ${conf_dir}/${key}-policy.json > $LOG
+  aws iam put-role-policy --role-name ${key} --policy-name ${key} --policy-document ${conf_dir}/${role}-policy.json > $LOG
 
   echo "Creating IAM instance-policy: ${key}"
   aws iam create-instance-profile --instance-profile-name ${key} > $LOG
@@ -721,14 +723,11 @@ function create-iam-profile {
 
 # Creates the IAM roles (if they do not already exist)
 function ensure-iam-profiles {
-  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_MASTER} || {
-    echo "Creating master IAM profile: ${IAM_PROFILE_MASTER}"
-    create-iam-profile ${IAM_PROFILE_MASTER}
-  }
-  aws iam get-instance-profile --instance-profile-name ${IAM_PROFILE_NODE} || {
-    echo "Creating minion IAM profile: ${IAM_PROFILE_NODE}"
-    create-iam-profile ${IAM_PROFILE_NODE}
-  }
+  echo "Creating master IAM profile: ${IAM_PROFILE_MASTER}"
+  create-iam-profile ${IAM_PROFILE_MASTER} kubernetes-master
+
+  echo "Creating minion IAM profile: ${IAM_PROFILE_NODE}"
+  create-iam-profile ${IAM_PROFILE_NODE} kubernetes-minion
 }
 
 # Wait for instance to be in specified state
@@ -785,13 +784,53 @@ function delete_security_group {
   echo "Deleting security group: ${sg_id}"
 
   # We retry in case there's a dependent resource - typically an ELB
-  n=0
+  local n=0
   until [ $n -ge 20 ]; do
     $AWS_CMD delete-security-group --group-id ${sg_id} > $LOG && return
     n=$[$n+1]
     sleep 3
   done
   echo "Unable to delete security group: ${sg_id}"
+  exit 1
+}
+
+
+
+# Deletes master and minion IAM roles and instance profiles
+# usage: delete-iam-instance-profiles
+function delete-iam-profiles {
+  for iam_profile_name in ${IAM_PROFILE_MASTER} ${IAM_PROFILE_NODE};do
+    echo "Removing role from instance profile: ${iam_profile_name}"
+    conceal-no-such-entity-response aws iam remove-role-from-instance-profile --instance-profile-name "${iam_profile_name}" --role-name "${iam_profile_name}"
+
+    echo "Deleting IAM Instance-Profile: ${iam_profile_name}"
+    conceal-no-such-entity-response aws iam delete-instance-profile --instance-profile-name "${iam_profile_name}"
+
+    echo "Delete IAM role policy: ${iam_profile_name}"
+    conceal-no-such-entity-response aws iam delete-role-policy --role-name "${iam_profile_name}" --policy-name "${iam_profile_name}"
+
+    echo "Deleting IAM Role: ${iam_profile_name}"
+    conceal-no-such-entity-response aws iam delete-role --role-name "${iam_profile_name}"
+  done
+}
+
+# Detects NoSuchEntity response from AWS cli stderr output and conceals error
+# Otherwise the error is treated as fatal
+# usage: conceal-no-such-entity-response ...args
+function conceal-no-such-entity-response {
+  # in plain english: redirect stderr to stdout, and stdout to the log file
+  local -r errMsg=$($@ 2>&1 > $LOG)
+  if [[ "$errMsg" == "" ]];then
+    return
+  fi
+
+  echo $errMsg
+  if [[ "$errMsg" =~ " (NoSuchEntity) " ]];then
+    echo " -> no such entity response detected. will assume operation is not necessary due to prior incomplete teardown"
+    return
+  fi
+
+  echo "Error message is fatal. Will exit"
   exit 1
 }
 
@@ -1446,6 +1485,9 @@ function kube-down {
     echo "Note: You may be seeing this message may be because the cluster was already deleted, or" >&2
     echo "has a name other than '${CLUSTER_ID}'." >&2
   fi
+
+  echo "Deleting IAM Instance profiles"
+  delete-iam-profiles
 }
 
 # Update a kubernetes cluster with latest source
