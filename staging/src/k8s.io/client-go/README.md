@@ -18,7 +18,17 @@ client-go has the same release cycle as the Kubernetes main repository. For exam
 
 ### How to get it
 
-You can `go get` a release of client-go, e.g., `go get k8s.io/client-go/1.4/...` for the whole thing or `go get k8s.io/client-go/1.4/kubernetes` if you just need the clientset.
+You can `go get` to get a release of client-go, e.g., `go get k8s.io/client-go/1.4/...` or `go get k8s.io/client-go/1.4/kubernetes`.
+
+### How to use it
+
+If your application runs in a Pod in the cluster, please refer to the in-cluster [example](examples/in-cluster/main.go), otherwise please refer to the out-of-cluster [example](examples/out-of-cluster/main.go).
+
+### Dependency management
+
+If your application depends on a package that client-go depends on, and you let the Go compiler find the dependency in `GOPATH`, you will end up with duplicated dependencies: one copy from the `GOPATH`, and one from the vendor folder of client-go. This will cause unexpected runtime error like flag redefinition, since the go compiler ends up importing both packages separately, even if they are exactly the same thing. If this happens, you can either
+* run `godep restore` ([godep](https://github.com/tools/godep)) in the client-go/1.4 folder, then remove the vendor folder of client-go. Then the packages in your GOPATH will be the only copy
+* or run `godep save` in your application folder to flatten all dependencies.
 
 ### Reporting bugs
 
