@@ -482,6 +482,48 @@ func logPodStates(pods []api.Pod) {
 	Logf("") // Final empty line helps for readability.
 }
 
+// errorBadPodsStates create error message of basic info of bad pods for debugging.
+func errorBadPodsStates(badPods []api.Pod, nPods int, ns string, timeout time.Duration) string {
+	errStr := fmt.Sprintf("%d / %d pods in namespace %q are NOT in the desired state in %v\n", len(badPods), nPods, ns, timeout)
+	// Pirnt bad pods info only if there are fewer than 10 bad pods
+	if len(badPods) > 10 {
+		return errStr + "There are too many bad pods. Please check log for details."
+	}
+
+	// Find maximum widths for pod, node, and phase strings for column printing.
+	maxPodW, maxNodeW, maxPhaseW, maxGraceW := len("POD"), len("NODE"), len("PHASE"), len("GRACE")
+	for i := range badPods {
+		badPod := &badPods[i]
+		if len(badPod.ObjectMeta.Name) > maxPodW {
+			maxPodW = len(badPod.ObjectMeta.Name)
+		}
+		if len(badPod.Spec.NodeName) > maxNodeW {
+			maxNodeW = len(badPod.Spec.NodeName)
+		}
+		if len(badPod.Status.Phase) > maxPhaseW {
+			maxPhaseW = len(badPod.Status.Phase)
+		}
+	}
+	// Increase widths by one to separate by a single space.
+	maxPodW++
+	maxNodeW++
+	maxPhaseW++
+	maxGraceW++
+
+	// Collect pods info. * does space padding, - makes them left-aligned.
+	errStr += fmt.Sprintf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]s\n",
+		maxPodW, "POD", maxNodeW, "NODE", maxPhaseW, "PHASE", maxGraceW, "GRACE", "CONDITIONS")
+	for _, badPod := range badPods {
+		grace := ""
+		if badPod.DeletionGracePeriodSeconds != nil {
+			grace = fmt.Sprintf("%ds", *badPod.DeletionGracePeriodSeconds)
+		}
+		errStr += fmt.Sprintf("%-[1]*[2]s %-[3]*[4]s %-[5]*[6]s %-[7]*[8]s %[9]s\n",
+			maxPodW, badPod.ObjectMeta.Name, maxNodeW, badPod.Spec.NodeName, maxPhaseW, badPod.Status.Phase, maxGraceW, grace, badPod.Status.Conditions)
+	}
+	return errStr
+}
+
 // PodRunningReady checks whether pod p's phase is running and it has a ready
 // condition of status true.
 func PodRunningReady(p *api.Pod) (bool, error) {
@@ -586,6 +628,8 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	var waitForSuccessError error
+	badPods := []api.Pod{}
+	nPods := 0
 	go func() {
 		waitForSuccessError = WaitForPodsSuccess(c, ns, ignoreLabels, timeout)
 		wg.Done()
@@ -610,7 +654,9 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 			Logf("Error getting pods in namespace '%s': %v", ns, err)
 			return false, nil
 		}
-		nOk, replicaOk, badPods := int32(0), int32(0), []api.Pod{}
+		nOk, replicaOk := int32(0), int32(0)
+		badPods = []api.Pod{}
+		nPods = len(podList.Items)
 		for _, pod := range podList.Items {
 			if len(ignoreLabels) != 0 && ignoreSelector.Matches(labels.Set(pod.Labels)) {
 				Logf("%v in state %v, ignoring", pod.Name, pod.Status.Phase)
@@ -643,7 +689,7 @@ func WaitForPodsRunningReady(c *client.Client, ns string, minPods int32, timeout
 		logPodStates(badPods)
 		return false, nil
 	}) != nil {
-		return fmt.Errorf("Not all pods in namespace '%s' running and ready within %v", ns, timeout)
+		return fmt.Errorf(errorBadPodsStates(badPods, nPods, ns, timeout))
 	}
 	wg.Wait()
 	if waitForSuccessError != nil {
