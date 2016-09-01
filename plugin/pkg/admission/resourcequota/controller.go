@@ -194,8 +194,11 @@ func (e *quotaEvaluator) checkAttributes(ns string, admissionAttributes []*admis
 //    documents for these waiters have already been evaluated.  Step 1, will mark all the ones that should already have succeeded.
 func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttributes []*admissionWaiter, remainingRetries int) {
 	// yet another copy to compare against originals to see if we actually have deltas
-	originalQuotas := make([]api.ResourceQuota, len(quotas), len(quotas))
-	copy(originalQuotas, quotas)
+	originalQuotas, err := copyQuotas(quotas)
+	if err != nil {
+		utilruntime.HandleError(err)
+		return
+	}
 
 	atLeastOneChanged := false
 	for i := range admissionAttributes {
@@ -210,7 +213,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 		// that means that no quota docs applied, so it can get a pass
 		atLeastOneChangeForThisWaiter := false
 		for j := range newQuotas {
-			if !quota.Equals(originalQuotas[j].Status.Used, newQuotas[j].Status.Used) {
+			if !quota.Equals(quotas[j].Status.Used, newQuotas[j].Status.Used) {
 				atLeastOneChanged = true
 				atLeastOneChangeForThisWaiter = true
 				break
@@ -220,6 +223,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 		if !atLeastOneChangeForThisWaiter {
 			admissionAttribute.result = nil
 		}
+
 		quotas = newQuotas
 	}
 
@@ -236,6 +240,7 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 	var lastErr error
 	for i := range quotas {
 		newQuota := quotas[i]
+
 		// if this quota didn't have its status changed, skip it
 		if quota.Equals(originalQuotas[i].Status.Used, newQuota.Status.Used) {
 			continue
@@ -297,6 +302,19 @@ func (e *quotaEvaluator) checkQuotas(quotas []api.ResourceQuota, admissionAttrib
 	e.checkQuotas(quotasToCheck, admissionAttributes, remainingRetries-1)
 }
 
+func copyQuotas(in []api.ResourceQuota) ([]api.ResourceQuota, error) {
+	out := make([]api.ResourceQuota, 0, len(in))
+	for _, quota := range in {
+		copied, err := api.Scheme.Copy(&quota)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *copied.(*api.ResourceQuota))
+	}
+
+	return out, nil
+}
+
 // checkRequest verifies that the request does not exceed any quota constraint. it returns back a copy of quotas not yet persisted
 // that capture what the usage would be if the request succeeded.  It return an error if the is insufficient quota to satisfy the request
 func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.Attributes) ([]api.ResourceQuota, error) {
@@ -329,8 +347,7 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
 		evaluatorResources := evaluator.MatchesResources()
 		requiredResources := quota.Intersection(hardResources, evaluatorResources)
-		err := evaluator.Constraints(requiredResources, inputObject)
-		if err != nil {
+		if err := evaluator.Constraints(requiredResources, inputObject); err != nil {
 			return nil, admission.NewForbidden(a, fmt.Errorf("failed quota: %s: %v", resourceQuota.Name, err))
 		}
 		if !hasUsageStats(&resourceQuota) {
@@ -382,8 +399,13 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		return quotas, nil
 	}
 
+	outQuotas, err := copyQuotas(quotas)
+	if err != nil {
+		return nil, err
+	}
+
 	for _, index := range interestingQuotaIndexes {
-		resourceQuota := quotas[index]
+		resourceQuota := outQuotas[index]
 
 		hardResources := quota.ResourceNames(resourceQuota.Status.Hard)
 		requestedUsage := quota.Mask(deltaUsage, hardResources)
@@ -403,10 +425,10 @@ func (e *quotaEvaluator) checkRequest(quotas []api.ResourceQuota, a admission.At
 		}
 
 		// update to the new usage number
-		quotas[index].Status.Used = newUsage
+		outQuotas[index].Status.Used = newUsage
 	}
 
-	return quotas, nil
+	return outQuotas, nil
 }
 
 func (e *quotaEvaluator) Evaluate(a admission.Attributes) error {
