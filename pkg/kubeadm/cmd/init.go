@@ -64,7 +64,7 @@ func RunInit(out io.Writer, cmd *cobra.Command, args []string, params *kubeadmap
 		if err != nil {
 			return err
 		}
-		params.Discovery.ListenIP = string(ip)
+		params.Discovery.ListenIP = ip.String()
 	}
 	if err := kubemaster.CreateTokenAuthFile(params); err != nil {
 		return err
