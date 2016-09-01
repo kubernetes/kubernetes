@@ -59,7 +59,7 @@ function save-logs() {
     local -r node_name="${1}"
     local -r dir="${2}"
     local files="${3} ${common_logfiles}"
-    if [[ "${KUBERNETES_PROVIDER}" == "gce" ]]; then
+    if [[ "${KUBERNETES_PROVIDER}" == "gce" || "${KUBERNETES_PROVIDER}" == "gke" ]]; then
         files="${files} ${gce_logfiles}"
     fi
     if [[ "${KUBERNETES_PROVIDER}" == "aws" ]]; then
