@@ -93,10 +93,14 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 		cachedClusterClient.endpointStore.Store, cachedClusterClient.endpointController = cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-					return clientset.Core().Endpoints(v1.NamespaceAll).List(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := util.VersionizeV1ListOptions(options)
+					return clientset.Core().Endpoints(v1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Endpoints(v1.NamespaceAll).Watch(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := util.VersionizeV1ListOptions(options)
+					return clientset.Core().Endpoints(v1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&v1.Endpoints{},
@@ -117,10 +121,14 @@ func (cc *clusterClientCache) startClusterLW(cluster *v1beta1.Cluster, clusterNa
 		cachedClusterClient.serviceStore.Indexer, cachedClusterClient.serviceController = cache.NewIndexerInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-					return clientset.Core().Services(v1.NamespaceAll).List(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := util.VersionizeV1ListOptions(options)
+					return clientset.Core().Services(v1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Services(v1.NamespaceAll).Watch(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := util.VersionizeV1ListOptions(options)
+					return clientset.Core().Services(v1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&v1.Service{},

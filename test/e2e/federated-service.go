@@ -23,7 +23,6 @@ import (
 	"strconv"
 	"time"
 
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -94,7 +93,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				By(fmt.Sprintf("Creation of service %q in namespace %q succeeded.  Deleting service.", service.Name, nsName))
 
 				// Cleanup
-				err := f.FederationClientset_1_4.Services(nsName).Delete(service.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, service.Namespace)
 				By(fmt.Sprintf("Deletion of service %q in namespace %q succeeded.", service.Name, nsName))
 			})
@@ -106,7 +105,7 @@ var _ = framework.KubeDescribe("[Feature:Federation]", func() {
 				service = createServiceOrFail(f.FederationClientset_1_4, nsName, FederatedServiceName)
 				defer func() { // Cleanup
 					By(fmt.Sprintf("Deleting service %q in namespace %q", service.Name, nsName))
-					err := f.FederationClientset_1_4.Services(nsName).Delete(service.Name, &api.DeleteOptions{})
+					err := f.FederationClientset_1_4.Services(nsName).Delete(service.Name, &v1.DeleteOptions{})
 					framework.ExpectNoError(err, "Error deleting service %q in namespace %q", service.Name, nsName)
 				}()
 				waitForServiceShardsOrFail(nsName, service, clusters)

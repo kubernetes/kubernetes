@@ -24,7 +24,6 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
 	"k8s.io/kubernetes/federation/pkg/federation-controller/util"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/client/clientset_generated/release_1_3"
@@ -61,10 +60,9 @@ var _ = framework.KubeDescribe("Federation secrets [Feature:Federation12]", func
 			framework.SkipUnlessFederated(f.Client)
 			nsName := f.FederationNamespace.Name
 			secret := createSecretOrFail(f.FederationClientset_1_4, nsName)
-
 			defer func() { // Cleanup
 				By(fmt.Sprintf("Deleting secret %q in namespace %q", secret.Name, nsName))
-				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Core().Secrets(nsName).Delete(secret.Name, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting secret %q in namespace %q", secret.Name, nsName)
 			}()
 			// wait for secret shards being created

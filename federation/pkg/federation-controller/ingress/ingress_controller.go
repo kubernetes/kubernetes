@@ -127,10 +127,14 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 	ic.ingressInformerStore, ic.ingressInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).List(options)
+				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+				versionedOptions := util.VersionizeExtensionsV1Beta1ListOptions(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+				versionedOptions := util.VersionizeExtensionsV1Beta1ListOptions(options)
+				return client.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 			},
 		},
 		&extensions_v1beta1.Ingress{},
@@ -148,10 +152,14 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(options)
+						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+						versionedOptions := util.VersionizeExtensionsV1Beta1ListOptions(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(options)
+						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+						versionedOptions := util.VersionizeExtensionsV1Beta1ListOptions(options)
+						return targetClient.Extensions().Ingresses(api.NamespaceAll).Watch(versionedOptions)
 					},
 				},
 				&extensions_v1beta1.Ingress{},
@@ -238,7 +246,7 @@ func NewIngressController(client federationclientset.Interface) *IngressControll
 		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			ingress := obj.(*extensions_v1beta1.Ingress)
 			glog.V(4).Infof("Attempting to delete Ingress: %v", ingress)
-			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &api.DeleteOptions{})
+			err := client.Extensions().Ingresses(ingress.Namespace).Delete(ingress.Name, &v1.DeleteOptions{})
 			return err
 		})
 

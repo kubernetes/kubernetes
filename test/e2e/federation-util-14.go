@@ -21,7 +21,6 @@ import (
 	"time"
 
 	federation_api "k8s.io/kubernetes/federation/apis/federation/v1beta1"
-	api "k8s.io/kubernetes/pkg/api"
 	api_v1 "k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -88,7 +87,7 @@ func buildClustersOrFail_14(f *framework.Framework) []*federation_api.Cluster {
 		framework.Failf("Not all clusters are ready: %v", err)
 	}
 
-	clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(api.ListOptions{})
+	clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(api_v1.ListOptions{})
 	if err != nil {
 		framework.Failf("Error in get clusters: %v", err)
 	}

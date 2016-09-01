@@ -82,10 +82,14 @@ func TestFederatedInformer(t *testing.T) {
 		return cache.NewInformer(
 			&cache.ListWatch{
 				ListFunc: func(options api.ListOptions) (runtime.Object, error) {
-					return clientset.Core().Services(api_v1.NamespaceAll).List(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := VersionizeV1ListOptions(options)
+					return clientset.Core().Services(api_v1.NamespaceAll).List(versionedOptions)
 				},
 				WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-					return clientset.Core().Services(api_v1.NamespaceAll).Watch(options)
+					// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+					versionedOptions := VersionizeV1ListOptions(options)
+					return clientset.Core().Services(api_v1.NamespaceAll).Watch(versionedOptions)
 				},
 			},
 			&api_v1.Service{},

@@ -278,7 +278,7 @@ func (f *Framework) deleteFederationNs() {
 
 	clientset := f.FederationClientset_1_4
 	// First delete the namespace from federation apiserver.
-	if err := clientset.Core().Namespaces().Delete(ns.Name, &api.DeleteOptions{}); err != nil {
+	if err := clientset.Core().Namespaces().Delete(ns.Name, &v1.DeleteOptions{}); err != nil {
 		Failf("Error while deleting federation namespace %s: %s", ns.Name, err)
 	}
 	// Verify that it got deleted.
@@ -357,7 +357,7 @@ func (f *Framework) AfterEach() {
 				Logf("Warning: framework is marked federated, but has no federation 1.4 clientset")
 				return
 			}
-			if err := f.FederationClientset_1_4.Federation().Clusters().DeleteCollection(nil, api.ListOptions{}); err != nil {
+			if err := f.FederationClientset_1_4.Federation().Clusters().DeleteCollection(nil, v1.ListOptions{}); err != nil {
 				Logf("Error: failed to delete Clusters: %+v", err)
 			}
 		}()

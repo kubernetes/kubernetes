@@ -57,7 +57,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 
 		AfterEach(func() {
 			framework.SkipUnlessFederated(f.Client)
-			deleteAllTestNamespaces(
+			deleteAllTestNamespacesWithVersionedOptions(
 				f.FederationClientset_1_4.Core().Namespaces().List,
 				f.FederationClientset_1_4.Core().Namespaces().Delete)
 			for _, cluster := range clusters {
@@ -95,7 +95,7 @@ var _ = framework.KubeDescribe("Federation namespace [Feature:Federation]", func
 			})
 			framework.ExpectNoError(err, "Not all namespaces created")
 
-			deleteAllTestNamespaces(
+			deleteAllTestNamespacesWithVersionedOptions(
 				f.FederationClientset_1_4.Core().Namespaces().List,
 				f.FederationClientset_1_4.Core().Namespaces().Delete)
 		})
@@ -122,6 +122,43 @@ func deleteAllTestNamespaces(lister func(api.ListOptions) (*api_v1.NamespaceList
 func waitForNoTestNamespaces(lister func(api.ListOptions) (*api_v1.NamespaceList, error)) {
 	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
 		list, err := lister(api.ListOptions{})
+		if err != nil {
+			return false, err
+		}
+		for _, namespace := range list.Items {
+			if strings.HasPrefix(namespace.Name, namespacePrefix) {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+	if err != nil {
+		framework.Failf("Namespaces not deleted: %v", err)
+	}
+}
+
+func deleteAllTestNamespacesWithVersionedOptions(lister func(api_v1.ListOptions) (*api_v1.NamespaceList, error), deleter func(string, *api_v1.DeleteOptions) error, waitForDeletion bool) {
+	list, err := lister(api_v1.ListOptions{})
+	if err != nil {
+		framework.Failf("Failed to get all namespaes: %v", err)
+		return
+	}
+	for _, namespace := range list.Items {
+		if strings.HasPrefix(namespace.Name, namespacePrefix) && namespace.DeletionTimestamp != nil {
+			err := deleter(namespace.Name, &api_v1.DeleteOptions{})
+			if err != nil {
+				framework.Failf("Failed to set %s for deletion: %v", namespace.Name, err)
+			}
+		}
+	}
+	if waitForDeletion {
+		waitForNoTestNamespacesWithVersionedOptions(lister)
+	}
+}
+
+func waitForNoTestNamespacesWithVersionedOptions(lister func(api_v1.ListOptions) (*api_v1.NamespaceList, error)) {
+	err := wait.Poll(5*time.Second, 2*time.Minute, func() (bool, error) {
+		list, err := lister(api_v1.ListOptions{})
 		if err != nil {
 			return false, err
 		}

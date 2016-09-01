@@ -21,7 +21,6 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
@@ -42,10 +41,10 @@ var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() 
 
 			nsName := f.FederationNamespace.Name
 			// Delete registered events.
-			eventList, err := f.FederationClientset_1_4.Core().Events(nsName).List(api.ListOptions{})
+			eventList, err := f.FederationClientset_1_4.Core().Events(nsName).List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, event := range eventList.Items {
-				err := f.FederationClientset_1_4.Core().Events(nsName).Delete(event.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Core().Events(nsName).Delete(event.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -57,7 +56,7 @@ var _ = framework.KubeDescribe("Federation events [Feature:Federation]", func() 
 			event := createEventOrFail(f.FederationClientset_1_4, nsName)
 			By(fmt.Sprintf("Creation of event %q in namespace %q succeeded.  Deleting event.", event.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Core().Events(nsName).Delete(event.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_4.Core().Events(nsName).Delete(event.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting event %q in namespace %q", event.Name, event.Namespace)
 			By(fmt.Sprintf("Deletion of event %q in namespace %q succeeded.", event.Name, nsName))
 		})

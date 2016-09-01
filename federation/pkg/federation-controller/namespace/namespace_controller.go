@@ -102,10 +102,14 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 	nc.namespaceInformerStore, nc.namespaceInformerController = cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-				return client.Core().Namespaces().List(options)
+				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Core().Namespaces().List(versionedOptions)
 			},
 			WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-				return client.Core().Namespaces().Watch(options)
+				// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+				versionedOptions := util.VersionizeV1ListOptions(options)
+				return client.Core().Namespaces().Watch(versionedOptions)
 			},
 		},
 		&api_v1.Namespace{},
@@ -119,10 +123,14 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 			return cache.NewInformer(
 				&cache.ListWatch{
 					ListFunc: func(options api.ListOptions) (pkg_runtime.Object, error) {
-						return targetClient.Core().Namespaces().List(options)
+						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().Namespaces().List(versionedOptions)
 					},
 					WatchFunc: func(options api.ListOptions) (watch.Interface, error) {
-						return targetClient.Core().Namespaces().Watch(options)
+						// TODO: remove this when Reflector takes an interface rather than a particular ListOptions as input parameter.
+						versionedOptions := util.VersionizeV1ListOptions(options)
+						return targetClient.Core().Namespaces().Watch(versionedOptions)
 					},
 				},
 				&api_v1.Namespace{},
@@ -156,7 +164,7 @@ func NewNamespaceController(client federationclientset.Interface) *NamespaceCont
 		},
 		func(client kubeclientset.Interface, obj pkg_runtime.Object) error {
 			namespace := obj.(*api_v1.Namespace)
-			err := client.Core().Namespaces().Delete(namespace.Name, &api.DeleteOptions{})
+			err := client.Core().Namespaces().Delete(namespace.Name, &api_v1.DeleteOptions{})
 			return err
 		})
 	return nc
@@ -385,7 +393,7 @@ func (nc *NamespaceController) delete(namespace *api_v1.Namespace) error {
 	}
 
 	// TODO: What about namespaces in subclusters ???
-	err = nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, &api.DeleteOptions{})
+	err = nc.federatedApiClient.Core().Namespaces().Delete(updatedNamespace.Name, &api_v1.DeleteOptions{})
 	if err != nil {
 		// Its all good if the error is not found error. That means it is deleted already and we do not have to do anything.
 		// This is expected when we are processing an update as a result of namespace finalizer deletion.

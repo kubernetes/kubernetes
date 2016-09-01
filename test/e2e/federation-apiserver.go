@@ -23,7 +23,6 @@ import (
 	. "github.com/onsi/ginkgo"
 	federationapi "k8s.io/kubernetes/federation/apis/federation/v1beta1"
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -41,10 +40,10 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 
 			// Delete registered clusters.
 			// This is if a test failed, it should not affect other tests.
-			clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(api.ListOptions{})
+			clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, cluster := range clusterList.Items {
-				err := f.FederationClientset_1_4.Federation().Clusters().Delete(cluster.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -69,14 +68,14 @@ var _ = framework.KubeDescribe("Federation apiserver [Feature:Federation]", func
 			framework.Logf("Deleting %d clusters", len(contexts))
 			for _, context := range contexts {
 				framework.Logf("Deleting cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
-				err := f.FederationClientset_1_4.Federation().Clusters().Delete(context.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Federation().Clusters().Delete(context.Name, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, fmt.Sprintf("unexpected error in deleting cluster %s: %+v", context.Name, err))
 				framework.Logf("Successfully deleted cluster object: %s (%s, secret: %s)", context.Name, context.Cluster.Cluster.Server, context.Name)
 			}
 
 			// There should not be any remaining cluster.
 			framework.Logf("Verifying that zero clusters remain")
-			clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(api.ListOptions{})
+			clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(v1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			if len(clusterList.Items) != 0 {
 				framework.Failf("there should not have been any remaining clusters. Found: %+v", clusterList)

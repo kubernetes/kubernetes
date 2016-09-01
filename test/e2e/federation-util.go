@@ -101,7 +101,7 @@ func waitForAllClustersReady(f *framework.Framework, clusterCount int) *federati
 	var clusterList *federationapi.ClusterList
 	if err := wait.PollImmediate(framework.Poll, FederatedServiceTimeout, func() (bool, error) {
 		var err error
-		clusterList, err = f.FederationClientset_1_4.Federation().Clusters().List(api.ListOptions{})
+		clusterList, err = f.FederationClientset_1_4.Federation().Clusters().List(v1.ListOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -173,10 +173,10 @@ func unregisterClusters(clusters map[string]*cluster, f *framework.Framework) {
 	}
 
 	// Delete the registered clusters in the federation API server.
-	clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(api.ListOptions{})
+	clusterList, err := f.FederationClientset_1_4.Federation().Clusters().List(v1.ListOptions{})
 	framework.ExpectNoError(err, "Error listing clusters")
 	for _, cluster := range clusterList.Items {
-		err := f.FederationClientset_1_4.Federation().Clusters().Delete(cluster.Name, &api.DeleteOptions{})
+		err := f.FederationClientset_1_4.Federation().Clusters().Delete(cluster.Name, &v1.DeleteOptions{})
 		framework.ExpectNoError(err, "Error deleting cluster %q", cluster.Name)
 	}
 }
@@ -284,7 +284,7 @@ func deleteServiceOrFail(clientset *federation_release_1_4.Clientset, namespace 
 	if clientset == nil || len(namespace) == 0 || len(serviceName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteServiceOrFail: clientset: %v, namespace: %v, service: %v", clientset, namespace, serviceName))
 	}
-	err := clientset.Services(namespace).Delete(serviceName, api.NewDeleteOptions(0))
+	err := clientset.Services(namespace).Delete(serviceName, v1.NewDeleteOptions(0))
 	framework.ExpectNoError(err, "Error deleting service %q from namespace %q", serviceName, namespace)
 }
 

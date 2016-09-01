@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/federation/client/clientset_generated/federation_release_1_4"
-	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	"k8s.io/kubernetes/pkg/apis/extensions/v1beta1"
@@ -55,10 +54,10 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 		AfterEach(func() {
 			nsName := f.FederationNamespace.Name
 			// Delete registered ingresses.
-			ingressList, err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).List(api.ListOptions{})
+			ingressList, err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).List(v1beta1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			for _, ingress := range ingressList.Items {
-				err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}
 		})
@@ -70,7 +69,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			ingress := createIngressOrFail(f.FederationClientset_1_4, nsName)
 			By(fmt.Sprintf("Creation of ingress %q in namespace %q succeeded.  Deleting ingress.", ingress.Name, nsName))
 			// Cleanup
-			err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &api.DeleteOptions{})
+			err := f.FederationClientset_1_4.Extensions().Ingresses(nsName).Delete(ingress.Name, &v1.DeleteOptions{})
 			framework.ExpectNoError(err, "Error deleting ingress %q in namespace %q", ingress.Name, ingress.Namespace)
 			By(fmt.Sprintf("Deletion of ingress %q in namespace %q succeeded.", ingress.Name, nsName))
 		})
@@ -104,7 +103,7 @@ var _ = framework.KubeDescribe("Federated ingresses [Feature:Federation]", func(
 			ingress := createIngressOrFail(f.FederationClientset_1_4, ns)
 			defer func() { // Cleanup
 				By(fmt.Sprintf("Deleting ingress %q in namespace %q", ingress.Name, ns))
-				err := f.FederationClientset_1_4.Ingresses(ns).Delete(ingress.Name, &api.DeleteOptions{})
+				err := f.FederationClientset_1_4.Ingresses(ns).Delete(ingress.Name, &v1.DeleteOptions{})
 				framework.ExpectNoError(err, "Error deleting ingress %q in namespace %q", ingress.Name, ns)
 			}()
 			// wait for ingress shards being created
@@ -265,7 +264,7 @@ func deleteIngressOrFail(clientset *federation_release_1_4.Clientset, namespace 
 	if clientset == nil || len(namespace) == 0 || len(ingressName) == 0 {
 		Fail(fmt.Sprintf("Internal error: invalid parameters passed to deleteIngressOrFail: clientset: %v, namespace: %v, ingress: %v", clientset, namespace, ingressName))
 	}
-	err := clientset.Ingresses(namespace).Delete(ingressName, api.NewDeleteOptions(0))
+	err := clientset.Ingresses(namespace).Delete(ingressName, v1.NewDeleteOptions(0))
 	framework.ExpectNoError(err, "Error deleting ingress %q from namespace %q", ingressName, namespace)
 }
 

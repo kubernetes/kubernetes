@@ -943,7 +943,7 @@ func WaitForDefaultServiceAccountInNamespace(c *client.Client, namespace string)
 // It tests the readiness by sending a GET request and expecting a non error response.
 func WaitForFederationApiserverReady(c *federation_release_1_4.Clientset) error {
 	return wait.PollImmediate(time.Second, 1*time.Minute, func() (bool, error) {
-		_, err := c.Federation().Clusters().List(api.ListOptions{})
+		_, err := c.Federation().Clusters().List(v1.ListOptions{})
 		if err != nil {
 			return false, nil
 		}
