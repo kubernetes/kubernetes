@@ -61,6 +61,9 @@ var (
 func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 	opts := &PauseConfig{}
 
+	validArgs := []string{"deployment"}
+	argAliases := kubectl.ResourceAliases(validArgs)
+
 	cmd := &cobra.Command{
 		Use:     "pause RESOURCE",
 		Short:   "Mark the provided resource as paused",
@@ -78,6 +81,8 @@ func NewCmdRolloutPause(f *cmdutil.Factory, out io.Writer) *cobra.Command {
 			}
 			cmdutil.CheckErr(utilerrors.Flatten(utilerrors.NewAggregate(allErrs)))
 		},
+		ValidArgs:  validArgs,
+		ArgAliases: argAliases,
 	}
 
 	usage := "Filename, directory, or URL to a file identifying the resource to get from a server."
