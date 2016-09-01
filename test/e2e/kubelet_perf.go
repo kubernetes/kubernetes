@@ -237,7 +237,8 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 85 * 1024 * 1024},
+					// The detail can be found at https://github.com/kubernetes/kubernetes/issues/28384#issuecomment-244158892
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 125 * 1024 * 1024},
 				},
 			},
 			{
@@ -250,7 +251,7 @@ var _ = framework.KubeDescribe("Kubelet [Serial] [Slow]", func() {
 				// of the addon pods affect the memory usage on each node.
 				memLimits: framework.ResourceUsagePerContainer{
 					stats.SystemContainerKubelet: &framework.ContainerResourceUsage{MemoryRSSInBytes: 70 * 1024 * 1024},
-					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 150 * 1024 * 1024},
+					stats.SystemContainerRuntime: &framework.ContainerResourceUsage{MemoryRSSInBytes: 200 * 1024 * 1024},
 				},
 			},
 			{
